@@ -40,8 +40,16 @@ interface PdRow {
 }
 interface PdFilter {
   q: string; journey: string; type: string; atc: string;
-  pctOp: '>=' | '<=' | '<'; pctVal: number; presentOn: string; absentOn: string;
+  pctOp: '>=' | '<=' | '<'; pctVal: number;
   band: string;   // QuartileRow.cls of a clicked ATC-completion tier ('' = none)
+}
+
+// One column of the Video Ask Tags scroller. `isAddressed` marks the single synthetic
+// column, which is not a taxonomy tag — see computeTagGroups().
+interface TagGroup {
+  id: string; label: string; color: string;
+  profileIds: string[];
+  isAddressed: boolean;
 }
 
 // ---- Arena Calling contract (C-9) — the call-outcome log exists in NO collection
@@ -607,6 +615,21 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return Math.round((va / day.count) * 100);
   }
 
+  // Shared day filter (CHANGED, operator 2026-07-29): Daily Attendance and Procedure
+  // Tracking read/write the SAME service field, so the two stay in sync structurally —
+  // there is no propagation code and they cannot drift. Clicking a day card selects;
+  // clicking the card's count still opens the attendance panel.
+  isDaySelected(day: DayAttendance): boolean { return this.data.procDayFilter === day.date; }
+  selectDay(day: DayAttendance): void {
+    if (day.isFuture) { return; }
+    this.data.setProcedureDay(day.date);   // owns the livechangework re-query
+  }
+  // 'all' used to select no card at all, which read as "nothing is selected" rather than
+  // "every day is selected". Total approved carries that state — it is already the
+  // all-days card by meaning, so it becomes the All Days control (CHANGED, operator).
+  get isAllDaysSelected(): boolean { return this.data.procDayFilter === 'all'; }
+  selectAllDays(): void { this.data.setProcedureDay('all'); }
+
   openAttDay(day: DayAttendance): void {
     if (day.isFuture) { return; }
     this.openPanel(`Attendance · ${this.attDayLabel(day)} · ${this.attWeekday(day)}`, this.data.selectedEvent?.['name'] || '', day.presentProfileIds);
@@ -704,7 +727,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     { k: 'adjDone', label: 'Adj. Done' }, { k: 'adjPending', label: 'Adj. Pending' },
     { k: 'procDone', label: 'Proc. Done' }, { k: 'procPending', label: 'Proc. Pending' }, { k: 'attd', label: 'Attd' }
   ];
-  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, presentOn: 'any', absentOn: 'any', band: '' }; }
+  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, band: '' }; }
   togglePd(): void { this.pdOpen = !this.pdOpen; }
   pdClear(): void { this.pdFilter = this.defaultPdFilter(); this.pdShown = 15; }
   pdMore(): void { this.pdShown += 25; }
@@ -752,8 +775,6 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       if (f.pctOp === '<=' && !(r.atcPct <= f.pctVal)) { return false; }
       if (f.pctOp === '<' && !(r.atcPct < f.pctVal)) { return false; }
     } else if (f.pctVal > 0) { return false; } // unknown % excluded once a threshold is set
-    if (f.presentOn !== 'any') { const day = this.data.dayWiseAttendance.find(d => d.date === f.presentOn); if (!day || !day.presentProfileIds.includes(r.profileId)) { return false; } }
-    if (f.absentOn !== 'any') { const day = this.data.dayWiseAttendance.find(d => d.date === f.absentOn); if (day && day.presentProfileIds.includes(r.profileId)) { return false; } }
     return true;
   }
   get pdFilteredRows(): PdRow[] {
@@ -767,7 +788,6 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   get pdVisibleRows(): PdRow[] { return this.pdFilteredRows.slice(0, this.pdShown); }
   get pdTotalDays(): number { return this.data.dayWiseAttendance.length; }
-  get pdDayOptions(): DayAttendance[] { return this.data.dayWiseAttendance.filter(d => !d.isFuture); }
   pdSort(k: keyof PdRow): void { if (this.pdSortK === k) { this.pdSortD *= -1; } else { this.pdSortK = k; this.pdSortD = k === 'name' ? 1 : -1; } }
   pdAtcLabel(b: number): string { return b >= 0 ? this.atcShort[b] : '—'; }
   /** A row click opens the WHOLE table in the panel, not just that participant —
@@ -806,32 +826,74 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return this.data.participantTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
   }
 
-  /** CHANGED (operator) — one tag per participant from metadata `profiletags`
-   *  (V2's source), resolved against the participant-tags taxonomy by TAXONOMY-ORDER
-   *  PRIORITY (first taxonomy tag the participant carries). */
-  getParticipantTag(profileId: string): string | null {
-    const meta = this.data.participantMetadataMap[profileId];
-    const tags: string[] = (meta && meta['profiletags']) || [];
-    if (!tags.length) { return null; }
-    for (const t of this.data.participantTags) { if (tags.includes(t['docid'])) { return t['docid']; } }
-    return null;
-  }
+  /** Synthetic column id — not a taxonomy tag, so it can never collide with a docid. */
+  static readonly ADDRESSED = '__addressed';
 
-  get tagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] { return this.memo('tagGroups', () => this.computeTagGroups()); }
-  private computeTagGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
+  get tagGroups(): TagGroup[] { return this.memo('tagGroups', () => this.computeTagGroups()); }
+
+  /**
+   * REWRITTEN (operator 2026-07-29). Buckets by the tags on each participantvideoask
+   * SUBMISSION, scoped to the shared day filter — replacing the old read of
+   * `participant metadata.profiletags`, which accumulates across every event and every
+   * day and so could not answer "tagged what, on which day".
+   *
+   * Three rules that are easy to get wrong:
+   *  - a participant appears in EVERY tag they carry, not one. Column sums therefore
+   *    exceed headcount; that is correct now, where before it was a bug signal.
+   *  - "Addressed" needs at least one TAGGED doc. Without that guard "all tagged docs
+   *    are addressed" is vacuously true for someone who was never tagged, and they
+   *    would land in Addressed by accident.
+   *  - Addressed is judged on the selected day alone, so the same participant can be
+   *    Addressed on one day and sitting under a tag on the next.
+   */
+  private computeTagGroups(): TagGroup[] {
     const tax = this.getTagTaxonomy();
     if (!tax.length) { return []; }
+    const day = this.data.procDayFilter;
+    const docs = this.data.videoAskTagDocs.filter(d => d.day && (day === 'all' || d.day === day));
+
+    const tagsByParticipant: { [pid: string]: Set<string> } = {};
+    const allAddressed: { [pid: string]: boolean } = {};
+    docs.forEach(d => {
+      if (!d.tags.length) { return; }   // an untagged submission buckets nowhere and gets no Addressed vote
+      const set = tagsByParticipant[d.profileid] = tagsByParticipant[d.profileid] || new Set<string>();
+      d.tags.forEach(t => set.add(t));   // Set = one entry per participant per column, across their submissions
+      allAddressed[d.profileid] = (allAddressed[d.profileid] !== false) && d.addressed;
+    });
+
     const byTag: { [id: string]: string[] } = {};
     tax.forEach(t => { byTag[t.id] = []; });
-    this.data.eventParticipantProfileIds.forEach(pid => {
-      const tag = this.getParticipantTag(pid);
-      if (tag && byTag[tag]) { byTag[tag].push(pid); }
+    const addressedIds: string[] = [];
+    const unknown = new Set<string>();
+    Object.keys(tagsByParticipant).forEach(pid => {
+      if (allAddressed[pid]) { addressedIds.push(pid); return; }   // Addressed replaces every tag column
+      tagsByParticipant[pid].forEach(tagId => {
+        if (byTag[tagId]) { byTag[tagId].push(pid); } else { unknown.add(tagId); }
+      });
     });
-    // Show every video-ask tag, including those with no participants (operator).
-    return tax.map(t => ({ ...t, profileIds: byTag[t.id] }));
+    if (unknown.size) {
+      // A tag written onto a submission whose taxonomy doc was later deactivated (or is
+      // not tagsfor 'video ask') has no column to live in — those people vanish silently.
+      console.warn('[v3][videoask-tags]', unknown.size, 'tag id(s) on submissions are not in the active video-ask taxonomy — not rendered:', [...unknown]);
+    }
+
+    // Every active tag renders, empty ones included (operator). Addressed sits last.
+    return [
+      ...tax.map(t => ({ ...t, profileIds: byTag[t.id], isAddressed: false })),
+      { id: LiveEventDashboardV3Component.ADDRESSED, label: 'Addressed', color: 'var(--ok)', profileIds: addressedIds, isAddressed: true }
+    ];
   }
-  openTag(g: { label: string; profileIds: string[] }): void {
-    this.openPanel(`Tag · ${g.label}`, `${this.data.selectedEvent?.['name'] || ''} · daily Video Ask review`, g.profileIds);
+  openTag(g: TagGroup): void {
+    const scope = `${this.data.selectedEvent?.['name'] || ''} · ${this.tagDayLabel}`;
+    if (g.isAddressed) { this.openPanel('Addressed · all tagged submissions resolved', scope, g.profileIds); return; }
+    this.openPanel(`Tag · ${g.label}`, scope, g.profileIds);
+  }
+  /** Day the section is showing, for panel subtitles. */
+  get tagDayLabel(): string {
+    const day = this.data.procDayFilter;
+    if (day === 'all') { return 'all days'; }
+    const match = this.attDays.find(d => d.date === day);
+    return match ? this.attDayLabel(match) : day;
   }
 
   // ==========================================================================
@@ -894,8 +956,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // The 2 non-Irregular cards (Irregular is rendered first — it has controls).
   get fuCards(): { label: string; title: string; color: string; eyebrow: string; ids: string[] }[] {
     return [
-      { label: 'Not Doing CW', title: 'Not doing changework', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuNotDoingCW },
-      { label: 'CW Not Received', title: 'Changework not received', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuCWNotReceived },
+      // RENAMED (operator 2026-07-29) — the old names read as "isn't participating";
+      // these say which DIRECTION is missing. notDoingCW = gave none to others,
+      // cwNotReceived = received none for themself. Underlying ids are unchanged.
+      { label: 'No CW to Others', title: 'Not doing changework', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuNotDoingCW },
+      { label: 'No CW to themself', title: 'Changework not received', color: 'var(--warn)', eyebrow: 'Throughout event', ids: this.fuCWNotReceived },
       { label: 'No cohort', title: 'No cohort assigned', color: 'var(--alert)', eyebrow: 'Not in any cohort', ids: this.noCohortProfileIds }
     ];
   }

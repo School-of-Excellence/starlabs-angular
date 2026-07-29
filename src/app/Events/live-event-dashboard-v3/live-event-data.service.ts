@@ -1,6 +1,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import {
-  addDoc, collection, collectionData, doc, documentId, DocumentReference, getDoc, getDocs, getFirestore,
+  addDoc, collection, collectionData, doc, documentId, DocumentReference, getDocs, getFirestore,
   limit, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where
 } from '@angular/fire/firestore';
 import { Subject, Subscription } from 'rxjs';
@@ -121,10 +121,8 @@ export class LiveEventDataService implements OnDestroy {
   todayAttendence = 0;
 
   // ---- video ask (V2 subscribeToVideoAsk) -------------------------------------
-  // Tag taxonomy (C-7 = V2): classify/eventtags.videoasktags (global, loaded once).
-  videoAskTags: string[] = [];
   // Participant-tag taxonomy (V2 "participant tags" collection): {docid, name, …}.
-  // Source for the Video Ask Tags section (grouped by metadata `profiletags`).
+  // Column set for the Video Ask Tags section (labels + palette order).
   participantTags: any[] = [];
   // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
   // (first-timers-dashboard source). Grouped by metadata `profiletags`.
@@ -138,6 +136,14 @@ export class LiveEventDataService implements OnDestroy {
   // frontend Video Ask Tags scroller — SAME source as the backend review.
   participantVideoAskTags: { [profileid: string]: string[] } = {};
   videoAskLoaded = false;
+  // CHANGED (operator 2026-07-29): the Video Ask Tags section now buckets by the TAGS
+  // ON EACH SUBMISSION, not by `participant metadata.profiletags`. Tagging writes both
+  // (participant-videoask.component.ts:624-630), but profiletags accumulates across
+  // every event and every day forever, so it could never answer "who was tagged WHAT,
+  // on WHICH day". These are the raw rows, flattened to just what the section needs and
+  // held in memory so switching day is a client-side re-bucket, not a re-query.
+  videoAskTagDocs: { profileid: string; day: string; tags: string[]; addressed: boolean }[] = [];
+  videoAskTagDocsLoaded = false;
 
   // ---- customer support (event-scoped: reporteddate window + participant filter)
   clientIssues: any[] = [];              // in-scope tickets (any status), newest-first
@@ -201,6 +207,7 @@ export class LiveEventDataService implements OnDestroy {
   private attendanceSub: Subscription | null = null;
   private eTicketSub: Subscription | null = null;
   private videoAskSub: Subscription | null = null;
+  private videoAskTagSub: Subscription | null = null;
   private clientIssuesSub: Subscription | null = null;
   private callLogSub: Subscription | null = null;
   private draftAtcSub: Subscription | null = null;
@@ -236,33 +243,30 @@ export class LiveEventDataService implements OnDestroy {
     });
     console.log('[v3][init] procedures docs:', Object.keys(this.mapProcedureNames).length);
 
-    // video-ask tag taxonomy (V2: classify/eventtags.videoasktags) — global doc, once
-    await getDoc(doc(collection(this.firestoreDefault, 'classify'), 'eventtags')).then(snap => {
-      if (snap.exists()) { this.videoAskTags = snap.data()['videoasktags'] || []; }
-    }).catch(err => console.error('Error loading classify/eventtags:', err));
-    console.log('[v3][init] videoask tag taxonomy:', this.videoAskTags);
-
-    // participant-tag taxonomy — VIDEO-ASK tags only (videoask-display pattern):
-    // tagsfor array-contains 'video ask' AND isActive. docid→name; the Video Ask
-    // Tags section groups participants by their `profiletags`.
+    // participant-tag taxonomy — ONE query for both tag families (CHANGED, operator):
+    //   participantTags = tagsfor 'video ask'  → Video Ask Tags section
+    //   crmTags         = tagsfor 'live event' → A&H CRM flag status
+    // Both are active-only. array-contains-any fetches the union in a single
+    // round-trip, then we split client-side; a tag carrying BOTH values lands in
+    // both lists, exactly as the two separate queries used to return it.
+    // Order is preserved: unordered Firestore queries come back by document id, and
+    // filtering a docid-sorted superset keeps each subset in its original order —
+    // load-bearing, because tag COLOR is assigned by palette index, so a reordering
+    // here silently recolours every column. (It used to also decide which single tag a
+    // participant was filed under; that priority rule is gone as of 2026-07-29, when
+    // the section moved to per-submission tags and became multi-tag.)
+    // CHANGED (operator): crmTags is now active-only — first-timers-dashboard does
+    // NOT filter isActive, so v3 deliberately shows fewer CRM flags than it does.
     await getDocs(query(
       collection(this.firestoreDefault, 'participant tags'),
-      where('tagsfor', 'array-contains', 'video ask'),
+      where('tagsfor', 'array-contains-any', ['video ask', 'live event']),
       where('isActive', '==', true)
     )).then(snap => {
-      this.participantTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
+      const tags = snap.docs.map(d => ({ docid: d.id, ...d.data() } as any));
+      this.participantTags = tags.filter(t => (t['tagsfor'] || []).includes('video ask'));
+      this.crmTags = tags.filter(t => (t['tagsfor'] || []).includes('live event'));
     }).catch(err => console.error('Error loading participant tags:', err));
-    console.log('[v3][init] video-ask participant tags:', this.participantTags.length);
-
-    // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
-    // (first-timers-dashboard pattern). Grouped by participants' `profiletags`.
-    await getDocs(query(
-      collection(this.firestoreDefault, 'participant tags'),
-      where('tagsfor', 'array-contains', 'live event')
-    )).then(snap => {
-      this.crmTags = snap.docs.map(d => ({ docid: d.id, ...d.data() }));
-    }).catch(err => console.error('Error loading A&H CRM tags:', err));
-    console.log('[v3][init] A&H CRM flag tags:', this.crmTags.length);
+    console.log('[v3][init] participant tags — video-ask:', this.participantTags.length, '| A&H CRM:', this.crmTags.length);
 
     // participant metadata (V2 loadParticipantMetadata)
     await this.loadParticipantMetadata();
@@ -380,6 +384,7 @@ export class LiveEventDataService implements OnDestroy {
     this.applyDefaultProcedureDay();
     this.subscribeToAttendance();
     this.subscribeToVideoAsk();
+    this.subscribeToVideoAskTags();
     this.subscribeToClientIssues();
     this.subscribeToCallLog();
     this.subscribeToEventZones();
@@ -658,6 +663,63 @@ export class LiveEventDataService implements OnDestroy {
     } catch (e) {
       console.error('Error loading arenavideoask:', e);
     }
+  }
+
+  // ---- video ask tag buckets (CHANGED, operator 2026-07-29) ------------------
+  // Feeds ONLY the Video Ask Tags section. Deliberately a second subscription rather
+  // than a widening of subscribeToVideoAsk(): that one reaches the collection through
+  // `videoaskid in [arenavideoask ids]`, this one through `arenaevent`, and the two
+  // need not select the same documents. Merging them would silently move Daily
+  // Attendance's per-day Video Ask counts, which the operator did not ask to change.
+  //
+  // Querying `arenaevent` directly also drops the 30-campaign ceiling that the other
+  // path still lives under (see the ids.slice(0, 30) warning above) — this query has
+  // no `in` clause, so no cap.
+  private async subscribeToVideoAskTags(): Promise<void> {
+    if (this.videoAskTagSub) { this.videoAskTagSub.unsubscribe(); this.videoAskTagSub = null; }
+    this.videoAskTagDocs = [];
+    this.videoAskTagDocsLoaded = false;
+    if (!this.selectedEvent) { return; }
+    this.videoAskTagSub = collectionData(query(
+      collection(this.firestoreDefault, 'participantvideoask'),
+      where('arenaevent', '==', this.selectedEvent.docref)
+    )).subscribe({
+      next: (docs: any[]) => {
+        let undated = 0;
+        this.videoAskTagDocs = docs.map((d: any) => {
+          const day = this.createdToDayKey(d['created']);
+          if (!day) { undated++; }
+          return {
+            profileid: d['profileid'] || '',
+            day,
+            tags: Array.isArray(d['tags']) ? d['tags'] : [],
+            addressed: d['addressed'] === true   // absent field reads as NOT addressed
+          };
+        }).filter(r => r.profileid);
+        this.videoAskTagDocsLoaded = true;
+        console.log('[v3][videoask-tags] participantvideoask docs for event:', docs.length,
+          '| usable:', this.videoAskTagDocs.length, '| tagged:', this.videoAskTagDocs.filter(r => r.tags.length).length);
+        if (undated) {
+          console.warn('[v3][videoask-tags]', undated, 'doc(s) have a missing/unparseable `created` — excluded from every day AND from All Days');
+        }
+        this.changed$.next();
+      },
+      error: (e) => console.error('Error subscribing to participantvideoask (tags):', e)
+    });
+  }
+
+  /** `created` is a MM/DD/YYYY string on these documents. Parse it to a local Date and
+   *  normalise to the yyyy-mm-dd key every day filter on this screen speaks — the same
+   *  normalisation subscribeToVideoAsk() applies to `uploaded`, so the two agree.
+   *  Returns '' when the field is absent or malformed; such a row is counted nowhere. */
+  private createdToDayKey(created: any): string {
+    if (!created) { return ''; }
+    if (created?.toDate) { return created.toDate().toLocaleDateString('en-CA'); }   // tolerate a Timestamp
+    const m = String(created).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) { return ''; }
+    const parsed = new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+    if (isNaN(parsed.getTime())) { return ''; }
+    return parsed.toLocaleDateString('en-CA');
   }
 
   // Category config (V2: chat config doc 0jqtiq3sxtbLVcEGMDhW → categories). Global, once.
@@ -1710,6 +1772,7 @@ export class LiveEventDataService implements OnDestroy {
     if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
     if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
     if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
+    if (this.videoAskTagSub) { this.videoAskTagSub.unsubscribe(); this.videoAskTagSub = null; }
     if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
     if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
     // event-scoped, not queue-scoped — the day chips must never tear this down
