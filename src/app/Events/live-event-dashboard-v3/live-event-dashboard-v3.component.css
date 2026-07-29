@@ -577,6 +577,10 @@ mat-select.pf-select.on{
 }
 .day-eyebrow span{white-space:nowrap}
 .day-num{font-size:26px;font-weight:700;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+/* The count is its own click target (opens the attendance panel); align-self keeps the
+   hit area hugging the digits instead of stretching across the card. */
+.day-card:not(.upcoming) .day-num{align-self:flex-start;cursor:pointer}
+.day-card:not(.upcoming) .day-num:hover{opacity:.6}
 .day-sub{
   margin-top:auto;padding-top:8px;border-top:1px dashed var(--z-200);
   font-size:10.5px;color:var(--z-500);display:flex;justify-content:space-between;align-items:center;
@@ -617,6 +621,10 @@ mat-select.pf-select.on{
 .day-card.never .day-eyebrow{color:var(--alert)}
 .day-card.never .day-num{color:var(--alert)}
 .day-card.never .day-sub{border-top-color:var(--alert-line);color:var(--alert)}
+/* Shared day filter. An accent ring rather than a background swap, so the state reads on
+   the dark .today card and the beige .total card alike. MUST stay below .today/.total —
+   those set border-color at equal specificity, so an earlier rule would lose. */
+.day-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-line)}
 
 /* ---- procedure tracking ---- */
 .proc-filters{
@@ -803,6 +811,11 @@ mat-select.pf-select.on{
 /* ---- bottom row: tags + followup ---- */
 .bottom-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-top:22px}
 .bottom-grid>.card{min-width:0}
+/* The Day chips again, inside the Video Ask Tags card. That card is the 1.6fr column of
+   .bottom-grid, not full width, so .pf-group must wrap here — a long event would
+   otherwise run the chips off the edge (Procedure Tracking is full width and doesn't). */
+.tag-filters{padding:14px 22px 0}
+.tag-filters .pf-group{flex-wrap:wrap}
 .tag-scroll{
   display:flex;gap:12px;padding:16px 22px 8px;overflow-x:auto;
   scrollbar-width:thin;scrollbar-color:var(--z-300) transparent;margin-bottom:8px;
@@ -824,6 +837,14 @@ mat-select.pf-select.on{
   padding:1px 7px;cursor:pointer;flex:none;
 }
 .tag-col-count:hover{background:var(--accent)}
+/* Addressed — not a taxonomy tag but a resolved-state column, so it reads as its own
+   thing: separated from the tag run by a margin, and tinted with the ok colour. */
+.tag-col-addressed{
+  margin-left:10px;background:var(--ok-soft);border-color:var(--ok-line);
+}
+.tag-col-addressed .tag-col-h{border-bottom-color:var(--ok-line)}
+.tag-col-addressed .tag-col-name{color:var(--ok)}
+.tag-col-addressed .tag-col-count{background:var(--ok)}
 .name-pill{
   background:var(--z-0);border:1px solid var(--z-200);border-radius:var(--r-xs);
   padding:5px 9px;font-size:11.5px;font-weight:500;margin-bottom:5px;

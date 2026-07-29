@@ -279,9 +279,9 @@
       </div>
       <div class="att-grid" id="attGrid">
         <!-- Total approved -->
-        <div class="day-card total" (click)="openAttTotal()">
+        <div class="day-card total" [class.selected]="isAllDaysSelected" (click)="selectAllDays()">
           <div class="day-eyebrow"><span>Total approved</span></div>
-          <div class="day-num num">{{ attTotalApproved | number }}</div>
+          <div class="day-num num" (click)="$event.stopPropagation(); openAttTotal()">{{ attTotalApproved | number }}</div>
           <div class="day-subs">
             <!-- turned up on any day so far = total approved − never attended -->
             <div class="day-stat" (click)="$event.stopPropagation(); openAttUnique()"><span>Unique</span><b class="num">{{ attUniqueParticipants | number }}</b></div>
@@ -295,14 +295,14 @@
             <div class="day-line"></div>
             <div class="day-sub">upcoming</div>
           </div>
-          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" (click)="openAttDay(d)">
+          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" [class.selected]="isDaySelected(d)" (click)="selectDay(d)">
             <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span>
               <span class="delta" *ngIf="attendanceDelta(d) !== null"
                     [class.up]="(attendanceDelta(d) || 0) > 0" [class.down]="(attendanceDelta(d) || 0) < 0" [class.flat]="attendanceDelta(d) === 0">
                 {{ (attendanceDelta(d) || 0) > 0 ? '+' : '' }}{{ attendanceDelta(d) }}
               </span>
             </div>
-            <div class="day-num num">{{ d.count }}</div>
+            <div class="day-num num" (click)="$event.stopPropagation(); openAttDay(d)">{{ d.count }}</div>
             <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
             <div class="day-subs">
               <div class="day-stat" (click)="$event.stopPropagation(); openAttAbsent(d)"><span>Unattended</span><b class="num">{{ attAbsentCount(d) }}</b></div>
@@ -416,16 +416,6 @@
             {{ pdBandLabel }}
             <button class="pd-band-x" (click)="clearPdBand()" title="Clear the ATC completion band">&times;</button>
           </span>
-          <span class="pd-lbl">Present on</span>
-          <select class="pd-sel" [(ngModel)]="pdFilter.presentOn" (ngModelChange)="pdOnFilterChange()">
-            <option value="any">Any day</option>
-            <option *ngFor="let d of pdDayOptions" [value]="d.date">D{{ d.day }}{{ d.isToday ? ' · Today' : '' }}</option>
-          </select>
-          <span class="pd-lbl">Absent on</span>
-          <select class="pd-sel" [(ngModel)]="pdFilter.absentOn" (ngModelChange)="pdOnFilterChange()">
-            <option value="any">Any day</option>
-            <option *ngFor="let d of pdDayOptions" [value]="d.date">D{{ d.day }}{{ d.isToday ? ' · Today' : '' }}</option>
-          </select>
         </div>
         <div class="pd-tablewrap">
           <table class="pd-table" id="pdTable">
@@ -469,10 +459,18 @@
       <section class="card">
         <div class="sec-head">
           <div class="sec-title">Video Ask Tags</div>
-          <div class="sec-right"><span class="sec-meta">tagged by the daily Video Ask reviewer &middot; one tag per participant &middot; click a count for the list</span></div>
+          <div class="sec-right"><span class="sec-meta">tags on the day's Video Ask submissions &middot; a participant can carry several &middot; click a count for the list</span></div>
+        </div>
+        <!-- Same chips, same handler, same state as Procedure Tracking's Day row: this is
+             not a copy of that filter, it IS that filter, rendered a second time here. -->
+        <div class="proc-filters tag-filters">
+          <span class="pf-label">Day</span>
+          <div class="pf-group">
+            <button class="pf-chip" *ngFor="let c of procDayChips" [class.on]="c.active" (click)="setProcDay(c.value)">{{ c.label }}</button>
+          </div>
         </div>
         <div class="tag-scroll" id="tagScroll">
-          <div class="tag-col" *ngFor="let g of tagGroups">
+          <div class="tag-col" *ngFor="let g of tagGroups" [class.tag-col-addressed]="g.isAddressed">
             <div class="tag-col-h">
               <span class="dot" [style.background]="g.color"></span>
               <span class="tag-col-name" [title]="g.label">{{ g.label }}</span>
@@ -567,9 +565,9 @@
         </div>
       </div>
       <div class="att-grid" id="attGridB">
-        <div class="day-card total" (click)="openAttTotal()">
+        <div class="day-card total" [class.selected]="isAllDaysSelected" (click)="selectAllDays()">
           <div class="day-eyebrow"><span>Total approved</span></div>
-          <div class="day-num num">{{ attTotalApproved | number }}</div>
+          <div class="day-num num" (click)="$event.stopPropagation(); openAttTotal()">{{ attTotalApproved | number }}</div>
           <div class="day-subs">
             <!-- turned up on any day so far = total approved − never attended -->
             <div class="day-stat" (click)="$event.stopPropagation(); openAttUnique()"><span>Unique participants</span><b class="num">{{ attUniqueParticipants | number }}</b></div>
@@ -582,14 +580,14 @@
             <div class="day-line"></div>
             <div class="day-sub">upcoming</div>
           </div>
-          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" (click)="openAttDay(d)">
+          <div class="day-card" *ngIf="!d.isFuture" [class.today]="d.isToday" [class.selected]="isDaySelected(d)" (click)="selectDay(d)">
             <div class="day-eyebrow"><span>{{ attDayLabel(d) }} &middot; {{ attWeekday(d) }}</span>
               <span class="delta" *ngIf="attendanceDelta(d) !== null"
                     [class.up]="(attendanceDelta(d) || 0) > 0" [class.down]="(attendanceDelta(d) || 0) < 0" [class.flat]="attendanceDelta(d) === 0">
                 {{ (attendanceDelta(d) || 0) > 0 ? '+' : '' }}{{ attendanceDelta(d) }}
               </span>
             </div>
-            <div class="day-num num">{{ d.count }}</div>
+            <div class="day-num num" (click)="$event.stopPropagation(); openAttDay(d)">{{ d.count }}</div>
             <div class="day-bar" *ngIf="d.isToday && getVideoAskByDay(d) !== null"><i [style.width.%]="attTodayBarPct(d)"></i></div>
             <div class="day-subs">
               <div class="day-stat" (click)="$event.stopPropagation(); openAttAbsent(d)"><span>Unattended</span><b class="num">{{ attAbsentCount(d) }}</b></div>
