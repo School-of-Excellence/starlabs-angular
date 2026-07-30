@@ -44,9 +44,73 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import type * as LeafletNS from 'leaflet';
 
 import { Coordinates } from './location.model';
+
+/**
+ * Leaflet is pulled in lazily at runtime (see `initialise`), so the only thing
+ * this file needs at compile time is a description of the handful of calls it
+ * makes. These local shapes cover exactly that surface — no wider dependency on
+ * the library's own typings.
+ */
+interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+interface LeafletMouseEvent {
+  latlng: LatLng;
+}
+
+interface LeafletLayer {
+  addTo(map: LeafletMap): this;
+}
+
+interface LeafletMap {
+  setView(center: [number, number], zoom: number): this;
+  on(type: 'click', handler: (event: LeafletMouseEvent) => void): this;
+  invalidateSize(options?: { animate?: boolean }): this;
+  remove(): this;
+}
+
+interface LeafletMarker extends LeafletLayer {
+  setLatLng(latlng: [number, number]): this;
+  getLatLng(): LatLng;
+  on(type: 'dragend', handler: () => void): this;
+}
+
+interface MapOptions {
+  center: [number, number];
+  zoom: number;
+  scrollWheelZoom?: boolean;
+  attributionControl?: boolean;
+}
+
+interface TileLayerOptions {
+  attribution?: string;
+  maxZoom?: number;
+  crossOrigin?: boolean | string;
+  keepBuffer?: number;
+}
+
+interface DivIconOptions {
+  className?: string;
+  html?: string;
+  iconSize?: [number, number];
+  iconAnchor?: [number, number];
+}
+
+interface MarkerOptions {
+  draggable?: boolean;
+  icon?: unknown;
+}
+
+interface LeafletModule {
+  map(element: HTMLElement, options: MapOptions): LeafletMap;
+  tileLayer(url: string, options: TileLayerOptions): LeafletLayer;
+  marker(latlng: [number, number], options: MarkerOptions): LeafletMarker;
+  divIcon(options: DivIconOptions): unknown;
+}
 
 const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION =
@@ -207,9 +271,9 @@ export class MapPickerComponent implements OnDestroy {
 
   private readonly injector = inject(Injector);
 
-  private leaflet: typeof LeafletNS | null = null;
-  private map: LeafletNS.Map | null = null;
-  private marker: LeafletNS.Marker | null = null;
+  private leaflet: LeafletModule | null = null;
+  private map: LeafletMap | null = null;
+  private marker: LeafletMarker | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -241,9 +305,10 @@ export class MapPickerComponent implements OnDestroy {
   }
 
   private async initialise(): Promise<void> {
-    const mod = await import('leaflet');
-    const leaflet = ((mod as unknown as { default?: typeof LeafletNS }).default ??
-      mod) as typeof LeafletNS;
+    const mod = (await import('leaflet')) as unknown as LeafletModule & {
+      default?: LeafletModule;
+    };
+    const leaflet = mod.default ?? mod;
     this.leaflet = leaflet;
 
     const start = this.initial;
@@ -266,7 +331,7 @@ export class MapPickerComponent implements OnDestroy {
       })
       .addTo(this.map);
 
-    this.map.on('click', (event: LeafletNS.LeafletMouseEvent) => {
+    this.map.on('click', (event) => {
       this.placePin({ latitude: event.latlng.lat, longitude: event.latlng.lng }, true);
     });
 
