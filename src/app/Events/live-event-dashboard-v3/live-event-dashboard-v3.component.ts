@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -93,7 +94,7 @@ const NO_JOURNEY = '__no_journey__';
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatSelectModule, ProfilePictureComponent],
+  imports: [CommonModule, FormsModule, MatSelectModule, MatSlideToggleModule, ProfilePictureComponent],
   providers: [LiveEventDataService],
   templateUrl: './live-event-dashboard-v3.component.html',
   styleUrl: './live-event-dashboard-v3.component.css',
@@ -1286,7 +1287,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+    this.panelFilter = {
+      type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [],
+      productInc: true, cohortInc: true, journeyInc: true   // every list opens on include
+    };
     this.panelProductSet.clear();
     this.panelCohortMemberSet.clear();
     this.panelJourneyMemberSet.clear();
@@ -1387,10 +1391,21 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
   // + cohorts (both multi-select, OR semantics). The two attendance chips are
   // mutually exclusive — together they would match nobody.
+  //
+  // productInc/cohortInc/journeyInc are the include↔exclude switches over each
+  // multi-select: ON (the default) keeps the rows that match the picks, OFF drops
+  // them and keeps everyone else. The picks themselves mean the same thing either
+  // way — only the sense of the test flips — so toggling never disturbs a selection.
+  // With nothing picked a dimension is inert in BOTH senses (excluding nothing
+  // excludes nobody), which is why panelFilterActive still keys off the picks alone.
   panelFilter: {
     type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
     products: string[]; cohorts: string[]; journeys: string[];
-  } = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+    productInc: boolean; cohortInc: boolean; journeyInc: boolean;
+  } = {
+    type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [],
+    productInc: true, cohortInc: true, journeyInc: true
+  };
   /** Products actually present in the OPEN list (not the whole catalogue), so the
    *  dropdown only ever offers options that can match something. `count` = how many
    *  distinct participants in this list hold that product. */
@@ -1486,6 +1501,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
   get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
   get panelJourneyTriggerLabel(): string { return this.triggerLabel(this.panelFilter.journeys, this.panelJourneyOptions, 'journey'); }
+  /** panelClass per dropdown. The overlay renders outside :host so the exclude sense
+   *  cannot be inherited through the DOM — it is carried in as a class, which repaints
+   *  the option ticks red so a tick in exclude mode never reads as "keep this one". */
+  private selectPanelClass(include: boolean, extra = ''): string {
+    return `pf-select-panel${extra}${include ? '' : ' pf-select-ex'}`;
+  }
+  get productPanelClass(): string { return this.selectPanelClass(this.panelFilter.productInc); }
+  get cohortPanelClass(): string { return this.selectPanelClass(this.panelFilter.cohortInc, ' pf-select-searchable'); }
+  get journeyPanelClass(): string { return this.selectPanelClass(this.panelFilter.journeyInc); }
   get panelFilterActive(): boolean {
     return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'
       || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0
@@ -1497,18 +1521,24 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
     if (this.panelFilter.attendance === 'none' && this.hasAttendanceLog(profileid)) { return false; }
     if (this.panelFilter.attendance === 'has' && !this.hasAttendanceLog(profileid)) { return false; }
+    // Each of the three multi-selects tests membership once and then compares the
+    // answer to its include switch: include keeps the hits, exclude keeps the misses.
     if (this.panelProductSet.size) {
-      // keep the participant when they hold at least one of the picked products
+      // holds at least one of the picked products
       const ids = this.data.registeredProductIds[profileid] || [];
-      if (!ids.some(id => this.panelProductSet.has(id))) { return false; }
+      const hit = ids.some(id => this.panelProductSet.has(id));
+      if (hit !== this.panelFilter.productInc) { return false; }
     }
     // cohort membership is the participantidlist on the "big cohorts" doc — NOT the
     // per-participant `eligiliblecohorts` that cohortNameOf()/the Zones view read.
-    if (this.panelFilter.cohorts.length && !this.panelCohortMemberSet.has(profileid)) { return false; }
+    if (this.panelFilter.cohorts.length) {
+      const hit = this.panelCohortMemberSet.has(profileid);
+      if (hit !== this.panelFilter.cohortInc) { return false; }
+    }
     if (this.panelFilter.journeys.length) {
       const inPicked = this.panelJourneyMemberSet.has(profileid);
       const isNone = this.panelJourneyNone && !this.journeyedIds.has(profileid);
-      if (!inPicked && !isNone) { return false; }
+      if ((inPicked || isNone) !== this.panelFilter.journeyInc) { return false; }
     }
     return true;
   }

@@ -833,75 +833,104 @@
 
   <!-- Products / cohorts / journeys share one row as bordered fields. All three are
        multi-select with OR semantics; each is dropped when the open list has nothing
-       to offer for it, and the survivors share the width. -->
+       to offer for it, and the survivors share the width.
+       Each carries its own include↔exclude switch above the field: ON (default) keeps
+       the picks, OFF drops them and keeps the rest. The switch sits directly over the
+       field it inverts — one shared control could not say WHICH dimension it flipped —
+       and exclude repaints that field, its ticks and its clear button red, since the
+       same pick list means the opposite thing in the two senses. -->
   <div class="pf-adv" *ngIf="panelProductOptions.length || panelCohortOptions.length || panelJourneyOptions.length">
 
-    <div class="pf-field" *ngIf="panelProductOptions.length">
-      <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
-                  placeholder="Products" aria-label="Filter this list by product"
-                  [(ngModel)]="panelFilter.products"
-                  (selectionChange)="onPanelProductChange()"
-                  (openedChange)="panelSelectOpen = $event"
-                  [panelWidth]="null"
-                  panelClass="pf-select-panel">
-        <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
-        <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
-          <span class="pf-opt">
-            <span class="pf-opt-n">{{ opt.name }}</span>
-            <span class="pf-opt-c">{{ opt.count }}</span>
-          </span>
-        </mat-option>
-      </mat-select>
-      <!-- sits over the caret once active, so the field never changes width -->
-      <button class="pf-x" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
+    <div class="pf-field" [class.ex]="!panelFilter.productInc" *ngIf="panelProductOptions.length">
+      <div class="pf-mode">
+        <span class="pf-mode-s">{{ panelFilter.productInc ? 'Include' : 'Exclude' }}</span>
+        <mat-slide-toggle class="pf-tgl" hideIcon
+                          [(ngModel)]="panelFilter.productInc" [ngModelOptions]="{ standalone: true }"
+                          aria-label="Include or exclude the selected products"></mat-slide-toggle>
+      </div>
+      <div class="pf-input">
+        <mat-select class="pf-select" [class.on]="panelFilter.products.length" multiple
+                    placeholder="Products" aria-label="Filter this list by product"
+                    [(ngModel)]="panelFilter.products"
+                    (selectionChange)="onPanelProductChange()"
+                    (openedChange)="panelSelectOpen = $event"
+                    [panelWidth]="null"
+                    [panelClass]="productPanelClass">
+          <mat-select-trigger>{{ panelProductTriggerLabel }}</mat-select-trigger>
+          <mat-option *ngFor="let opt of panelProductOptions" [value]="opt.id">
+            <span class="pf-opt">
+              <span class="pf-opt-n">{{ opt.name }}</span>
+              <span class="pf-opt-c">{{ opt.count }}</span>
+            </span>
+          </mat-option>
+        </mat-select>
+        <!-- sits over the caret once active, so the field never changes width -->
+        <button class="pf-x" *ngIf="panelFilter.products.length" (click)="clearPanelProducts()" title="Clear the product filter">&times;</button>
+      </div>
     </div>
 
     <!-- cohort = membership of a "big cohorts" participantidlist for this event -->
-    <div class="pf-field" *ngIf="panelCohortOptions.length">
-      <mat-select class="pf-select" [class.on]="panelFilter.cohorts.length" multiple
-                  placeholder="Cohorts" aria-label="Filter this list by cohort"
-                  [(ngModel)]="panelFilter.cohorts"
-                  (selectionChange)="onPanelCohortChange()"
-                  (openedChange)="onCohortSelectOpened($event)"
-                  [panelWidth]="null"
-                  panelClass="pf-select-panel pf-select-searchable">
-        <mat-select-trigger>{{ panelCohortTriggerLabel }}</mat-select-trigger>
-        <!-- pinned search — clicks must not bubble out to the option list -->
-        <div class="pf-search" (click)="$event.stopPropagation()" (keydown)="onCohortSearchKeydown($event)">
-          <input #cohortSearchBox type="text" placeholder="Search cohorts…" autocomplete="off"
-                 [(ngModel)]="cohortSearch" [ngModelOptions]="{ standalone: true }"
-                 (ngModelChange)="onCohortSearch()">
-        </div>
-        <mat-option *ngFor="let opt of panelCohortView; trackBy: trackOptId" [value]="opt.id">
-          <span class="pf-opt">
-            <span class="pf-opt-n">{{ opt.name }}</span>
-            <span class="pf-opt-c">{{ opt.count }}</span>
-          </span>
-        </mat-option>
-        <div class="pf-none" *ngIf="!panelCohortView.length">No cohort matches that search</div>
-      </mat-select>
-      <button class="pf-x" *ngIf="panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
+    <div class="pf-field" [class.ex]="!panelFilter.cohortInc" *ngIf="panelCohortOptions.length">
+      <div class="pf-mode">
+        <span class="pf-mode-s">{{ panelFilter.cohortInc ? 'Include' : 'Exclude' }}</span>
+        <mat-slide-toggle class="pf-tgl" hideIcon
+                          [(ngModel)]="panelFilter.cohortInc" [ngModelOptions]="{ standalone: true }"
+                          aria-label="Include or exclude the selected cohorts"></mat-slide-toggle>
+      </div>
+      <div class="pf-input">
+        <mat-select class="pf-select" [class.on]="panelFilter.cohorts.length" multiple
+                    placeholder="Cohorts" aria-label="Filter this list by cohort"
+                    [(ngModel)]="panelFilter.cohorts"
+                    (selectionChange)="onPanelCohortChange()"
+                    (openedChange)="onCohortSelectOpened($event)"
+                    [panelWidth]="null"
+                    [panelClass]="cohortPanelClass">
+          <mat-select-trigger>{{ panelCohortTriggerLabel }}</mat-select-trigger>
+          <!-- pinned search — clicks must not bubble out to the option list -->
+          <div class="pf-search" (click)="$event.stopPropagation()" (keydown)="onCohortSearchKeydown($event)">
+            <input #cohortSearchBox type="text" placeholder="Search cohorts…" autocomplete="off"
+                   [(ngModel)]="cohortSearch" [ngModelOptions]="{ standalone: true }"
+                   (ngModelChange)="onCohortSearch()">
+          </div>
+          <mat-option *ngFor="let opt of panelCohortView; trackBy: trackOptId" [value]="opt.id">
+            <span class="pf-opt">
+              <span class="pf-opt-n">{{ opt.name }}</span>
+              <span class="pf-opt-c">{{ opt.count }}</span>
+            </span>
+          </mat-option>
+          <div class="pf-none" *ngIf="!panelCohortView.length">No cohort matches that search</div>
+        </mat-select>
+        <button class="pf-x" *ngIf="panelFilter.cohorts.length" (click)="clearPanelCohorts()" title="Clear the cohort filter">&times;</button>
+      </div>
     </div>
 
-    <!-- journey = the participant's activejourney, resolved through journeyCounts 
+    <!-- journey = the participant's activejourney, resolved through journeyCounts
          "No journey" means the same here as it does on the Participants card -->
-    <div class="pf-field" *ngIf="panelJourneyOptions.length">
-      <mat-select class="pf-select" [class.on]="panelFilter.journeys.length" multiple
-                  placeholder="Journeys" aria-label="Filter this list by active journey"
-                  [(ngModel)]="panelFilter.journeys"
-                  (selectionChange)="onPanelJourneyChange()"
-                  (openedChange)="panelSelectOpen = $event"
-                  [panelWidth]="null"
-                  panelClass="pf-select-panel">
-        <mat-select-trigger>{{ panelJourneyTriggerLabel }}</mat-select-trigger>
-        <mat-option *ngFor="let opt of panelJourneyOptions; trackBy: trackOptId" [value]="opt.id">
-          <span class="pf-opt">
-            <span class="pf-opt-n">{{ opt.name }}</span>
-            <span class="pf-opt-c">{{ opt.count }}</span>
-          </span>
-        </mat-option>
-      </mat-select>
-      <button class="pf-x" *ngIf="panelFilter.journeys.length" (click)="clearPanelJourneys()" title="Clear the journey filter">&times;</button>
+    <div class="pf-field" [class.ex]="!panelFilter.journeyInc" *ngIf="panelJourneyOptions.length">
+      <div class="pf-mode">
+        <span class="pf-mode-s">{{ panelFilter.journeyInc ? 'Include' : 'Exclude' }}</span>
+        <mat-slide-toggle class="pf-tgl" hideIcon
+                          [(ngModel)]="panelFilter.journeyInc" [ngModelOptions]="{ standalone: true }"
+                          aria-label="Include or exclude the selected journeys"></mat-slide-toggle>
+      </div>
+      <div class="pf-input">
+        <mat-select class="pf-select" [class.on]="panelFilter.journeys.length" multiple
+                    placeholder="Journeys" aria-label="Filter this list by active journey"
+                    [(ngModel)]="panelFilter.journeys"
+                    (selectionChange)="onPanelJourneyChange()"
+                    (openedChange)="panelSelectOpen = $event"
+                    [panelWidth]="null"
+                    [panelClass]="journeyPanelClass">
+          <mat-select-trigger>{{ panelJourneyTriggerLabel }}</mat-select-trigger>
+          <mat-option *ngFor="let opt of panelJourneyOptions; trackBy: trackOptId" [value]="opt.id">
+            <span class="pf-opt">
+              <span class="pf-opt-n">{{ opt.name }}</span>
+              <span class="pf-opt-c">{{ opt.count }}</span>
+            </span>
+          </mat-option>
+        </mat-select>
+        <button class="pf-x" *ngIf="panelFilter.journeys.length" (click)="clearPanelJourneys()" title="Clear the journey filter">&times;</button>
+      </div>
     </div>
 
   </div>
