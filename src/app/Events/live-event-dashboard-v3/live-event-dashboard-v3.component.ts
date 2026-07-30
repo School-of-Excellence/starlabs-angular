@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -19,6 +20,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
 } from './live-event-data.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 // First-timer definition — lifted verbatim from first-timers-dashboard:
 // a participant is a first timer when their consumedproducts do NOT include the
@@ -92,7 +94,7 @@ const NO_JOURNEY = '__no_journey__';
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatSelectModule],
+  imports: [CommonModule, FormsModule, MatSelectModule, MatSlideToggleModule, ProfilePictureComponent],
   providers: [LiveEventDataService],
   templateUrl: './live-event-dashboard-v3.component.html',
   styleUrl: './live-event-dashboard-v3.component.css',
@@ -124,6 +126,35 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelMarkDate = '';
   markedIds = new Set<string>();
   markingId: string | null = null;
+  // Lazy profile photos: the panel list shows initials-only avatars by default so
+  // NO photo is fetched for the whole list. Clicking a row's avatar OR its name adds
+  // the profileId here, which mounts <app-profile-picture> for that row alone — and
+  // only then does that single image download (the component fetches on ngOnInit).
+  // The mounted picture has autoOpen=true, so it enlarges as soon as it loads.
+  revealedPhotos = new Set<string>();
+  // One-shot: the id whose picture should auto-open the enlarge overlay right after
+  // it loads. Bound to <app-profile-picture [autoOpen]>. Cleared the moment that
+  // picture emits (opened) so a later re-mount (e.g. filtered out then back in)
+  // never re-opens a preview on its own — only an explicit click does.
+  pendingOpenId: string | null = null;
+  // Handles to the mounted per-row pictures, so a repeat click (once already mounted
+  // and loaded) can re-open the enlarge overlay directly instead of doing nothing.
+  @ViewChildren(ProfilePictureComponent) private photoRefs?: QueryList<ProfilePictureComponent>;
+
+  /** Click a name/avatar → show that participant's enlarged profile photo. First
+   *  click mounts the picture (downloads the one image; autoOpen enlarges on load);
+   *  a later click re-opens the overlay on the already-mounted instance. */
+  showPhoto(profileId: string, event?: Event): void {
+    if (event) { event.stopPropagation(); }
+    if (!profileId) { return; }
+    const ref = this.photoRefs?.find(r => r.profileId === profileId);
+    if (this.revealedPhotos.has(profileId) && ref) {
+      ref.openPreview();
+      return;
+    }
+    this.pendingOpenId = profileId;
+    this.revealedPhotos.add(profileId);
+  }
   // inline product picker: which row is expanded, that participant's active
   // e-ticket, its eligible products and the operator's multi-selection.
   markPickerId: string | null = null;
@@ -1256,7 +1287,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
-    this.panelFilter = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+    this.panelFilter = {
+      type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [],
+      productInc: true, cohortInc: true, journeyInc: true   // every list opens on include
+    };
     this.panelProductSet.clear();
     this.panelCohortMemberSet.clear();
     this.panelJourneyMemberSet.clear();
@@ -1266,6 +1300,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
+    // Reset lazy photos per list. Without this, ids revealed in a previous panel stay
+    // in the set, so reopening the sidenav re-mounts those pictures and (autoOpen)
+    // pops a preview for every one of them — "all the images I opened" reappear.
+    this.revealedPhotos.clear();
+    this.pendingOpenId = null;
     this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1352,10 +1391,21 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // presence ('none' = no scan on any day · 'has' = at least one scan) + products
   // + cohorts (both multi-select, OR semantics). The two attendance chips are
   // mutually exclusive — together they would match nobody.
+  //
+  // productInc/cohortInc/journeyInc are the include↔exclude switches over each
+  // multi-select: ON (the default) keeps the rows that match the picks, OFF drops
+  // them and keeps everyone else. The picks themselves mean the same thing either
+  // way — only the sense of the test flips — so toggling never disturbs a selection.
+  // With nothing picked a dimension is inert in BOTH senses (excluding nothing
+  // excludes nobody), which is why panelFilterActive still keys off the picks alone.
   panelFilter: {
     type: 'all' | 'ft' | 'rp'; attendance: 'all' | 'none' | 'has';
     products: string[]; cohorts: string[]; journeys: string[];
-  } = { type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [] };
+    productInc: boolean; cohortInc: boolean; journeyInc: boolean;
+  } = {
+    type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [],
+    productInc: true, cohortInc: true, journeyInc: true
+  };
   /** Products actually present in the OPEN list (not the whole catalogue), so the
    *  dropdown only ever offers options that can match something. `count` = how many
    *  distinct participants in this list hold that product. */
@@ -1451,6 +1501,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
   get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
   get panelJourneyTriggerLabel(): string { return this.triggerLabel(this.panelFilter.journeys, this.panelJourneyOptions, 'journey'); }
+  /** panelClass per dropdown. The overlay renders outside :host so the exclude sense
+   *  cannot be inherited through the DOM — it is carried in as a class, which repaints
+   *  the option ticks red so a tick in exclude mode never reads as "keep this one". */
+  private selectPanelClass(include: boolean, extra = ''): string {
+    return `pf-select-panel${extra}${include ? '' : ' pf-select-ex'}`;
+  }
+  get productPanelClass(): string { return this.selectPanelClass(this.panelFilter.productInc); }
+  get cohortPanelClass(): string { return this.selectPanelClass(this.panelFilter.cohortInc, ' pf-select-searchable'); }
+  get journeyPanelClass(): string { return this.selectPanelClass(this.panelFilter.journeyInc); }
   get panelFilterActive(): boolean {
     return this.panelFilter.type !== 'all' || this.panelFilter.attendance !== 'all'
       || this.panelProductSet.size > 0 || this.panelFilter.cohorts.length > 0
@@ -1462,18 +1521,24 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (this.panelFilter.type === 'rp' && this.isFirstTimer(profileid)) { return false; }
     if (this.panelFilter.attendance === 'none' && this.hasAttendanceLog(profileid)) { return false; }
     if (this.panelFilter.attendance === 'has' && !this.hasAttendanceLog(profileid)) { return false; }
+    // Each of the three multi-selects tests membership once and then compares the
+    // answer to its include switch: include keeps the hits, exclude keeps the misses.
     if (this.panelProductSet.size) {
-      // keep the participant when they hold at least one of the picked products
+      // holds at least one of the picked products
       const ids = this.data.registeredProductIds[profileid] || [];
-      if (!ids.some(id => this.panelProductSet.has(id))) { return false; }
+      const hit = ids.some(id => this.panelProductSet.has(id));
+      if (hit !== this.panelFilter.productInc) { return false; }
     }
     // cohort membership is the participantidlist on the "big cohorts" doc — NOT the
     // per-participant `eligiliblecohorts` that cohortNameOf()/the Zones view read.
-    if (this.panelFilter.cohorts.length && !this.panelCohortMemberSet.has(profileid)) { return false; }
+    if (this.panelFilter.cohorts.length) {
+      const hit = this.panelCohortMemberSet.has(profileid);
+      if (hit !== this.panelFilter.cohortInc) { return false; }
+    }
     if (this.panelFilter.journeys.length) {
       const inPicked = this.panelJourneyMemberSet.has(profileid);
       const isNone = this.panelJourneyNone && !this.journeyedIds.has(profileid);
-      if (!inPicked && !isNone) { return false; }
+      if ((inPicked || isNone) !== this.panelFilter.journeyInc) { return false; }
     }
     return true;
   }
@@ -1577,7 +1642,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       : `${n} ${n === 1 ? 'doer' : 'doers'}`;
     return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
   }
-  closePanel(): void { this.panelOpen = false; }
+  closePanel(): void { this.panelOpen = false; this.revealedPhotos.clear(); this.pendingOpenId = null; }
 
   /** Manual attendance marking (Unattended list) — two steps.
    *  Step 1 `openMarkPicker`: fetch the participant's ACTIVE arena e-ticket. No

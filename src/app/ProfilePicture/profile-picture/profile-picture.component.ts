@@ -1,8 +1,15 @@
-import { Component, Input, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Firestore, collection, query, where, getDocs } from '@angular/fire/firestore';
 
 const photoCache = new Map<string, string | null>();
+
+// Module-level singleton: only ONE enlarge overlay may exist across ALL instances.
+// Each instance used to remove only its OWN previewEl, so opening a second avatar's
+// preview while another was still open (or auto-opened on a re-mount) left the first
+// stacked on document.body. Tracking the active overlay globally guarantees a new
+// openPreview() tears down whatever is currently showing first.
+let activePreview: HTMLElement | null = null;
 
 @Component({
   selector: 'app-profile-picture',
@@ -17,6 +24,13 @@ export class ProfilePictureComponent implements OnInit ,OnChanges{
   @Input() name: string = '';
   @Input() size: number = 40;
   @Input() skipProfileImg: boolean = false;
+  // Opt-in: open the enlarge preview overlay automatically as soon as the photo
+  // has loaded. Lets a lazy-mounted avatar (mounted only on click) go straight to
+  // the enlarged image without a second click. Default false = unchanged behavior.
+  @Input() autoOpen: boolean = false;
+  // Fires right after an autoOpen preview is shown, so the host can drop its
+  // one-shot "open this one" flag and a later re-mount won't re-open by itself.
+  @Output() opened = new EventEmitter<void>();
 
 
   private firestore = inject(Firestore);
@@ -38,10 +52,15 @@ export class ProfilePictureComponent implements OnInit ,OnChanges{
 
     if (photoCache.has(this.profileId)) {
       this.photoUrl = photoCache.get(this.profileId) ?? this.defaultAvatar;
+      // Defer: this branch runs synchronously inside the host's change-detection
+      // pass, so emitting (opened) — which flips the host's autoOpen binding — must
+      // wait a tick to avoid ExpressionChangedAfterItHasBeenChecked in dev.
+      if (this.autoOpen) { queueMicrotask(() => { this.openPreview(); this.opened.emit(); }); }
       return;
     }
 
-    await this.fetchPhoto();
+    await this.fetchPhoto();   // real async gap — safe to open/emit directly below
+    if (this.autoOpen) { this.openPreview(); this.opened.emit(); }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -93,9 +112,12 @@ private async fetchPhoto(): Promise<void> {
     this.cdr.markForCheck();
   }
 
-  openPreview(event: MouseEvent): void {
-    event.stopPropagation();
-    this.closePreview(); // never stack two overlays
+  openPreview(event?: MouseEvent): void {
+    event?.stopPropagation();
+    // Tear down whatever overlay is currently showing — from ANY instance — so a
+    // new preview never stacks on a lingering one.
+    if (activePreview) { activePreview.remove(); activePreview = null; }
+    if (this.previewEl) { this.previewEl = null; }
 
     const backdrop = document.createElement('div');
     backdrop.style.cssText =
@@ -135,9 +157,16 @@ private async fetchPhoto(): Promise<void> {
 
     document.body.appendChild(backdrop);
     this.previewEl = backdrop;
+    activePreview = backdrop;
   }
 
   closePreview(): void {
+    // Only clear the global handle if THIS instance owns the overlay currently
+    // showing — otherwise destroying an old row would yank a preview another row
+    // just opened. Always remove our own element (harmless if already detached).
+    if (this.previewEl && this.previewEl === activePreview) {
+      activePreview = null;
+    }
     if (this.previewEl) {
       this.previewEl.remove();
       this.previewEl = null;
