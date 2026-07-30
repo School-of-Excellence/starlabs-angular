@@ -984,13 +984,18 @@
                  [checked]="isCommSelected(p['lead'].profileid)"
                  (change)="toggleCommOne(p['lead'].profileid)"
                  [attr.aria-label]="'Select ' + p['lead'].name">
-          <span class="p-avatar" *ngIf="p['lead']">{{ initials(p['lead'].name) }}</span>
+          <ng-container *ngIf="p['lead']">
+            <app-profile-picture *ngIf="revealedPhotos.has(p['lead'].profileid); else avaLead" class="p-avatar-pic" [profileId]="p['lead'].profileid" [name]="p['lead'].name" [size]="30" [autoOpen]="pendingOpenId === p['lead'].profileid" (opened)="pendingOpenId = null"></app-profile-picture>
+            <ng-template #avaLead>
+              <button type="button" class="p-avatar p-avatar-btn" (click)="showPhoto(p['lead'].profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + p['lead'].name">{{ initials(p['lead'].name) }}</button>
+            </ng-template>
+          </ng-container>
           <span class="p-avatar p-dim" *ngIf="!p['lead']">&mdash;</span>
           <span style="min-width:0;flex:1">
             <span class="p-role" [ngClass]="p['leadRole'] === 'beneficiary' ? 'beneficiary' : 'doer'">
               {{ p['leadRole'] === 'beneficiary' ? 'BENEFICIARY' : 'DOER' }}
             </span>
-            <div class="p-name" *ngIf="p['lead']">{{ p['lead'].name }}</div>
+            <div class="p-name p-name-photo" *ngIf="p['lead']" (click)="showPhoto(p['lead'].profileid, $event)" title="View photo">{{ p['lead'].name }}</div>
             <div class="p-name p-dim" *ngIf="!p['lead']">&mdash;</div>
             <div class="p-meta" *ngIf="p['lead']?.email">{{ p['lead'].email }}</div>
             <div class="p-badges" *ngIf="p['lead']">
@@ -1006,10 +1011,13 @@
             &rarr; {{ p['others'].length }} {{ p['leadRole'] === 'beneficiary' ? (p['others'].length === 1 ? 'doer' : 'doers') : (p['others'].length === 1 ? 'beneficiary' : 'beneficiaries') }}
           </div>
           <div class="p-grp-kid" *ngFor="let c of p['others']">
-            <span class="p-avatar sm">{{ initials(c.name) }}</span>
+            <app-profile-picture *ngIf="revealedPhotos.has(c.profileid); else avaKid" class="p-avatar-pic sm" [profileId]="c.profileid" [name]="c.name" [size]="24" [autoOpen]="pendingOpenId === c.profileid" (opened)="pendingOpenId = null"></app-profile-picture>
+            <ng-template #avaKid>
+              <button type="button" class="p-avatar sm p-avatar-btn" (click)="showPhoto(c.profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + c.name">{{ initials(c.name) }}</button>
+            </ng-template>
             <span style="min-width:0">
               <!-- x3 = three changeworks with this same person, not three people -->
-              <div class="p-name">{{ c.name }}<span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span></div>
+              <div class="p-name"><span class="p-name-photo" (click)="showPhoto(c.profileid, $event)" title="View photo">{{ c.name }}</span><span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span></div>
               <div class="p-meta" *ngIf="c.email">{{ c.email }}</div>
               <div class="p-badges">
                 <span class="j-badge" [ngClass]="journeyBadgeClass(c.activejourney)" *ngIf="c.activejourney">{{ journeyLabel(c.activejourney) }}</span>
@@ -1030,9 +1038,12 @@
                  [checked]="isCommSelected(p.profileid)"
                  (change)="toggleCommOne(p.profileid)"
                  [attr.aria-label]="'Select ' + p.name">
-          <span class="p-avatar">{{ initials(p.name) }}</span>
+          <app-profile-picture *ngIf="revealedPhotos.has(p.profileid); else avaSingle" class="p-avatar-pic" [profileId]="p.profileid" [name]="p.name" [size]="30" [autoOpen]="pendingOpenId === p.profileid" (opened)="pendingOpenId = null"></app-profile-picture>
+          <ng-template #avaSingle>
+            <button type="button" class="p-avatar p-avatar-btn" (click)="showPhoto(p.profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + p.name">{{ initials(p.name) }}</button>
+          </ng-template>
           <span style="min-width:0">
-            <div class="p-name">{{ p.name }}</div>
+            <div class="p-name p-name-photo" (click)="showPhoto(p.profileid, $event)" title="View photo">{{ p.name }}</div>
             <div class="p-meta">{{ p.email }}</div>
             <div class="p-badges">
               <span class="j-badge" [ngClass]="journeyBadgeClass(p.activejourney)" *ngIf="p.activejourney">{{ journeyLabel(p.activejourney) }}</span>
