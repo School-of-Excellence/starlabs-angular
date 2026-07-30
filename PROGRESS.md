@@ -1,53 +1,38 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-28 (live-event-dashboard-v3: panel filters + Procedure Tracking)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-28-live-event-dashboard-v3-panel-filters-procedure-tracking.md`.
+_Last updated: 2026-07-30 (npm ERESOLVE fix: dead react/redux deps removed)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-30-npm-peer-conflict-react-removal.md`.
 
 ## Current state
-- **`live-event-dashboard-v3` drill-down panel** filters on six dimensions:
-  participant type + attendance log (two segmented controls, one row) and
-  products / cohorts / journeys (three bordered multi-select fields, one row).
-  Filter chrome cut ~203px → ~134px via an operator-approved redesign. Options
-  are derived from the OPEN list with per-option counts; the cohort dropdown has
-  a pinned search.
-- **Procedure Tracking drill-down is one-to-many**: one row per lead (doer or
-  beneficiary, following the cell clicked) with every counterpart beneath it,
-  and an `x3` pill where a pair share several changeworks. Filters match the
-  lead only.
-- Branch `nanda-development`, `ng build` green (only pre-existing CSS warnings
-  in `journey-onboarding-detail`). The operator merged an early slice upstream
-  mid-session (`17b82e2`, PRs #175/#177); the rest is **local only — push is
-  operator-gated**.
+- **Plain `npm install` (no flags) and `ng build --configuration production`
+  are both green** on branch `nanda-development`. The lockfile was regenerated;
+  Zoom's peer subtree (react 18.2.0, react-dom 18.2.0, redux 4.2.1,
+  react-redux 8.1.2, redux-thunk 2.4.2, lodash 4.18.1) is npm-auto-installed,
+  **not** declared in package.json — see the journal's constraint note.
+- live-event-dashboard-v3 panel-filter work from 2026-07-28 unchanged
+  (see that day's journal); push remains operator-gated.
+- **Everything from today is UNCOMMITTED by operator instruction** ("I'll
+  commit manually"): `package.json`, `package-lock.json`, today's journal,
+  this file, plus a pre-session edit to
+  `src/app/Events/locationlog/map-picker.component.ts` that is the operator's
+  own work.
 
-## Last session changes (2026-07-28) — why
-- **Two data bugs found behind UI complaints.** (a) `calculateProcedureData`
-  kept only the FIRST changework per doer (`if (!map.has(doerId))`) and
-  discarded the rest, so a doer who worked with four people showed one — no UI
-  fix was possible without this. (b) As Beneficiary · Completed ran over the
-  ATC-prescribed universe while As Doer ran over all participants, so the same
-  changework counted 4 / 0; completed now comes from `livechangework`,
-  not-started stays on `atc_alpha` (only a prescription can be outstanding).
-- **ATC completion tiers** ("25–49%") filtered the table from 25% *upwards* —
-  the ceiling was silently dropped. Now filters by tier membership, not a %
-  range, because the table's `Math.round(ratio*100)` column cannot reproduce a
-  band computed on the raw ratio.
-- **Manual attendance marks from a past day** were stamped `now` and landed on
-  today. Now backdated to noon local on the card's day; today deliberately keeps
-  the real click time (the irregular-arrival check reads time of day).
-- **Arena Followup CW cards** silently followed the Procedure Tracking day
-  filter despite being labelled "Throughout event" — given their own event-wide
-  subscription.
-- Also: Unique participants on the attendance card, Participant Data row-click
-  opens the whole filtered table, full names in dropdowns, `ngOnDestroy` leak.
-- Adversarial review workflow ran but **its verify stage silently failed** (bad
-  `parallel()` call — see journal); findings triaged by hand, three real
-  regressions fixed in `58d2537`.
+## Last session changes (2026-07-30) — why
+- `npm install` ERESOLVE'd: commit `65e0e36` (2026-07-30, Charan Reddy) had
+  added react ^19.2.8 / react-dom ^19.2.8 / redux ^5 / redux-thunk ^3 as
+  direct deps though **nothing in src/ imports them**, and every
+  @zoom/meetingsdk 6.x exact-pins react@18.2.0 (+ redux 4.2.1 etc.) — React 19
+  can never coexist with Zoom under strict npm. Removed the four dead entries,
+  restoring the pre-`65e0e36` baseline where npm satisfies Zoom's peers
+  automatically. Verified: dry-run + real install + prod build, all flag-free;
+  full 73-package peer sweep shows no other conflict.
+- Found in passing (not fixed): dead `@ai-coustics/aic-sdk` asset rule in
+  angular.json (ships empty `/assets/aic/`), accidental `common` dep,
+  `@types/*` hygiene — task chip spawned; 58 npm audit vulns pre-existing.
 
 ## Pending / next
-- **Operator manual test** of the Procedure Tracking panel and attendance
-  backdating (writes real `arena e-ticket log` docs — test on `starlabs-test`
-  first; the console logs `| credited to: <date>`).
-- **Known-and-deferred, all in the journal:** the LIVE cell counts changework
-  docs while the panel groups by doer (they can disagree); the live beneficiary
-  cell still uses the ATC-prescribed universe; three concurrent listeners on
-  `livechangework` where one would do.
-- Push `nanda-development` when the operator approves.
+- **Operator: review & commit** today's dependency fix (and push when ready —
+  CI runs plain `npm install`, so the fix must land before any fresh CI run).
+- Heads-up for Charan Reddy: their `65e0e36` react/redux additions were
+  removed as unused; coordinate if they had a planned use.
+- Deferred items from 2026-07-28 journal (live cell count vs panel grouping,
+  ATC-prescribed universe on live beneficiary cell, listener consolidation).
