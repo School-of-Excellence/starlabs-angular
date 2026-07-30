@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
@@ -19,6 +19,7 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
 } from './live-event-data.service';
+import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 
 // First-timer definition — lifted verbatim from first-timers-dashboard:
 // a participant is a first timer when their consumedproducts do NOT include the
@@ -92,7 +93,7 @@ const NO_JOURNEY = '__no_journey__';
 @Component({
   selector: 'app-live-event-dashboard-v3',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatSelectModule],
+  imports: [CommonModule, FormsModule, MatSelectModule, ProfilePictureComponent],
   providers: [LiveEventDataService],
   templateUrl: './live-event-dashboard-v3.component.html',
   styleUrl: './live-event-dashboard-v3.component.css',
@@ -124,6 +125,35 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelMarkDate = '';
   markedIds = new Set<string>();
   markingId: string | null = null;
+  // Lazy profile photos: the panel list shows initials-only avatars by default so
+  // NO photo is fetched for the whole list. Clicking a row's avatar OR its name adds
+  // the profileId here, which mounts <app-profile-picture> for that row alone — and
+  // only then does that single image download (the component fetches on ngOnInit).
+  // The mounted picture has autoOpen=true, so it enlarges as soon as it loads.
+  revealedPhotos = new Set<string>();
+  // One-shot: the id whose picture should auto-open the enlarge overlay right after
+  // it loads. Bound to <app-profile-picture [autoOpen]>. Cleared the moment that
+  // picture emits (opened) so a later re-mount (e.g. filtered out then back in)
+  // never re-opens a preview on its own — only an explicit click does.
+  pendingOpenId: string | null = null;
+  // Handles to the mounted per-row pictures, so a repeat click (once already mounted
+  // and loaded) can re-open the enlarge overlay directly instead of doing nothing.
+  @ViewChildren(ProfilePictureComponent) private photoRefs?: QueryList<ProfilePictureComponent>;
+
+  /** Click a name/avatar → show that participant's enlarged profile photo. First
+   *  click mounts the picture (downloads the one image; autoOpen enlarges on load);
+   *  a later click re-opens the overlay on the already-mounted instance. */
+  showPhoto(profileId: string, event?: Event): void {
+    if (event) { event.stopPropagation(); }
+    if (!profileId) { return; }
+    const ref = this.photoRefs?.find(r => r.profileId === profileId);
+    if (this.revealedPhotos.has(profileId) && ref) {
+      ref.openPreview();
+      return;
+    }
+    this.pendingOpenId = profileId;
+    this.revealedPhotos.add(profileId);
+  }
   // inline product picker: which row is expanded, that participant's active
   // e-ticket, its eligible products and the operator's multi-selection.
   markPickerId: string | null = null;
@@ -1266,6 +1296,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
+    // Reset lazy photos per list. Without this, ids revealed in a previous panel stay
+    // in the set, so reopening the sidenav re-mounts those pictures and (autoOpen)
+    // pops a preview for every one of them — "all the images I opened" reappear.
+    this.revealedPhotos.clear();
+    this.pendingOpenId = null;
     this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1577,7 +1612,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       : `${n} ${n === 1 ? 'doer' : 'doers'}`;
     return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
   }
-  closePanel(): void { this.panelOpen = false; }
+  closePanel(): void { this.panelOpen = false; this.revealedPhotos.clear(); this.pendingOpenId = null; }
 
   /** Manual attendance marking (Unattended list) — two steps.
    *  Step 1 `openMarkPicker`: fetch the participant's ACTIVE arena e-ticket. No
