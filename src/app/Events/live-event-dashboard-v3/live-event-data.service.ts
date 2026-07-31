@@ -1530,6 +1530,7 @@ export class LiveEventDataService implements OnDestroy {
         if (beneficiaryId) {
           const j = e.counterpartIds.indexOf(beneficiaryId);
           const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
                           doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
                           docId: lcw['id'] ?? null };
           if (j === -1) {
@@ -1555,6 +1556,7 @@ export class LiveEventDataService implements OnDestroy {
         if (doerId) {
           const j = e.counterpartIds.indexOf(doerId);
           const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
                           doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
                           docId: lcw['id'] ?? null };
           if (j === -1) {
@@ -1587,6 +1589,9 @@ export class LiveEventDataService implements OnDestroy {
         liveChangeworkMap[procedureId].push({ doerId, doerName, beneficiaryId, beneficiaryName, procedureName, createdon: lcw['createdon'] ?? null,
           doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
           docId: lcw['id'] ?? null,
+          // the changework popup shows the doc's own fields for live pairs too
+          note: lcw['sharednotes'] || '', hours: lcw['hours'] || '', hourType: lcw['hourtype'] || '',
+          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
           displayText: `${doerName} - ${beneficiaryName} - (${procedureName})` });
       }
     });
