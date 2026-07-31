@@ -1035,7 +1035,10 @@
                  (click)="$event.stopPropagation()"
                  (change)="toggleCommOne(p['lead'].profileid)"
                  [attr.aria-label]="'Select ' + p['lead'].name">
-          <span class="p-avatar" *ngIf="p['lead']" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
+          <span class="p-avatar" *ngIf="p['lead']" title="Click to view photo & details" tabindex="0" role="button"
+                [attr.aria-label]="'View photo & details of ' + p['lead'].name"
+                (click)="cameraClick($event, p['lead'])"
+                (keydown.enter)="cameraKey($event, p['lead'])" (keydown.space)="cameraKey($event, p['lead'])"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
           <span class="p-avatar p-dim" *ngIf="!p['lead']">&mdash;</span>
           <span style="min-width:0;flex:1">
             <span class="p-role" [ngClass]="p['leadRole'] === 'beneficiary' ? 'beneficiary' : 'doer'">
@@ -1055,12 +1058,16 @@
         <div class="p-grp-kids" *ngIf="p['others']?.length">
           <div class="p-grp-eyebrow">
             &rarr; {{ p['others'].length }} {{ p['leadRole'] === 'beneficiary' ? (p['others'].length === 1 ? 'doer' : 'doers') : (p['others'].length === 1 ? 'beneficiary' : 'beneficiaries') }}
+            &middot; {{ groupCwCount(p) }} {{ groupCwCount(p) === 1 ? 'changework' : 'changeworks' }}
           </div>
           <div class="p-grp-kid p-click" *ngFor="let c of p['others']" tabindex="0" role="button"
                (click)="rowClick($event, c, false)"
                (keydown.enter)="rowKey($event, c, false)"
                (keydown.space)="rowKey($event, c, false)">
-            <span class="p-avatar sm" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
+            <span class="p-avatar sm" title="Click to view photo & details" tabindex="0" role="button"
+                  [attr.aria-label]="'View photo & details of ' + c.name"
+                  (click)="cameraClick($event, c)"
+                  (keydown.enter)="cameraKey($event, c)" (keydown.space)="cameraKey($event, c)"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
             <span style="min-width:0">
               <!-- x3 = three changeworks with this same person, not three people -->
               <div class="p-name"><span>{{ c.name }}</span><span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span><span class="p-timer" *ngIf="c['_since']" [class.over]="liveOver(c['_since'])" [title]="'Live since the start of this changework' + (liveOver(c['_since']) ? ' — over 2 hours' : '')">{{ liveElapsed(c['_since']) }}</span><span class="p-status" *ngIf="c['_stOk']"><span class="p-st" [class.ok]="stDone(c['_ds'])" [title]="'Doer status: ' + (c['_ds'] || '—')">D</span><span class="p-st" [class.ok]="stDone(c['_bs'])" [title]="'Beneficiary status: ' + (c['_bs'] || '—')">B</span></span></div>
@@ -1088,7 +1095,10 @@
                  (click)="$event.stopPropagation()"
                  (change)="toggleCommOne(p.profileid)"
                  [attr.aria-label]="'Select ' + p.name">
-          <span class="p-avatar" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
+          <span class="p-avatar" title="Click to view photo & details" tabindex="0" role="button"
+                [attr.aria-label]="'View photo & details of ' + p.name"
+                (click)="cameraClick($event, p)"
+                (keydown.enter)="cameraKey($event, p)" (keydown.space)="cameraKey($event, p)"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
           <span style="min-width:0">
             <div class="p-name">{{ p.name }}</div>
             <div class="p-meta">{{ p.email }}</div>
@@ -1155,27 +1165,42 @@
       <div class="pp-row" *ngIf="detailP['_n'] > 1"><span>Changeworks together</span><b>&times;{{ detailP['_n'] }}</b></div>
       <div class="pp-row" *ngIf="detailP.isNotRegistered"><span>Status</span><b>Not a registered event participant</b></div>
     </div>
-    <!-- one widget per changework with hours+hourtype (As Beneficiary lists' doer
-         popups): which changework, when, and the time saved — the same card
-         language as the sharednotes widgets -->
-    <div class="pp-notes" *ngIf="detailHours.length">
-      <div class="pp-note-card" *ngFor="let h of detailHours; let i = index">
-        <div class="pp-note-head">
-          <span class="pp-note-proc">{{ h.procedure || 'Changework' }}{{ detailHours.length > 1 ? ' &middot; #' + (i + 1) : '' }}</span>
-          <span class="pp-note-date" *ngIf="noteDate(h.createdon)">{{ noteDate(h.createdon) }}</span>
-        </div>
-        <div class="pp-hours-text">{{ hoursSaved(h) }}</div>
-      </div>
+    <!-- sharednotes / time-saved deliberately NOT here — the changework popup
+         (row click) owns the per-doc data now (operator directive) -->
+  </div>
+</div>
+
+<!-- changework popup (row click on changework rows — the camera icon opens the
+     profile popup instead). Shows the pair's livechangework doc(s): who, which
+     procedure, notes, adjustment, time saved, created on, last update. Outside
+     the <aside> for the same fixed-positioning reason as the profile popup. -->
+<div class="pp-backdrop" *ngIf="cwP" (click)="onCwBackdrop($event)">
+  <div class="pp-card" (click)="$event.stopPropagation()">
+    <button class="pp-x" (click)="closeCw()" title="Close" aria-label="Close">&times;</button>
+    <div class="pp-name">Changework</div>
+    <div class="pp-rows">
+      <div class="pp-row"><span>Doer</span><b>{{ cwP['_cwPair']?.doerName || '—' }}</b></div>
+      <div class="pp-row"><span>Beneficiary</span><b>{{ cwP['_cwPair']?.beneficiaryName || '—' }}</b></div>
     </div>
-    <!-- one widget per NOTED changework: the note, which changework, and when —
-         an x2 pair shows two dated cards instead of one merged line -->
-    <div class="pp-notes" *ngIf="detailNotes.length">
-      <div class="pp-note-card" *ngFor="let n of detailNotes; let i = index">
+    <div class="pp-notes">
+      <div class="pp-note-card" *ngFor="let c of cwP['_cw']; let i = index">
         <div class="pp-note-head">
-          <span class="pp-note-proc">{{ n.procedure || 'Changework' }}{{ detailNotes.length > 1 ? ' &middot; #' + (i + 1) : '' }}</span>
-          <span class="pp-note-date" *ngIf="noteDate(n.createdon)">{{ noteDate(n.createdon) }}</span>
+          <span class="pp-note-proc">{{ c.procedure || 'Changework' }}{{ cwP['_cw'].length > 1 ? ' &middot; #' + (i + 1) : '' }}</span>
+          <span class="pp-note-side">
+            <!-- each changework doc carries its OWN statuses — per-card chips -->
+            <span class="p-status"><span class="p-st" [class.ok]="stDone(c.doerStatus)" [title]="'Doer status: ' + (c.doerStatus || '—')">D</span><span class="p-st" [class.ok]="stDone(c.beneficiaryStatus)" [title]="'Beneficiary status: ' + (c.beneficiaryStatus || '—')">B</span></span>
+            <span class="pp-note-date" *ngIf="noteDate(c.createdon)">{{ noteDate(c.createdon) }}</span>
+          </span>
         </div>
-        <div class="pp-note-text">&ldquo;{{ n.note }}&rdquo;</div>
+        <div class="cw-rows">
+          <div class="pp-row" *ngIf="c.hourType && c.hours"><span>Doer - Predictive years</span><b>{{ hoursSaved(c) }}</b></div>
+          <div class="pp-row" *ngIf="c.adjustment"><span>Adjustment</span><b>{{ c.adjustment }}</b></div>
+          <div class="pp-row"><span>Created on</span><b>{{ noteDate(c.createdon) || '—' }}</b></div>
+          <!-- Firestore's own last-write metadata (REST fetch), falling back to a
+               data field if one ever exists -->
+          <div class="pp-row"><span>Last update</span><b>{{ noteDate(cwUpdateTime(c.docId)) || '—' }}</b></div>
+        </div>
+        <div class="pp-note-text" *ngIf="c.note">&ldquo;{{ c.note }}&rdquo;</div>
       </div>
     </div>
   </div>

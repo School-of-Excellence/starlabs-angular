@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { collection, doc, Firestore, setDoc, Timestamp, updateDoc } from '@angular/fire/firestore';
+import { getAuth } from '@angular/fire/auth';
 import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
@@ -138,6 +139,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   @ViewChild(ProfilePictureComponent) private detailPhoto?: ProfilePictureComponent;
   openDetail(p: any): void {
     if (p && p.profileid) {
+      this.cwP = null;                        // one popup at a time
       this.detailP = p;
       // operator debugging aid: which livechangework doc(s) this row stands on
       const cwIds: string[] = (p['_cwIds'] || []).filter(Boolean);
@@ -145,6 +147,69 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     }
   }
   closeDetail(): void { this.detailP = null; }
+  /** Changework popup — the ROW's click target on changework rows (the camera
+   *  icon keeps the profile popup). Shows the pair's livechangework doc(s):
+   *  procedure, notes, adjustment, time saved, created on, last update. */
+  cwP: any = null;
+  openCw(p: any): void {
+    if (!p?.['_cw']?.length) { this.openDetail(p); return; }
+    this.detailP = null;                      // one popup at a time
+    this.cwP = p;
+    const ids: string[] = (p['_cwIds'] || []).filter(Boolean);
+    if (ids.length) {
+      console.log('[v3][popup] livechangework doc id(s) —', p.name + ':', ids);
+      this.fetchCwUpdateTimes(ids);           // fire-and-forget; cards fill in as it lands
+    }
+  }
+  closeCw(): void { this.cwP = null; }
+  /** Camera-icon activation → profile popup. Shares the mouse guards with row
+   *  clicks: a text-selection drag and the backdrop double-click fall-through
+   *  window must not reopen a popup through the camera either (verifier
+   *  finding — the guards lived only on rows). Keyboard twin skips the mouse
+   *  guards, same policy as rowKey. */
+  cameraClick(ev: MouseEvent, p: any): void {
+    ev.stopPropagation();
+    const sel = window.getSelection?.();
+    if (sel && !sel.isCollapsed) { return; }
+    if (Date.now() - this.detailClosedAt < 400) { return; }
+    this.openDetail(p);
+  }
+  cameraKey(ev: Event, p: any): void {
+    ev.stopPropagation(); ev.preventDefault();
+    this.openDetail(p);
+  }
+  // Firestore keeps a hidden system-level updateTime on every document, but the
+  // client SDK strictly hides it — the REST endpoint is the only client-side way
+  // to read it. Fetched lazily for exactly the doc(s) the open popup shows,
+  // cached per doc id for the session, authorised with the user's own ID token
+  // (the same security rules as the live listeners apply).
+  private cwUpdateTimes: { [docId: string]: string } = {};
+  cwUpdateTime(docId: string | null | undefined): string { return docId ? (this.cwUpdateTimes[docId] || '') : ''; }
+  private async fetchCwUpdateTimes(docIds: string[]): Promise<void> {
+    const ids = docIds.filter(id => id && !this.cwUpdateTimes[id]);
+    if (!ids.length) { return; }
+    try {
+      const token = await getAuth().currentUser?.getIdToken();
+      const projectId = environment.firebase.projectId;
+      if (!token || !projectId) { return; }
+      await Promise.all(ids.map(async id => {
+        try {
+          const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/livechangework/${id}`;
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) { return; }
+          const body: any = await res.json();
+          if (body?.updateTime) { this.cwUpdateTimes[id] = body.updateTime; }
+        } catch (err) { console.error('[v3][popup] updateTime fetch failed for', id, err); }
+      }));
+      this.cdr.markForCheck();
+    } catch (err) { console.error('[v3][popup] updateTime fetch failed:', err); }
+  }
+  onCwBackdrop(ev: MouseEvent): void {
+    const sel = window.getSelection?.();
+    if (ev.detail > 1 || (sel && !sel.isCollapsed)) { return; }
+    this.detailClosedAt = Date.now();
+    this.closeCw();
+  }
   // Set when a backdrop click closes the popup: the backdrop unmounts
   // synchronously, so the SECOND click of a double-click falls through to
   // whatever is beneath (the scrim would close the whole panel; a row would
@@ -163,11 +228,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.rowActivate(p, selectable);
   }
   /** Row activation. In selection (comm) mode a SELECTABLE row toggles its
-   *  checkbox — a misclick during bulk ticking must not cost a popup dismissal —
-   *  while counterpart rows (never selectable) still open their detail popup;
-   *  outside comm mode every row opens the popup. */
+   *  checkbox — a misclick during bulk ticking must not cost a popup dismissal.
+   *  Outside comm mode: changework rows (carrying _cw) open the CHANGEWORK
+   *  popup; everything else opens the profile popup. The camera icon always
+   *  opens the profile popup (its own stopPropagation click). */
   rowActivate(p: any, selectable: boolean): void {
     if (this.commOn && selectable) { if (p?.profileid) { this.toggleCommOne(p.profileid); } return; }
+    if (p?.['_cw']?.length) { this.openCw(p); return; }
     this.openDetail(p);
   }
   /** Keyboard twin — rows are tabbable. Only fires when the ROW itself is
@@ -238,23 +305,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   get detailAtc(): any { return this.detailP ? (this.data.participantAtc[this.detailP.profileid] || null) : null; }
   get detailAttd(): number { return this.detailP ? ((this.data.mapAttendence[this.detailP.profileid]?.length) || 0) : 0; }
-  /** Noted changeworks of the popup's pair — one widget each (note + which
-   *  changework + when), so an x2 pair shows both of its notes distinctly.
-   *  As Doer lists' beneficiary popups ONLY (_notesOk). */
-  get detailNotes(): any[] {
-    if (!this.detailP?.['_notesOk']) { return []; }
-    return ((this.detailP['_cw'] || []) as any[]).filter(c => c && c.note);
-  }
-  /** Changeworks carrying BOTH hours and hourtype — one widget each (which
-   *  changework + when + "Saved N hours per day/week"), same card language as
-   *  the notes. As Beneficiary lists' doer popups ONLY (_hoursOk). Returns the
-   *  records themselves (identity-stable across CD passes; text via hoursSaved). */
-  get detailHours(): any[] {
-    if (!this.detailP?.['_hoursOk']) { return []; }
-    return ((this.detailP['_cw'] || []) as any[])
-      .filter(c => c && c.hourType && c.hours != null && String(c.hours).trim() !== '');
-  }
+  // notes/hours getters are gone — the changework popup owns per-doc data now
   hoursSaved(c: any): string { return this.hoursSavedText(c.hours, c.hourType); }
+  /** Eyebrow total: changeworks across the group (Σ ×N) — "5 beneficiaries ·
+   *  6 changeworks" makes the x2 pairs legible at the group level. */
+  groupCwCount(p: any): number {
+    return ((p?.['others'] || []) as any[]).reduce((t, o) => t + (Number(o['_n']) || 1), 0);
+  }
   /** D/B chip state: green only when the side's status is exactly 'completed'
    *  (case-insensitive); null/empty/anything else = red. */
   stDone(v: any): boolean { return String(v || '').trim().toLowerCase() === 'completed'; }
@@ -447,6 +504,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // above the panel — ESC takes exactly one layer per press, top first
     if (this.detailPhoto?.previewOpen) { this.detailPhoto.closePreview(); return; }
     if (this.detailP) { this.closeDetail(); return; }
+    if (this.cwP) { this.closeCw(); return; }
     this.closePanel(); this.closeDropdowns();
   }
 
@@ -861,7 +919,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       const data = kind === 'dc' ? s.doerCompleted.data : kind === 'bc' ? s.beneficierCompleted.data : s.liveChangework.data;
       const label = kind === 'dc' ? 'As Doer · Completed' : kind === 'bc' ? 'As Beneficiary · Completed' : 'Live now';
       const groupBy: 'doer' | 'beneficiary' = kind === 'bc' ? 'beneficiary' : 'doer';
-      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procGroupRows(data as any[], this.procName(id), false, groupBy), true);
+      this.openPanelRows(`${this.procName(id)} · ${label}`, sub, this.procGroupRows(data as any[], this.procName(id), false, groupBy, kind !== 'live'), true);
       return;
     }
     // Not-started: a plain list (no counterpart yet).
@@ -900,7 +958,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     for (const id of this.data.sortedProcedureIds) {
       const s = this.data.mapProcedureData[id];
       const data = side === 'doer' ? s?.doerCompleted?.data : s?.beneficierCompleted?.data;
-      rows.push(...this.procGroupRows((data as any[]) || [], this.procName(id), true, side));
+      rows.push(...this.procGroupRows((data as any[]) || [], this.procName(id), true, side, true));
     }
     const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
     const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
@@ -1472,7 +1530,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
-    this.closeDetail();                         // a detail popup belongs to ONE list
+    this.closeDetail();                         // a popup belongs to ONE list
+    this.closeCw();
     this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1496,7 +1555,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
    *  `name`/`email` concatenate the whole group so the panel search still matches
    *  any member of it. */
   private procGroupRows(
-    data: any[], procName: string, showProc: boolean, groupBy: 'doer' | 'beneficiary'
+    data: any[], procName: string, showProc: boolean, groupBy: 'doer' | 'beneficiary',
+    // leadSearch: the panel search matches the LEAD side only (operator: doer
+    // panels search doers, beneficiary panels search beneficiaries). LIVE lists
+    // keep whole-group search — looking up a beneficiary still finds their doer.
+    leadSearch = false
   ): PanelParticipant[] {
     const groups = new Map<string, {
       lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string; since: number;
@@ -1546,6 +1609,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
               prev._stOk = true; prev._stAt = docSince;
             }
             if (cw.docId) { prev._cwIds = [...(prev._cwIds || []), cw.docId]; }
+            // a repeat LIVE doc for the same pair is another changework record
+            if (!cw.counterpartCw) {
+              prev._cw = [...(prev._cw || []), { note: cw.note || '', createdon: cw.createdon ?? null,
+                procedure: cw.procedureName || procName || '', hours: cw.hours || '',
+                hourType: cw.hourType || '', adjustment: cw.adjustment ?? '',
+                doerStatus: cw.doerStatus ?? null, beneficiaryStatus: cw.beneficiaryStatus ?? null,
+                lastUpdated: cw.lastUpdated ?? null, docId: cw.docId ?? null }];
+            }
           }
           return;
         }
@@ -1557,15 +1628,17 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
         p._n = inc;
         if (docSince) { p._since = docSince; }
-        // _cw = one record per changework of this pair (note/createdon/procedure/
-        // hours/hourType). The popup shows EITHER notes or hours by list side
-        // (operator directive): As Doer → sharednotes cards only (_notesOk),
-        // As Beneficiary → "saved N hours per X" lines only (_hoursOk). Nothing
-        // renders inline in the rows.
+        // _cw = one record per changework of this pair — the changework popup
+        // (row click) renders them; the profile popup carries no note/hours.
         const cwItems: any[] = cw.counterpartCw?.[i] || [];
+        // the changework popup names both sides of the pair regardless of which
+        // side leads the list
+        const pairNames = groupBy === 'doer'
+          ? { doerName: cw.doerName || g!.lead?.name || '—', beneficiaryName: p.name }
+          : { doerName: p.name, beneficiaryName: cw.beneficiaryName || g!.lead?.name || '—' };
         if (cwItems.length) {
           p._cw = cwItems;
-          if (groupBy === 'beneficiary') { p._hoursOk = true; } else { p._notesOk = true; }
+          p._cwPair = pairNames;
           // D/B status chips: the LATEST changework of the pair speaks for it
           const latest = cwItems.reduce((a: any, b: any) =>
             this.tsToMillis(b?.createdon) >= this.tsToMillis(a?.createdon) ? b : a, cwItems[0]);
@@ -1574,10 +1647,17 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
           const recIds = cwItems.map((x: any) => x.docId).filter(Boolean);
           if (recIds.length) { p._cwIds = recIds; }
         } else if (cw.doerStatus !== undefined || cw.beneficiaryStatus !== undefined) {
-          // live flat docs carry the statuses directly
+          // live flat docs carry the statuses directly — and ARE the changework
+          // record the popup shows
           p._ds = cw.doerStatus ?? null; p._bs = cw.beneficiaryStatus ?? null;
           p._stOk = true; p._stAt = docSince;
           if (cw.docId) { p._cwIds = [cw.docId]; }
+          p._cw = [{ note: cw.note || '', createdon: cw.createdon ?? null,
+                     procedure: cw.procedureName || procName || '', hours: cw.hours || '',
+                     hourType: cw.hourType || '', adjustment: cw.adjustment ?? '',
+                     doerStatus: cw.doerStatus ?? null, beneficiaryStatus: cw.beneficiaryStatus ?? null,
+                     lastUpdated: cw.lastUpdated ?? null, docId: cw.docId ?? null }];
+          p._cwPair = pairNames;
         }
         g!.others.push(p);
       });
@@ -1591,8 +1671,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         proc: g.proc,
         _since: g.since || 0,
         profileid: g.lead?.profileid || g.others[0]?.profileid || '',
-        name: [g.lead?.name, ...g.others.map(o => o.name)].filter(Boolean).join(' '),
-        email: [g.lead?.email, ...g.others.map(o => o.email)].filter(Boolean).join(' '),
+        // name/email are the group's SEARCH INDEX (nothing renders them)
+        name: leadSearch ? (g.lead?.name || '') : [g.lead?.name, ...g.others.map(o => o.name)].filter(Boolean).join(' '),
+        email: leadSearch ? (g.lead?.email || '') : [g.lead?.email, ...g.others.map(o => o.email)].filter(Boolean).join(' '),
       } as any))
       .sort((a, b) => (a.lead?.name || '').localeCompare(b.lead?.name || ''));
   }
@@ -1910,7 +1991,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       : `${n} ${n === 1 ? 'doer' : 'doers'}`;
     return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
   }
-  closePanel(): void { this.panelOpen = false; this.closeDetail(); this.syncLiveTicker(); }
+  closePanel(): void { this.panelOpen = false; this.closeDetail(); this.closeCw(); this.syncLiveTicker(); }
 
   /** Manual attendance marking (Unattended list) — two steps.
    *  Step 1 `openMarkPicker`: fetch the participant's ACTIVE arena e-ticket. No
