@@ -713,10 +713,13 @@ mat-select.pf-select.on{
   border-left:3px solid var(--ok-line);border-radius:var(--r-sm);padding:8px 10px;
 }
 .pp-note-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.pp-note-side{display:flex;align-items:baseline;gap:8px;flex:none}
 .pp-note-proc{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--z-700)}
 .pp-note-date{font-size:10px;font-family:var(--mono);color:var(--z-500);flex:none}
 .pp-note-text{font-size:12px;font-style:italic;color:var(--z-700);white-space:pre-wrap;word-break:break-word}
 .pp-hours-text{font-size:12px;font-weight:600;color:var(--ok)}
+/* field rows inside a changework card */
+.cw-rows{width:100%;display:flex;flex-direction:column;gap:5px;margin:2px 0 5px}
 .p-grp-kid .p-name{font-size:12px;font-weight:500}
 /* repeat count — the pair share more than one changework */
 .p-rep{
