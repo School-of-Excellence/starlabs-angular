@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -126,34 +126,147 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   panelMarkDate = '';
   markedIds = new Set<string>();
   markingId: string | null = null;
-  // Lazy profile photos: the panel list shows initials-only avatars by default so
-  // NO photo is fetched for the whole list. Clicking a row's avatar OR its name adds
-  // the profileId here, which mounts <app-profile-picture> for that row alone — and
-  // only then does that single image download (the component fetches on ngOnInit).
-  // The mounted picture has autoOpen=true, so it enlarges as soon as it loads.
-  revealedPhotos = new Set<string>();
-  // One-shot: the id whose picture should auto-open the enlarge overlay right after
-  // it loads. Bound to <app-profile-picture [autoOpen]>. Cleared the moment that
-  // picture emits (opened) so a later re-mount (e.g. filtered out then back in)
-  // never re-opens a preview on its own — only an explicit click does.
-  pendingOpenId: string | null = null;
-  // Handles to the mounted per-row pictures, so a repeat click (once already mounted
-  // and loaded) can re-open the enlarge overlay directly instead of doing nothing.
-  @ViewChildren(ProfilePictureComponent) private photoRefs?: QueryList<ProfilePictureComponent>;
-
-  /** Click a name/avatar → show that participant's enlarged profile photo. First
-   *  click mounts the picture (downloads the one image; autoOpen enlarges on load);
-   *  a later click re-opens the overlay on the already-mounted instance. */
-  showPhoto(profileId: string, event?: Event): void {
-    if (event) { event.stopPropagation(); }
-    if (!profileId) { return; }
-    const ref = this.photoRefs?.find(r => r.profileId === profileId);
-    if (this.revealedPhotos.has(profileId) && ref) {
-      ref.openPreview();
-      return;
+  // Row click → participant detail popup: one card with the photo AND the row's
+  // data, replacing the old camera-badge avatar and clickable-name affordances —
+  // the whole row is the click target now. The popup mounts ONE
+  // <app-profile-picture>, so exactly one image downloads per open (the lazy
+  // behaviour the list rows had, moved to the popup); clicking that picture
+  // still opens the full-size enlarge overlay it owns.
+  detailP: any = null;
+  // the popup's picture — the only mounted instance — so ESC can peel its
+  // enlarge overlay off FIRST instead of collapsing both layers at once
+  @ViewChild(ProfilePictureComponent) private detailPhoto?: ProfilePictureComponent;
+  openDetail(p: any): void {
+    if (p && p.profileid) {
+      this.detailP = p;
+      // operator debugging aid: which livechangework doc(s) this row stands on
+      const cwIds: string[] = (p['_cwIds'] || []).filter(Boolean);
+      if (cwIds.length) { console.log('[v3][popup] livechangework doc id(s) —', p.name + ':', cwIds); }
     }
-    this.pendingOpenId = profileId;
-    this.revealedPhotos.add(profileId);
+  }
+  closeDetail(): void { this.detailP = null; }
+  // Set when a backdrop click closes the popup: the backdrop unmounts
+  // synchronously, so the SECOND click of a double-click falls through to
+  // whatever is beneath (the scrim would close the whole panel; a row would
+  // reopen the popup for someone else). Row/scrim clicks inside this window
+  // are the tail of that double-click and must be ignored.
+  private detailClosedAt = 0;
+  /** Mouse path into rowActivate — carries the guards that only make sense for
+   *  clicks: a live text selection (drag-to-copy an email must not open the
+   *  popup), the fall-through window above, and in comm mode the second click
+   *  of a double-click (which would silently untick the row just ticked). */
+  rowClick(ev: MouseEvent, p: any, selectable: boolean): void {
+    const sel = window.getSelection?.();
+    if (sel && !sel.isCollapsed) { return; }
+    if (Date.now() - this.detailClosedAt < 400) { return; }
+    if (this.commOn && ev.detail > 1) { return; }
+    this.rowActivate(p, selectable);
+  }
+  /** Row activation. In selection (comm) mode a SELECTABLE row toggles its
+   *  checkbox — a misclick during bulk ticking must not cost a popup dismissal —
+   *  while counterpart rows (never selectable) still open their detail popup;
+   *  outside comm mode every row opens the popup. */
+  rowActivate(p: any, selectable: boolean): void {
+    if (this.commOn && selectable) { if (p?.profileid) { this.toggleCommOne(p.profileid); } return; }
+    this.openDetail(p);
+  }
+  /** Keyboard twin — rows are tabbable. Only fires when the ROW itself is
+   *  focused (a focusable child handles its own keys), and deliberately skips
+   *  the mouse-only guards: a stale text selection must not eat Enter/Space. */
+  rowKey(ev: KeyboardEvent, p: any, selectable: boolean): void {
+    if (ev.target !== ev.currentTarget) { return; }
+    ev.preventDefault();                    // Space must not scroll the panel
+    this.rowActivate(p, selectable);
+  }
+  // floating back-to-top for the panel list — appears once the list has been
+  // scrolled a screenful, jumps back smoothly
+  panelScrolled = false;
+  @ViewChild('panelList') private panelListRef?: ElementRef<HTMLDivElement>;
+  onPanelScroll(ev: Event): void {
+    const scrolled = (ev.target as HTMLElement).scrollTop > 300;
+    if (scrolled !== this.panelScrolled) { this.panelScrolled = scrolled; }
+  }
+  scrollPanelTop(): void { this.panelListRef?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+  /** Backdrop click closes the popup — except the second click of a double-click
+   *  that STARTED on a row (detail > 1: the popup opened under the cursor midway)
+   *  and a text-selection drag that ends over the backdrop. */
+  onDetailBackdrop(ev: MouseEvent): void {
+    const sel = window.getSelection?.();
+    if (ev.detail > 1 || (sel && !sel.isCollapsed)) { return; }
+    this.detailClosedAt = Date.now();
+    this.closeDetail();
+  }
+  /** Scrim shares the fall-through guard: a double-click starting on the popup
+   *  backdrop must not blow away the whole panel with its second click. */
+  onScrimClick(): void {
+    if (Date.now() - this.detailClosedAt < 400) { return; }
+    this.closePanel();
+  }
+
+  // Live elapsed timers (LIVE lists): each live changework doc's createdon rides
+  // onto its counterpart entry as _since (epoch ms); the bindings below read one
+  // shared clock that ticks only while a panel with timer rows is open — a
+  // permanent 1s interval would cost a change-detection pass per second forever.
+  nowTick = Date.now();
+  private liveTicker: ReturnType<typeof setInterval> | null = null;
+  private syncLiveTicker(): void {
+    const need = this.panelOpen && this.panelRows.some((r: any) =>
+      r['_pair'] && (r['_since'] || (r['others'] || []).some((o: any) => o['_since'])));
+    if (need && this.liveTicker === null) {
+      this.nowTick = Date.now();
+      this.liveTicker = setInterval(() => { this.nowTick = Date.now(); }, 1000);
+    } else if (!need && this.liveTicker !== null) {
+      clearInterval(this.liveTicker); this.liveTicker = null;
+    }
+  }
+  liveElapsed(since: number): string {
+    let s = Math.max(0, Math.floor((this.nowTick - since) / 1000));
+    const h = Math.floor(s / 3600); s -= h * 3600;
+    const m = Math.floor(s / 60);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${h}:${pad(m)}:${pad(s - m * 60)}`;
+  }
+  /** 2 hours is the operator's attention threshold: green under it, red from it. */
+  liveOver(since: number): boolean { return (this.nowTick - since) >= 2 * 60 * 60 * 1000; }
+  private tsToMillis(v: any): number {
+    if (!v) { return 0; }
+    if (typeof v.toMillis === 'function') { return v.toMillis(); }
+    if (typeof v.seconds === 'number') { return v.seconds * 1000; }
+    if (typeof v === 'number') { return v; }
+    const p = Date.parse(v); return isNaN(p) ? 0 : p;
+  }
+  get detailAtc(): any { return this.detailP ? (this.data.participantAtc[this.detailP.profileid] || null) : null; }
+  get detailAttd(): number { return this.detailP ? ((this.data.mapAttendence[this.detailP.profileid]?.length) || 0) : 0; }
+  /** Noted changeworks of the popup's pair — one widget each (note + which
+   *  changework + when), so an x2 pair shows both of its notes distinctly.
+   *  As Doer lists' beneficiary popups ONLY (_notesOk). */
+  get detailNotes(): any[] {
+    if (!this.detailP?.['_notesOk']) { return []; }
+    return ((this.detailP['_cw'] || []) as any[]).filter(c => c && c.note);
+  }
+  /** Changeworks carrying BOTH hours and hourtype — one widget each (which
+   *  changework + when + "Saved N hours per day/week"), same card language as
+   *  the notes. As Beneficiary lists' doer popups ONLY (_hoursOk). Returns the
+   *  records themselves (identity-stable across CD passes; text via hoursSaved). */
+  get detailHours(): any[] {
+    if (!this.detailP?.['_hoursOk']) { return []; }
+    return ((this.detailP['_cw'] || []) as any[])
+      .filter(c => c && c.hourType && c.hours != null && String(c.hours).trim() !== '');
+  }
+  hoursSaved(c: any): string { return this.hoursSavedText(c.hours, c.hourType); }
+  /** D/B chip state: green only when the side's status is exactly 'completed'
+   *  (case-insensitive); null/empty/anything else = red. */
+  stDone(v: any): boolean { return String(v || '').trim().toLowerCase() === 'completed'; }
+  private hoursSavedText(hours: any, hourType: string): string {
+    const n = Number(hours);
+    const amount = isNaN(n) ? String(hours).trim() : String(n);
+    const unit = (!isNaN(n) && n === 1) ? 'hour' : 'hours';
+    return `Saved ${amount} ${unit} per ${String(hourType).trim().toLowerCase()}`;
+  }
+  noteDate(v: any): string {
+    const ms = this.tsToMillis(v);
+    return ms ? new Date(ms).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   }
   // inline product picker: which row is expanded, that participant's active
   // e-ticket, its eligible products and the operator's multi-selection.
@@ -219,6 +332,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // release our view subscription here.
     if (this.sub) { this.sub.unsubscribe(); this.sub = null; }
     this.destroy$.next(); this.destroy$.complete();   // drops any open dialog's afterClosed()
+    if (this.liveTicker !== null) { clearInterval(this.liveTicker); this.liveTicker = null; }
   }
 
   // ==========================================================================
@@ -329,6 +443,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // disableClose, so ESC must not yank the panel out from under it.
   onEscape(): void {
     if (this.panelSelectOpen || this.dialog.openDialogs.length) { return; }
+    // layered peel: the enlarge overlay sits above the detail popup, which sits
+    // above the panel — ESC takes exactly one layer per press, top first
+    if (this.detailPhoto?.previewOpen) { this.detailPhoto.closePreview(); return; }
+    if (this.detailP) { this.closeDetail(); return; }
     this.closePanel(); this.closeDropdowns();
   }
 
@@ -702,6 +820,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   get procCount(): number { return this.data.sortedProcedureIds.length; }
   get procLiveTotal(): number { return this.data.liveChangeworkTotal; }
+  // Header totals beside the LIVE pill: distinct completed leads summed across
+  // all procedures (a doer counts once per procedure, same as the cells the sum
+  // is made of — and same as the groups in the pill's panel).
+  get procDoerCompletedTotal(): number {
+    return this.data.sortedProcedureIds.reduce((t, id) => t + (this.procStat(id)?.doerCompleted.count || 0), 0);
+  }
+  get procBenCompletedTotal(): number {
+    return this.data.sortedProcedureIds.reduce((t, id) => t + (this.procStat(id)?.beneficierCompleted.count || 0), 0);
+  }
   get procMeta(): string { return `${this.procCount} procedures · opportunities, doer & beneficiary progress, live now`; }
   get procDayFilter(): string { return this.data.procDayFilter; }
 
@@ -742,7 +869,46 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const label = kind === 'dns' ? 'As Doer · Not started' : 'As Beneficiary · Not started';
     this.openPanel(`${this.procName(id)} · ${label}`, sub, ids.filter(Boolean));
   }
+  /** The two proc-sub lines. The tile counts OPPORTUNITIES — one participant can
+   *  hold several for the same procedure — so the panel lists the unique
+   *  participants behind the number with each one's share as a count badge (and
+   *  in the CSV Detail column via _meta), and the sub repeats the tile's total so
+   *  the two figures reconcile on sight. Both lists come straight from atc_alpha
+   *  (pending/completed lists): scope applies, the day chips do NOT — so the sub
+   *  deliberately carries no day label, unlike the livechangework-backed cells. */
+  openProcTotals(id: string, kind: 'opp' | 'comp'): void {
+    const s = this.procStat(id); if (!s) { return; }
+    const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
+    const stat = kind === 'opp' ? s.totalOpportunities : s.totalCompleted;
+    const label = kind === 'opp' ? 'Total opportunities' : 'Completed';
+    const unit = (n: number) => kind === 'opp' ? (n === 1 ? 'opportunity' : 'opportunities') : 'completed';
+    const rows = (stat.data as { profileId: string; count: number }[])
+      .filter(d => !!d?.profileId)
+      .map(d => ({
+        ...this.data.buildParticipantFromProfileId(d.profileId, false),
+        _count: d.count, _countKind: kind, _meta: `${d.count} ${unit(d.count)}`
+      } as any));
+    this.openPanelRows(`${this.procName(id)} · ${label}`, `${scopeL} · ${stat.count.toLocaleString()} ${unit(stat.count)} total`, rows);
+  }
   openProcLive(): void { this.openLive(); }
+  /** The two header DONE pills — every procedure's completed changework in one
+   *  list, grouped within each procedure exactly like the LIVE pill's panel, so
+   *  the group count reconciles with the pill's sum. Same scope/day behaviour
+   *  as the per-procedure Completed cells (livechangework-derived → day applies). */
+  private openProcCompletedAll(side: 'doer' | 'beneficiary'): void {
+    const rows: PanelParticipant[] = [];
+    for (const id of this.data.sortedProcedureIds) {
+      const s = this.data.mapProcedureData[id];
+      const data = side === 'doer' ? s?.doerCompleted?.data : s?.beneficierCompleted?.data;
+      rows.push(...this.procGroupRows((data as any[]) || [], this.procName(id), true, side));
+    }
+    const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
+    const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
+    const label = side === 'doer' ? 'As Doer' : 'As Beneficiary';
+    this.openPanelRows(`Completed · ${label} · all procedures`, `${scopeL} · ${dayL}`, rows, true);
+  }
+  openProcDoerCompletedAll(): void { this.openProcCompletedAll('doer'); }
+  openProcBenCompletedAll(): void { this.openProcCompletedAll('beneficiary'); }
 
   // ==========================================================================
   // Participant Data table (#pdTable) — V1 aggregateData + customfilter + CSV
@@ -1234,7 +1400,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   zoneMentors(zone: any): string { return this.staffNames(zone['mentors']); }
   private staffNames(ids: any): string {
     const list = Array.isArray(ids) ? ids : [];
-    const names = list.map((id: string) => this.data.staffNameMap[id] || id).filter(Boolean);
+    // participant metadata is the name source (staff are participants too);
+    // falls back to the raw id like the old profile_data map did
+    const names = list.map((id: string) => this.data.participantMetadataMap[id]?.['name'] || id).filter(Boolean);
     return names.length ? names.join(', ') : '—';
   }
 
@@ -1287,6 +1455,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
+    this.panelCountSort = '';                   // every list opens in its own order
+    this.panelTimeSort = '';
+    this.panelScrolled = false;
+    this.panelListRef?.nativeElement.scrollTo({ top: 0 });   // a new list starts at its top
     this.panelFilter = {
       type: 'all', attendance: 'all', products: [], cohorts: [], journeys: [],
       productInc: true, cohortInc: true, journeyInc: true   // every list opens on include
@@ -1300,16 +1472,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.panelMarkable = false;                 // re-enabled per-list (openAttAbsent)
     this.panelMarkDate = '';                    // '' = credit the mark to today
     this.markedIds = new Set<string>();
-    // Reset lazy photos per list. Without this, ids revealed in a previous panel stay
-    // in the set, so reopening the sidenav re-mounts those pictures and (autoOpen)
-    // pops a preview for every one of them — "all the images I opened" reappear.
-    this.revealedPhotos.clear();
-    this.pendingOpenId = null;
+    this.closeDetail();                         // a detail popup belongs to ONE list
     this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
     this.panelRows = preserveOrder ? rows.slice() : rows.slice().sort((a, b) => a.name.localeCompare(b.name));
     this.panelOpen = true;
+    this.syncLiveTicker();                      // tick only while timer rows are on screen
   }
 
   /** ONE row per lead participant, carrying every counterpart they worked with.
@@ -1330,7 +1499,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     data: any[], procName: string, showProc: boolean, groupBy: 'doer' | 'beneficiary'
   ): PanelParticipant[] {
     const groups = new Map<string, {
-      lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string;
+      lead: PanelParticipant | null; others: PanelParticipant[]; seen: Set<string>; proc: string; since: number;
     }>();
     (data || []).forEach((cw: any, idx: number) => {
       if (!cw.doerId && !cw.beneficiaryId) { return; }
@@ -1350,10 +1519,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         g = {
           lead: leadId ? this.data.buildParticipantFromProfileId(leadId, true) : null,
           others: [], seen: new Set<string>(),
-          proc: showProc ? (cw.procedureName || procName || '') : ''
+          proc: showProc ? (cw.procedureName || procName || '') : '',
+          since: 0
         };
         groups.set(key, g);
       }
+      // only live docs carry createdon; the earliest of a group's docs wins so
+      // the timer shows the LONGEST-running changework
+      const docSince = this.tsToMillis(cw.createdon);
+      if (docSince && (!g.since || docSince < g.since)) { g.since = docSince; }
       otherIds.forEach((oid, i) => {
         if (!oid) { return; }
         // `_n` = how many changeworks the pair share. The completed lists arrive
@@ -1361,7 +1535,18 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         const inc = Number(cw.counterpartCounts?.[i]) || 1;
         if (g!.seen.has(oid)) {
           const prev: any = g!.others.find(o => o.profileid === oid);
-          if (prev) { prev._n = (prev._n || 1) + inc; }
+          if (prev) {
+            prev._n = (prev._n || 1) + inc;
+            if (docSince && (!prev._since || docSince < prev._since)) { prev._since = docSince; }
+            const moreCw: any[] = cw.counterpartCw?.[i] || [];
+            if (moreCw.length) { prev._cw = [...(prev._cw || []), ...moreCw]; }
+            // a NEWER doc for the same live pair updates the status chips
+            if ((cw.doerStatus !== undefined || cw.beneficiaryStatus !== undefined) && docSince >= (prev._stAt || 0)) {
+              prev._ds = cw.doerStatus ?? null; prev._bs = cw.beneficiaryStatus ?? null;
+              prev._stOk = true; prev._stAt = docSince;
+            }
+            if (cw.docId) { prev._cwIds = [...(prev._cwIds || []), cw.docId]; }
+          }
           return;
         }
         g!.seen.add(oid);
@@ -1371,6 +1556,29 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         const hinted = cw.counterpartNames?.[i] || (groupBy === 'doer' ? cw.beneficiaryName : cw.doerName);
         if (hinted && (!p.name || p.name === 'Unknown')) { p.name = hinted; }
         p._n = inc;
+        if (docSince) { p._since = docSince; }
+        // _cw = one record per changework of this pair (note/createdon/procedure/
+        // hours/hourType). The popup shows EITHER notes or hours by list side
+        // (operator directive): As Doer → sharednotes cards only (_notesOk),
+        // As Beneficiary → "saved N hours per X" lines only (_hoursOk). Nothing
+        // renders inline in the rows.
+        const cwItems: any[] = cw.counterpartCw?.[i] || [];
+        if (cwItems.length) {
+          p._cw = cwItems;
+          if (groupBy === 'beneficiary') { p._hoursOk = true; } else { p._notesOk = true; }
+          // D/B status chips: the LATEST changework of the pair speaks for it
+          const latest = cwItems.reduce((a: any, b: any) =>
+            this.tsToMillis(b?.createdon) >= this.tsToMillis(a?.createdon) ? b : a, cwItems[0]);
+          p._ds = latest?.doerStatus ?? null; p._bs = latest?.beneficiaryStatus ?? null;
+          p._stOk = true; p._stAt = this.tsToMillis(latest?.createdon);
+          const recIds = cwItems.map((x: any) => x.docId).filter(Boolean);
+          if (recIds.length) { p._cwIds = recIds; }
+        } else if (cw.doerStatus !== undefined || cw.beneficiaryStatus !== undefined) {
+          // live flat docs carry the statuses directly
+          p._ds = cw.doerStatus ?? null; p._bs = cw.beneficiaryStatus ?? null;
+          p._stOk = true; p._stAt = docSince;
+          if (cw.docId) { p._cwIds = [cw.docId]; }
+        }
         g!.others.push(p);
       });
     });
@@ -1381,6 +1589,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         leadRole: groupBy,
         others: g.others,
         proc: g.proc,
+        _since: g.since || 0,
         profileid: g.lead?.profileid || g.others[0]?.profileid || '',
         name: [g.lead?.name, ...g.others.map(o => o.name)].filter(Boolean).join(' '),
         email: [g.lead?.email, ...g.others.map(o => o.email)].filter(Boolean).join(' '),
@@ -1603,11 +1812,40 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (none) { opts.push({ id: NO_JOURNEY, name: 'No journey', count: none }); }
     return opts;
   }
+  /** Count sort (the ⇅ button in the count bar). Two list shapes carry a
+   *  sortable count: the proc totals lists (rows with a _count badge) and the
+   *  grouped changework lists (_pair rows, where the count is DISTINCT
+   *  counterparts — beneficiaries for an "As Doer" list, doers for an
+   *  "As Beneficiary" one). '' = the order the list opened with; first
+   *  click = highest first. */
+  panelCountSort: '' | 'asc' | 'desc' = '';
+  // LIVE lists carry a second, mutually exclusive sort: elapsed live time (◷)
+  panelTimeSort: '' | 'asc' | 'desc' = '';
+  get panelSortable(): boolean {
+    const r: any = this.panelRows[0];
+    return !!r && (r['_count'] != null || !!r['_pair']);
+  }
+  get panelHasTimes(): boolean { return this.panelRows.some((r: any) => r['_since']); }
+  get panelSortNoun(): string {
+    const r: any = this.panelRows[0];
+    if (r?.['_pair']) { return r['leadRole'] === 'beneficiary' ? 'doer count' : 'beneficiary count'; }
+    return 'count';
+  }
+  // three states so the opening order stays reachable: ⇅ → ↓ highest → ↑ lowest → ⇅;
+  // engaging either sort clears the other — one order at a time
+  toggleCountSort(): void {
+    this.panelTimeSort = '';
+    this.panelCountSort = this.panelCountSort === '' ? 'desc' : this.panelCountSort === 'desc' ? 'asc' : '';
+  }
+  toggleTimeSort(): void {
+    this.panelCountSort = '';
+    this.panelTimeSort = this.panelTimeSort === '' ? 'desc' : this.panelTimeSort === 'desc' ? 'asc' : '';
+  }
+
   get panelParticipants(): PanelParticipant[] {
     const q = this.panelSearch.toLowerCase().trim();
     const active = this.panelFilterActive;
-    if (!q && !active) { return this.panelRows; }
-    return this.panelRows.filter((p: any) => {
+    const rows = (!q && !active) ? this.panelRows : this.panelRows.filter((p: any) => {
       if (q && !((p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))) { return false; }
       if (!active) { return true; }
       if (p['_pair']) {
@@ -1620,6 +1858,36 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       }
       return this.matchesPanelFilter(p.profileid);
     });
+    // Sorting works on a COPY: the no-filter branch hands out panelRows itself, and
+    // sorting that in place would overwrite the order the list opened with — there
+    // would be nothing to come back to when the sort is toggled off.
+    if ((this.panelCountSort || this.panelTimeSort) && rows.length) {
+      const first: any = rows[0];
+      // live-time sort (the ◷ button, LIVE lists only): 'highest first' means
+      // longest-running changework first. Elapsed differences are constant, so
+      // the ticking clock can never reorder the list mid-view.
+      if (this.panelTimeSort && first['_pair']) {
+        const dir = this.panelTimeSort === 'desc' ? -1 : 1;
+        const e = (r: any) => r['_since'] ? (this.nowTick - r['_since']) : -1;
+        return rows.slice().sort((a: any, b: any) =>
+          (dir * (e(a) - e(b))) || (a['lead']?.name || '').localeCompare(b['lead']?.name || ''));
+      }
+      if (this.panelCountSort) {
+        const dir = this.panelCountSort === 'desc' ? -1 : 1;
+        if (first['_count'] != null) {
+          return rows.slice().sort((a: any, b: any) =>
+            (dir * ((a['_count'] || 0) - (b['_count'] || 0))) || a.name.localeCompare(b.name));
+        }
+        if (first['_pair']) {
+          // grouped lists sort by DISTINCT counterparts (the eyebrow's number,
+          // not changework depth); ties fall back to the lead's name.
+          const n = (r: any) => r['others']?.length || 0;
+          return rows.slice().sort((a: any, b: any) =>
+            (dir * (n(a) - n(b))) || (a['lead']?.name || '').localeCompare(b['lead']?.name || ''));
+        }
+      }
+    }
+    return rows;
   }
   get panelCount(): number { return this.panelParticipants.length; }
   /** A grouped row is 1 lead + N counterparts, so the row count is NOT a headcount —
@@ -1642,7 +1910,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       : `${n} ${n === 1 ? 'doer' : 'doers'}`;
     return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
   }
-  closePanel(): void { this.panelOpen = false; this.revealedPhotos.clear(); this.pendingOpenId = null; }
+  closePanel(): void { this.panelOpen = false; this.closeDetail(); this.syncLiveTicker(); }
 
   /** Manual attendance marking (Unattended list) — two steps.
    *  Step 1 `openMarkPicker`: fetch the participant's ACTIVE arena e-ticket. No

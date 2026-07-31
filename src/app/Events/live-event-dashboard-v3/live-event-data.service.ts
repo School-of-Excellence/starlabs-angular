@@ -176,8 +176,6 @@ export class LiveEventDataService implements OnDestroy {
   zoneParticipantIds: Set<string> = new Set();       // V2: profileids with any allocation
   noZoneProfileIds: string[] = [];                   // V2 calculateNoZoneParticipants
   noZoneCount = 0;
-  // staff (coordinator/mentor) id → name, from ZM's authguard.getProfileMap().
-  staffNameMap: { [profileid: string]: string } = {};
 
   // ---- procedure tracking filters (FT setFilter / participantFilter) ----------
   procDayFilter: string = 'all';   // 'all' | 'yyyy-mm-dd'
@@ -223,25 +221,39 @@ export class LiveEventDataService implements OnDestroy {
   async init(): Promise<void> {
     this.isLoading = true;
 
+    // H1 (perf audit 2026-07-30): every read below is independent of the others,
+    // so they run in PARALLEL — the old serial await chain paid the SUM of ~10
+    // round trips (1-3s of pure latency before any payload). Events+queues emit
+    // changed$ the moment THEY land, so the event selector and ongoing strip
+    // paint while the big metadata scan is still streaming — the page appears
+    // step by step instead of all-at-once after a long blank.
+    // selectEvent stays strictly AFTER the whole batch: its listeners' first
+    // snapshots read participantMetadataMap (calculateProcedureData bails on an
+    // empty map and nothing re-runs it until the next snapshot), so the static
+    // maps must be complete before any subscription starts.
+
     // journey map (V2 ngOnInit)
-    await getDocs(collection(this.firestoreDefault, 'journey')).then(snap => {
+    const journeyP = getDocs(collection(this.firestoreDefault, 'journey')).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const journeyData = snap.docs[i].data();
         journeyData['docid'] = snap.docs[i].id;
         this.mapJourneyData[snap.docs[i].id] = journeyData;
       }
-    });
-    console.log('[v3][init] journey docs:', Object.keys(this.mapJourneyData).length);
+      console.log('[v3][init] journey docs:', Object.keys(this.mapJourneyData).length);
+    }).catch(err => console.error('Error loading journeys:', err));
 
     // procedures map (FT loadData procedures block)
-    await getDocs(collection(this.firestoreDefault, 'procedures')).then(procedure => {
+    const proceduresP = getDocs(collection(this.firestoreDefault, 'procedures')).then(procedure => {
       procedure.docs.forEach(data => {
         const procedureData = data.data();
         this.mapProcedureNames[data.id] = procedureData['name'];
         this.mapProcedureData[data.id] = { totalCompleted: { count: 0, data: [] }, totalOpportunities: { count: 0, data: [] }, doerNotStarted: { count: 0, data: [] }, doerCompleted: { count: 0, data: [] }, beneficierNotStarted: { count: 0, data: [] }, beneficierCompleted: { count: 0, data: [] }, liveChangework: { count: 0, data: [] } };
       });
-    });
-    console.log('[v3][init] procedures docs:', Object.keys(this.mapProcedureNames).length);
+      console.log('[v3][init] procedures docs:', Object.keys(this.mapProcedureNames).length);
+      // a rejection here (or in journeyP) would make Promise.all skip selectEvent
+      // entirely — catch so a transient read failure degrades that one section
+      // instead of the whole dashboard (verifier finding, 2026-07-30)
+    }).catch(err => console.error('Error loading procedures:', err));
 
     // participant-tag taxonomy — ONE query for both tag families (CHANGED, operator):
     //   participantTags = tagsfor 'video ask'  → Video Ask Tags section
@@ -257,7 +269,7 @@ export class LiveEventDataService implements OnDestroy {
     // the section moved to per-submission tags and became multi-tag.)
     // CHANGED (operator): crmTags is now active-only — first-timers-dashboard does
     // NOT filter isActive, so v3 deliberately shows fewer CRM flags than it does.
-    await getDocs(query(
+    const tagsP = getDocs(query(
       collection(this.firestoreDefault, 'participant tags'),
       where('tagsfor', 'array-contains-any', ['video ask', 'live event']),
       where('isActive', '==', true)
@@ -265,70 +277,86 @@ export class LiveEventDataService implements OnDestroy {
       const tags = snap.docs.map(d => ({ docid: d.id, ...d.data() } as any));
       this.participantTags = tags.filter(t => (t['tagsfor'] || []).includes('video ask'));
       this.crmTags = tags.filter(t => (t['tagsfor'] || []).includes('live event'));
+      console.log('[v3][init] participant tags — video-ask:', this.participantTags.length, '| A&H CRM:', this.crmTags.length);
     }).catch(err => console.error('Error loading participant tags:', err));
-    console.log('[v3][init] participant tags — video-ask:', this.participantTags.length, '| A&H CRM:', this.crmTags.length);
 
-    // participant metadata (V2 loadParticipantMetadata)
-    await this.loadParticipantMetadata();
+    // participant metadata (V2 loadParticipantMetadata) — the biggest read; runs
+    // concurrently with everything else instead of gating it
+    const metadataP = this.loadParticipantMetadata();
 
     // customer support categories config (global doc, loaded once); the tickets
     // themselves are event-scoped and (re)subscribed per selectEvent.
-    await this.loadIssueCategories();
+    const issueCatP = this.loadIssueCategories();
 
     // current user for call-log writes (same accessor as V1/zone-management)
-    try {
-      const roles: any = await this.authguard.getRoles();
-      this.loggedInProfileId = roles?.['profile_ref']?.id || null;
-    } catch (err) { console.error('Error resolving current user:', err); }
-    console.log('[v3][init] logged-in profileId:', this.loggedInProfileId);
+    const rolesP = (async () => {
+      try {
+        const roles: any = await this.authguard.getRoles();
+        this.loggedInProfileId = roles?.['profile_ref']?.id || null;
+      } catch (err) { console.error('Error resolving current user:', err); }
+      console.log('[v3][init] logged-in profileId:', this.loggedInProfileId);
+    })();
 
-    // staff (coordinator/mentor) id→name map for the Zones view — reused verbatim
-    // from event-zone-management (authguard.getProfileMap().map). Global, once.
-    try {
-      const pm: any = await this.authguard.getProfileMap();
-      this.staffNameMap = pm?.['map'] || {};
-    } catch (err) { console.error('Error loading profile map:', err); }
-    console.log('[v3][zones] staff name-map entries:', Object.keys(this.staffNameMap).length);
+    // Staff (coordinator/mentor) names for the Zones view come from
+    // participantMetadataMap — getProfileMap() was a full platform-wide
+    // profile_data scan serving only that one lookup (perf audit 2026-07-30,
+    // H3). profile_data is no longer read here.
 
     // product id→name map (authguard.getProductMap) for the drill-down lists.
+    const productsP = (async () => {
+      try {
+        this.productMap = (await this.authguard.getProductMap()) || {};
+      } catch (err) { console.error('Error loading product map:', err); }
+      console.log('[v3][init] product map entries:', Object.keys(this.productMap).length);
+    })();
+
+    // events + queues (FT loadData / V2 identical) — the selector's data. Emits
+    // changed$ on its own the moment both lists are in, so the dropdown and the
+    // ongoing chips render without waiting for the rest of the batch.
+    const eventsQueuesP = (async () => {
+      try {
+        const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        eventsSnapshot.docs.forEach(d => {
+          const data = d.data() as EventData;
+          data['docref'] = d.ref;
+          this.eventsList.push(data);
+          const startDate = data['start_date']?.toDate ? data['start_date'].toDate() : new Date(data['start_date']);
+          const endDate = data['end_date']?.toDate ? data['end_date'].toDate() : new Date(data['end_date']);
+          startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
+          if (startDate <= today && today <= endDate) { this.ongoingEvents.push(data); }
+        });
+
+        // queues (FT loadQueues / V2) — loaded once so chips can render both kinds
+        const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
+        queuesSnapshot.docs.forEach(d => {
+          const data = d.data() as QueueData;
+          data['docref'] = d.ref;
+          this.queuesList.push(data);
+          const startDate = data['queuestartdate']?.toDate ? data['queuestartdate'].toDate() : new Date(data['queuestartdate']);
+          const endDate = data['queueenddate']?.toDate ? data['queueenddate'].toDate() : new Date(data['queueenddate']);
+          startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
+          if (startDate <= today && today <= endDate) { this.ongoingQueues.push(data); }
+        });
+
+        console.log('[v3][events] total:', this.eventsList.length, '| ongoing:', this.ongoingEvents.length,
+          this.ongoingEvents.map(e => e['name']));
+        console.log('[v3][queues] total:', this.queuesList.length, '| ongoing:', this.ongoingQueues.length,
+          this.ongoingQueues.map(q => q['name'] || q['queuename']));
+        this.changed$.next();               // first paint: selector + ongoing strip
+      } catch (error) {
+        console.error('Error loading events/queues:', error);
+      }
+    })();
+
+    await Promise.all([journeyP, proceduresP, tagsP, metadataP, issueCatP, rolesP, productsP, eventsQueuesP]);
+
+    // ONLY dependency in the whole chain: auto-selecting the ongoing event needs
+    // the events list, and its listeners need every static map above.
     try {
-      this.productMap = (await this.authguard.getProductMap()) || {};
-    } catch (err) { console.error('Error loading product map:', err); }
-    console.log('[v3][init] product map entries:', Object.keys(this.productMap).length);
-
-    // events (FT loadData events block / V2 identical)
-    try {
-      const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      eventsSnapshot.docs.forEach(d => {
-        const data = d.data() as EventData;
-        data['docref'] = d.ref;
-        this.eventsList.push(data);
-        const startDate = data['start_date']?.toDate ? data['start_date'].toDate() : new Date(data['start_date']);
-        const endDate = data['end_date']?.toDate ? data['end_date'].toDate() : new Date(data['end_date']);
-        startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
-        if (startDate <= today && today <= endDate) { this.ongoingEvents.push(data); }
-      });
-
-      // queues (FT loadQueues / V2) — loaded once so chips can render both kinds
-      const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
-      queuesSnapshot.docs.forEach(d => {
-        const data = d.data() as QueueData;
-        data['docref'] = d.ref;
-        this.queuesList.push(data);
-        const startDate = data['queuestartdate']?.toDate ? data['queuestartdate'].toDate() : new Date(data['queuestartdate']);
-        const endDate = data['queueenddate']?.toDate ? data['queueenddate'].toDate() : new Date(data['queueenddate']);
-        startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
-        if (startDate <= today && today <= endDate) { this.ongoingQueues.push(data); }
-      });
-
-      console.log('[v3][events] total:', this.eventsList.length, '| ongoing:', this.ongoingEvents.length,
-        this.ongoingEvents.map(e => e['name']));
-      console.log('[v3][queues] total:', this.queuesList.length, '| ongoing:', this.ongoingQueues.length,
-        this.ongoingQueues.map(q => q['name'] || q['queuename']));
       if (this.ongoingEvents.length > 0) { await this.selectEvent(this.ongoingEvents[0]); }
     } catch (error) {
-      console.error('Error loading events/queues:', error);
+      console.error('Error selecting initial event:', error);
     } finally {
       this.isLoading = false;
       this.changed$.next();
@@ -1490,15 +1518,27 @@ export class LiveEventDataService implements OnDestroy {
         if (!e) {
           e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
                 counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
+                // ONE record per changework of each counterpart pair (aligned with
+                // counterpartIds): note + createdon + procedure + hours/hourType.
+                // An x2 pair holds two records, so the popup can show each note as
+                // its own dated widget and every "saved N hours per X" line.
+                counterpartCw: [] as any[][],
                 displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
           doerCompletedMap[procedureId].set(doerId, e);
         }
         // one slot per distinct counterpart, carrying HOW MANY changeworks they share
         if (beneficiaryId) {
           const j = e.counterpartIds.indexOf(beneficiaryId);
+          const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+                          docId: lcw['id'] ?? null };
           if (j === -1) {
             e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName); e.counterpartCounts.push(1);
-          } else { e.counterpartCounts[j]++; }
+            e.counterpartCw.push([cwRec]);
+          } else {
+            e.counterpartCounts[j]++;
+            e.counterpartCw[j].push(cwRec);
+          }
         }
       }
       if (beneficiaryId && completedBeneficiaryScope.has(beneficiaryId)) {
@@ -1507,14 +1547,23 @@ export class LiveEventDataService implements OnDestroy {
         if (!e) {
           e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
                 counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
+                // ONE record per changework of each pair — see the doer accumulator
+                counterpartCw: [] as any[][],
                 displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
           beneficierCompletedMap[procedureId].set(beneficiaryId, e);
         }
         if (doerId) {
           const j = e.counterpartIds.indexOf(doerId);
+          const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+                          docId: lcw['id'] ?? null };
           if (j === -1) {
             e.counterpartIds.push(doerId); e.counterpartNames.push(doerName); e.counterpartCounts.push(1);
-          } else { e.counterpartCounts[j]++; }
+            e.counterpartCw.push([cwRec]);
+          } else {
+            e.counterpartCounts[j]++;
+            e.counterpartCw[j].push(cwRec);
+          }
         }
       }
     });
@@ -1532,7 +1581,13 @@ export class LiveEventDataService implements OnDestroy {
         if (!liveChangeworkMap[procedureId]) { liveChangeworkMap[procedureId] = []; }
         const doerName = this.participantMetadataMap[doerId]?.['name'] || 'Unknown';
         const beneficiaryName = this.participantMetadataMap[beneficiaryId]?.['name'] || 'Unknown';
-        liveChangeworkMap[procedureId].push({ doerId, doerName, beneficiaryId, beneficiaryName, procedureName, displayText: `${doerName} - ${beneficiaryName} - (${procedureName})` });
+        // createdon + per-side statuses ride along untouched (no effect on
+        // counts) so the panel can show a live elapsed timer and D/B status
+        // chips per changework.
+        liveChangeworkMap[procedureId].push({ doerId, doerName, beneficiaryId, beneficiaryName, procedureName, createdon: lcw['createdon'] ?? null,
+          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+          docId: lcw['id'] ?? null,
+          displayText: `${doerName} - ${beneficiaryName} - (${procedureName})` });
       }
     });
 
