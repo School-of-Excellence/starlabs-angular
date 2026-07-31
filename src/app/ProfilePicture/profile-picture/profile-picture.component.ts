@@ -24,6 +24,10 @@ export class ProfilePictureComponent implements OnInit ,OnChanges{
   @Input() name: string = '';
   @Input() size: number = 40;
   @Input() skipProfileImg: boolean = false;
+  // Host-supplied image URL. When set (even ''), the component uses it directly
+  // and NEVER queries profile_data — for hosts whose data source already carries
+  // the photo (e.g. live-event-dashboard-v3's participant metadata map).
+  @Input() src: string | null = null;
   // Opt-in: open the enlarge preview overlay automatically as soon as the photo
   // has loaded. Lets a lazy-mounted avatar (mounted only on click) go straight to
   // the enlarged image without a second click. Default false = unchanged behavior.
@@ -48,6 +52,11 @@ export class ProfilePictureComponent implements OnInit ,OnChanges{
   private previewEl: HTMLElement | null = null;
 
   async ngOnInit(): Promise<void> {
+    if (this.src != null) {
+      this.photoUrl = this.src || this.defaultAvatar;
+      if (this.autoOpen) { queueMicrotask(() => { this.openPreview(); this.opened.emit(); }); }
+      return;                                  // host owns the image — no Firestore read
+    }
     if (!this.profileId) return;
 
     if (photoCache.has(this.profileId)) {
@@ -64,6 +73,14 @@ export class ProfilePictureComponent implements OnInit ,OnChanges{
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (this.src != null) {
+      // host-supplied mode: track the src binding, never fetch
+      if (changes['src'] && !changes['src'].firstChange) {
+        this.photoUrl = this.src || this.defaultAvatar;
+        this.cdr.markForCheck();
+      }
+      return;
+    }
     if (changes['profileId'] && !changes['profileId'].firstChange) {
       const newId = changes['profileId'].currentValue;
       if (newId) {
@@ -159,6 +176,10 @@ private async fetchPhoto(): Promise<void> {
     this.previewEl = backdrop;
     activePreview = backdrop;
   }
+
+  /** Whether this instance's enlarge overlay is currently showing — lets a host
+   *  with its own ESC handling peel the overlay off before its own layers. */
+  get previewOpen(): boolean { return !!this.previewEl; }
 
   closePreview(): void {
     // Only clear the global handle if THIS instance owns the overlay currently

@@ -329,7 +329,9 @@
         <div class="sec-title">Procedure Tracking</div>
         <div class="sec-meta">{{ procMeta }}</div>
         <div class="sec-right">
-          <span class="live-pill" (click)="openProcLive()"><span class="dot live"></span>{{ procLiveTotal }} LIVE</span>
+          <span class="done-pill" (click)="openProcDoerCompletedAll()" title="Completed as doer — all procedures"><span class="dot done"></span>{{ procDoerCompletedTotal | number }} DOER DONE</span>
+          <span class="done-pill" (click)="openProcBenCompletedAll()" title="Completed as beneficiary — all procedures"><span class="dot done"></span>{{ procBenCompletedTotal | number }} BENEFICIARY DONE</span>
+          <span class="live-pill" (click)="openProcLive()"><span class="dot live"></span>{{ procLiveTotal | number }} LIVE</span>
           <button class="collapse-btn" [class.closed]="!procOpen" (click)="toggleProc()" title="Collapse">&#9662;</button>
         </div>
       </div>
@@ -357,7 +359,7 @@
             <div class="proc-row" *ngFor="let id of procIds">
               <div>
                 <div class="proc-name">{{ procName(id) }}</div>
-                <div class="proc-sub">Total opportunities: <b>{{ procOpp(id) | number }}</b><br>Completed: <b>{{ procCompleted(id) | number }}</b></div>
+                <div class="proc-sub"><span class="proc-sub-link" (click)="openProcTotals(id, 'opp')" title="Unique participants holding these opportunities">Total opportunities: <b>{{ procOpp(id) | number }}</b></span><br><span class="proc-sub-link" (click)="openProcTotals(id, 'comp')" title="Unique participants with completions marked in their ATC">Completed: <b>{{ procCompleted(id) | number }}</b></span></div>
               </div>
               <div class="pcell ns" (click)="openProcCell(id, 'dns')"><div class="pv">{{ procDoerNotStarted(id) }}</div><div class="pl">Not started</div></div>
               <div class="pcell done" (click)="openProcCell(id, 'dc')"><div class="pv">{{ procDoerCompleted(id) }}</div><div class="pl">Completed</div></div>
@@ -806,7 +808,7 @@
 </div>
 
 <!-- ================= DRILL-DOWN PANEL ================= -->
-<div class="scrim" [class.open]="panelOpen" (click)="closePanel()"></div>
+<div class="scrim" [class.open]="panelOpen" (click)="onScrimClick()"></div>
 <aside class="panel" [class.open]="panelOpen">
   <div class="panel-head">
     <div class="panel-eyebrow"><span>{{ panelEyebrow }}</span>
@@ -936,7 +938,15 @@
   </div>
   <div class="panel-count">
     <span>{{ panelCountLabel }}</span>
-    <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">⭳ Export</button>
+    <span class="panel-actions">
+      <button class="panel-sort" *ngIf="panelHasTimes" [class.on]="!!panelTimeSort" (click)="toggleTimeSort()"
+              [title]="panelTimeSort === 'desc' ? 'Sorted by live time, longest first — click for shortest first' : panelTimeSort === 'asc' ? 'Sorted by live time, shortest first — click to clear the sort' : 'Sort by live time'"
+              [attr.aria-label]="panelTimeSort === 'desc' ? 'Sorted by live time, longest first' : panelTimeSort === 'asc' ? 'Sorted by live time, shortest first' : 'Sort by live time'">{{ panelTimeSort === 'desc' ? '◷↓' : panelTimeSort === 'asc' ? '◷↑' : '◷' }}</button>
+      <button class="panel-sort" *ngIf="panelSortable" [class.on]="!!panelCountSort" (click)="toggleCountSort()"
+              [title]="panelCountSort === 'desc' ? 'Sorted by ' + panelSortNoun + ', highest first — click for lowest first' : panelCountSort === 'asc' ? 'Sorted by ' + panelSortNoun + ', lowest first — click to clear the sort' : 'Sort by ' + panelSortNoun"
+              [attr.aria-label]="panelCountSort === 'desc' ? 'Sorted by ' + panelSortNoun + ', highest first' : panelCountSort === 'asc' ? 'Sorted by ' + panelSortNoun + ', lowest first' : 'Sort by ' + panelSortNoun">{{ panelCountSort === 'desc' ? '↓' : panelCountSort === 'asc' ? '↑' : '⇅' }}</button>
+      <button class="panel-export" *ngIf="panelCount" (click)="panelExport()" title="Export this list to Excel (CSV)">⭳ Export</button>
+    </span>
   </div>
 
   <!-- ---- send to this list: notification · WhatsApp · email ----------------------
@@ -962,6 +972,14 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/>
       <path d="m3 7 9 5.5L21 7"/>
+    </svg>
+  </ng-template>
+  <!-- row avatars show this instead of initials — the camera says "click to see
+       the photo" (the whole row opens the detail popup with the picture) -->
+  <ng-template #icoCamera>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 5h-3.2l-1.2-1.4A2 2 0 0 0 14.1 3H9.9a2 2 0 0 0-1.5.6L7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/>
+      <circle cx="12" cy="13" r="4"/>
     </svg>
   </ng-template>
 
@@ -1002,29 +1020,28 @@
     </ng-container>
   </div>
 
-  <div class="panel-list">
+  <div class="panel-list" #panelList (scroll)="onPanelScroll($event)">
     <ng-container *ngFor="let p of panelParticipants">
       <!-- changework group: the lead once, every counterpart listed beneath it -->
       <div class="p-grp" *ngIf="p['_pair']; else singleRow">
-        <div class="p-grp-lead">
+        <div class="p-grp-lead" [class.p-click]="!!p['lead']" [attr.tabindex]="p['lead'] ? 0 : null" [attr.role]="p['lead'] ? 'button' : null"
+             (click)="p['lead'] && rowClick($event, p['lead'], true)"
+             (keydown.enter)="p['lead'] && rowKey($event, p['lead'], true)"
+             (keydown.space)="p['lead'] && rowKey($event, p['lead'], true)">
           <!-- the LEAD is the only selectable side: a doer in an "As Doer" list, a
                beneficiary in an "As Beneficiary" one. Counterparts below are context. -->
           <input type="checkbox" class="p-check" *ngIf="commOn && p['lead']"
                  [checked]="isCommSelected(p['lead'].profileid)"
+                 (click)="$event.stopPropagation()"
                  (change)="toggleCommOne(p['lead'].profileid)"
                  [attr.aria-label]="'Select ' + p['lead'].name">
-          <ng-container *ngIf="p['lead']">
-            <app-profile-picture *ngIf="revealedPhotos.has(p['lead'].profileid); else avaLead" class="p-avatar-pic" [profileId]="p['lead'].profileid" [name]="p['lead'].name" [size]="30" [autoOpen]="pendingOpenId === p['lead'].profileid" (opened)="pendingOpenId = null"></app-profile-picture>
-            <ng-template #avaLead>
-              <button type="button" class="p-avatar p-avatar-btn" (click)="showPhoto(p['lead'].profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + p['lead'].name">{{ initials(p['lead'].name) }}</button>
-            </ng-template>
-          </ng-container>
+          <span class="p-avatar" *ngIf="p['lead']" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
           <span class="p-avatar p-dim" *ngIf="!p['lead']">&mdash;</span>
           <span style="min-width:0;flex:1">
             <span class="p-role" [ngClass]="p['leadRole'] === 'beneficiary' ? 'beneficiary' : 'doer'">
               {{ p['leadRole'] === 'beneficiary' ? 'BENEFICIARY' : 'DOER' }}
             </span>
-            <div class="p-name p-name-photo" *ngIf="p['lead']" (click)="showPhoto(p['lead'].profileid, $event)" title="View photo">{{ p['lead'].name }}</div>
+            <div class="p-name" *ngIf="p['lead']">{{ p['lead'].name }}<span class="p-timer" *ngIf="p['_since'] && !p['others']?.length" [class.over]="liveOver(p['_since'])" [title]="'Live since the start of this changework' + (liveOver(p['_since']) ? ' — over 2 hours' : '')">{{ liveElapsed(p['_since']) }}</span></div>
             <div class="p-name p-dim" *ngIf="!p['lead']">&mdash;</div>
             <div class="p-meta" *ngIf="p['lead']?.email">{{ p['lead'].email }}</div>
             <div class="p-badges" *ngIf="p['lead']">
@@ -1039,14 +1056,14 @@
           <div class="p-grp-eyebrow">
             &rarr; {{ p['others'].length }} {{ p['leadRole'] === 'beneficiary' ? (p['others'].length === 1 ? 'doer' : 'doers') : (p['others'].length === 1 ? 'beneficiary' : 'beneficiaries') }}
           </div>
-          <div class="p-grp-kid" *ngFor="let c of p['others']">
-            <app-profile-picture *ngIf="revealedPhotos.has(c.profileid); else avaKid" class="p-avatar-pic sm" [profileId]="c.profileid" [name]="c.name" [size]="24" [autoOpen]="pendingOpenId === c.profileid" (opened)="pendingOpenId = null"></app-profile-picture>
-            <ng-template #avaKid>
-              <button type="button" class="p-avatar sm p-avatar-btn" (click)="showPhoto(c.profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + c.name">{{ initials(c.name) }}</button>
-            </ng-template>
+          <div class="p-grp-kid p-click" *ngFor="let c of p['others']" tabindex="0" role="button"
+               (click)="rowClick($event, c, false)"
+               (keydown.enter)="rowKey($event, c, false)"
+               (keydown.space)="rowKey($event, c, false)">
+            <span class="p-avatar sm" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
             <span style="min-width:0">
               <!-- x3 = three changeworks with this same person, not three people -->
-              <div class="p-name"><span class="p-name-photo" (click)="showPhoto(c.profileid, $event)" title="View photo">{{ c.name }}</span><span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span></div>
+              <div class="p-name"><span>{{ c.name }}</span><span class="p-rep" *ngIf="c['_n'] > 1" [title]="c['_n'] + ' changeworks with this person'">&times;{{ c['_n'] }}</span><span class="p-timer" *ngIf="c['_since']" [class.over]="liveOver(c['_since'])" [title]="'Live since the start of this changework' + (liveOver(c['_since']) ? ' — over 2 hours' : '')">{{ liveElapsed(c['_since']) }}</span><span class="p-status" *ngIf="c['_stOk']"><span class="p-st" [class.ok]="stDone(c['_ds'])" [title]="'Doer status: ' + (c['_ds'] || '—')">D</span><span class="p-st" [class.ok]="stDone(c['_bs'])" [title]="'Beneficiary status: ' + (c['_bs'] || '—')">B</span></span></div>
               <div class="p-meta" *ngIf="c.email">{{ c.email }}</div>
               <div class="p-badges">
                 <span class="j-badge" [ngClass]="journeyBadgeClass(c.activejourney)" *ngIf="c.activejourney">{{ journeyLabel(c.activejourney) }}</span>
@@ -1062,17 +1079,18 @@
 
       <!-- standard single-participant row -->
       <ng-template #singleRow>
-        <div class="p-row" [class.p-row-picking]="markPickerId === p.profileid">
+        <div class="p-row p-click" [class.p-row-picking]="markPickerId === p.profileid" tabindex="0" role="button"
+             (click)="rowClick($event, p, true)"
+             (keydown.enter)="rowKey($event, p, true)"
+             (keydown.space)="rowKey($event, p, true)">
           <input type="checkbox" class="p-check" *ngIf="commOn"
                  [checked]="isCommSelected(p.profileid)"
+                 (click)="$event.stopPropagation()"
                  (change)="toggleCommOne(p.profileid)"
                  [attr.aria-label]="'Select ' + p.name">
-          <app-profile-picture *ngIf="revealedPhotos.has(p.profileid); else avaSingle" class="p-avatar-pic" [profileId]="p.profileid" [name]="p.name" [size]="30" [autoOpen]="pendingOpenId === p.profileid" (opened)="pendingOpenId = null"></app-profile-picture>
-          <ng-template #avaSingle>
-            <button type="button" class="p-avatar p-avatar-btn" (click)="showPhoto(p.profileid, $event)" title="Load & view photo" [attr.aria-label]="'View photo of ' + p.name">{{ initials(p.name) }}</button>
-          </ng-template>
+          <span class="p-avatar" title="Click to view photo & details"><ng-container *ngTemplateOutlet="icoCamera"></ng-container></span>
           <span style="min-width:0">
-            <div class="p-name p-name-photo" (click)="showPhoto(p.profileid, $event)" title="View photo">{{ p.name }}</div>
+            <div class="p-name">{{ p.name }}</div>
             <div class="p-meta">{{ p.email }}</div>
             <div class="p-badges">
               <span class="j-badge" [ngClass]="journeyBadgeClass(p.activejourney)" *ngIf="p.activejourney">{{ journeyLabel(p.activejourney) }}</span>
@@ -1081,9 +1099,12 @@
             </div>
           </span>
           <span class="p-right">
-            <button class="mark-att" *ngIf="panelMarkable && !markedIds.has(p.profileid) && markPickerId !== p.profileid" [disabled]="markingId === p.profileid" (click)="openMarkPicker(p)">{{ markingId === p.profileid ? 'Loading…' : 'Mark attendance' }}</button>
+            <button class="mark-att" *ngIf="panelMarkable && !markedIds.has(p.profileid) && markPickerId !== p.profileid" [disabled]="markingId === p.profileid" (click)="$event.stopPropagation(); openMarkPicker(p)">{{ markingId === p.profileid ? 'Loading…' : 'Mark attendance' }}</button>
             <span class="mark-done" *ngIf="markedIds.has(p.profileid)">&checkmark; Marked</span>
-            <div class="p-flag" *ngIf="p['_meta']">{{ p['_meta'] }}</div>
+            <!-- proc totals lists: the participant's share of the tile number, coloured
+                 like the table cells (opportunities = pending amber, completed = green) -->
+            <span class="p-cnt" *ngIf="p['_count'] != null" [ngClass]="p['_countKind'] === 'comp' ? 'comp' : 'opp'" [title]="p['_meta']">{{ p['_count'] }}</span>
+            <div class="p-flag" *ngIf="p['_meta'] && p['_count'] == null">{{ p['_meta'] }}</div>
           </span>
         </div>
         <!-- inline product picker — one attendance log doc per selected product -->
@@ -1102,4 +1123,60 @@
     </ng-container>
     <div class="fu-empty" style="padding:14px 12px" *ngIf="panelCount === 0">No participants match.</div>
   </div>
+  <button class="panel-top" *ngIf="panelScrolled" (click)="scrollPanelTop()" title="Back to top" aria-label="Back to top">&uarr;</button>
 </aside>
+
+<!-- participant detail popup (row click in the drill-down panel): the photo and the
+     row's data in one card. Lives OUTSIDE the <aside> on purpose — the panel is
+     position:fixed with a transform, and a transformed ancestor would hijack this
+     overlay's fixed positioning. The picture's own click still opens the full-size
+     enlarge overlay (body-mounted, above this). -->
+<div class="pp-backdrop" *ngIf="detailP" (click)="onDetailBackdrop($event)">
+  <div class="pp-card" (click)="$event.stopPropagation()">
+    <button class="pp-x" (click)="closeDetail()" title="Close" aria-label="Close">&times;</button>
+    <!-- [src] = the participant-metadata photo (profile||profileimg, normalised at
+         load) — the picture component then never queries profile_data -->
+    <app-profile-picture class="pp-photo" [profileId]="detailP.profileid" [name]="detailP.name" [size]="120" [src]="detailP.photo || ''"></app-profile-picture>
+    <div class="pp-name">{{ detailP.name }}</div>
+    <div class="pp-badges">
+      <span class="j-badge" [ngClass]="journeyBadgeClass(detailP.activejourney)" *ngIf="detailP.activejourney">{{ journeyLabel(detailP.activejourney) }}</span>
+      <span class="j-badge" [ngClass]="isFirstTimer(detailP.profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(detailP.profileid) ? '1ST' : 'RPT' }}</span>
+      <span class="j-badge prod" *ngFor="let pr of productNames(detailP.profileid)">{{ pr }}</span>
+    </div>
+    <span class="p-cnt" *ngIf="detailP['_count'] != null" [ngClass]="detailP['_countKind'] === 'comp' ? 'comp' : 'opp'">{{ detailP['_meta'] }}</span>
+    <div class="pp-rows">
+      <div class="pp-row" *ngIf="detailP.email"><span>Email</span><b>{{ detailP.email }}</b></div>
+      <div class="pp-row" *ngIf="detailP.phone"><span>Phone</span><b>{{ detailP.phone }}</b></div>
+      <div class="pp-row"><span>Attendance</span><b>{{ detailAttd }} day{{ detailAttd === 1 ? '' : 's' }}</b></div>
+      <ng-container *ngIf="detailAtc">
+        <div class="pp-row"><span>Procedures</span><b>{{ detailAtc.procDone }} done &middot; {{ detailAtc.procPending }} pending</b></div>
+        <div class="pp-row"><span>Adjustments</span><b>{{ detailAtc.adjDone }} done &middot; {{ detailAtc.adjPending }} pending</b></div>
+      </ng-container>
+      <div class="pp-row" *ngIf="detailP['_n'] > 1"><span>Changeworks together</span><b>&times;{{ detailP['_n'] }}</b></div>
+      <div class="pp-row" *ngIf="detailP.isNotRegistered"><span>Status</span><b>Not a registered event participant</b></div>
+    </div>
+    <!-- one widget per changework with hours+hourtype (As Beneficiary lists' doer
+         popups): which changework, when, and the time saved — the same card
+         language as the sharednotes widgets -->
+    <div class="pp-notes" *ngIf="detailHours.length">
+      <div class="pp-note-card" *ngFor="let h of detailHours; let i = index">
+        <div class="pp-note-head">
+          <span class="pp-note-proc">{{ h.procedure || 'Changework' }}{{ detailHours.length > 1 ? ' &middot; #' + (i + 1) : '' }}</span>
+          <span class="pp-note-date" *ngIf="noteDate(h.createdon)">{{ noteDate(h.createdon) }}</span>
+        </div>
+        <div class="pp-hours-text">{{ hoursSaved(h) }}</div>
+      </div>
+    </div>
+    <!-- one widget per NOTED changework: the note, which changework, and when —
+         an x2 pair shows two dated cards instead of one merged line -->
+    <div class="pp-notes" *ngIf="detailNotes.length">
+      <div class="pp-note-card" *ngFor="let n of detailNotes; let i = index">
+        <div class="pp-note-head">
+          <span class="pp-note-proc">{{ n.procedure || 'Changework' }}{{ detailNotes.length > 1 ? ' &middot; #' + (i + 1) : '' }}</span>
+          <span class="pp-note-date" *ngIf="noteDate(n.createdon)">{{ noteDate(n.createdon) }}</span>
+        </div>
+        <div class="pp-note-text">&ldquo;{{ n.note }}&rdquo;</div>
+      </div>
+    </div>
+  </div>
+</div>
