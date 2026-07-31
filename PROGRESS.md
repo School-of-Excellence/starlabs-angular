@@ -1,38 +1,42 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-30 (npm ERESOLVE fix: dead react/redux deps removed)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-30-npm-peer-conflict-react-removal.md`.
+_Last updated: 2026-07-30 (panel-UX arc · perf audit · H1+H3 perf fixes · sharednotes)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-07-30-proc-tracking-totals-panel.md` (the whole day's arc, 5 addenda) and `specs/2026-07-30-perf-audit-live-event-dashboard-v3.md` (the performance report).
 
 ## Current state
-- **Plain `npm install` (no flags) and `ng build --configuration production`
-  are both green** on branch `nanda-development`. The lockfile was regenerated;
-  Zoom's peer subtree (react 18.2.0, react-dom 18.2.0, redux 4.2.1,
-  react-redux 8.1.2, redux-thunk 2.4.2, lodash 4.18.1) is npm-auto-installed,
-  **not** declared in package.json — see the journal's constraint note.
-- live-event-dashboard-v3 panel-filter work from 2026-07-28 unchanged
-  (see that day's journal); push remains operator-gated.
-- **Everything from today is UNCOMMITTED by operator instruction** ("I'll
-  commit manually"): `package.json`, `package-lock.json`, today's journal,
-  this file, plus a pre-session edit to
-  `src/app/Events/locationlog/map-picker.component.ts` that is the operator's
-  own work.
+- Branch `nanda-development`. Plain `npm install` (no flags) and
+  `ng build --configuration production` both green.
+- **Committed & pushed** (operator): the morning npm ERESOLVE fix (dead
+  react/redux deps removed — never re-add them; Zoom auto-installs its peers).
+- **UNCOMMITTED** (operator commits manually after Chrome testing): the entire
+  live-event-dashboard-v3 day — panel features (totals panels + badges,
+  row-click participant popup, camera avatars, dual ⇅/◷ sorts, DONE pills,
+  live timers, back-to-top, popup sharednotes cards [As Doer side] + time-saved
+  lines [As Beneficiary side]) AND two perf fixes from
+  the audit: **H3** (zero `profile_data` reads — staff names + popup photo now
+  from participant metadata; additive `[src]` input on ProfilePicture) and
+  **H1** (init() waterfall → 8-task parallel batch; selector paints
+  immediately; selectEvent still strictly last; journey/procedures reads now
+  fail-soft). Plus journals, the perf report, this file, and the operator's
+  own `map-picker.component.ts` edit.
 
 ## Last session changes (2026-07-30) — why
-- `npm install` ERESOLVE'd: commit `65e0e36` (2026-07-30, Charan Reddy) had
-  added react ^19.2.8 / react-dom ^19.2.8 / redux ^5 / redux-thunk ^3 as
-  direct deps though **nothing in src/ imports them**, and every
-  @zoom/meetingsdk 6.x exact-pins react@18.2.0 (+ redux 4.2.1 etc.) — React 19
-  can never coexist with Zoom under strict npm. Removed the four dead entries,
-  restoring the pre-`65e0e36` baseline where npm satisfies Zoom's peers
-  automatically. Verified: dry-run + real install + prod build, all flag-free;
-  full 73-package peer sweep shows no other conflict.
-- Found in passing (not fixed): dead `@ai-coustics/aic-sdk` asset rule in
-  angular.json (ships empty `/assets/aic/`), accidental `common` dep,
-  `@types/*` hygiene — task chip spawned; 58 npm audit vulns pre-existing.
+- Full detail in the day's journal. Highlights: the drill-down panel became the
+  hub (popup, badges, sorts, timers, notes); a 25-agent read-only perf audit
+  (every High/Medium finding adversarially verified) identified the load-time
+  structure: serial init waterfall × unbounded platform-wide scans × CD burst.
+  H1+H3 fixed same day; each change build-verified and adversarially reviewed
+  (one real bug caught and fixed: popup-backdrop double-click fall-through;
+  one hardening: init reads fail-soft).
 
 ## Pending / next
-- **Operator: review & commit** today's dependency fix (and push when ready —
-  CI runs plain `npm install`, so the fix must land before any fresh CI run).
-- Heads-up for Charan Reddy: their `65e0e36` react/redux additions were
-  removed as unused; coordinate if they had a planned use.
-- Deferred items from 2026-07-28 journal (live cell count vs panel grouping,
-  ATC-prescribed universe on live beneficiary cell, listener consolidation).
+- **Operator Chrome pass** (checklists at the end of the journal's addenda),
+  then commit manually.
+- **Perf audit remaining**: H2 (scope the unbounded `participant metadata`
+  scan — biggest single win; needs the out-of-universe fallback for
+  caller/assignee/staff names), H4 (bound `temporary_ATC` by lastupdated),
+  then Phase 2 (changed$ coalescing + Set-based membership + memoization) and
+  Phase 3 (limits, skeleton, trackBy, subscription hygiene). Report has the
+  ordered plan.
+- Cleanup chip pending (dead @ai-coustics asset rule, `common` dep, @types
+  hygiene); 58 pre-existing npm audit vulns; deferred 2026-07-28 items
+  (livechangework listener consolidation — now also perf M1).
