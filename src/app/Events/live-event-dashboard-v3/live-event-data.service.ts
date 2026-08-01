@@ -199,8 +199,6 @@ export class LiveEventDataService implements OnDestroy {
   private metadataSub: Subscription | null = null;
   private atcSub: Subscription | null = null;
   private atcToValidateSub: Subscription | null = null;
-  private lcwSub: Subscription | null = null;
-  private lcwLiveSub: Subscription | null = null;
   private lcwEventSub: Subscription | null = null;
   private attendanceSub: Subscription | null = null;
   private eTicketSub: Subscription | null = null;
@@ -227,10 +225,12 @@ export class LiveEventDataService implements OnDestroy {
     // changed$ the moment THEY land, so the event selector and ongoing strip
     // paint while the big metadata scan is still streaming — the page appears
     // step by step instead of all-at-once after a long blank.
-    // selectEvent stays strictly AFTER the whole batch: its listeners' first
-    // snapshots read participantMetadataMap (calculateProcedureData bails on an
-    // empty map and nothing re-runs it until the next snapshot), so the static
-    // maps must be complete before any subscription starts.
+    // selectEvent no longer waits for the metadata scan (measured 2026-08-01:
+    // gating on it held the whole queue pipeline — and the firestore-atc
+    // channel's very first request — until ~15.5s on production data). The scan
+    // resolves concurrently and RE-KICKS calculateProcedureData + changed$ when
+    // the map lands; until then name lookups fall back ('Unknown' /
+    // registeredNames) and calculateProcedureData bails harmlessly.
 
     // journey map (V2 ngOnInit)
     const journeyP = getDocs(collection(this.firestoreDefault, 'journey')).then(snap => {
@@ -349,7 +349,17 @@ export class LiveEventDataService implements OnDestroy {
       }
     })();
 
-    await Promise.all([journeyP, proceduresP, tagsP, metadataP, issueCatP, rolesP, productsP, eventsQueuesP]);
+    // metadata lands whenever it lands — re-kick every metadata-derived number
+    // then (loadParticipantMetadata catches internally, so this always runs).
+    // calculateJourneyCounts must be here too: selectEvent computes it before
+    // the map lands (zeros), and NOTHING else re-runs it. Ordering-safe: before
+    // selectEvent it sees an empty universe and selectEvent recomputes after.
+    metadataP.then(() => {
+      this.calculateJourneyCounts();
+      this.calculateProcedureData();
+      this.changed$.next();
+    }).catch(err => console.error('metadata re-kick failed:', err));
+    await Promise.all([journeyP, proceduresP, tagsP, issueCatP, rolesP, productsP, eventsQueuesP]);
 
     // ONLY dependency in the whole chain: auto-selecting the ongoing event needs
     // the events list, and its listeners need every static map above.
@@ -394,6 +404,18 @@ export class LiveEventDataService implements OnDestroy {
   // ==========================================================================
   async selectEvent(event: EventData): Promise<void> {
     this.unsubscribeEventPipeline();
+    // Queue-scoped snapshot state must not survive an event switch: repeat
+    // attendees' old-event atc_alpha docs pass the NEW event's universe filter,
+    // and the derive/calc calls that now run synchronously during the switch
+    // would transiently blend them into the new event's numbers.
+    this.resetProcedureState();
+    // The event-wide changework stream too — arena now attaches BEFORE
+    // subscribeToEventChangeWork resets it, and deriveLcwViews at attach must
+    // not filter the PREVIOUS event's docs into the new event's window. Kept
+    // OUT of resetProcedureState deliberately: queue deselection must not wipe
+    // these (a day-chip click still derives that day's changework with zero
+    // queues selected).
+    this.eventChangeWorkDocs = [];
     this.selectedEvent = event;
     this.procDayFilter = 'all';
     this.participantFilter = 'all';
@@ -410,6 +432,22 @@ export class LiveEventDataService implements OnDestroy {
     this.subscribeToETickets();
     this.generateDayWiseStructure();
     this.applyDefaultProcedureDay();
+
+    // auto-select this event's ongoing queues (FT/V2 default) and attach the ATC
+    // pipeline FIRST: it rides the separate firestore-atc channel, so opening it
+    // before the default-DB heavies (attendance, videoask, event changework, …)
+    // lets both databases backfill in parallel instead of the ATC card queuing
+    // behind them. It must not wait a round-trip for the queue-variation read
+    // either — its queries scope by queueid + queue range, not atcModels
+    // (measured 2026-08-01: those serial hops held the firestore-atc channel's
+    // first request to ~15.5s on production data).
+    this.selectedQueues = this.ongoingQueues.filter(q => q['eventref'] && this.selectedEvent && this.pathOf(q['eventref']) === this.pathOf(this.selectedEvent.docref));
+    if (this.selectedQueues.length === 0 && this.ongoingQueues.length > 0) { this.selectedQueues = [this.ongoingQueues[0]]; }
+    this.selectedQueueRefs = this.selectedQueues.map(q => q.docref);
+    console.log('[v3][select] auto-selected queues:', this.selectedQueues.map(q => q['name'] || q['queuename']));
+    this.updateQueueDateRange();
+    this.subscribeToArenaOverview();
+
     this.subscribeToAttendance();
     this.subscribeToVideoAsk();
     this.subscribeToVideoAskTags();
@@ -420,12 +458,6 @@ export class LiveEventDataService implements OnDestroy {
     this.subscribeToParticipantZones();
     this.subscribeToEventChangeWork();
 
-    // auto-select this event's ongoing queues → derives atcModels (FT/V2 default)
-    this.selectedQueues = this.ongoingQueues.filter(q => q['eventref'] && this.selectedEvent && this.pathOf(q['eventref']) === this.pathOf(this.selectedEvent.docref));
-    if (this.selectedQueues.length === 0 && this.ongoingQueues.length > 0) { this.selectedQueues = [this.ongoingQueues[0]]; }
-    this.selectedQueueRefs = this.selectedQueues.map(q => q.docref);
-    console.log('[v3][select] auto-selected queues:', this.selectedQueues.map(q => q['name'] || q['queuename']));
-    this.updateQueueDateRange();
     await this.loadQueuevariation();
 
     this.changed$.next();
@@ -437,7 +469,7 @@ export class LiveEventDataService implements OnDestroy {
     if (idx > -1) { this.selectedQueues.splice(idx, 1); this.selectedQueueRefs.splice(idx, 1); }
     else { this.selectedQueues.push(queue); this.selectedQueueRefs.push(queue.docref); }
     this.updateQueueDateRange();
-    if (this.selectedQueues.length > 0) { await this.loadQueuevariation(); }
+    if (this.selectedQueues.length > 0) { this.subscribeToArenaOverview(); await this.loadQueuevariation(); }
     else { this.unsubscribeQueuePipeline(); this.resetProcedureState(); }
     this.changed$.next();
   }
@@ -1094,11 +1126,11 @@ export class LiveEventDataService implements OnDestroy {
       this.filterEndDate = new Date(y, m - 1, dd, 23, 59, 59, 999);
     }
     // Only livechangework depends on the day window; ATC opportunities use the
-    // queue range and are unaffected (FT semantics).
-    if (this.lcwSub) { this.lcwSub.unsubscribe(); this.lcwSub = null; }
-    if (this.lcwLiveSub) { this.lcwLiveSub.unsubscribe(); this.lcwLiveSub = null; }
-    this.subscribeToLiveChangeWork();
-    this.subscribeToLiveChangeworkLive();
+    // queue range and are unaffected (FT semantics). The day views are a pure
+    // in-memory re-filter of the event-wide stream now — a chip change no longer
+    // tears down and re-runs two server queries, so it needs no network at all.
+    this.deriveLcwViews();
+    this.calculateProcedureData();
     this.changed$.next();
   }
 
@@ -1130,7 +1162,6 @@ export class LiveEventDataService implements OnDestroy {
       this.atcModels = [...new Set(models)];
       console.log('[v3][atcModels] from', variationSnapshots.reduce((n, s) => n + s.docs.length, 0),
         'queue-variation docs →', this.atcModels);
-      this.subscribeToArenaOverview();
     } catch (error) {
       console.error('Error loading queue variation:', error);
     }
@@ -1166,8 +1197,8 @@ export class LiveEventDataService implements OnDestroy {
     this.subscribeToAtcAlpha();
     this.subscribeToAtcToValidate();
     this.subscribeToDraftAtc();
-    this.subscribeToLiveChangeWork();
-    this.subscribeToLiveChangeworkLive();
+    this.deriveLcwViews();
+    this.calculateProcedureData();
   }
 
   // V2 subscribeToDraftAtc — temporary_ATC drafts (delete==false) whose transcript[0]
@@ -1176,8 +1207,20 @@ export class LiveEventDataService implements OnDestroy {
   private subscribeToDraftAtc(): void {
     if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
     if (!this.selectedEvent || !this.queueRangeStartDate) { this.draftAtcProfileIds = []; this.draftAtcCount = 0; return; }
+    // Bounded server-side (operator, 2026-08-01): only drafts touched on/after
+    // the EARLIEST selected queue's start date (queueRangeStartDate = oldest
+    // queuestartdate across the selection, midnight-floored — updateQueueDateRange)
+    // come down the wire. The client-side isDateInQueueRange filter below always
+    // discarded everything older, but only AFTER downloading every active draft
+    // platform-wide (perf audit H4) — the numbers cannot move, only the download
+    // shrinks. The client filter stays unchanged as the parity backstop (it also
+    // applies the upper bound). NOTE: equality(delete) + range(lastupdated) needs
+    // a composite index on the firestore-atc DB — if missing, the error handler
+    // below logs a failed-precondition error carrying a one-click create link.
     this.draftAtcSub = collectionData(query(
-      collection(this.firestoreATC, 'temporary_ATC'), where('delete', '==', false)
+      collection(this.firestoreATC, 'temporary_ATC'),
+      where('delete', '==', false),
+      where('lastupdated', '>=', this.queueRangeStartDate)
     )).subscribe({
       next: (docs: any[]) => {
         const ids: string[] = [];
@@ -1198,7 +1241,15 @@ export class LiveEventDataService implements OnDestroy {
         console.log('[v3][atc] temporary_ATC draft docs:', docs.length, '| draft participants (event):', ids.length);
         this.changed$.next();
       },
-      error: (error) => console.error('Error subscribing to temporary_ATC drafts:', error)
+      error: (error) => {
+        // A failed-precondition here = the composite index (delete equality +
+        // lastupdated range) is missing on the firestore-atc DB; the error text
+        // carries a one-click create link. Clear rather than keep stale counts.
+        this.draftAtcProfileIds = [];
+        this.draftAtcCount = 0;
+        this.changed$.next();
+        console.error('Error subscribing to temporary_ATC drafts — if this is failed-precondition, open the index-creation link inside this error:', error);
+      }
     });
   }
 
@@ -1292,11 +1343,34 @@ export class LiveEventDataService implements OnDestroy {
       next: (docs: any[]) => {
         this.atcDocs = docs.filter((d: any) => d['isdelete'] !== true);
         this.profileAtcMap = {};
+        // ONE pass over the snapshot builds BOTH the latest-doc-per-profile map
+        // AND the V1 scalar adjustment sums (event totals + the per-participant
+        // aggregate, accumulated across ALL of a person's docs, not just the
+        // latest) — computeAdjustmentTotals used to walk the same doc set a
+        // second time. Set membership replaces the per-doc O(participants)
+        // array scan; same universe, same numbers (C-12 basis unchanged).
+        this.totalAdjustmentCount = 0;
+        this.totalAdjustmentCompletedCount = 0;
+        this.totalAdjustmentPendingCount = 0;
+        this.participantAtc = {};
+        const num = (v: any) => (v && !Number.isNaN(v)) ? Number(v) : 0;
         this.atcDocs.forEach((d: any) => {
           const profileId: string = d['profileid'] || '';
-          if (!profileId || !this.eventParticipantProfileIds.includes(profileId)) return;
+          if (!profileId || !this.eventParticipantSet.has(profileId)) return;
           const prescriptionDate = d['prescription_date']?.toDate ? d['prescription_date'].toDate() : new Date(d['prescription_date']);
           if (!this.profileAtcMap[profileId] || prescriptionDate > this.profileAtcMap[profileId]._date) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
+          const total = num(d['totaladjustment']);
+          const completedAdj = num(d['totaladjustmentcompleted']);
+          const pendingAdj = num(d['totaladjustmentpending']);
+          this.totalAdjustmentCount += total;
+          this.totalAdjustmentCompletedCount += completedAdj;
+          this.totalAdjustmentPendingCount += pendingAdj;
+          const agg = this.participantAtc[profileId] || { adjTotal: 0, adjDone: 0, adjPending: 0, procTotal: 0, procDone: 0, procPending: 0 };
+          agg.adjTotal += total; agg.adjDone += completedAdj; agg.adjPending += pendingAdj;
+          agg.procTotal += num(d['totalprocedure']);
+          agg.procDone += num(d['totalprocedurecompleted']);
+          agg.procPending += num(d['totalprocedurepending']);
+          this.participantAtc[profileId] = agg;
         });
         this.beneficierProfileIds = [];
         Object.keys(this.profileAtcMap).forEach(profileId => {
@@ -1306,7 +1380,6 @@ export class LiveEventDataService implements OnDestroy {
           if (procedurePendingList.length > 0 || procedureCompletedList.length > 0) { this.beneficierProfileIds.push(profileId); }
         });
         this.beneficierTotal = this.beneficierProfileIds.length;
-        this.computeAdjustmentTotals();
         console.log('[v3][atc] atc_alpha docs:', docs.length,
           '| completed profiles (event-participant):', Object.keys(this.profileAtcMap).length,
           '| adj total/done/pending:', this.totalAdjustmentCount, this.totalAdjustmentCompletedCount, this.totalAdjustmentPendingCount);
@@ -1318,75 +1391,48 @@ export class LiveEventDataService implements OnDestroy {
     });
   }
 
-  // Adjustments — V1 scalar-field sums (lines 723-744), over atcDocs scoped to
-  // this event's participants. USER TO CONFIRM (C-12): same formula as V1, but
-  // applied to FT's atc_alpha doc set (product-in-atcModels + queue range) rather
-  // than V1's own query window (prescription_date last 4 months). Numbers may differ.
-  private computeAdjustmentTotals(): void {
-    this.totalAdjustmentCount = 0;
-    this.totalAdjustmentCompletedCount = 0;
-    this.totalAdjustmentPendingCount = 0;
-    this.participantAtc = {};
-    const num = (v: any) => (v && !Number.isNaN(v)) ? Number(v) : 0;
-    this.atcDocs.forEach((atcData: any) => {
-      const pid = atcData['profileid'];
-      if (!this.eventParticipantProfileIds.includes(pid)) return;
-      const total = num(atcData['totaladjustment']);
-      const completed = num(atcData['totaladjustmentcompleted']);
-      const pending = num(atcData['totaladjustmentpending']);
-      this.totalAdjustmentCount += total;
-      this.totalAdjustmentCompletedCount += completed;
-      this.totalAdjustmentPendingCount += pending;
-      // per-participant aggregate (V1 scalar-field sums across this person's docs)
-      const agg = this.participantAtc[pid] || { adjTotal: 0, adjDone: 0, adjPending: 0, procTotal: 0, procDone: 0, procPending: 0 };
-      agg.adjTotal += total; agg.adjDone += completed; agg.adjPending += pending;
-      agg.procTotal += num(atcData['totalprocedure']);
-      agg.procDone += num(atcData['totalprocedurecompleted']);
-      agg.procPending += num(atcData['totalprocedurepending']);
-      this.participantAtc[pid] = agg;
-    });
-  }
-
-  // FT subscribeToLiveChangeWork (completed)
-  private subscribeToLiveChangeWork(): void {
+  // The two day-scoped livechangework views (completed / live) are DERIVED from
+  // the ONE event-wide listener (subscribeToEventChangeWork) whose result set
+  // strictly contains them — the event's changework used to download roughly
+  // twice, and every changework write fired three snapshot callbacks.
+  // Predicate parity with the removed server queries (numbers must not move):
+  // same eventref scope (the source listener's own where); createdon must be a
+  // real Timestamp inside [start, end] — a server range filter only matches
+  // timestamp-typed values, so string/missing createdon never matched and must
+  // not match here; EXACT procedurestatus equality (the queries used ==, not the
+  // trim/lowercase some client code applies); the same filterStart||queueRange
+  // date fallback; and results re-sorted createdon-asc then doc id to reproduce
+  // the implicit orderBy a Firestore range query applies (drill-down row order).
+  // Guard matches the OLD server queries' guard EXACTLY (!start || !end ||
+  // !selectedEvent) — deliberately NO queue check: the old day queries also ran
+  // with zero queues selected (a day-chip click after deselecting every queue
+  // still shows that day's changework; verifier round 4, defect 1).
+  private deriveLcwViews(): void {
     const start = this.filterStartDate || this.queueRangeStartDate;
     const end = this.filterEndDate || this.queueRangeEndDate;
-    if (!start || !end || !this.selectedEvent) return;
-    const q = query(collection(this.firestoreDefault, 'livechangework'),
-      where('eventref', '==', this.selectedEvent.docref),
-      where('createdon', '>=', start),
-      where('createdon', '<=', end),
-      where('procedurestatus', '==', 'completed'));
-    this.lcwSub = collectionData(q, { idField: 'id' }).subscribe({
-      next: (docs: any[]) => {
-        this.liveChangeWorkData = docs;
-        console.log('[v3][lcw completed] docs:', docs.length);
-        this.calculateProcedureData();
-        this.changed$.next();
-      },
-      error: (error) => console.error('Error subscribing to livechangework:', error)
+    if (!start || !end || !this.selectedEvent) {
+      this.liveChangeWorkData = [];
+      this.liveChangeworkLiveData = [];
+      return;
+    }
+    const s = start.getTime(); const e = end.getTime();
+    const completed: any[] = []; const live: any[] = [];
+    (this.eventChangeWorkDocs || []).forEach((d: any) => {
+      const t = d['createdon'];
+      if (!t?.toDate) { return; }
+      const ms = t.toDate().getTime();
+      if (ms < s || ms > e) { return; }
+      if (d['procedurestatus'] === 'completed') { completed.push(d); }
+      else if (d['procedurestatus'] === 'live') { live.push(d); }
     });
-  }
-
-  // FT subscribeToLiveChangeworkLive (live)
-  private subscribeToLiveChangeworkLive(): void {
-    const start = this.filterStartDate || this.queueRangeStartDate;
-    const end = this.filterEndDate || this.queueRangeEndDate;
-    if (!start || !end || !this.selectedEvent) return;
-    const q = query(collection(this.firestoreDefault, 'livechangework'),
-      where('eventref', '==', this.selectedEvent.docref),
-      where('createdon', '>=', start),
-      where('createdon', '<=', end),
-      where('procedurestatus', '==', 'live'));
-    this.lcwLiveSub = collectionData(q, { idField: 'id' }).subscribe({
-      next: (docs: any[]) => {
-        this.liveChangeworkLiveData = docs;
-        console.log('[v3][lcw live] docs:', docs.length);
-        this.calculateProcedureData();
-        this.changed$.next();
-      },
-      error: (error) => console.error('Error subscribing to livechangework live:', error)
-    });
+    const byCreated = (a: any, b: any) => {
+      const am = a['createdon'].toDate().getTime(); const bm = b['createdon'].toDate().getTime();
+      return am - bm || (a['id'] < b['id'] ? -1 : a['id'] > b['id'] ? 1 : 0);
+    };
+    this.liveChangeWorkData = completed.sort(byCreated);
+    this.liveChangeworkLiveData = live.sort(byCreated);
+    console.log('[v3][lcw derived] completed:', completed.length, '| live:', live.length,
+      '| from event-wide docs:', (this.eventChangeWorkDocs || []).length);
   }
 
   /** ALL changework for the event — no `createdon` window and no status filter, so
@@ -1402,7 +1448,12 @@ export class LiveEventDataService implements OnDestroy {
     this.lcwEventSub = collectionData(q, { idField: 'id' }).subscribe({
       next: (docs: any[]) => {
         this.eventChangeWorkDocs = docs;
-        console.log('[v3][lcw event-wide] docs:', docs.length, '(followup CW cards)');
+        // The day-scoped completed/live views are subsets of THIS stream — derive
+        // them (and the procedure numbers they feed) here instead of running two
+        // more server queries over the same documents.
+        this.deriveLcwViews();
+        this.calculateProcedureData();
+        console.log('[v3][lcw event-wide] docs:', docs.length, '(followup CW cards + derived day views)');
         this.changed$.next();
       },
       error: (error) => console.error('Error subscribing to event-wide livechangework:', error)
@@ -1823,8 +1874,6 @@ export class LiveEventDataService implements OnDestroy {
     if (this.atcSub) { this.atcSub.unsubscribe(); this.atcSub = null; }
     if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
     if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
-    if (this.lcwSub) { this.lcwSub.unsubscribe(); this.lcwSub = null; }
-    if (this.lcwLiveSub) { this.lcwLiveSub.unsubscribe(); this.lcwLiveSub = null; }
   }
 
   private unsubscribeEventPipeline(): void {
