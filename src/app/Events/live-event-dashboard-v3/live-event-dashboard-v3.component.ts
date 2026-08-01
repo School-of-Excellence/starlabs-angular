@@ -6,7 +6,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { debounceTime, Subject, Subscription, takeUntil } from 'rxjs';
 import { collection, doc, Firestore, setDoc, Timestamp, updateDoc } from '@angular/fire/firestore';
 import { getAuth } from '@angular/fire/auth';
 import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
@@ -415,7 +415,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.sub = this.data.changed$.subscribe(() => {
+    // debounceTime(0) coalesces the service's emission bursts: a first load or a
+    // queue toggle fires changed$ several times in quick succession, and each
+    // one used to run this whole handler plus a full detectChanges with every
+    // memo invalidated. Same-tick bursts now collapse into ONE pass; emissions
+    // that arrive spaced out still paint individually, and zone.js keeps
+    // painting template bindings immediately — only this derived work defers by
+    // a macrotask.
+    this.sub = this.data.changed$.pipe(debounceTime(0)).subscribe(() => {
       this.viewVersion++;   // invalidate memoized derived data (data changed)
       // Keep the service's first-timer set (used by procedure scope filter) in sync
       // with seam 3 so "First timers" resolves against the same registered universe.
