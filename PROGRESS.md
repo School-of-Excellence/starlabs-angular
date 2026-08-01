@@ -1,42 +1,48 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-30 (panel-UX arc · perf audit · H1+H3 perf fixes · sharednotes)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-07-30-proc-tracking-totals-panel.md` (the whole day's arc, 5 addenda) and `specs/2026-07-30-perf-audit-live-event-dashboard-v3.md` (the performance report).
+_Last updated: 2026-08-01 (dashboard rounds 1-5: profile-tile merge · header search · ATC slowness diagnosed EMPIRICALLY · duplicate-stream + ladder + transport fixes)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-08-01-live-event-dashboard-v3-continued.md` (today: 5 rounds with WHYs + live measurements) and `specs/2026-07-30-perf-audit-live-event-dashboard-v3.md`.
 
 ## Current state
-- Branch `nanda-development`. Plain `npm install` (no flags) and
-  `ng build --configuration production` both green.
-- **Committed & pushed** (operator): the morning npm ERESOLVE fix (dead
-  react/redux deps removed — never re-add them; Zoom auto-installs its peers).
-- **UNCOMMITTED** (operator commits manually after Chrome testing): the entire
-  live-event-dashboard-v3 day — panel features (totals panels + badges,
-  row-click participant popup, camera avatars, dual ⇅/◷ sorts, DONE pills,
-  live timers, back-to-top, popup sharednotes cards [As Doer side] + time-saved
-  lines [As Beneficiary side]) AND two perf fixes from
-  the audit: **H3** (zero `profile_data` reads — staff names + popup photo now
-  from participant metadata; additive `[src]` input on ProfilePicture) and
-  **H1** (init() waterfall → 8-task parallel batch; selector paints
-  immediately; selectEvent still strictly last; journey/procedures reads now
-  fail-soft). Plus journals, the perf report, this file, and the operator's
-  own `map-picker.component.ts` edit.
+- Branch `nanda-development`; `ng build --configuration production` green
+  (only pre-existing canvg/leaflet + Bootstrap warnings).
+- HEAD holds the 07-30 arc through ~round 13-14; **UNCOMMITTED** (operator
+  commits manually after Chrome testing): 07-30 rounds ~14-24 delta PLUS all
+  of today: profile-card % tiles with done·pending sub-lines; header search
+  over the Total approved universe (opens the rich profile dialog); round-4
+  perf fixes (livechangework 3 listeners → 1 with in-memory day views,
+  atc_alpha single-pass, changed$ debounce, temporary_ATC bounded by
+  `lastupdated >= queueRangeStartDate` — the earliest selected queue start —
+  plus atc-draft `toServer()` timestamp normalization); round-5 ladder fixes
+  (metadata scan un-gated with re-kick incl. calculateJourneyCounts, ATC
+  pipeline attaches before the default-DB heavies and without awaiting the
+  legacy queue-variation read) and **main.ts: firestore-atc switched from
+  FORCED long-polling to auto-detect** (one-word revert if ATC screens ever
+  blank at a venue; firestore-forms left forced).
+- Composite index (temporary_ATC: delete ASC + lastupdated ASC) already
+  exists in prod — verified live (draft count 96-97 works).
 
-## Last session changes (2026-07-30) — why
-- Full detail in the day's journal. Highlights: the drill-down panel became the
-  hub (popup, badges, sorts, timers, notes); a 25-agent read-only perf audit
-  (every High/Medium finding adversarially verified) identified the load-time
-  structure: serial init waterfall × unbounded platform-wide scans × CD burst.
-  H1+H3 fixed same day; each change build-verified and adversarially reviewed
-  (one real bug caught and fixed: popup-backdrop double-click fall-through;
-  one hardening: init reads fail-soft).
+## Last session changes (2026-08-01, why)
+- ATC card took 40-60s. Measured ON the operator's Mac (their ng serve,
+  production data, in-app pane + `ng.getComponent` state reads): app boots
+  in <1s; firestore-atc's FIRST request was held to 15.5s by a serial init
+  ladder (3,376-doc metadata full scan gating selectEvent, then serial
+  participants + queue-variation hops), and the ATC backfill then crawled
+  ~50s on FORCED long-polling (19-29 sequential polls, singles 14-74s).
+  Ladder fixes cut attach to ~11-12s; numbers verified byte-identical
+  (buckets 451/10/1/82 · 506 atc docs · journeys 544). Every round was
+  adversarially verified by agent workflows; verifiers caught real defects
+  (journey counts stuck at zero; event-switch stale-changework blend;
+  zero-queue day-chip parity; ESC double-close; backdrop fall-through) —
+  all fixed. Videoask double-stream deliberately NOT merged (operator
+  comment 2026-07-29 in code).
 
-## Pending / next
-- **Operator Chrome pass** (checklists at the end of the journal's addenda),
-  then commit manually.
-- **Perf audit remaining**: H2 (scope the unbounded `participant metadata`
-  scan — biggest single win; needs the out-of-universe fallback for
-  caller/assignee/staff names), H4 (bound `temporary_ATC` by lastupdated),
-  then Phase 2 (changed$ coalescing + Set-based membership + memoization) and
-  Phase 3 (limits, skeleton, trackBy, subscription hygiene). Report has the
-  ordered plan.
-- Cleanup chip pending (dead @ai-coustics asset rule, `common` dep, @types
-  hygiene); 58 pre-existing npm audit vulns; deferred 2026-07-28 items
-  (livechangework listener consolidation — now also perf M1).
+## Pending
+- **CONFIRMED measured result: dashboard data 40-60s → ~7s** (metadata
+  1.5s; atc/buckets/changework all at 7.0s; numbers identical; transport
+  streaming). Remaining: operator's own Chrome pass + manual commit of
+  the day.
+- If a venue ever blanks ATC screens again: revert the one word in main.ts.
+- Phase-2 perf (H2 proper): scope/cache the `participant metadata` scan;
+  bound event-wide changework (3.4k) / videoask-tag (2.2k) streams.
+- Offered-not-built (07-30): DONE-pill tooltips with doc counts; cleanup
+  chip items; dropped debug of /livechangework/blkWuqSNB2XNco10GSDI.

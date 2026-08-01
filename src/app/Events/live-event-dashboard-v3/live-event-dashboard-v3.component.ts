@@ -6,7 +6,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { debounceTime, Subject, Subscription, takeUntil } from 'rxjs';
 import { collection, doc, Firestore, setDoc, Timestamp, updateDoc } from '@angular/fire/firestore';
 import { getAuth } from '@angular/fire/auth';
 import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
@@ -37,13 +37,15 @@ const EXCLUDED_PRODUCT_ID = getExcludedProductId();
 interface PdRow {
   profileId: string; name: string; email: string; journeyId: string; ft: boolean;
   atcBucket: number;            // 0 full · 1 partial · 2 unvalidated · 3 none · -1 unknown
-  atcPct: number | null;        // SEAM 5
+  atcPct: number | null;        // SEAM 5 — adjustment completion % (column "ADJ %")
+  procPct: number | null;       // procedure completion % (procDone / (done+pending))
   adjDone: number; adjPending: number; procDone: number; procPending: number;
   attd: number;                 // distinct days present
 }
 interface PdFilter {
   q: string; journey: string; type: string; atc: string;
   pctOp: '>=' | '<=' | '<'; pctVal: number;
+  procOp: '>=' | '<=' | '<'; procVal: number;   // PROC % — mirrors the ADJ % pair
   band: string;   // QuartileRow.cls of a clicked ATC-completion tier ('' = none)
 }
 
@@ -141,12 +143,66 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (p && p.profileid) {
       this.cwP = null;                        // one popup at a time
       this.detailP = p;
+      // the rich card's stats + full changework history — built ONCE per open
+      // from data already in memory (event-wide listener), never per CD pass
+      this.detailCw = this.buildDetailCw(p.profileid);
+      this.detailCohorts = this.buildDetailCohorts(p.profileid);
       // operator debugging aid: which livechangework doc(s) this row stands on
       const cwIds: string[] = (p['_cwIds'] || []).filter(Boolean);
       if (cwIds.length) { console.log('[v3][popup] livechangework doc id(s) —', p.name + ':', cwIds); }
     }
   }
-  closeDetail(): void { this.detailP = null; }
+  closeDetail(): void { this.detailP = null; this.detailCw = null; this.detailCohorts = []; }
+  /** The participant's cohorts (big cohorts membership), name-sorted. */
+  detailCohorts: string[] = [];
+  private buildDetailCohorts(pid: string): string[] {
+    const names: string[] = [];
+    for (const [docId, members] of Object.entries(this.data.mapCohortParticipants || {})) {
+      if ((members || []).includes(pid)) {
+        names.push(this.data.mapCohortsData[docId]?.['name'] || docId);
+      }
+    }
+    return names.sort((a, b) => a.localeCompare(b));
+  }
+  /** The rich profile card's data: ATC stats + the participant's ENTIRE
+   *  changework history (both roles, ALL days — eventChangeWorkDocs is the
+   *  event-wide listener), newest first. */
+  detailCw: { stats: any; list: any[] } | null = null;
+  private buildDetailCw(pid: string): { stats: any; list: any[] } {
+    const agg: any = this.data.participantAtc[pid] || { adjDone: 0, adjPending: 0, procDone: 0, procPending: 0 };
+    const adjTotal = agg.adjTotal || ((agg.adjDone || 0) + (agg.adjPending || 0));
+    const procTotal = (agg.procDone || 0) + (agg.procPending || 0);
+    let doerDone = 0, benDone = 0, liveNow = 0;
+    const list = (this.data.eventChangeWorkDocs || [])
+      .filter((d: any) => d['doerid'] === pid || d['beneficiaryid'] === pid)
+      .map((d: any) => {
+        const role = d['doerid'] === pid ? 'doer' : 'beneficiary';
+        const status = String(d['procedurestatus'] || '').trim().toLowerCase();
+        if (status === 'completed') { if (role === 'doer') { doerDone++; } else { benDone++; } }
+        if (status === 'live') { liveNow++; }
+        const cpId = role === 'doer' ? d['beneficiaryid'] : d['doerid'];
+        return {
+          role, status,
+          procedure: d['procedurename'] || this.data.mapProcedureNames[d['procedureid']] || '',
+          counterpart: this.data.participantMetadataMap[cpId]?.['name']
+            || (role === 'doer' ? d['beneficiaryname'] : '') || cpId || '—',
+          createdon: d['createdon'] ?? null, note: d['sharednotes'] || '',
+          adjustment: d['adjustment'] ?? '', hours: d['hours'] || '', hourType: d['hourtype'] || '',
+          ds: d['doerstatus'] ?? null, bs: d['beneficiarystatus'] ?? null, docId: d['id'] ?? null,
+        };
+      })
+      .sort((a: any, b: any) => this.tsToMillis(b.createdon) - this.tsToMillis(a.createdon));
+    return {
+      stats: {
+        adjDone: agg.adjDone || 0, adjPending: agg.adjPending || 0,
+        procDone: agg.procDone || 0, procPending: agg.procPending || 0,
+        adjPct: adjTotal ? Math.round(((agg.adjDone || 0) / adjTotal) * 100) : null,
+        procPct: procTotal ? Math.round(((agg.procDone || 0) / procTotal) * 100) : null,
+        doerDone, benDone, liveNow,
+      },
+      list
+    };
+  }
   /** Changework popup — the ROW's click target on changework rows (the camera
    *  icon keeps the profile popup). Shows the pair's livechangework doc(s):
    *  procedure, notes, adjustment, time saved, created on, last update. */
@@ -303,7 +359,6 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (typeof v === 'number') { return v; }
     const p = Date.parse(v); return isNaN(p) ? 0 : p;
   }
-  get detailAtc(): any { return this.detailP ? (this.data.participantAtc[this.detailP.profileid] || null) : null; }
   get detailAttd(): number { return this.detailP ? ((this.data.mapAttendence[this.detailP.profileid]?.length) || 0) : 0; }
   // notes/hours getters are gone — the changework popup owns per-doc data now
   hoursSaved(c: any): string { return this.hoursSavedText(c.hours, c.hourType); }
@@ -360,7 +415,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.sub = this.data.changed$.subscribe(() => {
+    // debounceTime(0) coalesces the service's emission bursts: a first load or a
+    // queue toggle fires changed$ several times in quick succession, and each
+    // one used to run this whole handler plus a full detectChanges with every
+    // memo invalidated. Same-tick bursts now collapse into ONE pass; emissions
+    // that arrive spaced out still paint individually, and zone.js keeps
+    // painting template bindings immediately — only this derived work defers by
+    // a macrotask.
+    this.sub = this.data.changed$.pipe(debounceTime(0)).subscribe(() => {
       this.viewVersion++;   // invalidate memoized derived data (data changed)
       // Keep the service's first-timer set (used by procedure scope filter) in sync
       // with seam 3 so "First timers" resolves against the same registered universe.
@@ -491,7 +553,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   queueDropdownOpen = false;
   queueSearch = '';
 
-  closeDropdowns(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = false; }
+  closeDropdowns(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = false; this.hdrSearchOpen = false; }
   // The product multi-select renders in a CDK overlay ABOVE the drill-down panel;
   // its own ESC handler closes it, so swallow this one or the panel would go too.
   // The panel's multi-selects render in a CDK overlay ABOVE the drill-down panel;
@@ -509,7 +571,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
 
   // Event (single-select)
-  toggleEventDropdown(): void { this.queueDropdownOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
+  toggleEventDropdown(): void { this.queueDropdownOpen = false; this.hdrSearchOpen = false; this.eventDropdownOpen = !this.eventDropdownOpen; if (this.eventDropdownOpen) { this.eventSearch = ''; } }
   pickEvent(e: EventData): void { this.data.selectEvent(e); this.eventDropdownOpen = false; }
   get filteredEvents(): EventData[] {
     const t = this.eventSearch.toLowerCase().trim();
@@ -518,7 +580,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   isOngoingEvent(e: EventData): boolean { return this.data.ongoingEvents.some(o => this.pathOf(o.docref) === this.pathOf(e.docref)); }
 
   // Queue (multi-select — stays open while toggling, mirrors FT)
-  toggleQueueDropdown(): void { this.eventDropdownOpen = false; this.queueDropdownOpen = !this.queueDropdownOpen; if (this.queueDropdownOpen) { this.queueSearch = ''; } }
+  toggleQueueDropdown(): void { this.eventDropdownOpen = false; this.hdrSearchOpen = false; this.queueDropdownOpen = !this.queueDropdownOpen; if (this.queueDropdownOpen) { this.queueSearch = ''; } }
   pickQueue(q: QueueData): void { this.data.toggleQueue(q); }
   queueName(q: QueueData): string { return q.name || q['queuename'] || 'Queue'; }
   isOngoingQueue(q: QueueData): boolean { return this.data.ongoingQueues.some(o => this.pathOf(o.docref) === this.pathOf(q.docref)); }
@@ -532,6 +594,48 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     if (n === 1) { return this.queueName(this.data.selectedQueues[0]); }
     return n + ' queues selected';
   }
+
+  // ==========================================================================
+  // Header search — searches ONLY the Daily Attendance "Total approved"
+  // universe (data.eventParticipantProfileIds — the exact ids openAttTotal
+  // shows). A result click opens the SAME rich profile card the panel camera
+  // icons use (openDetail). The universe rows are built ONCE per open — never
+  // in a getter — so each keystroke costs string filters only (default-CD
+  // discipline); reopening rebuilds, so a changed universe is picked up.
+  // ==========================================================================
+  hdrSearchOpen = false;
+  hdrSearchQ = '';
+  hdrUniverse: PanelParticipant[] = [];
+  hdrResults: PanelParticipant[] = [];
+  hdrMore = 0;                                  // matches beyond the render cap
+  @ViewChild('hdrInput') private hdrInput?: ElementRef<HTMLInputElement>;
+  toggleHdrSearch(): void {
+    const open = !this.hdrSearchOpen;
+    this.closeDropdowns();
+    this.hdrSearchOpen = open;
+    if (open) {
+      this.hdrSearchQ = '';                     // fresh search per open (matches event/queue dropdowns)
+      this.hdrUniverse = (this.data.eventParticipantProfileIds || [])
+        .map(id => this.data.buildParticipantFromProfileId(id, false))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      this.runHdrSearch();
+      setTimeout(() => this.hdrInput?.nativeElement?.focus(), 0);
+    }
+  }
+  closeHdrSearch(): void { this.hdrSearchOpen = false; }
+  onHdrSearch(v: string): void { this.hdrSearchQ = v; this.runHdrSearch(); }
+  private runHdrSearch(): void {
+    const t = this.hdrSearchQ.toLowerCase().trim();
+    if (!t) { this.hdrResults = []; this.hdrMore = 0; return; }
+    const all = this.hdrUniverse.filter(p =>
+      p.name.toLowerCase().includes(t)
+      || (p.email || '').toLowerCase().includes(t)
+      || (p.phone || '').toLowerCase().includes(t));
+    this.hdrMore = Math.max(0, all.length - 30);  // cap the DOM, not the search
+    this.hdrResults = all.slice(0, 30);
+  }
+  hdrOpenResult(p: PanelParticipant): void { this.closeHdrSearch(); this.openDetail(p); }
+  hdrSearchEnter(): void { if (this.hdrResults.length) { this.hdrOpenResult(this.hdrResults[0]); } }
 
   // ==========================================================================
   // ATC card (fed by SEAM 2)
@@ -864,7 +968,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   procOpen = true;
   toggleProc(): void { this.procOpen = !this.procOpen; }
 
-  get procIds(): string[] { return this.data.sortedProcedureIds; }
+  get procIds(): string[] {
+    // operator: a procedure with ZERO total opportunities (available +
+    // completed) is noise — hide the row entirely
+    return this.data.sortedProcedureIds.filter(id => {
+      const s = this.procStat(id);
+      return !!s && (s.totalOpportunities.count + s.totalCompleted.count) > 0;
+    });
+  }
   procName(id: string): string { return this.data.mapProcedureNames[id] || id; }
   private procStat(id: string) { return this.data.mapProcedureData[id]; }
   procOpp(id: string): number { return this.procStat(id)?.totalOpportunities.count || 0; }
@@ -876,16 +987,38 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   procLive(id: string): number { return this.procStat(id)?.liveChangework.count || 0; }
   procCompletionPct(id: string): number { return this.data.completionPct(id); }
 
-  get procCount(): number { return this.data.sortedProcedureIds.length; }
+  get procCount(): number { return this.procIds.length; }   // visible rows only
   get procLiveTotal(): number { return this.data.liveChangeworkTotal; }
-  // Header totals beside the LIVE pill: distinct completed leads summed across
-  // all procedures (a doer counts once per procedure, same as the cells the sum
-  // is made of — and same as the groups in the pill's panel).
+  // Header DONE pills: UNIQUE people across ALL procedures (operator revision —
+  // a doer completing in three procedures counts ONCE). Reconciles with the
+  // panel's "No. of unique doers/beneficiaries" stats line by construction.
   get procDoerCompletedTotal(): number {
-    return this.data.sortedProcedureIds.reduce((t, id) => t + (this.procStat(id)?.doerCompleted.count || 0), 0);
+    const ids = new Set<string>();
+    for (const id of this.data.sortedProcedureIds) {
+      for (const e of (this.procStat(id)?.doerCompleted.data as any[]) || []) {
+        if (e?.doerId) { ids.add(e.doerId); }
+      }
+    }
+    return ids.size;
   }
   get procBenCompletedTotal(): number {
-    return this.data.sortedProcedureIds.reduce((t, id) => t + (this.procStat(id)?.beneficierCompleted.count || 0), 0);
+    const ids = new Set<string>();
+    for (const id of this.data.sortedProcedureIds) {
+      for (const e of (this.procStat(id)?.beneficierCompleted.data as any[]) || []) {
+        if (e?.beneficiaryId) { ids.add(e.beneficiaryId); }
+      }
+    }
+    return ids.size;
+  }
+  /** Head tags' hover labels with each side's share of the total. */
+  get procHeadTips(): { tot: string; comp: string; opp: string } {
+    const t = this.data.procTotals;
+    const pct = (n: number) => t.total ? (Math.round((n / t.total) * 1000) / 10) : 0;
+    return {
+      tot: 'Total opportunities (available + completed) · 100%',
+      comp: `Completed opportunities · ${pct(t.done)}% of total`,
+      opp: `Available opportunities · ${pct(t.pending)}% of total`,
+    };
   }
   get procMeta(): string { return `${this.procCount} procedures · opportunities, doer & beneficiary progress, live now`; }
   get procDayFilter(): string { return this.data.procDayFilter; }
@@ -938,7 +1071,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     const s = this.procStat(id); if (!s) { return; }
     const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
     const stat = kind === 'opp' ? s.totalOpportunities : s.totalCompleted;
-    const label = kind === 'opp' ? 'Total opportunities' : 'Completed';
+    const label = kind === 'opp' ? 'Available opportunities' : 'Completed opportunities';
     const unit = (n: number) => kind === 'opp' ? (n === 1 ? 'opportunity' : 'opportunities') : 'completed';
     const rows = (stat.data as { profileId: string; count: number }[])
       .filter(d => !!d?.profileId)
@@ -967,6 +1100,78 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
   openProcDoerCompletedAll(): void { this.openProcCompletedAll('doer'); }
   openProcBenCompletedAll(): void { this.openProcCompletedAll('beneficiary'); }
+  /** The COMPLETED chip's panel: the day-windowed completed docs themselves
+   *  (liveChangeWorkData — same window as the table's Day chips, no scope
+   *  filter), grouped by doer within each procedure. Flat raw docs are mapped
+   *  to the procGroupRows shape; _since is stripped afterwards so completed
+   *  rows never show a live-elapsed timer. */
+  openProcCompletedDocs(): void {
+    const mapped = (this.data.liveChangeWorkData || []).map((lcw: any) => ({
+      procedureId: lcw['procedureid'] || '',
+      doerId: lcw['doerid'] || '', beneficiaryId: lcw['beneficiaryid'] || '',
+      doerName: this.data.participantMetadataMap[lcw['doerid']]?.['name'] || 'Unknown',
+      beneficiaryName: this.data.participantMetadataMap[lcw['beneficiaryid']]?.['name'] || lcw['beneficiaryname'] || 'Unknown',
+      procedureName: lcw['procedurename'] || this.data.mapProcedureNames[lcw['procedureid']] || '',
+      createdon: lcw['createdon'] ?? null,
+      doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+      docId: lcw['id'] ?? null,
+      note: lcw['sharednotes'] || '', hours: lcw['hours'] || '', hourType: lcw['hourtype'] || '',
+      adjustment: lcw['adjustment'] ?? '',
+      lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
+    }));
+    // one procGroupRows call per procedure — same as openLive, so a doer active
+    // in two procedures gets a group per procedure, each correctly labelled
+    const byProc = new Map<string, any[]>();
+    mapped.forEach(m => {
+      const k = m.procedureId || m.procedureName || '?';
+      const list = byProc.get(k) || [];
+      list.push(m); byProc.set(k, list);
+    });
+    const rows: PanelParticipant[] = [];
+    for (const list of byProc.values()) {
+      rows.push(...this.procGroupRows(list, list[0]?.procedureName || '', true, 'doer'));
+    }
+    rows.forEach((r: any) => { r._since = 0; (r['others'] || []).forEach((o: any) => { delete o._since; }); });
+    const dayL = this.procDayFilter === 'all' ? 'All Days' : this.procDayFilter;
+    this.openPanelRows(`Completed changework · ${dayL}`,
+      `${mapped.length.toLocaleString()} completed changework docs in this day window`, rows, true);
+  }
+  /** Head tags → all-procedures participant panels. Merges every procedure's
+   *  {profileId, count} ATC list; someone prescribed in several procedures
+   *  appears ONCE with the summed count. 'tot' = available + completed. */
+  openProcTotalsAll(kind: 'tot' | 'opp' | 'comp'): void {
+    const freq = new Map<string, number>();
+    // per-participant per-procedure tally — the badge's hover breakdown
+    const perProc = new Map<string, Map<string, number>>();
+    let total = 0;
+    for (const id of this.data.sortedProcedureIds) {
+      const s = this.procStat(id); if (!s) { continue; }
+      const pname = this.procName(id);
+      const lists = kind === 'tot' ? [s.totalOpportunities.data, s.totalCompleted.data]
+        : kind === 'opp' ? [s.totalOpportunities.data] : [s.totalCompleted.data];
+      for (const list of lists) {
+        for (const d of (list as any[]) || []) {
+          if (!d?.profileId) { continue; }
+          const n = Number(d.count) || 1;
+          freq.set(d.profileId, (freq.get(d.profileId) || 0) + n);
+          const m = perProc.get(d.profileId) || new Map<string, number>();
+          m.set(pname, (m.get(pname) || 0) + n);
+          perProc.set(d.profileId, m);
+          total += n;
+        }
+      }
+    }
+    const label = kind === 'tot' ? 'Total opportunities' : kind === 'opp' ? 'Available opportunities' : 'Completed opportunities';
+    const scopeL = this.procScope === 'firstTimers' ? 'First Timers' : 'Overall';
+    const rows = [...freq.entries()].map(([pid, count]) => ({
+      ...this.data.buildParticipantFromProfileId(pid, false),
+      _count: count, _countKind: kind,
+      _meta: `${count} ${count === 1 ? 'opportunity' : 'opportunities'}`,
+      _tip: [...(perProc.get(pid) || new Map<string, number>()).entries()]
+        .map(([nm, n]) => n > 1 ? `${nm} ×${n}` : nm).join(' · ')
+    } as any));
+    this.openPanelRows(`${label} · all procedures`, `${scopeL} · ${total.toLocaleString()} opportunities total`, rows);
+  }
 
   // ==========================================================================
   // Participant Data table (#pdTable) — V1 aggregateData + customfilter + CSV
@@ -978,11 +1183,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   pdFilter: PdFilter = this.defaultPdFilter();
   readonly atcShort = ['Full', 'Partial', 'Unval', 'None'];
   readonly pdCols: { k: keyof PdRow; label: string }[] = [
-    { k: 'name', label: 'Name' }, { k: 'atcBucket', label: 'ATC' }, { k: 'atcPct', label: 'ATC %' },
+    { k: 'name', label: 'Name' }, { k: 'atcBucket', label: 'ATC' }, { k: 'atcPct', label: 'ADJ %' },
     { k: 'adjDone', label: 'Adj. Done' }, { k: 'adjPending', label: 'Adj. Pending' },
+    { k: 'procPct', label: 'Proc %' },
     { k: 'procDone', label: 'Proc. Done' }, { k: 'procPending', label: 'Proc. Pending' }, { k: 'attd', label: 'Attd' }
   ];
-  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, band: '' }; }
+  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, procOp: '>=', procVal: 0, band: '' }; }
   togglePd(): void { this.pdOpen = !this.pdOpen; }
   pdClear(): void { this.pdFilter = this.defaultPdFilter(); this.pdShown = 15; }
   pdMore(): void { this.pdShown += 25; }
@@ -1004,6 +1210,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       profileId, name: meta['name'] || 'Unknown', email: meta['email'] || '',
       journeyId: meta['activejourney'] || '', ft: this.isFirstTimer(profileId),
       atcBucket: this.bucketOf(profileId), atcPct: ratio === null ? null : Math.round(ratio * 100),
+      // procedure completion %: done / (done + pending); no procedures → '—'
+      procPct: (agg.procDone + agg.procPending) > 0
+        ? Math.round((agg.procDone / (agg.procDone + agg.procPending)) * 100) : null,
       adjDone: agg.adjDone, adjPending: agg.adjPending, procDone: agg.procDone, procPending: agg.procPending,
       attd: (this.data.mapAttendence[profileId]?.length) || 0
     };
@@ -1030,6 +1239,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       if (f.pctOp === '<=' && !(r.atcPct <= f.pctVal)) { return false; }
       if (f.pctOp === '<' && !(r.atcPct < f.pctVal)) { return false; }
     } else if (f.pctVal > 0) { return false; } // unknown % excluded once a threshold is set
+    // PROC % — same rules as ADJ %, over procPct
+    if (r.procPct !== null) {
+      if (f.procOp === '>=' && !(r.procPct >= f.procVal)) { return false; }
+      if (f.procOp === '<=' && !(r.procPct <= f.procVal)) { return false; }
+      if (f.procOp === '<' && !(r.procPct < f.procVal)) { return false; }
+    } else if (f.procVal > 0) { return false; }
     return true;
   }
   get pdFilteredRows(): PdRow[] {
@@ -1057,11 +1272,12 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
 
   pdExport(): void {
     const esc = (s: any) => `"${String(s).replace(/"/g, '""')}"`;
-    const header = ['Name', 'Email', 'Journey', 'Type', 'ATC Status', 'ATC %', 'Adj Done', 'Adj Pending', 'Proc Done', 'Proc Pending', 'Attended Days'];
+    const header = ['Name', 'Email', 'Journey', 'Type', 'ATC Status', 'ADJ %', 'Adj Done', 'Adj Pending', 'Proc %', 'Proc Done', 'Proc Pending', 'Attended Days'];
     const lines = [header.join(',')];
     this.pdFilteredRows.forEach(r => {
       lines.push([esc(r.name), esc(r.email), esc(this.journeyLabel(r.journeyId)), r.ft ? 'First timer' : 'Repeat',
-        this.pdAtcLabel(r.atcBucket), r.atcPct === null ? '' : r.atcPct, r.adjDone, r.adjPending, r.procDone, r.procPending, `${r.attd}/${this.pdTotalDays}`].join(','));
+        this.pdAtcLabel(r.atcBucket), r.atcPct === null ? '' : r.atcPct, r.adjDone, r.adjPending,
+        r.procPct === null ? '' : r.procPct, r.procDone, r.procPending, `${r.attd}/${this.pdTotalDays}`].join(','));
     });
     const name = (this.data.selectedEvent?.['name'] || 'event').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const a = document.createElement('a');
@@ -1510,6 +1726,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.openPanelRows(title, sub, profileIds.map(id => this.data.buildParticipantFromProfileId(id, false)));
   }
   private openPanelRows(title: string, sub: string, rows: PanelParticipant[], preserveOrder = false): void {
+    // The profile popup can open OVER the bare dashboard (header search), so the
+    // second click of a backdrop double-click can fall through onto a page-level
+    // stat — inside the window it is the tail of that double-click, not intent.
+    if (Date.now() - this.detailClosedAt < 400) { return; }
     this.panelTitle = title;
     this.panelSub = sub;
     this.panelSearch = '';
@@ -1532,6 +1752,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.markedIds = new Set<string>();
     this.closeDetail();                         // a popup belongs to ONE list
     this.closeCw();
+    // Panels opened from stopPropagation'd click targets (attendance stats)
+    // never reach the document-click listener — without this, a header dropdown
+    // would linger under the scrim and ESC would then close panel + dropdown
+    // in ONE press instead of peeling one layer at a time.
+    this.closeDropdowns();
     this.exitCommMode();                        // a selection is only ever about ONE list
     this.closeMarkPicker();                     // never carry a picker across lists
     // preserveOrder keeps doer↔beneficiary pairs adjacent (as a set); otherwise sort by name.
@@ -1974,6 +2199,28 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** A grouped row is 1 lead + N counterparts, so the row count is NOT a headcount —
    *  calling it "N participants" under-reported the people on screen and contradicted
    *  the filter dropdowns, whose counts are per person. Grouped lists state both. */
+  /** Changework panels' count block (operator format): total changeworks plus
+   *  unique people per side — replaces "N doers · M people". Computed over the
+   *  FILTERED rows so it follows search/filters like the old label. Null for
+   *  plain (non-pair) lists, which keep "N participants". */
+  get panelPairStats(): { cw: number; doers: number; beneficiaries: number } | null {
+    const rows: any[] = this.panelParticipants as any[];
+    if (!rows.length || !rows[0]['_pair']) { return null; }
+    const leads = new Set<string>(); const counters = new Set<string>();
+    let cw = 0; let role = 'doer';
+    rows.forEach(p => {
+      role = p['leadRole'] || role;
+      if (p['lead']?.profileid) { leads.add(p['lead'].profileid); }
+      (p['others'] || []).forEach((o: any) => {
+        if (o.profileid) { counters.add(o.profileid); }
+        cw += Number(o['_n']) || 1;
+      });
+    });
+    return role === 'beneficiary'
+      ? { cw, doers: counters.size, beneficiaries: leads.size }
+      : { cw, doers: leads.size, beneficiaries: counters.size };
+  }
+
   get panelCountLabel(): string {
     const rows: any[] = this.panelParticipants as any[];
     if (!rows.length || !rows[0]['_pair']) {

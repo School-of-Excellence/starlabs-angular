@@ -110,6 +110,32 @@ input,select{font:inherit}
   color:var(--live);display:flex;align-items:center;gap:4px;
 }
 .tab .live-tag .dot{width:5px;height:5px}
+/* Header search — icon before the view tabs; dropdown searches the Total
+   approved universe; a result opens the profile-card popup */
+.hs-wrap{position:relative;display:flex}
+.tab.tab-ico{padding:7px 11px;cursor:pointer}
+.hs-drop{
+  position:absolute;top:calc(100% + 10px);left:0;z-index:30;
+  width:340px;max-width:calc(100vw - 32px);
+  background:var(--z-0);border:1px solid var(--z-200);border-radius:12px;
+  box-shadow:0 8px 28px rgba(28,28,30,.18);padding:10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.hs-input{
+  width:100%;padding:8px 10px;font-size:13px;color:var(--z-900);
+  border:1px solid var(--z-200);border-radius:8px;background:var(--z-50);outline:none;
+}
+.hs-input:focus{border-color:var(--accent);background:var(--z-0)}
+.hs-list{display:flex;flex-direction:column;max-height:320px;overflow:auto}
+.hs-row{
+  display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+  padding:7px 8px;border-radius:8px;text-align:left;cursor:pointer;
+}
+.hs-row:hover{background:var(--z-100)}
+.hs-name{font-size:13px;font-weight:600;color:var(--z-900)}
+.hs-sub{font-size:11px;color:var(--z-500);word-break:break-all}
+.hs-more{font-size:11px;color:var(--z-500);padding:0 8px 2px}
+.hs-hint{font-size:12px;color:var(--z-500);padding:2px 8px 4px}
 
 /* ============================================================
    SECTIONS
@@ -296,6 +322,9 @@ input,select{font:inherit}
 }
 .panel-export:hover{filter:brightness(.96)}
 .panel-actions{display:flex;align-items:center;gap:8px}
+/* stacked changework stats in the count bar */
+.panel-stats{display:flex;flex-direction:column;gap:2px;font-size:10px;line-height:1.4;letter-spacing:.08em}
+.panel-stats b{font-weight:700;color:var(--z-900)}
 /* icon-only count sort — ⇅ untouched, ↓ highest first, ↑ lowest first */
 .panel-sort{
   font-size:13px;line-height:1;font-weight:700;color:var(--z-700);
@@ -614,6 +643,17 @@ mat-select.pf-select.on{
 }
 .p-cnt.opp{background:var(--alert-soft);color:var(--alert)}
 .p-cnt.comp{background:var(--ok-soft);color:var(--ok)}
+.p-cnt.tot{background:var(--accent-soft);color:var(--accent)}
+/* per-procedure breakdown on hover (all-procedures panels) — same styled
+   tooltip as the head tags, right-anchored so it stays inside the panel */
+.p-cnt{position:relative}
+.p-cnt[data-tip]::after{
+  content:attr(data-tip);position:absolute;right:0;top:calc(100% + 6px);
+  background:var(--z-900);color:#fff;font-size:10px;font-weight:600;line-height:1.45;
+  padding:5px 9px;border-radius:6px;white-space:normal;width:max-content;max-width:240px;
+  text-align:left;opacity:0;pointer-events:none;transition:opacity .12s;z-index:6;
+}
+.p-cnt[data-tip]:hover::after{opacity:1}
 /* live elapsed timer (LIVE lists) — green until 2h, red from 2h up */
 .p-timer{
   font-family:var(--mono);font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
@@ -696,6 +736,46 @@ mat-select.pf-select.on{
   font-size:20px;line-height:1;color:var(--z-400);cursor:pointer;
 }
 .pp-x:hover{color:var(--z-700)}
+/* RICH participant card — wide, left-aligned, tiles + history grid */
+.pp-card.pp-big{
+  width:min(880px,calc(100vw - 48px));max-height:min(90vh,820px);
+  text-align:left;align-items:stretch;gap:12px;
+}
+/* changework popup — larger too (operator) */
+.pp-card.pp-wide{
+  width:min(680px,calc(100vw - 48px));max-height:min(88vh,760px);
+}
+/* history cards: a LIST — one card per row (operator revision) */
+.pp-hist{display:flex;flex-direction:column;gap:8px}
+.pp-head{display:flex;gap:14px;align-items:flex-start}
+.pp-big .pp-photo{flex:none}
+.pp-id{min-width:0;display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.pp-big .pp-badges{justify-content:flex-start}
+.pp-contact{font-size:12px;color:var(--z-500);word-break:break-word}
+.j-badge.coh{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
+.pp-flag{font-size:10.5px;font-family:var(--mono);font-weight:600;color:var(--alert)}
+.pp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:640px){.pp-grid{grid-template-columns:repeat(2,1fr)}}
+.pp-tile{
+  background:var(--z-50);border:1px solid var(--z-200);border-radius:var(--r-sm);
+  padding:8px 10px;display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.pp-tile span{
+  font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--z-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pp-tile b{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp-tile b.pp-live{color:var(--live)}
+.pp-tile small{
+  font-size:10.5px;color:var(--z-500);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pp-sec{display:flex;flex-direction:column;gap:8px}
+.pp-sec-title{
+  font-size:10px;font-family:var(--mono);font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-700);
+}
+.pp-empty{font-size:12px;color:var(--z-500);font-style:italic}
 .pp-photo{display:block;flex:none;border-radius:50%;overflow:hidden}
 .pp-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
 .pp-badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
@@ -706,6 +786,9 @@ mat-select.pf-select.on{
 .pp-row{display:flex;justify-content:space-between;gap:14px;font-size:12px}
 .pp-row span{color:var(--z-500);flex:none}
 .pp-row b{font-weight:600;color:var(--z-900);word-break:break-word;text-align:right}
+/* stacked variant: title line, value on the next line, LEFT-aligned (long text) */
+.pp-row.pp-block{flex-direction:column;align-items:flex-start;gap:2px}
+.pp-row.pp-block b{text-align:left}
 /* per-changework note widgets — one dated card per noted changework */
 .pp-notes{width:100%;margin-top:8px;display:flex;flex-direction:column;gap:8px}
 .pp-note-card{
@@ -835,6 +918,7 @@ mat-select.pf-select.on{
 .proc-col-h{
   font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;color:var(--z-400);text-align:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;
 }
 .proc-col-h.first{text-align:left}
 .proc-group-h{
@@ -850,6 +934,27 @@ mat-select.pf-select.on{
 .proc-sub-link{cursor:pointer}
 .proc-sub-link:hover{color:var(--z-700)}
 .proc-sub-link:hover b{text-decoration:underline}
+/* table-head totals tags ONLY — blue total · green completed · red pending;
+   the label lives in the tooltip (numbers as tags, label on hover) */
+.proc-tag{
+  display:inline-flex;align-items:center;font-family:var(--mono);font-size:10.5px;
+  font-weight:700;font-variant-numeric:tabular-nums;line-height:1;
+  padding:3px 9px;border-radius:var(--r-pill);border:1px solid;
+  position:relative;cursor:pointer;
+}
+.proc-tag:hover{filter:brightness(.96)}
+/* styled tooltip — the native title was unreliable for the operator */
+.proc-tag::after{
+  content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);
+  background:var(--z-900);color:#fff;font-size:10px;font-weight:600;line-height:1.3;
+  padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity .12s;z-index:6;
+}
+.proc-tag:hover::after{opacity:1}
+.proc-tag.blue{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.proc-tag.green{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
+.proc-tag.red{background:var(--alert-soft);color:var(--alert);border-color:var(--alert-line)}
+.proc-head-tags{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap}
 .pcell{
   border-radius:var(--r-sm);padding:10px 8px;text-align:center;cursor:pointer;
   transition:transform .15s var(--ease),box-shadow .15s var(--ease);
