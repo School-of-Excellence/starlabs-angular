@@ -99,6 +99,31 @@
     <div class="hero-label">Approved &amp; attended participants</div>
     <div class="hero-right">
       <div class="tabs" id="tabs">
+        <!-- Header search — the Daily Attendance "Total approved" universe only;
+             a result opens the SAME profile-card popup the panel cameras use -->
+        <div class="hs-wrap" (click)="$event.stopPropagation()">
+          <button class="tab tab-ico" type="button" [class.active]="hdrSearchOpen" (click)="toggleHdrSearch()"
+                  aria-label="Search approved participants" title="Search approved participants">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+          <div class="hs-drop" *ngIf="hdrSearchOpen">
+            <input #hdrInput class="hs-input" type="text" [ngModel]="hdrSearchQ" (ngModelChange)="onHdrSearch($event)"
+                   (keydown.enter)="hdrSearchEnter()" placeholder="Search approved participants…" autocomplete="off">
+            <div class="hs-list" *ngIf="hdrResults.length">
+              <button class="hs-row" type="button" *ngFor="let p of hdrResults" (click)="hdrOpenResult(p)">
+                <span class="hs-name">{{ p.name }}</span>
+                <span class="hs-sub" *ngIf="p.email || p.phone">{{ p.email || p.phone }}</span>
+              </button>
+            </div>
+            <div class="hs-more" *ngIf="hdrMore">+{{ hdrMore | number }} more — keep typing to narrow</div>
+            <div class="hs-hint" *ngIf="!hdrResults.length">
+              {{ hdrSearchQ.trim() ? 'No match among approved participants' : 'Search ' + (hdrUniverse.length | number) + ' approved participants' }}
+            </div>
+          </div>
+        </div>
         <button class="tab" [class.active]="activeView === 'frontend'" (click)="setView('frontend')">Frontend Dashboard</button>
         <button class="tab" [class.active]="activeView === 'backend'" (click)="setView('backend')">Backend Dashboard</button>
         <button class="tab" [class.active]="activeView === 'zones'" (click)="setView('zones')">Zones
@@ -329,9 +354,9 @@
         <div class="sec-title">Procedure Tracking</div>
         <div class="sec-meta">{{ procMeta }}</div>
         <div class="sec-right">
-          <span class="done-pill" (click)="openProcDoerCompletedAll()" title="Completed as doer — all procedures"><span class="dot done"></span>{{ procDoerCompletedTotal | number }} DOER DONE</span>
-          <span class="done-pill" (click)="openProcBenCompletedAll()" title="Completed as beneficiary — all procedures"><span class="dot done"></span>{{ procBenCompletedTotal | number }} BENEFICIARY DONE</span>
-          <span class="live-pill" (click)="openProcLive()"><span class="dot live"></span>{{ procLiveTotal | number }} LIVE</span>
+          <!-- completed docs in the CURRENT day window (follows the Day chips;
+               no scope filter) — click for the grouped list -->
+          <span class="done-pill" (click)="openProcCompletedDocs()" title="Completed changework — follows the Day filter · click for the list"><span class="dot done"></span>{{ data.liveChangeWorkData.length | number }} COMPLETED</span>
           <button class="collapse-btn" [class.closed]="!procOpen" (click)="toggleProc()" title="Collapse">&#9662;</button>
         </div>
       </div>
@@ -349,17 +374,37 @@
           </div>
         </div>
         <div class="proc-table">
+          <!-- the three totals pills sit exactly above their columns (moved here
+               from the section header — operator UI request) -->
           <div class="proc-group-h">
-            <span></span>
-            <span class="proc-col-h">As Doer</span>
-            <span class="proc-col-h">As Beneficiary</span>
-            <span class="proc-col-h">Live Changework</span>
+            <!-- all-procedures totals, same colour language as the row tags -->
+            <span class="proc-head-tags">
+              <span class="proc-tag blue" [attr.data-tip]="procHeadTips.tot" (click)="openProcTotalsAll('tot')">{{ data.procTotals.total | number }}</span>
+              <span class="proc-tag green" [attr.data-tip]="procHeadTips.comp" (click)="openProcTotalsAll('comp')">{{ data.procTotals.done | number }}</span>
+              <span class="proc-tag red" [attr.data-tip]="procHeadTips.opp" (click)="openProcTotalsAll('opp')">{{ data.procTotals.pending | number }}</span>
+            </span>
+            <span class="proc-col-h">
+              <span class="done-pill" (click)="openProcDoerCompletedAll()" title="Unique doers with completed changework — all procedures"><span class="dot done"></span>{{ procDoerCompletedTotal | number }} DOER DONE</span>
+              As Doer
+            </span>
+            <span class="proc-col-h">
+              <span class="done-pill" (click)="openProcBenCompletedAll()" title="Unique beneficiaries with completed changework — all procedures"><span class="dot done"></span>{{ procBenCompletedTotal | number }} BENEFICIARY DONE</span>
+              As Beneficiary
+            </span>
+            <span class="proc-col-h">
+              <span class="live-pill" (click)="openProcLive()"><span class="dot live"></span>{{ procLiveTotal | number }} LIVE</span>
+              Live Changework
+            </span>
           </div>
           <div id="procRows">
             <div class="proc-row" *ngFor="let id of procIds">
               <div>
                 <div class="proc-name">{{ procName(id) }}</div>
-                <div class="proc-sub"><span class="proc-sub-link" (click)="openProcTotals(id, 'opp')" title="Unique participants holding these opportunities">Total opportunities: <b>{{ procOpp(id) | number }}</b></span><br><span class="proc-sub-link" (click)="openProcTotals(id, 'comp')" title="Unique participants with completions marked in their ATC">Completed: <b>{{ procCompleted(id) | number }}</b></span></div>
+                <div class="proc-sub">
+                  <span title="Available + completed">Total opportunities: <b>{{ (procOpp(id) + procCompleted(id)) | number }}</b></span><br>
+                  <span class="proc-sub-link" (click)="openProcTotals(id, 'opp')" title="Unique participants holding these opportunities">Available opportunities: <b>{{ procOpp(id) | number }}</b></span><br>
+                  <span class="proc-sub-link" (click)="openProcTotals(id, 'comp')" title="Unique participants with completions marked in their ATC">Completed opportunities: <b>{{ procCompleted(id) | number }}</b></span>
+                </div>
               </div>
               <div class="pcell ns" (click)="openProcCell(id, 'dns')"><div class="pv">{{ procDoerNotStarted(id) }}</div><div class="pl">Not started</div></div>
               <div class="pcell done" (click)="openProcCell(id, 'dc')"><div class="pv">{{ procDoerCompleted(id) }}</div><div class="pl">Completed</div></div>
@@ -406,13 +451,20 @@
             <option value="all">All</option>
             <option *ngFor="let l of atcShort; let i = index" [value]="i">{{ l }}</option>
           </select>
-          <span class="pd-lbl">ATC %</span>
+          <span class="pd-lbl">ADJ %</span>
           <select class="pd-sel" [(ngModel)]="pdFilter.pctOp" (ngModelChange)="pdOnFilterChange()">
             <option value=">=">&ge;</option>
             <option value="<=">&le;</option>
             <option value="<">&lt;</option>
           </select>
           <input class="pd-in pd-num" type="number" min="0" max="100" [(ngModel)]="pdFilter.pctVal" (ngModelChange)="pdOnFilterChange()">
+          <span class="pd-lbl">PROC %</span>
+          <select class="pd-sel" [(ngModel)]="pdFilter.procOp" (ngModelChange)="pdOnFilterChange()">
+            <option value=">=">&ge;</option>
+            <option value="<=">&le;</option>
+            <option value="<">&lt;</option>
+          </select>
+          <input class="pd-in pd-num" type="number" min="0" max="100" [(ngModel)]="pdFilter.procVal" (ngModelChange)="pdOnFilterChange()">
           <!-- set by clicking an ATC-completion tier; a band, not a threshold -->
           <span class="pd-band" *ngIf="pdFilter.band">
             {{ pdBandLabel }}
@@ -440,6 +492,7 @@
               <td class="pd-pct num">{{ r.atcPct === null ? '—' : r.atcPct + '%' }}</td>
               <td class="num">{{ r.adjDone }}</td>
               <td class="num" [class.pd-dim]="!r.adjPending">{{ r.adjPending }}</td>
+              <td class="pd-pct num">{{ r.procPct === null ? '—' : r.procPct + '%' }}</td>
               <td class="num">{{ r.procDone }}</td>
               <td class="num" [class.pd-dim]="!r.procPending">{{ r.procPending }}</td>
               <td class="num">{{ pdTotalDays ? r.attd + '/' + pdTotalDays : '—' }}</td>
@@ -937,7 +990,14 @@
 
   </div>
   <div class="panel-count">
-    <span>{{ panelCountLabel }}</span>
+    <!-- changework lists: explicit stats block (operator format); other lists
+         keep the plain participant count -->
+    <span class="panel-stats" *ngIf="panelPairStats as s; else plainCount">
+      <span>No. of changeworks: <b>{{ s.cw | number }}</b></span>
+      <span>No. of unique beneficiaries: <b>{{ s.beneficiaries | number }}</b></span>
+      <span>No. of unique doers: <b>{{ s.doers | number }}</b></span>
+    </span>
+    <ng-template #plainCount><span>{{ panelCountLabel }}</span></ng-template>
     <span class="panel-actions">
       <button class="panel-sort" *ngIf="panelHasTimes" [class.on]="!!panelTimeSort" (click)="toggleTimeSort()"
               [title]="panelTimeSort === 'desc' ? 'Sorted by live time, longest first — click for shortest first' : panelTimeSort === 'asc' ? 'Sorted by live time, shortest first — click to clear the sort' : 'Sort by live time'"
@@ -1113,7 +1173,7 @@
             <span class="mark-done" *ngIf="markedIds.has(p.profileid)">&checkmark; Marked</span>
             <!-- proc totals lists: the participant's share of the tile number, coloured
                  like the table cells (opportunities = pending amber, completed = green) -->
-            <span class="p-cnt" *ngIf="p['_count'] != null" [ngClass]="p['_countKind'] === 'comp' ? 'comp' : 'opp'" [title]="p['_meta']">{{ p['_count'] }}</span>
+            <span class="p-cnt" *ngIf="p['_count'] != null" [ngClass]="p['_countKind'] === 'comp' ? 'comp' : p['_countKind'] === 'tot' ? 'tot' : 'opp'" [attr.data-tip]="p['_tip'] || null" [attr.title]="p['_tip'] ? null : p['_meta']">{{ p['_count'] }}</span>
             <div class="p-flag" *ngIf="p['_meta'] && p['_count'] == null">{{ p['_meta'] }}</div>
           </span>
         </div>
@@ -1141,32 +1201,63 @@
      position:fixed with a transform, and a transformed ancestor would hijack this
      overlay's fixed positioning. The picture's own click still opens the full-size
      enlarge overlay (body-mounted, above this). -->
+<!-- RICH participant card (opened from Daily Attendance rows and every camera
+     icon): photo + identity, stat tiles, and the person's FULL changework
+     history — everything from data already in memory, no new queries. -->
 <div class="pp-backdrop" *ngIf="detailP" (click)="onDetailBackdrop($event)">
-  <div class="pp-card" (click)="$event.stopPropagation()">
+  <div class="pp-card pp-big" (click)="$event.stopPropagation()">
     <button class="pp-x" (click)="closeDetail()" title="Close" aria-label="Close">&times;</button>
-    <!-- [src] = the participant-metadata photo (profile||profileimg, normalised at
-         load) — the picture component then never queries profile_data -->
-    <app-profile-picture class="pp-photo" [profileId]="detailP.profileid" [name]="detailP.name" [size]="120" [src]="detailP.photo || ''"></app-profile-picture>
-    <div class="pp-name">{{ detailP.name }}</div>
-    <div class="pp-badges">
-      <span class="j-badge" [ngClass]="journeyBadgeClass(detailP.activejourney)" *ngIf="detailP.activejourney">{{ journeyLabel(detailP.activejourney) }}</span>
-      <span class="j-badge" [ngClass]="isFirstTimer(detailP.profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(detailP.profileid) ? '1ST' : 'RPT' }}</span>
-      <span class="j-badge prod" *ngFor="let pr of productNames(detailP.profileid)">{{ pr }}</span>
+    <div class="pp-head">
+      <!-- [src] = participant-metadata photo — never queries profile_data -->
+      <app-profile-picture class="pp-photo" [profileId]="detailP.profileid" [name]="detailP.name" [size]="96" [src]="detailP.photo || ''"></app-profile-picture>
+      <div class="pp-id">
+        <div class="pp-name">{{ detailP.name }}</div>
+        <div class="pp-badges">
+          <span class="j-badge" [ngClass]="journeyBadgeClass(detailP.activejourney)" *ngIf="detailP.activejourney">{{ journeyLabel(detailP.activejourney) }}</span>
+          <span class="j-badge" [ngClass]="isFirstTimer(detailP.profileid) ? 'ft1st' : 'ftrpt'">{{ isFirstTimer(detailP.profileid) ? '1ST' : 'RPT' }}</span>
+          <span class="j-badge prod" *ngFor="let pr of productNames(detailP.profileid)">{{ pr }}</span>
+        </div>
+        <div class="pp-contact" *ngIf="detailP.email">{{ detailP.email }}</div>
+        <div class="pp-contact" *ngIf="detailP.phone">{{ detailP.phone }}</div>
+        <!-- big-cohorts membership -->
+        <div class="pp-badges" *ngIf="detailCohorts.length">
+          <span class="j-badge coh" *ngFor="let c of detailCohorts">{{ c }}</span>
+        </div>
+        <span class="p-cnt" *ngIf="detailP['_count'] != null" [ngClass]="detailP['_countKind'] === 'comp' ? 'comp' : detailP['_countKind'] === 'tot' ? 'tot' : 'opp'" [attr.data-tip]="detailP['_tip'] || null">{{ detailP['_meta'] }}</span>
+        <div class="pp-flag" *ngIf="detailP.isNotRegistered">Not a registered event participant</div>
+      </div>
     </div>
-    <span class="p-cnt" *ngIf="detailP['_count'] != null" [ngClass]="detailP['_countKind'] === 'comp' ? 'comp' : 'opp'">{{ detailP['_meta'] }}</span>
-    <div class="pp-rows">
-      <div class="pp-row" *ngIf="detailP.email"><span>Email</span><b>{{ detailP.email }}</b></div>
-      <div class="pp-row" *ngIf="detailP.phone"><span>Phone</span><b>{{ detailP.phone }}</b></div>
-      <div class="pp-row"><span>Attendance</span><b>{{ detailAttd }} day{{ detailAttd === 1 ? '' : 's' }}</b></div>
-      <ng-container *ngIf="detailAtc">
-        <div class="pp-row"><span>Procedures</span><b>{{ detailAtc.procDone }} done &middot; {{ detailAtc.procPending }} pending</b></div>
-        <div class="pp-row"><span>Adjustments</span><b>{{ detailAtc.adjDone }} done &middot; {{ detailAtc.adjPending }} pending</b></div>
-      </ng-container>
-      <div class="pp-row" *ngIf="detailP['_n'] > 1"><span>Changeworks together</span><b>&times;{{ detailP['_n'] }}</b></div>
-      <div class="pp-row" *ngIf="detailP.isNotRegistered"><span>Status</span><b>Not a registered event participant</b></div>
+    <div class="pp-grid" *ngIf="detailCw as dc">
+      <div class="pp-tile"><span>Attendance</span><b>{{ detailAttd }}{{ pdTotalDays ? '/' + pdTotalDays : '' }} days</b></div>
+      <div class="pp-tile"><span>ADJ %</span><b>{{ dc.stats.adjPct === null ? '—' : dc.stats.adjPct + '%' }}</b><small>{{ dc.stats.adjDone }} done &middot; {{ dc.stats.adjPending }} pending</small></div>
+      <div class="pp-tile"><span>Proc %</span><b>{{ dc.stats.procPct === null ? '—' : dc.stats.procPct + '%' }}</b><small>{{ dc.stats.procDone }} done &middot; {{ dc.stats.procPending }} pending</small></div>
+      <div class="pp-tile"><span>Live now</span><b [class.pp-live]="dc.stats.liveNow">{{ dc.stats.liveNow }}</b></div>
+      <div class="pp-tile"><span>Changework as Doer</span><b>{{ dc.stats.doerDone }}</b></div>
+      <div class="pp-tile"><span>Changework as Beneficiary</span><b>{{ dc.stats.benDone }}</b></div>
     </div>
-    <!-- sharednotes / time-saved deliberately NOT here — the changework popup
-         (row click) owns the per-doc data now (operator directive) -->
+    <div class="pp-sec" *ngIf="detailCw?.list?.length">
+      <div class="pp-sec-title">Changework history &middot; {{ detailCw?.list?.length }}</div>
+      <div class="pp-hist">
+      <div class="pp-note-card" *ngFor="let c of detailCw?.list">
+        <div class="pp-note-head">
+          <span class="pp-note-proc"><span class="p-role" [ngClass]="c.role === 'beneficiary' ? 'beneficiary' : 'doer'">{{ c.role === 'beneficiary' ? 'BENEFICIARY' : 'DOER' }}</span> {{ c.procedure || 'Changework' }}</span>
+          <span class="pp-note-side">
+            <span class="p-status"><span class="p-st" [class.ok]="stDone(c.ds)" [title]="'Doer status: ' + (c.ds || '—')">D</span><span class="p-st" [class.ok]="stDone(c.bs)" [title]="'Beneficiary status: ' + (c.bs || '—')">B</span></span>
+            <span class="pp-note-date" *ngIf="noteDate(c.createdon)">{{ noteDate(c.createdon) }}</span>
+          </span>
+        </div>
+        <div class="cw-rows">
+          <div class="pp-row"><span>{{ c.role === 'beneficiary' ? 'Doer' : 'Beneficiary' }}</span><b>{{ c.counterpart || '—' }}</b></div>
+          <div class="pp-row" *ngIf="c.status"><span>Status</span><b>{{ c.status }}</b></div>
+          <div class="pp-row" *ngIf="c.hourType && c.hours"><span>Time saved</span><b>{{ hoursSaved(c) }}</b></div>
+          <!-- adjustment text can be long — title line, value on the NEXT line, left-aligned -->
+          <div class="pp-row pp-block" *ngIf="c.adjustment"><span>Adjustment</span><b>{{ c.adjustment }}</b></div>
+        </div>
+        <div class="pp-note-text" *ngIf="c.note">&ldquo;{{ c.note }}&rdquo;</div>
+      </div>
+      </div>
+    </div>
+    <div class="pp-empty" *ngIf="detailCw && !detailCw.list.length">No changework yet for this participant.</div>
   </div>
 </div>
 
@@ -1175,7 +1266,7 @@
      procedure, notes, adjustment, time saved, created on, last update. Outside
      the <aside> for the same fixed-positioning reason as the profile popup. -->
 <div class="pp-backdrop" *ngIf="cwP" (click)="onCwBackdrop($event)">
-  <div class="pp-card" (click)="$event.stopPropagation()">
+  <div class="pp-card pp-wide" (click)="$event.stopPropagation()">
     <button class="pp-x" (click)="closeCw()" title="Close" aria-label="Close">&times;</button>
     <div class="pp-name">Changework</div>
     <div class="pp-rows">
@@ -1194,7 +1285,8 @@
         </div>
         <div class="cw-rows">
           <div class="pp-row" *ngIf="c.hourType && c.hours"><span>Doer - Predictive years</span><b>{{ hoursSaved(c) }}</b></div>
-          <div class="pp-row" *ngIf="c.adjustment"><span>Adjustment</span><b>{{ c.adjustment }}</b></div>
+          <!-- adjustment text can be long — title line, value on the NEXT line, left-aligned -->
+          <div class="pp-row pp-block" *ngIf="c.adjustment"><span>Adjustment</span><b>{{ c.adjustment }}</b></div>
           <div class="pp-row"><span>Created on</span><b>{{ noteDate(c.createdon) || '—' }}</b></div>
           <!-- Firestore's own last-write metadata (REST fetch), falling back to a
                data field if one ever exists -->
