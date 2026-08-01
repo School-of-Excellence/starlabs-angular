@@ -133,7 +133,7 @@ input,select{font:inherit}
   text-transform:uppercase;color:var(--z-600);
 }
 .sec-meta{font-size:12px;color:var(--z-500)}
-.sec-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.sec-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .footnote{padding:12px 22px 0;font-size:11.5px;color:var(--z-400);}
 
 /* ---- overview: ATC + Adjustments (Participants moved to its own full-width row) ---- */
@@ -295,6 +295,22 @@ input,select{font:inherit}
   border-radius:var(--r-pill);padding:5px 14px;cursor:pointer;white-space:nowrap;
 }
 .panel-export:hover{filter:brightness(.96)}
+.panel-actions{display:flex;align-items:center;gap:8px}
+/* icon-only count sort — ⇅ untouched, ↓ highest first, ↑ lowest first */
+.panel-sort{
+  font-size:13px;line-height:1;font-weight:700;color:var(--z-700);
+  background:var(--z-100);border:1px solid var(--z-200);
+  border-radius:var(--r-pill);padding:5px 11px;cursor:pointer;
+}
+.panel-sort:hover{background:var(--z-200)}
+.panel-sort.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+/* floating back-to-top over the scrolled panel list */
+.panel-top{
+  position:absolute;right:16px;bottom:16px;width:36px;height:36px;border-radius:50%;
+  border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:700;
+  cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.22);display:grid;place-items:center;
+}
+.panel-top:hover{filter:brightness(.95)}
 .panel-close{
   margin-left:auto;width:28px;height:28px;border-radius:var(--r-xs);
   border:1px solid var(--z-200);display:grid;place-items:center;color:var(--z-500);
@@ -383,9 +399,89 @@ input,select{font:inherit}
    height and radius as the search box above, so they do not look like bare text.
    mat-select is used WITHOUT mat-form-field (it does not need one), which is what
    lets the trigger be styled directly instead of through an MDC notched outline. */
-.pf-adv{display:flex;gap:7px;align-items:center;padding:8px 22px 0}
-/* flex:1 1 0 keeps the three equal and lets them expand when one is absent */
-.pf-field{position:relative;flex:1 1 0;min-width:0;display:flex}
+.pf-adv{display:flex;gap:7px;align-items:flex-end;padding:8px 22px 0}
+/* flex:1 1 0 keeps the three equal and lets them expand when one is absent. The field
+   is a column — include/exclude switch above, select below — because at the panel's
+   440px three selects plus three switches will not sit side by side on one line. */
+.pf-field{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:3px}
+/* .pf-x anchors here, NOT to .pf-field: its top:50% must centre on the select alone,
+   not on the taller column that now includes the switch row. */
+.pf-input{position:relative;min-width:0;display:flex}
+
+/* ---- include / exclude switch ---------------------------------------------------
+   Reads as a caption over the field rather than a control in its own right: the word
+   carries the state (a bare switch cannot say which way is which) and both go red
+   together on exclude, matching the field and its option ticks below. */
+/* min-height reserves the 16px handle, which overflows its 12px track box */
+.pf-mode{
+  display:flex;align-items:center;justify-content:space-between;gap:4px;
+  min-height:18px;padding:0 2px 0 3px;
+}
+.pf-mode-s{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--z-500);white-space:nowrap;
+  transition:color .15s var(--ease);
+}
+.pf-field.ex .pf-mode-s{color:var(--alert)}
+/* The stock switch is 36x14 with a 20px handle — too heavy beside a 9.5px caption in a
+   ~125px field, so it is re-proportioned through the switch tokens (NOT
+   transform:scale, which would leave the original layout box behind and offset the row). */
+mat-slide-toggle.pf-tgl{
+  flex:none;
+  /* Same proportions as the stock switch (handle taller than the track, zero handle
+     margin — the handle's travel IS track-width minus handle-width), scaled to 30x16.
+     Margins stay 0 or the handle overshoots the track end in the ON position. */
+  --mdc-switch-track-width:30px;
+  --mdc-switch-track-height:12px;
+  --mdc-switch-handle-width:16px;
+  --mdc-switch-handle-height:16px;
+  --mat-switch-unselected-handle-size:16px;
+  --mat-switch-selected-handle-size:16px;
+  --mat-switch-pressed-handle-size:16px;
+  --mat-switch-with-icon-handle-size:16px;
+  --mat-switch-unselected-handle-horizontal-margin:0;
+  --mat-switch-selected-handle-horizontal-margin:0;
+  --mat-switch-unselected-pressed-handle-horizontal-margin:0;
+  --mat-switch-selected-pressed-handle-horizontal-margin:0;
+  --mat-switch-unselected-with-icon-handle-horizontal-margin:0;
+  --mat-switch-selected-with-icon-handle-horizontal-margin:0;
+  /* stated, not inherited: the defaults read --mat-sys-corner-full, an M3 token the
+     prebuilt theme this app loads does not necessarily define (→ square corners) */
+  --mdc-switch-track-shape:999px;
+  --mdc-switch-handle-shape:999px;
+  --mdc-switch-state-layer-size:22px;
+  /* include = accent, the same "this filter is on" purple the field itself uses */
+  --mdc-switch-selected-track-color:var(--accent);
+  --mdc-switch-selected-focus-track-color:var(--accent);
+  --mdc-switch-selected-hover-track-color:var(--accent);
+  --mdc-switch-selected-pressed-track-color:var(--accent);
+  --mdc-switch-selected-handle-color:#fff;
+  --mdc-switch-selected-focus-handle-color:#fff;
+  --mdc-switch-selected-hover-handle-color:#fff;
+  --mdc-switch-selected-pressed-handle-color:#fff;
+  --mdc-switch-selected-focus-state-layer-color:var(--accent);
+  --mdc-switch-selected-hover-state-layer-color:var(--accent);
+  --mdc-switch-selected-pressed-state-layer-color:var(--accent);
+  /* exclude = the off position, so it is coloured through the UNSELECTED tokens */
+  --mdc-switch-unselected-track-color:var(--alert-soft);
+  --mdc-switch-unselected-focus-track-color:var(--alert-soft);
+  --mdc-switch-unselected-hover-track-color:var(--alert-soft);
+  --mdc-switch-unselected-pressed-track-color:var(--alert-soft);
+  --mdc-switch-unselected-handle-color:var(--alert);
+  --mdc-switch-unselected-focus-handle-color:var(--alert);
+  --mdc-switch-unselected-hover-handle-color:var(--alert);
+  --mdc-switch-unselected-pressed-handle-color:var(--alert);
+  --mdc-switch-unselected-focus-state-layer-color:var(--alert);
+  --mdc-switch-unselected-hover-state-layer-color:var(--alert);
+  --mdc-switch-unselected-pressed-state-layer-color:var(--alert);
+  --mat-switch-track-outline-color:var(--alert-line);
+  --mat-switch-track-outline-width:1px;
+}
+.pf-tgl ::ng-deep .mdc-form-field{margin:0}
+.pf-tgl ::ng-deep .mat-mdc-slide-toggle-ripple,
+.pf-tgl ::ng-deep .mdc-switch__ripple{display:none}
+/* the handle elevation reads as a smudge under a 16px handle */
+.pf-tgl ::ng-deep .mdc-switch__shadow{box-shadow:none}
 mat-select.pf-select{
   flex:1;min-width:0;height:34px;padding:0 8px 0 12px;
   display:inline-flex;align-items:center;cursor:pointer;
@@ -398,6 +494,13 @@ mat-select.pf-select.on{
   background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
   padding-right:26px;                 /* room for the clear button over the caret */
 }
+/* exclude — the picks now mean "drop these", so the active field turns red rather
+   than accent. Only the ACTIVE state is repainted: with nothing picked the dimension
+   filters nobody either way, and a red empty field would claim otherwise. */
+.pf-field.ex mat-select.pf-select.on{
+  background:var(--alert-soft);border-color:var(--alert-line);color:var(--alert);
+}
+.pf-field.ex .pf-x{color:var(--alert)}
 .pf-select ::ng-deep .mat-mdc-select-trigger{height:100%}
 .pf-select ::ng-deep .mat-mdc-select-value{color:inherit}
 .pf-select ::ng-deep .mat-mdc-select-placeholder{color:var(--z-500)}
@@ -425,6 +528,16 @@ mat-select.pf-select.on{
   --mat-full-pseudo-checkbox-selected-icon-color:#5856d6;
   --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
   --mat-full-pseudo-checkbox-unselected-icon-color:#aeaeb2;
+}
+/* exclude — a tick means "drop this one", so the checkbox and its row go red. The
+   class is put on the panel by [panelClass] (selectPanelClass): the overlay is a
+   sibling of :host, so the field's .ex state cannot reach it through the DOM. Literal
+   values for the same reason as the block above. */
+::ng-deep .pf-select-panel.pf-select-ex.mat-mdc-select-panel{
+  --mat-option-selected-state-label-text-color:#de3b45;
+  --mat-option-selected-state-layer-color:#fdeded;
+  --mat-full-pseudo-checkbox-selected-icon-color:#de3b45;
+  --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
 }
 /* The trigger is a fixed-height field so it must ellipsize, but the option list
    shows names in full: [panelWidth]="null" lets the panel size to its content
@@ -476,6 +589,9 @@ mat-select.pf-select.on{
   display:grid;place-items:center;font-size:10.5px;font-weight:600;
   font-family:var(--mono);background:var(--accent-soft);color:var(--accent);
 }
+/* camera glyph inside the avatar circle (initials retired) */
+.p-avatar svg{width:14px;height:14px}
+.p-avatar.sm svg{width:11px;height:11px}
 .p-name{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .p-meta{font-size:11px;color:var(--z-400);margin-top:1px}
 .p-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
@@ -491,6 +607,28 @@ mat-select.pf-select.on{
 .j-badge.prod{background:var(--z-100);color:var(--z-600)}
 .p-right{margin-left:auto;text-align:right;flex:none}
 .p-flag{font-size:10px;color:var(--z-400);margin-top:2px;font-family:var(--mono)}
+/* proc totals count badge — same palette as the table's ns/done cells */
+.p-cnt{
+  display:inline-block;font-family:var(--mono);font-size:13px;font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1;padding:4px 10px;border-radius:var(--r-pill);
+}
+.p-cnt.opp{background:var(--alert-soft);color:var(--alert)}
+.p-cnt.comp{background:var(--ok-soft);color:var(--ok)}
+/* live elapsed timer (LIVE lists) — green until 2h, red from 2h up */
+.p-timer{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  margin-left:6px;padding:2px 8px;border-radius:var(--r-pill);vertical-align:1px;
+  background:var(--ok-soft);color:var(--ok);
+}
+.p-timer.over{background:var(--alert-soft);color:var(--alert)}
+/* D/B changework status chips — green = that side is 'completed', red = anything else */
+.p-status{display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px}
+.p-st{
+  width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;
+  font-family:var(--mono);font-size:9px;font-weight:700;line-height:1;
+  background:var(--alert-soft);color:var(--alert);border:1px solid var(--alert-line);
+}
+.p-st.ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
 .mark-att{
   font-size:10px;font-weight:600;letter-spacing:.03em;color:#fff;background:var(--ok);
   border:1px solid var(--ok);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;white-space:nowrap;
@@ -529,26 +667,59 @@ mat-select.pf-select.on{
   display:flex;flex-direction:column;gap:7px;
 }
 .p-grp-eyebrow{
-  font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--z-400);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--z-700);
 }
 .p-grp-kid{display:flex;align-items:flex-start;gap:9px}
 .p-avatar.sm{width:24px;height:24px;font-size:9px}
-/* Lazy-photo avatar button — shows initials until clicked, then <app-profile-picture>
-   mounts and the single image downloads. The camera badge signals it's clickable. */
-.p-avatar-btn{position:relative;border:none;padding:0;cursor:pointer;font-family:var(--mono);transition:filter .15s}
-.p-avatar-btn:hover{filter:brightness(.95)}
-.p-avatar-btn::after{
-  content:'';position:absolute;right:-2px;bottom:-2px;width:13px;height:13px;border-radius:50%;
-  background:var(--accent) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'><path d='M20 5h-3.17l-1.24-1.35A2 2 0 0 0 14.12 3H9.88a2 2 0 0 0-1.47.65L7.17 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z'/></svg>") center/8px 8px no-repeat;
-  border:1.5px solid #fff;box-sizing:border-box;
+/* whole row opens the participant detail popup — no per-element photo affordances.
+   Lead/kid hover uses z-100, one step past the z-50 the whole .p-grp already gets
+   on hover — the same tone would paint an invisible highlight. */
+.p-click{cursor:pointer}
+.p-grp-lead.p-click:hover,.p-grp-kid.p-click:hover{background:var(--z-100);border-radius:var(--r-sm)}
+.p-click:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--r-sm)}
+
+/* participant detail popup (row click): photo + the row's data in one card.
+   Rendered OUTSIDE the transformed .panel so position:fixed means the viewport. */
+.pp-backdrop{
+  position:fixed;inset:0;background:rgba(15,15,30,.45);z-index:60;
+  display:flex;align-items:center;justify-content:center;
 }
-.p-avatar-btn.sm::after{width:11px;height:11px;background-size:7px 7px}
-/* the mounted picture keeps the avatar's footprint and vertical alignment */
-.p-avatar-pic{flex:none;align-self:flex-start}
-/* clickable name — click it to reveal + enlarge the profile photo */
-.p-name-photo{cursor:pointer;transition:color .12s}
-.p-name-photo:hover{color:var(--accent);text-decoration:underline}
+.pp-card{
+  position:relative;background:var(--z-0);border-radius:var(--r-lg);
+  box-shadow:0 24px 60px rgba(0,0,0,.28);padding:26px 28px 22px;
+  width:min(360px,calc(100vw - 48px));max-height:min(80vh,640px);overflow:auto;
+  display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+}
+.pp-x{
+  position:absolute;top:10px;right:12px;border:none;background:none;padding:2px;
+  font-size:20px;line-height:1;color:var(--z-400);cursor:pointer;
+}
+.pp-x:hover{color:var(--z-700)}
+.pp-photo{display:block;flex:none;border-radius:50%;overflow:hidden}
+.pp-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.pp-badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.pp-rows{
+  width:100%;margin-top:6px;border-top:1px dashed var(--z-200);padding-top:10px;
+  display:flex;flex-direction:column;gap:7px;
+}
+.pp-row{display:flex;justify-content:space-between;gap:14px;font-size:12px}
+.pp-row span{color:var(--z-500);flex:none}
+.pp-row b{font-weight:600;color:var(--z-900);word-break:break-word;text-align:right}
+/* per-changework note widgets — one dated card per noted changework */
+.pp-notes{width:100%;margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.pp-note-card{
+  text-align:left;background:var(--z-50);border:1px solid var(--z-200);
+  border-left:3px solid var(--ok-line);border-radius:var(--r-sm);padding:8px 10px;
+}
+.pp-note-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.pp-note-side{display:flex;align-items:baseline;gap:8px;flex:none}
+.pp-note-proc{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--z-700)}
+.pp-note-date{font-size:10px;font-family:var(--mono);color:var(--z-500);flex:none}
+.pp-note-text{font-size:12px;font-style:italic;color:var(--z-700);white-space:pre-wrap;word-break:break-word}
+.pp-hours-text{font-size:12px;font-weight:600;color:var(--ok)}
+/* field rows inside a changework card */
+.cw-rows{width:100%;display:flex;flex-direction:column;gap:5px;margin:2px 0 5px}
 .p-grp-kid .p-name{font-size:12px;font-weight:500}
 /* repeat count — the pair share more than one changework */
 .p-rep{
@@ -676,6 +847,9 @@ mat-select.pf-select.on{
 .proc-name{font-weight:600;font-size:13.5px;letter-spacing:-.01em}
 .proc-sub{font-size:11px;color:var(--z-500);margin-top:3px;line-height:1.5}
 .proc-sub b{font-family:var(--mono);font-weight:600;color:var(--z-700)}
+.proc-sub-link{cursor:pointer}
+.proc-sub-link:hover{color:var(--z-700)}
+.proc-sub-link:hover b{text-decoration:underline}
 .pcell{
   border-radius:var(--r-sm);padding:10px 8px;text-align:center;cursor:pointer;
   transition:transform .15s var(--ease),box-shadow .15s var(--ease);
@@ -702,6 +876,14 @@ mat-select.pf-select.on{
   font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--alert);
   cursor:pointer;
 }
+/* header totals for completed changework — the LIVE pill's green siblings */
+.done-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 11px;
+  border-radius:var(--r-pill);background:var(--ok-soft);border:1px solid var(--ok-line);
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--ok);
+  cursor:pointer;
+}
+.dot.done{background:var(--ok)}
 .collapse-btn{
   width:26px;height:26px;border-radius:var(--r-xs);border:1px solid var(--z-200);
   display:grid;place-items:center;color:var(--z-500);background:var(--z-0);
