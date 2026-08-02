@@ -1,39 +1,48 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-20 (Form builder redesign)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-20-update-delivery-form-builder-redesign.md`.
+_Last updated: 2026-08-01 (dashboard rounds 1-5: profile-tile merge · header search · ATC slowness diagnosed EMPIRICALLY · duplicate-stream + ladder + transport fixes)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-08-01-live-event-dashboard-v3-continued.md` (today: 5 rounds with WHYs + live measurements) and `specs/2026-07-30-perf-audit-live-event-dashboard-v3.md`.
 
 ## Current state
-- **UpdateDeliveryComponent's `Form` type fully redesigned** (Product Designer ▸
-  delivery-set ▸ update-delivery). Sectioned layout, numbered field cards with
-  duplicate / expand-collapse / drag-drop reorder, sticky Save footer, a11y
-  fixes. **All reactive-form bindings and Firestore writes unchanged** (parity
-  audit: zero regressions; `ng build` green). Committed on `nanda-development`:
-  `55cf4da` (chip-input bug fixes) and `84d2591` (redesign + features). Local
-  only — push is operator-gated.
-- Other delivery types (Appointment/Report/Events/Queue/Fieldwork) untouched.
-- Operator's separate New-Workshop changes (workshop-configuration,
-  workshop-dashboard) are uncommitted in the working tree — not mine, left alone.
+- Branch `nanda-development`; `ng build --configuration production` green
+  (only pre-existing canvg/leaflet + Bootstrap warnings).
+- HEAD holds the 07-30 arc through ~round 13-14; **UNCOMMITTED** (operator
+  commits manually after Chrome testing): 07-30 rounds ~14-24 delta PLUS all
+  of today: profile-card % tiles with done·pending sub-lines; header search
+  over the Total approved universe (opens the rich profile dialog); round-4
+  perf fixes (livechangework 3 listeners → 1 with in-memory day views,
+  atc_alpha single-pass, changed$ debounce, temporary_ATC bounded by
+  `lastupdated >= queueRangeStartDate` — the earliest selected queue start —
+  plus atc-draft `toServer()` timestamp normalization); round-5 ladder fixes
+  (metadata scan un-gated with re-kick incl. calculateJourneyCounts, ATC
+  pipeline attaches before the default-DB heavies and without awaiting the
+  legacy queue-variation read) and **main.ts: firestore-atc switched from
+  FORCED long-polling to auto-detect** (one-word revert if ATC screens ever
+  blank at a venue; firestore-forms left forced).
+- Composite index (temporary_ATC: delete ASC + lastupdated ASC) already
+  exists in prod — verified live (draft count 96-97 works).
 
-## Last session changes (2026-07-20) — why
-- Fixed array sub-field option chips: input not cleared on Enter (wrong
-  `event.value=` instead of `chipInput.clear()`) and dead backspace after one
-  removal (Material focus hand-off race; fixed by refocusing the chip input
-  after removal — deliberate, see journal).
-- Rebuilt the Form UI per operator directive "premium clean classic UI/UX,
-  don't touch data structure": scoped `.fb-*` styles appended to component CSS,
-  existing classes preserved for other types.
-- Added duplicate (deep clone appended at end), collapse keyed by control
-  identity (survives reorder), CDK drag-drop persisting order via the existing
-  debounced autosave.
-- 15-agent adversarial review → 9 confirmed findings all applied (contrast,
-  aria-labels, inline required errors + invalid-save snackbar, media-URL
-  labels, flipping-options gating, spacing/mobile/hairline fixes).
+## Last session changes (2026-08-01, why)
+- ATC card took 40-60s. Measured ON the operator's Mac (their ng serve,
+  production data, in-app pane + `ng.getComponent` state reads): app boots
+  in <1s; firestore-atc's FIRST request was held to 15.5s by a serial init
+  ladder (3,376-doc metadata full scan gating selectEvent, then serial
+  participants + queue-variation hops), and the ATC backfill then crawled
+  ~50s on FORCED long-polling (19-29 sequential polls, singles 14-74s).
+  Ladder fixes cut attach to ~11-12s; numbers verified byte-identical
+  (buckets 451/10/1/82 · 506 atc docs · journeys 544). Every round was
+  adversarially verified by agent workflows; verifiers caught real defects
+  (journey counts stuck at zero; event-switch stale-changework blend;
+  zero-queue day-chip parity; ESC double-close; backdrop fall-through) —
+  all fixed. Videoask double-stream deliberately NOT merged (operator
+  comment 2026-07-29 in code).
 
-## Pending / next
-- Operator manual test of duplicate / collapse / drag-drop in the dev app
-  (localhost:4200 — NOTE: dev serves production Firebase `fir-sample-aae4a`;
-  valid forms autosave to live `delivery forms`. Test with Form Name empty to
-  stay write-safe).
-- Known-but-deferred: `{Validators:[...]}` capital-V typo makes the TS
-  "required" validators on type selects inert (template `required` attr is the
-  live one); display-name map for raw type tokens — both optional, unapproved.
+## Pending
+- **CONFIRMED measured result: dashboard data 40-60s → ~7s** (metadata
+  1.5s; atc/buckets/changework all at 7.0s; numbers identical; transport
+  streaming). Remaining: operator's own Chrome pass + manual commit of
+  the day.
+- If a venue ever blanks ATC screens again: revert the one word in main.ts.
+- Phase-2 perf (H2 proper): scope/cache the `participant metadata` scan;
+  bound event-wide changework (3.4k) / videoask-tag (2.2k) streams.
+- Offered-not-built (07-30): DONE-pill tooltips with doc counts; cleanup
+  chip items; dropped debug of /livechangework/blkWuqSNB2XNco10GSDI.

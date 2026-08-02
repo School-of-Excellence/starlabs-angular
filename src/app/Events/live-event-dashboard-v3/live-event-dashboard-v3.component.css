@@ -110,6 +110,32 @@ input,select{font:inherit}
   color:var(--live);display:flex;align-items:center;gap:4px;
 }
 .tab .live-tag .dot{width:5px;height:5px}
+/* Header search — icon before the view tabs; dropdown searches the Total
+   approved universe; a result opens the profile-card popup */
+.hs-wrap{position:relative;display:flex}
+.tab.tab-ico{padding:7px 11px;cursor:pointer}
+.hs-drop{
+  position:absolute;top:calc(100% + 10px);left:0;z-index:30;
+  width:340px;max-width:calc(100vw - 32px);
+  background:var(--z-0);border:1px solid var(--z-200);border-radius:12px;
+  box-shadow:0 8px 28px rgba(28,28,30,.18);padding:10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.hs-input{
+  width:100%;padding:8px 10px;font-size:13px;color:var(--z-900);
+  border:1px solid var(--z-200);border-radius:8px;background:var(--z-50);outline:none;
+}
+.hs-input:focus{border-color:var(--accent);background:var(--z-0)}
+.hs-list{display:flex;flex-direction:column;max-height:320px;overflow:auto}
+.hs-row{
+  display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+  padding:7px 8px;border-radius:8px;text-align:left;cursor:pointer;
+}
+.hs-row:hover{background:var(--z-100)}
+.hs-name{font-size:13px;font-weight:600;color:var(--z-900)}
+.hs-sub{font-size:11px;color:var(--z-500);word-break:break-all}
+.hs-more{font-size:11px;color:var(--z-500);padding:0 8px 2px}
+.hs-hint{font-size:12px;color:var(--z-500);padding:2px 8px 4px}
 
 /* ============================================================
    SECTIONS
@@ -133,7 +159,7 @@ input,select{font:inherit}
   text-transform:uppercase;color:var(--z-600);
 }
 .sec-meta{font-size:12px;color:var(--z-500)}
-.sec-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.sec-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .footnote{padding:12px 22px 0;font-size:11.5px;color:var(--z-400);}
 
 /* ---- overview: ATC + Adjustments (Participants moved to its own full-width row) ---- */
@@ -227,6 +253,7 @@ input,select{font:inherit}
 .pt-table tr.no-journey-row td:first-child{color:var(--z-500);font-style:italic}
 .pt-nojourney{cursor:pointer;color:var(--z-600)}
 .pt-nojourney:hover{color:var(--accent)}
+.pt-grp{color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-pill);padding:2px 9px}
 /* journey grouping (mirrors product-funnel) */
 .jgroup-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 22px 2px}
 .jgroup-hint{font-size:11px;color:var(--z-500);flex:1 1 100%}
@@ -244,6 +271,8 @@ input,select{font:inherit}
 .jcol-head input{cursor:pointer}
 .jcol-tag{font-family:var(--font);font-size:8.5px;font-weight:600;letter-spacing:.04em;text-transform:none;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:1px 5px}
 .pt-table th.jcol-group span{color:var(--accent)}
+.jcol-total{font-family:var(--mono);font-weight:700;color:var(--accent);letter-spacing:0}
+.jgroup-seltotal{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--accent)}
 .pt-table th{
   font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;
   text-transform:uppercase;color:var(--z-500);padding:8px 10px;text-align:right;
@@ -286,6 +315,31 @@ input,select{font:inherit}
   font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--z-500);display:flex;align-items:center;
 }
+.panel-export{
+  font-size:11px;font-weight:600;letter-spacing:.03em;
+  color:#fff;background:var(--accent);border:1px solid var(--accent);
+  border-radius:var(--r-pill);padding:5px 14px;cursor:pointer;white-space:nowrap;
+}
+.panel-export:hover{filter:brightness(.96)}
+.panel-actions{display:flex;align-items:center;gap:8px}
+/* stacked changework stats in the count bar */
+.panel-stats{display:flex;flex-direction:column;gap:2px;font-size:10px;line-height:1.4;letter-spacing:.08em}
+.panel-stats b{font-weight:700;color:var(--z-900)}
+/* icon-only count sort — ⇅ untouched, ↓ highest first, ↑ lowest first */
+.panel-sort{
+  font-size:13px;line-height:1;font-weight:700;color:var(--z-700);
+  background:var(--z-100);border:1px solid var(--z-200);
+  border-radius:var(--r-pill);padding:5px 11px;cursor:pointer;
+}
+.panel-sort:hover{background:var(--z-200)}
+.panel-sort.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+/* floating back-to-top over the scrolled panel list */
+.panel-top{
+  position:absolute;right:16px;bottom:16px;width:36px;height:36px;border-radius:50%;
+  border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:700;
+  cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.22);display:grid;place-items:center;
+}
+.panel-top:hover{filter:brightness(.95)}
 .panel-close{
   margin-left:auto;width:28px;height:28px;border-radius:var(--r-xs);
   border:1px solid var(--z-200);display:grid;place-items:center;color:var(--z-500);
@@ -294,30 +348,470 @@ input,select{font:inherit}
 .panel-close:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-title{font-size:17px;font-weight:700;letter-spacing:-.015em;margin-top:8px}
 .panel-sub{font-size:12px;color:var(--z-500);margin-top:3px}
+/* ---- send to this list ---------------------------------------------------------
+   Sits under .panel-count, so it is read together with Export: both act on the list
+   as it currently stands. Three channels, then one — picked, it becomes the bar that
+   owns the selection (channel badge, count, select-all, Send), so the panel never
+   shows two competing sets of controls.
+   Black, not the grey used by the filter chrome above: this is the panel's only
+   outbound action, and grey read as another passive label. */
+.panel-comm{display:flex;align-items:center;gap:8px;padding:2px 22px 12px}
+.pc-label{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);margin-right:auto;
+}
+.pc-picked{
+  font-size:11px;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border-radius:var(--r-pill);padding:3px 9px;white-space:nowrap;
+}
+.pc-btn{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);
+  border:1px solid var(--z-300);background:var(--z-0);color:var(--z-900);
+  display:grid;place-items:center;transition:all .15s var(--ease);
+}
+.pc-btn:hover{border-color:var(--z-900);background:var(--z-900);color:#fff}
+.pc-btn svg{width:21px;height:21px;display:block}
+.pc-big{
+  width:40px;height:40px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent);
+}
+.pc-big svg{width:21px;height:21px;display:block}
+.pc-big.wati{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok)}
+.pc-meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.pc-title{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
+.pc-sub{font-size:10.5px;color:var(--z-500);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-all{
+  display:flex;align-items:center;gap:5px;flex:none;cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--z-600);white-space:nowrap;
+}
+.pc-all input{cursor:pointer;accent-color:var(--accent)}
+.pc-send{
+  flex:none;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:#fff;
+  background:var(--accent);border:1px solid var(--accent);border-radius:var(--r-pill);
+  padding:8px 16px;white-space:nowrap;
+}
+.pc-send:hover:not(:disabled){filter:brightness(.96)}
+.pc-send:disabled{opacity:.45;cursor:default}
+.pc-exit{
+  width:30px;height:30px;flex:none;border-radius:var(--r-xs);
+  border:1px solid var(--z-200);display:grid;place-items:center;
+  color:var(--z-500);font-size:15px;line-height:1;
+}
+.pc-exit:hover{border-color:var(--z-400);color:var(--z-900)}
 .panel-search{padding:14px 22px 0}
 .panel-search input{
   width:100%;padding:8px 12px;border:1px solid var(--z-200);border-radius:var(--r-sm);
   font-size:13px;background:var(--z-50);outline:none;
 }
 .panel-search input:focus{border-color:var(--accent);background:var(--z-0)}
+/* ---- panel filters: 2 rows, not 4 ---------------------------------------------
+   The four chips were two either/or questions (type · attendance log) wearing the
+   wrong control, so at 440px they wrapped to a second row. Segmented controls say
+   pick-one, and both fit on one line. */
+.panel-filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:11px 22px 0}
+.pf-seg{
+  display:inline-flex;align-items:center;gap:2px;padding:2px;
+  background:var(--z-100);border:1px solid var(--z-200);border-radius:var(--r-pill);
+}
+.pf-seg button{
+  padding:5px 11px;border-radius:var(--r-pill);font-size:11.5px;font-weight:500;
+  color:var(--z-600);white-space:nowrap;transition:all .18s var(--ease);
+}
+.pf-seg button:hover:not(.on){color:var(--z-900)}
+.pf-seg button.on{
+  background:var(--z-0);color:var(--z-900);font-weight:600;
+  box-shadow:0 1px 2px rgba(28,28,30,.12);
+}
+.pf-seg.acc button.on{color:var(--accent)}
+
+/* Products / cohorts share one row and read as FIELDS — bordered and filled, same
+   height and radius as the search box above, so they do not look like bare text.
+   mat-select is used WITHOUT mat-form-field (it does not need one), which is what
+   lets the trigger be styled directly instead of through an MDC notched outline. */
+.pf-adv{display:flex;gap:7px;align-items:flex-end;padding:8px 22px 0}
+/* flex:1 1 0 keeps the three equal and lets them expand when one is absent. The field
+   is a column — include/exclude switch above, select below — because at the panel's
+   440px three selects plus three switches will not sit side by side on one line. */
+.pf-field{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:3px}
+/* .pf-x anchors here, NOT to .pf-field: its top:50% must centre on the select alone,
+   not on the taller column that now includes the switch row. */
+.pf-input{position:relative;min-width:0;display:flex}
+
+/* ---- include / exclude switch ---------------------------------------------------
+   Reads as a caption over the field rather than a control in its own right: the word
+   carries the state (a bare switch cannot say which way is which) and both go red
+   together on exclude, matching the field and its option ticks below. */
+/* min-height reserves the 16px handle, which overflows its 12px track box */
+.pf-mode{
+  display:flex;align-items:center;justify-content:space-between;gap:4px;
+  min-height:18px;padding:0 2px 0 3px;
+}
+.pf-mode-s{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--z-500);white-space:nowrap;
+  transition:color .15s var(--ease);
+}
+.pf-field.ex .pf-mode-s{color:var(--alert)}
+/* The stock switch is 36x14 with a 20px handle — too heavy beside a 9.5px caption in a
+   ~125px field, so it is re-proportioned through the switch tokens (NOT
+   transform:scale, which would leave the original layout box behind and offset the row). */
+mat-slide-toggle.pf-tgl{
+  flex:none;
+  /* Same proportions as the stock switch (handle taller than the track, zero handle
+     margin — the handle's travel IS track-width minus handle-width), scaled to 30x16.
+     Margins stay 0 or the handle overshoots the track end in the ON position. */
+  --mdc-switch-track-width:30px;
+  --mdc-switch-track-height:12px;
+  --mdc-switch-handle-width:16px;
+  --mdc-switch-handle-height:16px;
+  --mat-switch-unselected-handle-size:16px;
+  --mat-switch-selected-handle-size:16px;
+  --mat-switch-pressed-handle-size:16px;
+  --mat-switch-with-icon-handle-size:16px;
+  --mat-switch-unselected-handle-horizontal-margin:0;
+  --mat-switch-selected-handle-horizontal-margin:0;
+  --mat-switch-unselected-pressed-handle-horizontal-margin:0;
+  --mat-switch-selected-pressed-handle-horizontal-margin:0;
+  --mat-switch-unselected-with-icon-handle-horizontal-margin:0;
+  --mat-switch-selected-with-icon-handle-horizontal-margin:0;
+  /* stated, not inherited: the defaults read --mat-sys-corner-full, an M3 token the
+     prebuilt theme this app loads does not necessarily define (→ square corners) */
+  --mdc-switch-track-shape:999px;
+  --mdc-switch-handle-shape:999px;
+  --mdc-switch-state-layer-size:22px;
+  /* include = accent, the same "this filter is on" purple the field itself uses */
+  --mdc-switch-selected-track-color:var(--accent);
+  --mdc-switch-selected-focus-track-color:var(--accent);
+  --mdc-switch-selected-hover-track-color:var(--accent);
+  --mdc-switch-selected-pressed-track-color:var(--accent);
+  --mdc-switch-selected-handle-color:#fff;
+  --mdc-switch-selected-focus-handle-color:#fff;
+  --mdc-switch-selected-hover-handle-color:#fff;
+  --mdc-switch-selected-pressed-handle-color:#fff;
+  --mdc-switch-selected-focus-state-layer-color:var(--accent);
+  --mdc-switch-selected-hover-state-layer-color:var(--accent);
+  --mdc-switch-selected-pressed-state-layer-color:var(--accent);
+  /* exclude = the off position, so it is coloured through the UNSELECTED tokens */
+  --mdc-switch-unselected-track-color:var(--alert-soft);
+  --mdc-switch-unselected-focus-track-color:var(--alert-soft);
+  --mdc-switch-unselected-hover-track-color:var(--alert-soft);
+  --mdc-switch-unselected-pressed-track-color:var(--alert-soft);
+  --mdc-switch-unselected-handle-color:var(--alert);
+  --mdc-switch-unselected-focus-handle-color:var(--alert);
+  --mdc-switch-unselected-hover-handle-color:var(--alert);
+  --mdc-switch-unselected-pressed-handle-color:var(--alert);
+  --mdc-switch-unselected-focus-state-layer-color:var(--alert);
+  --mdc-switch-unselected-hover-state-layer-color:var(--alert);
+  --mdc-switch-unselected-pressed-state-layer-color:var(--alert);
+  --mat-switch-track-outline-color:var(--alert-line);
+  --mat-switch-track-outline-width:1px;
+}
+.pf-tgl ::ng-deep .mdc-form-field{margin:0}
+.pf-tgl ::ng-deep .mat-mdc-slide-toggle-ripple,
+.pf-tgl ::ng-deep .mdc-switch__ripple{display:none}
+/* the handle elevation reads as a smudge under a 16px handle */
+.pf-tgl ::ng-deep .mdc-switch__shadow{box-shadow:none}
+mat-select.pf-select{
+  flex:1;min-width:0;height:34px;padding:0 8px 0 12px;
+  display:inline-flex;align-items:center;cursor:pointer;
+  border:1px solid var(--z-200);border-radius:var(--r-sm);background:var(--z-50);
+  font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;
+  letter-spacing:normal;color:var(--z-900);transition:all .15s var(--ease);
+}
+mat-select.pf-select:hover{border-color:var(--z-300);background:var(--z-0)}
+mat-select.pf-select.on{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+  padding-right:26px;                 /* room for the clear button over the caret */
+}
+/* exclude — the picks now mean "drop these", so the active field turns red rather
+   than accent. Only the ACTIVE state is repainted: with nothing picked the dimension
+   filters nobody either way, and a red empty field would claim otherwise. */
+.pf-field.ex mat-select.pf-select.on{
+  background:var(--alert-soft);border-color:var(--alert-line);color:var(--alert);
+}
+.pf-field.ex .pf-x{color:var(--alert)}
+.pf-select ::ng-deep .mat-mdc-select-trigger{height:100%}
+.pf-select ::ng-deep .mat-mdc-select-value{color:inherit}
+.pf-select ::ng-deep .mat-mdc-select-placeholder{color:var(--z-500)}
+.pf-select ::ng-deep .mat-mdc-select-arrow-wrapper{height:auto}
+.pf-select ::ng-deep .mat-mdc-select-arrow{color:currentColor;opacity:.5}
+.pf-select.on ::ng-deep .mat-mdc-select-arrow-wrapper{display:none}
+.pf-x{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  font-size:15px;line-height:1;color:var(--accent);opacity:.75;
+  transition:all .15s var(--ease);
+}
+.pf-x:hover{background:var(--z-0);opacity:1}
+
+/* ---- dropdown panel -------------------------------------------------------------
+   Renders in the CDK overlay container, OUTSIDE :host, so the design tokens above do
+   not resolve there — hence the literal values (kept in sync by hand with the :host
+   token block). Namespaced by panelClass so the ::ng-deep leak is inert. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{
+  padding:6px !important;border:1px solid #e3e3e8;background:#fff;
+  border-radius:12px !important;
+  box-shadow:0 1px 2px rgba(28,28,30,.04),0 10px 30px rgba(28,28,30,.06) !important;
+  --mat-option-selected-state-label-text-color:#5856d6;
+  --mat-option-selected-state-layer-color:#eeeefb;
+  --mat-full-pseudo-checkbox-selected-icon-color:#5856d6;
+  --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
+  --mat-full-pseudo-checkbox-unselected-icon-color:#aeaeb2;
+}
+/* exclude — a tick means "drop this one", so the checkbox and its row go red. The
+   class is put on the panel by [panelClass] (selectPanelClass): the overlay is a
+   sibling of :host, so the field's .ex state cannot reach it through the DOM. Literal
+   values for the same reason as the block above. */
+::ng-deep .pf-select-panel.pf-select-ex.mat-mdc-select-panel{
+  --mat-option-selected-state-label-text-color:#de3b45;
+  --mat-option-selected-state-layer-color:#fdeded;
+  --mat-full-pseudo-checkbox-selected-icon-color:#de3b45;
+  --mat-full-pseudo-checkbox-selected-checkmark-color:#fff;
+}
+/* The trigger is a fixed-height field so it must ellipsize, but the option list
+   shows names in full: [panelWidth]="null" lets the panel size to its content
+   instead of matching the trigger, and the option text wraps rather than
+   truncating. Bounded so a long product name cannot outgrow the 440px panel. */
+::ng-deep .pf-select-panel.mat-mdc-select-panel{min-width:216px;max-width:328px}
+::ng-deep .pf-select-panel .mat-mdc-option{
+  min-height:36px;height:auto;border-radius:8px;padding-top:7px;padding-bottom:7px;
+}
+::ng-deep .pf-select-panel .mat-mdc-option .mdc-list-item__primary-text{
+  width:100%;font-size:12.5px;line-height:1.35;
+  white-space:normal;overflow:visible;text-overflow:clip;
+}
+::ng-deep .pf-select-panel .pf-opt{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;width:100%}
+::ng-deep .pf-select-panel .pf-opt-n{white-space:normal;overflow-wrap:anywhere}
+::ng-deep .pf-select-panel .pf-opt-c{flex:none;font-size:10.5px;color:#8e8e93;font-variant-numeric:tabular-nums;margin-top:2px}
+
+/* in-dropdown search — sticks to the top of the scrolling option list. The negative
+   margin + matching top offset let it cover the panel's own 6px padding as the list
+   scrolls under it. */
+::ng-deep .pf-select-searchable .pf-search{
+  position:sticky;top:-6px;z-index:2;background:#fff;
+  margin:-6px -6px 4px;padding:8px 8px 7px;border-bottom:1px solid #f2f2f7;
+}
+::ng-deep .pf-select-searchable .pf-search input{
+  width:100%;height:28px;padding:0 10px;border:1px solid #e3e3e8;border-radius:999px;
+  background:#f6f6f8;font-size:12px;color:#1c1c1e;outline:none;
+}
+::ng-deep .pf-select-searchable .pf-search input:focus{border-color:#cfcef3;background:#fff}
+::ng-deep .pf-select-searchable .pf-search input::placeholder{color:#aeaeb2}
+::ng-deep .pf-select-searchable .pf-none{padding:10px 12px 8px;font-size:12px;color:#8e8e93}
+/* Same treatment as .pc-label directly below it — the count and "Send to" are one
+   band of controls over the list, so they read at one weight. */
 .panel-count{
-  padding:12px 22px 8px;font-family:var(--mono);font-size:10.5px;
-  letter-spacing:.1em;text-transform:uppercase;color:var(--z-400);
+  padding:12px 22px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-900);
 }
 .panel-list{flex:1;overflow-y:auto;padding:0 12px 20px}
 .p-row{
   display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r-sm);
 }
 .p-row:hover{background:var(--z-50)}
+/* row selection checkbox — only rendered in selection mode */
+.p-check{width:15px;height:15px;flex:none;cursor:pointer;accent-color:var(--accent)}
+.p-grp-lead .p-check{margin-top:7px}   /* the group lead aligns to flex-start */
 .p-avatar{
   width:30px;height:30px;border-radius:50%;flex:none;
   display:grid;place-items:center;font-size:10.5px;font-weight:600;
   font-family:var(--mono);background:var(--accent-soft);color:var(--accent);
 }
+/* camera glyph inside the avatar circle (initials retired) */
+.p-avatar svg{width:14px;height:14px}
+.p-avatar.sm svg{width:11px;height:11px}
 .p-name{font-weight:500;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .p-meta{font-size:11px;color:var(--z-400);margin-top:1px}
+.p-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+/* colour-coded journey + first-timer badges (prototype palette; journeys cycle) */
+.j-badge.jc0{background:var(--accent-soft);color:var(--accent)}
+.j-badge.jc1{background:var(--ok-soft);color:var(--ok)}
+.j-badge.jc2{background:var(--alert-soft);color:var(--alert)}
+.j-badge.jc3{background:#fdf0f5;color:#c7366f}
+.j-badge.jc4{background:var(--warn-soft);color:var(--warn)}
+.j-badge.jc5{background:#eef;color:#5b57c9}
+.j-badge.ft1st{background:var(--accent-soft);color:var(--accent)}
+.j-badge.ftrpt{background:var(--ok-soft);color:var(--ok)}
+.j-badge.prod{background:var(--z-100);color:var(--z-600)}
 .p-right{margin-left:auto;text-align:right;flex:none}
 .p-flag{font-size:10px;color:var(--z-400);margin-top:2px;font-family:var(--mono)}
+/* proc totals count badge — same palette as the table's ns/done cells */
+.p-cnt{
+  display:inline-block;font-family:var(--mono);font-size:13px;font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1;padding:4px 10px;border-radius:var(--r-pill);
+}
+.p-cnt.opp{background:var(--alert-soft);color:var(--alert)}
+.p-cnt.comp{background:var(--ok-soft);color:var(--ok)}
+.p-cnt.tot{background:var(--accent-soft);color:var(--accent)}
+/* per-procedure breakdown on hover (all-procedures panels) — same styled
+   tooltip as the head tags, right-anchored so it stays inside the panel */
+.p-cnt{position:relative}
+.p-cnt[data-tip]::after{
+  content:attr(data-tip);position:absolute;right:0;top:calc(100% + 6px);
+  background:var(--z-900);color:#fff;font-size:10px;font-weight:600;line-height:1.45;
+  padding:5px 9px;border-radius:6px;white-space:normal;width:max-content;max-width:240px;
+  text-align:left;opacity:0;pointer-events:none;transition:opacity .12s;z-index:6;
+}
+.p-cnt[data-tip]:hover::after{opacity:1}
+/* live elapsed timer (LIVE lists) — green until 2h, red from 2h up */
+.p-timer{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  margin-left:6px;padding:2px 8px;border-radius:var(--r-pill);vertical-align:1px;
+  background:var(--ok-soft);color:var(--ok);
+}
+.p-timer.over{background:var(--alert-soft);color:var(--alert)}
+/* D/B changework status chips — green = that side is 'completed', red = anything else */
+.p-status{display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px}
+.p-st{
+  width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;
+  font-family:var(--mono);font-size:9px;font-weight:700;line-height:1;
+  background:var(--alert-soft);color:var(--alert);border:1px solid var(--alert-line);
+}
+.p-st.ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
+.mark-att{
+  font-size:10px;font-weight:600;letter-spacing:.03em;color:#fff;background:var(--ok);
+  border:1px solid var(--ok);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;white-space:nowrap;
+}
+.mark-att:hover{filter:brightness(.96)}
+.mark-att:disabled{opacity:.5;cursor:default}
+.mark-done{font-size:10px;font-weight:600;color:var(--ok)}
+/* inline product multi-select for manual attendance marking */
+.p-row-picking{background:var(--z-50)}
+.mark-picker{margin:0 10px 8px 51px;padding:9px 11px;border:1px solid var(--z-200);border-radius:var(--r-sm);background:var(--z-50)}
+.mark-picker-head{font-size:10.5px;font-weight:600;color:var(--z-600);margin-bottom:6px}
+.mark-opt{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0;cursor:pointer}
+.mark-opt input{cursor:pointer}
+.mark-picker-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}
+.mark-cancel{
+  font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--z-600);background:#fff;
+  border:1px solid var(--z-200);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;white-space:nowrap;
+}
+.mark-cancel:hover{border-color:var(--z-400)}
+.mark-cancel:disabled{opacity:.5;cursor:default}
+/* doer vs beneficiary role pill — clear, colour-coded */
+.p-role{font-size:8.5px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-pill);display:inline-block;white-space:nowrap}
+.p-role.doer{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
+.p-role.beneficiary{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+/* changework group — the lead once, its counterparts indented under a rail. Replaces
+   the old side-by-side pair row, which repeated the doer once per beneficiary. */
+.p-grp{padding:10px;border-radius:var(--r-sm);border:1px dashed var(--z-200);margin-bottom:6px}
+.p-grp:hover{background:var(--z-50)}
+.p-grp-lead{display:flex;align-items:flex-start;gap:10px}
+.p-grp-lead .p-role{margin-bottom:3px}
+.p-grp-lead .p-name{font-weight:600;font-size:12.5px}
+.p-name.p-dim{color:var(--z-400);font-weight:500}
+.p-avatar.p-dim{background:var(--z-100);color:var(--z-400)}
+.p-grp-kids{
+  margin:8px 0 0 14px;padding-left:12px;border-left:1.5px solid var(--z-200);
+  display:flex;flex-direction:column;gap:7px;
+}
+.p-grp-eyebrow{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--z-700);
+}
+.p-grp-kid{display:flex;align-items:flex-start;gap:9px}
+.p-avatar.sm{width:24px;height:24px;font-size:9px}
+/* whole row opens the participant detail popup — no per-element photo affordances.
+   Lead/kid hover uses z-100, one step past the z-50 the whole .p-grp already gets
+   on hover — the same tone would paint an invisible highlight. */
+.p-click{cursor:pointer}
+.p-grp-lead.p-click:hover,.p-grp-kid.p-click:hover{background:var(--z-100);border-radius:var(--r-sm)}
+.p-click:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--r-sm)}
+
+/* participant detail popup (row click): photo + the row's data in one card.
+   Rendered OUTSIDE the transformed .panel so position:fixed means the viewport. */
+.pp-backdrop{
+  position:fixed;inset:0;background:rgba(15,15,30,.45);z-index:60;
+  display:flex;align-items:center;justify-content:center;
+}
+.pp-card{
+  position:relative;background:var(--z-0);border-radius:var(--r-lg);
+  box-shadow:0 24px 60px rgba(0,0,0,.28);padding:26px 28px 22px;
+  width:min(360px,calc(100vw - 48px));max-height:min(80vh,640px);overflow:auto;
+  display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+}
+.pp-x{
+  position:absolute;top:10px;right:12px;border:none;background:none;padding:2px;
+  font-size:20px;line-height:1;color:var(--z-400);cursor:pointer;
+}
+.pp-x:hover{color:var(--z-700)}
+/* RICH participant card — wide, left-aligned, tiles + history grid */
+.pp-card.pp-big{
+  width:min(880px,calc(100vw - 48px));max-height:min(90vh,820px);
+  text-align:left;align-items:stretch;gap:12px;
+}
+/* changework popup — larger too (operator) */
+.pp-card.pp-wide{
+  width:min(680px,calc(100vw - 48px));max-height:min(88vh,760px);
+}
+/* history cards: a LIST — one card per row (operator revision) */
+.pp-hist{display:flex;flex-direction:column;gap:8px}
+.pp-head{display:flex;gap:14px;align-items:flex-start}
+.pp-big .pp-photo{flex:none}
+.pp-id{min-width:0;display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.pp-big .pp-badges{justify-content:flex-start}
+.pp-contact{font-size:12px;color:var(--z-500);word-break:break-word}
+.j-badge.coh{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
+.pp-flag{font-size:10.5px;font-family:var(--mono);font-weight:600;color:var(--alert)}
+.pp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:640px){.pp-grid{grid-template-columns:repeat(2,1fr)}}
+.pp-tile{
+  background:var(--z-50);border:1px solid var(--z-200);border-radius:var(--r-sm);
+  padding:8px 10px;display:flex;flex-direction:column;gap:3px;min-width:0;
+}
+.pp-tile span{
+  font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--z-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pp-tile b{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp-tile b.pp-live{color:var(--live)}
+.pp-tile small{
+  font-size:10.5px;color:var(--z-500);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pp-sec{display:flex;flex-direction:column;gap:8px}
+.pp-sec-title{
+  font-size:10px;font-family:var(--mono);font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--z-700);
+}
+.pp-empty{font-size:12px;color:var(--z-500);font-style:italic}
+.pp-photo{display:block;flex:none;border-radius:50%;overflow:hidden}
+.pp-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.pp-badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.pp-rows{
+  width:100%;margin-top:6px;border-top:1px dashed var(--z-200);padding-top:10px;
+  display:flex;flex-direction:column;gap:7px;
+}
+.pp-row{display:flex;justify-content:space-between;gap:14px;font-size:12px}
+.pp-row span{color:var(--z-500);flex:none}
+.pp-row b{font-weight:600;color:var(--z-900);word-break:break-word;text-align:right}
+/* stacked variant: title line, value on the next line, LEFT-aligned (long text) */
+.pp-row.pp-block{flex-direction:column;align-items:flex-start;gap:2px}
+.pp-row.pp-block b{text-align:left}
+/* per-changework note widgets — one dated card per noted changework */
+.pp-notes{width:100%;margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.pp-note-card{
+  text-align:left;background:var(--z-50);border:1px solid var(--z-200);
+  border-left:3px solid var(--ok-line);border-radius:var(--r-sm);padding:8px 10px;
+}
+.pp-note-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.pp-note-side{display:flex;align-items:baseline;gap:8px;flex:none}
+.pp-note-proc{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--z-700)}
+.pp-note-date{font-size:10px;font-family:var(--mono);color:var(--z-500);flex:none}
+.pp-note-text{font-size:12px;font-style:italic;color:var(--z-700);white-space:pre-wrap;word-break:break-word}
+.pp-hours-text{font-size:12px;font-weight:600;color:var(--ok)}
+/* field rows inside a changework card */
+.cw-rows{width:100%;display:flex;flex-direction:column;gap:5px;margin:2px 0 5px}
+.p-grp-kid .p-name{font-size:12px;font-weight:500}
+/* repeat count — the pair share more than one changework */
+.p-rep{
+  margin-left:6px;padding:1px 6px;border-radius:var(--r-pill);
+  background:var(--accent-soft);color:var(--accent);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.02em;
+  vertical-align:1px;
+}
+.p-grp-proc{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--z-500);letter-spacing:.03em}
 .fu-empty{font-size:11.5px;color:var(--z-400);font-style:italic;padding:8px 2px}
 
 /* placeholder views */
@@ -352,6 +846,10 @@ input,select{font:inherit}
 }
 .day-eyebrow span{white-space:nowrap}
 .day-num{font-size:26px;font-weight:700;letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+/* The count is its own click target (opens the attendance panel); align-self keeps the
+   hit area hugging the digits instead of stretching across the card. */
+.day-card:not(.upcoming) .day-num{align-self:flex-start;cursor:pointer}
+.day-card:not(.upcoming) .day-num:hover{opacity:.6}
 .day-sub{
   margin-top:auto;padding-top:8px;border-top:1px dashed var(--z-200);
   font-size:10.5px;color:var(--z-500);display:flex;justify-content:space-between;align-items:center;
@@ -366,8 +864,21 @@ input,select{font:inherit}
 .day-card.total{background:var(--beige);border-color:var(--beige-line)}
 .day-card.total .day-sub{border-top-color:var(--beige-line);color:var(--alert);font-weight:500}
 .day-card.total .day-sub b{color:var(--alert)}
+.day-card.total .day-subs{border-top-color:var(--beige-line)}
+/* the total card stacks a neutral stat over a negative one, so the red is carried
+   by the row that earns it rather than by the card */
+.day-stat.alert,.day-stat.alert b{color:var(--alert)}
+.day-stat.alert:hover{opacity:.72}
 .day-card.today{background:var(--z-900);border-color:var(--z-900);color:#fff}
 .day-card.today .day-eyebrow{color:var(--z-400)}
+.day-subs{margin-top:auto;padding-top:6px;border-top:1px dashed var(--z-200);display:flex;flex-direction:column;gap:3px}
+.day-stat{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--z-500);cursor:pointer}
+.day-stat span{white-space:nowrap}
+.day-stat:hover{color:var(--accent)}
+.day-stat b{font-family:var(--mono);font-weight:600;color:var(--z-700)}
+.day-card.today .day-subs{border-top-color:var(--z-700)}
+.day-card.today .day-stat{color:var(--z-400)}
+.day-card.today .day-stat b{color:#fff}
 .day-card.today .day-sub{border-top-color:var(--z-700);color:var(--z-400)}
 .day-card.today .day-sub b{color:#fff}
 .day-card.today .day-bar{height:3px;border-radius:2px;background:var(--z-700);margin-top:8px;overflow:hidden}
@@ -379,6 +890,10 @@ input,select{font:inherit}
 .day-card.never .day-eyebrow{color:var(--alert)}
 .day-card.never .day-num{color:var(--alert)}
 .day-card.never .day-sub{border-top-color:var(--alert-line);color:var(--alert)}
+/* Shared day filter. An accent ring rather than a background swap, so the state reads on
+   the dark .today card and the beige .total card alike. MUST stay below .today/.total —
+   those set border-color at equal specificity, so an earlier rule would lose. */
+.day-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-line)}
 
 /* ---- procedure tracking ---- */
 .proc-filters{
@@ -403,6 +918,7 @@ input,select{font:inherit}
 .proc-col-h{
   font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;color:var(--z-400);text-align:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;
 }
 .proc-col-h.first{text-align:left}
 .proc-group-h{
@@ -415,6 +931,30 @@ input,select{font:inherit}
 .proc-name{font-weight:600;font-size:13.5px;letter-spacing:-.01em}
 .proc-sub{font-size:11px;color:var(--z-500);margin-top:3px;line-height:1.5}
 .proc-sub b{font-family:var(--mono);font-weight:600;color:var(--z-700)}
+.proc-sub-link{cursor:pointer}
+.proc-sub-link:hover{color:var(--z-700)}
+.proc-sub-link:hover b{text-decoration:underline}
+/* table-head totals tags ONLY — blue total · green completed · red pending;
+   the label lives in the tooltip (numbers as tags, label on hover) */
+.proc-tag{
+  display:inline-flex;align-items:center;font-family:var(--mono);font-size:10.5px;
+  font-weight:700;font-variant-numeric:tabular-nums;line-height:1;
+  padding:3px 9px;border-radius:var(--r-pill);border:1px solid;
+  position:relative;cursor:pointer;
+}
+.proc-tag:hover{filter:brightness(.96)}
+/* styled tooltip — the native title was unreliable for the operator */
+.proc-tag::after{
+  content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);
+  background:var(--z-900);color:#fff;font-size:10px;font-weight:600;line-height:1.3;
+  padding:4px 8px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity .12s;z-index:6;
+}
+.proc-tag:hover::after{opacity:1}
+.proc-tag.blue{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.proc-tag.green{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-line)}
+.proc-tag.red{background:var(--alert-soft);color:var(--alert);border-color:var(--alert-line)}
+.proc-head-tags{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap}
 .pcell{
   border-radius:var(--r-sm);padding:10px 8px;text-align:center;cursor:pointer;
   transition:transform .15s var(--ease),box-shadow .15s var(--ease);
@@ -441,6 +981,14 @@ input,select{font:inherit}
   font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--alert);
   cursor:pointer;
 }
+/* header totals for completed changework — the LIVE pill's green siblings */
+.done-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 11px;
+  border-radius:var(--r-pill);background:var(--ok-soft);border:1px solid var(--ok-line);
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--ok);
+  cursor:pointer;
+}
+.dot.done{background:var(--ok)}
 .collapse-btn{
   width:26px;height:26px;border-radius:var(--r-xs);border:1px solid var(--z-200);
   display:grid;place-items:center;color:var(--z-500);background:var(--z-0);
@@ -466,6 +1014,17 @@ input,select{font:inherit}
 .pd-in:focus,.pd-sel:focus{border-color:var(--accent);background:var(--z-0)}
 .pd-sel{appearance:auto}
 .pd-num{width:54px;text-align:right}
+/* active ATC-completion band (set by clicking a tier) */
+.pd-band{
+  display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 11px;
+  border-radius:var(--r-pill);background:var(--accent-soft);border:1px solid var(--accent-line);
+  font-size:12px;font-weight:500;color:var(--accent);
+}
+.pd-band-x{
+  width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font-size:13px;line-height:1;color:var(--accent);opacity:.75;
+}
+.pd-band-x:hover{background:var(--z-0);opacity:1}
 .pd-tablewrap{overflow-x:auto;padding:8px 22px 4px}
 .pd-table{width:100%;border-collapse:collapse;min-width:860px}
 .pd-table th{
@@ -554,6 +1113,11 @@ input,select{font:inherit}
 /* ---- bottom row: tags + followup ---- */
 .bottom-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-top:22px}
 .bottom-grid>.card{min-width:0}
+/* The Day chips again, inside the Video Ask Tags card. That card is the 1.6fr column of
+   .bottom-grid, not full width, so .pf-group must wrap here — a long event would
+   otherwise run the chips off the edge (Procedure Tracking is full width and doesn't). */
+.tag-filters{padding:14px 22px 0}
+.tag-filters .pf-group{flex-wrap:wrap}
 .tag-scroll{
   display:flex;gap:12px;padding:16px 22px 8px;overflow-x:auto;
   scrollbar-width:thin;scrollbar-color:var(--z-300) transparent;margin-bottom:8px;
@@ -575,13 +1139,21 @@ input,select{font:inherit}
   padding:1px 7px;cursor:pointer;flex:none;
 }
 .tag-col-count:hover{background:var(--accent)}
+/* Addressed — not a taxonomy tag but a resolved-state column, so it reads as its own
+   thing: separated from the tag run by a margin, and tinted with the ok colour. */
+.tag-col-addressed{
+  margin-left:10px;background:var(--ok-soft);border-color:var(--ok-line);
+}
+.tag-col-addressed .tag-col-h{border-bottom-color:var(--ok-line)}
+.tag-col-addressed .tag-col-name{color:var(--ok)}
+.tag-col-addressed .tag-col-count{background:var(--ok)}
 .name-pill{
   background:var(--z-0);border:1px solid var(--z-200);border-radius:var(--r-xs);
   padding:5px 9px;font-size:11.5px;font-weight:500;margin-bottom:5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
 }
 .name-pill:hover{border-color:var(--accent);color:var(--accent)}
-.fu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:16px 22px 20px}
+.fu-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 22px 20px}
 .fu-col{
   background:var(--beige);border:1px solid var(--beige-line);
   border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;min-height:230px;

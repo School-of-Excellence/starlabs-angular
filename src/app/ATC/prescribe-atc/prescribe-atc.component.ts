@@ -191,7 +191,8 @@ export class PrescribeATCComponent {
   previewATCImages = []
 
   // Queue Data
-  ongoingQueue = null
+  // ongoingQueue = null
+  ongoingQueues = []
   arenamode:boolean = false
   liveassignmentid = null
   liveassignmentdata = null
@@ -784,16 +785,17 @@ export class PrescribeATCComponent {
       // Check if inside a Queue
       await getDocs(query(collection(this.firestoreDefault,'queue generation'),where("queueenddate", ">=", new Date()))).then(async queuesnap=>{
         var ongoingQueueList = queuesnap.docs.map(e => e.data()).filter(e => e["queuestartdate"].toDate() < new Date())
-        var queueref = ongoingQueueList.map(e => doc(this.firestoreDefault, 'queue generation', e["docid"]))
-        if(queueref.length != 0){
-          await getDocs(query(collection(this.firestoreDefault, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
-            if(pairing.size != 0){
-              this.ongoingQueue = ongoingQueueList.find(e => e["docid"] == pairing.docs[0].data()["queueref"].id) ?? null
-              if(this.ongoingQueue != null) this.arenamode = true
-            }
-          })
-        }
-        console.log("Ongoing Queue", this.ongoingQueue, queueref)
+        this.ongoingQueues = ongoingQueueList
+        // var queueref = ongoingQueueList.map(e => doc(this.firestoreDefault, 'queue generation', e["docid"]))
+        // if(queueref.length != 0){
+        //   await getDocs(query(collection(this.firestoreDefault, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
+        //     if(pairing.size != 0){
+        //       this.ongoingQueue = ongoingQueueList.find(e => e["docid"] == pairing.docs[0].data()["queueref"].id) ?? null
+        //       if(this.ongoingQueue != null) this.arenamode = true
+        //     }
+        //   })
+        // }
+        // console.log("Ongoing Queue", this.ongoingQueue, queueref)
 
       });
     } catch (error) {
@@ -908,38 +910,48 @@ export class PrescribeATCComponent {
         }
       })
     }
-    if(this.ongoingQueue != null){
-      console.log(this.ongoingQueue);
 
-      // var atcstudio = ["diagnostics", "consultation", "ah", "validation"]
-      var atcWidget = ["addunvalidatedatc", "addvalidatedatc"]
-      var atcActivityStage = []
-      Object.keys(this.ongoingQueue["stageproperty"] ?? {}).forEach(key=>{
-        var studiowidgets = this.ongoingQueue["stageproperty"][key]["studiowidgets"] ?? []
-        if(studiowidgets.some(e => atcWidget.includes(e))){
-          atcActivityStage.push(key)
-        }
-      })
-      console.log(atcActivityStage)
-      getDocs(query(collection(this.firestoreDefault,"live assignment"),where("queueid", "==", this.ongoingQueue["docid"]),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
-        var live = studio.docs.filter(e => e.data()["status"] == "recording" || e.data()["status"] == "live")
-        var atcStudio = null
-        if(live.length != 0){
-          atcStudio = live[0]
-        }
-        else{
-          var lastStudio = studio.docs.filter(e => atcActivityStage.includes(e.data()["stagename"]))
-          if(lastStudio.length != 0){
-            atcStudio = lastStudio[0]
-          }
-        }
+    // Step 3: does this specialist + participant have an existing live assignment record, in any of the currently ongoing queues
+    var ongoingQueueIds = this.ongoingQueues.map(e => e["docid"])
+    if(ongoingQueueIds.length != 0){
+      await getDocs(query(collection(this.firestoreDefault,"live assignment"),where("queueid", "in", ongoingQueueIds),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
+      var live = studio.docs.filter(e => e.data()["status"] == "recording" || e.data()["status"] == "live" || e.data()["status"] == "completed")
+      var atcStudio = live.length != 0 ? live[0] : null
+      // if(atcStudio == null){
+      // var atcWidget = ["addunvalidatedatc", "addvalidatedatc"]
+      // var lastStudio = studio.docs.filter(e => {
+      // var docQueue = this.ongoingQueues.find(q => q["docid"] == e.data()["queueid"])
+      // if(!docQueue) return false
+      // var atcActivityStage = []
+      // Object.keys(docQueue["stageproperty"] ?? {}).forEach(key=>{
+      //   var studiowidgets = docQueue["stageproperty"][key]["studiowidgets"] ?? []
+      //   if(studiowidgets.some(e => atcWidget.includes(e))){
+      //     atcActivityStage.push(key)
+      //   }
+      // })
+      //   return atcActivityStage.includes(e.data()["stagename"])
+      // })
+      //     if(lastStudio.length != 0){
+      //       atcStudio = lastStudio[0]
+      //     }
+      //   }
         if(atcStudio != null){
+          this.arenamode = true
           this.liveassignmentid = atcStudio.id
           this.liveassignmentdata = atcStudio.data()
           console.log("Live assignment", this.liveassignmentdata)
           this.stagename = this.liveassignmentdata['stagename']
-          this.queueid = this.ongoingQueue["docid"]
+          this.queueid = this.liveassignmentdata['queueid']
           this.validationnotrequired = this.mentor || this.queryparam["validation"] == "true" // this.liveassignmentdata['stagetype'] == 'consultation' || this.liveassignmentdata['stagetype'] == 'ah' || (this.ongoingQueue["isconsultationrequired"] ?? []).length == 0
+          
+          if(this.liveassignmentdata['queuename'] == null || this.liveassignmentdata['queuename'] == undefined){
+            getDoc(doc(this.firestoreDefault, "queue generation", this.queueid)).then(queueDoc =>{
+              if(queueDoc.exists()){
+                this.liveassignmentdata['queuename'] = queueDoc.data()["queuename"]
+              }
+            })
+          }
+          
           getDocs(query(collection(this.firestoreDefault,"queue stage log"), where("liveassignmentid", "==", this.liveassignmentid),limit(1))).then(queuetoken=>{
             console.log("queue Token", queuetoken.size)
             console.log("Live Assignment", this.liveassignmentdata)
@@ -1051,7 +1063,6 @@ export class PrescribeATCComponent {
           this.arenamode = false
           this.liveassignmentdata = null
           this.tokendata = null
-          alert(`You are currently active in the Queue ${this.ongoingQueue['queuename']}. But there is no record of you having a session with ${this.mapProfile[this.participantProfileid]['name']}. You can still submit this ATC independently or choose other participant who you have worked with in this queue.`)
         }
       }).catch(e =>{
         console.log(e)
@@ -1085,7 +1096,7 @@ export class PrescribeATCComponent {
         where('delete', '==', false)
       );
       // local-first list: bounded server query merged with any unsynced local drafts; local-only if unreachable
-      draftATC = await this.draftService.listDrafts('temporary_ATC', q, 
+      draftATC = await this.draftService.listDrafts('temporary_ATC', q,
         d => d['profileid'] === this.participantProfileid && d['delete'] !== true
       );
     } else {
@@ -2208,7 +2219,7 @@ async removeATCImage(index: number) {
     var firebaseATCBatch = writeBatch(this.firestoreATC)
     // var firebaseBatch = writeBatch(this.firestore);
     var selectedProfile = this.mapProfile[this.participantProfileid]["name"]
-    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.ongoingQueue['queuename']}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
+    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.liveassignmentdata["queuename"]}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
     var aelConfirm = this.matDialog.open(AtcAelConfirmComponent, {
       maxHeight: "90vh",
       maxWidth: "60vw",
