@@ -186,6 +186,106 @@
             </div>
             <mat-slide-toggle formControlName="show" color="primary"></mat-slide-toggle>
           </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Auto Notification</span>
+              <span class="toggle-desc">Schedule daily app notifications for this ad.</span>
+            </div>
+            <mat-slide-toggle formControlName="autonotification" color="primary"></mat-slide-toggle>
+          </div>
+        </div>
+
+        <!-- Auto notification schedule -->
+        <div class="notif-section" *ngIf="form.get('autonotification')?.value">
+          <div class="notif-section-head">
+            <span class="notif-section-title">
+              <mat-icon>notifications_active</mat-icon> Notification Schedule
+            </span>
+            <span class="day-chip" *ngIf="notificationDayCount > 0">
+              {{ notificationDayCount }} {{ notificationDayCount === 1 ? 'day' : 'days' }} ·
+              {{ notificationDayCount }} {{ notificationDayCount === 1 ? 'notification' : 'notifications' }}
+            </span>
+          </div>
+
+          <div class="grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Start Date</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="startdate" readonly
+                (click)="startPicker.open()" />
+              <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+              <mat-hint *ngIf="isStartdateLocked">
+                <mat-icon class="lock-icon">lock</mat-icon> Locked while “Show” is on.
+              </mat-hint>
+              <mat-error *ngIf="form.get('startdate')?.hasError('required')">Start date is required.</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>End Date</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="enddate" [min]="minEndDate" readonly
+                (click)="endPicker.open()" />
+              <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+              <mat-error *ngIf="form.get('enddate')?.hasError('required')">End date is required.</mat-error>
+              <mat-error *ngIf="form.get('enddate')?.hasError('daterange')">
+                End date must be after the start date.
+              </mat-error>
+            </mat-form-field>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Enable App Notification</span>
+              <span class="toggle-desc">Send one in-app notification per scheduled day.</span>
+            </div>
+            <mat-slide-toggle formControlName="enableappnotification" color="primary"></mat-slide-toggle>
+          </div>
+
+          <ng-container *ngIf="form.get('enableappnotification')?.value">
+            <div class="notif-list" formArrayName="appnotificationmap">
+              <div class="notif-card" *ngFor="let n of adsNotifications.controls; let i = index" [formGroupName]="i">
+                <div class="notif-card-head">
+                  <span class="notif-day">Day {{ i + 1 }}</span>
+                  <span class="notif-date">{{ notificationDateAt(i) | date: 'EEE, MMM d, y' }}</span>
+                </div>
+
+                <div class="grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Title</mat-label>
+                    <input matInput formControlName="title" placeholder="Enter title" />
+                    <mat-error *ngIf="n.get('title')?.hasError('required')">Title is required.</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Subtitle</mat-label>
+                    <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-span">
+                    <mat-label>Message</mat-label>
+                    <textarea matInput formControlName="message" rows="2" placeholder="Enter message"></textarea>
+                    <mat-error *ngIf="n.get('message')?.hasError('required')">Message is required.</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-span">
+                    <mat-label>Landing Page</mat-label>
+                    <input matInput formControlName="landingPage" placeholder="Enter landing page" />
+                  </mat-form-field>
+                </div>
+
+                <div class="notif-flags">
+                  <mat-slide-toggle formControlName="sticky" color="primary">Sticky</mat-slide-toggle>
+                  <mat-slide-toggle formControlName="logged" color="primary">Logged</mat-slide-toggle>
+                </div>
+              </div>
+
+              <div class="notif-empty" *ngIf="adsNotifications.length === 0">
+                <mat-icon>event_busy</mat-icon>
+                Pick a valid start and end date to generate the daily notifications.
+              </div>
+            </div>
+          </ng-container>
         </div>
       </ng-container>
 
