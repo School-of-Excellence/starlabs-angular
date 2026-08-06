@@ -64,7 +64,7 @@ export class EventParticipationApproveComponent {
   @ViewChild("paginator1")paginator1:MatPaginator
   @ViewChild("sort1")sort1:MatSort
 
-  // Mark Attendance
+  // Mark Attendance (approved only)
   attendance = []
   displayedColumns2: string[] = ['sno', 'clientname', 'product', 'status', 'action'];
   dataSource2 = new MatTableDataSource()
@@ -78,6 +78,13 @@ export class EventParticipationApproveComponent {
   @ViewChild('paginator3') paginator3!: MatPaginator;
   @ViewChild('sort3') sort3!: MatSort;
 
+  // Unattended
+  unattendedList = []
+  displayedColumns5: string[] = ['sno', 'clientname', 'product', 'status', 'action'];
+  dataSource5 = new MatTableDataSource()
+  @ViewChild('paginator5') paginator5!: MatPaginator;
+  @ViewChild('sort5') sort5!: MatSort;
+
   // Revoke (read-only — no row actions)
   revoked = []
   displayedColumns4: string[] = ['sno', 'clientname', 'product', 'status'];
@@ -90,6 +97,8 @@ export class EventParticipationApproveComponent {
   loggedInProfileid = null
   requestselection = new SelectionModel(true,[]);
   attendanceselection = new SelectionModel(true,[]);
+  attendedselection = new SelectionModel(true,[]);
+  unattendedselection = new SelectionModel(true,[]);
 
   isAllSelectedrequest() {
     const numSelected = this.requestselection.selected.length;
@@ -115,6 +124,32 @@ export class EventParticipationApproveComponent {
     this.isAllSelectedattendance() ?
     this.attendanceselection.clear() :
     this.dataSource2.data.forEach(row => this.attendanceselection.select(row));
+  }
+
+  isAllSelectedattended() {
+    const numSelected = this.attendedselection.selected.length;
+    const numRows = this.dataSource3.data.length;
+    return numRows != 0 && numSelected === numRows;
+  }
+
+  /** Selects all rows if they are not all selected; otherwise clear selection. */
+  masterToggleattended() {
+    this.isAllSelectedattended() ?
+    this.attendedselection.clear() :
+    this.dataSource3.data.forEach(row => this.attendedselection.select(row));
+  }
+
+  isAllSelectedunattended() {
+    const numSelected = this.unattendedselection.selected.length;
+    const numRows = this.dataSource5.data.length;
+    return numRows != 0 && numSelected === numRows;
+  }
+
+  /** Selects all rows if they are not all selected; otherwise clear selection. */
+  masterToggleunattended() {
+    this.isAllSelectedunattended() ?
+    this.unattendedselection.clear() :
+    this.dataSource5.data.forEach(row => this.unattendedselection.select(row));
   }
 
   constructor(
@@ -173,6 +208,10 @@ export class EventParticipationApproveComponent {
     this.dataSource3.sort = this.sort3
     this.dataSource3.paginator = this.paginator3
 
+    this.dataSource5.data = this.unattendedList
+    this.dataSource5.sort = this.sort5
+    this.dataSource5.paginator = this.paginator5
+
     this.dataSource4.data = this.revoked
     this.dataSource4.sort = this.sort4
     this.dataSource4.paginator = this.paginator4
@@ -210,6 +249,11 @@ export class EventParticipationApproveComponent {
     this.dataSource4.filter = filterValue.trim().toLowerCase();
   }
 
+  applyFilterD5(event: Event) {
+    const filterValue = (event.target as HTMLInputElement).value;
+    this.dataSource5.filter = filterValue.trim().toLowerCase();
+  }
+
   onEventSelect(){
     // this.requestSubscription?.next()
     // this.requestSubscription?.complete()
@@ -226,6 +270,7 @@ export class EventParticipationApproveComponent {
       this.approved = []
       this.attendance = []
       this.attended = []
+      this.unattendedList = []
       this.revoked = []
       for (let i = 0; i < snap.length; i++) {
         const element = snap[i];
@@ -237,9 +282,10 @@ export class EventParticipationApproveComponent {
         }
         else if(element["status"] == "approved"){
           this.approved.push(element)
-        }
-        if(['approved','unattended'].includes(element["status"])){
           this.attendance.push(element)
+        }
+        else if(element["status"] == "unattended"){
+          this.unattendedList.push(element)
         }
         else if(element["status"] == "attended"){
           this.attended.push(element)
@@ -258,9 +304,18 @@ export class EventParticipationApproveComponent {
     })
   }
 
-  async markAsAttended(){
-    if(confirm("Sure, would you like to update the selection? The selected list will be marked as attended.")){
-      var selected = this.attendanceselection.selected
+  /**
+   * Marks the selection as attended.
+   * @param selection which tab's selection model to act on.
+   * @param restoreProduct when the rows come from the Unattended tab their product was
+   *        cancelled by markAsUnattendedAndCancelProduct, so it has to be restored here.
+   *        Approved rows were never cancelled — leave their product status alone.
+   */
+  async markAsAttended(selection = this.attendanceselection, restoreProduct = false){
+    if(confirm(restoreProduct
+      ? "Sure, would you like to update the selection? The selected list will be marked as attended and their cancelled product will be restored."
+      : "Sure, would you like to update the selection? The selected list will be marked as attended.")){
+      var selected = selection.selected
       var loading = this.matdailog.open(LoadingProgressComponent, {
         data:{
           msg: "updating status...."
@@ -306,6 +361,12 @@ export class EventParticipationApproveComponent {
           for (let j = 0; j < snapshot.docs.length; j++) {
             const deliverableDoc = snapshot.docs[j];
             console.log(deliverableDoc.ref.path)
+            var deliverableData = deliverableDoc.data()
+            if (restoreProduct && deliverableData["participantproductid"]) {
+              batch.update(doc(this.firestore, "participantsproduct", deliverableData["participantproductid"]), {
+                status: null
+              })
+            }
             batch.update(deliverableDoc.ref, {
               status: "completed"
             })
@@ -323,9 +384,13 @@ export class EventParticipationApproveComponent {
     }
   }
 
-  async markAsUnattendedAndCancelProduct() {
+  /**
+   * Marks the selection as unattended and cancels the related product.
+   * @param selection which tab's selection model to act on.
+   */
+  async markAsUnattendedAndCancelProduct(selection = this.attendanceselection) {
     if (confirm("The selected list will be marked as unattended, and the product will be marked as canceled. Would you like to proceed with updating the selection?")) {
-      var selected = this.attendanceselection.selected
+      var selected = selection.selected
       var loading = this.matdailog.open(LoadingProgressComponent, {
         data: {
           msg: "updating status...."
@@ -334,11 +399,11 @@ export class EventParticipationApproveComponent {
       })
       var batch = writeBatch(this.firestore)
       var promises: Array<Promise<QuerySnapshot<any>>> = []
+      var eventProfileListPromises: Array<Promise<QuerySnapshot<any>>> = []
       for (let i = 0; i < selected.length; i += 10) {
         const subList = selected.slice(i, i + 10);
         console.log(subList)
         var refList = []
-        var eventProfileListPromises: Array<Promise<QuerySnapshot<any>>> = []
         subList.forEach(element => {
           var ref = doc(this.firestore, "event participation request", element["docid"])
           batch.update(ref, {
@@ -526,6 +591,8 @@ export class EventParticipationApproveComponent {
   clearSelection(){
     this.requestselection.clear()
     this.attendanceselection.clear()
+    this.attendedselection.clear()
+    this.unattendedselection.clear()
   }
   exportCSV(){
     const ws:XLSX.WorkSheet = XLSX.utils.table_to_sheet(this.table.nativeElement)
