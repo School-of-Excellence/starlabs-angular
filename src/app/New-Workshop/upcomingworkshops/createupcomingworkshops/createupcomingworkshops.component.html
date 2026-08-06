@@ -196,6 +196,38 @@
           </div>
         </div>
 
+        <!-- Auto notification: audience -->
+        <div class="notif-section" *ngIf="form.get('autonotification')?.value">
+          <div class="notif-section-head">
+            <span class="notif-section-title">
+              <mat-icon>group</mat-icon> Notify To
+            </span>
+          </div>
+
+          <div class="grid">
+            <mat-form-field appearance="outline" [class.full-span]="!notifyToIncludesJourney">
+              <mat-label>Notify To</mat-label>
+              <mat-select formControlName="notifyto" multiple>
+                <mat-option *ngFor="let opt of notifyToOptions" [value]="opt">{{ opt | titlecase }}</mat-option>
+              </mat-select>
+              <mat-error *ngIf="form.get('notifyto')?.hasError('required')">
+                Select at least one audience.
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" *ngIf="notifyToIncludesJourney">
+              <mat-label>Journeys</mat-label>
+              <mat-select formControlName="selectedjourneys" multiple>
+                <mat-option *ngFor="let j of journeyOptions" [value]="j.id">{{ j.label }}</mat-option>
+              </mat-select>
+              <mat-hint *ngIf="journeysLoading">Loading journeys…</mat-hint>
+              <mat-error *ngIf="form.get('selectedjourneys')?.hasError('required')">
+                Select at least one journey.
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </div>
+
         <!-- Auto notification schedule -->
         <div class="notif-section" *ngIf="form.get('autonotification')?.value">
           <div class="notif-section-head">

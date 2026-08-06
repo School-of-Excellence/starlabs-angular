@@ -72,6 +72,17 @@ export class CreateupcomingworkshopsComponent {
   uploadingKeys = new Set<string>();
   uploadProgress: Record<string, number> = {};
 
+  // Auto notification audiences (stored verbatim in notifyto).
+  readonly notifyToOptions = [
+    'journey',
+    'active participants',
+    'non active participants',
+    'all exist users',
+    'new users'
+  ];
+  journeyOptions: { id: string; label: string }[] = [];
+  journeysLoading = false;
+
   get isUploadingAny(): boolean {
     return this.uploadingKeys.size > 0;
   }
@@ -113,6 +124,8 @@ export class CreateupcomingworkshopsComponent {
           adimagetab: w.adimagetab || '',
           adimagemobile: w.adimagemobile || '',
           autonotification: !!w.autonotification,
+          notifyto: Array.isArray(w.notifyto) ? w.notifyto : [],
+          selectedjourneys: Array.isArray(w.selectedjourneys) ? w.selectedjourneys : [],
           startdate: this.toDate(w.startdate),
           enddate: this.toDate(w.enddate),
           enableappnotification: !!w.enableappnotification
@@ -146,6 +159,7 @@ export class CreateupcomingworkshopsComponent {
     }
 
     if (this.widgettype === 'ads') {
+      this.loadJourneyOptions();
       this.setupAdsNotificationBehavior();
     }
   }
@@ -202,9 +216,11 @@ export class CreateupcomingworkshopsComponent {
       adimage: [''],
       adimagetab: [''],
       adimagemobile: [''],
-      // Auto notification schedule. startdate/enddate are only validated while
-      // enabled — syncAdsControlState() disables them when autonotification is off.
+      // Auto notification schedule. These are only validated while enabled —
+      // syncAdsControlState() disables them when autonotification is off.
       autonotification: [false],
+      notifyto: [[] as string[], Validators.required],
+      selectedjourneys: [[] as string[], Validators.required],
       startdate: [null as Date | null, Validators.required],
       enddate: [null as Date | null, [Validators.required, this.endAfterStartValidator]],
       enableappnotification: [false],
@@ -215,6 +231,26 @@ export class CreateupcomingworkshopsComponent {
   // --- auto notification (ads only) ---
   get adsNotifications(): FormArray {
     return this.form.get('appnotificationmap') as FormArray;
+  }
+
+  get notifyToIncludesJourney(): boolean {
+    const v = this.form.get('notifyto')?.value;
+    return Array.isArray(v) && v.includes('journey');
+  }
+
+  // Journey audience options: doc id (stored) + `journey` field (label).
+  private async loadJourneyOptions(): Promise<void> {
+    this.journeysLoading = true;
+    try {
+      const snap = await getDocs(collection(this.firestore, 'journey'));
+      this.journeyOptions = snap.docs
+        .map(d => ({ id: d.id, label: (d.data()?.['journey'] || 'Untitled journey').toString() }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (err) {
+      console.error('Error loading journeys:', err);
+    } finally {
+      this.journeysLoading = false;
+    }
   }
 
   // Once a shown ad has a saved startdate, the schedule is live — lock it.
@@ -254,6 +290,7 @@ export class CreateupcomingworkshopsComponent {
 
   private setupAdsNotificationBehavior(): void {
     this.form.get('autonotification')?.valueChanges.subscribe(() => this.syncAdsControlState());
+    this.form.get('notifyto')?.valueChanges.subscribe(() => this.syncAdsControlState());
     this.form.get('enableappnotification')?.valueChanges.subscribe(() => this.syncAdsControlState());
     this.form.get('show')?.valueChanges.subscribe(() => this.syncAdsControlState());
     this.form.get('startdate')?.valueChanges.subscribe(() => {
@@ -295,12 +332,16 @@ export class CreateupcomingworkshopsComponent {
     if (this.widgettype !== 'ads') return;
     const opts = { emitEvent: false };
     const auto = !!this.form.get('autonotification')?.value;
+    const notifyto = this.form.get('notifyto');
+    const selectedjourneys = this.form.get('selectedjourneys');
     const startdate = this.form.get('startdate');
     const enddate = this.form.get('enddate');
     const enableApp = this.form.get('enableappnotification');
     const arr = this.adsNotifications;
 
     if (!auto) {
+      notifyto?.disable(opts);
+      selectedjourneys?.disable(opts);
       startdate?.disable(opts);
       enddate?.disable(opts);
       enableApp?.disable(opts);
@@ -308,6 +349,9 @@ export class CreateupcomingworkshopsComponent {
       return;
     }
 
+    notifyto?.enable(opts);
+    if (this.notifyToIncludesJourney) selectedjourneys?.enable(opts);
+    else selectedjourneys?.disable(opts);
     if (this.isStartdateLocked) startdate?.disable(opts);
     else startdate?.enable(opts);
     enddate?.enable(opts);
@@ -329,8 +373,13 @@ export class CreateupcomingworkshopsComponent {
   private adsNotificationPayload(raw: any): any {
     const auto = !!raw.autonotification;
     const enableApp = auto && !!raw.enableappnotification;
+    const notifyto: string[] = auto && Array.isArray(raw.notifyto) ? raw.notifyto : [];
     return {
       autonotification: auto,
+      notifyto,
+      selectedjourneys: notifyto.includes('journey') && Array.isArray(raw.selectedjourneys)
+        ? raw.selectedjourneys
+        : [],
       startdate: auto && raw.startdate ? Timestamp.fromDate(this.atTime(raw.startdate, 0, 1)) : null,
       enddate: auto && raw.enddate ? Timestamp.fromDate(this.atTime(raw.enddate, 23, 59)) : null,
       enableappnotification: enableApp,
