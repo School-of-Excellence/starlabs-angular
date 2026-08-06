@@ -228,6 +228,12 @@
   font-size: 12px;
 }
 
+/* the tag dropdown sits at the toggle group's height so the two read as one row */
+.tagselect {
+  width: 200px;
+  font-size: 13px;
+}
+
 /* Material's toggle label is left-aligned inline content — centre it in both
    axes so the three buttons read evenly. ::ng-deep because the label markup is
    inside the Material component, not this template. */

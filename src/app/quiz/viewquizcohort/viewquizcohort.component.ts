@@ -28,6 +28,7 @@ import {
   DocumentReference
 } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
+import * as XLSX from 'xlsx';
 
 interface QuizOption {
   text: string;
@@ -433,5 +434,110 @@ export class ViewquizcohortComponent implements OnInit, AfterViewInit {
   onDateToChange(value: string) {
     this.filterDateTo = value ? new Date(value) : null;
     this.applyFilters();
+  }
+
+  // ============ EXCEL EXPORT ============
+
+  exportToExcel() {
+    if (!this.selectedQuiz || this.filteredResponses.length === 0) {
+      return;
+    }
+
+    // Sheet 1 — one row per participant response (respects active filters + sort)
+    const rows = this.sortedResponses.map((r, i) => ({
+      'S.No': i + 1,
+      'Participant Name': this.mapProfile[r.profileid] || r.profileid || 'Unknown',
+      'Selected Option': r.selectedOption || 'No selection',
+      'Cohort': r.selectedCohortName || 'N/A',
+      'Event': r.selectedEventName || 'N/A',
+      'Date': r.date?.toDate ? r.date.toDate() : null
+    }));
+
+    // Row 1 carries the quiz question; the table header starts on row 2
+    const responsesSheet = XLSX.utils.aoa_to_sheet([[this.selectedQuiz.question]]);
+    XLSX.utils.sheet_add_json(responsesSheet, rows, {
+      origin: 'A2',
+      cellDates: true,
+      dateNF: 'dd-mmm-yyyy hh:mm AM/PM'
+    });
+
+    responsesSheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
+    responsesSheet['!cols'] = [
+      { wch: 6 }, { wch: 28 }, { wch: 32 },
+      { wch: 24 }, { wch: 24 }, { wch: 22 }
+    ];
+
+    // Sheet 2 — option breakdown summary for the same filtered set
+    const summaryRows: any[][] = [
+      ['Quiz Question', this.selectedQuiz.question],
+      ['Status', this.selectedQuiz.active ? 'Active' : 'Inactive'],
+      ['Total Responses', this.filteredResponses.length],
+      ['Filters Applied', this.activeFilterSummary],
+      [],
+      ['Option', 'Responses', 'Percentage']
+    ];
+
+    this.optionBreakdown.forEach(b => {
+      summaryRows.push([b.option, b.count, `${b.percentage}%`]);
+    });
+
+    // Options that nobody picked still belong in the breakdown
+    const answered = new Set(this.optionBreakdown.map(b => b.option));
+    this.selectedQuiz.options
+      .filter(o => !answered.has(o.text))
+      .forEach(o => summaryRows.push([o.text, 0, '0%']));
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+    summarySheet['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 14 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, responsesSheet, 'Responses');
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+    XLSX.writeFile(workbook, this.buildFileName());
+  }
+
+  /** Rows in the order the table currently shows them (sort applied, pagination ignored). */
+  private get sortedResponses(): QuizResponse[] {
+    const data = this.filteredResponses;
+    if (!this.sort?.active || !this.sort.direction) {
+      return data;
+    }
+
+    const accessor = this.dataSource.sortingDataAccessor;
+    const factor = this.sort.direction === 'asc' ? 1 : -1;
+
+    return [...data].sort((a, b) => {
+      const valueA = accessor(a, this.sort.active);
+      const valueB = accessor(b, this.sort.active);
+      if (valueA < valueB) return -1 * factor;
+      if (valueA > valueB) return 1 * factor;
+      return 0;
+    });
+  }
+
+  private get activeFilterSummary(): string {
+    const parts: string[] = [];
+    if (this.filterProfileId) parts.push(`Participant: ${this.filterProfileId}`);
+    if (this.filterOptionText) parts.push(`Option: ${this.filterOptionText}`);
+    if (this.filterDateFrom) parts.push(`From: ${this.filterDateFrom.toLocaleDateString('en-US')}`);
+    if (this.filterDateTo) parts.push(`To: ${this.filterDateTo.toLocaleDateString('en-US')}`);
+    return parts.length ? parts.join(' | ') : 'None';
+  }
+
+  private buildFileName(): string {
+    const slug = (this.selectedQuiz?.question || 'quiz')
+      .replace(/[^a-z0-9]+/gi, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 50) || 'quiz';
+
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-');
+
+    return `quiz_responses_${slug}_${stamp}.xlsx`;
   }
 }
