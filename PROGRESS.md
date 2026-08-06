@@ -5,7 +5,7 @@ session? Read `specs/ORIENTATION.md` first**, then
 `specs/journals/2026-08-06-ads-auto-notification.md`.
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `4b46ce9d`;
+- Branch `nanda-development`, tree clean at HEAD `faecb355`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). The 08-01 dashboard-perf arc is
   committed/merged (operator merges via PRs, e.g. `41de2ed7`).
@@ -26,6 +26,12 @@ session? Read `specs/ORIENTATION.md` first**, then
   isn't trapped). Hidden sections are *disabled* so their `required`
   validators can't block saving, and the payload nulls the schedule
   fields when off to keep doc shape consistent. Journal has the WHYs.
+- Round 2: required `notifyto` audience multi-select (journey / active
+  participants / non active participants / all exist users / new
+  users, stored verbatim) before the schedule; picking "journey"
+  reveals a required Journeys multi-select (labels from the `journey`
+  collection's `journey` field, doc ids stored in `selectedjourneys`;
+  payload clears it when journey isn't an audience).
 - `graphify` isn't installed here (rebuild command fails); graph is
   stale until `/graphify .` is run.
 
