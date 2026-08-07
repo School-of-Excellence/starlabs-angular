@@ -298,10 +298,23 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   openTags(user: any): void {
     this.dialog.open(AssignTagsDialogComponent, {
-      width: '480px',
-      maxWidth: '92vw',
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
       autoFocus: false,
       data: { user }
+    });
+  }
+
+  // Toolbar "Tags" button: opens the same dialog in manage mode (create tags +
+  // All Tags / copy segment), not tied to a specific user.
+  openTagsManager(): void {
+    this.dialog.open(AssignTagsDialogComponent, {
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: { mode: 'manage' }
     });
   }
 
@@ -376,8 +389,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     const byId = new Map<string, any>(this.dataSource.data.map(u => [this.rowId(u), u]));
     const users = ids.map(id => byId.get(id)).filter(Boolean);
     const ref = this.dialog.open(AssignTagsDialogComponent, {
-      width: '480px',
-      maxWidth: '92vw',
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
       autoFocus: false,
       data: { mode: 'bulk', users }
     });
@@ -880,3 +894,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     });
   }
 }
+
+
+
+//https://eiflix.com?segment=nRpMxgeTYEzhGHEeigrL
+// https://eiflix.com/eiflix?segment=3ZLQDG4RiVklI2HUz00D,nRpMxgeTYEzhGHEeigrL

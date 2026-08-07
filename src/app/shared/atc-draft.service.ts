@@ -331,7 +331,17 @@ export class ATCDraftService {
 
   // add the server-only bookkeeping fields to a draft payload just before a Firestore write
   private toServer(working: any, rev: number): any {
-    return { ...working, rev, lastWriterDevice: this.deviceId, serverUpdatedAt: serverTimestamp() };
+    const out = { ...working, rev, lastWriterDevice: this.deviceId, serverUpdatedAt: serverTimestamp() };
+    // clone()'s JSON fallback (old WebKit) turns Date fields into ISO strings; a
+    // string lastupdated lands in Firestore's STRING type bracket, where the live
+    // dashboard's `lastupdated >= <date>` range filter can never match it and the
+    // draft silently vanishes from the Draft ATC count. Re-coerce just before the
+    // write so the server always stores a real timestamp.
+    if (out.lastupdated != null && !(out.lastupdated instanceof Date) && typeof out.lastupdated?.toDate !== 'function') {
+      const d = new Date(out.lastupdated);
+      if (!Number.isNaN(d.getTime())) { out.lastupdated = d; }
+    }
+    return out;
   }
 
   private clone<T>(v: T): T {

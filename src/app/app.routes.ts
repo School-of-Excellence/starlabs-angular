@@ -126,12 +126,14 @@ export const routes: Routes = [
   {path: 'qr-scanner', loadComponent: () => import('./Events/qr-scanner/qr-scanner.component').then(m => m.QrScannerComponent), canActivate: [authGuard]},
   {path: 'event_attendance_log', loadComponent: () => import('./Events/event-attendance-log/event-attendance-log.component').then(m => m.EventAttendanceLogComponent), canActivate: [authGuard]},
   {path: 'videoask-display', loadComponent: () => import('./Events/videoask-display/videoask-display.component').then(m => m.VideoaskDisplayComponent), canActivate:[authGuard]},
+  {path: 'participantvideoask', loadComponent: () => import('./participant-videoask/participant-videoask.component').then(m => m.ParticipantVideoaskComponent), canActivate:[authGuard]},
   {path: 'overall_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard/live-event-dashboard.component').then(m => m.LiveEventDashboardComponent), canActivate:[authGuard]},
   {path: 'live_event_dashboard', loadComponent: () => import('./Events/live-event-dashboard-v2/live-event-dashboard-v2.component').then(m => m.LiveEventDashboardV2Component), canActivate:[authGuard]},
   {path: 'first_timers_dashboard', loadComponent: () => import('./Events/first-timers-dashboard/first-timers-dashboard.component').then(m => m.FirstTimersDashboardComponent), canActivate:[authGuard]},
   {path: 'live_event_dashboard_v3', loadComponent: () => import('./Events/live-event-dashboard-v3/live-event-dashboard-v3.component').then(m => m.LiveEventDashboardV3Component), canActivate:[authGuard]},
   {path: 'contentupload', loadComponent: () => import('./content/content-upload/content-upload.component').then(m => m.ContentUploadComponent), canActivate: [authGuard]},
   {path: 'createarenavideoasktemplate', loadComponent: () => import('./content/arena-video-ask-input/arena-video-ask-input.component').then(m => m.ArenaVideoAskInputComponent), canActivate: [authGuard]},
+  {path: 'locationlog', loadComponent: () => import('./Events/locationlog/locationlog.component').then(m => m.LocationlogComponent)},
 
   // Scheduling
   {path: 'EISzoom', loadComponent: () => import('./Scheduling/eis-zoom-account/eis-zoom-account.component').then(m => m.EISZoomAccountComponent), canActivate:[authGuard]},

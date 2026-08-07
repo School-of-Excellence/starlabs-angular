@@ -1,0 +1,377 @@
+.mainscreen {
+  padding: 20px;
+}
+
+.heading {
+  text-align: center;
+  margin-bottom: 15px;
+  color: rgb(0, 50, 67);
+}
+
+/* ------------------------------------------------------------------ filters */
+
+.filterbar {
+  padding: 14px 16px 12px;
+  border-radius: 6px;
+  background: #fff;
+  margin-bottom: 12px;
+}
+
+/* ------------------------------------------------------------ filter groups */
+
+.fgroup {
+  margin-bottom: 16px;
+}
+
+.fgrouphead {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgb(0, 50, 67);
+  margin-bottom: 10px;
+}
+
+/* --------------------------------------------------------- filter summary */
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.summarylabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-right: 2px;
+}
+
+/* the OR'd event pills sit in one box so their grouping is readable */
+.groupwrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 14px;
+  padding: 3px 8px;
+}
+
+.conn {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 3px 6px 3px 12px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.pill mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.pill mat-icon:hover {
+  color: #111827;
+}
+
+/* ------------------------------------------------------------------ actions */
+
+.filteractions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.actionstack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.buttonrow {
+  display: flex;
+  gap: 10px;
+}
+
+.dirtyhint {
+  display: flex;
+  align-items: center;
+  color: #b45309;
+  font-size: 12px;
+}
+
+.dirtyicon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Three across on desktop, collapsing to two then one. Fixed tracks keep the
+   fields aligned instead of the ragged rows a flex-wrap layout produces. */
+.filterfields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+@media (max-width: 1200px) {
+  .filterfields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .filterfields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.filteritem {
+  width: 100%;
+}
+
+/* search box pinned inside the dropdown panel */
+::ng-deep .filterpanel .panelsearch {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+::ng-deep .filterpanel .panelsearch input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+::ng-deep .filterpanel .panelsearch input:focus {
+  border-color: #6366f1;
+}
+
+::ng-deep .filterpanel .panelhint {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ------------------------------------------------------------ table toolbar */
+
+.tabletoolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 14px;
+  color: #4b5563;
+  flex: 1;
+}
+
+.warn {
+  color: #b45309;
+}
+
+.subtle {
+  color: #6b7280;
+}
+
+.tagfilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagfilterlabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.tagfilter mat-button-toggle-group {
+  height: 34px;
+}
+
+.tagfilter mat-button-toggle {
+  font-size: 12px;
+}
+
+/* the tag dropdown sits at the toggle group's height so the two read as one row */
+.tagselect {
+  width: 200px;
+  font-size: 13px;
+}
+
+/* Material's toggle label is left-aligned inline content — centre it in both
+   axes so the three buttons read evenly. ::ng-deep because the label markup is
+   inside the Material component, not this template. */
+.tagfilter ::ng-deep .mat-button-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.tagfilter ::ng-deep .mat-button-toggle-label-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0 14px;
+}
+
+/* -------------------------------------------------------------------- table */
+
+.body {
+  padding: 10px;
+}
+
+table {
+  width: 100%;
+}
+
+.emptytext {
+  text-align: center;
+  color: grey;
+}
+
+.newuser {
+  color: red;
+}
+
+.kindtag {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------ video preview */
+
+.videoplaceholder {
+  width: 170px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111827;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.videoplaceholder:hover {
+  background: #1f2937;
+}
+
+.playicon {
+  color: #ffffff;
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+}
+
+/* --------------------------------------------------------------------- tags */
+
+.tag-checklist-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.tag-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+  padding-left: 28px;
+  font-size: 13px;
+  color: #374151;
+  user-select: none;
+}
+
+.tag-checkbox-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  left: 0;
+  height: 18px;
+  width: 18px;
+  background-color: #fff;
+  border: 2px solid #d1d5db;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.tag-checkbox-row:hover input ~ .checkmark {
+  border-color: #6366f1;
+}
+
+.tag-checkbox-row input:checked ~ .checkmark {
+  background-color: #6366f1;
+  border-color: #6366f1;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.tag-checkbox-row input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.tag-checkbox-row .checkmark:after {
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.tag-checkbox-label {
+  font-size: 13px;
+  color: #374151;
+}
