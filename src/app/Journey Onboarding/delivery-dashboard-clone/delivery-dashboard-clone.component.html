@@ -794,7 +794,7 @@
                 </button>
               </div>
               <!-- Filter Tabs -->
-              <div class="diag-tabs">
+              <div class="diag-tabs" *ngIf="selectedStageFilter === 'Scheduled'">
                 <button class="diag-tab" [class.active]="selectedFilter === 'all'" (click)="onFilterChange('all')">
                   All
                 </button>
@@ -816,24 +816,27 @@
                 <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
-                    <a class="participant-name" [href]="'/participantdeliverysequence/' + app.bookedby?.id">
-                      {{ mapMetaData[app.bookedby?.id]?.['name'] || app.bookedby?.id }}
+                    <a class="participant-name" [href]="'/participantdeliverysequence/' + getStageModalProfileId(app)">
+                      {{ mapMetaData[getStageModalProfileId(app)]?.['name'] || getStageModalProfileId(app) }}
                     </a>
-                  </div>
-                  <div class="profile-products">
-                    <div class="product-tag">
-                      <span class="status-tag"
-                        [ngClass]="selectedStageFilter === 'Scheduled' ? 'scheduled' : 'not-scheduled'">
-                        {{ selectedStageFilter === 'Scheduled' ? 'Scheduled' : 'Not Scheduled' }}
-                      </span>
-                      <span *ngIf="selectedStageFilter === 'Scheduled'">
-                        <span class="fw-bold">Start: </span>
-                        <span>{{ app.starttime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
-                        <span class="fw-bold ps-2">End: </span>
-                        <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
-                      </span>
                     </div>
-                  </div>
+                    <div class="profile-products">
+                      <div class="product-tag">
+                        <span class="status-tag" [ngClass]="stageModalBadgeClass(selectedStageFilter)">
+                          {{ selectedStageFilter }}
+                        </span>
+                        <span *ngIf="selectedStageFilter === 'Scheduled' && app.starttime">
+                          <span class="fw-bold">Start: </span>
+                          <span>{{ app.starttime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+                          <span class="fw-bold ps-2">End: </span>
+                          <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+                        </span>
+                        <span *ngIf="selectedStageFilter === 'Completed' && app.endtime">
+                          <span class="fw-bold">Completed: </span>
+                          <span>{{ app.endtime.toDate() | date:'dd MMM yyyy, hh:mm a' }}</span>
+                        </span>
+                      </div>
+                    </div>
                 </div>
                 <div *ngIf="groupedByStageProfileAll.length === 0" class="no-data">
                   No data yet
@@ -939,14 +942,32 @@
                             </div>
                             <div class="mini-stat-lbl">Scheduled</div>
                           </div>
-                          <!-- Awaiting -->
-                          <!-- <div (click)="openStageModal(col, 'Awaiting', stage.awaiting)" class="mini-stat mini-stat-clickable"
-                    title="View awaiting participants">
-                    <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ stage.awaiting?.length || 0 }}
-                    </div>
-                    <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
+
+                          <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
+                            <div (click)="openStageModal(col, 'Not Scheduled', notScheduledCards)"
+                              class="mini-stat mini-stat-clickable" title="View not scheduled participants">
+                              <div class="mini-stat-val" style="color:var(--coral)">
+                                {{ notScheduledCards.length || 0 }}
+                              </div>
+                              <div class="mini-stat-lbl">Not Scheduled</div>
+                            </div>
+                          </ng-container>
+
+                          <div (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))"
+                            class="mini-stat mini-stat-clickable" title="View completed appointments">
+                            <div class="mini-stat-val" style="color:#10b981">
+                              {{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}
+                            </div>
+                            <div class="mini-stat-lbl">Completed</div>
+                          </div>
+
+                          <div (click)="openStageModal(col, 'Cancelled', stage.cancelled)"
+                            class="mini-stat mini-stat-clickable" title="View cancelled appointments">
+                            <div class="mini-stat-val" style="color:#94a3b8">
+                              {{ stage.cancelled.length || 0 }}
+                            </div>
+                            <div class="mini-stat-lbl">Cancelled</div>
+                          </div>
                         </ng-container>
                       </div>
                     </div>

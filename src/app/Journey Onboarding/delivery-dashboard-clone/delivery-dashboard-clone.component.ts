@@ -582,6 +582,33 @@ export class DeliveryDashboardCloneComponent {
     events: any[] = [];
     selectedEvent: any = null;
     productTableFilterControl = new FormControl<string[]>([]); 
+    stageAppointmentTypeMap: { [key: string]: string } = {};
+    
+    private readonly stagePopulationSource: { [product: string]: { [stageKey: string]: string } } = {
+        eiStarterPack: {
+            onboarded: 'totalEligible',
+            diagnostics: 'onBoarded',
+            implementation: 'diagnostics',
+            'celebration call': 'implementation'
+        },
+        eiCustomSolutions: {
+            diagnostics: 'totalEligible',
+            implementation: 'diagnostics',
+            review: 'implementation',
+            'celebration call': 'review'
+        },
+        criticalSupport: {
+            diagnostics: 'preprocess',
+            implementation: 'diagnostics',
+            review: 'implementation'
+        }
+    };
+
+    private readonly terminalStageKey: { [productType: string]: string } = {
+        eiStarterPack: 'celebration call',
+        eiCustomSolutions: 'celebration call',
+        criticalSupport: 'completion'
+    };
 
     productData: any = {
         eiStarterPack: {
@@ -1748,6 +1775,8 @@ export class DeliveryDashboardCloneComponent {
 
     async filterStageData(product: string) {
         let stageConfig = [];
+        this.stageAppointmentTypeMap = {}; // NEW — reset before repopulating
+
         if (product === 'criticalSupport') {
             stageConfig = [
                 { key: 'diagnostics', appointmentType: 'Critical Support Diagnostics' },
@@ -1772,7 +1801,79 @@ export class DeliveryDashboardCloneComponent {
 
         stageConfig.forEach(stage => {
             this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
+            this.stageAppointmentTypeMap[stage.key] = stage.appointmentType; 
         });
+    }
+
+    getNotScheduledCards(stageKey: string): any[] {
+        const productType = this.selectedProductType;
+        const populationSourceKey = this.stagePopulationSource[productType]?.[stageKey];
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
+
+        if (!populationSourceKey || !appointmentTypeName) return [];
+
+        const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+        const bookedProfileIds = this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
+
+        return populationPool.filter((card: any) => {
+            const profileId = card?.profileid || card?.clientid;
+            const alreadyHasAppointment = profileId ? bookedProfileIds.has(profileId) : false;
+            return !alreadyHasAppointment;
+        });
+    }
+
+    getStageCompletedCards(stageKey: string): any[] {
+        const productType = this.selectedProductType;
+        const appointmentCompleted = this.stageData?.[stageKey]?.completed || [];
+
+        const isTerminalStage = this.terminalStageKey[productType] === stageKey;
+        if (!isTerminalStage) {
+            return appointmentCompleted;
+        }
+
+        const productCompletedKey = productType === 'criticalSupport' ? 'completion' : 'celebrationCall';
+        const productCompleted = this.productData?.[productType]?.[productCompletedKey] || [];
+
+        const seen = new Set<string>();
+        const merged: any[] = [];
+
+        for (const c of productCompleted) {
+            const pid = c?.profileid || c?.clientid;
+            if (pid) {
+                if (seen.has(pid)) continue;
+                seen.add(pid);
+            }
+            merged.push(c);
+        }
+        for (const a of appointmentCompleted) {
+            const pid = a?.profileid || a?.clientid || a?.bookedby?.id;
+            if (pid) {
+                if (seen.has(pid)) continue;
+                seen.add(pid);
+            }
+            merged.push(a);
+        }
+        return merged;
+    }
+
+    private getBookedProfileIdsForAppointmentType(appointmentTypeName: string): Set<string> {
+        const bookedProfileIds = new Set<string>();
+        for (const appointment of this.allAppointments) {
+            const isMatchingType = appointment.appointmentTypeName === appointmentTypeName;
+            if (!isMatchingType) continue;
+            const profileId = appointment.profileid || appointment.clientid || appointment.bookedby?.id;
+            if (profileId) bookedProfileIds.add(profileId);
+        }
+        return bookedProfileIds;
+    }
+
+    getStageModalProfileId(app: any): string {
+        return app?.bookedby?.id || app?.profileid || app?.clientid || '';
+    }
+
+    stageModalBadgeClass(stageFilter: string): string {
+        const isPositiveState = stageFilter === 'Scheduled' || stageFilter === 'Completed';
+        return isPositiveState ? 'scheduled' : 'not-scheduled';
     }
 
     filterAppointmentsForStage(appointmentTypeName: string) {
@@ -1782,34 +1883,40 @@ export class DeliveryDashboardCloneComponent {
             endOfTomorrow
         } = this.getTodayAndTomorrowRange();
 
-        const filteredAppointments = this.allAppointments
-            .filter(app =>
-                app.appointmentTypeName === appointmentTypeName &&
-                app.attended === false
-            );
-        // no need to map/find matchedProduct again
-        // profileid is already merged in filterAppointmentsByType
+        const appointmentsForType = this.allAppointments
+            .filter(app => app.appointmentTypeName === appointmentTypeName);
+
+        const scheduledAppointments = appointmentsForType
+            .filter(app => app.attended === false && !app.cancelled);
+
+        const completedAppointments = appointmentsForType
+            .filter(app => app.attended === true || app.status === 'submitted');
+
+        const cancelledAppointments = appointmentsForType
+            .filter(app => app.cancelled === true);
 
         return {
-            all: filteredAppointments,
-            today: filteredAppointments.filter(app => {
+            all: scheduledAppointments,
+            today: scheduledAppointments.filter(app => {
                 const appointmentDate = app?.endtime?.toDate();
                 return (
                     appointmentDate >= startOfToday &&
                     appointmentDate < startOfTomorrow
                 );
             }),
-            tomorrow: filteredAppointments.filter(app => {
+            tomorrow: scheduledAppointments.filter(app => {
                 const appointmentDate = app?.endtime?.toDate();
                 return (
                     appointmentDate >= startOfTomorrow &&
                     appointmentDate <= endOfTomorrow
                 );
             }),
-            overdue: filteredAppointments.filter(app => {
+            overdue: scheduledAppointments.filter(app => {
                 const appointmentDate = app?.endtime?.toDate();
                 return appointmentDate < startOfToday;
-            })
+            }),
+            completed: completedAppointments,
+            cancelled: cancelledAppointments
         };
     }
 
