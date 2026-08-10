@@ -27,7 +27,8 @@ session? Read `specs/ORIENTATION.md` first**, then
   validators can't block saving, and the payload nulls the schedule
   fields when off to keep doc shape consistent. Journal has the WHYs.
 - Round 2: required `notifyto` audience multi-select (journey / active
-  participants / non active participants / all exist users / new
+  <!-- participants / non active participants / all exist users / new -->
+  participants / non active participants / new
   users, stored verbatim) before the schedule; picking "journey"
   reveals a required Journeys multi-select (labels from the `journey`
   collection's `journey` field, doc ids stored in `selectedjourneys`;

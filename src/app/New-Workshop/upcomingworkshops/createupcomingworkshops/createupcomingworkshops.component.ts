@@ -77,7 +77,7 @@ export class CreateupcomingworkshopsComponent {
     'journey',
     'active participants',
     'non active participants',
-    'all exist users',
+    // 'all exist users',
     'new users'
   ];
   journeyOptions: { id: string; label: string }[] = [];
