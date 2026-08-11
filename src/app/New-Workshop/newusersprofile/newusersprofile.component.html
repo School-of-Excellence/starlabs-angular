@@ -265,12 +265,13 @@
       </div>
 
       <mat-chip-listbox multiple [(ngModel)]="selectedExportKeys" class="export-chips">
-        <mat-chip-option *ngFor="let c of exportColumns" [value]="c.key">{{ c.label }}</mat-chip-option>
+        <mat-chip-option *ngFor="let c of exportColumnsView" [value]="c.key">{{ c.label }}</mat-chip-option>
       </mat-chip-listbox>
 
       <button mat-flat-button color="primary" class="download-btn" (click)="exportExcel()"
-        [disabled]="selectedExportKeys.length === 0">
-        <mat-icon>download</mat-icon> Download Excel
+        [disabled]="selectedExportKeys.length === 0 || workshopFilterLoading">
+        <mat-icon>download</mat-icon>
+        {{ workshopFilterLoading ? 'Loading workshops…' : 'Download Excel' }}
       </button>
       <p class="export-hint">Exports the {{ selection.selected.length }} selected profile(s).</p>
     </div>

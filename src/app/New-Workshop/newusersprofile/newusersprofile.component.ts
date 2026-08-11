@@ -88,6 +88,15 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   ];
   // Default: all columns selected.
   selectedExportKeys: string[] = this.exportColumns.map(c => c.key);
+  // Workshop titles export column — offered only while the workshop filter is
+  // active; titles come from the cached enrolled reads, same as the table column.
+  private readonly workshopExportColumn = {
+    key: 'workshop',
+    label: 'Workshop',
+    value: (u: any) => this.workshopNames(u).join(', ')
+  };
+  // What the export panel offers right now (base + Workshop when filtering).
+  exportColumnsView = this.exportColumns;
 
   // tag id -> name, from the newusertags collection (live).
   tagMap: Record<string, string> = {};
@@ -412,11 +421,15 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   selectAllExportColumns(): void {
-    this.selectedExportKeys = this.exportColumns.map(c => c.key);
+    this.selectedExportKeys = this.exportColumnsView.map(c => c.key);
   }
 
   exportExcel(): void {
-    const cols = this.exportColumns.filter(c => this.selectedExportKeys.includes(c.key));
+    if (this.workshopFilterLoading) {
+      this.snackBar.open('Workshop filter is still loading. Please wait.', 'Close', { duration: 3000 });
+      return;
+    }
+    const cols = this.exportColumnsView.filter(c => this.selectedExportKeys.includes(c.key));
     if (cols.length === 0) {
       this.snackBar.open('Select at least one column to export.', 'Close', { duration: 3000 });
       return;
@@ -552,6 +565,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
     this.workshopFilterLoading = true;
     this.workshopProfileIds = null; // predicate hides rows while loading
+    // Clear now (not just on completion) so a mid-load export can't read the
+    // previous selection's titles.
+    this.workshopsByProfile.clear();
     this.refreshFilter();
 
     try {
@@ -608,9 +624,23 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   private updateDisplayedColumns(): void {
-    this.displayedColumns = this.selectedWorkshopIds.size > 0
-      ? [...this.baseColumns, 'workshop']
-      : [...this.baseColumns];
+    const active = this.selectedWorkshopIds.size > 0;
+    const wasActive = this.displayedColumns.includes('workshop');
+    this.displayedColumns = active ? [...this.baseColumns, 'workshop'] : [...this.baseColumns];
+    this.exportColumnsView = active
+      ? [...this.exportColumns, this.workshopExportColumn]
+      : this.exportColumns;
+
+    // Sync the export chip selection only when the filter turns on/off, so a
+    // manual deselection isn't fought on every workshop toggle.
+    if (active === wasActive) return;
+    if (active) {
+      if (!this.selectedExportKeys.includes('workshop')) {
+        this.selectedExportKeys = [...this.selectedExportKeys, 'workshop'];
+      }
+    } else {
+      this.selectedExportKeys = this.selectedExportKeys.filter(k => k !== 'workshop');
+    }
   }
 
   // Titles for the `workshop` column: the selected workshops this profile is
