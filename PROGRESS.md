@@ -6,7 +6,7 @@ filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
 rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `76275f01`;
+- Branch `nanda-development`, tree clean at HEAD `86cd7884`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
 - Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
@@ -33,6 +33,12 @@ rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
   selected workshops as pills — from the cached per-workshop reads only
   (the enrolled collection is huge; never scanned whole). Enrolled
   queries are one-shot, not live.
+- Export gained the same Workshop column (`86cd7884`): chip offered and
+  auto-selected only while the filter is active (sync on on/off
+  transitions only), titles comma-joined from the cached map. Review
+  workflow caught mid-load exports emitting empty/stale titles — fixed
+  by clearing the map at load start and blocking Download while the
+  enrolled sets load.
 
 ## Pending
 - Operator Chrome pass on both features, then push/deploy when asked
