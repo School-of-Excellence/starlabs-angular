@@ -6,7 +6,7 @@ filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
 rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `86cd7884`;
+- Branch `nanda-development`, tree clean at HEAD `14cc583d`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
 - Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
@@ -39,6 +39,14 @@ rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
   workflow caught mid-load exports emitting empty/stale titles — fixed
   by clearing the map at load start and blocking Download while the
   enrolled sets load.
+- Workshop dropdown gained two top toggles (`14cc583d`): Funnel only
+  (default ON; offers only `evergreenWorkshop == true` configs; turning
+  it on prunes non-evergreen selections) and Include/Exclude (default
+  Include; Exclude = profiles NOT enrolled in any selected workshop,
+  same cached sets). Workshop column/export render in include mode only.
+  Review fixes: enrolled-fetch errors fail closed in both modes (null
+  set + snackbar), and chip auto-sync keys off filter on/off so mode
+  round-trips don't fight manual deselection.
 
 ## Pending
 - Operator Chrome pass on both features, then push/deploy when asked
