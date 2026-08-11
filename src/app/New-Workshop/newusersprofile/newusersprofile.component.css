@@ -488,6 +488,44 @@
   margin-left: auto;
 }
 
+/* ---- workshop filter (toolbar) ---- */
+.tag-select-btn .wf-spinner {
+  display: inline-block;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+/* Workshop menu: Funnel-only slide toggle row above the Include/Exclude modes. */
+::ng-deep .tag-filter-menu .tfm-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px 4px 12px;
+}
+
+::ng-deep .tag-filter-menu .tfm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+::ng-deep .tag-filter-menu .tfm-toggle-label mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #4f46e5;
+}
+
+/* Workshop column pills — same shape as tag pills, indigo tint. */
+.workshop-pill {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
 @media (max-width: 820px) {
   .table-toolbar {
     flex-wrap: wrap;

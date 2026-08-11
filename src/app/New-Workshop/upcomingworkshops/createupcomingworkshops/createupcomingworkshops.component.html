@@ -205,7 +205,8 @@
           </div>
 
           <div class="grid">
-            <mat-form-field appearance="outline" [class.full-span]="!notifyToIncludesJourney">
+            <mat-form-field appearance="outline"
+              [class.full-span]="!notifyToIncludesJourney && !notifyToIncludesFunnel">
               <mat-label>Notify To</mat-label>
               <mat-select formControlName="notifyto" multiple>
                 <mat-option *ngFor="let opt of notifyToOptions" [value]="opt">{{ opt | titlecase }}</mat-option>
@@ -223,6 +224,17 @@
               <mat-hint *ngIf="journeysLoading">Loading journeys…</mat-hint>
               <mat-error *ngIf="form.get('selectedjourneys')?.hasError('required')">
                 Select at least one journey.
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" *ngIf="notifyToIncludesFunnel">
+              <mat-label>Funnel Workshops</mat-label>
+              <mat-select formControlName="selectedfunnels" multiple>
+                <mat-option *ngFor="let f of funnelOptions" [value]="f.id">{{ f.label }}</mat-option>
+              </mat-select>
+              <mat-hint *ngIf="funnelsLoading">Loading funnel workshops…</mat-hint>
+              <mat-error *ngIf="form.get('selectedfunnels')?.hasError('required')">
+                Select at least one funnel workshop.
               </mat-error>
             </mat-form-field>
           </div>
