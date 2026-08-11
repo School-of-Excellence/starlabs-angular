@@ -21,6 +21,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
@@ -57,7 +58,8 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
     MatChipsModule,
     MatMenuModule,
     MatDatepickerModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatSlideToggleModule
   ],
   templateUrl: './newusersprofile.component.html',
   styleUrl: './newusersprofile.component.css'
@@ -122,9 +124,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   endDate: Date | null = null;
   // Workshop filter: options from workshopconfiguration (label detailpage.title),
   // matching rows via `workshop participant enrolled` (workshopref -> profileid).
-  workshopOptions: { id: string; title: string }[] = [];
+  workshopOptions: { id: string; title: string; evergreen: boolean }[] = [];
   selectedWorkshopIds = new Set<string>();
   workshopFilterLoading = false;
+  // Funnel only (default ON): offer only evergreenWorkshop == true configs.
+  funnelOnly = true;
+  // include = show enrolled profiles; exclude = show profiles NOT enrolled in
+  // any selected workshop.
+  workshopFilterMode: 'include' | 'exclude' = 'include';
   // profileids enrolled in any selected workshop; null while inactive/loading.
   private workshopProfileIds: Set<string> | null = null;
   // workshop id -> enrolled profileids, so re-selections don't refetch.
@@ -133,6 +140,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // from the per-workshop cache only, never a collection-wide read.
   private workshopsByProfile = new Map<string, string[]>();
   private workshopTitleById: Record<string, string> = {};
+  // Tracks selection-active transitions for the export-chip sync.
+  private lastWorkshopFilterActive = false;
   // Guards against out-of-order async results; bumped to invalidate in-flight loads.
   private workshopFilterToken = 0;
   // Bumped when the async load lands so the filter string changes and re-runs.
@@ -177,7 +186,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         this.workshopOptions = snap.docs
           .map(d => ({
             id: d.id,
-            title: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString()
+            title: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString(),
+            evergreen: d.data()?.['evergreenWorkshop'] === true
           }))
           .sort((a, b) => a.title.localeCompare(b.title));
         const titles: Record<string, string> = {};
@@ -246,7 +256,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       if (this.selectedWorkshopIds.size) {
         if (!this.workshopProfileIds) return false;
         const pid = (u.profileid || this.rowId(u) || '').toString();
-        if (!this.workshopProfileIds.has(pid)) return false;
+        const enrolled = this.workshopProfileIds.has(pid);
+        // include -> keep enrolled profiles; exclude -> keep the rest.
+        if (this.workshopFilterMode === 'include' ? !enrolled : enrolled) return false;
       }
 
       return true;
@@ -319,6 +331,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       // The predicate reads the workshop state off `this`; these only make the
       // filter string change so the table re-filters.
       workshops: [...this.selectedWorkshopIds],
+      wmode: this.workshopFilterMode,
       wv: this.workshopFilterVersion
     });
     this.dataSource.paginator?.firstPage();
@@ -540,6 +553,38 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   // ---- filter by workshops (mat-menu, same UI as filter by tags) ----
+  // Options offered in the dropdown; Funnel only narrows to evergreen configs.
+  get visibleWorkshopOptions(): { id: string; title: string; evergreen: boolean }[] {
+    return this.funnelOnly ? this.workshopOptions.filter(w => w.evergreen) : this.workshopOptions;
+  }
+
+  setFunnelOnly(on: boolean): void {
+    if (this.funnelOnly === on) return;
+    this.funnelOnly = on;
+    if (!on) return;
+    // Selections that are no longer offered would filter invisibly — drop them.
+    let changed = false;
+    [...this.selectedWorkshopIds].forEach(id => {
+      const opt = this.workshopOptions.find(w => w.id === id);
+      if (opt && !opt.evergreen) {
+        this.selectedWorkshopIds.delete(id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.updateDisplayedColumns();
+      this.refreshWorkshopFilter();
+    }
+  }
+
+  // Switching include/exclude reuses the already-loaded enrolled sets — no refetch.
+  setWorkshopFilterMode(mode: 'include' | 'exclude'): void {
+    if (this.workshopFilterMode === mode) return;
+    this.workshopFilterMode = mode;
+    this.updateDisplayedColumns();
+    this.refreshFilter();
+  }
+
   toggleWorkshopSelect(id: string): void {
     if (this.selectedWorkshopIds.has(id)) this.selectedWorkshopIds.delete(id);
     else this.selectedWorkshopIds.add(id);
@@ -597,8 +642,12 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Error loading enrolled participants:', err);
       if (token === this.workshopFilterToken) {
-        this.workshopProfileIds = new Set();
+        // Fail closed in BOTH modes: null keeps the predicate hiding rows. An
+        // empty set would fail open in exclude mode — every profile would
+        // count as "not enrolled" and show up.
+        this.workshopProfileIds = null;
         this.workshopsByProfile.clear();
+        this.snackBar.open('Error loading enrolled participants. Please try again.', 'Close', { duration: 3000 });
       }
     } finally {
       if (token === this.workshopFilterToken) {
@@ -619,22 +668,28 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.workshopProfileIds = null;
     this.workshopsByProfile.clear();
     this.workshopFilterLoading = false;
+    this.workshopFilterMode = 'include'; // back to the default; funnelOnly is a list preference, kept
     this.workshopFilterToken++; // invalidate any in-flight load
     this.updateDisplayedColumns();
   }
 
   private updateDisplayedColumns(): void {
-    const active = this.selectedWorkshopIds.size > 0;
-    const wasActive = this.displayedColumns.includes('workshop');
-    this.displayedColumns = active ? [...this.baseColumns, 'workshop'] : [...this.baseColumns];
-    this.exportColumnsView = active
+    // The Workshop column/export only means something in include mode — in
+    // exclude mode every visible row is by definition not enrolled.
+    const filterActive = this.selectedWorkshopIds.size > 0;
+    const columnActive = filterActive && this.workshopFilterMode === 'include';
+    this.displayedColumns = columnActive ? [...this.baseColumns, 'workshop'] : [...this.baseColumns];
+    this.exportColumnsView = columnActive
       ? [...this.exportColumns, this.workshopExportColumn]
       : this.exportColumns;
 
-    // Sync the export chip selection only when the filter turns on/off, so a
-    // manual deselection isn't fought on every workshop toggle.
-    if (active === wasActive) return;
-    if (active) {
+    // Sync the export chip selection only when the filter itself turns on/off
+    // — not on include/exclude round-trips or workshop toggles — so a manual
+    // deselection isn't fought. A lingering key is inert while the view
+    // doesn't offer the column.
+    if (filterActive === this.lastWorkshopFilterActive) return;
+    this.lastWorkshopFilterActive = filterActive;
+    if (filterActive) {
       if (!this.selectedExportKeys.includes('workshop')) {
         this.selectedExportKeys = [...this.selectedExportKeys, 'workshop'];
       }

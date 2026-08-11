@@ -83,15 +83,36 @@
             </button>
           </div>
 
+          <div class="tfm-toggle-row">
+            <span class="tfm-toggle-label">
+              <mat-icon>filter_vintage</mat-icon> Funnel only
+            </span>
+            <mat-slide-toggle color="primary" [checked]="funnelOnly"
+              (change)="setFunnelOnly($event.checked)"></mat-slide-toggle>
+          </div>
+
+          <div class="tfm-modes">
+            <button type="button" class="tfm-mode" [class.on]="workshopFilterMode === 'include'"
+              (click)="setWorkshopFilterMode('include')">
+              <mat-icon>how_to_reg</mat-icon> Include
+            </button>
+            <button type="button" class="tfm-mode" [class.on]="workshopFilterMode === 'exclude'"
+              (click)="setWorkshopFilterMode('exclude')">
+              <mat-icon>person_off</mat-icon> Exclude
+            </button>
+          </div>
+
           <div class="tfm-list">
-            <button type="button" class="tfm-item" *ngFor="let w of workshopOptions"
+            <button type="button" class="tfm-item" *ngFor="let w of visibleWorkshopOptions"
               [class.sel]="selectedWorkshopIds.has(w.id)" (click)="toggleWorkshopSelect(w.id)">
               <mat-icon class="tfm-check">
                 {{ selectedWorkshopIds.has(w.id) ? 'check_box' : 'check_box_outline_blank' }}
               </mat-icon>
               <span class="tfm-name">{{ w.title }}</span>
             </button>
-            <div class="tfm-empty" *ngIf="workshopOptions.length === 0">No workshops available</div>
+            <div class="tfm-empty" *ngIf="visibleWorkshopOptions.length === 0">
+              {{ funnelOnly ? 'No funnel workshops available' : 'No workshops available' }}
+            </div>
           </div>
 
           <div class="tfm-foot">
