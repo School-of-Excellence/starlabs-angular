@@ -1,39 +1,59 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-20 (Form builder redesign)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-20-update-delivery-form-builder-redesign.md`.
+_Last updated: 2026-08-11 (Ads funnel-only audience · New Users workshops
+filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 3
+rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
 
 ## Current state
-- **UpdateDeliveryComponent's `Form` type fully redesigned** (Product Designer ▸
-  delivery-set ▸ update-delivery). Sectioned layout, numbered field cards with
-  duplicate / expand-collapse / drag-drop reorder, sticky Save footer, a11y
-  fixes. **All reactive-form bindings and Firestore writes unchanged** (parity
-  audit: zero regressions; `ng build` green). Committed on `nanda-development`:
-  `55cf4da` (chip-input bug fixes) and `84d2591` (redesign + features). Local
-  only — push is operator-gated.
-- Other delivery types (Appointment/Report/Events/Queue/Fieldwork) untouched.
-- Operator's separate New-Workshop changes (workshop-configuration,
-  workshop-dashboard) are uncommitted in the working tree — not mine, left alone.
+- Branch `nanda-development`, tree clean at HEAD `14cc583d`;
+  `ng build --configuration production` green (only pre-existing
+  canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
+- Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
+  auto-notification feature: `autonotification` → required `notifyto`
+  audiences (+`selectedjourneys` for `journey`, +`selectedfunnels` for
+  `funnel only` = evergreen workshopconfiguration docs) → start/end dates
+  (pinned 12:01 am / 11:59 pm, end > start, startdate locks while `show`
+  on) → `enableappnotification` → `appnotificationmap`, one card per
+  date-difference day.
+- New Users screen (`/newusersprofile`) has a Workshops multi-select
+  filter after Select-by-tags: all `workshopconfiguration` docs (label
+  `detailpage.title`), filters rows to profileids found in
+  `workshop participant enrolled` for the selected workshops.
 
-## Last session changes (2026-07-20) — why
-- Fixed array sub-field option chips: input not cleared on Enter (wrong
-  `event.value=` instead of `chipInput.clear()`) and dead backspace after one
-  removal (Material focus hand-off race; fixed by refocusing the chip input
-  after removal — deliberate, see journal).
-- Rebuilt the Form UI per operator directive "premium clean classic UI/UX,
-  don't touch data structure": scoped `.fb-*` styles appended to component CSS,
-  existing classes preserved for other types.
-- Added duplicate (deep clone appended at end), collapse keyed by control
-  identity (survives reorder), CDK drag-drop persisting order via the existing
-  debounced autosave.
-- 15-agent adversarial review → 9 confirmed findings all applied (contrast,
-  aria-labels, inline required errors + invalid-save snackbar, media-URL
-  labels, flipping-options gating, spacing/mobile/hairline fixes).
+## Last session changes (2026-08-11, why)
+- Ads round 3: `funnel only` audience + Funnel Workshops picker
+  (`63a244b4`). Preserved operator hand-edit: `'all exist users'`
+  commented out of `notifyToOptions` — deliberate, do not restore.
+- New Users workshops filter (`a9bc6b51`, reworked `76275f01`): now the
+  same button+mat-menu UI as Select-by-tags; enrolled sets cached per
+  workshop with a token guard against out-of-order async; predicate hides
+  rows while loading (no unfiltered flash); clear-all resets it. While
+  active, a Workshop column (after Tags) shows each row's enrolled
+  selected workshops as pills — from the cached per-workshop reads only
+  (the enrolled collection is huge; never scanned whole). Enrolled
+  queries are one-shot, not live.
+- Export gained the same Workshop column (`86cd7884`): chip offered and
+  auto-selected only while the filter is active (sync on on/off
+  transitions only), titles comma-joined from the cached map. Review
+  workflow caught mid-load exports emitting empty/stale titles — fixed
+  by clearing the map at load start and blocking Download while the
+  enrolled sets load.
+- Workshop dropdown gained two top toggles (`14cc583d`): Funnel only
+  (default ON; offers only `evergreenWorkshop == true` configs; turning
+  it on prunes non-evergreen selections) and Include/Exclude (default
+  Include; Exclude = profiles NOT enrolled in any selected workshop,
+  same cached sets). Workshop column/export render in include mode only.
+  Review fixes: enrolled-fetch errors fail closed in both modes (null
+  set + snackbar), and chip auto-sync keys off filter on/off so mode
+  round-trips don't fight manual deselection.
 
-## Pending / next
-- Operator manual test of duplicate / collapse / drag-drop in the dev app
-  (localhost:4200 — NOTE: dev serves production Firebase `fir-sample-aae4a`;
-  valid forms autosave to live `delivery forms`. Test with Form Name empty to
-  stay write-safe).
-- Known-but-deferred: `{Validators:[...]}` capital-V typo makes the TS
-  "required" validators on type selects inert (template `required` attr is the
-  live one); display-name map for raw type tokens — both optional, unapproved.
+## Pending
+- Operator Chrome pass on both features, then push/deploy when asked
+  (build green; nothing half-done).
+- Consumer of the ads notification fields (sender job) is not in this
+  repo — admin UI only writes the schedule.
+- Carried: phase-2 dashboard perf (scope/cache participant-metadata scan;
+  bound event-wide changework / videoask-tag streams); revert one word in
+  `main.ts` (firestore-atc transport) if a venue ever blanks ATC screens.
+- `graphify` module not installed here — graph stale until `/graphify .`.

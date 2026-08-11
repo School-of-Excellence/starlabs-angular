@@ -1,6 +1,14 @@
 import { Component, Inject, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  ReactiveFormsModule,
+  FormBuilder,
+  FormGroup,
+  FormArray,
+  Validators,
+  AbstractControl,
+  ValidationErrors
+} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -56,10 +64,27 @@ export class CreateupcomingworkshopsComponent {
   // the dialog shows and the widgettype stored on the eiflixhomewidgets doc.
   widgettype: 'comingsoon' | 'ads' = 'comingsoon';
   private docId: string | null = null;
+  // Ads only: true when the doc being edited already has a saved startdate —
+  // combined with "show" it decides whether the startdate is locked.
+  private hadSavedStartdate = false;
 
   // Per-field upload state (keyed by form control name).
   uploadingKeys = new Set<string>();
   uploadProgress: Record<string, number> = {};
+
+  // Auto notification audiences (stored verbatim in notifyto).
+  readonly notifyToOptions = [
+    'journey',
+    'funnel only',
+    'active participants',
+    'non active participants',
+    // 'all exist users',
+    'new users'
+  ];
+  journeyOptions: { id: string; label: string }[] = [];
+  journeysLoading = false;
+  funnelOptions: { id: string; label: string }[] = [];
+  funnelsLoading = false;
 
   get isUploadingAny(): boolean {
     return this.uploadingKeys.size > 0;
@@ -86,6 +111,7 @@ export class CreateupcomingworkshopsComponent {
       const w = data.widget;
       this.docId = w.docid || w.id || null;
       if (this.widgettype === 'ads') {
+        this.hadSavedStartdate = !!w.startdate;
         this.form.patchValue({
           head: w.head || '',
           headright: w.headright || '',
@@ -99,8 +125,17 @@ export class CreateupcomingworkshopsComponent {
           imageonly: !!w.imageonly,
           adimage: w.adimage || '',
           adimagetab: w.adimagetab || '',
-          adimagemobile: w.adimagemobile || ''
+          adimagemobile: w.adimagemobile || '',
+          autonotification: !!w.autonotification,
+          notifyto: Array.isArray(w.notifyto) ? w.notifyto : [],
+          selectedjourneys: Array.isArray(w.selectedjourneys) ? w.selectedjourneys : [],
+          selectedfunnels: Array.isArray(w.selectedfunnels) ? w.selectedfunnels : [],
+          startdate: this.toDate(w.startdate),
+          enddate: this.toDate(w.enddate),
+          enableappnotification: !!w.enableappnotification
         });
+        const saved = Array.isArray(w.appnotificationmap) ? w.appnotificationmap : [];
+        saved.forEach((n: any) => this.adsNotifications.push(this.makeNotificationRow(n), { emitEvent: false }));
       } else {
         this.form.patchValue({
           eventdate: this.toDate(w.eventdate),
@@ -125,6 +160,12 @@ export class CreateupcomingworkshopsComponent {
           this.form.get('totalseats')?.disable();
         }
       }
+    }
+
+    if (this.widgettype === 'ads') {
+      this.loadJourneyOptions();
+      this.loadFunnelOptions();
+      this.setupAdsNotificationBehavior();
     }
   }
 
@@ -179,8 +220,217 @@ export class CreateupcomingworkshopsComponent {
       imageonly: [false],
       adimage: [''],
       adimagetab: [''],
-      adimagemobile: ['']
+      adimagemobile: [''],
+      // Auto notification schedule. These are only validated while enabled —
+      // syncAdsControlState() disables them when autonotification is off.
+      autonotification: [false],
+      notifyto: [[] as string[], Validators.required],
+      selectedjourneys: [[] as string[], Validators.required],
+      selectedfunnels: [[] as string[], Validators.required],
+      startdate: [null as Date | null, Validators.required],
+      enddate: [null as Date | null, [Validators.required, this.endAfterStartValidator]],
+      enableappnotification: [false],
+      appnotificationmap: this.fb.array([])
     });
+  }
+
+  // --- auto notification (ads only) ---
+  get adsNotifications(): FormArray {
+    return this.form.get('appnotificationmap') as FormArray;
+  }
+
+  get notifyToIncludesJourney(): boolean {
+    const v = this.form.get('notifyto')?.value;
+    return Array.isArray(v) && v.includes('journey');
+  }
+
+  get notifyToIncludesFunnel(): boolean {
+    const v = this.form.get('notifyto')?.value;
+    return Array.isArray(v) && v.includes('funnel only');
+  }
+
+  // Journey audience options: doc id (stored) + `journey` field (label).
+  private async loadJourneyOptions(): Promise<void> {
+    this.journeysLoading = true;
+    try {
+      const snap = await getDocs(collection(this.firestore, 'journey'));
+      this.journeyOptions = snap.docs
+        .map(d => ({ id: d.id, label: (d.data()?.['journey'] || 'Untitled journey').toString() }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (err) {
+      console.error('Error loading journeys:', err);
+    } finally {
+      this.journeysLoading = false;
+    }
+  }
+
+  // Funnel audience options: evergreen workshopconfiguration docs —
+  // doc id (stored) + detailpage.title (label).
+  private async loadFunnelOptions(): Promise<void> {
+    this.funnelsLoading = true;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'workshopconfiguration'),
+        where('evergreenWorkshop', '==', true)
+      ));
+      this.funnelOptions = snap.docs
+        .map(d => ({ id: d.id, label: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString() }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (err) {
+      console.error('Error loading funnel workshops:', err);
+    } finally {
+      this.funnelsLoading = false;
+    }
+  }
+
+  // Once a shown ad has a saved startdate, the schedule is live — lock it.
+  get isStartdateLocked(): boolean {
+    return this.widgettype === 'ads' && this.isEditMode && this.hadSavedStartdate
+      && !!this.form.get('show')?.value;
+  }
+
+  // Day count uses dates only (start assumed 12:01 am, end 11:59 pm), so
+  // Jul 22 → Jul 30 = 8 days = 8 notifications.
+  get notificationDayCount(): number {
+    const start = this.form.get('startdate')?.value as Date | null;
+    const end = this.form.get('enddate')?.value as Date | null;
+    if (!start || !end) return 0;
+    const days = Math.round((this.dateOnly(end).getTime() - this.dateOnly(start).getTime()) / 86_400_000);
+    return days > 0 ? days : 0;
+  }
+
+  get minEndDate(): Date | null {
+    const start = this.form.get('startdate')?.value as Date | null;
+    if (!start) return null;
+    return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+  }
+
+  notificationDateAt(index: number): Date | null {
+    const start = this.form.get('startdate')?.value as Date | null;
+    if (!start) return null;
+    return new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
+  }
+
+  private endAfterStartValidator = (control: AbstractControl): ValidationErrors | null => {
+    const start = control.parent?.get('startdate')?.value as Date | null;
+    const end = control.value as Date | null;
+    if (!start || !end) return null;
+    return this.dateOnly(end).getTime() > this.dateOnly(start).getTime() ? null : { daterange: true };
+  };
+
+  private setupAdsNotificationBehavior(): void {
+    this.form.get('autonotification')?.valueChanges.subscribe(() => this.syncAdsControlState());
+    this.form.get('notifyto')?.valueChanges.subscribe(() => this.syncAdsControlState());
+    this.form.get('enableappnotification')?.valueChanges.subscribe(() => this.syncAdsControlState());
+    this.form.get('show')?.valueChanges.subscribe(() => this.syncAdsControlState());
+    this.form.get('startdate')?.valueChanges.subscribe(() => {
+      const end = this.form.get('enddate');
+      end?.updateValueAndValidity({ emitEvent: false });
+      if (end?.value && end.hasError('daterange')) end.markAsTouched();
+      this.syncNotificationRows();
+    });
+    this.form.get('enddate')?.valueChanges.subscribe(() => this.syncNotificationRows());
+
+    this.syncNotificationRows();
+    this.syncAdsControlState();
+  }
+
+  private makeNotificationRow(n: any = {}): FormGroup {
+    return this.fb.group({
+      title: [n?.title || '', Validators.required],
+      subtitle: [n?.subtitle || ''],
+      message: [n?.message || '', Validators.required],
+      landingPage: [n?.landingPage || ''],
+      sticky: [!!n?.sticky],
+      logged: [!!n?.logged]
+    });
+  }
+
+  // Keep one notification row per scheduled day, preserving typed values.
+  private syncNotificationRows(): void {
+    if (this.widgettype !== 'ads') return;
+    const target = this.notificationDayCount;
+    const arr = this.adsNotifications;
+    while (arr.length < target) arr.push(this.makeNotificationRow(), { emitEvent: false });
+    while (arr.length > target) arr.removeAt(arr.length - 1, { emitEvent: false });
+    this.syncAdsControlState();
+  }
+
+  // Disabled controls skip validation, so the schedule fields only gate the
+  // save while their section is visible.
+  private syncAdsControlState(): void {
+    if (this.widgettype !== 'ads') return;
+    const opts = { emitEvent: false };
+    const auto = !!this.form.get('autonotification')?.value;
+    const notifyto = this.form.get('notifyto');
+    const selectedjourneys = this.form.get('selectedjourneys');
+    const selectedfunnels = this.form.get('selectedfunnels');
+    const startdate = this.form.get('startdate');
+    const enddate = this.form.get('enddate');
+    const enableApp = this.form.get('enableappnotification');
+    const arr = this.adsNotifications;
+
+    if (!auto) {
+      notifyto?.disable(opts);
+      selectedjourneys?.disable(opts);
+      selectedfunnels?.disable(opts);
+      startdate?.disable(opts);
+      enddate?.disable(opts);
+      enableApp?.disable(opts);
+      arr.disable(opts);
+      return;
+    }
+
+    notifyto?.enable(opts);
+    if (this.notifyToIncludesJourney) selectedjourneys?.enable(opts);
+    else selectedjourneys?.disable(opts);
+    if (this.notifyToIncludesFunnel) selectedfunnels?.enable(opts);
+    else selectedfunnels?.disable(opts);
+    if (this.isStartdateLocked) startdate?.disable(opts);
+    else startdate?.enable(opts);
+    enddate?.enable(opts);
+    enableApp?.enable(opts);
+    if (enableApp?.value) arr.enable(opts);
+    else arr.disable(opts);
+  }
+
+  private dateOnly(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  private atTime(d: Date, hours: number, minutes: number): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hours, minutes, 0, 0);
+  }
+
+  // Stored startdate is pinned to 12:01 am and enddate to 11:59 pm — the day
+  // count (and appnotificationmap length) comes from the date difference only.
+  private adsNotificationPayload(raw: any): any {
+    const auto = !!raw.autonotification;
+    const enableApp = auto && !!raw.enableappnotification;
+    const notifyto: string[] = auto && Array.isArray(raw.notifyto) ? raw.notifyto : [];
+    return {
+      autonotification: auto,
+      notifyto,
+      selectedjourneys: notifyto.includes('journey') && Array.isArray(raw.selectedjourneys)
+        ? raw.selectedjourneys
+        : [],
+      selectedfunnels: notifyto.includes('funnel only') && Array.isArray(raw.selectedfunnels)
+        ? raw.selectedfunnels
+        : [],
+      startdate: auto && raw.startdate ? Timestamp.fromDate(this.atTime(raw.startdate, 0, 1)) : null,
+      enddate: auto && raw.enddate ? Timestamp.fromDate(this.atTime(raw.enddate, 23, 59)) : null,
+      enableappnotification: enableApp,
+      appnotificationmap: enableApp
+        ? (Array.isArray(raw.appnotificationmap) ? raw.appnotificationmap : []).map((n: any) => ({
+            title: (n?.title || '').trim(),
+            subtitle: (n?.subtitle || '').trim(),
+            message: (n?.message || '').trim(),
+            landingPage: (n?.landingPage || '').trim(),
+            sticky: !!n?.sticky,
+            logged: !!n?.logged
+          }))
+        : []
+    };
   }
 
   // --- colour picker (ads only) ---
@@ -335,7 +585,8 @@ export class CreateupcomingworkshopsComponent {
           imageonly: !!raw.imageonly,
           adimage: (raw.adimage || '').trim(),
           adimagetab: (raw.adimagetab || '').trim(),
-          adimagemobile: (raw.adimagemobile || '').trim()
+          adimagemobile: (raw.adimagemobile || '').trim(),
+          ...this.adsNotificationPayload(raw)
         }
       : {
           widgettype: 'comingsoon',

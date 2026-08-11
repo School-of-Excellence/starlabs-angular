@@ -97,6 +97,124 @@
   border-radius: 4px;
 }
 
+/* ---- auto notification schedule (ads) ---- */
+.notif-section {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notif-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notif-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.92rem;
+}
+
+.notif-section-title mat-icon {
+  color: #4f46e5;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.day-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.notif-section .toggle-row {
+  background: #ffffff;
+}
+
+.lock-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  vertical-align: text-bottom;
+  color: #b45309;
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notif-card {
+  padding: 12px 14px;
+  border: 1px solid #e6e8ee;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.notif-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.notif-day {
+  font-weight: 700;
+  color: #4f46e5;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notif-date {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.notif-flags {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.notif-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed #dbe0ea;
+  border-radius: 10px;
+  color: #6b7280;
+  font-size: 0.85rem;
+  background: #ffffff;
+  text-align: center;
+}
+
+.notif-empty mat-icon {
+  color: #c4cbd7;
+}
+
 /* ---- image upload ---- */
 .upload-block {
   margin-top: 12px;
