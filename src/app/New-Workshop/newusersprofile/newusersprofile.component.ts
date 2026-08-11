@@ -652,6 +652,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   setTagPolarity(polarity: 'include' | 'exclude'): void {
     if (this.selectByTagPolarity === polarity) return;
     this.selectByTagPolarity = polarity;
+    // Exclude reads as "hide anyone with ANY of these tags" — align the mode
+    // with that (and with the workshop filter's Exclude). Match all stays
+    // selectable afterwards for the rarer "not all of them" case.
+    if (polarity === 'exclude') this.selectByTagMode = 'any';
     this.refreshFilter();
   }
 
