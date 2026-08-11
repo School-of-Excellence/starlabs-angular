@@ -21,7 +21,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
@@ -58,8 +57,7 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
     MatChipsModule,
     MatMenuModule,
     MatDatepickerModule,
-    MatProgressSpinnerModule,
-    MatSelectModule
+    MatProgressSpinnerModule
   ],
   templateUrl: './newusersprofile.component.html',
   styleUrl: './newusersprofile.component.css'
@@ -67,7 +65,10 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 export class NewusersprofileComponent implements OnInit, OnDestroy {
   dataSource = new MatTableDataSource<any>([]);
   loading = true;
-  displayedColumns = ['select', 'name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags'];
+  private readonly baseColumns =
+    ['select', 'name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags'];
+  // The `workshop` column appears only while the workshop filter is active.
+  displayedColumns = [...this.baseColumns];
   // Keyed by user id so selection survives live data refreshes.
   selection = new SelectionModel<string>(true, []);
   applyingBulk = false;
@@ -113,12 +114,16 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // Workshop filter: options from workshopconfiguration (label detailpage.title),
   // matching rows via `workshop participant enrolled` (workshopref -> profileid).
   workshopOptions: { id: string; title: string }[] = [];
-  selectedWorkshopIds: string[] = [];
+  selectedWorkshopIds = new Set<string>();
   workshopFilterLoading = false;
   // profileids enrolled in any selected workshop; null while inactive/loading.
   private workshopProfileIds: Set<string> | null = null;
   // workshop id -> enrolled profileids, so re-selections don't refetch.
   private enrolledCache = new Map<string, string[]>();
+  // profileid -> selected workshop ids (drives the `workshop` column) — built
+  // from the per-workshop cache only, never a collection-wide read.
+  private workshopsByProfile = new Map<string, string[]>();
+  private workshopTitleById: Record<string, string> = {};
   // Guards against out-of-order async results; bumped to invalidate in-flight loads.
   private workshopFilterToken = 0;
   // Bumped when the async load lands so the filter string changes and re-runs.
@@ -166,6 +171,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
             title: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString()
           }))
           .sort((a, b) => a.title.localeCompare(b.title));
+        const titles: Record<string, string> = {};
+        this.workshopOptions.forEach(w => (titles[w.id] = w.title));
+        this.workshopTitleById = titles;
       })
       .catch(err => console.error('Error loading workshops:', err));
 
@@ -226,7 +234,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       // Workshop filter — only profiles enrolled in a selected workshop.
       // The enrolled set lives on `this` (not the filter string); while it is
       // still loading, show nothing rather than a flash of unfiltered rows.
-      if (this.selectedWorkshopIds.length) {
+      if (this.selectedWorkshopIds.size) {
         if (!this.workshopProfileIds) return false;
         const pid = (u.profileid || this.rowId(u) || '').toString();
         if (!this.workshopProfileIds.has(pid)) return false;
@@ -271,7 +279,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   get hasAnyFilter(): boolean {
     return !!(this.searchText || this.selectByTagIds.size > 0 || this.hasDateFilter
-      || this.selectedWorkshopIds.length > 0);
+      || this.selectedWorkshopIds.size > 0);
   }
 
   clearAllFilters(): void {
@@ -518,16 +526,25 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     return this.dataSource.filteredData.length;
   }
 
-  // ---- filter by workshops ----
+  // ---- filter by workshops (mat-menu, same UI as filter by tags) ----
+  toggleWorkshopSelect(id: string): void {
+    if (this.selectedWorkshopIds.has(id)) this.selectedWorkshopIds.delete(id);
+    else this.selectedWorkshopIds.add(id);
+    this.updateDisplayedColumns();
+    this.refreshWorkshopFilter();
+  }
+
   // Resolve the selected workshops' doc refs against `workshop participant
   // enrolled` (workshopref == ref) and keep only rows whose profileid is
-  // enrolled in at least one of them.
-  async onWorkshopFilterChange(): Promise<void> {
+  // enrolled in at least one of them. Reads are per-workshop and cached —
+  // never a scan of the whole (huge) enrolled collection.
+  private async refreshWorkshopFilter(): Promise<void> {
     const ids = [...this.selectedWorkshopIds];
     const token = ++this.workshopFilterToken;
 
     if (!ids.length) {
       this.workshopProfileIds = null;
+      this.workshopsByProfile.clear();
       this.workshopFilterLoading = false;
       this.refreshFilter();
       return;
@@ -552,11 +569,21 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       }));
       if (token !== this.workshopFilterToken) return; // superseded by a newer change
       const set = new Set<string>();
-      ids.forEach(id => (this.enrolledCache.get(id) || []).forEach(p => set.add(p)));
+      const byProfile = new Map<string, string[]>();
+      ids.forEach(id => (this.enrolledCache.get(id) || []).forEach(p => {
+        set.add(p);
+        const list = byProfile.get(p) || [];
+        list.push(id);
+        byProfile.set(p, list);
+      }));
       this.workshopProfileIds = set;
+      this.workshopsByProfile = byProfile;
     } catch (err) {
       console.error('Error loading enrolled participants:', err);
-      if (token === this.workshopFilterToken) this.workshopProfileIds = new Set();
+      if (token === this.workshopFilterToken) {
+        this.workshopProfileIds = new Set();
+        this.workshopsByProfile.clear();
+      }
     } finally {
       if (token === this.workshopFilterToken) {
         this.workshopFilterLoading = false;
@@ -572,10 +599,27 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   private resetWorkshopFilter(): void {
-    this.selectedWorkshopIds = [];
+    this.selectedWorkshopIds.clear();
     this.workshopProfileIds = null;
+    this.workshopsByProfile.clear();
     this.workshopFilterLoading = false;
     this.workshopFilterToken++; // invalidate any in-flight load
+    this.updateDisplayedColumns();
+  }
+
+  private updateDisplayedColumns(): void {
+    this.displayedColumns = this.selectedWorkshopIds.size > 0
+      ? [...this.baseColumns, 'workshop']
+      : [...this.baseColumns];
+  }
+
+  // Titles for the `workshop` column: the selected workshops this profile is
+  // enrolled in, from the cached per-workshop reads.
+  workshopNames(u: any): string[] {
+    const pid = (u.profileid || this.rowId(u) || '').toString();
+    return (this.workshopsByProfile.get(pid) || [])
+      .map(id => this.workshopTitleById[id])
+      .filter(Boolean);
   }
 
   toggleComm(): void {

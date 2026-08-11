@@ -489,44 +489,16 @@
 }
 
 /* ---- workshop filter (toolbar) ---- */
-.workshop-filter-field {
-  width: 210px;
-  max-width: 100%;
+.tag-select-btn .wf-spinner {
+  display: inline-block;
+  margin: 0 4px;
+  vertical-align: middle;
 }
 
-.workshop-filter-field mat-icon[matPrefix] {
-  color: #9ca3af;
-  margin-right: 6px;
-}
-
-.workshop-filter-field.active mat-icon[matPrefix] {
+/* Workshop column pills — same shape as tag pills, indigo tint. */
+.workshop-pill {
+  background: #eef2ff;
   color: #4f46e5;
-}
-
-.workshop-filter-field mat-spinner[matSuffix] {
-  margin-right: 6px;
-}
-
-.wf-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  padding: 0;
-  margin-right: 4px;
-  cursor: pointer;
-  color: #9ca3af;
-}
-
-.wf-clear:hover {
-  color: #d76060;
-}
-
-.wf-clear mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
 }
 
 @media (max-width: 820px) {
@@ -535,9 +507,6 @@
   }
   .search-field {
     margin-left: 0;
-    width: 100%;
-  }
-  .workshop-filter-field {
     width: 100%;
   }
 }
