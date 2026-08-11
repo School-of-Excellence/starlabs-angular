@@ -75,6 +75,7 @@ export class CreateupcomingworkshopsComponent {
   // Auto notification audiences (stored verbatim in notifyto).
   readonly notifyToOptions = [
     'journey',
+    'funnel only',
     'active participants',
     'non active participants',
     // 'all exist users',
@@ -82,6 +83,8 @@ export class CreateupcomingworkshopsComponent {
   ];
   journeyOptions: { id: string; label: string }[] = [];
   journeysLoading = false;
+  funnelOptions: { id: string; label: string }[] = [];
+  funnelsLoading = false;
 
   get isUploadingAny(): boolean {
     return this.uploadingKeys.size > 0;
@@ -126,6 +129,7 @@ export class CreateupcomingworkshopsComponent {
           autonotification: !!w.autonotification,
           notifyto: Array.isArray(w.notifyto) ? w.notifyto : [],
           selectedjourneys: Array.isArray(w.selectedjourneys) ? w.selectedjourneys : [],
+          selectedfunnels: Array.isArray(w.selectedfunnels) ? w.selectedfunnels : [],
           startdate: this.toDate(w.startdate),
           enddate: this.toDate(w.enddate),
           enableappnotification: !!w.enableappnotification
@@ -160,6 +164,7 @@ export class CreateupcomingworkshopsComponent {
 
     if (this.widgettype === 'ads') {
       this.loadJourneyOptions();
+      this.loadFunnelOptions();
       this.setupAdsNotificationBehavior();
     }
   }
@@ -221,6 +226,7 @@ export class CreateupcomingworkshopsComponent {
       autonotification: [false],
       notifyto: [[] as string[], Validators.required],
       selectedjourneys: [[] as string[], Validators.required],
+      selectedfunnels: [[] as string[], Validators.required],
       startdate: [null as Date | null, Validators.required],
       enddate: [null as Date | null, [Validators.required, this.endAfterStartValidator]],
       enableappnotification: [false],
@@ -238,6 +244,11 @@ export class CreateupcomingworkshopsComponent {
     return Array.isArray(v) && v.includes('journey');
   }
 
+  get notifyToIncludesFunnel(): boolean {
+    const v = this.form.get('notifyto')?.value;
+    return Array.isArray(v) && v.includes('funnel only');
+  }
+
   // Journey audience options: doc id (stored) + `journey` field (label).
   private async loadJourneyOptions(): Promise<void> {
     this.journeysLoading = true;
@@ -250,6 +261,25 @@ export class CreateupcomingworkshopsComponent {
       console.error('Error loading journeys:', err);
     } finally {
       this.journeysLoading = false;
+    }
+  }
+
+  // Funnel audience options: evergreen workshopconfiguration docs —
+  // doc id (stored) + detailpage.title (label).
+  private async loadFunnelOptions(): Promise<void> {
+    this.funnelsLoading = true;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'workshopconfiguration'),
+        where('evergreenWorkshop', '==', true)
+      ));
+      this.funnelOptions = snap.docs
+        .map(d => ({ id: d.id, label: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString() }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    } catch (err) {
+      console.error('Error loading funnel workshops:', err);
+    } finally {
+      this.funnelsLoading = false;
     }
   }
 
@@ -334,6 +364,7 @@ export class CreateupcomingworkshopsComponent {
     const auto = !!this.form.get('autonotification')?.value;
     const notifyto = this.form.get('notifyto');
     const selectedjourneys = this.form.get('selectedjourneys');
+    const selectedfunnels = this.form.get('selectedfunnels');
     const startdate = this.form.get('startdate');
     const enddate = this.form.get('enddate');
     const enableApp = this.form.get('enableappnotification');
@@ -342,6 +373,7 @@ export class CreateupcomingworkshopsComponent {
     if (!auto) {
       notifyto?.disable(opts);
       selectedjourneys?.disable(opts);
+      selectedfunnels?.disable(opts);
       startdate?.disable(opts);
       enddate?.disable(opts);
       enableApp?.disable(opts);
@@ -352,6 +384,8 @@ export class CreateupcomingworkshopsComponent {
     notifyto?.enable(opts);
     if (this.notifyToIncludesJourney) selectedjourneys?.enable(opts);
     else selectedjourneys?.disable(opts);
+    if (this.notifyToIncludesFunnel) selectedfunnels?.enable(opts);
+    else selectedfunnels?.disable(opts);
     if (this.isStartdateLocked) startdate?.disable(opts);
     else startdate?.enable(opts);
     enddate?.enable(opts);
@@ -379,6 +413,9 @@ export class CreateupcomingworkshopsComponent {
       notifyto,
       selectedjourneys: notifyto.includes('journey') && Array.isArray(raw.selectedjourneys)
         ? raw.selectedjourneys
+        : [],
+      selectedfunnels: notifyto.includes('funnel only') && Array.isArray(raw.selectedfunnels)
+        ? raw.selectedfunnels
         : [],
       startdate: auto && raw.startdate ? Timestamp.fromDate(this.atTime(raw.startdate, 0, 1)) : null,
       enddate: auto && raw.enddate ? Timestamp.fromDate(this.atTime(raw.enddate, 23, 59)) : null,
