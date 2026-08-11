@@ -1,56 +1,43 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-11 (Ads funnel-only audience · New Users workshops
-filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 3
-rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
+_Last updated: 2026-08-11 (New Users: Excel import-select · tags
+Include/Exclude)_ · **New session? Read `specs/ORIENTATION.md` first**,
+then `specs/journals/2026-08-11-newusers-workshop-filter.md` (6 rounds on
+the New Users screen) and
+`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `14cc583d`;
+- Branch `nanda-development`, tree clean at HEAD `d821d721`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
-- Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
-  auto-notification feature: `autonotification` → required `notifyto`
-  audiences (+`selectedjourneys` for `journey`, +`selectedfunnels` for
-  `funnel only` = evergreen workshopconfiguration docs) → start/end dates
-  (pinned 12:01 am / 11:59 pm, end > start, startdate locks while `show`
-  on) → `enableappnotification` → `appnotificationmap`, one card per
-  date-difference day.
-- New Users screen (`/newusersprofile`) has a Workshops multi-select
-  filter after Select-by-tags: all `workshopconfiguration` docs (label
-  `detailpage.title`), filters rows to profileids found in
-  `workshop participant enrolled` for the selected workshops.
+- Ads dialog (`/eiflixhomeconfig` → Ads tab): full auto-notification
+  feature (autonotification → notifyto audiences incl. journey/funnel
+  pickers → pinned start/end dates → enableappnotification →
+  per-day appnotificationmap).
+- New Users screen (`/newusersprofile`):
+  - Workshops filter (tags-style menu) with Funnel-only (default ON,
+    evergreen configs) + Include/Exclude toggles; Workshop table column
+    + export column in include mode only; per-workshop cached enrolled
+    reads, fail-closed on errors.
+  - Tags filter now also has Include/Exclude (Exclude auto-sets Match
+    any; resets to Include on clear).
+  - Import button (after Tags): Excel with A1 header `email`, mails from
+    row 2 → replaces selection with matching profiles; snackbar reports
+    matched/missing/hidden/ignored; zero-match leaves selection intact.
 
 ## Last session changes (2026-08-11, why)
-- Ads round 3: `funnel only` audience + Funnel Workshops picker
-  (`63a244b4`). Preserved operator hand-edit: `'all exist users'`
-  commented out of `notifyToOptions` — deliberate, do not restore.
-- New Users workshops filter (`a9bc6b51`, reworked `76275f01`): now the
-  same button+mat-menu UI as Select-by-tags; enrolled sets cached per
-  workshop with a token guard against out-of-order async; predicate hides
-  rows while loading (no unfiltered flash); clear-all resets it. While
-  active, a Workshop column (after Tags) shows each row's enrolled
-  selected workshops as pills — from the cached per-workshop reads only
-  (the enrolled collection is huge; never scanned whole). Enrolled
-  queries are one-shot, not live.
-- Export gained the same Workshop column (`86cd7884`): chip offered and
-  auto-selected only while the filter is active (sync on on/off
-  transitions only), titles comma-joined from the cached map. Review
-  workflow caught mid-load exports emitting empty/stale titles — fixed
-  by clearing the map at load start and blocking Download while the
-  enrolled sets load.
-- Workshop dropdown gained two top toggles (`14cc583d`): Funnel only
-  (default ON; offers only `evergreenWorkshop == true` configs; turning
-  it on prunes non-evergreen selections) and Include/Exclude (default
-  Include; Exclude = profiles NOT enrolled in any selected workshop,
-  same cached sets). Workshop column/export render in include mode only.
-  Review fixes: enrolled-fetch errors fail closed in both modes (null
-  set + snackbar), and chip auto-sync keys off filter on/off so mode
-  round-trips don't fight manual deselection.
+- Excel import-select (`a6254e59`), review fixes (`464c67b7`): matches
+  computed before clearing selection; toolbar wraps (1366px clip risk);
+  detached input retained; non-email values ignored and reported.
+- Tags Include/Exclude (`ffd790a7`), refinement (`d821d721`): Exclude
+  flips mode to Match any so the default complement is "none of these
+  tags", matching the workshop filter's semantics.
+- All rounds adversarially verified by 3-lens workflows; every fix above
+  traces to a verified finding. Accepted nits documented in the journal.
 
 ## Pending
-- Operator Chrome pass on both features, then push/deploy when asked
-  (build green; nothing half-done).
+- Operator Chrome pass on the New Users screen (filters, import, export)
+  and the Ads dialog, then push/deploy when asked.
 - Consumer of the ads notification fields (sender job) is not in this
   repo — admin UI only writes the schedule.
 - Carried: phase-2 dashboard perf (scope/cache participant-metadata scan;
