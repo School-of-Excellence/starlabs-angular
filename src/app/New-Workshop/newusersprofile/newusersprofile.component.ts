@@ -473,9 +473,13 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   // Expected sheet: A1 header "email", emails from row 2 down. Importing
   // replaces the current selection with the profiles matching those emails.
   importing = false;
+  // Kept on the component so the detached input can't be GC'd while the
+  // native file picker is open.
+  private importFileInput: HTMLInputElement | null = null;
 
   importFromExcel(): void {
     const input = document.createElement('input');
+    this.importFileInput = input;
     input.type = 'file';
     input.accept = '.xlsx,.xls';
     input.onchange = async (event) => {
@@ -504,37 +508,62 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
           return;
         }
 
-        const emails = new Set(
-          rows.slice(1)
-            .map(r => (r?.[0] ?? '').toString().trim().toLowerCase())
-            .filter(Boolean)
-        );
+        const values = rows.slice(1)
+          .map(r => (r?.[0] ?? '').toString().trim().toLowerCase())
+          .filter(Boolean);
+        // Stray notes/numbers in column A would inflate the counts — keep
+        // email-shaped values only and report the rest.
+        const emailList = values.filter(v => v.includes('@'));
+        const invalidCount = values.length - emailList.length;
+        const emails = new Set(emailList);
         if (emails.size === 0) {
           this.snackBar.open('No email ids found in the file.', 'Close', { duration: 3000 });
           return;
         }
 
-        // Select exactly the imported emails (matched case-insensitively).
-        this.selection.clear();
+        // Work out the matches BEFORE touching the selection — a zero-match
+        // import must not destroy the user's existing selection.
+        const matchedRowIds: string[] = [];
         const matched = new Set<string>();
         this.dataSource.data.forEach(u => {
           const mail = (u.email || '').toString().trim().toLowerCase();
           if (mail && emails.has(mail)) {
-            this.selection.select(this.rowId(u));
-            matched.add(mail);
+            const id = this.rowId(u);
+            if (id) {
+              matchedRowIds.push(id);
+              matched.add(mail);
+            }
           }
         });
 
+        if (matchedRowIds.length === 0) {
+          this.snackBar.open(
+            'None of the imported emails matched a profile. Selection unchanged.'
+            + (invalidCount > 0 ? ` ${invalidCount} non-email value(s) ignored.` : ''),
+            'Close',
+            { duration: 5000 }
+          );
+          return;
+        }
+
+        // Select exactly the imported emails (matched case-insensitively).
+        const replaced = this.selection.selected.length > 0;
+        this.selection.clear();
+        matchedRowIds.forEach(id => this.selection.select(id));
+
+        // Selection spans ALL profiles; active filters may hide some of them.
+        const visible = new Set(this.dataSource.filteredData.map(u => this.rowId(u)));
+        const hidden = matchedRowIds.filter(id => !visible.has(id)).length;
         const missing = emails.size - matched.size;
-        const selected = this.selection.selected.length;
-        this.snackBar.open(
-          selected === 0
-            ? 'None of the imported emails matched a profile.'
-            : `Selected ${selected} profile(s) for ${matched.size} of ${emails.size} imported email(s)`
-              + (missing > 0 ? ` — ${missing} not found.` : '.'),
-          'Close',
-          { duration: 5000 }
-        );
+
+        const parts = [
+          `Selected ${matchedRowIds.length} profile(s) for ${matched.size} of ${emails.size} imported email(s)`
+        ];
+        if (missing > 0) parts.push(`${missing} email(s) not found`);
+        if (hidden > 0) parts.push(`${hidden} hidden by the current filters`);
+        if (invalidCount > 0) parts.push(`${invalidCount} non-email value(s) ignored`);
+        if (replaced) parts.push('previous selection replaced');
+        this.snackBar.open(parts.join(' · ') + '.', 'Close', { duration: 6000 });
       } catch (err) {
         console.error('Error importing Excel:', err);
         this.snackBar.open('Error reading the Excel file. Please try again.', 'Close', { duration: 3000 });
