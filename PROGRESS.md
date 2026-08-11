@@ -6,7 +6,7 @@ filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
 rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `a9bc6b51`;
+- Branch `nanda-development`, tree clean at HEAD `76275f01`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
 - Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
@@ -25,10 +25,13 @@ rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
 - Ads round 3: `funnel only` audience + Funnel Workshops picker
   (`63a244b4`). Preserved operator hand-edit: `'all exist users'`
   commented out of `notifyToOptions` — deliberate, do not restore.
-- New Users workshops filter (`a9bc6b51`): ids in the select, doc refs at
-  query time (mat-select identity compare); enrolled sets cached per
+- New Users workshops filter (`a9bc6b51`, reworked `76275f01`): now the
+  same button+mat-menu UI as Select-by-tags; enrolled sets cached per
   workshop with a token guard against out-of-order async; predicate hides
-  rows while loading (no unfiltered flash); clear-all resets it. Enrolled
+  rows while loading (no unfiltered flash); clear-all resets it. While
+  active, a Workshop column (after Tags) shows each row's enrolled
+  selected workshops as pills — from the cached per-workshop reads only
+  (the enrolled collection is huge; never scanned whole). Enrolled
   queries are one-shot, not live.
 
 ## Pending
