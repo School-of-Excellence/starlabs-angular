@@ -269,66 +269,45 @@
         </div>
       </mat-tab>
 
-      <!-- ── TAB 3: Preview ── -->
+      <!-- ── TAB 3: Preview (SPLIT-SCREEN) ── -->
       <mat-tab [disabled]="!isTemplatePresent()">
         <ng-template mat-tab-label>
           <mat-icon class="tab-icon">visibility</mat-icon>
           Preview
         </ng-template>
 
-        <div class="tab-content preview-tab-content" *ngIf="isTemplatePresent()">
+        <!-- <div class="tab-content preview-tab-content"> -->
+          <div class="preview-split-root" *ngIf="isTemplatePresent()">
 
-          <!-- Preview controls bar -->
-          <div class="preview-bar">
-            <div class="preview-bar-left">
-              <mat-icon>visibility</mat-icon>
-              <span>
-                {{isQueuedEmailSelected()
-                  ? selectedQueuedEmail['broadcastname']
-                  : selectedTemplate['templatename'] || 'Preview'}}
-              </span>
-              <span class="preview-source-tag">
-                {{isQueuedEmailSelected() ? 'Queued' : 'Template'}}
-              </span>
-              <!-- Server name highlight in preview bar -->
-              <span class="preview-server-tag" *ngIf="selectedTemplate['servername']">
-                <mat-icon>dns</mat-icon>
-                {{selectedTemplate['servername']}}
-              </span>
+          <!-- ══ LEFT PANEL — Controls ══ -->
+          <div class="preview-split-left" (click)="closeCcBccDropdowns()">
+
+            <!-- Sticky header -->
+            <div class="ps-left-header">
+              <div class="ps-left-title">
+                <mat-icon>tune</mat-icon>
+                <span>
+                  {{isQueuedEmailSelected()
+                    ? selectedQueuedEmail['broadcastname']
+                    : selectedTemplate['templatename'] || 'Configure'}}
+                </span>
+                <span class="preview-source-tag">
+                  {{isQueuedEmailSelected() ? 'Queued' : 'Template'}}
+                </span>
+                <span class="preview-server-tag" *ngIf="selectedTemplate['servername']">
+                  <mat-icon>dns</mat-icon>
+                  {{selectedTemplate['servername']}}
+                </span>
+              </div>
             </div>
 
-            <div class="preview-bar-right">
-              <div class="cc-bcc-bar">
-                <mat-form-field appearance="outline" class="ccbcc-ff">
-                  <mat-label>CC</mat-label>
-                  <mat-chip-grid #ccChipGrid>
-                    <mat-chip-row *ngFor="let r of ccRecipients; let i = index" (removed)="removeCcRecipient(i)">
-                      {{r.email}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
-                    </mat-chip-row>
-                  </mat-chip-grid>
-                  <input placeholder="Enter email and press Enter" type="email"
-                    [(ngModel)]="customCcEmail" [matChipInputFor]="ccChipGrid"
-                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes" (matChipInputTokenEnd)="addCustomCcEmail(); customCcEmail = ''">
-                  <mat-icon matSuffix>alternate_email</mat-icon>
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" class="ccbcc-ff">
-                  <mat-label>BCC</mat-label>
-                  <mat-chip-grid #bccChipGrid>
-                    <mat-chip-row *ngFor="let r of bccRecipients; let i = index" (removed)="removeBccRecipient(i)">
-                      {{r.email}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
-                    </mat-chip-row>
-                  </mat-chip-grid>
-                  <input placeholder="Enter email and press Enter"
-                    type="email" [(ngModel)]="customBccEmail" [matChipInputFor]="bccChipGrid"
-                    [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
-                    (matChipInputTokenEnd)="addCustomBccEmail(); customBccEmail = ''">
-                  <mat-icon matSuffix>visibility_off</mat-icon>
-                </mat-form-field>
+            <!-- Sender -->
+            <div class="ps-section">
+              <div class="ps-section-label">
+                <mat-icon>alternate_email</mat-icon>
+                Sender
               </div>
-
-
-              <mat-form-field appearance="outline" class="from-ff">
+              <mat-form-field appearance="outline" class="ps-full-width">
                 <mat-label>From</mat-label>
                 <mat-select [(ngModel)]="fromemail">
                   <mat-option>
@@ -339,326 +318,371 @@
                   <mat-option *ngFor="let o of onSearchEmail()" [value]="o">{{o}}</mat-option>
                 </mat-select>
               </mat-form-field>
-
-              <mat-button-toggle-group [(value)]="previewMode" class="mode-toggle">
-                <mat-button-toggle value="desktop">
-                  <mat-icon>desktop_mac</mat-icon>
-                </mat-button-toggle>
-                <mat-button-toggle value="mobile">
-                  <mat-icon>phone_android</mat-icon>
-                </mat-button-toggle>
-              </mat-button-toggle-group>
-            </div>
-          </div>
-
-          <!-- Gmail shell -->
-          <div class="gmail-shell" [class.mobile]="previewMode === 'mobile'">
-
-            <!-- macOS chrome -->
-            <div class="gmail-chrome">
-              <div class="gc-dots">
-                <div class="gc-dot" style="background:#ff5f57"></div>
-                <div class="gc-dot" style="background:#febc2e"></div>
-                <div class="gc-dot" style="background:#28c840"></div>
-              </div>
-              <div class="gc-url">gmail.com — {{fromemail}}</div>
-              <div class="gc-right"></div>
             </div>
 
-            <!-- Gmail toolbar -->
-            <div class="gmail-toolbar">
-              <div class="gt-left">
-                <mat-icon class="gt-icon">menu</mat-icon>
-                <div class="gmail-wordmark">
-                  <span style="color:#4285f4">G</span><span style="color:#ea4335">m</span><span style="color:#fbbc05">a</span><span style="color:#34a853">i</span><span style="color:#4285f4">l</span>
-                </div>
-              </div>
-              <div class="gt-search">
-                <mat-icon>search</mat-icon>
-                <span>Search in mail</span>
-              </div>
-              <div class="gt-right">
-                <mat-icon>help_outline</mat-icon>
-                <div class="gt-avatar">T</div>
-              </div>
-            </div>
-
-            <!-- Email pane -->
-            <div class="gmail-body">
-
-              <div class="email-subject-row">
-                <span class="es-title">{{bufferDoc.subject || 'Email Subject'}}</span>
-                <div class="es-actions">
-                  <mat-icon>print</mat-icon>
-                  <mat-icon>open_in_new</mat-icon>
-                </div>
+            <!-- CC / BCC -->
+            <div class="ps-section">
+              <div class="ps-section-label">
+                <mat-icon>people_outline</mat-icon>
+                CC / BCC
               </div>
 
-              <div class="email-sender-row">
-                <div class="esr-avatar">T</div>
-                <div class="esr-info">
-                  <div class="esr-top">
-                    <span class="esr-name">Team Antano &amp; Harini</span>
-                    <span class="esr-addr">&lt;{{fromemail}}&gt;</span>
-                    <span class="esr-time">{{bufferDoc.date | date:'MMM d, h:mm a'}}</span>
+              <div class="ps-cc-bcc-wrap" (click)="$event.stopPropagation()">
+                <!-- CC -->
+                <mat-form-field appearance="outline" class="ps-full-width">
+                  <mat-label>CC</mat-label>
+                  <mat-chip-grid #ccChipGrid>
+                    <mat-chip-row *ngFor="let chip of ccSelectedChips" (removed)="removeCcChip(chip)">
+                      {{chip}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                    </mat-chip-row>
+                  </mat-chip-grid>
+                  <input [matChipInputFor]="ccChipGrid"
+                    placeholder="Search or type email…"
+                    [(ngModel)]="ccSearchQuery"
+                    (focus)="onCcInputFocus($event)"
+                    (input)="onCcSearchChange()"
+                    autocomplete="off">
+                  <mat-icon matSuffix>alternate_email</mat-icon>
+                </mat-form-field>
+                <div class="ps-cc-dropdown" *ngIf="ccDropdownOpen" (click)="$event.stopPropagation()">
+                  <div *ngIf="emailsLoading" class="ps-dd-loading">
+                    <mat-spinner diameter="14"></mat-spinner> Loading…
                   </div>
-                  <div class="esr-bottom">
-                    <span class="esr-to">to</span>
-                    <span class="esr-recip" (click)="onShowRecipients()">
-                      {{getRecipientCount() === 1 ? 'me' : getRecipientCount() + ' recipients'}}
-                    </span>
+                  <div *ngIf="!emailsLoading && ccFilteredEmails.length === 0" class="ps-dd-empty">No emails found</div>
+                  <div *ngFor="let email of ccFilteredEmails" class="ps-dd-item"
+                    (mousedown)="addCcEmail(email, $event)">
+                    <mat-icon>person</mat-icon> {{email}}
                   </div>
                 </div>
-                <div class="esr-btns">
-                  <mat-icon>reply</mat-icon>
-                  <mat-icon>more_vert</mat-icon>
+
+                <!-- BCC -->
+                <mat-form-field appearance="outline" class="ps-full-width" style="margin-top: 4px;">
+                  <mat-label>BCC</mat-label>
+                  <mat-chip-grid #bccChipGrid>
+                    <mat-chip-row *ngFor="let chip of bccSelectedChips" (removed)="removeBccChip(chip)">
+                      {{chip}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                    </mat-chip-row>
+                  </mat-chip-grid>
+                  <input [matChipInputFor]="bccChipGrid"
+                    placeholder="Search or type email…"
+                    [(ngModel)]="bccSearchQuery"
+                    (focus)="onBccInputFocus($event)"
+                    (input)="onBccSearchChange()"
+                    autocomplete="off">
+                  <mat-icon matSuffix>visibility_off</mat-icon>
+                </mat-form-field>
+                <div class="ps-cc-dropdown" *ngIf="bccDropdownOpen" (click)="$event.stopPropagation()">
+                  <div *ngIf="emailsLoading" class="ps-dd-loading">
+                    <mat-spinner diameter="14"></mat-spinner> Loading…
+                  </div>
+                  <div *ngIf="!emailsLoading && bccFilteredEmails.length === 0" class="ps-dd-empty">No emails found</div>
+                  <div *ngFor="let email of bccFilteredEmails" class="ps-dd-item"
+                    (mousedown)="addBccEmail(email, $event)">
+                    <mat-icon>person</mat-icon> {{email}}
+                  </div>
                 </div>
-              </div>
-
-              <!-- Full HTML body render -->
-              <div class="email-html-body">
-                <div *ngIf="selectedTemplate['htmlbody']" [innerHTML]="sanitizeHTML(selectedTemplate['htmlbody'])"></div>
-                <div class="email-placeholder" *ngIf="!selectedTemplate['htmlbody']">
-                  <mat-icon>email</mat-icon>
-                  <p>Select a template to preview email content here</p>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          <!-- ═══ Editable Attachments Panel (above variables) ═══ -->
-          <div class="preview-attachments-panel">
-            <div class="pap-header">
-              <div class="pap-header-left">
-                <mat-icon>attach_file</mat-icon>
-                <span>Attachments ({{getTemplateAttachments().length}})</span>
-              </div>
-              <div class="pap-header-right">
-                <button class="pap-add-btn" (click)="emailAttachmentInput.click()"
-                  [disabled]="isUploadingEmailAttachment">
-                  <mat-spinner diameter="14" *ngIf="isUploadingEmailAttachment"></mat-spinner>
-                  <mat-icon *ngIf="!isUploadingEmailAttachment">add</mat-icon>
-                  {{isUploadingEmailAttachment ? 'Uploading…' : 'Add File'}}
-                </button>
-                <input type="file" #emailAttachmentInput
-                  (change)="onEmailAttachmentSelected($event)"
-                  multiple
-                  accept=".pdf,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt,.zip,.jpg,.jpeg,.png,.gif,.webp"
-                  style="display: none;">
               </div>
             </div>
 
-            <!-- Attachment list -->
-            <div class="pap-list" *ngIf="getTemplateAttachments().length > 0">
-              <div class="pap-item-editable" *ngFor="let att of getTemplateAttachments(); let i = index">
-                <div class="pap-icon" [style.color]="getAttachmentColor(att.type)">
-                  <mat-icon>{{getAttachmentIcon(att.type)}}</mat-icon>
+            <!-- Variable chip summary -->
+            <div class="ps-section" *ngIf="extractVariables(selectedTemplate['htmlbody']).length > 0">
+              <div class="ps-section-label">
+                <mat-icon>code</mat-icon>
+                Variables
+              </div>
+              <div class="variable-chip-row">
+                <div class="var-chip"
+                  *ngFor="let v of extractVariables(selectedTemplate['htmlbody'])"
+                  [class.configured]="isVariableConfigured(v)"
+                  [class.unconfigured]="!isVariableConfigured(v)">
+                  <mat-icon class="vc-icon">{{isVariableConfigured(v) ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
+                  {{v}}
                 </div>
-                <div class="pap-details">
-                  <span class="pap-name">{{att.name}}</span>
-                  <span class="pap-size">
-                    {{formatFileSize(att.size)}}
-                    <span class="pap-source-tag" *ngIf="!att.isNew">template</span>
-                    <span class="pap-source-tag new" *ngIf="att.isNew">added</span>
+              </div>
+            </div>
+
+            <!-- Variable config panel -->
+            <div class="ps-section ps-var-panel"
+              *ngIf="isTemplatePresent() && extractVariables(selectedTemplate['htmlbody']).length > 0">
+
+              <div class="var-panel-header">
+                <div class="vph-left">
+                  <mat-icon>tune</mat-icon>
+                  Variable Configuration
+                  <span class="vph-saved-badge" *ngIf="hasSavedVariables">
+                    <mat-icon>bookmark</mat-icon>
+                    saved
                   </span>
                 </div>
-                <div class="pap-actions">
-                  <a [href]="att.url" target="_blank" rel="noopener" class="pap-action-btn" matTooltip="Download">
-                    <mat-icon>download</mat-icon>
-                  </a>
-                  <button class="pap-action-btn remove" matTooltip="Remove" (click)="removeEmailAttachment(i)">
-                    <mat-icon>close</mat-icon>
+                <div class="vph-right">
+                  <button class="vph-btn save" (click)="saveVariablesToLocal()"
+                    matTooltip="Save variable values locally for this template">
+                    <mat-icon>save</mat-icon> Save
                   </button>
+                  <button class="vph-btn load" (click)="loadSavedVariables()"
+                    *ngIf="hasSavedVariables" matTooltip="Reload saved variable values">
+                    <mat-icon>refresh</mat-icon> Reload
+                  </button>
+                  <button class="vph-btn delete" (click)="deleteSavedVariables()"
+                    *ngIf="hasSavedVariables" matTooltip="Delete saved variable values for this template">
+                    <mat-icon>delete_outline</mat-icon> Clear Saved
+                  </button>
+                  <div class="config-progress">
+                    <span class="cp-text">
+                      {{configuredCount()}} / {{extractVariables(selectedTemplate['htmlbody']).length}} configured
+                    </span>
+                    <div class="cp-bar">
+                      <div class="cp-fill"
+                        [style.width.%]="extractVariables(selectedTemplate['htmlbody']).length
+                          ? (configuredCount() / extractVariables(selectedTemplate['htmlbody']).length) * 100
+                          : 0">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="var-list">
+                <div class="var-row"
+                  *ngFor="let variable of extractVariables(selectedTemplate['htmlbody'])"
+                  [class.configured]="isVariableConfigured(variable)">
+
+                  <div class="vr-name">
+                    <div class="vr-tag">
+                      <mat-icon class="vr-tag-icon">code</mat-icon>
+                      {{variable}}
+                      <span class="vr-multi-badge" *ngIf="ensureConfig(variable).isMulti">multi</span>
+                    </div>
+                    <mat-icon class="vrs-icon ok" *ngIf="isVariableConfigured(variable)">check_circle</mat-icon>
+                    <mat-icon class="vrs-icon pending" *ngIf="!isVariableConfigured(variable)">pending</mat-icon>
+                  </div>
+
+                  <div class="vr-source-selector">
+                    <button class="src-btn" [class.active]="ensureConfig(variable).source === 'static'"
+                      (click)="setVariableSource(variable, 'static')">
+                      <mat-icon>edit</mat-icon> Static
+                    </button>
+                    <button class="src-btn" [class.active]="ensureConfig(variable).source === 'analytics'"
+                      (click)="setVariableSource(variable, 'analytics')">
+                      <mat-icon>analytics</mat-icon> Metadata
+                    </button>
+                    <button class="src-btn" [class.active]="ensureConfig(variable).source === 'sheet'"
+                      (click)="setVariableSource(variable, 'sheet')">
+                      <mat-icon>table_chart</mat-icon> Sheet
+                    </button>
+                  </div>
+
+                  <div class="vr-input-area" *ngIf="ensureConfig(variable).source">
+                    <div *ngIf="ensureConfig(variable).source === 'static'">
+                      <mat-form-field appearance="outline" class="chip-ff">
+                        <mat-chip-grid #chipGrid>
+                          <mat-chip-row
+                            *ngFor="let val of ensureConfig(variable).staticValues; let j = index"
+                            (removed)="removeStaticValue(variable, j)">
+                            {{val}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
+                          </mat-chip-row>
+                        </mat-chip-grid>
+                        <input
+                          [placeholder]="ensureConfig(variable).isMulti ? 'Add multiple values — press Enter' : 'Enter value — press Enter'"
+                          [matChipInputFor]="chipGrid"
+                          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+                          (matChipInputTokenEnd)="addStaticValue(variable, $event)">
+                      </mat-form-field>
+                      <div class="input-hint"
+                        *ngIf="!ensureConfig(variable).isMulti && ensureConfig(variable).staticValues.length > 1">
+                        <mat-icon>info</mat-icon>
+                        Only the first value will be used for this variable.
+                      </div>
+                    </div>
+
+                    <div *ngIf="ensureConfig(variable).source === 'analytics'">
+                      <mat-form-field appearance="outline" class="analytics-ff">
+                        <mat-label>Metadata field</mat-label>
+                        <mat-select [(ngModel)]="ensureConfig(variable).analyticsKey"
+                          [multiple]="ensureConfig(variable).isMulti">
+                          <mat-option *ngFor="let k of metaDataFields" [value]="k">{{k}}</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <div *ngIf="ensureConfig(variable).source === 'sheet'">
+                      <div *ngIf="!uploadedFile" class="sheet-upload-zone">
+                        <input type="file" class="file-input" (change)="onFileSelected($event)" accept=".xlsx,.xls,.csv">
+                        <mat-icon class="sz-icon">cloud_upload</mat-icon>
+                        <span>Click to upload Excel / CSV</span>
+                      </div>
+                      <div *ngIf="uploadedFile" class="sheet-uploaded">
+                        <mat-icon>description</mat-icon>
+                        <span class="su-name">{{uploadedFile.name}}</span>
+                        <button mat-icon-button (click)="removeUploadedFile()"><mat-icon>close</mat-icon></button>
+                      </div>
+                      <div class="sheet-meta" *ngIf="sheetVariables.length">
+                        <span>{{excelData.length - 1}} rows</span>
+                        <span class="sm-sep">·</span>
+                        <span>Cols: {{sheetVariables.join(', ')}}</span>
+                      </div>
+                      <div class="validation-chip error" *ngIf="sheetValidationError">
+                        <mat-icon>error_outline</mat-icon>{{sheetValidationError}}
+                      </div>
+                      <div class="validation-chip success" *ngIf="isSheetValid && !sheetValidationError">
+                        <mat-icon>check_circle</mat-icon>Validated — {{validEmails.length}} valid emails
+                      </div>
+                      <div class="validation-chip loading" *ngIf="isValidatingEmails">
+                        <mat-icon class="spin">refresh</mat-icon>Validating…
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
 
-            <!-- Empty state -->
-            <div class="pap-empty" *ngIf="getTemplateAttachments().length === 0">
-              <mat-icon>attachment</mat-icon>
-              <span>No attachments — click "Add File" to attach</span>
+            <!-- Attachments panel -->
+            <div class="ps-section">
+              <div class="preview-attachments-panel">
+                <div class="pap-header">
+                  <div class="pap-header-left">
+                    <mat-icon>attach_file</mat-icon>
+                    <span>Attachments ({{getTemplateAttachments().length}})</span>
+                  </div>
+                  <div class="pap-header-right">
+                    <button class="pap-add-btn" (click)="emailAttachmentInput.click()"
+                      [disabled]="isUploadingEmailAttachment">
+                      <mat-spinner diameter="14" *ngIf="isUploadingEmailAttachment"></mat-spinner>
+                      <mat-icon *ngIf="!isUploadingEmailAttachment">add</mat-icon>
+                      {{isUploadingEmailAttachment ? 'Uploading…' : 'Add File'}}
+                    </button>
+                    <input type="file" #emailAttachmentInput
+                      (change)="onEmailAttachmentSelected($event)"
+                      multiple
+                      accept=".pdf,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt,.zip,.jpg,.jpeg,.png,.gif,.webp"
+                      style="display:none;">
+                  </div>
+                </div>
+
+                <div class="pap-list" *ngIf="getTemplateAttachments().length > 0">
+                  <div class="pap-item-editable" *ngFor="let att of getTemplateAttachments(); let i = index">
+                    <div class="pap-icon" [style.color]="getAttachmentColor(att.type)">
+                      <mat-icon>{{getAttachmentIcon(att.type)}}</mat-icon>
+                    </div>
+                    <div class="pap-details">
+                      <span class="pap-name">{{att.name}}</span>
+                      <span class="pap-size">
+                        {{formatFileSize(att.size)}}
+                        <span class="pap-source-tag" *ngIf="!att.isNew">template</span>
+                        <span class="pap-source-tag new" *ngIf="att.isNew">added</span>
+                      </span>
+                    </div>
+                    <div class="pap-actions">
+                      <a [href]="att.url" target="_blank" rel="noopener" class="pap-action-btn" matTooltip="Download">
+                        <mat-icon>download</mat-icon>
+                      </a>
+                      <button class="pap-action-btn remove" matTooltip="Remove" (click)="removeEmailAttachment(i)">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pap-empty" *ngIf="getTemplateAttachments().length === 0">
+                  <mat-icon>attachment</mat-icon>
+                  <span>No attachments — click "Add File" to attach</span>
+                </div>
+
+                <div class="pap-hint">
+                  <mat-icon>info_outline</mat-icon>
+                  Max 10MB per file. Files will be sent as Postmark attachments.
+                </div>
+              </div>
             </div>
 
-            <div class="pap-hint">
-              <mat-icon>info_outline</mat-icon>
-              Max 10MB per file. Files will be sent as Postmark attachments with the email.
-            </div>
           </div>
+          <!-- /preview-split-left -->
 
-          <!-- Variable chips summary -->
-          <div class="variable-chip-row"
-            *ngIf="extractVariables(selectedTemplate['htmlbody']).length > 0">
-            <span class="vcr-label">Variables:</span>
-            <div class="var-chip"
-              *ngFor="let v of extractVariables(selectedTemplate['htmlbody'])"
-              [class.configured]="isVariableConfigured(v)"
-              [class.unconfigured]="!isVariableConfigured(v)">
-              <mat-icon class="vc-icon">{{isVariableConfigured(v) ? 'check_circle' : 'radio_button_unchecked'}}</mat-icon>
-              {{v}}
+          <!-- ══ RIGHT PANEL — Gmail Preview ══ -->
+          <div class="preview-split-right">
+
+            <!-- Mode toggle -->
+            <div class="preview-right-topbar">
+              <mat-button-toggle-group [(value)]="previewMode" class="mode-toggle">
+                <mat-button-toggle value="desktop"><mat-icon>desktop_mac</mat-icon></mat-button-toggle>
+                <mat-button-toggle value="mobile"><mat-icon>phone_android</mat-icon></mat-button-toggle>
+              </mat-button-toggle-group>
             </div>
-          </div>
 
+            <!-- Gmail shell -->
+            <div class="gmail-shell" [class.mobile]="previewMode === 'mobile'">
+
+              <div class="gmail-chrome">
+                <div class="gc-dots">
+                  <div class="gc-dot" style="background:#ff5f57"></div>
+                  <div class="gc-dot" style="background:#febc2e"></div>
+                  <div class="gc-dot" style="background:#28c840"></div>
+                </div>
+                <div class="gc-url">gmail.com — {{fromemail}}</div>
+                <div class="gc-right"></div>
+              </div>
+
+              <div class="gmail-toolbar">
+                <div class="gt-left">
+                  <mat-icon class="gt-icon">menu</mat-icon>
+                  <div class="gmail-wordmark">
+                    <span style="color:#4285f4">G</span><span style="color:#ea4335">m</span><span style="color:#fbbc05">a</span><span style="color:#34a853">i</span><span style="color:#4285f4">l</span>
+                  </div>
+                </div>
+                <div class="gt-search">
+                  <mat-icon>search</mat-icon>
+                  <span>Search in mail</span>
+                </div>
+                <div class="gt-right">
+                  <mat-icon>help_outline</mat-icon>
+                  <div class="gt-avatar">T</div>
+                </div>
+              </div>
+
+              <div class="gmail-body">
+                <div class="email-subject-row">
+                  <span class="es-title">{{bufferDoc.subject || 'Email Subject'}}</span>
+                  <div class="es-actions">
+                    <mat-icon>print</mat-icon>
+                    <mat-icon>open_in_new</mat-icon>
+                  </div>
+                </div>
+
+                <div class="email-sender-row">
+                  <div class="esr-avatar">T</div>
+                  <div class="esr-info">
+                    <div class="esr-top">
+                      <span class="esr-name">Team Antano &amp; Harini</span>
+                      <span class="esr-addr">&lt;{{fromemail}}&gt;</span>
+                      <span class="esr-time">{{bufferDoc.date | date:'MMM d, h:mm a'}}</span>
+                    </div>
+                    <div class="esr-bottom">
+                      <span class="esr-to">to</span>
+                      <span class="esr-recip" (click)="onShowRecipients()">
+                        {{getRecipientCount() === 1 ? 'me' : getRecipientCount() + ' recipients'}}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="esr-btns">
+                    <mat-icon>reply</mat-icon>
+                    <mat-icon>more_vert</mat-icon>
+                  </div>
+                </div>
+
+                <div class="email-html-body">
+                  <div *ngIf="selectedTemplate['htmlbody']" [innerHTML]="sanitizeHTML(selectedTemplate['htmlbody'])"></div>
+                  <div class="email-placeholder" *ngIf="!selectedTemplate['htmlbody']">
+                    <mat-icon>email</mat-icon>
+                    <p>Select a template to preview email content here</p>
+                  </div>
+                </div>
+              </div>
+            </div>            <!-- /gmail-shell -->
+          </div>          <!-- /preview-split-right -->
         </div>
       </mat-tab>
-
     </mat-tab-group>
-
-    <!-- ══════════════ VARIABLE CONFIG PANEL ══════════════ -->
-    <div class="var-panel"
-      *ngIf="isTemplatePresent() && extractVariables(selectedTemplate['htmlbody']).length > 0">
-
-      <div class="var-panel-header">
-        <div class="vph-left">
-          <mat-icon>tune</mat-icon>
-          Variable Configuration
-          <span class="vph-saved-badge" *ngIf="hasSavedVariables">
-            <mat-icon>bookmark</mat-icon>
-            saved
-          </span>
-        </div>
-
-        <div class="vph-right">
-          <!-- Save variables button -->
-          <button class="vph-btn save" (click)="saveVariablesToLocal()"
-            matTooltip="Save variable values locally for this template">
-            <mat-icon>save</mat-icon>
-            Save
-          </button>
-
-          <!-- Load saved variables button -->
-          <button class="vph-btn load" (click)="loadSavedVariables()"
-            *ngIf="hasSavedVariables"
-            matTooltip="Reload saved variable values">
-            <mat-icon>refresh</mat-icon>
-            Reload
-          </button>
-
-          <!-- Delete saved variables button -->
-          <button class="vph-btn delete" (click)="deleteSavedVariables()"
-            *ngIf="hasSavedVariables"
-            matTooltip="Delete saved variable values for this template">
-            <mat-icon>delete_outline</mat-icon>
-            Clear Saved
-          </button>
-
-          <div class="config-progress">
-            <span class="cp-text">
-              {{configuredCount()}} / {{extractVariables(selectedTemplate['htmlbody']).length}} configured
-            </span>
-            <div class="cp-bar">
-              <div class="cp-fill"
-                [style.width.%]="extractVariables(selectedTemplate['htmlbody']).length
-                  ? (configuredCount() / extractVariables(selectedTemplate['htmlbody']).length) * 100
-                  : 0">
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="var-list">
-        <div class="var-row"
-          *ngFor="let variable of extractVariables(selectedTemplate['htmlbody'])"
-          [class.configured]="isVariableConfigured(variable)">
-
-          <div class="vr-name">
-            <div class="vr-tag">
-              <mat-icon class="vr-tag-icon">code</mat-icon>
-              {{variable}}
-              <span class="vr-multi-badge" *ngIf="ensureConfig(variable).isMulti">multi</span>
-            </div>
-            <mat-icon class="vrs-icon ok" *ngIf="isVariableConfigured(variable)">check_circle</mat-icon>
-            <mat-icon class="vrs-icon pending" *ngIf="!isVariableConfigured(variable)">pending</mat-icon>
-          </div>
-
-          <div class="vr-source-selector">
-            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'static'"
-              (click)="setVariableSource(variable, 'static')">
-              <mat-icon>edit</mat-icon> Static
-            </button>
-            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'analytics'"
-              (click)="setVariableSource(variable, 'analytics')">
-              <mat-icon>analytics</mat-icon> Metadata
-            </button>
-            <button class="src-btn" [class.active]="ensureConfig(variable).source === 'sheet'"
-              (click)="setVariableSource(variable, 'sheet')">
-              <mat-icon>table_chart</mat-icon> Sheet
-            </button>
-          </div>
-
-          <div class="vr-input-area" *ngIf="ensureConfig(variable).source">
-
-            <div *ngIf="ensureConfig(variable).source === 'static'">
-              <mat-form-field appearance="outline" class="chip-ff">
-                <mat-chip-grid #chipGrid>
-                  <mat-chip-row
-                    *ngFor="let val of ensureConfig(variable).staticValues; let j = index"
-                    (removed)="removeStaticValue(variable, j)">
-                    {{val}}<button matChipRemove><mat-icon>cancel</mat-icon></button>
-                  </mat-chip-row>
-                </mat-chip-grid>
-                <input
-                  [placeholder]="ensureConfig(variable).isMulti
-                    ? 'Add multiple values — press Enter'
-                    : 'Enter value — press Enter'"
-                  [matChipInputFor]="chipGrid"
-                  [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
-                  (matChipInputTokenEnd)="addStaticValue(variable, $event)">
-              </mat-form-field>
-              <div class="input-hint"
-                *ngIf="!ensureConfig(variable).isMulti && ensureConfig(variable).staticValues.length > 1">
-                <mat-icon>info</mat-icon>
-                Only the first value will be used for this variable.
-              </div>
-            </div>
-
-            <div *ngIf="ensureConfig(variable).source === 'analytics'">
-              <mat-form-field appearance="outline" class="analytics-ff">
-                <mat-label>Metadata field</mat-label>
-                <mat-select [(ngModel)]="ensureConfig(variable).analyticsKey"
-                  [multiple]="ensureConfig(variable).isMulti">
-                  <mat-option *ngFor="let k of metaDataFields" [value]="k">{{k}}</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-
-            <div *ngIf="ensureConfig(variable).source === 'sheet'">
-              <div *ngIf="!uploadedFile" class="sheet-upload-zone">
-                <input type="file" class="file-input" (change)="onFileSelected($event)" accept=".xlsx,.xls,.csv">
-                <mat-icon class="sz-icon">cloud_upload</mat-icon>
-                <span>Click to upload Excel / CSV</span>
-              </div>
-
-              <div *ngIf="uploadedFile" class="sheet-uploaded">
-                <mat-icon>description</mat-icon>
-                <span class="su-name">{{uploadedFile.name}}</span>
-                <button mat-icon-button (click)="removeUploadedFile()"><mat-icon>close</mat-icon></button>
-              </div>
-
-              <div class="sheet-meta" *ngIf="sheetVariables.length">
-                <span>{{excelData.length - 1}} rows</span>
-                <span class="sm-sep">·</span>
-                <span>Cols: {{sheetVariables.join(', ')}}</span>
-              </div>
-
-              <div class="validation-chip error" *ngIf="sheetValidationError">
-                <mat-icon>error_outline</mat-icon>{{sheetValidationError}}
-              </div>
-              <div class="validation-chip success" *ngIf="isSheetValid && !sheetValidationError">
-                <mat-icon>check_circle</mat-icon>Validated — {{validEmails.length}} valid emails
-              </div>
-              <div class="validation-chip loading" *ngIf="isValidatingEmails">
-                <mat-icon class="spin">refresh</mat-icon>Validating…
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </div>
-
-    </div>
 
     <!-- ══════════════ ACTION BAR ══════════════ -->
     <div class="action-bar">

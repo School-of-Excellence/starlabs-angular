@@ -171,6 +171,12 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   noteeditors: { [key: string]: Editor } = {};
   assignmenteditors: { [key: string]: Editor } = {};
   cpwelcomeeditors: { [key: string]: Editor } = {};
+  // Dynamic Enrollment Configuration — one ngx-editor per rich-text control,
+  // keyed by stable block/item uid so editors survive add/remove/reorder.
+  dynamicEditors: { [key: string]: Editor } = {};
+  private deUidCounter = 0;
+  // Collapsed block uids (drag-drop provides ordering; no sequence number shown).
+  deCollapsedUids = new Set<string>();
   cpwelcomeFields = [
     {
       key: 'abovediagnosticsheading',
@@ -287,7 +293,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'workshopoverview',
@@ -297,7 +303,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 70
+      maxLength: 300
     },
     {
       key: 'knowinfo',
@@ -307,7 +313,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'dropdown',
       iconLabel: 'Choose Icon',
       descriptionLabel: 'Overview Description',
-      maxLength: 150
+      maxLength: 300
     },
     {
       key: 'faq',
@@ -317,7 +323,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
       fieldType: 'inputfield',
       iconLabel: 'Enter FAQ Question',
       descriptionLabel: 'Enter FAQ Answer',
-      maxLength: 500
+      maxLength: 600
     }
   ];
   //challenge type
@@ -953,6 +959,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     Object.values(this.noteeditors).forEach(editor => editor?.destroy());
     Object.values(this.assignmenteditors).forEach(editor => editor?.destroy());
     Object.values(this.cpwelcomeeditors).forEach(editor => editor?.destroy());
+    Object.values(this.dynamicEditors).forEach(editor => editor?.destroy());
     this.subscription.next();
     this.subscription.complete();
   }
@@ -968,6 +975,7 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     const noterichTextControls = {};
     this.settingsForm = this.fb.group({
       active: [false],
+      homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
@@ -996,7 +1004,9 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         amount: [null],
         amountstriked: [null],
         api: [''],
-        id: ['']
+        id: [''],
+        paymentfor: [''],
+        hint: ['']
       }),
       referallowedusers: this.fb.group({
         all: [false],
@@ -1025,13 +1035,16 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       heroHeading: [''],
       heroDescription: [''],
       heroshowtype: [''],
-      heroImage: [''], 
+      heroImage: [''],
       heroImageMobile:[''],
       heroVideo:[''],
+      // Hero accent colour hex like #FFFFFF (empty allowed).
+      heroAccent: ['', [Validators.pattern(/^#[0-9A-Fa-f]{6}$/)]],
       testusers: [[],],
       facilitatorprofiles:[[],],
       selectedgroup: [''],
       enrollwattimessage: [''],
+      enrolledcongrats: [''],
       loginlogchannel:['workshop-logs'],
       workshopactivitychannel:['workshop-logs'],
       selectedjourneys: [[],],
@@ -1095,6 +1108,12 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       sneakpeak: this.fb.array([]),
       knowinfo: this.fb.array([]),
       faq: this.fb.array([]),
+      // Outcomes: array of { value, title } maps.
+      outcome: this.fb.array([]),
+      // Hometags: simple string list (same shape as "Who is this workshop for?").
+      hometags: this.fb.array([]),
+      // Dynamic Enrollment Configuration: array of richtext/icontext blocks.
+      dynamicenrollment: this.fb.array([]),
     });
   this.detailPageForm.get('selectedTestimonials')?.valueChanges
     .pipe(takeUntil(this.subscription))
@@ -1289,6 +1308,38 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         array.push(group);
       });
     });
+
+    // Outcomes: array of { value, title } maps.
+    const outcomeArray = this.getFormArray('outcome');
+    outcomeArray.clear();
+    (data.detailpage['outcome'] || []).forEach((item: any) => {
+      outcomeArray.push(this.fb.group({
+        value: [item?.value || ''],
+        title: [item?.title || '']
+      }));
+    });
+
+    // Hometags: simple string list (same shape as "Who is this workshop for?").
+    const hometagsArray = this.getFormArray('hometags');
+    hometagsArray.clear();
+    (data.detailpage['hometags'] || []).forEach((value: string) => {
+      hometagsArray.push(this.fb.control(value));
+    });
+
+    // Dynamic Enrollment Configuration — rebuild blocks (sorted by sequence).
+    this.destroyAllDynEditors();
+    this.deCollapsedUids.clear();
+    this.dynamicBlocks.clear();
+    const deBlocks = Array.isArray(data.detailpage['dynamicenrollment'])
+      ? [...data.detailpage['dynamicenrollment']]
+      : [];
+    deBlocks
+      .sort((a: any, b: any) => (a?.sequence || 0) - (b?.sequence || 0))
+      .forEach((block: any) => {
+        const g = this.makeDynBlock(block?.type, block?.data);
+        this.deCollapsedUids.add(g.get('uid')?.value); // loaded blocks start collapsed
+        this.dynamicBlocks.push(g);
+      });
   }
 
   onEditorContentChange(content: string, fieldKey: string): void {
@@ -1343,6 +1394,150 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
       return this.detailPageForm.get(key) as FormArray;
     }
 
+    // ===================== Dynamic Enrollment Configuration =====================
+    get dynamicBlocks(): FormArray {
+      return this.detailPageForm.get('dynamicenrollment') as FormArray;
+    }
+
+    dynIcons(blockIndex: number): FormArray {
+      return this.dynamicBlocks.at(blockIndex)?.get('icontext') as FormArray;
+    }
+
+    private makeDynIcon(item: any = {}): FormGroup {
+      const uid = 'i' + (++this.deUidCounter);
+      return this.fb.group({
+        uid: [uid],
+        value1: [item?.value1 || ''],
+        value2: [item?.value2 || '']
+      });
+    }
+
+    private makeDynBlock(type: string = 'richtext', data: any = {}): FormGroup {
+      const uid = 'b' + (++this.deUidCounter);
+      const icons = Array.isArray(data?.icontext) ? data.icontext : [];
+      const iconArray: FormArray = this.fb.array([]);
+      icons.forEach((it: any) => iconArray.push(this.makeDynIcon(it)));
+      // icontext blocks always have at least one item.
+      if (type === 'icontext' && iconArray.length === 0) iconArray.push(this.makeDynIcon());
+      return this.fb.group({
+        uid: [uid],
+        type: [type || 'richtext'],
+        title1: [data?.title1 || ''],
+        title2: [data?.title2 || ''],
+        border: [!!data?.border],
+        content: [data?.content || ''],
+        icontext: iconArray
+      });
+    }
+
+    addDynBlock(): void {
+      // New blocks open expanded so they can be filled in immediately.
+      this.dynamicBlocks.push(this.makeDynBlock('richtext'));
+    }
+
+    // Collapse / expand (keyed by stable block uid).
+    isBlockCollapsed(block: AbstractControl): boolean {
+      return this.deCollapsedUids.has(block.get('uid')?.value);
+    }
+
+    toggleBlockCollapsed(block: AbstractControl): void {
+      const uid = block.get('uid')?.value;
+      if (this.deCollapsedUids.has(uid)) this.deCollapsedUids.delete(uid);
+      else this.deCollapsedUids.add(uid);
+    }
+
+    // trackBy uid so reordering moves (not recreates) the ngx-editor components.
+    trackDynBlock = (_: number, block: AbstractControl) => block.get('uid')?.value;
+    trackDynIcon = (_: number, item: AbstractControl) => item.get('uid')?.value;
+
+    // Short header summary (type + a plain-text preview of Title 1).
+    blockSummary(block: AbstractControl): string {
+      const html = (block.get('title1')?.value || '').toString();
+      const text = html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+      return text ? text.slice(0, 60) : 'Untitled block';
+    }
+
+    removeDynBlock(index: number): void {
+      if (index < 0 || index >= this.dynamicBlocks.length) return;
+      this.destroyBlockEditors(this.dynamicBlocks.at(index) as FormGroup);
+      this.dynamicBlocks.removeAt(index);
+    }
+
+    onDynTypeChange(index: number): void {
+      const block = this.dynamicBlocks.at(index) as FormGroup;
+      if (!block) return;
+      // Switching to icontext: ensure at least one item exists.
+      if (block.get('type')?.value === 'icontext' && this.dynIcons(index).length === 0) {
+        this.dynIcons(index).push(this.makeDynIcon());
+      }
+    }
+
+    addDynIcon(blockIndex: number): void {
+      this.dynIcons(blockIndex)?.push(this.makeDynIcon());
+    }
+
+    removeDynIcon(blockIndex: number, itemIndex: number): void {
+      const arr = this.dynIcons(blockIndex);
+      if (!arr || itemIndex < 0 || itemIndex >= arr.length) return;
+      this.destroyIconEditors(this.dynamicBlocks.at(blockIndex) as FormGroup, arr.at(itemIndex) as FormGroup);
+      arr.removeAt(itemIndex);
+    }
+
+    // --- editor keys (based on stable uids) ---
+    deKey(block: AbstractControl, field: string): string {
+      return `de_${block.get('uid')?.value}_${field}`;
+    }
+
+    deIconKey(block: AbstractControl, item: AbstractControl, field: string): string {
+      return `de_${block.get('uid')?.value}_ic_${item.get('uid')?.value}_${field}`;
+    }
+
+    // Lazily create + cache the ngx-editor instance for a given key.
+    getDynEditor(key: string): Editor {
+      if (!this.dynamicEditors[key]) this.dynamicEditors[key] = new Editor();
+      return this.dynamicEditors[key];
+    }
+
+    private destroyIconEditors(block: FormGroup, item: FormGroup): void {
+      // value1 is an icon select (not an editor); only value2 is rich text.
+      const key = this.deIconKey(block, item, 'value2');
+      this.dynamicEditors[key]?.destroy();
+      delete this.dynamicEditors[key];
+    }
+
+    private destroyBlockEditors(block: FormGroup): void {
+      ['title1', 'title2', 'content'].forEach(f => {
+        const key = this.deKey(block, f);
+        this.dynamicEditors[key]?.destroy();
+        delete this.dynamicEditors[key];
+      });
+      (block.get('icontext') as FormArray)?.controls.forEach(
+        item => this.destroyIconEditors(block, item as FormGroup)
+      );
+    }
+
+    private destroyAllDynEditors(): void {
+      Object.values(this.dynamicEditors).forEach(e => e?.destroy());
+      this.dynamicEditors = {};
+    }
+
+    // --- hero accent colour picker (settingsForm.heroAccent) ---
+    get heroAccentControl(): FormControl {
+      return this.settingsForm.get('heroAccent') as FormControl;
+    }
+
+    // <input type="color"> needs a valid hex; fall back to white for the swatch.
+    get heroAccentSwatch(): string {
+      const v = (this.settingsForm.get('heroAccent')?.value || '').trim();
+      return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '#FFFFFF';
+    }
+
+    onHeroAccentSwatch(event: Event): void {
+      const value = (event.target as HTMLInputElement).value || '';
+      this.settingsForm.patchValue({ heroAccent: value.toUpperCase() });
+      this.settingsForm.get('heroAccent')?.markAsDirty();
+    }
+
     addIconWithText(key: string, maxItems: number): void {
       const formArray = this.getFormArray(key);
       if (formArray.length >= maxItems) {
@@ -1380,6 +1575,21 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
   isAllFilled(key: string): boolean {
     const formArray = this.detailPageForm.get(key) as FormArray;
     return formArray.controls.every(control => control.value && control.valid);
+  }
+
+  get outcomeArray(): FormArray {
+    return this.detailPageForm.get('outcome') as FormArray;
+  }
+
+  addOutcome(): void {
+    this.outcomeArray.push(this.fb.group({
+      value: [''],
+      title: ['']
+    }));
+  }
+
+  removeOutcome(index: number): void {
+    if (index >= 0) this.outcomeArray.removeAt(index);
   }
 
   get primarylyTaughtArray(): FormArray {
@@ -1477,6 +1687,24 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         question: item.question,
         answer: item.answer
       }));
+    });
+
+    // Dynamic Enrollment Configuration -> [{ type, sequence, data }] (uids stripped).
+    data.dynamicenrollment = this.dynamicBlocks.controls.map((c, idx) => {
+      const v: any = c.value;
+      const block: any = { type: v.type, sequence: idx + 1, data: {} };
+      block.data.title1 = v.title1 || '';
+      block.data.title2 = v.title2 || '';
+      block.data.border = !!v.border;
+      if (v.type === 'icontext') {
+        block.data.icontext = (Array.isArray(v.icontext) ? v.icontext : []).map((it: any) => ({
+          value1: it?.value1 || '',
+          value2: it?.value2 || ''
+        }));
+      } else {
+        block.data.content = v.content || '';
+      }
+      return block;
     });
 
     delete data.selectedTestimonials;
@@ -2134,6 +2362,7 @@ private rebuildActivityIds(): void {
     if (data && typeof data === 'object') {
       this.settingsForm.patchValue({
         active: data['active'] || false,
+        homescreenwidget: data['homescreenwidget'] || false,
         qanda: data['qanda'] || false,
         breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
@@ -2157,6 +2386,8 @@ private rebuildActivityIds(): void {
           amountstriked: data['paymentmap']?.amountstriked ?? null,
           api: data['paymentmap']?.api ?? '',
           id: data['paymentmap']?.id ?? '',
+          paymentfor: data['paymentmap']?.paymentfor ?? '',
+          hint: data['paymentmap']?.hint ?? '',
         },
         referallowedusers: {
           all: data['referallowedusers']?.all || false,
@@ -2184,6 +2415,7 @@ private rebuildActivityIds(): void {
         facilitatorprofiles: data['facilitatorprofiles'] || [],
         selectedgroup: data['selectedgroup'] || null,
         enrollwattimessage: data['enrollwattimessage'] || null,
+        enrolledcongrats: data['enrolledcongrats'] ?? '',
         loginlogchannel: data['loginlogchannel'] || 'workshop-logs',
         workshopactivitychannel: data['workshopactivitychannel'] || 'workshop-logs',
         mailTemplate: data['mailTemplate'] || null,
@@ -2202,6 +2434,7 @@ private rebuildActivityIds(): void {
         heroImage: data['heroImage'] || '',
         heroImageMobile: data['heroImageMobile'] || '',
         heroVideo: data['heroVideo'] || '',
+        heroAccent: data['heroAccent'] || '',
       });
 
       const isEvergreenEnabled = !!data['evergreenWorkshop'];
@@ -2353,6 +2586,7 @@ private rebuildActivityIds(): void {
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
+        homescreenwidget: this.settingsForm.get('homescreenwidget')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
@@ -2382,6 +2616,7 @@ private rebuildActivityIds(): void {
         selectedgroup: this.settingsForm.get('selectedgroup')?.value || null,
         loginlogchannel: this.settingsForm.get('loginlogchannel')?.value || null,
         enrollwattimessage: this.settingsForm.get('enrollwattimessage')?.value || null,
+        enrolledcongrats: this.settingsForm.get('enrolledcongrats')?.value || '',
         workshopactivitychannel: this.settingsForm.get('workshopactivitychannel')?.value || null,
         mailTemplate: this.settingsForm.get('mailTemplate')?.value || null,
         testusers: this.settingsForm.get('testusers')?.value || [],
@@ -2400,6 +2635,7 @@ private rebuildActivityIds(): void {
         heroImage: this.settingsForm.get('heroImage')?.value || '',
         heroImageMobile: this.settingsForm.get('heroImageMobile')?.value || '',
         heroVideo: this.settingsForm.get('heroVideo')?.value || '',
+        heroAccent: (this.settingsForm.get('heroAccent')?.value || '').trim().toUpperCase(),
       });
       
       this.snackBar.open('Settings saved successfully!', 'Close', { duration: 2000 });
@@ -2463,7 +2699,15 @@ private rebuildActivityIds(): void {
       this.snackBar.open('Video upload failed', 'Close', { duration: 2000 });
     }
   }
-  onToggleChange(field: 'active' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
+  // Clear a selected hero asset (web image / mobile image / video). Only removes
+  // it from the config; the actual file in Storage is left untouched.
+  removeHeroAsset(field: 'heroImage' | 'heroImageMobile' | 'heroVideo', input?: HTMLInputElement): void {
+    this.settingsForm.get(field)?.setValue('');
+    if (input) {
+      input.value = '';
+    }
+  }
+  onToggleChange(field: 'active' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }

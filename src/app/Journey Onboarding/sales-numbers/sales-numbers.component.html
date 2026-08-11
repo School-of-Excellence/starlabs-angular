@@ -1,14 +1,18 @@
 <div class="sn-wrap">
 
-  <!-- Header -->
+  <!-- Header + screen toggle -->
   <div class="sn-header">
-    <div>
-      <h1>Sales Numbers</h1>
-    </div>
-    <a mat-stroked-button color="primary" class="sn-btn-secondary" routerLink="/sales-teams">
-      <mat-icon>groups</mat-icon> Manage Teams
-    </a>
+    <h1>Sales Numbers</h1>
+    <mat-button-toggle-group class="sn-screen-toggle" [(ngModel)]="screen" (change)="onScreenChange(screen)" hideSingleSelectionIndicator>
+      <mat-button-toggle value="dashboard">Dashboard</mat-button-toggle>
+      <mat-button-toggle value="teams">Teams</mat-button-toggle>
+      <mat-button-toggle value="salespeople">Salespeople</mat-button-toggle>
+      <mat-button-toggle value="sources">Assign Source</mat-button-toggle>
+    </mat-button-toggle-group>
   </div>
+
+  <!-- ==================== DASHBOARD ==================== -->
+  <ng-container *ngIf="screen === 'dashboard'">
 
   <!-- Toolbar: controls + filters in one cohesive card -->
   <div class="sn-toolbar">
@@ -19,6 +23,7 @@
       <mat-button-toggle-group [(ngModel)]="timeframe" (change)="reload()" hideSingleSelectionIndicator>
         <mat-button-toggle value="last7">7 Days</mat-button-toggle>
         <mat-button-toggle value="last30">30 Days</mat-button-toggle>
+        <mat-button-toggle value="last90">90 Days</mat-button-toggle>
         <mat-button-toggle value="month">Month range</mat-button-toggle>
       </mat-button-toggle-group>
     </div>
@@ -61,14 +66,7 @@
       <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
         <mat-label>Source</mat-label>
         <mat-select multiple [(ngModel)]="filters.sources" (selectionChange)="onFilterChange()" placeholder="All sources">
-          <mat-option *ngFor="let s of data.sources" [value]="s">{{ s }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="sn-filter" floatLabel="always" subscriptSizing="dynamic">
-        <mat-label>Original Source</mat-label>
-        <mat-select multiple [(ngModel)]="filters.originalSources" (selectionChange)="onFilterChange()" placeholder="All original sources">
-          <mat-option *ngFor="let s of data.originalSources" [value]="s">{{ s }}</mat-option>
+          <mat-option *ngFor="let o of sourceOptions" [value]="o.id">{{ o.name }}</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -225,5 +223,117 @@
       </apx-chart>
     </mat-card>
 
+  </ng-container>
+  </ng-container>
+  <!-- ==================== end dashboard ==================== -->
+
+  <!-- ==================== TEAMS ==================== -->
+  <ng-container *ngIf="screen === 'teams'">
+    <mat-card class="sn-panel sn-create">
+      <mat-form-field appearance="outline" class="sn-newname" floatLabel="always" subscriptSizing="dynamic">
+        <mat-label>New team name</mat-label>
+        <input matInput [(ngModel)]="newTeamName" (keyup.enter)="createTeam()" placeholder="e.g. Team Delta">
+      </mat-form-field>
+      <button mat-flat-button color="primary" class="st-btn-primary" (click)="createTeam()" [disabled]="!newTeamName.trim() || saving">
+        <mat-icon>add</mat-icon> Create team
+      </button>
+    </mat-card>
+
+    <div class="st-teams">
+      <mat-card class="st-team" *ngFor="let t of teams">
+        <div class="st-team-head">
+          <h2>{{ t.team }}</h2>
+          <span class="st-count">{{ t.members.length }} member{{ t.members.length === 1 ? '' : 's' }}</span>
+          <button mat-icon-button color="warn" (click)="deleteTeam(t)" [disabled]="saving" matTooltip="Delete team">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+        <mat-chip-set>
+          <mat-chip *ngFor="let m of t.members" (removed)="removeMember(m)">
+            {{ nameForId(m) }}
+            <button matChipRemove [disabled]="saving"><mat-icon>cancel</mat-icon></button>
+          </mat-chip>
+        </mat-chip-set>
+        <p class="st-empty" *ngIf="!t.members.length">No members yet — assign from the roster below.</p>
+      </mat-card>
+    </div>
+
+    <mat-card class="sn-panel">
+      <h2>Roster</h2>
+      <p class="sn-src-hint">All salespeople seen in sales. Assign each to a team — membership is stored by profile id. A name with no matching user record can't be assigned (flag/link it from that person's profile).</p>
+      <div class="st-roster">
+        <div class="st-roster-row" *ngFor="let name of teamSalespeople">
+          <span class="st-person">{{ name }}</span>
+          <span class="st-nolink" *ngIf="!resolvable(name)" matTooltip="No user record matches this name">no profile id</span>
+          <mat-form-field appearance="outline" class="st-assign" floatLabel="always" subscriptSizing="dynamic">
+            <mat-label>Team</mat-label>
+            <mat-select [ngModel]="teamIdOfName(name)" (selectionChange)="assignTeamByName(name, $event.value)" [disabled]="saving || !resolvable(name)" placeholder="Unassigned">
+              <mat-option [value]="''">Unassigned</mat-option>
+              <mat-option *ngFor="let t of teams" [value]="t.id">{{ t.team }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+      <p class="st-empty" *ngIf="!teamSalespeople.length">No salespeople in the last 12 months.</p>
+    </mat-card>
+  </ng-container>
+
+  <!-- ==================== SALESPEOPLE (flag) ==================== -->
+  <ng-container *ngIf="screen === 'salespeople'">
+    <mat-card class="sn-panel">
+      <h2>Salespeople</h2>
+      <p class="sn-src-hint">Mark who is a salesperson. Flagging sets <code>salesperson: true</code> on their user record and enables profile-id team grouping. A name with no matching profile can't be flagged here — do it from that person's profile.</p>
+      <div class="sn-loading" *ngIf="flagLoading"><mat-spinner diameter="36"></mat-spinner></div>
+      <div class="st-roster" *ngIf="!flagLoading">
+        <div class="st-roster-row" *ngFor="let r of flagRows">
+          <span class="st-person">{{ r.name }}</span>
+          <button mat-stroked-button class="sn-flag-btn" [class.on]="r.flagged" (click)="toggleFlag(r)" [disabled]="savingFlag === r.name">
+            <mat-icon>{{ r.flagged ? 'check_circle' : 'add_circle_outline' }}</mat-icon>
+            {{ r.flagged ? 'Salesperson' : 'Mark salesperson' }}
+          </button>
+        </div>
+      </div>
+      <p class="st-empty" *ngIf="!flagLoading && !flagRows.length">No sales in the last 12 months.</p>
+    </mat-card>
+  </ng-container>
+
+  <!-- ==================== ASSIGN SOURCE ==================== -->
+  <ng-container *ngIf="screen === 'sources'">
+    <mat-card class="sn-panel">
+      <h2>Assign Source</h2>
+      <p class="sn-src-hint">Set the lead source on each sale (last 12 months). Saves immediately.</p>
+      <div class="sn-loading" *ngIf="sourceLoading"><mat-spinner diameter="36"></mat-spinner></div>
+      <table mat-table [dataSource]="sourceRows" class="sn-table" *ngIf="!sourceLoading">
+        <ng-container matColumnDef="participant">
+          <th mat-header-cell *matHeaderCellDef>Participant</th>
+          <td mat-cell *matCellDef="let r">{{ r.participantName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="product">
+          <th mat-header-cell *matHeaderCellDef>Product</th>
+          <td mat-cell *matCellDef="let r">{{ r.productName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="person">
+          <th mat-header-cell *matHeaderCellDef>Sales Person</th>
+          <td mat-cell *matCellDef="let r">{{ r.salespersonname }}</td>
+        </ng-container>
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let r">{{ r.purchasedate | date:'dd MMM yyyy' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="source">
+          <th mat-header-cell *matHeaderCellDef>Source</th>
+          <td mat-cell *matCellDef="let r">
+            <mat-form-field appearance="outline" class="sn-src-select" subscriptSizing="dynamic">
+              <mat-select [ngModel]="r.source" (selectionChange)="setSource(r, $event.value)" placeholder="Set source">
+                <mat-option *ngFor="let o of sourceOptions" [value]="o.id">{{ o.name }}</mat-option>
+              </mat-select>
+            </mat-form-field>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="sourceColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: sourceColumns"></tr>
+      </table>
+      <p class="sn-empty" *ngIf="!sourceLoading && !sourceRows.length">No sales in the last 12 months.</p>
+    </mat-card>
   </ng-container>
 </div>

@@ -3,6 +3,7 @@ import { Firestore, collection, collectionData,query, where, getDocs,doc, update
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Storage, ref as afRef, uploadBytes as afUploadBytes, getDownloadURL as afGetDownloadURL } from '@angular/fire/storage';
 import { inject } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { MatSort } from '@angular/material/sort';
@@ -61,6 +62,7 @@ export class EvolutionMappingComponent {
     searchTitleTab1:string ='';
     globalSearchTab1: string = '';
     globalSearchTab2: string = '';
+    private destroy$ = new Subject<void>();
     
     constructor(
       public firestore: Firestore,
@@ -87,6 +89,11 @@ export class EvolutionMappingComponent {
       this.dataSource.sort = this.sort;
       // this.dataSource2.paginator = this.paginator;
       // this.dataSource2.sort = this.sort;
+    }
+    
+    ngOnDestroy(): void {
+      this.destroy$.next();
+      this.destroy$.complete();
     }
 
     isSelected(row: any): boolean {
@@ -253,44 +260,27 @@ export class EvolutionMappingComponent {
     //   });  
     // }
   
-  async getLiveEvolutionMapping() {
-  // Initialize empty maps
-  const mapLiveData: any[] = [];
+  getLiveEvolutionMapping() {
+    const liveEvolutionRef = collection(this.firestore, 'liveevolutionmapping');
+    const q = query(liveEvolutionRef, where('videolist', '>', []));
 
-  // Create reference to the collection
-  const liveEvolutionRef = collection(this.firestore, 'liveevolutionmapping');
+    collectionData(q).pipe(takeUntil(this.destroy$)).subscribe((mapLiveData: any[]) => {
+      this.originalLiveData = mapLiveData.map(data => ({
+        profileid: data.profileid,
+        title: data.title,
+        live: data.live,
+        videolist: data.videolist || []
+      }));
 
-  // Create Firestore query
-  const q = query(liveEvolutionRef, where('videolist', '>', []));
+      const uniqueProfiles = Array.from(new Set(this.originalLiveData.map(item => item.profileid)));
+      this.profileOptionsLive = uniqueProfiles
+        .map(id => ({ id, name: this.mapProfile[id] || '' }))
+        .filter(p => p.name)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Fetch query results
-  const res = await getDocs(q);
-
-  // Process documents
-  res.forEach((doc) => {
-    const data: any = doc.data();
-
-    const obj = {
-      profileid: data.profileid,
-      title: data.title,
-      live: data.live,
-      videolist: data.videolist || []
-    };
-
-    mapLiveData.push(obj);
-  });
-
-  // Assign to local variables
-  this.originalLiveData = [...mapLiveData];
-  this.dataSource2.data = mapLiveData;
-
-  // Build unique profile dropdown
-  const uniqueProfiles = Array.from(new Set(mapLiveData.map(item => item.profileid)));
-  this.profileOptionsLive = uniqueProfiles
-    .map(id => ({ id, name: this.mapProfile[id] || '' }))
-    .filter(p => p.name)
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+      this.applyProfileFilterLive();
+    });
+  }
     // applyProfileFilter() {
     //   let filteredData = [...this.originalData];
     //   if (this.selectedProfileId) {
@@ -507,20 +497,35 @@ export class EvolutionMappingComponent {
     clearSelection() {
       this.selection.clear();
     }
-    makeLive(row:any){
-      var dialogRef = this.dialog.open(LiveEvolutionMappingComponent, { 
-        data: row == null ? this.selection : row,
-        disableClose: true,
-        autoFocus: false,
-        width: '90%',
-        height: '95%',
-      });
-      dialogRef.afterClosed().subscribe(value => {  
-        this.getEvolutionMapping();
-        this.getLiveEvolutionMapping();
-        this.clearSelection();
-      });
-      console.log('making live Selected Rows:', Array.from(this.selection));
+    makeLive(row:any) {
+        const isSingleRow = row != null && typeof row === 'object' && 'profileid' in row;
+        const isReactivating = isSingleRow && row['live'] == false;
+
+        if (isReactivating) {
+          const confirmed = confirm(
+            "While making a participant from Not‑Live to Live, first move them from In Evolution Mapping Activity to Evolution Mapping, and then mark them as Live so the 48‑hour and 24‑hour reminder notifications are triggered.\n\nDo you want to proceed?"
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+
+        const dialogData = row == null 
+          ? this.selection 
+          : (isSingleRow ? row['profileid'] : row); 
+        var dialogRef = this.dialog.open(LiveEvolutionMappingComponent, { 
+          data: dialogData,
+          disableClose: true,
+          autoFocus: false,
+          width: '90%',
+          height: '95%',
+        });
+        dialogRef.afterClosed().subscribe(value => {  
+          this.getEvolutionMapping();
+          this.getLiveEvolutionMapping();
+          this.clearSelection();
+        });
+        console.log('making live Selected Rows:', Array.from(this.selection));
     }
     sanitize(url: string) {
       return this.sanitizer.bypassSecurityTrustUrl(url);

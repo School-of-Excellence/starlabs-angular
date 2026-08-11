@@ -3,6 +3,8 @@ import { FirebaseApp } from '@angular/fire/app';
 import { Firestore, getFirestore } from '@angular/fire/firestore';
 import { Functions, getFunctions, httpsCallable } from '@angular/fire/functions';
 import {
+  AttachOfflineOk,
+  AttachOfflineReq,
   RebuildOk,
   RebuildReq,
   RegenerateOk,
@@ -37,6 +39,14 @@ export class AtcFirebaseService {
    */
   readonly atcDb: Firestore = getFirestore(this.app, 'firestore-atc');
 
+  /**
+   * Named Firestore database `firestore-forms` — READ ONLY from the UI.
+   * Participant form submissions (formsByClient) live here; the ATC ops screens
+   * read them to tell whether a config-stage own source exists. Pre-initialized in
+   * main.ts with the same long-polling transport; just fetch the instance here.
+   */
+  readonly formsDb: Firestore = getFirestore(this.app, 'firestore-forms');
+
   /** Callables region for the ATC pipeline (v2 onCall). */
   readonly functions: Functions = getFunctions(this.app, 'us-central1');
 
@@ -50,5 +60,15 @@ export class AtcFirebaseService {
   readonly rebuildAtcPrompt = httpsCallable<RebuildReq, RebuildOk>(
     this.functions,
     'rebuildAtcPrompt',
+  );
+
+  /**
+   * attachOfflineStudioSession({ docid, stage, dropboxLink, profileName? }) —
+   * for a stage with NO studio-session log at all (the session happened
+   * offline). See atc-ops.types.ts for the full contract.
+   */
+  readonly attachOfflineStudioSession = httpsCallable<AttachOfflineReq, AttachOfflineOk>(
+    this.functions,
+    'attachOfflineStudioSession',
   );
 }

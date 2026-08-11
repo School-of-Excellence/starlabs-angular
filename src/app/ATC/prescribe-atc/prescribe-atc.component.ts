@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { collection, collectionData, collectionSnapshots, doc, DocumentReference, Firestore, getDoc, getDocs, getFirestore, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL, deleteObject, uploadBytesResumable } from '@angular/fire/storage';
@@ -191,10 +191,12 @@ export class PrescribeATCComponent {
   previewATCImages = []
 
   // Queue Data
-  ongoingQueue = null
+  // ongoingQueue = null
+  ongoingQueues = []
   arenamode:boolean = false
   liveassignmentid = null
   liveassignmentdata = null
+  personnelReady = true   // toggled false→true after a programmatic patch to force the author/observer/mentor mat-selects to rebuild
   tokendata = null
   queueid:string = null
   stagename:string = null
@@ -281,7 +283,8 @@ export class PrescribeATCComponent {
     private networkStatusService : NetworkStatusService,
     private connectivity: ConnectivityGuardService,
     private mediaCache: MediaCacheService,
-    private draftService: ATCDraftService
+    private draftService: ATCDraftService,
+    private ngZone: NgZone
   ) {
     this.settingup = true
     this.route.queryParams.subscribe(data=>{
@@ -458,13 +461,18 @@ export class PrescribeATCComponent {
     this.route.queryParams.subscribe(async params => {
       if (!params['aigenerated'] || !params['docid']) return;
       const docid = params['docid'];
-      const draftRef = doc(this.firestoreATC, 'temporary_ATC', docid);
-      const draftSnap = await getDoc(draftRef);
+      // Load through the offline-capable draft service (local-first): openDraft returns the cached
+      // copy when the server is unreachable, so an already-opened AI draft still loads offline —
+      // matching the normal prescribe flow. Only when NO draft exists anywhere do we parse the AI
+      // source below. (Was a raw getDoc, which failed offline since firestore-atc has no persistence.)
+      const existing = await this.draftService.openDraft(
+        this.firestoreATC, 'temporary_ATC', docid,
+        (mine, theirs) => this.openConflictDialog(mine, theirs));
 
-      if (draftSnap.exists()) {
-        console.log('Draft exists → loading from temporary_ATC');
+      if (existing) {
+        console.log('Draft exists → loading from temporary_ATC (local-first)');
 
-        const value = draftSnap.data();
+        const value = existing;
 
         this.autoSaveID = docid;
         this.aigeneratedEntry = true;  // AI-generated draft entry: lock name, no "open another draft"
@@ -580,7 +588,11 @@ export class PrescribeATCComponent {
       this.aigeneratedsource = aiSourceCollection;
       this.aigeneratedid = docid;
 
-      await setDoc(draftRef, {
+      // Create the draft through the offline-capable draft service: saveLocal writes to IndexedDB
+      // first (durable across refresh/offline), then sync pushes to the server when online — the same
+      // path the normal flow uses, so the AI draft gets the offline safety net. (Was a raw setDoc,
+      // which wrote only to the server and skipped the local cache.)
+      await this.draftService.saveLocal('temporary_ATC', docid, {
         profileid: this.participantProfileid,
         transcript: [],
         aiatcsummary: this.summarystring,
@@ -590,9 +602,9 @@ export class PrescribeATCComponent {
         aiedited: true,
         aigeneratedsource: aiSourceCollection,
         aigeneratedid: docid,
-        created: serverTimestamp(),
-        lastupdated: serverTimestamp()
+        lastupdated: new Date(),
       });
+      await this.draftService.sync(this.firestoreATC, 'temporary_ATC', docid);
 
       if (this.proceduresLoaded) {
         this.patchAIAdjustments(this.pendingAIJson);
@@ -773,16 +785,17 @@ export class PrescribeATCComponent {
       // Check if inside a Queue
       await getDocs(query(collection(this.firestoreDefault,'queue generation'),where("queueenddate", ">=", new Date()))).then(async queuesnap=>{
         var ongoingQueueList = queuesnap.docs.map(e => e.data()).filter(e => e["queuestartdate"].toDate() < new Date())
-        var queueref = ongoingQueueList.map(e => doc(this.firestoreDefault, 'queue generation', e["docid"]))
-        if(queueref.length != 0){
-          await getDocs(query(collection(this.firestoreDefault, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
-            if(pairing.size != 0){
-              this.ongoingQueue = ongoingQueueList.find(e => e["docid"] == pairing.docs[0].data()["queueref"].id) ?? null
-              if(this.ongoingQueue != null) this.arenamode = true
-            }
-          })
-        }
-        console.log("Ongoing Queue", this.ongoingQueue, queueref)
+        this.ongoingQueues = ongoingQueueList
+        // var queueref = ongoingQueueList.map(e => doc(this.firestoreDefault, 'queue generation', e["docid"]))
+        // if(queueref.length != 0){
+        //   await getDocs(query(collection(this.firestoreDefault, "queue studio pairing"), where("queueref", "in", queueref),where("participants", "array-contains", this.loggedinProfileid),where("checkin", "==", true),where("studioin", "==", true))).then(pairing=>{
+        //     if(pairing.size != 0){
+        //       this.ongoingQueue = ongoingQueueList.find(e => e["docid"] == pairing.docs[0].data()["queueref"].id) ?? null
+        //       if(this.ongoingQueue != null) this.arenamode = true
+        //     }
+        //   })
+        // }
+        // console.log("Ongoing Queue", this.ongoingQueue, queueref)
 
       });
     } catch (error) {
@@ -897,38 +910,48 @@ export class PrescribeATCComponent {
         }
       })
     }
-    if(this.ongoingQueue != null){
-      console.log(this.ongoingQueue);
 
-      // var atcstudio = ["diagnostics", "consultation", "ah", "validation"]
-      var atcWidget = ["addunvalidatedatc", "addvalidatedatc"]
-      var atcActivityStage = []
-      Object.keys(this.ongoingQueue["stageproperty"] ?? {}).forEach(key=>{
-        var studiowidgets = this.ongoingQueue["stageproperty"][key]["studiowidgets"] ?? []
-        if(studiowidgets.some(e => atcWidget.includes(e))){
-          atcActivityStage.push(key)
-        }
-      })
-      console.log(atcActivityStage)
-      getDocs(query(collection(this.firestoreDefault,"live assignment"),where("queueid", "==", this.ongoingQueue["docid"]),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
-        var live = studio.docs.filter(e => e.data()["status"] == "recording" || e.data()["status"] == "live")
-        var atcStudio = null
-        if(live.length != 0){
-          atcStudio = live[0]
-        }
-        else{
-          var lastStudio = studio.docs.filter(e => atcActivityStage.includes(e.data()["stagename"]))
-          if(lastStudio.length != 0){
-            atcStudio = lastStudio[0]
-          }
-        }
+    // Step 3: does this specialist + participant have an existing live assignment record, in any of the currently ongoing queues
+    var ongoingQueueIds = this.ongoingQueues.map(e => e["docid"])
+    if(ongoingQueueIds.length != 0){
+      await getDocs(query(collection(this.firestoreDefault,"live assignment"),where("queueid", "in", ongoingQueueIds),where("participantid", "==", this.participantProfileid),where('pairing', 'array-contains', this.loggedinProfileid),orderBy("created", "desc"))).then(async (studio) =>{
+      var live = studio.docs.filter(e => e.data()["status"] == "recording" || e.data()["status"] == "live" || e.data()["status"] == "completed")
+      var atcStudio = live.length != 0 ? live[0] : null
+      // if(atcStudio == null){
+      // var atcWidget = ["addunvalidatedatc", "addvalidatedatc"]
+      // var lastStudio = studio.docs.filter(e => {
+      // var docQueue = this.ongoingQueues.find(q => q["docid"] == e.data()["queueid"])
+      // if(!docQueue) return false
+      // var atcActivityStage = []
+      // Object.keys(docQueue["stageproperty"] ?? {}).forEach(key=>{
+      //   var studiowidgets = docQueue["stageproperty"][key]["studiowidgets"] ?? []
+      //   if(studiowidgets.some(e => atcWidget.includes(e))){
+      //     atcActivityStage.push(key)
+      //   }
+      // })
+      //   return atcActivityStage.includes(e.data()["stagename"])
+      // })
+      //     if(lastStudio.length != 0){
+      //       atcStudio = lastStudio[0]
+      //     }
+      //   }
         if(atcStudio != null){
+          this.arenamode = true
           this.liveassignmentid = atcStudio.id
           this.liveassignmentdata = atcStudio.data()
           console.log("Live assignment", this.liveassignmentdata)
           this.stagename = this.liveassignmentdata['stagename']
-          this.queueid = this.ongoingQueue["docid"]
+          this.queueid = this.liveassignmentdata['queueid']
           this.validationnotrequired = this.mentor || this.queryparam["validation"] == "true" // this.liveassignmentdata['stagetype'] == 'consultation' || this.liveassignmentdata['stagetype'] == 'ah' || (this.ongoingQueue["isconsultationrequired"] ?? []).length == 0
+          
+          if(this.liveassignmentdata['queuename'] == null || this.liveassignmentdata['queuename'] == undefined){
+            getDoc(doc(this.firestoreDefault, "queue generation", this.queueid)).then(queueDoc =>{
+              if(queueDoc.exists()){
+                this.liveassignmentdata['queuename'] = queueDoc.data()["queuename"]
+              }
+            })
+          }
+          
           getDocs(query(collection(this.firestoreDefault,"queue stage log"), where("liveassignmentid", "==", this.liveassignmentid),limit(1))).then(queuetoken=>{
             console.log("queue Token", queuetoken.size)
             console.log("Live Assignment", this.liveassignmentdata)
@@ -999,18 +1022,28 @@ export class PrescribeATCComponent {
                   otherValue[value].push("profile_data/"+key)
                 }
               })
-              this.authorMap = authorValue
-              this.observerMap = observerValue
-              this.mentorMap = mentorValue
-              Object.keys(otherValue).forEach(key=>{
-                this.additionalActivityMap.push({
-                  activity: key,
-                  specialist: otherValue[key]
+              // mat-select is OnPush: setting authorMap/observerMap/mentorMap during this async CD pass updates the
+              // model, but the CLOSED trigger stays stale until the NEXT detection tick — which is why the selected
+              // name only appears once the dropdown is opened. Schedule the assignment on a fresh macrotask INSIDE
+              // Angular's zone so a clean top-down change-detection cycle renders the selected names immediately.
+              this.ngZone.run(() => {
+                this.authorMap = authorValue
+                this.observerMap = observerValue
+                this.mentorMap = mentorValue
+                Object.keys(otherValue).forEach(key=>{
+                  this.additionalActivityMap.push({
+                    activity: key,
+                    specialist: otherValue[key]
+                  })
                 })
+                this.onObserverSelect()
+                console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
+                // mat-select is OnPush: a value set programmatically mid-CD only shows once the dropdown is opened.
+                // Rebuild the personnel selects (hide→show) so they initialise WITH the patched values and their
+                // CLOSED triggers render the specialist names from the first paint — no interaction needed.
+                this.personnelReady = false
+                setTimeout(() => this.personnelReady = true)
               })
-              console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
-              this.onObserverSelect()
-              console.log(this.authorMap, this.observerMap, this.mentorMap, this.additionalActivityMap)
 
             }
             else{
@@ -1030,7 +1063,6 @@ export class PrescribeATCComponent {
           this.arenamode = false
           this.liveassignmentdata = null
           this.tokendata = null
-          alert(`You are currently active in the Queue ${this.ongoingQueue['queuename']}. But there is no record of you having a session with ${this.mapProfile[this.participantProfileid]['name']}. You can still submit this ATC independently or choose other participant who you have worked with in this queue.`)
         }
       }).catch(e =>{
         console.log(e)
@@ -1064,7 +1096,7 @@ export class PrescribeATCComponent {
         where('delete', '==', false)
       );
       // local-first list: bounded server query merged with any unsynced local drafts; local-only if unreachable
-      draftATC = await this.draftService.listDrafts('temporary_ATC', q, 
+      draftATC = await this.draftService.listDrafts('temporary_ATC', q,
         d => d['profileid'] === this.participantProfileid && d['delete'] !== true
       );
     } else {
@@ -2187,7 +2219,7 @@ async removeATCImage(index: number) {
     var firebaseATCBatch = writeBatch(this.firestoreATC)
     // var firebaseBatch = writeBatch(this.firestore);
     var selectedProfile = this.mapProfile[this.participantProfileid]["name"]
-    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.ongoingQueue['queuename']}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
+    var confirmationMessage = this.liveassignmentdata != null ? `You are sumbitting this ATC for the Queue '${this.liveassignmentdata["queuename"]}' for the stage '${this.liveassignmentdata?.stagename}'. After submission you can move the participant to the next stage` : `Sure do you want to submit this ATC to the participant '${selectedProfile}'?`
     var aelConfirm = this.matDialog.open(AtcAelConfirmComponent, {
       maxHeight: "90vh",
       maxWidth: "60vw",
@@ -2703,7 +2735,10 @@ async removeATCImage(index: number) {
   */
 
   moveToStudio(){
-    this.router.navigateByUrl("/dynamicstudio")
+    // Return to the studio ON the prescribe-atc step (mirrors the zoom-clientview
+    // return URL). The studio reads ?step= into pendingDeepLinkStep and reopens
+    // that stage instead of snapping to the first step.
+    this.router.navigateByUrl("/dynamicstudio?step=prescribe-atc")
   }
 
   //Big Assignment
