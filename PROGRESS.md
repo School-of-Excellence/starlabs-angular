@@ -1,48 +1,40 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-06 (Ads auto-notification schedule)_ · **New
-session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-06-ads-auto-notification.md`.
+_Last updated: 2026-08-11 (Ads auto-notification: funnel-only audience)_ ·
+**New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-06-ads-auto-notification.md` (all 3 rounds of this
+feature, with WHYs).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `faecb355`;
+- Branch `nanda-development`, tree clean at HEAD `63a244b4`;
   `ng build --configuration production` green (only pre-existing
-  canvg/leaflet + Bootstrap warnings). The 08-01 dashboard-perf arc is
-  committed/merged (operator merges via PRs, e.g. `41de2ed7`).
-- Ads dialog (`/eiflixhomeconfig` → Ads tab →
-  `createupcomingworkshops` in ads mode) now supports an auto
-  notification schedule; not yet deployed.
+  canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
+- Ads dialog (`/eiflixhomeconfig` → Ads tab → `createupcomingworkshops`
+  in ads mode) has the full auto-notification feature: `autonotification`
+  → required `notifyto` audience multi-select + start/end dates (pinned
+  12:01 am / 11:59 pm, end > start, startdate locks while `show` is on)
+  → `enableappnotification` → `appnotificationmap` with one card per
+  date-difference day. Audience sub-selects: `journey` →
+  `selectedjourneys` (journey collection doc ids, labels from `journey`
+  field); `funnel only` → `selectedfunnels` (workshopconfiguration doc
+  ids where `evergreenWorkshop == true`, labels from `detailpage.title`).
 
-## Last session changes (2026-08-06, why)
-- Added to ads widgets: `autonotification` toggle → mandatory
-  start/end datepickers (saved as Timestamps pinned to 12:01 am /
-  11:59 pm local) + `enableappnotification` toggle →
-  `appnotificationmap` with one `{title, subtitle, message,
-  landingPage, sticky, logged}` card per day of the **date-only
-  difference** (operator's example: Jul 22 → Jul 30 = 8) — rows
-  resize with the dates but keep typed values. End must be after
-  start ([min] + cross-field validator); startdate locks while `show`
-  is on for an already-saved schedule (edit-mode qualifier so create
-  isn't trapped). Hidden sections are *disabled* so their `required`
-  validators can't block saving, and the payload nulls the schedule
-  fields when off to keep doc shape consistent. Journal has the WHYs.
-- Round 2: required `notifyto` audience multi-select (journey / active
-  <!-- participants / non active participants / all exist users / new -->
-  participants / non active participants / new
-  users, stored verbatim) before the schedule; picking "journey"
-  reveals a required Journeys multi-select (labels from the `journey`
-  collection's `journey` field, doc ids stored in `selectedjourneys`;
-  payload clears it when journey isn't an audience).
-- `graphify` isn't installed here (rebuild command fails); graph is
-  stale until `/graphify .` is run.
+## Last session changes (2026-08-11, why)
+- Added the `funnel only` audience + Funnel Workshops picker (round 3) —
+  mirrors the journeys pattern exactly: hidden sections are disabled so
+  `required` never blocks save; payload clears `selectedfunnels` unless
+  `funnel only` is chosen. Committed `63a244b4`.
+- Found an operator hand-edit from between sessions: `'all exist users'`
+  commented out of `notifyToOptions`. Preserved — deliberate removal,
+  do not restore.
 
 ## Pending
-- Operator Chrome pass on the new Ads schedule UI, then push/deploy
-  when asked (build is green; nothing half-done).
-- Consumer of `appnotificationmap` (the thing that actually sends the
-  daily app notifications) is out of scope of the admin UI and does
-  not exist in this repo change.
-- Carried: phase-2 dashboard perf (scope/cache participant-metadata
-  scan; bound event-wide changework / videoask-tag streams); revert
-  one word in `main.ts` (firestore-atc transport) if a venue ever
-  blanks ATC screens.
+- Operator Chrome pass on the Ads auto-notification UI, then push/deploy
+  when asked (build green; nothing half-done).
+- Consumer of `notifyto`/`selectedjourneys`/`selectedfunnels`/
+  `appnotificationmap` (whatever sends the daily notifications) is not in
+  this repo — admin UI only writes the schedule.
+- Carried: phase-2 dashboard perf (scope/cache participant-metadata scan;
+  bound event-wide changework / videoask-tag streams); revert one word in
+  `main.ts` (firestore-atc transport) if a venue ever blanks ATC screens.
+- `graphify` module not installed here — graph stale until `/graphify .`.
