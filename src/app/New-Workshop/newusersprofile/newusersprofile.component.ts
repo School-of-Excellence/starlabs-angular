@@ -469,6 +469,82 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.snackBar.open(`Exported ${users.length} profile${users.length === 1 ? '' : 's'}.`, 'Close', { duration: 2500 });
   }
 
+  // ---- import (Excel -> select matching profiles) ----
+  // Expected sheet: A1 header "email", emails from row 2 down. Importing
+  // replaces the current selection with the profiles matching those emails.
+  importing = false;
+
+  importFromExcel(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls';
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const name = (file.name || '').toLowerCase();
+      if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+        this.snackBar.open('Please select an Excel file (.xlsx or .xls).', 'Close', { duration: 3000 });
+        return;
+      }
+
+      this.importing = true;
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) {
+          this.snackBar.open('The Excel file has no sheets.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+        const head = (rows[0]?.[0] ?? '').toString().trim().toLowerCase();
+        if (head !== 'email') {
+          this.snackBar.open('The first column\'s header must be "email".', 'Close', { duration: 3500 });
+          return;
+        }
+
+        const emails = new Set(
+          rows.slice(1)
+            .map(r => (r?.[0] ?? '').toString().trim().toLowerCase())
+            .filter(Boolean)
+        );
+        if (emails.size === 0) {
+          this.snackBar.open('No email ids found in the file.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        // Select exactly the imported emails (matched case-insensitively).
+        this.selection.clear();
+        const matched = new Set<string>();
+        this.dataSource.data.forEach(u => {
+          const mail = (u.email || '').toString().trim().toLowerCase();
+          if (mail && emails.has(mail)) {
+            this.selection.select(this.rowId(u));
+            matched.add(mail);
+          }
+        });
+
+        const missing = emails.size - matched.size;
+        const selected = this.selection.selected.length;
+        this.snackBar.open(
+          selected === 0
+            ? 'None of the imported emails matched a profile.'
+            : `Selected ${selected} profile(s) for ${matched.size} of ${emails.size} imported email(s)`
+              + (missing > 0 ? ` — ${missing} not found.` : '.'),
+          'Close',
+          { duration: 5000 }
+        );
+      } catch (err) {
+        console.error('Error importing Excel:', err);
+        this.snackBar.open('Error reading the Excel file. Please try again.', 'Close', { duration: 3000 });
+      } finally {
+        this.importing = false;
+      }
+    };
+    input.click();
+  }
+
   // ---- bulk add tags ----
   openBulkTags(): void {
     const ids = this.selection.selected;

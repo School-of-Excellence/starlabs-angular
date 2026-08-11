@@ -150,6 +150,12 @@
         Tags
       </button>
 
+      <button mat-stroked-button class="tags-manage-btn" (click)="importFromExcel()" [disabled]="importing"
+        matTooltip="Import an Excel file (column A: email) and select the matching profiles">
+        <mat-icon>upload_file</mat-icon>
+        {{ importing ? 'Importing…' : 'Import' }}
+      </button>
+
       <button mat-button type="button" class="clear-filters-btn" *ngIf="hasAnyFilter"
         (click)="clearAllFilters()" matTooltip="Clear all filters">
         <mat-icon>filter_alt_off</mat-icon>
