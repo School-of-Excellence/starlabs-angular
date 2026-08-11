@@ -118,6 +118,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   showComm = false;
   allTags: { id: string; name: string }[] = [];
   selectByTagMode: 'all' | 'any' = 'all';
+  // include = show profiles matching the tag condition; exclude = show the rest.
+  selectByTagPolarity: 'include' | 'exclude' = 'include';
   selectByTagIds = new Set<string>();
   // Date range filter on the `created` column.
   startDate: Date | null = null;
@@ -202,6 +204,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       let q = '';
       let tags: string[] = [];
       let mode: 'all' | 'any' = 'all';
+      let tpol: 'include' | 'exclude' = 'include';
       let start: number | null = null;
       let end: number | null = null;
       try {
@@ -209,6 +212,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         q = f.q || '';
         tags = f.tags || [];
         mode = f.mode || 'all';
+        tpol = f.tpol === 'exclude' ? 'exclude' : 'include';
         start = f.start ?? null;
         end = f.end ?? null;
       } catch {
@@ -233,13 +237,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (!haystack.includes(q)) return false;
       }
 
-      // Tag filter — show only profiles matching the chosen tags.
+      // Tag filter — include keeps profiles matching the chosen tags
+      // (per the all/any mode); exclude keeps the complement.
       if (tags.length) {
         const userTags: string[] = Array.isArray(u.tags) ? u.tags : [];
         const tagMatch = mode === 'all'
           ? tags.every(t => userTags.includes(t))
           : tags.some(t => userTags.includes(t));
-        if (!tagMatch) return false;
+        if (tpol === 'include' ? !tagMatch : tagMatch) return false;
       }
 
       // Date range filter on the `created` column.
@@ -306,6 +311,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   clearAllFilters(): void {
     this.searchText = '';
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
     this.resetWorkshopFilter();
@@ -326,6 +332,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       q: this.searchText.trim().toLowerCase(),
       tags: [...this.selectByTagIds],
       mode: this.selectByTagMode,
+      tpol: this.selectByTagPolarity,
       start,
       end,
       // The predicate reads the workshop state off `this`; these only make the
@@ -642,6 +649,12 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.refreshFilter();
   }
 
+  setTagPolarity(polarity: 'include' | 'exclude'): void {
+    if (this.selectByTagPolarity === polarity) return;
+    this.selectByTagPolarity = polarity;
+    this.refreshFilter();
+  }
+
   toggleTagSelect(id: string): void {
     if (this.selectByTagIds.has(id)) this.selectByTagIds.delete(id);
     else this.selectByTagIds.add(id);
@@ -650,6 +663,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   clearTagFilter(): void {
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include'; // back to the default
     this.refreshFilter();
   }
 
