@@ -64,6 +64,24 @@
         </div>
       </mat-menu>
 
+      <mat-form-field appearance="outline" class="workshop-filter-field" subscriptSizing="dynamic"
+        [class.active]="selectedWorkshopIds.length > 0">
+        <mat-icon matPrefix>co_present</mat-icon>
+        <mat-select multiple placeholder="Workshops" [(ngModel)]="selectedWorkshopIds"
+          [ngModelOptions]="{ standalone: true }" (selectionChange)="onWorkshopFilterChange()">
+          <mat-select-trigger>
+            Workshops
+            <span class="tag-badge" *ngIf="selectedWorkshopIds.length > 0">{{ selectedWorkshopIds.length }}</span>
+          </mat-select-trigger>
+          <mat-option *ngFor="let w of workshopOptions" [value]="w.id">{{ w.title }}</mat-option>
+        </mat-select>
+        <mat-spinner matSuffix diameter="16" *ngIf="workshopFilterLoading"></mat-spinner>
+        <button matSuffix type="button" class="wf-clear" *ngIf="selectedWorkshopIds.length > 0 && !workshopFilterLoading"
+          matTooltip="Clear workshops" (click)="$event.stopPropagation(); clearWorkshopFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
+
       <div class="date-filter-wrap">
         <button mat-stroked-button type="button" class="tag-select-btn date-filter-btn"
           [class.active]="hasDateFilter" (click)="createdPicker.open()">
