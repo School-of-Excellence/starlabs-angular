@@ -1,16 +1,18 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-12 (Ads: Enable Wati per-day schedule in enlarged
-dialog)_ · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 4
+_Last updated: 2026-08-12 (Ads dialog: 93% fullscreen redesign, app+wati
+side by side)_ · **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 5
 rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md` (6
 rounds on the New Users screen).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `db185c76`;
+- Branch `nanda-development`, tree clean at HEAD `2ba1543e`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
-- Ads dialog (`/eiflixhomeconfig` → Ads tab, now 1100px/94vh in ads mode):
+- Ads dialog (`/eiflixhomeconfig` → Ads tab, 93vw×93vh sectioned layout;
+  daily messages render one row per day with App Notification left and
+  Wati right):
   full auto-notification feature (autonotification → notifyto audiences
   incl. journey/funnel pickers → pinned start/end dates →
   enableappnotification → per-day appnotificationmap → **enablewati →
@@ -30,6 +32,12 @@ rounds on the New Users screen).
     matched/missing/hidden/ignored; zero-match leaves selection intact.
 
 ## Last session changes (2026-08-12, why)
+- Ads dialog redesign (`2ba1543e`): 93vw×93vh, sectioned layout (Ad
+  Content / Display / Audience & Schedule / Daily Messages / Images),
+  per-day rows with app+wati columns side by side. Template/CSS only —
+  form model and payload untouched; `scheduleDays` iterates indices over
+  the always-equal-length maps. Review fixes: sect-head flex-wrap
+  (mobile overflow), empty day-list removed, lone column capped 980px.
 - Ads Enable Wati (`db185c76`): watimap sized by the same day-count
   resize as appnotificationmap; searchable per-day template select
   (ngx-mat-select-search, shared search reset per open; current value
