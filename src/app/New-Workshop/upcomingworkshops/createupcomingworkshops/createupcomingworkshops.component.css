@@ -3,6 +3,15 @@
   background: #ffffff;
 }
 
+/* Ads mode: the auto-notification + wati schedules need a much larger canvas. */
+.dialog-wrap.wide {
+  width: min(1060px, 92vw);
+}
+
+.dialog-wrap.wide .dialog-body {
+  max-height: 78vh;
+}
+
 .dialog-head {
   display: flex;
   align-items: center;
@@ -213,6 +222,73 @@
 
 .notif-empty mat-icon {
   color: #c4cbd7;
+}
+
+/* ---- wati per-day messages (ads) ---- */
+.wati-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wati-count {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+.wati-error {
+  color: #d76060;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.wati-toolbar button mat-icon {
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.wati-template-field {
+  width: 100%;
+}
+
+.wati-vars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wati-var {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 150px minmax(0, 1fr);
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.wati-var-name {
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4f46e5;
+  overflow-wrap: anywhere;
+}
+
+.wati-var mat-form-field {
+  width: 100%;
+}
+
+.wati-novars {
+  color: #6b7280;
+  font-size: 0.8rem;
+  padding: 4px 0;
+}
+
+@media (max-width: 700px) {
+  .wati-var {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 
 /* ---- image upload ---- */

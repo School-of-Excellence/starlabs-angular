@@ -324,10 +324,13 @@ export class UpcomingworkshopsComponent implements OnInit {
   }
 
   // --- Ads dialog (same component, different fields) ---
+  // Wider/taller than the coming-soon dialog: the auto-notification and wati
+  // schedules need the room.
   openAdsDialog(widget?: any): void {
     this.dialog.open(CreateupcomingworkshopsComponent, {
-      width: '720px',
+      width: '1100px',
       maxWidth: '95vw',
+      maxHeight: '94vh',
       panelClass: 'upcoming-dialog-panel',
       autoFocus: false,
       data: {

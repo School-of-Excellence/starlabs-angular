@@ -1,4 +1,4 @@
-<div class="dialog-wrap">
+<div class="dialog-wrap" [class.wide]="widgettype === 'ads'">
   <div class="dialog-head">
     <h2 mat-dialog-title>
       {{ isEditMode ? 'Edit ' : 'Add ' }}{{ widgettype === 'ads' ? 'Ad' : 'Upcoming Workshop' }}
@@ -327,6 +327,99 @@
               <div class="notif-empty" *ngIf="adsNotifications.length === 0">
                 <mat-icon>event_busy</mat-icon>
                 Pick a valid start and end date to generate the daily notifications.
+              </div>
+            </div>
+          </ng-container>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Enable Wati</span>
+              <span class="toggle-desc">Send one WhatsApp template message per scheduled day.</span>
+            </div>
+            <mat-slide-toggle formControlName="enablewati" color="primary"></mat-slide-toggle>
+          </div>
+
+          <ng-container *ngIf="form.get('enablewati')?.value">
+            <div class="wati-toolbar">
+              <span class="wati-count" *ngIf="watiTemplates.length > 0">
+                {{ watiTemplates.length }} template(s) loaded
+              </span>
+              <span class="wati-error" *ngIf="watiTemplatesError">{{ watiTemplatesError }}</span>
+              <button mat-stroked-button type="button" (click)="loadWatiTemplates(true)"
+                [disabled]="watiTemplatesLoading">
+                <mat-icon>refresh</mat-icon>
+                {{ watiTemplatesLoading ? 'Loading templates…' : (watiTemplates.length ? 'Reload templates' : 'Load templates') }}
+              </button>
+            </div>
+
+            <div class="notif-list" formArrayName="watimap">
+              <div class="notif-card" *ngFor="let d of adsWati.controls; let i = index" [formGroupName]="i">
+                <div class="notif-card-head">
+                  <span class="notif-day">Day {{ i + 1 }}</span>
+                  <span class="notif-date">{{ notificationDateAt(i) | date: 'EEE, MMM d, y' }}</span>
+                </div>
+
+                <mat-form-field appearance="outline" class="wati-template-field">
+                  <mat-label>Template</mat-label>
+                  <mat-select formControlName="templateName"
+                    (selectionChange)="onWatiTemplateChange(i, $event.value)"
+                    (openedChange)="onWatiSelectOpened($event)">
+                    <mat-option>
+                      <ngx-mat-select-search [formControl]="watiTemplateSearchCtrl"
+                        placeholderLabel="Search templates…"
+                        noEntriesFoundLabel="No templates found">
+                      </ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let name of watiTemplateOptionsFor(i)" [value]="name">
+                      {{ name }}{{ watiTemplateNames.includes(name) ? '' : ' (not loaded)' }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-hint *ngIf="watiTemplates.length === 0 && !watiTemplatesLoading">
+                    Load templates to choose.
+                  </mat-hint>
+                  <mat-error *ngIf="d.get('templateName')?.hasError('required')">Template is required.</mat-error>
+                </mat-form-field>
+
+                <div class="wati-vars" formArrayName="variables">
+                  <div class="wati-var" *ngFor="let v of watiVariables(i).controls; let vi = index"
+                    [formGroupName]="vi">
+                    <span class="wati-var-name">{{ '{{' + v.get('name')?.value + '}}' }}</span>
+
+                    <mat-form-field appearance="outline" class="wati-var-type">
+                      <mat-label>Source</mat-label>
+                      <mat-select formControlName="type" (selectionChange)="onWatiVarTypeChange(i, vi)">
+                        <mat-option value="static">Static</mat-option>
+                        <mat-option value="metadata">Metadata</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="wati-var-value"
+                      *ngIf="v.get('type')?.value === 'static'">
+                      <mat-label>Value</mat-label>
+                      <textarea matInput formControlName="value" rows="1" placeholder="Enter value"
+                        (paste)="onWatiValuePaste($event, i, vi)"></textarea>
+                      <mat-error *ngIf="v.get('value')?.hasError('required')">Value is required.</mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="wati-var-value"
+                      *ngIf="v.get('type')?.value === 'metadata'">
+                      <mat-label>Metadata field</mat-label>
+                      <mat-select formControlName="value">
+                        <mat-option *ngFor="let m of watiMetadataOptions" [value]="m">{{ m }}</mat-option>
+                      </mat-select>
+                      <mat-error *ngIf="v.get('value')?.hasError('required')">Pick a metadata field.</mat-error>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="wati-novars" *ngIf="dayTemplateName(i) && watiVariables(i).length === 0">
+                    This template has no variables.
+                  </div>
+                </div>
+              </div>
+
+              <div class="notif-empty" *ngIf="adsWati.length === 0">
+                <mat-icon>event_busy</mat-icon>
+                Pick a valid start and end date to generate the daily Wati messages.
               </div>
             </div>
           </ng-container>
