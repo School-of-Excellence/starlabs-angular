@@ -1,19 +1,23 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-11 (New Users: Excel import-select · tags
-Include/Exclude)_ · **New session? Read `specs/ORIENTATION.md` first**,
-then `specs/journals/2026-08-11-newusers-workshop-filter.md` (6 rounds on
-the New Users screen) and
-`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature).
+_Last updated: 2026-08-12 (Ads: Enable Wati per-day schedule in enlarged
+dialog)_ · **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 4
+rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md` (6
+rounds on the New Users screen).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `d821d721`;
+- Branch `nanda-development`, tree clean at HEAD `db185c76`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
-- Ads dialog (`/eiflixhomeconfig` → Ads tab): full auto-notification
-  feature (autonotification → notifyto audiences incl. journey/funnel
-  pickers → pinned start/end dates → enableappnotification →
-  per-day appnotificationmap).
+- Ads dialog (`/eiflixhomeconfig` → Ads tab, now 1100px/94vh in ads mode):
+  full auto-notification feature (autonotification → notifyto audiences
+  incl. journey/funnel pickers → pinned start/end dates →
+  enableappnotification → per-day appnotificationmap → **enablewati →
+  per-day watimap**: searchable WATI template select per day (classify/
+  wati `101723` config, UTILITY templates, Load/Reload), variables from
+  the template's customParams each mapped static (single-line text) or
+  metadata (only `name` for now), reconciled on template load).
 - New Users screen (`/newusersprofile`):
   - Workshops filter (tags-style menu) with Funnel-only (default ON,
     evergreen configs) + Include/Exclude toggles; Workshop table column
@@ -25,15 +29,18 @@ the New Users screen) and
     row 2 → replaces selection with matching profiles; snackbar reports
     matched/missing/hidden/ignored; zero-match leaves selection intact.
 
-## Last session changes (2026-08-11, why)
-- Excel import-select (`a6254e59`), review fixes (`464c67b7`): matches
-  computed before clearing selection; toolbar wraps (1366px clip risk);
-  detached input retained; non-email values ignored and reported.
-- Tags Include/Exclude (`ffd790a7`), refinement (`d821d721`): Exclude
-  flips mode to Match any so the default complement is "none of these
-  tags", matching the workshop filter's semantics.
-- All rounds adversarially verified by 3-lens workflows; every fix above
-  traces to a verified finding. Accepted nits documented in the journal.
+## Last session changes (2026-08-12, why)
+- Ads Enable Wati (`db185c76`): watimap sized by the same day-count
+  resize as appnotificationmap; searchable per-day template select
+  (ngx-mat-select-search, shared search reset per open; current value
+  stays selectable when filtered/unloaded); static values are forced
+  single-line (WATI rejects newlines); review-driven: hydrated variable
+  rows reconcile against freshly loaded templates (same-named values
+  survive), setControl re-applies disabled state, static text survives a
+  metadata round-trip. Review regressions lens confirmed comingsoon mode
+  untouched. Accepted nits in the journal.
+- Prior day (2026-08-11): New Users Excel import-select + tags
+  Include/Exclude — see the newusers journal.
 
 ## Pending
 - Operator Chrome pass on the New Users screen (filters, import, export)
