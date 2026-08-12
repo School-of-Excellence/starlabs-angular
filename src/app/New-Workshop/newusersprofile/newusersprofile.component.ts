@@ -118,6 +118,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   showComm = false;
   allTags: { id: string; name: string }[] = [];
   selectByTagMode: 'all' | 'any' = 'all';
+  // include = show profiles matching the tag condition; exclude = show the rest.
+  selectByTagPolarity: 'include' | 'exclude' = 'include';
   selectByTagIds = new Set<string>();
   // Date range filter on the `created` column.
   startDate: Date | null = null;
@@ -202,6 +204,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       let q = '';
       let tags: string[] = [];
       let mode: 'all' | 'any' = 'all';
+      let tpol: 'include' | 'exclude' = 'include';
       let start: number | null = null;
       let end: number | null = null;
       try {
@@ -209,6 +212,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         q = f.q || '';
         tags = f.tags || [];
         mode = f.mode || 'all';
+        tpol = f.tpol === 'exclude' ? 'exclude' : 'include';
         start = f.start ?? null;
         end = f.end ?? null;
       } catch {
@@ -233,13 +237,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (!haystack.includes(q)) return false;
       }
 
-      // Tag filter — show only profiles matching the chosen tags.
+      // Tag filter — include keeps profiles matching the chosen tags
+      // (per the all/any mode); exclude keeps the complement.
       if (tags.length) {
         const userTags: string[] = Array.isArray(u.tags) ? u.tags : [];
         const tagMatch = mode === 'all'
           ? tags.every(t => userTags.includes(t))
           : tags.some(t => userTags.includes(t));
-        if (!tagMatch) return false;
+        if (tpol === 'include' ? !tagMatch : tagMatch) return false;
       }
 
       // Date range filter on the `created` column.
@@ -306,6 +311,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   clearAllFilters(): void {
     this.searchText = '';
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
     this.resetWorkshopFilter();
@@ -326,6 +332,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       q: this.searchText.trim().toLowerCase(),
       tags: [...this.selectByTagIds],
       mode: this.selectByTagMode,
+      tpol: this.selectByTagPolarity,
       start,
       end,
       // The predicate reads the workshop state off `this`; these only make the
@@ -469,6 +476,111 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.snackBar.open(`Exported ${users.length} profile${users.length === 1 ? '' : 's'}.`, 'Close', { duration: 2500 });
   }
 
+  // ---- import (Excel -> select matching profiles) ----
+  // Expected sheet: A1 header "email", emails from row 2 down. Importing
+  // replaces the current selection with the profiles matching those emails.
+  importing = false;
+  // Kept on the component so the detached input can't be GC'd while the
+  // native file picker is open.
+  private importFileInput: HTMLInputElement | null = null;
+
+  importFromExcel(): void {
+    const input = document.createElement('input');
+    this.importFileInput = input;
+    input.type = 'file';
+    input.accept = '.xlsx,.xls';
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const name = (file.name || '').toLowerCase();
+      if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+        this.snackBar.open('Please select an Excel file (.xlsx or .xls).', 'Close', { duration: 3000 });
+        return;
+      }
+
+      this.importing = true;
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) {
+          this.snackBar.open('The Excel file has no sheets.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+        const head = (rows[0]?.[0] ?? '').toString().trim().toLowerCase();
+        if (head !== 'email') {
+          this.snackBar.open('The first column\'s header must be "email".', 'Close', { duration: 3500 });
+          return;
+        }
+
+        const values = rows.slice(1)
+          .map(r => (r?.[0] ?? '').toString().trim().toLowerCase())
+          .filter(Boolean);
+        // Stray notes/numbers in column A would inflate the counts — keep
+        // email-shaped values only and report the rest.
+        const emailList = values.filter(v => v.includes('@'));
+        const invalidCount = values.length - emailList.length;
+        const emails = new Set(emailList);
+        if (emails.size === 0) {
+          this.snackBar.open('No email ids found in the file.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        // Work out the matches BEFORE touching the selection — a zero-match
+        // import must not destroy the user's existing selection.
+        const matchedRowIds: string[] = [];
+        const matched = new Set<string>();
+        this.dataSource.data.forEach(u => {
+          const mail = (u.email || '').toString().trim().toLowerCase();
+          if (mail && emails.has(mail)) {
+            const id = this.rowId(u);
+            if (id) {
+              matchedRowIds.push(id);
+              matched.add(mail);
+            }
+          }
+        });
+
+        if (matchedRowIds.length === 0) {
+          this.snackBar.open(
+            'None of the imported emails matched a profile. Selection unchanged.'
+            + (invalidCount > 0 ? ` ${invalidCount} non-email value(s) ignored.` : ''),
+            'Close',
+            { duration: 5000 }
+          );
+          return;
+        }
+
+        // Select exactly the imported emails (matched case-insensitively).
+        const replaced = this.selection.selected.length > 0;
+        this.selection.clear();
+        matchedRowIds.forEach(id => this.selection.select(id));
+
+        // Selection spans ALL profiles; active filters may hide some of them.
+        const visible = new Set(this.dataSource.filteredData.map(u => this.rowId(u)));
+        const hidden = matchedRowIds.filter(id => !visible.has(id)).length;
+        const missing = emails.size - matched.size;
+
+        const parts = [
+          `Selected ${matchedRowIds.length} profile(s) for ${matched.size} of ${emails.size} imported email(s)`
+        ];
+        if (missing > 0) parts.push(`${missing} email(s) not found`);
+        if (hidden > 0) parts.push(`${hidden} hidden by the current filters`);
+        if (invalidCount > 0) parts.push(`${invalidCount} non-email value(s) ignored`);
+        if (replaced) parts.push('previous selection replaced');
+        this.snackBar.open(parts.join(' · ') + '.', 'Close', { duration: 6000 });
+      } catch (err) {
+        console.error('Error importing Excel:', err);
+        this.snackBar.open('Error reading the Excel file. Please try again.', 'Close', { duration: 3000 });
+      } finally {
+        this.importing = false;
+      }
+    };
+    input.click();
+  }
+
   // ---- bulk add tags ----
   openBulkTags(): void {
     const ids = this.selection.selected;
@@ -537,6 +649,16 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.refreshFilter();
   }
 
+  setTagPolarity(polarity: 'include' | 'exclude'): void {
+    if (this.selectByTagPolarity === polarity) return;
+    this.selectByTagPolarity = polarity;
+    // Exclude reads as "hide anyone with ANY of these tags" — align the mode
+    // with that (and with the workshop filter's Exclude). Match all stays
+    // selectable afterwards for the rarer "not all of them" case.
+    if (polarity === 'exclude') this.selectByTagMode = 'any';
+    this.refreshFilter();
+  }
+
   toggleTagSelect(id: string): void {
     if (this.selectByTagIds.has(id)) this.selectByTagIds.delete(id);
     else this.selectByTagIds.add(id);
@@ -545,6 +667,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   clearTagFilter(): void {
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include'; // back to the default
     this.refreshFilter();
   }
 

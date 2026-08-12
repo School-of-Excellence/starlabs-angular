@@ -18,7 +18,7 @@
 <!-- Categorized participants based on their mode  -->
 <div class="mode-section">
     <div class="section-header">
-        <span class="filter-title">Participant Modes</span>
+        <span class="filter-title">Participant Modess</span>
     </div>
 
     <div class="mode-selection">
@@ -141,6 +141,9 @@
                 <div class="title-section">
                     <span class="title">Review Configured</span>
                     <span class="count-badge">{{configuredModes.length}}</span>
+                    <button class="export-btn" (click)="openExportDialog('configured')">
+                        <span>📥</span> Export
+                    </button>
                 </div>
                 <form [formGroup]="configuredform">
                     <div class="search-section">
@@ -161,6 +164,24 @@
                                 [value]="mode">{{mode}}</mat-option>
                             </mat-select>
                         </mat-form-field>
+
+                        <div class="config-date-range">
+                            <mat-form-field appearance="outline" class="medium-dropdown">
+                                <mat-label>Configured Date Range</mat-label>
+                                <mat-date-range-input [formGroup]="configuredDateRange"
+                                    [rangePicker]="configuredPicker">
+                                    <input matStartDate formControlName="start" placeholder="Start date"
+                                        (dateChange)="configuredFilter(configuredform.value)">
+                                    <input matEndDate formControlName="end" placeholder="End date"
+                                        (dateChange)="configuredFilter(configuredform.value)">
+                                </mat-date-range-input>
+                                <mat-datepicker-toggle matIconSuffix [for]="configuredPicker"></mat-datepicker-toggle>
+                                <mat-date-range-picker #configuredPicker></mat-date-range-picker>
+                            </mat-form-field>
+                            <button type="button" class="clear-date-btn"
+                                *ngIf="configuredDateRange.value.start || configuredDateRange.value.end"
+                                (click)="clearConfiguredDateRange()">Clear</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -261,6 +282,9 @@
                 <div class="title-section">
                     <span class="title">Configuration Missing</span>
                     <span class="count-badge">{{notConfiguredModes.length}}</span>
+                    <button class="export-btn" (click)="openExportDialog('notconfigured')">
+                        <span>📥</span> Export
+                    </button>
                 </div>
                 <form [formGroup]="notconfiguredform">
                     <div class="search-section">
@@ -367,6 +391,45 @@
         </div>
     </div>
 </div>
+
+<!-- Export options dialog -->
+    <div class="modal-overlay" *ngIf="showExportDialog" (click)="closeExportDialog()">
+        <div class="export-dialog" (click)="$event.stopPropagation()">
+            <div class="export-dialog-header">
+                <h3>Export {{ exportTarget === 'configured' ? 'Review Configured' : 'Configuration Missing' }}</h3>
+                <button class="close-btn" (click)="closeExportDialog()"><span>×</span></button>
+            </div>
+
+            <div class="export-dialog-body">
+                <p class="export-hint">Count members <b>coming to each mode</b> whose next mode date is
+                    from today up to:</p>
+
+                <label class="export-option">
+                    <input type="radio" name="exportRange" value="months"
+                        [(ngModel)]="exportRangeMode">
+                    <span>Next</span>
+                    <input type="number" min="1" class="months-input"
+                        [(ngModel)]="exportMonths" [disabled]="exportRangeMode !== 'months'">
+                    <span>month(s) from today</span>
+                </label>
+
+                <label class="export-option">
+                    <input type="radio" name="exportRange" value="date"
+                        [(ngModel)]="exportRangeMode">
+                    <span>A specific date:</span>
+                    <input type="date" class="date-input"
+                        [(ngModel)]="exportSpecificDate" [disabled]="exportRangeMode !== 'date'">
+                </label>
+            </div>
+
+            <div class="export-dialog-footer">
+                <button class="btn-cancel" (click)="closeExportDialog()">Cancel</button>
+                <button class="btn-export" (click)="confirmExport()">
+                    <span>📥</span> Export
+                </button>
+            </div>
+        </div>
+    </div>
 
 <!-- Modal/Dialog -->
     <div class="modal-overlay" *ngIf="showDialog" (click)="closeDialog()">
