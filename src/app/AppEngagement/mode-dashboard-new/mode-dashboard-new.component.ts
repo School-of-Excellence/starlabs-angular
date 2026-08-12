@@ -9,6 +9,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../authguard.service';
 import { environment } from '../../../environments/environment';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { provideNativeDateAdapter } from '@angular/material/core';
 import * as XLSX from 'xlsx';
 
 
@@ -19,8 +21,10 @@ import * as XLSX from 'xlsx';
     MatSelectModule,
     FormsModule,
     ReactiveFormsModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatDatepickerModule
   ],
+  providers: [provideNativeDateAdapter()],
   templateUrl: './mode-dashboard-new.component.html',
   styleUrl: './mode-dashboard-new.component.css'
 })
@@ -72,6 +76,19 @@ export class ModeDashboardNewComponent {
   mapQueues: any = {};
   mapEventDataOriginal: { [key: string]: any[] } = {};
 
+  // Per product+mode member stats for the config exports:
+  // currentCount = members whose current mode == this mode (for this product)
+  // comingDates  = nextmodedate of every member whose next mode == this mode (for this product);
+  //                the export windows these by the range chosen in the export dialog.
+  modeStatsByProductMode: { [key: string]: { currentCount: number, comingDates: Date[] } } = {};
+
+  // Export dialog state (asks for the "coming to mode" window when Export is clicked)
+  showExportDialog: boolean = false;
+  exportTarget: 'configured' | 'notconfigured' = 'configured';
+  exportRangeMode: 'months' | 'date' = 'months';
+  exportMonths: number = 3;
+  exportSpecificDate: string = '';
+
   // String declarations
   selectedMode: any = null;
   activeTab = 'participants';
@@ -79,6 +96,9 @@ export class ModeDashboardNewComponent {
   selectedEvent: string = '';
   activeMode: string = '';
   selectedQueue: string = '';
+
+  // Configured date-range filter (filters "Review Configured" by configured-on date)
+  configuredDateRange!: FormGroup;
 
   notConfiguredModeHighlight: { productid: string, configurations: any[] } | null = null;
   configuredModeHighlight: { productid: string, configurations: any[] } | null = null;
@@ -109,6 +129,11 @@ export class ModeDashboardNewComponent {
       mode: ['',]
     });
 
+    this.configuredDateRange = this.formbuilder.group({
+      start: [null],
+      end: [null]
+    });
+
     this.guard.getProfileMap().then(e => {
       this.mapProfile = e.map;
     });
@@ -122,6 +147,7 @@ export class ModeDashboardNewComponent {
     this.debugMode();
     this.fetchEvents();
     this.fetchQueues();
+    this.fetchModeMemberStats();
     // await this.getModes();
 
     setTimeout(() => {
@@ -324,6 +350,46 @@ export class ModeDashboardNewComponent {
       if (Object.keys(this.modeProfile).length > 0) {
         this.nextModeChange();
       }
+    });
+  }
+
+  // Build per product+mode member counts used by the config exports.
+  // Loads participantsproduct once (real-time) and aggregates current-mode and
+  // next-mode membership per product.
+  fetchModeMemberStats() {
+    this.subscription['modestats'] = collectionData(collection(this.firestore, "participantsproduct")).subscribe((list) => {
+      const stats: { [key: string]: { currentCount: number, comingDates: Date[] } } = {};
+
+      const ensure = (key: string) => {
+        if (!stats[key]) {
+          stats[key] = { currentCount: 0, comingDates: [] };
+        }
+        return stats[key];
+      };
+
+      for (let i = 0; i < list.length; i++) {
+        const p = list[i];
+        const productid = p['productref']?.id;
+        if (!productid) continue;
+
+        const mode = p['mode'];
+        const nextmode = p['nextmode'];
+
+        // Members currently in this mode for this product
+        if (![null, undefined, ''].includes(mode)) {
+          ensure(productid + mode).currentCount++;
+        }
+
+        // Members whose next mode is this mode for this product (keep the date; window at export time)
+        if (![null, undefined, ''].includes(nextmode)) {
+          const nextDate = p['nextmodedate']?.toDate ? p['nextmodedate'].toDate() : null;
+          if (nextDate) {
+            ensure(productid + nextmode).comingDates.push(nextDate);
+          }
+        }
+      }
+
+      this.modeStatsByProductMode = stats;
     });
   }
 
@@ -691,14 +757,41 @@ export class ModeDashboardNewComponent {
   }
 
   configuredFilter(value) {
+    const startVal: Date | null = this.configuredDateRange?.value?.start ?? null;
+    const endVal: Date | null = this.configuredDateRange?.value?.end ?? null;
+
+    // Normalize the picked dates to start-of-day / end-of-day (local time)
+    const start = startVal
+      ? new Date(startVal.getFullYear(), startVal.getMonth(), startVal.getDate(), 0, 0, 0, 0)
+      : null;
+    const end = endVal
+      ? new Date(endVal.getFullYear(), endVal.getMonth(), endVal.getDate(), 23, 59, 59, 999)
+      : null;
+
     this.configuredModes = this.tempConfiguredModes.filter((e) => {
-      if ((value.product.length != 0 ? value.product.includes(e.productid) : true)
-        && (value.mode.length != 0 ? value.mode.includes(e.mode) : true)) {
-        return e;
+      const productMatch = value.product.length != 0 ? value.product.includes(e.productid) : true;
+      const modeMatch = value.mode.length != 0 ? value.mode.includes(e.mode) : true;
+
+      let dateMatch = true;
+      if (start || end) {
+        const configuredOn = e.lastupdate?.toDate ? e.lastupdate.toDate() : null;
+        if (!configuredOn) {
+          dateMatch = false;
+        } else {
+          if (start && configuredOn < start) dateMatch = false;
+          if (end && configuredOn > end) dateMatch = false;
+        }
       }
+
+      return productMatch && modeMatch && dateMatch;
     })
     this.configuredModeHighlight = null;
     this.configuredModeHighlightIndex = null;
+  }
+
+  clearConfiguredDateRange() {
+    this.configuredDateRange.reset();
+    this.configuredFilter(this.configuredform.value);
   }
 
   debugMode() {
@@ -834,6 +927,100 @@ export class ModeDashboardNewComponent {
 
       // Download the file
       XLSX.writeFile(workbook, fullFilename);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Failed to export Excel file. Please try again.');
+    }
+  }
+
+  // Open the export dialog (which asks for the "coming to mode" window) for a given list
+  openExportDialog(target: 'configured' | 'notconfigured') {
+    this.exportTarget = target;
+    this.exportRangeMode = 'months';
+    this.exportMonths = 3;
+    this.exportSpecificDate = '';
+    this.showExportDialog = true;
+  }
+
+  closeExportDialog() {
+    this.showExportDialog = false;
+  }
+
+  // Confirm the dialog: compute the [today, cutoff] window and export.
+  // Exports both lists as:
+  // Product | Mode | Configured On | Members in Current Mode | Members Coming to Mode | Next Mode Date
+  confirmExport() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let cutoff: Date;
+    if (this.exportRangeMode === 'date') {
+      if (!this.exportSpecificDate) {
+        alert('Please pick a date.');
+        return;
+      }
+      const [y, m, d] = this.exportSpecificDate.split('-').map(Number);
+      cutoff = new Date(y, m - 1, d, 23, 59, 59, 999);
+    } else {
+      const months = Number(this.exportMonths);
+      if (!months || months <= 0) {
+        alert('Please enter a valid number of months.');
+        return;
+      }
+      cutoff = new Date(today);
+      cutoff.setMonth(cutoff.getMonth() + months);
+      cutoff.setHours(23, 59, 59, 999);
+    }
+
+    const cutoffLabel = cutoff.toLocaleDateString();
+    const source = this.exportTarget === 'configured' ? this.configuredModes : this.notConfiguredModes;
+    const data = source.map((item, index) => this.buildModeExportRow(item, index, today, cutoff, cutoffLabel));
+
+    const filename = this.exportTarget === 'configured' ? 'Review_Configured' : 'Configuration_Missing';
+    const sheetName = this.exportTarget === 'configured' ? 'Configured' : 'Missing';
+
+    this.downloadModeSheet(data, filename, sheetName);
+    this.closeExportDialog();
+  }
+
+  // Build one export row (product-mode). "Members Coming to Mode" is limited to
+  // members whose next mode date falls within [today, cutoff].
+  private buildModeExportRow(item: any, index: number, today: Date, cutoff: Date, cutoffLabel: string) {
+    const stats = this.modeStatsByProductMode[item.productid + item.mode]
+      || { currentCount: 0, comingDates: [] };
+
+    const inWindow = stats.comingDates.filter((dt) => dt >= today && dt <= cutoff);
+
+    return {
+      'Serial No': index + 1,
+      'Product': this.mapProducts[item.productid]?.product || 'N/A',
+      'Mode': item.mode || 'N/A',
+      'Configured On': item.lastupdate?.toDate
+        ? new Date(item.lastupdate.toDate()).toLocaleDateString()
+        : 'NA',
+      'Members in Current Mode': stats.currentCount,
+      [`Members Coming to Mode (till ${cutoffLabel})`]: inWindow.length
+    };
+  }
+
+  private downloadModeSheet(data: any[], filename: string, sheetName: string) {
+    if (!data || data.length === 0) {
+      alert('No data available to export');
+      return;
+    }
+    try {
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      worksheet['!cols'] = [
+        { wch: 10 }, // Serial No
+        { wch: 30 }, // Product
+        { wch: 20 }, // Mode
+        { wch: 18 }, // Configured On
+        { wch: 22 }, // Members in Current Mode
+        { wch: 28 }  // Members Coming to Mode (till <date>)
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      XLSX.writeFile(workbook, `${filename}.xlsx`);
     } catch (error) {
       console.error('Error exporting to Excel:', error);
       alert('Failed to export Excel file. Please try again.');

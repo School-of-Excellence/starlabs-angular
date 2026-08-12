@@ -1232,6 +1232,149 @@ body.modal-open {
     background-color: #059669;
     transform: translateY(-1px);
 }
+
+/* Configured date-range filter */
+.config-date-range {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.clear-date-btn {
+    background-color: transparent;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    height: 38px;
+}
+
+.clear-date-btn:hover {
+    background-color: #ef4444;
+    color: white;
+}
+
+/* Export options dialog */
+.export-dialog {
+    background: white;
+    border-radius: 12px;
+    width: min(480px, 92vw);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: slideIn 0.3s ease-out;
+    overflow: hidden;
+}
+
+.export-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.export-dialog-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.export-dialog-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.export-hint {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.export-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #374151;
+    flex-wrap: wrap;
+}
+
+.export-option .months-input {
+    width: 64px;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    text-align: center;
+    outline: none;
+}
+
+.export-option .date-input {
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+}
+
+.export-option input:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+}
+
+.export-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.btn-cancel {
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.btn-export {
+    background-color: #10b981;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-export:hover {
+    background-color: #059669;
+    transform: translateY(-1px);
+}
 /* Show More/Less Button Styles */
 .show-more-container {
     display: flex;
