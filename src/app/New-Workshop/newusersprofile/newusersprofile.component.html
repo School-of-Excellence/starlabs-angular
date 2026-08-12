@@ -46,6 +46,17 @@
             </button>
           </div>
 
+          <div class="tfm-modes">
+            <button type="button" class="tfm-mode" [class.on]="selectByTagPolarity === 'include'"
+              (click)="setTagPolarity('include')">
+              <mat-icon>how_to_reg</mat-icon> Include
+            </button>
+            <button type="button" class="tfm-mode" [class.on]="selectByTagPolarity === 'exclude'"
+              (click)="setTagPolarity('exclude')">
+              <mat-icon>person_off</mat-icon> Exclude
+            </button>
+          </div>
+
           <div class="tfm-list">
             <button type="button" class="tfm-item" *ngFor="let t of allTags"
               [class.sel]="selectByTagIds.has(t.id)" (click)="toggleTagSelect(t.id)">
@@ -148,6 +159,12 @@
       <button mat-stroked-button class="tags-manage-btn" (click)="openTagsManager()">
         <mat-icon>sell</mat-icon>
         Tags
+      </button>
+
+      <button mat-stroked-button class="tags-manage-btn" (click)="importFromExcel()" [disabled]="importing"
+        matTooltip="Import an Excel file (column A: email) and select the matching profiles">
+        <mat-icon>upload_file</mat-icon>
+        {{ importing ? 'Importing…' : 'Import' }}
       </button>
 
       <button mat-button type="button" class="clear-filters-btn" *ngIf="hasAnyFilter"

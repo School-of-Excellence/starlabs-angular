@@ -1,56 +1,58 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-11 (Ads funnel-only audience · New Users workshops
-filter)_ · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 3
-rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md`.
+_Last updated: 2026-08-12 (Ads dialog: 93% fullscreen redesign, app+wati
+side by side)_ · **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 5
+rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md` (6
+rounds on the New Users screen).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `14cc583d`;
+- Branch `nanda-development`, tree clean at HEAD `2ba1543e`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
-- Ads dialog (`/eiflixhomeconfig` → Ads tab) has the full
-  auto-notification feature: `autonotification` → required `notifyto`
-  audiences (+`selectedjourneys` for `journey`, +`selectedfunnels` for
-  `funnel only` = evergreen workshopconfiguration docs) → start/end dates
-  (pinned 12:01 am / 11:59 pm, end > start, startdate locks while `show`
-  on) → `enableappnotification` → `appnotificationmap`, one card per
-  date-difference day.
-- New Users screen (`/newusersprofile`) has a Workshops multi-select
-  filter after Select-by-tags: all `workshopconfiguration` docs (label
-  `detailpage.title`), filters rows to profileids found in
-  `workshop participant enrolled` for the selected workshops.
+- Ads dialog (`/eiflixhomeconfig` → Ads tab, 93vw×93vh sectioned layout;
+  daily messages render one row per day with App Notification left and
+  Wati right):
+  full auto-notification feature (autonotification → notifyto audiences
+  incl. journey/funnel pickers → pinned start/end dates →
+  enableappnotification → per-day appnotificationmap → **enablewati →
+  per-day watimap**: searchable WATI template select per day (classify/
+  wati `101723` config, UTILITY templates, Load/Reload), variables from
+  the template's customParams each mapped static (single-line text) or
+  metadata (only `name` for now), reconciled on template load).
+- New Users screen (`/newusersprofile`):
+  - Workshops filter (tags-style menu) with Funnel-only (default ON,
+    evergreen configs) + Include/Exclude toggles; Workshop table column
+    + export column in include mode only; per-workshop cached enrolled
+    reads, fail-closed on errors.
+  - Tags filter now also has Include/Exclude (Exclude auto-sets Match
+    any; resets to Include on clear).
+  - Import button (after Tags): Excel with A1 header `email`, mails from
+    row 2 → replaces selection with matching profiles; snackbar reports
+    matched/missing/hidden/ignored; zero-match leaves selection intact.
 
-## Last session changes (2026-08-11, why)
-- Ads round 3: `funnel only` audience + Funnel Workshops picker
-  (`63a244b4`). Preserved operator hand-edit: `'all exist users'`
-  commented out of `notifyToOptions` — deliberate, do not restore.
-- New Users workshops filter (`a9bc6b51`, reworked `76275f01`): now the
-  same button+mat-menu UI as Select-by-tags; enrolled sets cached per
-  workshop with a token guard against out-of-order async; predicate hides
-  rows while loading (no unfiltered flash); clear-all resets it. While
-  active, a Workshop column (after Tags) shows each row's enrolled
-  selected workshops as pills — from the cached per-workshop reads only
-  (the enrolled collection is huge; never scanned whole). Enrolled
-  queries are one-shot, not live.
-- Export gained the same Workshop column (`86cd7884`): chip offered and
-  auto-selected only while the filter is active (sync on on/off
-  transitions only), titles comma-joined from the cached map. Review
-  workflow caught mid-load exports emitting empty/stale titles — fixed
-  by clearing the map at load start and blocking Download while the
-  enrolled sets load.
-- Workshop dropdown gained two top toggles (`14cc583d`): Funnel only
-  (default ON; offers only `evergreenWorkshop == true` configs; turning
-  it on prunes non-evergreen selections) and Include/Exclude (default
-  Include; Exclude = profiles NOT enrolled in any selected workshop,
-  same cached sets). Workshop column/export render in include mode only.
-  Review fixes: enrolled-fetch errors fail closed in both modes (null
-  set + snackbar), and chip auto-sync keys off filter on/off so mode
-  round-trips don't fight manual deselection.
+## Last session changes (2026-08-12, why)
+- Ads dialog redesign (`2ba1543e`): 93vw×93vh, sectioned layout (Ad
+  Content / Display / Audience & Schedule / Daily Messages / Images),
+  per-day rows with app+wati columns side by side. Template/CSS only —
+  form model and payload untouched; `scheduleDays` iterates indices over
+  the always-equal-length maps. Review fixes: sect-head flex-wrap
+  (mobile overflow), empty day-list removed, lone column capped 980px.
+- Ads Enable Wati (`db185c76`): watimap sized by the same day-count
+  resize as appnotificationmap; searchable per-day template select
+  (ngx-mat-select-search, shared search reset per open; current value
+  stays selectable when filtered/unloaded); static values are forced
+  single-line (WATI rejects newlines); review-driven: hydrated variable
+  rows reconcile against freshly loaded templates (same-named values
+  survive), setControl re-applies disabled state, static text survives a
+  metadata round-trip. Review regressions lens confirmed comingsoon mode
+  untouched. Accepted nits in the journal.
+- Prior day (2026-08-11): New Users Excel import-select + tags
+  Include/Exclude — see the newusers journal.
 
 ## Pending
-- Operator Chrome pass on both features, then push/deploy when asked
-  (build green; nothing half-done).
+- Operator Chrome pass on the New Users screen (filters, import, export)
+  and the Ads dialog, then push/deploy when asked.
 - Consumer of the ads notification fields (sender job) is not in this
   repo — admin UI only writes the schedule.
 - Carried: phase-2 dashboard perf (scope/cache participant-metadata scan;
