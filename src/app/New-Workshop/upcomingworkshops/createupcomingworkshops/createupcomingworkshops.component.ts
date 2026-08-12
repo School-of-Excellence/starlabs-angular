@@ -266,6 +266,16 @@ export class CreateupcomingworkshopsComponent {
     return this.form.get('watimap') as FormArray;
   }
 
+  // One entry per scheduled day; both maps are kept at the same length, so
+  // the day rows iterate indices and address each array by [formGroupName].
+  get scheduleDays(): number[] {
+    return Array.from({ length: this.adsNotifications.length }, (_, i) => i);
+  }
+
+  get bothDailyColumns(): boolean {
+    return !!this.form.get('enableappnotification')?.value && !!this.form.get('enablewati')?.value;
+  }
+
   watiVariables(dayIndex: number): FormArray {
     return this.adsWati.at(dayIndex)?.get('variables') as FormArray;
   }

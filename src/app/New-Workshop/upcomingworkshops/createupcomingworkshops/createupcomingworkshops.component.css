@@ -3,13 +3,211 @@
   background: #ffffff;
 }
 
-/* Ads mode: the auto-notification + wati schedules need a much larger canvas. */
+/* Ads mode: near-fullscreen (dialog panel is 93vw x 93vh) — fill it and let
+   the body take every spare row. */
 .dialog-wrap.wide {
-  width: min(1060px, 92vw);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-wrap.wide form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .dialog-wrap.wide .dialog-body {
-  max-height: 78vh;
+  flex: 1;
+  max-height: none;
+}
+
+/* Wide canvas: three field columns per section. */
+.dialog-wrap.wide .grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- ads sections ---- */
+.sect {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid #e6e8ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.sect-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sect-head > mat-icon {
+  color: #4f46e5;
+  background: #eef2ff;
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+  box-sizing: content-box;
+  flex: 0 0 auto;
+}
+
+.sect-text h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.sect-text p {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.sect-head .day-chip,
+.sect-head .wati-toolbar {
+  margin-left: auto;
+}
+
+.toggle-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.toggle-cards.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.toggle-cards .toggle-row {
+  background: #ffffff;
+}
+
+/* ---- per-day rows: app notification | wati ---- */
+.day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.day-row {
+  border: 1px solid #e6e8ee;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.day-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #eef2ff;
+}
+
+.day-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.day-cols.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.day-col {
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+/* A lone channel column shouldn't stretch its fields across the full 93vw. */
+.day-cols:not(.two) .day-col {
+  max-width: 980px;
+}
+
+.day-cols.two .day-col + .day-col {
+  border-left: 1px solid #eef1f6;
+}
+
+.col-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4f46e5;
+  margin-bottom: 8px;
+}
+
+.col-tag mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.col-tag.wati-tag {
+  color: #0f766e;
+}
+
+.col-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.col-grid .full-span {
+  grid-column: 1 / -1;
+}
+
+.col-grid mat-form-field {
+  width: 100%;
+}
+
+/* ---- images section (ads): uploads side by side ---- */
+.dialog-wrap.wide .uploads-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.dialog-wrap.wide .uploads-row .upload-block {
+  margin-top: 0;
+  background: #ffffff;
+}
+
+/* ---- responsive ---- */
+@media (max-width: 980px) {
+  .dialog-wrap.wide .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .toggle-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .day-cols.two {
+    grid-template-columns: 1fr;
+  }
+  .day-cols.two .day-col + .day-col {
+    border-left: none;
+    border-top: 1px solid #eef1f6;
+  }
+}
+
+@media (max-width: 640px) {
+  .dialog-wrap.wide .grid,
+  .toggle-cards,
+  .toggle-cards.two,
+  .col-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dialog-head {
@@ -107,41 +305,6 @@
 }
 
 /* ---- auto notification schedule (ads) ---- */
-.notif-section {
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px solid #e6e8ee;
-  border-radius: 10px;
-  background: #f8fafc;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.notif-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.notif-section-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.92rem;
-}
-
-.notif-section-title mat-icon {
-  color: #4f46e5;
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
-}
-
 .day-chip {
   padding: 3px 10px;
   border-radius: 999px;
@@ -153,36 +316,12 @@
   white-space: nowrap;
 }
 
-.notif-section .toggle-row {
-  background: #ffffff;
-}
-
 .lock-icon {
   font-size: 14px;
   width: 14px;
   height: 14px;
   vertical-align: text-bottom;
   color: #b45309;
-}
-
-.notif-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.notif-card {
-  padding: 12px 14px;
-  border: 1px solid #e6e8ee;
-  border-radius: 10px;
-  background: #ffffff;
-}
-
-.notif-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
 }
 
 .notif-day {
