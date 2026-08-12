@@ -258,6 +258,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private pageCache = new Map<number, QueryDocumentSnapshot[]>();
   // full dataset cached so switching back to a specific coach doesn't re-read 10k each time
   private fullPjpData: any[] | null = null;
+  // profileids whose heavy joins (tickets / touchpoints / contacts / event-requests / health) are
+  // already loaded into the shared maps. Lets a later full-set build (export, or paging back over a
+  // page) skip re-querying Firestore for rows it has already fetched — see loadJoinsFor().
+  private loadedJoinIds = new Set<string>();
   // paged KPI: accurate server counts (countable cards) + accumulate-over-loaded (the rest)
   private countedProfiles = new Set<string>();
   private serverCounts = { total: 0, renewalsSoon: 0, notStarted: 0, inactive: 0, active: 0, openTickets: 0 };
@@ -621,13 +625,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  computeRows only reads entries for the currently-matched profiles. */
   private async loadFullDependentsForBase(): Promise<void> {
     const baseProfileIds = this.currentBaseProfileIds();
-    await Promise.all([
-      this.loadOpenTicketCountsFor(baseProfileIds),
-      this.loadTouchpointsFor(baseProfileIds),
-      this.loadContactEventsFor(baseProfileIds),
-      this.loadRecentEventRequestsFor(baseProfileIds),
-      this.loadCoachHealthStatesFor(baseProfileIds),
-    ]);
+    await this.loadJoinsFor(baseProfileIds);
   }
 
   // ===================== server-side pagination (ALL / UNASSIGNED) =====================
@@ -753,13 +751,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         pjpForPage = pjpForPage.filter(d => this.isUnassigned(d['coachedby']));
       }
       const profileIds = Array.from(new Set(pjpForPage.map(d => d['profileid']).filter(Boolean)));
-      await Promise.all([
-        this.loadOpenTicketCountsFor(profileIds),
-        this.loadTouchpointsFor(profileIds),
-        this.loadContactEventsFor(profileIds),
-        this.loadRecentEventRequestsFor(profileIds),
-        this.loadCoachHealthStatesFor(profileIds),
-      ]);
+      await this.loadJoinsFor(profileIds);
       this.pjpData = pjpForPage;       // computeRows reads this.pjpData (page-local matching + scoring)
       this.computeRows();
       this.accumulatePagedSummary();
@@ -853,6 +845,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const out: T[][] = [];
     for (let i = 0; i < arr.length; i += 30) out.push(arr.slice(i, i + 30));
     return out;
+  }
+
+  /** Load the five heavy joins for exactly the ids not already loaded, then mark them loaded.
+   *  Repeat calls for the same ids (paging back, exporting after a full load) do NO Firestore reads.
+   *  Writes that mutate a participant's join data (logCall / setHealthState / toggleFlag) update the
+   *  shared maps directly, so a cached id stays consistent without a reload. */
+  private async loadJoinsFor(profileIds: string[]): Promise<void> {
+    const missing = profileIds.filter(id => id && !this.loadedJoinIds.has(id));
+    if (!missing.length) return;
+    await Promise.all([
+      this.loadOpenTicketCountsFor(missing),
+      this.loadTouchpointsFor(missing),
+      this.loadContactEventsFor(missing),
+      this.loadRecentEventRequestsFor(missing),
+      this.loadCoachHealthStatesFor(missing),
+    ]);
+    for (const id of missing) this.loadedJoinIds.add(id);
   }
 
   // page-scoped variants of the full-collection dependent loaders — merge into the same maps
@@ -2002,6 +2011,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       default: return true;
     }
   }
+  /** Page-size options for the table paginator: the fixed steps PLUS the overall matched count, so
+   *  the user can select "all" and show every matched row on one page. Total = pageLength in paged
+   *  mode (full matched set once the lite index is built), else the loaded base. Appended only when
+   *  it exceeds the largest fixed step, and de-duped so it never doubles up with 100. */
+  get pageSizeOptions(): number[] {
+    const total = this.pagedMode ? this.pageLength : this.dataSource.data.length;
+    const opts = [25, 50, 100];
+    if (total > 100) opts.push(total);
+    return opts;
+  }
+
   /** Base-wide count matching the applied filter — paged from the lite index, else the loaded rows. */
   get summaryShownCount(): number { return this.pagedMode ? this.pagedFilteredCount() : this.filteredRows().length; }
   get summaryScopeTotal(): number { return this.pagedMode ? this.fullIndex.length : this.allRows().length; }
@@ -2473,12 +2493,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return this.activeLever === this.kpiLever(which);
   }
 
-  exportCsv(): void {
+  async exportCsv(): Promise<void> {
+    // Export EVERY matched row, not just the visible page. In paged mode (ALL / UNASSIGNED)
+    // dataSource.data is only the current 50-row page, so collect the full matched set first.
+    const rows = await this.collectExportRows();
     const q = (v: any) => `"${(v ?? '').toString().replace(/"/g, '""')}"`;
     const headers = ['Priority', 'Band', 'Participant', 'Number', 'Coach', 'Reason', 'Journey', 'Tier',
       'Status', 'Financial', 'Renewal', 'DaysToRenewal', 'LastTouch', 'DaysSinceTouch', 'OpenTickets'];
     const lines = [headers.join(',')];
-    for (const r of this.dataSource.data) {
+    for (const r of rows) {
       lines.push([
         r.priority, r.priorityBand, q(r.name), q(r.number), q(r.coachname), q(r.reason), q(r.journeyname),
         q(r.atcmodel), q(r.customerstatus), q(r.financialstatus), this.fmtDate(r.subscriptionend),
@@ -2492,6 +2515,40 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     a.download = `base-${(this.selectedCoachName || 'export').replace(/\s+/g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  /** Every row matched by the active search/filters — the WHOLE set, not just the visible page.
+   *  Full mode: allRows is already the full base, so just filter it. Paged mode (ALL / UNASSIGNED):
+   *  build rows for every matched profile id (loading their joins), then restore the visible page. */
+  private async collectExportRows(): Promise<PortfolioRow[]> {
+    if (!this.pagedMode) {
+      return this.allRows().filter(r => this.rowMatches(r));
+    }
+    // ensure the base-wide lite index exists so the matched set spans ALL pages, not the loaded one.
+    await this.ensureFullIndex();
+    this.recomputeFullBaseMatch();
+    const ids = this.sortedMatchedIds();
+    if (!ids.length) return [];
+    // load the heavy joins ONLY for matched rows not already fetched (paging / a prior export cache
+    // them). Show the spinner only when there is genuinely something to fetch.
+    const needsFetch = ids.some(id => id && !this.loadedJoinIds.has(id));
+    if (needsFetch) this.pageLoading = true;
+    try {
+      await this.loadJoinsFor(ids);
+      const idSet = new Set(ids);
+      const savedPjp = this.pjpData;
+      this.suppressPagedRender = true;
+      this.pjpData = (this.fullPjpData ?? []).filter(d => idSet.has(d['profileid']));
+      this.computeRows();   // builds allRows for the ENTIRE matched set (applyFilters suppressed)
+      const rows = this.allRows().filter(r => this.rowMatches(r));
+      this.suppressPagedRender = false;
+      this.pjpData = savedPjp;
+      // restore the visible page (rebuilds allRows / dataSource for the current slice).
+      await this.renderMatchedPage();
+      return rows;
+    } finally {
+      this.pageLoading = false;
+    }
   }
 
   private coachNameFor(coachedby: any): string {
@@ -2715,13 +2772,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const start = this.currentPage * this.pageSize;
       const slice = this.matchedIds.slice(start, start + this.pageSize);
       const sliceSet = new Set(slice);
-      await Promise.all([
-        this.loadOpenTicketCountsFor(slice),
-        this.loadTouchpointsFor(slice),
-        this.loadContactEventsFor(slice),
-        this.loadRecentEventRequestsFor(slice),
-        this.loadCoachHealthStatesFor(slice),
-      ]);
+      await this.loadJoinsFor(slice);
       const pjpForPage = (this.fullPjpData ?? []).filter(d => sliceSet.has(d['profileid']));
       this.suppressPagedRender = true;
       this.pjpData = pjpForPage;
