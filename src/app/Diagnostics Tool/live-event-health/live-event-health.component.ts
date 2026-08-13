@@ -174,7 +174,14 @@ export class LiveEventHealthComponent {
 
     if (!this.selectedRows.length) return;
 
-    const ok = confirm(`Cancel ${this.selectedRows.length} participants?`);
+    const message =
+      `You're about to cancel ${this.selectedRows.length} participant(s).\n\n` +
+      `This will:\n` +
+      `- Set product status to "cancelled" \n` +
+      `- Set event status to "unattended"\n\n` +
+      `Do you want to proceed?`;
+
+    const ok = confirm(message);
     if (!ok) return;
 
     try {
@@ -718,19 +725,47 @@ private upsertProduct(product: any) {
     this.applyPagination();
   }
 
+  onTotalKpiClick() {
+    if (this.kpiFilter.type === 'total') {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = 'total';
+    this.kpiFilter.value = null;
+    this.eventStatusFilter.setValue([]);
+    this.productStatusFilter.setValue([]);
+    this.modeFilter.setValue([]);
+    this.validationFilter.setValue([]);
+
+    this.applyFilters();
+  }
+
   onValidKpiClick(isValid: boolean) {
-    this.kpiFilter.type = isValid ? 'valid' : 'invalid';
+    const type = isValid ? 'valid' : 'invalid';
+
+    if (this.kpiFilter.type === type) {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = type;
     this.kpiFilter.value = null;
 
     this.eventStatusFilter.setValue([]);
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
 
-    this.validationFilter.setValue([isValid ? 'valid' : 'invalid']);
+    this.validationFilter.setValue([type]);
     this.applyFilters();
   }
 
   onEventStatusKpiClick(status: string) {
+    if (this.kpiFilter.type === 'eventStatus' && this.kpiFilter.value === status) {
+      this.resetKpiFilter();
+      return;
+    }
+
     this.kpiFilter.type = 'eventStatus';
     this.kpiFilter.value = status;
 
@@ -743,6 +778,11 @@ private upsertProduct(product: any) {
   }
 
   onProductStatusKpiClick(status: string) {
+    if (this.kpiFilter.type === 'productStatus' && this.kpiFilter.value === status) {
+      this.resetKpiFilter();
+      return;
+    }
+
     this.kpiFilter.type = 'productStatus';
     this.kpiFilter.value = status;
 
@@ -754,9 +794,10 @@ private upsertProduct(product: any) {
     this.applyFilters();
   }
 
-  onTotalKpiClick() {
-    this.kpiFilter.type = 'total';
+  resetKpiFilter() {
+    this.kpiFilter.type = null;
     this.kpiFilter.value = null;
+
     this.eventStatusFilter.setValue([]);
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
