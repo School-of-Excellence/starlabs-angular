@@ -11,6 +11,7 @@ import { environment } from '../../../environments/environment';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import * as XLSX from 'xlsx';
 
 
@@ -22,7 +23,8 @@ import * as XLSX from 'xlsx';
     FormsModule,
     ReactiveFormsModule,
     MatSlideToggleModule,
-    MatDatepickerModule
+    MatDatepickerModule,
+    NgxMatSelectSearchModule
   ],
   providers: [provideNativeDateAdapter()],
   templateUrl: './mode-dashboard-new.component.html',
@@ -88,6 +90,7 @@ export class ModeDashboardNewComponent {
   exportRangeMode: 'months' | 'date' = 'months';
   exportMonths: number = 3;
   exportSpecificDate: string = '';
+  exportStatsLoading: boolean = false;
 
   // String declarations
   selectedMode: any = null;
@@ -96,6 +99,27 @@ export class ModeDashboardNewComponent {
   selectedEvent: string = '';
   activeMode: string = '';
   selectedQueue: string = '';
+
+  // Event/Queue filter only counts participant products in these statuses
+  readonly eventQueueStatuses = ['initiated', 'ongoing', 'completed'];
+
+  // Model for the Event section "Filter by Product" (so it can be cleared)
+  eventProductFilter: string = '';
+
+  // Event/Queue popup grouping toggle
+  eventGroupBy: 'product' | 'profile' = 'product';
+
+  // Dropdown search terms
+  eventSearch = '';
+  queueSearch = '';
+  eventProductSearch = '';
+  configuredProductSearch = '';
+  configuredModeSearch = '';
+  notConfiguredProductSearch = '';
+  notConfiguredModeSearch = '';
+
+  // Profile-name search inside the popup/dialog
+  dialogSearch = '';
 
   // Configured date-range filter (filters "Review Configured" by configured-on date)
   configuredDateRange!: FormGroup;
@@ -147,7 +171,7 @@ export class ModeDashboardNewComponent {
     this.debugMode();
     this.fetchEvents();
     this.fetchQueues();
-    this.fetchModeMemberStats();
+    // Member stats are loaded lazily when the Export dialog opens (see openExportDialog)
     // await this.getModes();
 
     setTimeout(() => {
@@ -356,41 +380,43 @@ export class ModeDashboardNewComponent {
   // Build per product+mode member counts used by the config exports.
   // Loads participantsproduct once (real-time) and aggregates current-mode and
   // next-mode membership per product.
-  fetchModeMemberStats() {
-    this.subscription['modestats'] = collectionData(collection(this.firestore, "participantsproduct")).subscribe((list) => {
-      const stats: { [key: string]: { currentCount: number, comingDates: Date[] } } = {};
+  // One-time read (getDocs, not a live listener) of participantsproduct, aggregated per
+  // product+mode. Called lazily from openExportDialog so the full-collection read only
+  // happens when the user actually exports.
+  async fetchModeMemberStats() {
+    const snapshot = await getDocs(collection(this.firestore, "participantsproduct"));
+    const stats: { [key: string]: { currentCount: number, comingDates: Date[] } } = {};
 
-      const ensure = (key: string) => {
-        if (!stats[key]) {
-          stats[key] = { currentCount: 0, comingDates: [] };
-        }
-        return stats[key];
-      };
+    const ensure = (key: string) => {
+      if (!stats[key]) {
+        stats[key] = { currentCount: 0, comingDates: [] };
+      }
+      return stats[key];
+    };
 
-      for (let i = 0; i < list.length; i++) {
-        const p = list[i];
-        const productid = p['productref']?.id;
-        if (!productid) continue;
+    snapshot.forEach((docSnap) => {
+      const p: any = docSnap.data();
+      const productid = p['productref']?.id;
+      if (!productid) return;
 
-        const mode = p['mode'];
-        const nextmode = p['nextmode'];
+      const mode = p['mode'];
+      const nextmode = p['nextmode'];
 
-        // Members currently in this mode for this product
-        if (![null, undefined, ''].includes(mode)) {
-          ensure(productid + mode).currentCount++;
-        }
-
-        // Members whose next mode is this mode for this product (keep the date; window at export time)
-        if (![null, undefined, ''].includes(nextmode)) {
-          const nextDate = p['nextmodedate']?.toDate ? p['nextmodedate'].toDate() : null;
-          if (nextDate) {
-            ensure(productid + nextmode).comingDates.push(nextDate);
-          }
-        }
+      // Members currently in this mode for this product
+      if (![null, undefined, ''].includes(mode)) {
+        ensure(productid + mode).currentCount++;
       }
 
-      this.modeStatsByProductMode = stats;
+      // Members whose next mode is this mode for this product (keep the date; window at export time)
+      if (![null, undefined, ''].includes(nextmode)) {
+        const nextDate = p['nextmodedate']?.toDate ? p['nextmodedate'].toDate() : null;
+        if (nextDate) {
+          ensure(productid + nextmode).comingDates.push(nextDate);
+        }
+      }
     });
+
+    this.modeStatsByProductMode = stats;
   }
 
   fetchModes() {
@@ -619,7 +645,7 @@ export class ModeDashboardNewComponent {
 
     this.subscription['product2'] = collectionData(query(collection(this.firestore, "participantsproduct"), where("eventref", "==", eventRef))).subscribe((events) => {
       if (events.length != 0) {
-        let productDocs = events;
+        let productDocs = events.filter((p) => this.eventQueueStatuses.includes(p['status']));
         var productMap: { [key: string]: any[] } = {};
 
         for (let i = 0; i < productDocs.length; i++) {
@@ -632,7 +658,9 @@ export class ModeDashboardNewComponent {
           productMap[mode].push(product);
         }
         this.mapEventData = productMap;
-        this.mapEventDataOriginal = JSON.parse(JSON.stringify(productMap));
+        // Shallow copy — deep clone (JSON) would strip the Firestore productref DocumentReference,
+        // breaking the product filter which reads productref.id.
+        this.mapEventDataOriginal = { ...productMap };
         this.cdr.detectChanges();
       }
     })
@@ -647,7 +675,7 @@ export class ModeDashboardNewComponent {
       query(collection(this.firestore, "participantsproduct"), where("eventref", "==", queueRef))
     ).subscribe((queues) => {
       if (queues.length != 0) {
-        let productDocs = queues;
+        let productDocs = queues.filter((p) => this.eventQueueStatuses.includes(p['status']));
         var productMap: { [key: string]: any[] } = {};
 
         for (let i = 0; i < productDocs.length; i++) {
@@ -660,7 +688,8 @@ export class ModeDashboardNewComponent {
           productMap[mode].push(product);
         }
         this.mapEventData = productMap;
-        this.mapEventDataOriginal = JSON.parse(JSON.stringify(productMap)); // Store original
+        // Shallow copy — keep the real productref DocumentReference for the product filter.
+        this.mapEventDataOriginal = { ...productMap };
         this.cdr.detectChanges();
       }
     });
@@ -669,8 +698,8 @@ export class ModeDashboardNewComponent {
   // Update the filterEventQueueByProduct method:
   filterEventQueueByProduct(productId: string) {
     if (!productId) {
-      // Reset to original data instead of re-fetching
-      this.mapEventData = JSON.parse(JSON.stringify(this.mapEventDataOriginal));
+      // Reset to original data instead of re-fetching (shallow copy keeps productref intact)
+      this.mapEventData = { ...this.mapEventDataOriginal };
       this.cdr.detectChanges();
       return;
     }
@@ -691,12 +720,120 @@ export class ModeDashboardNewComponent {
     this.cdr.detectChanges();
   }
 
+  // ---- Searchable dropdown helpers ----
+  private filterByText(list: any[], term: string, key?: string): any[] {
+    if (!term) return list || [];
+    const t = term.toLowerCase();
+    return (list || []).filter((item) => {
+      const val = key ? (item?.[key] ?? '') : (item ?? '');
+      return val.toString().toLowerCase().includes(t);
+    });
+  }
+
+  filteredEventsList() { return this.filterByText(this.eventsList, this.eventSearch, 'name'); }
+  filteredQueuesList() { return this.filterByText(this.queueList, this.queueSearch, 'queuename'); }
+  filteredEventProducts() { return this.filterByText(this.productList, this.eventProductSearch, 'product'); }
+  filteredConfiguredProducts() { return this.filterByText(this.productList, this.configuredProductSearch, 'product'); }
+  filteredConfiguredModes() { return this.filterByText(this.modesList, this.configuredModeSearch); }
+  filteredNotConfiguredProducts() { return this.filterByText(this.productList, this.notConfiguredProductSearch, 'product'); }
+  filteredNotConfiguredModes() { return this.filterByText(this.modesList, this.notConfiguredModeSearch); }
+
+  // ---- Dialog profile-name search ----
+  matchesDialogSearch(name: any): boolean {
+    if (!this.dialogSearch) return true;
+    return (name ?? '').toString().toLowerCase().includes(this.dialogSearch.toLowerCase());
+  }
+
+  // Rows for the generic (transition/debug/participants) dialog table, filtered by name search
+  getDialogParticipants(): any[] {
+    const base = this.tableView === 'transition'
+      ? (this.selectedMode?.participantproduct || [])
+      : (this.selectedMode || []);
+    if (!this.dialogSearch) return base;
+    return base.filter((p) => {
+      const name = this.tableView === 'participants' ? this.mapProfile[p] : this.mapProfile[p?.profileid];
+      return this.matchesDialogSearch(name);
+    });
+  }
+
+  // Distinct profile count for an event/queue mode list (dedupe duplicate profiles across products)
+  uniqueProfileCount(list: any[]): number {
+    if (!Array.isArray(list)) return 0;
+    return new Set(list.map((p) => p?.profileid).filter(Boolean)).size;
+  }
+
+  // Event popup — "Group by Product": each product -> its distinct profiles
+  getEventProductGroups(list: any[]): { productId: string, productName: string, profiles: { profileid: string, name: string, email: string }[] }[] {
+    const groups: { [pid: string]: { productId: string, productName: string, seen: Set<string>, profiles: any[] } } = {};
+
+    for (const p of (list || [])) {
+      const productId = p?.productref?.id ?? 'unknown';
+      if (!groups[productId]) {
+        groups[productId] = {
+          productId,
+          productName: this.mapProducts[productId]?.product || 'Unknown Product',
+          seen: new Set(),
+          profiles: []
+        };
+      }
+      const g = groups[productId];
+      const profileid = p?.profileid;
+      const name = this.mapProfile[profileid] || 'N/A';
+      if (profileid && !g.seen.has(profileid) && this.matchesDialogSearch(name)) {
+        g.seen.add(profileid);
+        g.profiles.push({
+          profileid,
+          name,
+          email: this.mapMetaData[profileid]?.email || 'N/A'
+        });
+      }
+    }
+
+    return Object.values(groups)
+      .map((g) => ({ productId: g.productId, productName: g.productName, profiles: g.profiles }))
+      .filter((g) => g.profiles.length > 0);
+  }
+
+  // Event popup — "Group by Profile": each distinct profile -> the products they hold in this mode
+  getEventProfileGroups(list: any[]): { profileid: string, name: string, email: string, products: string[] }[] {
+    const groups: { [profileid: string]: { profileid: string, name: string, email: string, seen: Set<string>, products: string[] } } = {};
+
+    for (const p of (list || [])) {
+      const profileid = p?.profileid;
+      if (!profileid) continue;
+      const name = this.mapProfile[profileid] || 'N/A';
+      if (!this.matchesDialogSearch(name)) continue;
+      if (!groups[profileid]) {
+        groups[profileid] = {
+          profileid,
+          name,
+          email: this.mapMetaData[profileid]?.email || 'N/A',
+          seen: new Set(),
+          products: []
+        };
+      }
+      const g = groups[profileid];
+      const productName = this.mapProducts[p?.productref?.id]?.product || 'Unknown Product';
+      if (!g.seen.has(productName)) {
+        g.seen.add(productName);
+        g.products.push(productName);
+      }
+    }
+
+    return Object.values(groups).map((g) => ({ profileid: g.profileid, name: g.name, email: g.email, products: g.products }));
+  }
+
   async openModeDialog(mode: any, view: any, activemode: any) {
     this.selectedMode = mode;
     this.tableView = view;
+    this.dialogSearch = '';
 
     if (['participants', 'event'].includes(view)) {
       this.activeMode = activemode
+    }
+
+    if (view === 'event') {
+      this.eventGroupBy = 'product';
     }
 
     this.showDialog = true;
@@ -712,6 +849,7 @@ export class ModeDashboardNewComponent {
     this.showDialog = false;
     this.selectedMode = null;
     this.tableView = '';
+    this.dialogSearch = '';
     const scrollY = document.body.style.top;
     document.body.style.position = '';
     document.body.style.top = '';
@@ -792,6 +930,49 @@ export class ModeDashboardNewComponent {
   clearConfiguredDateRange() {
     this.configuredDateRange.reset();
     this.configuredFilter(this.configuredform.value);
+  }
+
+  // ---- Clear-filter helpers ----
+  hasEventQueueFilter(): boolean {
+    return !!this.selectedEvent || !!this.selectedQueue || !!this.eventProductFilter;
+  }
+
+  clearEventQueueFilter() {
+    this.selectedEvent = '';
+    this.selectedQueue = '';
+    this.eventProductFilter = '';
+    this.eventSearch = '';
+    this.queueSearch = '';
+    this.eventProductSearch = '';
+    this.mapEventData = {};
+    this.mapEventDataOriginal = {};
+    this.cdr.detectChanges();
+  }
+
+  hasConfiguredFilter(): boolean {
+    const v = this.configuredform.value;
+    return (v.product?.length > 0) || (v.mode?.length > 0)
+      || !!this.configuredDateRange.value.start || !!this.configuredDateRange.value.end;
+  }
+
+  clearConfiguredFilters() {
+    this.configuredform.reset({ product: [], mode: [] });
+    this.configuredDateRange.reset();
+    this.configuredProductSearch = '';
+    this.configuredModeSearch = '';
+    this.configuredFilter(this.configuredform.value);
+  }
+
+  hasNotConfiguredFilter(): boolean {
+    const v = this.notconfiguredform.value;
+    return (v.product?.length > 0) || (v.mode?.length > 0);
+  }
+
+  clearNotConfiguredFilters() {
+    this.notconfiguredform.reset({ product: [], mode: [] });
+    this.notConfiguredProductSearch = '';
+    this.notConfiguredModeSearch = '';
+    this.notConfiguredFilter(this.notconfiguredform.value);
   }
 
   debugMode() {
@@ -883,10 +1064,12 @@ export class ModeDashboardNewComponent {
         break;
 
       case 'event':
-        data = (this.selectedMode || []).map((participant, index) => ({
+        // Deduped by profile; list each profile's products in this mode
+        data = this.getEventProfileGroups(this.selectedMode || []).map((g, index) => ({
           'Serial No': index + 1,
-          'Participant Name': this.mapProfile[participant.profileid] || 'N/A',
-          'Email': this.mapMetaData[participant.profileid]?.email || 'N/A'
+          'Participant Name': g.name,
+          'Email': g.email,
+          'Products': g.products.join(', ')
         }));
         filename = `Event_Participants_${this.activeMode?.replace(/\s+/g, '_')}`;
         sheetName = 'Event Participants';
@@ -933,13 +1116,24 @@ export class ModeDashboardNewComponent {
     }
   }
 
-  // Open the export dialog (which asks for the "coming to mode" window) for a given list
-  openExportDialog(target: 'configured' | 'notconfigured') {
+  // Open the export dialog (which asks for the "coming to mode" window) for a given list.
+  // Loads the member stats lazily here (one-time getDocs) rather than on screen open.
+  async openExportDialog(target: 'configured' | 'notconfigured') {
     this.exportTarget = target;
     this.exportRangeMode = 'months';
     this.exportMonths = 3;
     this.exportSpecificDate = '';
     this.showExportDialog = true;
+
+    this.exportStatsLoading = true;
+    try {
+      await this.fetchModeMemberStats();
+    } catch (error) {
+      console.error('Failed to load member stats for export:', error);
+    } finally {
+      this.exportStatsLoading = false;
+      this.cdr.detectChanges();
+    }
   }
 
   closeExportDialog() {
