@@ -73,10 +73,20 @@
     
     <!-- Approved Selected Event Table -->
     <mat-tab label="Approved ({{approved.length}})">
-      <mat-form-field class="search mt-2 " appearance="outline" style="margin-left: 10px;min-width: 300px;">
-        <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
-      </mat-form-field>
+      <div class="actionbox">
+        <mat-form-field class="search mt-2 " appearance="outline" style="margin-left: 10px;min-width: 300px;">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
+        </mat-form-field>
+        <div class="overall-profiles">
+          <div class="op-pill">
+            <div>Overall Profiles: <span>{{distinctProfiles(approved)}}</span></div>
+            <div class="product-counts">
+              <div *ngFor="let pc of productProfileCounts(approved)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div>
         <table mat-table [dataSource]="dataSource1" matSort #sort1="matSort">
           <ng-container matColumnDef="sno">
@@ -123,6 +133,14 @@
             <mat-label>Filter</mat-label>
             <input matInput (keyup)="applyFilterD2($event)" placeholder="Ex. Mia" #input>
           </mat-form-field>
+        </div>
+        <div class="overall-profiles">
+          <div class="op-pill">
+            <div>Overall Profiles: <span>{{distinctProfiles(attendance)}}</span></div>
+            <div class="product-counts">
+              <div *ngFor="let pc of productProfileCounts(attendance)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+            </div>
+          </div>
         </div>
         <div *ngIf="attendanceselection.selected.length != 0">
           <button class="greenbtn" mat-stroked-button (click)="markAsAttended()">Mark as Attended ({{attendanceselection.selected.length}})</button>
@@ -199,6 +217,14 @@
           <input matInput (keyup)="applyFilterD3($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
       </div>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(attended)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(attended)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
       <div>
         <button *ngIf="attendedselection.selected.length != 0" class="redbtn mr-3" mat-stroked-button (click)="markAsUnattendedAndCancelProduct(attendedselection)">Mark as Not Attended ({{attendedselection.selected.length}})</button>
         <button type="button" mat-stroked-button (click)="exportCSV()">Export CSV</button>
@@ -274,6 +300,14 @@
           <input matInput (keyup)="applyFilterD5($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
       </div>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(unattendedList)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(unattendedList)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
       <div>
         <button *ngIf="unattendedselection.selected.length != 0" class="greenbtn" mat-stroked-button (click)="markAsAttended(unattendedselection, true)">Mark as Attended ({{unattendedselection.selected.length}})</button>
       </div>
@@ -336,10 +370,20 @@
 
   <!-- Revoked Selected Event Table (read-only — no row actions) -->
   <mat-tab label="Revoke ({{revoked.length}})">
-    <mat-form-field class="search mt-2" appearance="outline" style="margin-left: 10px;min-width: 300px;">
-      <mat-label>Filter</mat-label>
-      <input matInput (keyup)="applyFilterD4($event)" placeholder="Ex. Mia" #input>
-    </mat-form-field>
+    <div class="actionbox">
+      <mat-form-field class="search mt-2" appearance="outline" style="margin-left: 10px;min-width: 300px;">
+        <mat-label>Filter</mat-label>
+        <input matInput (keyup)="applyFilterD4($event)" placeholder="Ex. Mia" #input>
+      </mat-form-field>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(revoked)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(revoked)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div>
       <table mat-table [dataSource]="dataSource4" matSort #sort4="matSort">
         <ng-container matColumnDef="sno">

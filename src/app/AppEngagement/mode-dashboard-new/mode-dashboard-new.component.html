@@ -89,11 +89,16 @@
 
         <mat-form-field appearance="outline" class="large-dropdown">
             <mat-label>Events List</mat-label>
-            <mat-select [(ngModel)]="selectedEvent" 
+            <mat-select [(ngModel)]="selectedEvent"
                         (selectionChange)="selectedQueue = ''; updateEventData()"
                         [disabled]="!!selectedQueue">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="eventSearch" [ngModelOptions]="{standalone: true}"
+                        placeholderLabel="Search event..." noEntriesFoundLabel="No matching event"
+                        ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
                 <mat-option [value]="''">-- None --</mat-option>
-                <mat-option *ngFor="let event of eventsList" [value]="event['docid']">
+                <mat-option *ngFor="let event of filteredEventsList()" [value]="event['docid']">
                     {{event['name']}}
                 </mat-option>
             </mat-select>
@@ -101,11 +106,16 @@
 
         <mat-form-field appearance="outline" class="large-dropdown">
             <mat-label>Queue List</mat-label>
-            <mat-select [(ngModel)]="selectedQueue" 
+            <mat-select [(ngModel)]="selectedQueue"
                         (selectionChange)="selectedEvent = ''; updateQueueData()"
                         [disabled]="!!selectedEvent">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="queueSearch" [ngModelOptions]="{standalone: true}"
+                        placeholderLabel="Search queue..." noEntriesFoundLabel="No matching queue"
+                        ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
                 <mat-option [value]="''">-- None --</mat-option>
-                <mat-option *ngFor="let queue of queueList" [value]="queue['docid']">
+                <mat-option *ngFor="let queue of filteredQueuesList()" [value]="queue['docid']">
                     {{queue['queuename']}}
                 </mat-option>
             </mat-select>
@@ -113,21 +123,31 @@
 
         <mat-form-field appearance="outline" class="medium-dropdown">
             <mat-label>Filter by Product</mat-label>
-            <mat-select (selectionChange)="filterEventQueueByProduct($event.value)"
+            <mat-select [(ngModel)]="eventProductFilter"
+                        (selectionChange)="filterEventQueueByProduct($event.value)"
                         [disabled]="!selectedEvent && !selectedQueue">
+                <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="eventProductSearch" [ngModelOptions]="{standalone: true}"
+                        placeholderLabel="Search product..." noEntriesFoundLabel="No matching product"
+                        ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
                 <mat-option [value]="''">-- All Products --</mat-option>
-                <mat-option *ngFor="let product of productList" [value]="product['id']">
+                <mat-option *ngFor="let product of filteredEventProducts()" [value]="product['id']">
                     {{product['product']}}
                 </mat-option>
             </mat-select>
         </mat-form-field>
+
+        <button class="clear-filters-btn" *ngIf="hasEventQueueFilter()" (click)="clearEventQueueFilter()">
+            ✕ Clear Filters
+        </button>
     </div>
 
     <div class="filters-grid">
         <div *ngFor="let event of mapEventData | keyvalue">
             <div class="filter-badge" (click)="openModeDialog(event.value, 'event', event.key)">
                 <span class="filter-name">{{event.key}}</span>
-                <span class="filter-count">{{event.value.length || 0}}</span>
+                <span class="filter-count">{{uniqueProfileCount(event.value)}}</span>
             </div>
         </div>
     </div>
@@ -151,7 +171,12 @@
                             <mat-label>Filter by Product</mat-label>
                             <mat-select multiple formControlName="product"
                                 (selectionChange)="configuredFilter(configuredform.value)">
-                                <mat-option *ngFor="let product of productList"
+                                <mat-option>
+                                    <ngx-mat-select-search [(ngModel)]="configuredProductSearch"
+                                        [ngModelOptions]="{standalone: true}" placeholderLabel="Search product..."
+                                        noEntriesFoundLabel="No matching product" ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let product of filteredConfiguredProducts()"
                                     [value]="product['id']">{{product['product']}}</mat-option>
                             </mat-select>
                         </mat-form-field>
@@ -160,7 +185,12 @@
                             <mat-label>Filter by Mode</mat-label>
                             <mat-select multiple formControlName="mode"
                                 (selectionChange)="configuredFilter(configuredform.value)">
-                                <mat-option *ngFor="let mode of modesList"
+                                <mat-option>
+                                    <ngx-mat-select-search [(ngModel)]="configuredModeSearch"
+                                        [ngModelOptions]="{standalone: true}" placeholderLabel="Search mode..."
+                                        noEntriesFoundLabel="No matching mode" ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let mode of filteredConfiguredModes()"
                                 [value]="mode">{{mode}}</mat-option>
                             </mat-select>
                         </mat-form-field>
@@ -182,6 +212,9 @@
                                 *ngIf="configuredDateRange.value.start || configuredDateRange.value.end"
                                 (click)="clearConfiguredDateRange()">Clear</button>
                         </div>
+
+                        <button type="button" class="clear-filters-btn" *ngIf="hasConfiguredFilter()"
+                            (click)="clearConfiguredFilters()">✕ Clear Filters</button>
                     </div>
                 </form>
             </div>
@@ -292,7 +325,12 @@
                             <mat-label>Filter by Product</mat-label>
                             <mat-select multiple formControlName="product"
                                 (selectionChange)="notConfiguredFilter(notconfiguredform.value)">
-                                <mat-option *ngFor="let product of productList"
+                                <mat-option>
+                                    <ngx-mat-select-search [(ngModel)]="notConfiguredProductSearch"
+                                        [ngModelOptions]="{standalone: true}" placeholderLabel="Search product..."
+                                        noEntriesFoundLabel="No matching product" ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let product of filteredNotConfiguredProducts()"
                                     [value]="product['id']">{{product['product']}}</mat-option>
                             </mat-select>
                         </mat-form-field>
@@ -301,10 +339,18 @@
                         <mat-label>Filter by Mode</mat-label>
                         <mat-select multiple formControlName="mode"
                             (selectionChange)="notConfiguredFilter(notconfiguredform.value)">
-                            <mat-option *ngFor="let mode of modesList"
+                            <mat-option>
+                                <ngx-mat-select-search [(ngModel)]="notConfiguredModeSearch"
+                                    [ngModelOptions]="{standalone: true}" placeholderLabel="Search mode..."
+                                    noEntriesFoundLabel="No matching mode" ngDefaultControl></ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let mode of filteredNotConfiguredModes()"
                             [value]="mode">{{mode}}</mat-option>
                         </mat-select>
                         </mat-form-field>
+
+                        <button type="button" class="clear-filters-btn" *ngIf="hasNotConfiguredFilter()"
+                            (click)="clearNotConfiguredFilters()">✕ Clear Filters</button>
                     </div>
                 </form>
             </div>
@@ -423,9 +469,10 @@
             </div>
 
             <div class="export-dialog-footer">
+                <span class="export-loading" *ngIf="exportStatsLoading">Loading member counts…</span>
                 <button class="btn-cancel" (click)="closeExportDialog()">Cancel</button>
-                <button class="btn-export" (click)="confirmExport()">
-                    <span>📥</span> Export
+                <button class="btn-export" [disabled]="exportStatsLoading" (click)="confirmExport()">
+                    <span>📥</span> {{ exportStatsLoading ? 'Loading…' : 'Export' }}
                 </button>
             </div>
         </div>
@@ -476,6 +523,14 @@
                     </div>
                 </div>
 
+                <!-- Profile name search -->
+                <div class="dialog-search">
+                    <span class="dialog-search-icon">🔍</span>
+                    <input type="text" [(ngModel)]="dialogSearch" [ngModelOptions]="{standalone: true}"
+                        placeholder="Search participant name...">
+                    <button *ngIf="dialogSearch" class="dialog-search-clear" (click)="dialogSearch = ''">×</button>
+                </div>
+
                 <!-- Data Tables -->
                 <div class="table-section">
                     <div class="table-tabs" *ngIf="['transition'].includes(tableView)">
@@ -493,13 +548,73 @@
                         </button>
                     </div>
 
+                    <!-- Event/Queue: grouped view (Group by Product / Group by Profile) -->
+                    <div class="table-content" *ngIf="tableView === 'event'">
+                        <div class="table-header">
+                            <div style="display: flex; align-items: center;">
+                                <h4>Participant Details</h4>
+                                &nbsp;&nbsp;
+                                <span class="count-badge">{{uniqueProfileCount(selectedMode)}}</span>
+                            </div>
+                            <button class="export-btn" (click)="exportToExcel()">
+                                <span>📥</span> Export
+                            </button>
+                        </div>
+
+                        <div class="event-group-toggle">
+                            <button [class.active]="eventGroupBy === 'product'"
+                                (click)="eventGroupBy = 'product'">Group by Product</button>
+                            <button [class.active]="eventGroupBy === 'profile'"
+                                (click)="eventGroupBy = 'profile'">Group by Profile</button>
+                        </div>
+
+                        <div class="table-container">
+                            <div class="table-wrapper">
+                                <!-- Group by Product -->
+                                <ng-container *ngIf="eventGroupBy === 'product'">
+                                    <div class="event-group" *ngFor="let group of getEventProductGroups(selectedMode)">
+                                        <div class="event-group-header">
+                                            <span>{{group.productName}}</span>
+                                            <span class="count-badge">{{group.profiles.length}}</span>
+                                        </div>
+                                        <table class="data-table">
+                                            <thead>
+                                                <tr><th>#</th><th>Name</th><th>Email</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let p of group.profiles; let i = index">
+                                                    <td>{{i + 1}}</td>
+                                                    <td>{{p.name}}</td>
+                                                    <td>{{p.email}}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </ng-container>
+
+                                <!-- Group by Profile -->
+                                <ng-container *ngIf="eventGroupBy === 'profile'">
+                                    <div class="event-group" *ngFor="let group of getEventProfileGroups(selectedMode)">
+                                        <div class="event-group-header">
+                                            <span>{{group.name}} — {{group.email}}</span>
+                                            <span class="count-badge">{{group.products.length}} product(s)</span>
+                                        </div>
+                                        <ul class="event-product-list">
+                                            <li *ngFor="let prod of group.products">{{prod}}</li>
+                                        </ul>
+                                    </div>
+                                </ng-container>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Participants Table -->
-                    <div class="table-content" *ngIf="activeTab === 'participants'">
+                    <div class="table-content" *ngIf="activeTab === 'participants' && tableView !== 'event'">
                         <div class="table-header">
                             <div style="display: flex;">
                                 <h4>Participant Details</h4>
                                 &nbsp;&nbsp;
-                                <span class="count-badge">{{selectedMode.participantproduct?.length || selectedMode.length}}</span>
+                                <span class="count-badge">{{getDialogParticipants().length}}</span>
                             </div>
                             <button class="export-btn" (click)="exportToExcel()">
                                 <span>📥</span> Export
@@ -523,7 +638,7 @@
                                     </thead>
                                     <tbody>
                                         <tr
-                                            *ngFor="let participant of (tableView == 'transition' ? selectedMode.participantproduct : selectedMode); let i = index">
+                                            *ngFor="let participant of getDialogParticipants(); let i = index">
                                             <td>{{i + 1}}</td>
                                             <td *ngIf="['transition','debug', 'event'].includes(tableView)">{{mapProfile[participant.profileid] || 'N/A'}}</td>
                                             <td *ngIf="['participants'].includes(tableView)">{{mapProfile[participant] || 'N/A'}}</td>

@@ -95,6 +95,26 @@ export class EventParticipationApproveComponent {
   // requestedQueue = []
   // attendenceQueue = []
   loggedInProfileid = null
+
+  /** Number of distinct profiles (deduplicated by profileid) in a given tab's list. */
+  distinctProfiles(list: any[]): number {
+    return new Set((list || []).map(e => e['profileid'])).size
+  }
+
+  /**
+   * Per-product breakdown for a given tab's list: for each product, the number of
+   * distinct profiles (deduplicated by profileid). Sorted by product name.
+   */
+  productProfileCounts(list: any[]): { product: string; count: number }[] {
+    const map = new Map<string, Set<any>>()
+    for (const e of (list || [])) {
+      const product = e['product'] || '—'
+      if (!map.has(product)) map.set(product, new Set())
+      map.get(product).add(e['profileid'])
+    }
+    return Array.from(map, ([product, ids]) => ({ product, count: ids.size }))
+      .sort((a, b) => a.product.localeCompare(b.product))
+  }
   requestselection = new SelectionModel(true,[]);
   attendanceselection = new SelectionModel(true,[]);
   attendedselection = new SelectionModel(true,[]);
