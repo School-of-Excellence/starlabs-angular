@@ -27,6 +27,7 @@ import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { FormOverlayViewComponent } from '../form-overlay-view/form-overlay-view.component';
 
 @Component({
   selector: 'app-view-participants-form',
@@ -50,6 +51,7 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
     MatDividerModule,
     MatProgressSpinnerModule,
     NgxMatSelectSearchModule,
+    FormOverlayViewComponent
   ],
   providers: [
     provideNativeDateAdapter()
@@ -68,6 +70,7 @@ export class ViewParticipantsFormComponent {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
+  @ViewChild('formOverlay') formOverlay: FormOverlayViewComponent;
 
   mapProfile: any = {};
   mapProfileNew: any = {};
@@ -141,6 +144,15 @@ export class ViewParticipantsFormComponent {
   //Like and Flag Filter
   filterLiked = false;
   filterFlagged = false;
+
+  openFormOverlay(row: any) {
+    this.formOverlay.mapProfile = this.mapProfile;
+    this.formOverlay.mapProfileNew = this.mapProfileNew;
+    this.formOverlay.mapQueue = this.mapQueue;
+    this.formOverlay.mapWorkshop = this.mapWorkshop;
+    this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
+    this.formOverlay.viewFormOverlay(row);
+  }
 
   get loadingScreen() {
     return this.dialog.open(LoadingProgressComponent, {
