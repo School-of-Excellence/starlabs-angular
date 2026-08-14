@@ -1836,6 +1836,71 @@
   border-color: #bce9d6;
 }
 
+.ev-day-node--ext .ev-day-badge--ext {
+  color: #ffffff;
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px #ffffff, 0 0 0 5px #fde8c3;
+}
+.ev-day-node--ext .ev-day-badge--ext mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+.ev-day-node--ext:hover {
+  box-shadow: 0 10px 26px -12px rgba(245, 158, 11, 0.4);
+  border-color: #f3ddb2;
+}
+
+/* ---- Completed panel: extend-until picker ---- */
+/* Button (keyboard-accessible) styled like the anchor rows. */
+.extend-item {
+  cursor: pointer;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+
+.extend-item .extend-caret {
+  margin-left: auto;
+  color: #f59e0b;
+  flex: 0 0 auto;
+}
+
+.extend-hint {
+  font-size: 11px;
+  margin-top: 3px;
+  display: block;
+  opacity: 0.6;
+}
+
+.extend-box {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #f3ddb2;
+  border-radius: 10px;
+  background: #fffaf0;
+}
+
+.extend-field {
+  width: 100%;
+}
+
+.extend-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.extend-actions mat-spinner {
+  display: inline-block;
+}
+
 @media (max-width: 600px) {
   .ev-day-section { padding: 20px 16px; border-radius: 14px; }
   .ev-day-node { width: 104px; }
