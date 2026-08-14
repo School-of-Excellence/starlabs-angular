@@ -649,7 +649,7 @@
         <span *ngIf="pagedMode && reachedEnd">No more participants.</span>
       </div>
 
-      <mat-paginator pageSize="50" [pageSizeOptions]="[25, 50, 100]"
+      <mat-paginator pageSize="50" [pageSizeOptions]="pageSizeOptions"
         [length]="pagedMode ? pageLength : dataSource.data.length"
         (page)="onPageEvent($event)" showFirstLastButtons></mat-paginator>
     </div>
