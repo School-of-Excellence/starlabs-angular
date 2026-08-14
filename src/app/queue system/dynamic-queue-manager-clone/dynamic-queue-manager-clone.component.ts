@@ -6353,12 +6353,24 @@ toggleSegmentDropdown() {
     });
 
     this.availableStagesForBulkMove = allStageOptions;
-
+    this.availableStagesForBulkMove.push({
+      stagename: 'Unattended Participants',
+      markascompleted: false
+    });
     this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
     this.showBulkMovePanel = true;
   }
 
   onBulkTargetStageChange(targetStageName: string) {
+    if (targetStageName === 'Unattended Participants') {
+      this.bulkMoveComputedResult = {
+        movable: this.bulkMoveResults,
+        skippedDFU: [],
+        skippedVariation: []
+      };
+      return;
+    }
+
     if (!targetStageName) {
       this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
       return;
@@ -6393,6 +6405,9 @@ toggleSegmentDropdown() {
 
 
   async executeBulkMove(): Promise<void> {
+    if (this.bulkMoveTargetStageKey === 'Unattended Participants') {
+      return this.executeBulkMoveToUnattended();
+    }
     const target = this.availableStagesForBulkMove.find(s => s.stagename === this.bulkMoveTargetStageKey);
     if (!target) return;
 
@@ -6429,13 +6444,129 @@ toggleSegmentDropdown() {
     this.bulkMoveCompleted = true;
   }
 
-    get bulkMovableCount(): number {
-      return this.bulkMoveComputedResult.movable.length;
+  private async markTokensUnattendedBulk(tokens: any[]): Promise<void> {
+    if (!tokens.length) return;
+
+    const batch = writeBatch(this.firestore);
+
+    tokens.forEach(token => {
+      batch.update(doc(this.firestore, 'queue_token', token['docid']), {
+        tokenstatus: 'inActive'
+      });
+      if (token['participantproductid']) {
+        batch.update(doc(this.firestore, 'participantsproduct', token['participantproductid']), {
+          status: 'cancelled'
+        });
+      }
+    });
+
+    const productIds = tokens.map(t => t['participantproductid']).filter(Boolean);
+    const productIdChunks = this.chunkArray(productIds, 10);
+
+    const participation = (await Promise.all(
+      productIdChunks.map(chunk =>
+        getDocs(query(
+          collection(this.firestore, "event participation request"),
+          where("participantproductid", "in", chunk)
+        ))
+      )
+    )).flatMap(snap => snap.docs);
+
+    const queueRefPathByProductId = new Map<string, string>();
+    tokens.forEach(token => {
+      if (token['participantproductid']) {
+        queueRefPathByProductId.set(token['participantproductid'], token['queueref'].path);
+      }
+    });
+
+    const approvedDocs = participation.filter(doc => {
+      const data = doc.data();
+      const expectedPath = queueRefPathByProductId.get(data['participantproductid']);
+      return data['status'] === 'approved' && expectedPath != null && data['eventref'].path === expectedPath;
+    });
+
+    approvedDocs.forEach(doc => {
+      batch.update(doc.ref, { status: 'unattended' });
+    });
+
+    const matchedPlIds = new Map<string, Set<string>>();
+
+    tokens.forEach(token => {
+      const profileParticipantLists = this.participantListMap[token['profile_id']] || [];
+      this.availableSegments.forEach(segment => {
+        const segmentParticipantLists = this.segmentParticipantListMap[segment.id] || [];
+        profileParticipantLists.forEach(plId => {
+          if (segmentParticipantLists.includes(plId)) {
+            if (!matchedPlIds.has(plId)) matchedPlIds.set(plId, new Set());
+            matchedPlIds.get(plId)!.add(token['profile_id']);
+          }
+        });
+      });
+    });
+
+    const uniquePlIds = Array.from(matchedPlIds.keys());
+    const plDocs = await Promise.all(
+      uniquePlIds.map(plId => getDoc(doc(this.firestore, 'participant list', plId)))
+    );
+
+    plDocs.forEach((plDoc, i) => {
+      if (!plDoc.exists()) return;
+      const plId = uniquePlIds[i];
+      const profileIdsToRemove = matchedPlIds.get(plId)!;
+      const profileList: string[] = plDoc.data()['profilelist'] || [];
+      const updatedProfileList = profileList.filter(id => !profileIdsToRemove.has(id));
+      batch.update(plDoc.ref, { profilelist: updatedProfileList });
+    });
+
+    await batch.commit();
+    tokens.forEach(token => {
+      token.tokenstatus = 'inActive';
+      const idx = this.allTokensData.findIndex(t => t.docid === token.docid);
+      if (idx !== -1) {
+        this.allTokensData[idx].tokenstatus = 'inActive';
+      }
+    });
+  }
+
+  async executeBulkMoveToUnattended(): Promise<void> {
+    const tokensToMove = this.bulkMoveResults.map(r => r.token);
+    if (!tokensToMove.length) return;
+
+    if (!confirm(
+      `Are you sure you want to mark ${tokensToMove.length} participant(s) as unattended`
+    )) {
+      return;
     }
 
-    get bulkDFUCount(): number {
-      return this.bulkMoveComputedResult.skippedDFU.length;
+    const loading = this.dialog.open(LoadingProgressComponent, {
+      data: { msg: "Marking Unattended..." },
+      disableClose: true
+    });
+
+    this.bulkMoveInProgress = true;
+    this.bulkMoveFailed = false;
+
+    try {
+      await this.markTokensUnattendedBulk(tokensToMove);
+    } catch (error) {
+      console.error("Error marking participants unattended:", error);
+      this.bulkMoveFailed = true;
+    } finally {
+      loading.close();
     }
+
+    this.bulkMoveInProgress = false;
+    this.bulkMoveCompleted = true;
+    this.processTokensIntoStages(this.allTokensData);
+  }
+
+  get bulkMovableCount(): number {
+    return this.bulkMoveComputedResult.movable.length;
+  }
+
+  get bulkDFUCount(): number {
+    return this.bulkMoveComputedResult.skippedDFU.length;
+  }
 
   closeBulkMovePanel(): void {
     if (this.bulkMoveInProgress) return;
