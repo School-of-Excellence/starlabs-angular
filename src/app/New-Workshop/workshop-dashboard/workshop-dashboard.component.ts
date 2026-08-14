@@ -19,7 +19,9 @@ import {
   Firestore, collection, doc, query, where,
   updateDoc, setDoc, Timestamp, Unsubscribe,
   getDoc, getDocs, onSnapshot, getFirestore, documentId,
+  arrayUnion,
 } from '@angular/fire/firestore';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
@@ -45,7 +47,8 @@ import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsa
     MatProgressSpinnerModule, MatProgressBarModule, MatTableModule,
     MatPaginatorModule, MatSortModule, MatChipsModule, MatExpansionModule, MatSnackBarModule,
     MatListModule, MatTooltipModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule
+    RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule,
+    MatDatepickerModule
   ],
   templateUrl: './workshop-dashboard.component.html',
   styleUrls: ['./workshop-dashboard.component.css']
@@ -77,7 +80,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   evergreenDayDistribution: { day: number; count: number; profileIds: string[] }[] = [];
   evergreenCompletedBucket: { day: number; count: number; profileIds: string[]; completed: boolean } =
     { day: -1, count: 0, profileIds: [], completed: true };
+  // Past-workshop participants with >= 1 evergreenaccessto.extendworkshop entry
+  // live here instead of Completed. activeCount = users whose latest
+  // extenduntill is still in the future.
+  evergreenExtendedBucket: { count: number; profileIds: string[]; activeCount: number } =
+    { count: 0, profileIds: [], activeCount: 0 };
   evergreenDayTotal = 0;
+
+  // Completed-panel extension UI (evergreen only).
+  extendTargetProfileId: string | null = null;
+  extendDate: Date | null = null;
+  extendSaving = false;
+  // Getter, not a field: a dashboard left open past midnight must not allow
+  // picking an already-past day.
+  get extendMinDate(): Date {
+    return new Date();
+  }
 
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
@@ -1449,6 +1467,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (this.workshopData?.evergreenWorkshop !== true || days <= 0) {
       this.evergreenDayDistribution = [];
       this.evergreenCompletedBucket = { day: -1, count: 0, profileIds: [], completed: true };
+      this.evergreenExtendedBucket = { count: 0, profileIds: [], activeCount: 0 };
       this.evergreenDayTotal = 0;
       return;
     }
@@ -1459,6 +1478,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     const buckets: { day: number; count: number; profileIds: string[] }[] = [];
     for (let i = 1; i <= days; i++) buckets.push({ day: i, count: 0, profileIds: [] });
     const completed = { day: -1, count: 0, profileIds: [] as string[], completed: true };
+    const extended = { count: 0, profileIds: [] as string[], activeCount: 0 };
     let total = 0;
 
     for (const p of this.enrolledParticipants) {
@@ -1468,8 +1488,17 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       let day = Math.floor((now - enrolledMs) / DAY_MS) + 1;
       if (day < 1) day = 1; // guard against clock skew / future-dated enrollment
       if (day > days) {
-        completed.count++;
-        completed.profileIds.push(p.profileid);
+        // Anyone with at least one workshop extension moves to Extended.
+        const entries = this.getExtendEntries(p.profileid);
+        if (entries.length > 0) {
+          extended.count++;
+          extended.profileIds.push(p.profileid);
+          const until = this.toMillis(entries[entries.length - 1]?.extenduntill);
+          if (until != null && until >= now) extended.activeCount++;
+        } else {
+          completed.count++;
+          completed.profileIds.push(p.profileid);
+        }
       } else {
         const b = buckets[day - 1];
         b.count++;
@@ -1479,7 +1508,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     this.evergreenDayDistribution = buckets;
     this.evergreenCompletedBucket = completed;
+    this.evergreenExtendedBucket = extended;
     this.evergreenDayTotal = total;
+  }
+
+  // evergreenaccessto.extendworkshop entries from the live participant
+  // workshop doc ([{extenduntill, created}, ...]).
+  private getExtendEntries(profileid: string): any[] {
+    const pw = this.participantWorkshopMap.get(profileid);
+    const arr = pw?.['evergreenaccessto']?.['extendworkshop'];
+    return Array.isArray(arr) ? arr : [];
   }
 
   private toMillis(ts: any): number | null {
@@ -1866,8 +1904,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       subChallengeName: bucket.completed
         ? `Past day ${this.evergreenWorkshopDays} of ${this.evergreenWorkshopDays}`
         : `Day ${bucket.day} of ${this.evergreenWorkshopDays}`,
-      count: bucket.count
+      count: bucket.count,
+      // Completed rows swap the profile link for the extend-date picker.
+      evergreenCompleted: !!bucket.completed
     };
+    this.extendTargetProfileId = null;
+    this.extendDate = null;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
     this.selectedJourneyFilters = [];
@@ -1876,6 +1918,88 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedCategoryFilters = [];
     this.selectedNotStartedTypeFilters = [];
     this.applyFilterSide();
+  }
+
+  // ---- evergreen workshop extension (Completed panel) ----
+  toggleExtendTarget(profileid: string): void {
+    this.extendTargetProfileId = this.extendTargetProfileId === profileid ? null : profileid;
+    this.extendDate = null;
+  }
+
+  // Appends {extenduntill, created} to evergreenaccessto.extendworkshop on the
+  // participant workshop doc — a NEW array index per extension. extenduntill is
+  // pinned to 11:59 pm of the chosen day; created is now. The live participant
+  // workshop snapshot then moves the user from Completed to Extended.
+  async confirmExtend(participant: any): Promise<void> {
+    if (!this.extendDate || this.extendSaving) return;
+    const enrolled = this.enrolledParticipants.find(e => e.profileid === participant.profileid);
+    const ref = enrolled?.participantworkshopref;
+    if (!ref) {
+      this.snackbarService.show('No participant workshop document found for this user');
+      return;
+    }
+
+    this.extendSaving = true;
+    try {
+      const d = this.extendDate;
+      const until = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 0, 0);
+      await updateDoc(ref, {
+        'evergreenaccessto.extendworkshop': arrayUnion({
+          extenduntill: Timestamp.fromDate(until),
+          created: Timestamp.now()
+        })
+      });
+
+      // The snapshot listener re-buckets; update the open panel list optimistically.
+      this.selectedParticipants = this.selectedParticipants.filter(p => p.profileid !== participant.profileid);
+      if (this.selectedStatusInfo) {
+        this.selectedStatusInfo.count = Math.max(0, (this.selectedStatusInfo.count || 1) - 1);
+      }
+      this.applyFilterSide();
+      this.extendTargetProfileId = null;
+      this.extendDate = null;
+      this.snackbarService.show(`Extended ${participant.name} until ${until.toLocaleDateString()}`);
+    } catch (err) {
+      console.error('Error extending workshop access:', err);
+      this.snackbarService.show('Error extending. Please try again.');
+    } finally {
+      this.extendSaving = false;
+    }
+  }
+
+  // Extended node -> premium timeline dialog of every extended user.
+  async openExtendedTimeline(): Promise<void> {
+    const users = this.evergreenExtendedBucket.profileIds.map(id => {
+      const enrolled = this.enrolledParticipants.find(e => e.profileid === id);
+      const entries = this.getExtendEntries(id)
+        .map(e => ({
+          created: this.toMillis(e?.created),
+          extenduntill: this.toMillis(e?.extenduntill)
+        }))
+        .filter(e => e.created != null || e.extenduntill != null)
+        .sort((a, b) => (a.created || 0) - (b.created || 0));
+      return {
+        profileid: id,
+        name: this.mapProfile[id]?.name || 'Unknown',
+        participantworkshopref: enrolled?.participantworkshopref || null,
+        entries
+      };
+    })
+    // Most recently extended user first.
+    .sort((a, b) => {
+      const lastA = a.entries.length ? (a.entries[a.entries.length - 1].created || 0) : 0;
+      const lastB = b.entries.length ? (b.entries[b.entries.length - 1].created || 0) : 0;
+      return lastB - lastA;
+    });
+
+    const { ExtendedTimelineComponent } = await import('./extended-timeline/extended-timeline.component');
+    this.dialog.open(ExtendedTimelineComponent, {
+      width: '860px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: { workshopTitle: this.workshopTitle, users }
+    });
   }
 
   onChallengeMainStatusClick(status: string, challengeIndex: number, count: number) {
