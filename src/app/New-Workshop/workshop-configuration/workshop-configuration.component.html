@@ -1149,6 +1149,13 @@
                         </div>
                         <mat-slide-toggle formControlName="enableshare" (change)="onToggleChange('enableshare', $event)" color="primary"></mat-slide-toggle>
                       </div>
+                      <div *ngIf="settingsForm.get('enableshare')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Share Message</mat-label>
+                          <textarea matInput formControlName="enablesharemessage" rows="3"
+                            placeholder="Enter the message shared along with the workshop"></textarea>
+                        </mat-form-field>
+                      </div>
                     </div>
 
                     <div class="setting-row">
