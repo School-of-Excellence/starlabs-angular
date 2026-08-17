@@ -1215,3 +1215,31 @@
   height: 180px;
   pointer-events: none;
 }
+
+/* "Open Journey Plan" — same look as appointment-studio's journeyplanbtn, centered in the
+   fixed toolbar (absolute so the left controls / right end-button keep their positions). */
+.journeyplanbtn {
+  background: transparent !important;
+  color: #28a745 !important;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.journeyplan-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Small screens: the centered pill would collide with the control cluster — tighten it. */
+@media (max-width: 760px) {
+  .journeyplanbtn { padding: 8px 14px; font-size: 0.8rem; }
+}

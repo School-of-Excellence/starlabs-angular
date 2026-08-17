@@ -236,13 +236,13 @@ export class OpenviduRecordingComponent {
         const collectionName = "openviduroom"
         const roomId = this.guard.generateId(this.firestore, collectionName)
 
-        // Which cloud hosts this room — from openvidu server/mediaprovider (default aws).
-        var activeProvider: 'aws' | 'oci' = 'aws'
+        // Which cloud hosts this room — from openvidu server/mediaprovider (default oci).
+        var activeProvider: 'aws' | 'oci' = 'oci'
         try {
           const providerData = await firstValueFrom(this.infraService.getActiveProvider())
-          if (providerData?.activeprovider === 'oci') activeProvider = 'oci'
+          if (providerData?.activeprovider === 'aws') activeProvider = 'aws'
         } catch (e) {
-          console.log("Active provider read failed, defaulting to aws", e)
+          console.log("Active provider read failed, defaulting to oci", e)
         }
 
         await this.guard.createOpenViduRoom({

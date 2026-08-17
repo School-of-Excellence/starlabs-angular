@@ -333,10 +333,10 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     }
 
     // OpenVidu self-hosted: existing capacity-aware retry loop. The room's mediaProvider
-    // (aws/oci) tells the token function which cluster to issue for — WITHOUT it the server
-    // defaults to aws, so the monitor would try to join an OCI room on the AWS master and
-    // never connect. Missing mediaProvider == aws (legacy rooms).
-    const mediaProvider = this.mapOpenViduRoom[roomID]?.['mediaProvider'] || 'aws';
+    // (aws/oci) tells the token function which cluster to issue for. Missing mediaProvider
+    // == oci (matches the join-livekit-call fallback and the server-side default), so the
+    // monitor joins the same cluster the participants do.
+    const mediaProvider = this.mapOpenViduRoom[roomID]?.['mediaProvider'] || 'oci';
     let retryCount = 0;
 
     while (retryCount <= 3) {
@@ -768,7 +768,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   /** Human label for the provider badge (reflects the actual media backend). */
   getProviderLabel(roomId: string): string {
     if (this.getProvider(roomId) === 'livekit-cloud') return 'LiveKit Cloud';
-    const media = (this.mapOpenViduRoom[roomId]?.['mediaProvider'] || 'aws').toString().toUpperCase();
+    const media = (this.mapOpenViduRoom[roomId]?.['mediaProvider'] || 'oci').toString().toUpperCase();
     return `OpenVidu ${media}`;
   }
 

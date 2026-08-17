@@ -1,36 +1,38 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-18 (session 5 — Audio menu: mic-check, output fix, NC two options)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-07-18-call-ui-audio-pip.md` (§10 = this session).
+_Last updated: 2026-08-14 (session 6 — default provider → OCI, schedulers strictly DB-driven)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-08-14-default-provider-oci.md`.
 
 ## Current state
-- Branch **`videoconference`**; working tree has UNCOMMITTED changes in
-  `src/app/LiveKit/join-livekit-call/` (git commit permission-blocked all session).
-- Call screen Audio menu (`/joinlivekit`, `/joinroom`): mic list · speaker list · **Noise
-  Cancellation two options** — "In-Built Noise Cancellation" (browser NS/EC/AGC, DFN off) vs
-  "Deep Filter Noise" (DFN on raw capture). Mode flip re-acquires the mic via
-  `restartTrack({deviceId, EC/NS/AGC})` (applyConstraints is ignored live by Chrome).
-- **No code auto-toggles DFN anymore** (Bluetooth/HFP auto-disable removed). Input state is
-  observe-only: `[mic-check]` console line on mic set/change says RAW vs PROCESSED
-  (browser-level only; on-device DSP is invisible and reads RAW).
-- Speaker switching: LiveKit path + direct `setSinkId` on every rendered `<audio>`, with a
-  `[speaker]` console line showing each element's resulting sinkId. Safari can't support
-  output switching at all (library + no audiooutput enumeration).
-- `ng build --configuration production` clean (pre-existing CSS warnings only).
+- Branch **`videoconference`**; working tree UNCOMMITTED (this session's provider-default
+  changes + the 2026-07-18 audio-menu changes in `join-livekit-call/`; git permission-blocked).
+- **Default media provider is now `oci` everywhere on the live-call path** (Angular join
+  fallback + sanitizer catch-all, monitor join/badge, instant-meeting default, CF
+  `createOpenViduToken`/recording start/stop `req.body.provider || "oci"`).
+- **Schedulers (`CheckMasternodeStatus`, `CheckOciNodeStatus`) read `activeprovider`
+  STRICTLY from `openvidu server/mediaprovider`** — missing doc/field or read error ⇒ null
+  ⇒ NO lifecycle actions by either controller. The doc is load-bearing in dev AND prod.
+- Recording playback fallback intentionally stays `aws` (legacy recordings; events are
+  webhook-stamped since 2026-07-17). CF housekeeping guards still treat missing field as
+  aws-scoped (only runs when activeprovider=aws) — open question, journaled.
+- `ng build --configuration production` clean (exit 0, pre-existing warnings only);
+  CF `node --check` ×3 + require-load OK (9/10/12 exports).
 
 ## Last session changes — why
-- Operator wants to VALIDATE what each input device delivers before designing any DFN device
-  policy → auto-disable removed, console evidence added instead.
-- Output switching observed broken in Chrome despite a statically-correct livekit-client
-  2.19.1 chain → belt-and-braces direct element setSinkId + evidence logging.
-- NC toggle → two explicit options (same underlying `dfnEnabled` binary); `toggleDfn` (diag
-  panel) delegates to `setNcMode`. restartTrack MUST get deviceId or it silently drops the
-  NS/EC/AGC constraints (verified in livekit source).
+- Operator found rooms created without `mediaProvider` while DB `activeprovider=oci`:
+  only 3 of 7 creation paths stamp the field; the 4 studio/appointment Angular paths do
+  not, and the fallbacks disagreed (Angular oci vs CF aws vs schedulers aws). Directive:
+  absent ⇒ oci on the call path; schedulers trust only the DB. Stamping at the 4 creation
+  sites was NOT requested — routing stays fallback-based.
 
 ## Pending / next
-- **Operator to runtime-test all three**: `[mic-check]` verdicts per device (esp. Bluetooth),
-  speaker switching in Chrome (check the `[speaker]` sinkId line if audio doesn't move), NC
-  mode flip mid-call (expect sub-second mic gap).
-- Decide DFN policy for PROCESSED inputs from the collected `[mic-check]` evidence.
-- Open threads from §9/§3 of the journal: PiP decision (manual-only vs nudge vs Document-PiP),
-  backend multi-provider threads (2026-07-17 journal), OpenVidu AWS migration items (memory).
-- **Commit the working tree** once git is permitted; push stays operator-gated.
+- ✅ DONE (dev): `flushOpenviduCallQuality` deleted from starlabs-test (archived in CF
+  `components/depreciated.js`) and all 20 media functions deployed clean. Prod
+  (`fir-sample-aae4a`) still needs the same delete+deploy at cutover.
+- Angular rebuild/deploy for client-side fallbacks; verify `openvidu server/mediaprovider`
+  exists in BOTH projects. Operator will also disable `CheckMasternodeStatus` (caveats
+  in journal: no AWS auto-stop while disabled; re-enable before any switch back to aws).
+- Runtime-verify: no-provider token → OCI creds; scheduler doc-present and doc-absent
+  behavior; field-less room join lands on OCI and gets stamped at first token.
+- Carry-over: operator runtime tests from session 5 (`[mic-check]`, speaker switching,
+  NC mode flip); PiP decision; DO bring-up parked; Phase-6 OCI prod; AWS-migration
+  cleanup (memory). **Commit both repos** once git is permitted; push stays operator-gated.

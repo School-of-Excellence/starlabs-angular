@@ -4,9 +4,9 @@ import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, Firestore } from '@angular/fire/firestore';
+import { doc, docData, getDoc, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { OpenviduVideoElementComponent } from '../../OpenVidu/openvidu-video-element/openvidu-video-element.component';
 import { CommonModule } from '@angular/common';
@@ -75,9 +75,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
-  // Media backend provider for this room: 'aws' (default/current) | 'do' | 'oci'.
+  // Media backend provider for this room: 'oci' (default) | 'aws' | 'do'.
   // Resolved from the ?provider= query param (manual testing) or the Firestore room field.
-  provider: 'aws' | 'do' | 'oci' = 'aws';
+  provider: 'aws' | 'do' | 'oci' = 'oci';
 
   // Server Subscription
   serverSubscription = new Subject<void>();
@@ -95,6 +95,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private lastActiveSpeaker: string | null = null;
   private pipCanvas: HTMLCanvasElement | null = null;
   private pipVisibilityHandler: (() => void) | null = null;
+
+  // "Open Journey Plan" (bottom-center) — shown only for journey-coach/onboarding
+  // appointments (twin of the appointment-studio button; opens /journeysupport/<client>).
+  journeyPlanProfileId: string | null = null;
 
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
@@ -176,6 +180,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
+    private router: Router,
     public httpClient: HttpClient,
     public guard: AuthguardService,
     public dialog: MatDialog,
@@ -211,9 +216,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
             // Resolve which media backend (cloud) hosts this room's OpenVidu Elastic cluster.
             // NB: the existing `provider` field means system (openvidu vs livekit-cloud) and is
             // rewritten to "openvidu" by createOpenViduToken — so the cloud selector uses a SEPARATE
-            // `mediaProvider` field. Priority: ?provider= query param (manual A/B) → mediaProvider → 'aws'.
-            const requestedProvider = (this.route.snapshot.queryParamMap.get("provider") || data["mediaProvider"] || "aws").toString().toLowerCase()
-            this.provider = requestedProvider === "do" ? "do" : requestedProvider === "oci" ? "oci" : "aws"
+            // `mediaProvider` field. Priority: ?provider= query param (manual A/B) → mediaProvider → 'oci'.
+            const requestedProvider = (this.route.snapshot.queryParamMap.get("provider") || data["mediaProvider"] || "oci").toString().toLowerCase()
+            this.provider = requestedProvider === "do" ? "do" : requestedProvider === "aws" ? "aws" : "oci"
 
             console.log("Provider", this.provider)
 
@@ -244,9 +249,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           }
         })
 
+        // Journey-plan button gate: room id == appointment docid for appointment sessions.
+        // Non-appointment rooms (live assignment / private) simply have no matching doc.
+        getDoc(doc(this.firestore, "appointments", id)).then(appt => {
+          const a = appt.exists() ? appt.data() : null
+          if (a && (a["journeycoach"] || a["onboarding"]) && a["bookedby"]?.id) {
+            this.journeyPlanProfileId = a["bookedby"].id
+          }
+        }).catch(err => console.log("Journey-plan appointment lookup failed:", err))
+
         this.loading = false
       })
     }
+  }
+
+  /** Bottom-center toolbar button — same target as appointment-studio's Open Journey Plan. */
+  openJourneyPlan(): void {
+    if (!this.journeyPlanProfileId) return
+    const url = this.router.createUrlTree(['/journeysupport', this.journeyPlanProfileId]).toString()
+    window.open(url, '_blank')
   }
 
   ngOnDestroy(): void {
@@ -1047,6 +1068,22 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     (el as any).autoPictureInPicture = true;
     el.disablePictureInPicture = false;
 
+    // ── Auto-PiP eligibility snapshot (diagnosis step 1) ──────────────────────
+    // Logs every capability Chrome needs for automatic PiP on tab switch, so a failed
+    // auto-pop can be pinned to the exact missing prerequisite from the console alone.
+    const chromeVer = (navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/) || [])[1] ?? null;
+    console.log('%c[pip] eligibility snapshot', 'font-weight:bold;color:#03a9f4', {
+      browser: navigator.userAgent,
+      chromeMajorVersion: chromeVer,
+      chromeAutoPipViaMediaSession: chromeVer ? (Number(chromeVer) >= 134 ? 'YES (>=134)' : `NO (Chrome ${chromeVer} < 134)`) : 'not Chrome',
+      pictureInPictureEnabled: (document as any).pictureInPictureEnabled ?? false,
+      requestPictureInPicture: 'requestPictureInPicture' in HTMLVideoElement.prototype,
+      autoPictureInPictureAttr: 'autoPictureInPicture' in HTMLVideoElement.prototype,
+      mediaSession: 'mediaSession' in navigator,
+      documentPiP: 'documentPictureInPicture' in window,
+      isInstalledPwa: window.matchMedia?.('(display-mode: standalone)').matches ?? false,
+    });
+
     el.addEventListener('enterpictureinpicture', () => console.log('[pip] entered'));
     el.addEventListener('leavepictureinpicture', () => console.log('[pip] left'));
 
@@ -1055,6 +1092,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // requestPictureInPicture without a fresh gesture WHILE the tab is capturing camera/mic.
     if ('mediaSession' in navigator && 'setActionHandler' in navigator.mediaSession) {
       try {
+        // Chrome's auto-PiP eligibility wants an ACTIVE media session, not just a registered
+        // handler. Metadata + playbackState is what marks the session active (the remote
+        // <audio> elements provide the audible playback that anchors it).
+        try {
+          (navigator.mediaSession as any).metadata = new MediaMetadata({
+            title: 'Live meeting',
+            artist: 'StarLabs',
+          });
+        } catch (me) { console.warn('[pip] MediaMetadata failed:', me); }
         (navigator.mediaSession as any).playbackState = 'playing';
         navigator.mediaSession.setActionHandler('enterpictureinpicture' as any, () => {
           console.log('[pip] mediaSession enterpictureinpicture FIRED');
@@ -1073,7 +1119,24 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // are (A) the mediaSession enterpictureinpicture action above, or the autoPictureInPicture
     // attribute — both Chrome-internal. This listener only EXITS PiP when returning to the tab.
     this.pipVisibilityHandler = () => {
-      if (!document.hidden && (document as any).pictureInPictureElement === el) {
+      if (document.hidden) {
+        // Diagnosis step 1: state at the exact moment of tab switch. If Chrome's auto-PiP
+        // doesn't pop, this line shows which prerequisite was false when it mattered.
+        const stream = el.srcObject as MediaStream | null;
+        console.log('%c[pip] tab hidden — auto-PiP state', 'font-weight:bold;color:#03a9f4', {
+          videoPlaying: !el.paused && el.readyState >= 2,
+          paused: el.paused,
+          readyState: el.readyState,
+          hasSource: !!stream,
+          sourceTracks: stream?.getVideoTracks().map(t => t.label || t.id) ?? [],
+          alreadyInPip: !!(document as any).pictureInPictureElement,
+          mediaSessionPlaybackState: (navigator as any).mediaSession?.playbackState ?? 'n/a',
+          remoteParticipants: this.remoteParticipants().size,
+        });
+        console.log('[pip] now waiting for Chrome to fire the mediaSession enterpictureinpicture action — if no "[pip] mediaSession … FIRED" line follows, Chrome declined auto-PiP (version < 134, site setting blocked, or video not eligible)');
+        return;
+      }
+      if ((document as any).pictureInPictureElement === el) {
         (document as any).exitPictureInPicture?.().catch(() => {});
       }
     };
@@ -1118,8 +1181,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         }
       }
       if (!el.srcObject) { alert('No video available to show in Picture-in-Picture. Turn your camera on or wait for a participant.'); return; }
-      // The video must have frames before requestPictureInPicture — wait for metadata/play.
-      await el.play().catch(() => {});
+      // Safari: transient user activation does NOT survive awaits — request PiP in the
+      // same task as the click when frames are already there (the normal case, since the
+      // pip video plays continuously). Only fall back to waiting when data isn't ready.
+      el.play().catch(() => {});
       if (el.readyState < 2) {
         await new Promise<void>(res => { el.onloadeddata = () => res(); setTimeout(res, 1000); });
       }

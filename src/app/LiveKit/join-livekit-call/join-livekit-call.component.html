@@ -543,7 +543,13 @@
 
     </div>
 
-    <button 
+    <!-- Journey plan — bottom-center, hosts only, journey-coach/onboarding appointments -->
+    <button *ngIf="journeyPlanProfileId && roomDetail.hosts.includes(loggedinProfileid)"
+      class="journeyplanbtn journeyplan-center" (click)="openJourneyPlan()">
+      Open Journey Plan
+    </button>
+
+    <button
       *ngIf="roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']; else leaveMenu"
       class="zoom-btn-end" mat-icon-button [matMenuTriggerFor]="userMenu" (click)="isFullscreen ? toggleFullscreen() : null"
     >
