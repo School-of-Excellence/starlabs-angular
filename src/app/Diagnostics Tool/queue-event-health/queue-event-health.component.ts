@@ -1373,6 +1373,7 @@ export class QueueEventHealthComponent {
         participantproductid: token['participantproductid'],
         eventref: token['eventref'],
         productref: token['productref'],
+        deliveryref: token['deliveryRef'] ?? null,
         profileid: token['profile_id'],
         productName: token['participantproductid']
         ? (token['productname'] ?? '-')
@@ -1687,6 +1688,82 @@ export class QueueEventHealthComponent {
 
     if (updateCount === 0) {
       alert('Nothing to update — selected records already have this status.');
+      return;
+    }
+
+    await batch.commit();
+    // Clear selection
+    selectedRecords.forEach(r => r.selected = false);
+  }
+
+  // Reinitiate function
+  async bulkReinitiate() {
+    const selectedRecords = this.activeView === 'initiated_not_in_queue'
+      ? this.initiatedNotInQueueRecords.filter(r => r.selected)
+      : this.allRecords.filter(r => r.selected);
+
+    if (selectedRecords.length === 0) {
+      alert('No participants selected');
+      return;
+    }
+
+    if (!this.queueEndDate) {
+      alert('Queue end date not found. Cannot reinitiate.');
+      return;
+    }
+
+    const confirmAction = confirm(
+      `Are you sure you want to reinitiate ${selectedRecords.length} participant(s)?\n\n` +
+      `This will:\n` +
+      `• Set Token Status → active\n` +
+      `• Set Event Participation → approved\n` +
+      `• Set Product Status → ongoing (Mode: Event Mode)\n` +
+      `• Set Deliverable Status → ongoing\n\n` +
+      `This action cannot be undone.`
+    );
+
+    if (!confirmAction) {
+      return;
+    }
+
+    const nextModeDate = Timestamp.fromDate(this.queueEndDate);
+    const batch = writeBatch(this.firestoreDefault);
+    let updateCount = 0;
+
+    for (const record of selectedRecords) {
+
+      if (record.tokenDocId && String(record.tokenStatus).toLowerCase() !== 'active') {
+        const tokenRef = doc(this.firestoreDefault, 'queue_token', record.tokenDocId);
+        batch.update(tokenRef, { tokenstatus: 'Active' });
+        updateCount++;
+      }
+
+      if (record.eventParticipationId && String(record.eventParticipationStatus).toLowerCase() !== 'approved') {
+        const epRef = doc(this.firestoreDefault, 'event participation request', record.eventParticipationId);
+        batch.update(epRef, { status: 'approved' });
+        updateCount++;
+      }
+
+      if (record.participantproductid && String(record.productStatus).toLowerCase() !== 'ongoing') {
+        const ppRef = doc(this.firestoreDefault, 'participantsproduct', record.participantproductid);
+        batch.update(ppRef, {
+          status: 'ongoing',
+          mode: 'Event Mode',
+          nextmode: 'Integration Mode',
+          nextmodedate: nextModeDate,
+          'statusdate.ongoing': serverTimestamp()
+        });
+        updateCount++;
+      }
+
+      if (record.deliveryref && String(record.deliveryStatus).toLowerCase() !== 'ongoing') {
+        batch.update(record.deliveryref, { status: 'ongoing' });
+        updateCount++;
+      }
+    }
+
+    if (updateCount === 0) {
+      alert('Nothing to update.');
       return;
     }
 

@@ -239,6 +239,15 @@
     Mark As Attended ({{ selectedCount }})
   </button>
 
+  <button
+    *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
+    (click)="bulkReinitiate()"
+    [disabled]="selectedCount === 0"
+    class="bulk-btn"
+    style="margin-left: 12px;">
+    Reinitiate ({{ selectedCount }})
+  </button>
+
 <!-- ALL TOKENS TABLE -->
   <div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0 && activeView === 'main' && !showAtcNameList">
     <table>
