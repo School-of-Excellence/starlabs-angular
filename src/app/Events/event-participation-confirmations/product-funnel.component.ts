@@ -522,7 +522,7 @@ export class ProductFunnelComponent implements OnInit {
         else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
       // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
-      // live bucket they still qualify for (owner / scanned→approved / requested), in ADDITION to their own
+      // live bucket they still qualify for (owner / requested), in ADDITION to their own
       // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
 
       // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
@@ -542,16 +542,19 @@ export class ProductFunnelComponent implements OnInit {
       const scanned = new Set<string>();
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
 
-      // Approved cohort = EPR approved/attended OR physically scanned (a scan means they were ticketed).
-      // Cohort members are not "requested". Attendance itself is EPR-only (see isAttended below), and
-      // every 'attended' EPR doc also lands in approvedReq, so attended stays a subset of approved.
-      const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
+      // Approved cohort = `event participation request` with status 'approved' or 'attended', ONLY.
+      // (operator directive) A physical e-ticket scan no longer confers membership of any bucket — it is
+      // kept solely as the `· scanned` badge on the row. Every 'attended' EPR doc also lands in
+      // approvedReq, so attended stays a subset of approved.
+      // Cohort members are not "requested" — they are removed from requestedData below.
+      const cohort = new Set<string>([...approvedReq.keys()]);
       cohort.forEach(p => requestedData.delete(p));
 
       // (removed) previously unattended/revoked were dropped from cohort/owner sets so they only showed in
       // their terminal segment. Per operator directive they now stay in every live bucket they qualify for.
-      // Consequence: a scanned-then-revoked person is in BOTH `approved` (cohort) and `revoked`; the counts
-      // and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid inflation.
+      // Consequence: a revoked person who still owns the product is in BOTH `potential` and `revoked`; the
+      // counts and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid
+      // inflation.
 
       const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
       const rows: PRow[] = [];
@@ -563,11 +566,12 @@ export class ProductFunnelComponent implements OnInit {
         // whatever live membership their source data still gives them AND retains their terminal flag.
         const isOwner = owners.has(pid);
         const isScanned = scanned.has(pid);
-        // Attendance is EPR-only (operator directive): a row counts as attended solely when its
-        // `event participation request` doc has status 'attended'. An e-ticket scan still puts the
-        // person in the approved cohort (below) but no longer marks them attended on its own.
+        // Approval and attendance are both EPR-only (operator directive): a row is approved when its
+        // `event participation request` doc has status 'approved' or 'attended', and attended only when
+        // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
+        // `· scanned` badge and nothing else.
         const isAttended = attendedIds.has(pid);
-        const inCohort = approvedReq.has(pid) || isScanned;
+        const inCohort = approvedReq.has(pid);
         const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
@@ -621,8 +625,9 @@ export class ProductFunnelComponent implements OnInit {
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
         unattended: rows.filter(r => r.isUnattended).length,
         revoked: rows.filter(r => r.isRevoked).length,
-        // De-duplicated union — a scanned-then-revoked person is in both `cohort` and `revokedIds`, so a raw
-        // sum would double-count. Count unique rows matching the same predicate as the segment filter.
+        // De-duplicated union — a revoked person who still owns the product / has a live request sits in
+        // more than one source set, so a raw sum would double-count. Count unique rows matching the same
+        // predicate as the segment filter.
         overallRequested: rows.filter(r => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked).length
       };
 
