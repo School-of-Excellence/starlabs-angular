@@ -1,0 +1,81 @@
+<div class="ext-dialog">
+  <div class="ext-head">
+    <div class="ext-head-icon">
+      <mat-icon>more_time</mat-icon>
+    </div>
+    <div class="ext-head-text">
+      <h2>Extended Participants</h2>
+      <p>
+        {{ data.workshopTitle }}
+        <span class="ext-head-dot">•</span>
+        {{ users.length }} {{ users.length === 1 ? 'participant' : 'participants' }}
+      </p>
+    </div>
+    <button mat-icon-button type="button" class="ext-close" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="ext-search" *ngIf="users.length > 3">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ext-search-field">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchText" placeholder="Search participants" />
+    </mat-form-field>
+  </div>
+
+  <div class="ext-body">
+    <div class="ext-card" *ngFor="let u of filteredUsers">
+      <div class="ext-card-head">
+        <span class="ext-avatar">{{ initials(u.name) }}</span>
+        <div class="ext-card-text">
+          <span class="ext-name">{{ u.name }}</span>
+          <span class="ext-sub">
+            {{ u.entries.length }} {{ u.entries.length === 1 ? 'extension' : 'extensions' }}
+          </span>
+        </div>
+        <span class="ext-status" [class.on]="isActive(u)">
+          {{ isActive(u) ? 'Active until' : 'Expired' }}
+          {{ latestEntry(u)?.extenduntill | date: 'MMM d, y' }}
+        </span>
+        <button mat-stroked-button type="button" class="ext-again-btn"
+                (click)="toggleExtend(u.profileid)" [disabled]="saving">
+          <mat-icon>more_time</mat-icon>
+          {{ extendFor === u.profileid ? 'Close' : 'Extend again' }}
+        </button>
+      </div>
+
+      <div class="ext-extend-box" *ngIf="extendFor === u.profileid">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ext-extend-field">
+          <mat-label>Extend until</mat-label>
+          <input matInput [matDatepicker]="extAgainPicker" [min]="minDateFor(u)" [(ngModel)]="extendDate"
+                 readonly (click)="extAgainPicker.open()" />
+          <mat-datepicker-toggle matIconSuffix [for]="extAgainPicker"></mat-datepicker-toggle>
+          <mat-datepicker #extAgainPicker></mat-datepicker>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button"
+                (click)="confirmExtend(u)" [disabled]="!extendDate || saving">
+          <mat-spinner diameter="16" *ngIf="saving"></mat-spinner>
+          <span *ngIf="!saving">Extend</span>
+        </button>
+      </div>
+
+      <div class="ext-timeline">
+        <div class="ext-event" *ngFor="let e of u.entries; let last = last" [class.current]="last">
+          <span class="ext-dot"></span>
+          <div class="ext-event-body">
+            <span class="ext-event-title">Access until {{ e.extenduntill | date: 'EEE, MMM d, y' }}</span>
+            <span class="ext-event-meta">Extended on {{ e.created | date: 'MMM d, y · h:mm a' }}</span>
+          </div>
+          <span class="ext-event-chip" *ngIf="last" [class.on]="isActive(u)">
+            {{ isActive(u) ? 'Current' : 'Lapsed' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ext-empty" *ngIf="filteredUsers.length === 0">
+      <mat-icon>search_off</mat-icon>
+      <span>No extended participants match your search.</span>
+    </div>
+  </div>
+</div>
