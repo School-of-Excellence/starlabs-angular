@@ -1,0 +1,427 @@
+/* ============================================================
+   EiFlix Operations Dashboard — "operations ledger" aesthetic
+   Porcelain canvas · ink typography (Geist) · tabular metrics
+   (Geist Mono) · hairline borders · tinted accent chips.
+   All future dashboard sections reuse these tokens.
+   ============================================================ */
+
+.eod-page {
+  /* ---- design tokens ---- */
+  --eod-bg: #f6f6f3;
+  --eod-surface: #ffffff;
+  --eod-ink: #17181c;
+  --eod-ink-2: #5d6169;
+  --eod-ink-3: #6a6f78;
+  --eod-hairline: #e8e8e3;
+  --eod-indigo: #4753e6;
+  --eod-indigo-tint: rgba(71, 83, 230, 0.09);
+  --eod-emerald: #0c8a5f;
+  --eod-emerald-tint: rgba(12, 138, 95, 0.10);
+  --eod-shadow-rest: 0 1px 2px rgba(23, 24, 28, 0.05);
+  --eod-shadow-lift: 0 14px 32px -8px rgba(23, 24, 28, 0.14);
+  --eod-radius: 18px;
+
+  min-height: 100vh;
+  box-sizing: border-box;
+  background:
+    radial-gradient(1100px 400px at 85% -10%, rgba(71, 83, 230, 0.05), transparent 60%),
+    var(--eod-bg);
+  color: var(--eod-ink);
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  padding: clamp(20px, 4vw, 44px) clamp(16px, 5vw, 56px) 64px;
+}
+.eod-page *,
+.eod-page *::before,
+.eod-page *::after { box-sizing: border-box; }
+
+/* ============ Page header ============ */
+.eod-header {
+  max-width: 1240px;
+  margin: 0 auto 36px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  animation: eod-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.eod-eyebrow {
+  display: block;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--eod-ink-3);
+  margin-bottom: 8px;
+}
+.eod-title {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.eod-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+.eod-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a6f4d;
+  background: var(--eod-emerald-tint);
+  border: 1px solid rgba(12, 138, 95, 0.18);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+.eod-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--eod-emerald);
+  animation: eod-pulse 1.8s ease-in-out infinite;
+}
+.eod-date {
+  font-size: 13px;
+  color: var(--eod-ink-2);
+}
+
+/* ============ Section ============ */
+.eod-section { max-width: 1240px; margin: 0 auto; }
+.eod-section-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  animation: eod-rise 0.5s 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.eod-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--eod-ink-2);
+  white-space: nowrap;
+}
+.eod-section-rule { flex: 1; height: 1px; background: var(--eod-hairline); }
+
+.eod-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fdf1f0;
+  border: 1px solid #f3d2ce;
+  color: #a13c31;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+.eod-error mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+/* ============ Stat cards ============ */
+.eod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 18px;
+}
+.eod-card {
+  appearance: none;
+  border: 1px solid var(--eod-hairline);
+  background: var(--eod-surface);
+  border-radius: var(--eod-radius);
+  box-shadow: var(--eod-shadow-rest);
+  padding: 22px 22px 20px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: inherit;
+  color: inherit;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.25s ease;
+  animation: eod-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.eod-card:hover,
+.eod-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: var(--eod-shadow-lift);
+}
+.eod-card:focus-visible { outline: 2px solid var(--eod-indigo); outline-offset: 2px; }
+.eod-accent-indigo.eod-card:hover { border-color: rgba(71, 83, 230, 0.35); }
+.eod-accent-emerald.eod-card:hover { border-color: rgba(12, 138, 95, 0.35); }
+
+.eod-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.eod-chip {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eod-chip mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.eod-accent-indigo .eod-chip { background: var(--eod-indigo-tint); color: var(--eod-indigo); }
+.eod-accent-emerald .eod-chip { background: var(--eod-emerald-tint); color: var(--eod-emerald); }
+
+.eod-card-arrow {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--eod-ink-3);
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.eod-card:hover .eod-card-arrow,
+.eod-card:focus-visible .eod-card-arrow { opacity: 1; transform: translate(0, 0); }
+
+.eod-card-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--eod-ink-2);
+  letter-spacing: 0.01em;
+}
+.eod-count {
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(34px, 4vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--eod-ink);
+}
+.eod-card-caption {
+  font-size: 12.5px;
+  color: var(--eod-ink-3);
+  letter-spacing: 0.01em;
+}
+.eod-skeleton {
+  display: block;
+  width: 96px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #eeeeea 40%, #f8f8f5 50%, #eeeeea 60%);
+  background-size: 200% 100%;
+  animation: eod-shimmer 1.4s ease-in-out infinite;
+}
+
+/* ============ Backdrop + side panel ============ */
+.eod-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 24, 28, 0.38);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 1000;
+}
+.eod-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  background: var(--eod-surface, #fff);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -24px 0 64px -16px rgba(23, 24, 28, 0.28);
+  border-left: 1px solid var(--eod-hairline, #e8e8e3);
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  color: #17181c;
+}
+
+.eod-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 18px;
+  border-bottom: 1px solid #e8e8e3;
+}
+.eod-panel-titles { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.eod-panel-chip {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eod-panel-chip mat-icon { font-size: 22px; width: 22px; height: 22px; }
+.eod-panel.eod-accent-indigo .eod-panel-chip { background: rgba(71, 83, 230, 0.09); color: #4753e6; }
+.eod-panel.eod-accent-emerald .eod-panel-chip { background: rgba(12, 138, 95, 0.10); color: #0c8a5f; }
+.eod-panel-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.eod-panel-caption { font-size: 12.5px; color: var(--eod-ink-3, #6a6f78); }
+.eod-panel-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.eod-panel-count {
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  background: #f2f2ee;
+  border: 1px solid #e8e8e3;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.eod-close {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #5d6169;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.eod-close:hover { background: #f2f2ee; color: #17181c; }
+.eod-close mat-icon { font-size: 20px; width: 20px; height: 20px; }
+
+.eod-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px 24px;
+  overscroll-behavior: contain;
+}
+
+/* ---- user rows ---- */
+.eod-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 10px;
+  border-radius: 14px;
+  border-bottom: 1px solid #f0f0eb;
+  transition: background 0.18s ease;
+}
+.eod-row:last-child { border-bottom: none; }
+.eod-row:hover { background: #f7f7f4; }
+.eod-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eeeef7;
+  color: #4753e6;
+  font-family: 'Geist Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.eod-panel.eod-accent-emerald .eod-avatar { background: rgba(12, 138, 95, 0.10); color: #0c8a5f; }
+.eod-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.eod-row-name {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eod-row-email {
+  font-size: 12.5px;
+  color: #5d6169;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eod-row-side {
+  flex: none;
+  max-width: 45%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.eod-row-phone {
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: #17181c;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eod-row-date { font-size: 11.5px; color: var(--eod-ink-3, #6a6f78); }
+
+/* ---- empty state ---- */
+.eod-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 72px 20px;
+  color: var(--eod-ink-3, #6a6f78);
+  text-align: center;
+}
+.eod-empty mat-icon { font-size: 34px; width: 34px; height: 34px; opacity: 0.6; }
+.eod-empty p { margin: 0; font-size: 14px; }
+
+/* ============ Motion ============ */
+@keyframes eod-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes eod-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(12, 138, 95, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(12, 138, 95, 0); }
+}
+@keyframes eod-shimmer {
+  0% { background-position: 180% 0; }
+  100% { background-position: -20% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eod-header, .eod-section-head, .eod-card { animation: none; }
+  .eod-card, .eod-card-arrow, .eod-row { transition: none; }
+  .eod-live-dot { animation: none; }
+  .eod-skeleton { animation: none; background: #eeeeea; }
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 640px) {
+  .eod-page { padding: 18px 14px 48px; }
+  .eod-header { margin-bottom: 26px; }
+  .eod-grid { grid-template-columns: 1fr; gap: 14px; }
+  .eod-panel { width: 100vw; border-left: none; }
+  .eod-row { flex-wrap: wrap; }
+  .eod-row-side {
+    width: 100%;
+    max-width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 53px;
+  }
+}

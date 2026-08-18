@@ -339,3 +339,10 @@ body:has(#zmmtg-root) { background: #000; }
 }
 .update-snackbar .mat-mdc-snack-bar-label,
 .update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; flex: 0 0 auto; }
+
+/* EiFlix operations dashboard — modal scroll lock (class-based so it beats
+   the body { overflow: auto !important } rule above; works on iOS Safari). */
+body.eod-scroll-lock,
+body.eod-scroll-lock .mat-drawer-content {
+  overflow: hidden !important;
+}

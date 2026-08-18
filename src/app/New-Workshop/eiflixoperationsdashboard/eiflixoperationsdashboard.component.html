@@ -1,1 +1,121 @@
-<p>eiflixoperationsdashboard works!</p>
+<div class="eod-page" [@.disabled]="reducedMotion">
+
+  <!-- ============ Page header ============ -->
+  <header class="eod-header">
+    <div class="eod-header-titles">
+      <span class="eod-eyebrow">EiFlix &middot; Operations</span>
+      <h1 class="eod-title">Operations Dashboard</h1>
+    </div>
+    <div class="eod-header-meta">
+      <span class="eod-live"><span class="eod-live-dot"></span>Live</span>
+      <span class="eod-date">{{ today | date: 'EEEE, MMM d, y' }}</span>
+    </div>
+  </header>
+
+  <!-- ============ New Users section ============ -->
+  <section class="eod-section">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">New Users</h2>
+      <span class="eod-section-rule"></span>
+    </div>
+
+    @if (loadError) {
+      <div class="eod-error">
+        <mat-icon>error_outline</mat-icon>
+        <span>Couldn&rsquo;t load new user data. Please refresh to try again.</span>
+      </div>
+    }
+
+    <div class="eod-grid">
+      @for (card of cards; track card.key; let i = $index) {
+        <button
+          type="button"
+          class="eod-card"
+          [class.eod-accent-indigo]="card.accent === 'indigo'"
+          [class.eod-accent-emerald]="card.accent === 'emerald'"
+          [style.animation-delay.ms]="80 + i * 90"
+          (click)="openPanel(card)"
+          [attr.aria-label]="card.title + ', ' + card.users.length + ' users. Open details panel'">
+          <div class="eod-card-top">
+            <span class="eod-chip"><mat-icon>{{ card.icon }}</mat-icon></span>
+            <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
+          </div>
+          <span class="eod-card-label">{{ card.title }}</span>
+          @if (loading) {
+            <span class="eod-skeleton" aria-hidden="true"></span>
+          } @else {
+            <span class="eod-count">{{ card.displayCount | number }}</span>
+          }
+          <span class="eod-card-caption">{{ card.caption }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- ============ Detail side panel ============ -->
+  @if (activeCard; as card) {
+    <div class="eod-backdrop" @fade (click)="closePanel()" aria-hidden="true"></div>
+
+    <aside
+      class="eod-panel"
+      @slide
+      role="dialog"
+      aria-modal="true"
+      cdkTrapFocus
+      cdkTrapFocusAutoCapture
+      tabindex="-1"
+      [class.eod-accent-indigo]="card.accent === 'indigo'"
+      [class.eod-accent-emerald]="card.accent === 'emerald'"
+      [attr.aria-label]="card.title">
+      <header class="eod-panel-head">
+        <div class="eod-panel-titles">
+          <span class="eod-panel-chip"><mat-icon>{{ card.icon }}</mat-icon></span>
+          <div>
+            <h3 class="eod-panel-title">{{ card.title }}</h3>
+            <span class="eod-panel-caption">{{ card.caption }}</span>
+          </div>
+        </div>
+        <div class="eod-panel-actions">
+          <span class="eod-panel-count">{{ card.users.length | number }}</span>
+          <button type="button" class="eod-close" (click)="closePanel()" aria-label="Close panel">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </header>
+
+      <div class="eod-panel-body">
+        @if (loading) {
+          <div class="eod-empty">
+            <mat-icon>hourglass_empty</mat-icon>
+            <p>Loading users&hellip;</p>
+          </div>
+        } @else if (loadError) {
+          <div class="eod-empty">
+            <mat-icon>error_outline</mat-icon>
+            <p>Couldn&rsquo;t load users. Please refresh to try again.</p>
+          </div>
+        } @else if (card.users.length === 0) {
+          <div class="eod-empty">
+            <mat-icon>hourglass_empty</mat-icon>
+            <p>No users here yet.</p>
+          </div>
+        } @else {
+          @for (user of card.users; track user.id) {
+            <article class="eod-row">
+              <span class="eod-avatar" aria-hidden="true">{{ user.initialsLabel }}</span>
+              <div class="eod-row-main">
+                <span class="eod-row-name">{{ user.name || '—' }}</span>
+                <span class="eod-row-email">{{ user.email || '—' }}</span>
+              </div>
+              <div class="eod-row-side">
+                <span class="eod-row-phone">{{ user.phonenumber || '—' }}</span>
+                <span class="eod-row-date">{{ user.createdLabel }}</span>
+              </div>
+            </article>
+          }
+        }
+      </div>
+    </aside>
+  }
+
+</div>
