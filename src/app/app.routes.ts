@@ -281,6 +281,8 @@ export const routes: Routes = [
   {path: 'engagementdashboard', loadComponent: () => import('./New-Workshop/engagement-dashboard/engagement-dashboard.component').then(m => m.EngagementDashboardComponent),canActivate:[authGuard]},
   {path: 'bigengagementdashboard', loadComponent: () => import('./New-Workshop/capacity-dashboard/capacity-dashboard.component').then(m => m.CapacityDashboardComponent),canActivate:[authGuard]},
   {path: 'bigeventmentor', loadComponent: () => import('./New-Workshop/bigeventmentor/bigeventmentor.component').then(m => m.BigeventmentorComponent),canActivate:[authGuard]},
+  {path: 'eiflixoperationsdashboard', loadComponent: () => import('./New-Workshop/eiflixoperationsdashboard/eiflixoperationsdashboard.component').then(m => m.EiflixoperationsdashboardComponent)},
+  
   // Evolution Mapping
   {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
   {path: 'participant_videos_mapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping-new/evolution-mapping-new.component').then(m => m.EvolutionMappingNewComponent), canActivate:[authGuard]},
