@@ -201,7 +201,7 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   // dialog box
   dialogOpen = false;
   dialogTitle = '';
-  dialogProfiles = [];
+  dialogProfiles: any[] = [];
 
   // loading status
   isLoading = true;
@@ -253,6 +253,11 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    // the 'content analytics' listener is a raw onSnapshot, not part of destroy$
+    if (this.analyticsSubscribe) {
+      this.analyticsSubscribe();
+      this.analyticsSubscribe = null;
+    }
   }
 
   // function to patch date range flilter on screen load
@@ -799,6 +804,14 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     this.participantContentMap = {};
     this.contentMap = {};
     this.contentTypeMap = {};
+    // these counters accumulate off docChanges deltas, so they must be zeroed
+    // alongside the maps - otherwise re-applying a date range leaves the KPI
+    // cards showing old range + new range while the lists show only the new one
+    this.totalUniqueUsers = 0;
+    this.totalUniueContents = 0;
+    this.totalWatchHours = 0;
+    this.totalSuperFans = 0;
+    this.totalRisingFans = 0;
 
     this.analyticsSubscribe = onSnapshot(q, (contentSnap) => {
 
@@ -905,9 +918,11 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           contDate.setHours(0, 0, 0, 0);
           const timeDelay = participant.maxContWatchDates.at(-1).getTime() - contDate.getTime();
           if (timeDelay / 86400000 === 1) {
+            // new consecutive day in the streak - do NOT add totalTimeSpend
+            // here, the single accumulate below covers every branch
             participant.maxContWatchDates.push(contDate);
-            participant.maxWatch += totalTimeSpend;
           } else if (timeDelay !== 0) {
+            // streak broken - restart it on this date
             participant.maxContWatchDates = [contDate];
             participant.maxWatch = 0
           }
@@ -1155,7 +1170,8 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
           } else if (playListMixMap[recommandedPlaylistId].completedProfiles.has(profileId) || completedContents.length > 0) {
 
             playlist?.completedProfiles.delete(profileId);
-            this.participantContentMap[profileId]?.completedPlayList.delete(profileId);
+            // completedPlayList holds playlist ids, not profile ids
+            this.participantContentMap[profileId]?.completedPlayList.delete(recommandedPlaylistId);
             playlist?.notStartedProfiles.delete(profileId);
             playlist?.ongoingProfiles.add(profileId);
 
@@ -1187,7 +1203,14 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     const end = this.endDate.value;
     this.totalDays = this.getTotalDays(start,end);
 
-    this.ngOnDestroy();
+    // tear down the previous range's streams, then hand out a FRESH destroy$.
+    // ngOnDestroy() completes the subject; reusing a completed subject means
+    // takeUntil never fires again and every re-apply stacks another playlist
+    // subscription that keeps overwriting the table with stale data.
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.destroy$ = new Subject<void>();
+
     this.fetchContentAnalytics();
     this.fetchRecommendedMixPlayList();
   }
@@ -1268,7 +1291,8 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
   // function to get loading progress
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStatus).filter(state => state === true).length;
+    // loadingStatus[x] === true means "still loading", so count the false ones
+    const loaded = Object.values(this.loadingStatus).filter(state => state === false).length;
     const total = Object.keys(this.loadingStatus).length;
     return (loaded / total) * 100;
   }
@@ -1329,11 +1353,14 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
   openPlatformComparView(platform: string, completed: boolean) {
     let data = [];
     let title = '';
+    // the platform key only exists once at least one log lands in the selected
+    // date range - guard so an empty platform opens an empty panel, not a crash
+    const contentType = this.contentTypeMap[platform.toLocaleLowerCase()];
     if (completed) {
       title = `${platform} Completed`
-      data = Array.from(this.contentTypeMap[platform.toLocaleLowerCase()].completed.values())
+      data = Array.from(contentType?.completed?.values() || [])
     } else {
-      data = Array.from(this.contentTypeMap[platform.toLocaleLowerCase()].profileid.values());
+      data = Array.from(contentType?.profileid?.values() || []);
       title = platform;
     }
 
@@ -1363,8 +1390,13 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
     return; 
   }
     const exportData = this.dialogProfiles.map((p) => ({
-      'Name': p['name'] || 'N/A',
-      'Email': p['email'] || 'N/A',
+      'Name': p?.['name'] || 'N/A',
+      'Email': p?.['email'] || 'N/A',
+      'Profile Id': p?.['profileid'] || 'N/A',
+      'Customer Status': p?.['journey']?.status || '',
+      'Last Completed Journey': p?.['journey']?.last || '',
+      'Active Journey': p?.['journey']?.active || '',
+      'Financial Status': p?.['journey']?.financeStatus || '',
     }))
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -1377,11 +1409,40 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
 
   // function to open side panel
+  // NOTE: a profile can appear in 'content analytics' without having a
+  // 'participant metadata' doc. Never emit undefined rows here - the panel
+  // template dereferences p.name / p.profileid and one undefined entry used to
+  // abort rendering of every row after it (count said 31, only 6 names drew).
   openDialogBox(title: string, profileid: string[]) {
-  this.dialogOpen = true;
-  this.dialogTitle = title;
-  this.dialogProfiles = profileid.map((p) => this.participantMetaDataMap[p]);
-}
+    this.dialogOpen = true;
+    this.dialogTitle = title;
+
+    const seen = new Set<string>();
+    this.dialogProfiles = (profileid || [])
+      .filter((p) => {
+        if (!p || seen.has(p)) {
+          return false;
+        }
+        seen.add(p);
+        return true;
+      })
+      .map((p) => {
+        const meta = this.participantMetaDataMap[p];
+        return {
+          ...(meta || {}),
+          profileid: p,
+          name: meta?.name || 'Unknown participant',
+          email: meta?.email || '',
+          hasMetaData: !!meta,
+          journey: this.getJourneyDetails(p)
+        };
+      });
+
+    this.cdr.detectChanges();
+  }
+
+  // trackBy for the side panel list
+  trackByProfileId = (_: number, p: any) => p?.profileid;
 
   // function to close panel
   closedialog() {
@@ -1401,14 +1462,21 @@ export class ContentAnalyticsDashboardComponent implements OnInit, AfterViewInit
 
   // filter predicate function for participant table
   filterParticipants = (p: ParticipantContentMapInterface, filter: string) => {
-    const name = (this.participantMetaDataMap[p.profileid]?.name || '')?.toLocaleLowerCase()?.trim();
-    const journey = (this.participantMetaDataMap[p.profileid]?.activejourney || '')?.toLocaleLowerCase()?.trim();
+    const search = (filter || '')?.toLocaleLowerCase()?.trim();
+    if (!search) {
+      return true;
+    }
 
-    if (!name) {
-    return false;
-  }
-    return name.includes(filter?.toLocaleLowerCase()?.trim())
-        
+    const meta = this.participantMetaDataMap[p.profileid];
+    // participants with no 'participant metadata' doc still belong in the
+    // results - match on email / profile id so they are reachable by search
+    const haystack = [
+      meta?.name,
+      meta?.email,
+      p.profileid
+    ].map((v) => (v || '').toString().toLocaleLowerCase().trim());
+
+    return haystack.some((v) => v && v.includes(search));
   };
 
   // filter function for participant table
