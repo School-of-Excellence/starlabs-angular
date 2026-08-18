@@ -121,7 +121,7 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
-    { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
+    { key: 'attended', label: 'Attended', cls: 'att', desc: 'marked attended', tip: 'Of the approved, how many have request status “attended”' },
     { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event. Product is kept.' },
     { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' },
     { key: 'revoked', label: 'Revoked', cls: 'rv', desc: 'cancelled — product pulled', tip: 'Manually revoked — the product is cancelled and the event profile removed (status “revoked”).' }
@@ -543,7 +543,8 @@ export class ProductFunnelComponent implements OnInit {
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
 
       // Approved cohort = EPR approved/attended OR physically scanned (a scan means they were ticketed).
-      // Cohort members are not "requested", so attended is always a subset of approved.
+      // Cohort members are not "requested". Attendance itself is EPR-only (see isAttended below), and
+      // every 'attended' EPR doc also lands in approvedReq, so attended stays a subset of approved.
       const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
       cohort.forEach(p => requestedData.delete(p));
 
@@ -562,7 +563,10 @@ export class ProductFunnelComponent implements OnInit {
         // whatever live membership their source data still gives them AND retains their terminal flag.
         const isOwner = owners.has(pid);
         const isScanned = scanned.has(pid);
-        const isAttended = attendedIds.has(pid) || isScanned;
+        // Attendance is EPR-only (operator directive): a row counts as attended solely when its
+        // `event participation request` doc has status 'attended'. An e-ticket scan still puts the
+        // person in the approved cohort (below) but no longer marks them attended on its own.
+        const isAttended = attendedIds.has(pid);
         const inCohort = approvedReq.has(pid) || isScanned;
         const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
