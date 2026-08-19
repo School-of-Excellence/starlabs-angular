@@ -44,7 +44,9 @@ import { TagParticipantsComponent } from '../../Participants Profile Management/
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AddQueueTagComponent } from '../../Participants Profile Management/participants-analytics/add-queue-tag/add-queue-tag.component';
+import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
 
 interface SearchMatch {
   tokenId: string;
@@ -100,6 +102,7 @@ interface ProfileNotificationSummary {
     MatChip, 
     MatChipSet,
     MatTooltipModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatProgressSpinnerModule,
@@ -371,12 +374,21 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   bulkMoveTargetStageKey     = '';
   bulkMoveCurrentStageObj: any = null;
   availableStagesForBulkMove: any[] = [];
+  readonly BULK_SELECTION_LIMIT = 10;
   bulkMoveResults: { token: any; variationName: string; isDFU: boolean }[] = [];
   bulkMoveComputedResult: {
     movable: { token: any; variationName: string; isDFU: boolean }[];
     skippedDFU: { token: any; variationName: string; isDFU: boolean }[];
     skippedVariation: { token: any; variationName: string; isDFU: boolean }[];
-  } = { movable: [], skippedDFU: [], skippedVariation: [] };  
+  } = { movable: [], skippedDFU: [], skippedVariation: [] }; 
+  unattendedProductGroups: {
+    productId: string;
+    productName: string;
+    productref: any;
+    tokens: any[];
+    selectedProfileIds: Set<string>;
+    completed: boolean;
+    }[] = [];
   // Stage Activity Panel
   showStageActivityPanel: boolean = false;
   selectedStageForActivity: string = '';
@@ -1000,18 +1012,16 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
   toggleSelectAll() {
     if (this.areAllSelected()) {
       this.selectedTokens.clear();
-    } else {
-      let tokens: any[] = [];
-
-      if (this.selectedStages.length > 0) {
-        tokens = this.getMergedParticipants();
-      } else {
-        tokens = this.getStageParticipants(this.selectedChatStage)?.['tokenlist'] || [];
-      }
-
-      this.selectedTokens.clear();
-      tokens.forEach(token => this.selectedTokens.add(token));
+      return;
     }
+    let tokens: any[] = [];
+    if (this.selectedStages.length > 0) {
+      tokens = this.getMergedParticipants();
+    } else {
+      tokens = this.getStageParticipants(this.selectedChatStage)?.['tokenlist'] || [];
+    }
+    this.selectedTokens.clear();
+    tokens.forEach(token => this.selectedTokens.add(token));
   }
 
   getParticipantSegments(profileId: string): string[] {
@@ -4516,11 +4526,6 @@ export class DynamicQueueManagerCloneComponent implements OnInit, OnDestroy, Aft
       return;
     }
 
-    if (this.selectedTokens.size >= 10) {
-      this.guard.openSnackBar('Maximum 10 participants can be selected at a time', 'OK', 2000);
-      return;
-    }
-
     this.selectedTokens.add(token);
   }
 
@@ -6285,11 +6290,28 @@ toggleSegmentDropdown() {
   }
 
   async openBulkMovePanel(): Promise<void> {
-    const selected = this.getSelectedTokens();
+    let selected = this.getSelectedTokens();
 
     if (!selected.length) {
       this.guard.openSnackBar('Please select participants first', 'OK', 2000);
       return;
+    }
+
+    if (selected.length > this.BULK_SELECTION_LIMIT) {
+      const keptTokens = selected.slice(0, this.BULK_SELECTION_LIMIT);
+      const trimmedOut = selected.slice(this.BULK_SELECTION_LIMIT);
+
+      trimmedOut.forEach(token => {
+        const existing = Array.from(this.selectedTokens).find(t => t.profile_id === token.profile_id);
+        if (existing) this.selectedTokens.delete(existing);
+      });
+
+      selected = keptTokens;
+
+      this.guard.openSnackBar(
+        `Only the first ${this.BULK_SELECTION_LIMIT} selected participants will be used for Bulk Move — the rest were deselected`,
+        'OK', 3000
+      );
     }
 
     // All selected tokens must belong to the same stage column
@@ -6527,6 +6549,74 @@ toggleSegmentDropdown() {
     });
   }
 
+  private buildUnattendedProductGroups(tokens: any[]): void {
+    const groups = new Map<string, {
+      productId: string;
+      productName: string;
+      productref: any;
+      tokens: any[];
+      selectedProfileIds: Set<string>;
+      completed: boolean;
+    }>();
+
+    tokens.forEach(token => {
+      const productref = token['productref'];
+      const productId = productref?.id;
+      if (!productId) return;
+
+      if (!groups.has(productId)) {
+        groups.set(productId, {
+          productId,
+          productName: token['productname'] || productId,
+          productref,
+          tokens: [],
+          selectedProfileIds: new Set<string>(),
+          completed: false
+        });
+      }
+
+      const group = groups.get(productId)!;
+      group.tokens.push(token);
+      group.selectedProfileIds.add(token['profile_id']); 
+    });
+
+    this.unattendedProductGroups = Array.from(groups.values());
+  }
+
+  toggleUnattendedProductParticipant(group: { selectedProfileIds: Set<string> }, profileId: string): void {
+    if (group.selectedProfileIds.has(profileId)) {
+      group.selectedProfileIds.delete(profileId);
+    } else {
+      group.selectedProfileIds.add(profileId);
+    }
+  }
+
+  openAssignProductForGroup(group: {
+    productId: string;
+    tokens: any[];
+    selectedProfileIds: Set<string>;
+    completed: boolean;
+  }): void {
+    const selectedTokens = group.tokens.filter(t => group.selectedProfileIds.has(t['profile_id']));
+    if (!selectedTokens.length) return;
+
+    const participants = selectedTokens.map(t => ({
+      profileid: t['profile_id'],
+      name: this.mapProfileData[t['profile_id']]?.['name'],
+      email: this.mapProfileData[t['profile_id']]?.['email']
+    }));
+
+    this.dialog.open(BulkAddProductsComponent, {
+      data: { participants, productrefId: group.productId },
+      width: '70vw',
+      disableClose: true
+    }).afterClosed().subscribe((success: boolean) => {
+      if (success) {
+        group.completed = true;
+      }
+    });
+  }
+
   async executeBulkMoveToUnattended(): Promise<void> {
     const tokensToMove = this.bulkMoveResults.map(r => r.token);
     if (!tokensToMove.length) return;
@@ -6555,6 +6645,9 @@ toggleSegmentDropdown() {
     }
 
     this.bulkMoveInProgress = false;
+    if (!this.bulkMoveFailed) {
+      this.buildUnattendedProductGroups(tokensToMove);
+    }
     this.bulkMoveCompleted = true;
     this.processTokensIntoStages(this.allTokensData);
   }
@@ -6583,6 +6676,7 @@ toggleSegmentDropdown() {
     this.availableStagesForBulkMove = [];
     this.bulkMoveResults = [];  
     this.bulkMoveComputedResult = { movable: [], skippedDFU: [], skippedVariation: [] };
+    this.unattendedProductGroups = [];
   }
 
   async fetchStageActivity() {

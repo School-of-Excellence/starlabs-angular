@@ -158,7 +158,7 @@
                 (click)="openBulkMovePanel()"
                 [disabled]="getSelectedTokens().length === 0">
                 <mat-icon>multiple_stop</mat-icon>
-                Bulk Move ({{getSelectedTokens().length}}/10)
+                Bulk Move 
               </button>
             </div>
           </div>
@@ -2139,12 +2139,47 @@
       <p *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey === 'Unattended Participants'" class="done-ok">
         ✓ {{bulkMoveResults.length}} participant(s) marked unattended
       </p>
+
+      <div *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey === 'Unattended Participants' && unattendedProductGroups.length > 0"
+           class="unattended-product-groups">
+        <div class="upg-header">
+          Optionally re-assign the same product to these participants:
+        </div>
+
+        <div class="upg-group" *ngFor="let group of unattendedProductGroups">
+          <div class="upg-group-header">
+            <span class="upg-product-name">{{group.productName}}</span>
+            <span class="upg-count" *ngIf="!group.completed">{{group.selectedProfileIds.size}} / {{group.tokens.length}} selected</span>
+          </div>
+
+          <div class="upg-participant-list" *ngIf="!group.completed">
+            <div class="upg-participant-row" *ngFor="let token of group.tokens">
+              <mat-checkbox
+                [checked]="group.selectedProfileIds.has(token.profile_id)"
+                (change)="toggleUnattendedProductParticipant(group, token.profile_id)">
+                {{mapProfileData[token.profile_id]?.['name']}}
+              </mat-checkbox>
+            </div>
+          </div>
+
+          <button mat-stroked-button color="primary"
+                  class="upg-assign-btn"
+                  *ngIf="!group.completed"
+                  [disabled]="group.selectedProfileIds.size === 0"
+                  (click)="openAssignProductForGroup(group)">
+            Assign Product to {{group.selectedProfileIds.size}} Selected
+          </button>
+
+          <div class="upg-completed-msg" *ngIf="group.completed">
+            <mat-icon style="color:#388e3c; vertical-align:middle; font-size:18px; width:18px; height:18px;">check_circle</mat-icon>
+            Product assigned
+          </div>
+        </div>
+      </div>
+
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.
       </p>
-      <button mat-raised-button color="primary" (click)="closeBulkMovePanel()">
-        Done
-      </button>
     </div>
 
   </div>

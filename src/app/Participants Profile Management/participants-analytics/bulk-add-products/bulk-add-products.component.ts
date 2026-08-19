@@ -662,7 +662,7 @@ export class BulkAddProductsComponent {
 
       console.log('All operations completed successfully!');
       loadingWidget.close();
-      this.dialogRef.close();
+      this.dialogRef.close(true);
 
     } catch (error) {
       console.error('Critical error during update process:', error);

@@ -62,6 +62,11 @@ export class CreateGroupDialogComponent implements OnInit {
   isImporting: boolean = false;
   importResults: { matched: number; notFound: string[] } | null = null;
   profileDataMap: Map<string, string> = new Map(); // email -> docId mapping
+  memberLookup: { [id: string]: any } = {};
+  channelMembers: string[] = [];
+  channelAdmins: string[] = [];
+  channelMemberSearch: string = '';
+  channelAdminSearch: string = '';
   
   defaultGroupIcon: string = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiMyMTk2RjMiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSI5IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0zMCA3MGMwLTkgOS0xNiAyMC0xNnMxOSA3IDIwIDE2SDMweiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=';
   
@@ -82,6 +87,10 @@ export class CreateGroupDialogComponent implements OnInit {
     this.userList = metadata['userlist'] || [];
     this.mapUser = metadata['mapUser'] || {};
     this.groupData = metadata['groupData'] ?? null;
+    this.memberLookup = { ...this.mapUser, ...(metadata['mapProfileDocId'] || {}) };
+  }
+  get isChannelEdit(): boolean {
+    return this.groupData?.type === 'channel';
   }
 
   ngOnInit() {
@@ -95,18 +104,23 @@ export class CreateGroupDialogComponent implements OnInit {
       this.mapProfile = e.docdata;
 
       if (this.groupData != null) {
-        const existingMembers = [...(this.groupData['members'] || [])];
-        
         this.form.patchValue({
           groupname: this.groupData['chatname'] ?? this.groupData['group_name'],
           groupprofile: this.groupData['chatprofile'] ?? this.groupData['group_profile'] ?? this.defaultGroupIcon,
-          members: existingMembers
         });
-        
-        setTimeout(() => {
+        if (this.isChannelEdit) {
+          this.channelMembers = [...(this.groupData['members'] || [])];
+          this.channelAdmins  = [...(this.groupData['admins']  || [])];
+          this.form.get('members')?.clearValidators();
           this.form.get('members')?.updateValueAndValidity();
-          this.form.get('members')?.markAsDirty();
-        }, 200);
+        } else {
+          const existingMembers = [...(this.groupData['members'] || [])];
+          this.form.patchValue({ members: existingMembers });
+          setTimeout(() => {
+            this.form.get('members')?.updateValueAndValidity();
+            this.form.get('members')?.markAsDirty();
+          }, 200);
+        }
       }
     });
 
@@ -116,7 +130,7 @@ export class CreateGroupDialogComponent implements OnInit {
 
   async loadProfileData() {
     try {
-      const profileDataRef = collection(this.firestore, 'profiledata');
+      const profileDataRef = collection(this.firestore, 'profile_data');
       const snapshot = await getDocs(profileDataRef);
       
       snapshot.forEach(doc => {
@@ -133,8 +147,7 @@ export class CreateGroupDialogComponent implements OnInit {
   }
 
   async removeMember(member: any) {
-    const memberName = this.mapUser[member]?.name || member;
-    
+    const memberName = this.memberLookup[member]?.name || member;
     const confirmed = await this.showConfirmDialog(
       'Remove Member',
       `Are you sure you want to remove "${memberName}" from the group?`
@@ -156,6 +169,34 @@ export class CreateGroupDialogComponent implements OnInit {
       duration: 3000,
       horizontalPosition: 'center',
       verticalPosition: 'bottom'
+    });
+  }
+
+  toggleChannelListEntry(kind: 'members' | 'admins', profileDocId: string) {
+    const list = kind === 'members' ? this.channelMembers : this.channelAdmins;
+    const updated = list.includes(profileDocId)? list.filter(id => id !== profileDocId): [...list, profileDocId];
+    if (kind === 'members') this.channelMembers = updated;
+    else this.channelAdmins = updated;
+  }
+
+  removeChannelListEntry(kind: 'members' | 'admins', profileDocId: string) {
+    if (kind === 'members') {
+      this.channelMembers = this.channelMembers.filter(id => id !== profileDocId);
+    } else {
+      this.channelAdmins = this.channelAdmins.filter(id => id !== profileDocId);
+    }
+  }
+
+  isChannelAdmin(profileDocId: string): boolean {
+    return this.channelAdmins.includes(profileDocId);
+  }
+
+  returnFilteredChannelProfiles(search: string): string[] {
+    const q = search.trim().toLowerCase();
+    if (!q) return this.profileList;
+    return this.profileList.filter((id: string) => {
+      const p = this.memberLookup[id];
+      return p?.name?.toLowerCase().includes(q) || p?.email?.toLowerCase().includes(q);
     });
   }
 
@@ -376,6 +417,11 @@ export class CreateGroupDialogComponent implements OnInit {
   }
 
   submit(value: any) {
+    if (this.isChannelEdit) {
+      this.submitChannel(value);
+      return;
+    }
+
     if (value.members.length < 2) {
       alert("Unable To Create Group. Select at least 2 members to create a group.");
       return;
@@ -389,6 +435,22 @@ export class CreateGroupDialogComponent implements OnInit {
       groupId: this.groupData?.id || this.groupData?.chatid || null
     };
     this.dialogRef.close(map);
+  }
+
+  private submitChannel(value: any) {
+    if (this.channelMembers.length < 1) {
+      alert('A channel must have at least 1 member.');
+      return;
+    }
+
+    this.dialogRef.close({
+      isChannelEdit: true,
+      groupname: value['groupname'],
+      groupprofile: value['groupprofile'] || this.defaultGroupIcon,
+      members: this.channelMembers,
+      admins: this.channelAdmins,
+      docid: this.groupData?.docid,
+    });
   }
 
   async hideGroup() {

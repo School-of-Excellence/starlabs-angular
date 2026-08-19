@@ -560,12 +560,17 @@ export class ParticipantsAnalyticsComponent {
     // Participant metadata
     const participantProductMap = {}
     metadataSnap.docs.forEach(e => {
-      const element = e.data();
-      const profileId = element['profileid'];
-      const consumedProducts = element['consumedproducts']|| [];
-      const unconsumedProducts = element['unconsumedproducts'] || [];
-      element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
-      if (![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
+  const element = e.data();
+  const profileId = element['profileid'];
+  const consumedProducts = element['consumedproducts']|| [];
+  const unconsumedProducts = element['unconsumedproducts'] || [];
+  element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
+  const productEventMap = element['productevent'] || {};
+  element['events'] = Object.values(productEventMap)
+    .filter((v): v is string[] => Array.isArray(v))
+    .flat();
+
+  if (![null, undefined].includes(element['profiletags']) && element['profiletags'].length != 0) {
         for (let i = 0; i < element['profiletags'].length; i++) {
           const tag = element['profiletags'][i];
 
@@ -741,6 +746,11 @@ export class ParticipantsAnalyticsComponent {
       for (let i = 0; i < metadataSnap.docs.length; i++) {
         const element = metadataSnap.docs[i].data();
         element['registereduser'] = element['firebaseuserref'] != null ? 'registered' : 'non-registered';
+        const productEventMap = element['productevent'] || {};
+        element['events'] = Object.values(productEventMap)
+          .filter((v): v is string[] => Array.isArray(v))
+          .flat();
+
         this.dashboardEntireData.push(element);
       }
 

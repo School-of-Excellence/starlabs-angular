@@ -82,6 +82,7 @@ export class ChatScreenComponent implements OnInit, OnDestroy {
   currentuserData: any = {};
   selectedChat: any = {};
   mapProfileuid: any = {};
+  mapProfileId: any = {};
   mapRoles: any = {};
   subscription = {};
 
@@ -177,7 +178,7 @@ participantsPanelList: any[] = [];
   loadingMoreMessages: boolean = false;
   private messagePageSize = 10;
   private inactiveChannelPageSize = 10;
-
+  private channelMessageMap: Map<string, any> = new Map();
 
   private destroy$ = new Subject<void>();
 
@@ -221,9 +222,12 @@ participantsPanelList: any[] = [];
       collectionSnapshots(query(this.profiledataCollection, orderBy('name', 'asc'))).pipe(takeUntil(this.destroy$)).subscribe((profileDoc) => {
         this.profileList = [];
         this.userListId = [];
+        this.mapProfileId = {};
         for (let i = 0; i < profileDoc.length; i++) {
           const element = profileDoc[i].data();
-          this.profileList.push(profileDoc[i].id);
+          const profileDocId = profileDoc[i].id;
+          this.profileList.push(profileDocId);
+          this.mapProfileId[profileDocId] = element;  
           if (element['user_ref'] != null || element['user_ref'] != undefined) {
             this.userListId.push(element['user_ref'].id);
             this.mapProfileuid[element['user_ref'].id] = element
@@ -409,17 +413,14 @@ openParticipantsPanel(event: Event, chat: any): void {
   const memberIds: string[] = chat.members || [];
 
   this.participantsPanelList = memberIds
-    .map((uid: string) => {
-      // chat.members holds UIDs (user_ref.id); mapProfileuid is keyed by that UID.
-      const profile = this.mapProfileuid[uid];
+    .map((id: string) => {
+      // Groups store UIDs in `members`; channels store profileIds.
+      const profile = chat.type === 'channel'? this.getProfileByDocId(id): this.mapProfileuid[id];
       if (!profile) return null;
-
-      return { ...profile, uid };
+      return { ...profile, uid: id };
     })
     .filter((p: any) => p !== null);
-
     console.log("participantslist :" ,this.participantsPanelList)
-
   this.showParticipantsPanel = true;
 }
 
@@ -569,12 +570,8 @@ closeChannelSendDialog() {
 }
 buildChannelParticipants(): any[] {
   const result: any[] = [];
-
-  for (let i = 0; i < this.profileList.length; i++) {
-    const profileDocId = this.profileList[i];
-    const uid = this.userListId[i];
-    const profile = uid ? this.mapProfileuid[uid] : null;
-
+  for (const profileDocId of this.profileList) {
+    const profile = this.mapProfileId[profileDocId];
     if (profile?.name) {
       result.push({ ...profile, profileDocId });
     }
@@ -831,6 +828,7 @@ clearselectedParticipants() {
     this.firstMessageDoc = null;
     this.hasMoreMessages = false;
     this.loadingMoreMessages = false;
+    this.channelMessageMap = new Map();
 
     if (selectedChat.type === 'channel') {
       // Channel: paginated, load 10 most recent
@@ -893,143 +891,144 @@ clearselectedParticipants() {
     });
   }
 
-  private async loadInitialChannelMessages(selectedChat: any) {
-  this.messagesLoading = true;
-  const msgCol = collection(this.supportchatCollection, selectedChat['docid'], 'messages');
+    private loadInitialChannelMessages(selectedChat: any) {
+      this.messagesLoading = true;
+      const msgCol = collection(this.supportchatCollection, selectedChat['docid'], 'messages');
+      const q = query(
+        msgCol,
+        orderBy('time', 'desc'),
+        limit(this.messagePageSize)
+      );
 
-  const q = query(
-    msgCol,
-    orderBy('time', 'desc'),
-    limit(this.messagePageSize)
-  );
+      this.subscription['channelMessages'] = collectionSnapshots(q).pipe(takeUntil(this.destroy$)).subscribe({
+        next: (docs) => {
+          if (this.firstMessageDoc === null) {
+            const reversed = [...docs].reverse();
+            this.firstMessageDoc = reversed[0] ?? null;
+            this.hasMoreMessages = docs.length === this.messagePageSize;
+          }
+          docs.forEach(d => {
+            const mapped = this.mapMessageDoc(d, selectedChat);
+            this.channelMessageMap.set(mapped.docid, mapped);
+          });
 
-  try {
-    const snap = await getDocs(q);
-    const reversed = [...snap.docs].reverse();
-    this.firstMessageDoc = reversed[0] ?? null; 
-    this.hasMoreMessages = snap.docs.length === this.messagePageSize;
+          this.messages = Array.from(this.channelMessageMap.values())
+            .sort((a, b) => (a.time?.seconds ?? 0) - (b.time?.seconds ?? 0));
+          this.filteredMessages = [...this.messages];
+          this.groupMessagesByDate();
+          this.messagesLoading = false;
 
-    this.messages = reversed.map(d => this.mapMessageDoc(d, selectedChat));
-    this.filteredMessages = [...this.messages];
-    this.groupMessagesByDate();
-    this.messagesLoading = false;
-
-    if (!this.isInactiveChatSelected) {
-      this.markMessagesAsRead(selectedChat);
+          if (!this.isInactiveChatSelected) {
+            this.markMessagesAsRead(selectedChat);
+          }
+          setTimeout(() => this.scrollToBottom(), 100);
+        },
+        error: (e) => {
+          console.error('load initial channel messages', e);
+          this.messagesLoading = false;
+        }
+      });
     }
-    setTimeout(() => this.scrollToBottom(), 100);
-  } catch (e) {
-    console.error('load initial channel messages', e);
-    this.messagesLoading = false;
+
+  async loadMoreChannelMessages() {
+    if (!this.hasMoreMessages || this.loadingMoreMessages || !this.firstMessageDoc) return;
+    this.loadingMoreMessages = true;
+
+    const msgCol = collection(this.supportchatCollection, this.selectedChat['docid'], 'messages');
+
+    const q = query(
+      msgCol,
+      orderBy('time', 'desc'),
+      startAfter(this.firstMessageDoc),
+      limit(this.messagePageSize)
+    );
+
+    try {
+      const snap = await getDocs(q);
+      const reversed = [...snap.docs].reverse();
+      this.firstMessageDoc = reversed[0] ?? this.firstMessageDoc;
+      this.hasMoreMessages = snap.docs.length === this.messagePageSize;
+
+      reversed.forEach(d => {
+        const mapped = this.mapMessageDoc(d, this.selectedChat);
+        this.channelMessageMap.set(mapped.docid, mapped);
+      });
+
+      this.messages = Array.from(this.channelMessageMap.values())
+        .sort((a, b) => (a.time?.seconds ?? 0) - (b.time?.seconds ?? 0));
+      this.filteredMessages = [...this.messages];
+      this.groupMessagesByDate();
+    } catch (e) {
+      console.error('load more channel messages', e);
+    } finally {
+      this.loadingMoreMessages = false;
+    }
   }
-}
 
-async loadMoreChannelMessages() {
-  if (!this.hasMoreMessages || this.loadingMoreMessages || !this.firstMessageDoc) return;
-  this.loadingMoreMessages = true;
+  private mapMessageDoc(docSnap: any, selectedChat: any): any {
+    const element = docSnap.data();
+    element['docref'] = docSnap.ref;
+    element['docid'] = element['messageid'];
+    element['time'] = element['time'];
+    element['senderuid'] = element['sender_uid'];
+    element['files'] = element['files'] ?? [];
 
-  const msgCol = collection(this.supportchatCollection, this.selectedChat['docid'], 'messages');
+    const rawText = this.isChannelChat(element, selectedChat)
+      ? (element['htmlbody'] ?? '')
+      : (element['message'] ?? '');
 
-  const q = query(
-    msgCol,
-    orderBy('time', 'desc'),
-    startAfter(this.firstMessageDoc),
-    limit(this.messagePageSize)
-  );
+    element['originalmessage'] = rawText;
+    element['message'] = rawText === '' ? '' : rawText.replace(/\n/g, '<br>');
+    element['chattype'] = 'groupchat';
+    element['read_by'] = element['read_by'] ?? [];
+    element['pending'] = element['pending'] ?? [];
+    element['links'] = element['links'];
+    element['type'] = element['type'];
+    element['isMyMessage'] = this.isChannelChat(element, selectedChat)
+      ? ''
+      : element['sender_uid'] === this.currentuserData['uid'];
 
-  try {
-    const snap = await getDocs(q);
-    const reversed = [...snap.docs].reverse();
-    this.firstMessageDoc = reversed[0] ?? this.firstMessageDoc;
-    this.hasMoreMessages = snap.docs.length === this.messagePageSize;
-
-    const olderMessages = reversed.map(d => this.mapMessageDoc(d, this.selectedChat));
-    this.messages = [...olderMessages, ...this.messages];
-    this.filteredMessages = [...this.messages];
-    this.groupMessagesByDate();
-  } catch (e) {
-    console.error('load more channel messages', e);
-  } finally {
-    this.loadingMoreMessages = false;
+    return element;
   }
-}
-
-private mapMessageDoc(docSnap: any, selectedChat: any): any {
-  const element = docSnap.data();
-  element['docref'] = docSnap.ref;
-  element['docid'] = element['messageid'];
-  element['time'] = element['time'];
-  element['senderuid'] = element['sender_uid'];
-  element['files'] = element['files'] ?? [];
-
-  const rawText = this.isChannelChat(element, selectedChat)
-    ? (element['htmlbody'] ?? '')
-    : (element['message'] ?? '');
-
-  element['originalmessage'] = rawText;
-  element['message'] = rawText === '' ? '' : rawText.replace(/\n/g, '<br>');
-  element['chattype'] = 'groupchat';
-  element['read_by'] = element['read_by'] ?? [];
-  element['pending'] = element['pending'] ?? [];
-  element['links'] = element['links'];
-  element['type'] = element['type'];
-  element['isMyMessage'] = this.isChannelChat(element, selectedChat)
-    ? ''
-    : element['sender_uid'] === this.currentuserData['uid'];
-
-  return element;
-}
 
   isChannelChat(messageElement: any, chat: any): boolean {
-  return chat?.type === 'channel';
-}
-
-getChannelReadByUsers(message: any): any[] {
-  if (!message?.read_by) return [];
-  return message.read_by
-    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
-    .filter((p: any) => !!p);
-}
-
-getChannelSentMessages(message: any): any[] {
-  if (!message?.members) return [];
-  return message.members
-    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
-    .filter((p: any) => !!p);
-}
-
-getChannelPendingUsers(message: any): any[] {
-  if (!message?.pending) return [];
-  console.log("pendingList",message.pending)
-  return message.pending
-    .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
-    .filter((p: any) => !!p);
-}
-
-getProfileByDocId(profileDocId: string): any {
-  const byField = Object.values(this.mapProfileuid).find((p: any) =>
-    p['profileid'] === profileDocId ||
-    p['profile_id'] === profileDocId ||
-    p['id'] === profileDocId
-  );
-  if (byField) return byField;
-
-  const idx = this.profileList.indexOf(profileDocId);
-  if (idx !== -1) {
-    const uid = this.userListId[idx];
-    return uid ? this.mapProfileuid[uid] : null;
+    return chat?.type === 'channel';
   }
-  return null;
-}
 
-getTotalParticipantsCount(message: any): number {
-  if (!message) return 0;
-  return (message?.read_by?.length ?? 0) + (message?.pending?.length ?? 0);
-}
+  getChannelReadByUsers(message: any): any[] {
+    if (!message?.read_by) return [];
+    return message.read_by
+      .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+      .filter((p: any) => !!p);
+  }
 
-getReadCount(message: any): number {
-  return message?.read_by?.length ?? 0;
-}
+  getChannelSentMessages(message: any): any[] {
+    if (!message?.members) return [];
+    return message.members
+      .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+      .filter((p: any) => !!p);
+  }
+
+  getChannelPendingUsers(message: any): any[] {
+    if (!message?.pending) return [];
+    console.log("pendingList",message.pending)
+    return message.pending
+      .map((profileDocId: string) => this.getProfileByDocId(profileDocId))
+      .filter((p: any) => !!p);
+  }
+
+  getProfileByDocId(profileDocId: string): any {
+    return this.mapProfileId[profileDocId] ?? null;
+  }
+
+  getTotalParticipantsCount(message: any): number {
+    if (!message) return 0;
+    return (message?.read_by?.length ?? 0) + (message?.pending?.length ?? 0);
+  }
+
+  getReadCount(message: any): number {
+    return message?.read_by?.length ?? 0;
+  }
 
   groupMessagesByDate() {
     const groups: MessageGroup[] = [];
@@ -1639,36 +1638,67 @@ get isChannelSelected(): boolean {
 
   //edit group function
   editGroup(groupdata: any): void {
-    var groupDialog = this.dialog.open(CreateGroupDialogComponent, {
-      disableClose: true,
-      height: '80vh',
-      width: '70vw',
-      data: {
-        profilelist: this.profileList,
-        userlist: this.userListId,
-        groupData: groupdata,
-        mapUser: this.mapProfileuid,
-      }
-    });
+  var groupDialog = this.dialog.open(CreateGroupDialogComponent, {
+    disableClose: true,
+    height: '80vh',
+    width: '70vw',
+    data: {
+      profilelist: this.profileList,
+      userlist: this.userListId,
+      groupData: groupdata,
+      mapUser: this.mapProfileuid,
+      mapProfileId: this.mapProfileId,  
+    }
+  });
 
     groupDialog.afterClosed().toPromise().then(async (result) => {
-      if (result != null) {
-        console.log('Dialog result:', result);
-        const docId = groupdata ? groupdata['docid'] : doc(collection(this.firestore, 'temp')).id;
-        await this.buildGroup(result, docId);
+      if (result == null) return;
 
-        if (this.selectedChat && groupdata && this.selectedChat.docid === groupdata['docid']) {
-          this.selectedChat.members = result.members;
-          console.log('Updated selectedChat members:', this.selectedChat.members);
-        }
+      console.log('Dialog result:', result);
+      if (result.isChannelEdit) {
+        try {
+          await updateDoc(doc(this.firestore, 'supportchat', result.docid), {
+            group_name: result.groupname,
+            group_profile: result.groupprofile,
+            members: result.members,     
+            admins: result.admins,       
+            last_modification: serverTimestamp(),
+          });
 
-        if (groupdata) {
-          // Update the appropriate cached list (active in this case, since we don't edit inactive groups)
-          const idx = this.activeChatList.findIndex(chat => chat.docid === groupdata['docid']);
+          if (this.selectedChat?.docid === result.docid) {
+            this.selectedChat.members = result.members;
+            this.selectedChat.chatname = result.groupname;
+            this.selectedChat.chatprofile = result.groupprofile;
+          }
+
+          const idx = this.activeChannelList.findIndex(chat => chat.docid === result.docid);
           if (idx !== -1) {
-            this.activeChatList[idx].members = result.members;
+            this.activeChannelList[idx].members = result.members;
+            this.activeChannelList[idx].chatname = result.groupname;
+            this.activeChannelList[idx].chatprofile = result.groupprofile;
             this.applySearchFilter();
           }
+
+          this.snackBar.open('Channel updated successfully', 'Close', { duration: 2000 });
+        } catch (error) {
+          console.error('Error updating channel:', error);
+          this.snackBar.open('Error updating channel', 'Close', { duration: 2000 });
+        }
+        return;
+      }
+      const docId = groupdata ? groupdata['docid'] : doc(collection(this.firestore, 'temp')).id;
+      await this.buildGroup(result, docId);
+
+      if (this.selectedChat && groupdata && this.selectedChat.docid === groupdata['docid']) {
+        this.selectedChat.members = result.members;
+        console.log('Updated selectedChat members:', this.selectedChat.members);
+      }
+
+      if (groupdata) {
+        const idx = this.activeChatList.findIndex(chat => chat.docid === groupdata['docid']);
+        if (idx !== -1) {
+          this.activeChatList[idx].members = result.members;
+          this.applySearchFilter();
         }
       }
     });
