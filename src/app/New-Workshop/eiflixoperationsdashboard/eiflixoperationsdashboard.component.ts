@@ -1238,7 +1238,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         break;
       }
     };
-    this.pmMap.forEach((_doc, id) => assign(id, false, null));
+    this.pmMap.forEach((pmDoc, id) => {
+      if (!this.isEligibleParticipant(pmDoc)) return;
+      assign(id, false, null);
+    });
     this.nudMap.forEach((nudDoc, id) => {
       if (this.pmMap.has(id)) return; // participant metadata is primary
       const created = this.toDate(nudDoc.created);
@@ -1292,6 +1295,21 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('eiflixoperationsdashboard: non-active refresh failed', err);
     }
+  }
+
+  /**
+   * Non-Active eligibility (operator rule): a participant is only checked
+   * when customerstatus is 'active' AND firebaseuserref carries a value —
+   * cancelled customers and profiles without an app account are not
+   * "inactive", they were never expected to watch.
+   */
+  private isEligibleParticipant(pmDoc: any): boolean {
+    const status = (pmDoc?.customerstatus ?? '').toString().trim().toLowerCase();
+    if (status !== 'active') return false;
+    const ref = pmDoc?.firebaseuserref;
+    if (ref === null || ref === undefined) return false;
+    if (typeof ref === 'string') return ref.trim() !== '';
+    return true; // non-null object (e.g. a document reference) is a value
   }
 
   async openNonActivePanel(
