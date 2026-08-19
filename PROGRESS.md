@@ -1,13 +1,13 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-12 (Ads dialog: 93% fullscreen redesign, app+wati
-side by side)_ · **New session? Read `specs/ORIENTATION.md` first**, then
+_Last updated: 2026-08-14 (Evergreen workshop extensions + Extended
+timeline · enablesharemessage)_ · **New session? Read `specs/ORIENTATION.md` first**, then
 `specs/journals/2026-08-06-ads-auto-notification.md` (ads feature, 5
 rounds) and `specs/journals/2026-08-11-newusers-workshop-filter.md` (6
 rounds on the New Users screen).
 
 ## Current state
-- Branch `nanda-development`, tree clean at HEAD `2ba1543e`;
+- Branch `nanda-development`, tree clean at HEAD `1c3c434a`;
   `ng build --configuration production` green (only pre-existing
   canvg/leaflet + Bootstrap warnings). Not pushed/deployed.
 - Ads dialog (`/eiflixhomeconfig` → Ads tab, 93vw×93vh sectioned layout;
@@ -31,7 +31,19 @@ rounds on the New Users screen).
     row 2 → replaces selection with matching profiles; snackbar reports
     matched/missing/hidden/ignored; zero-match leaves selection intact.
 
-## Last session changes (2026-08-12, why)
+## Last session changes (2026-08-14 + 08-12, why)
+- Workshop dashboard evergreen extensions (`1c3c434a`): Completed panel
+  rows extend instead of navigating (arrayUnion of
+  {extenduntill 11:59pm, created now} into
+  evergreenaccessto.extendworkshop on the participant workshop doc);
+  Extended node (amber, active/lapsed tooltip) holds extension-history
+  users exclusively; premium timeline dialog with per-user history and
+  Extend again (min = day after current extenduntill while active — no
+  silent shortening). See
+  `specs/journals/2026-08-14-evergreen-extend-workshop.md`.
+- Workshop config Settings→General (`74d40984`): Enable Share row now
+  expands (Test Mode pattern) with a Share Message textarea → string
+  field `enablesharemessage` on the workshopconfiguration doc.
 - Ads dialog redesign (`2ba1543e`): 93vw×93vh, sectioned layout (Ad
   Content / Display / Audience & Schedule / Daily Messages / Images),
   per-day rows with app+wati columns side by side. Template/CSS only —

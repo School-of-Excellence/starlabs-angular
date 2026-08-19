@@ -180,12 +180,12 @@
               Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length :
               (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
             </h5>
-            <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
+            <!-- <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
               <div class="custom-checkbox" [class.checked]="areAllSelected()">
                 <i class="bi bi-check" *ngIf="areAllSelected()"></i>
               </div>
               <span class="select-all-text">Select All</span>
-            </div>
+            </div> -->
           </div>
           <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->

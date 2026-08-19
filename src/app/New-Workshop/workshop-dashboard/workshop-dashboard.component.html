@@ -391,6 +391,19 @@
             <span class="ev-day-count">{{ evergreenCompletedBucket.count }}</span>
             <span class="ev-day-caption">Completed</span>
           </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--ext"
+                  *ngIf="evergreenExtendedBucket.count > 0"
+                  [matTooltip]="evergreenExtendedBucket.activeCount + ' active · '
+                    + (evergreenExtendedBucket.count - evergreenExtendedBucket.activeCount) + ' lapsed'"
+                  (click)="openExtendedTimeline()">
+            <span class="ev-day-badge ev-day-badge--ext">
+              <mat-icon>more_time</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenExtendedBucket.count }}</span>
+            <span class="ev-day-caption">Extended</span>
+          </button>
         </div>
       </section>
 
@@ -2048,6 +2061,7 @@
         <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a
+              *ngIf="!selectedStatusInfo?.evergreenCompleted"
               class="participant-item"
               [href]="'/userprofile/' + participant.profileid"
               target="_blank"
@@ -2077,6 +2091,45 @@
                 </span>
               </div>
             </a>
+
+            <!-- Evergreen Completed panel: no profile navigation — clicking a
+                 participant opens the extend-until date picker instead. -->
+            <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted">
+              <button type="button" class="participant-item extend-item"
+                      (click)="toggleExtendTarget(participant.profileid)">
+                <mat-icon class="participant-avatar">person</mat-icon>
+                <div class="participant-details">
+                  <span class="participant-name">{{ participant.name }}</span>
+                  <span class="extend-hint">Click to extend workshop access</span>
+                </div>
+                <mat-icon class="extend-caret">
+                  {{ extendTargetProfileId === participant.profileid ? 'expand_less' : 'more_time' }}
+                </mat-icon>
+              </button>
+
+              <div class="extend-box"
+                   *ngIf="extendTargetProfileId === participant.profileid"
+                   (click)="$event.stopPropagation()">
+                <mat-form-field appearance="outline" class="extend-field">
+                  <mat-label>Extend until</mat-label>
+                  <input matInput [matDatepicker]="extendPicker" [min]="extendMinDate"
+                         [(ngModel)]="extendDate" [ngModelOptions]="{ standalone: true }"
+                         readonly (click)="extendPicker.open()" />
+                  <mat-datepicker-toggle matIconSuffix [for]="extendPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #extendPicker></mat-datepicker>
+                </mat-form-field>
+                <div class="extend-actions">
+                  <button mat-button type="button" (click)="toggleExtendTarget(participant.profileid)"
+                          [disabled]="extendSaving">Cancel</button>
+                  <button mat-flat-button color="primary" type="button"
+                          (click)="confirmExtend(participant)"
+                          [disabled]="!extendDate || extendSaving">
+                    <mat-spinner diameter="16" *ngIf="extendSaving"></mat-spinner>
+                    <span *ngIf="!extendSaving">Extend</span>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
           </mat-card-content>
         </mat-card>
       </div>
