@@ -1,38 +1,33 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-19 (EiFlix operations dashboard: full build-out)_
-· **New session? Read `specs/ORIENTATION.md` first**, then the journal
-`specs/journals/2026-08-18-eiflix-operations-dashboard.md` (16 rounds).
+_Last updated: 2026-08-20 (Audio Library download button)_
+· **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/journals/2026-08-20-audio-download-button.md`.
 
 ## Current state
-- Branch `nanda-development`, HEAD `2eef4fd4` + large UNCOMMITTED working
-  tree (operator commits manually — standing directive). Production build
-  green. Not pushed/deployed.
-- `/eiflixoperationsdashboard` now has: Users section (3 stat cards incl.
-  Total B!G Participants w/ journey chips); Engagement (shared
-  Today/7D/30D+custom filter, Total Watch Hours w/ cohort tiles + trend
-  graph, Top Performing Content top-10 pager); 🔥 Hot Leads Today
-  (config dialog via shared EodDialogService, expandable video rows);
-  Non-Active Users (3 cards, one full-width row, cohort chip clicks,
-  register-based); Device Breakdown (donut + legend, 1M/2M/3M, platform
-  viewer panels). One shared side panel serves every card.
-- Data spine: one realtime listener each on new_user_data + participant
-  metadata; one-shot episodes + journey names; `eiflixdailywatchers`
-  register (one page/day: profileids + platforms maps) written by the
-  dashboard for today (+7-day heal) and backfilled 90 days by the
-  operator's manual script (script dir is HANDS-OFF for Claude).
+- Branch `production` (HEAD `871ccc3c`). UNCOMMITTED: the download
+  feature (3 files in `src/app/content/audio-dashboard/`) + the
+  operator's own staged edit to `ah-notification.component.html`.
+  Operator commits manually — standing directive. NOT pushed.
+- `/audiodashboard` rows now have Download → Edit → Delete actions.
+  Download streams the storage file with a live %, saves it locally
+  with a clean filename, and falls back to opening the URL on failure.
 
-## Last session changes (2026-08-19)
-- Device Breakdown + platform panels; register platforms capture;
-  Non-Active restored to 3-in-a-row full width after a layout misread.
-- Review-workflow fixes incl. a REPRODUCED '__proto__' prototype-pollution
-  vector via client-writable platform_name/profileid (null-proto
-  accumulators + reserved-name guards). The operator's backfill script
-  shares this exposure — flagged, not fixed (hands-off).
+## Last session changes (2026-08-20)
+- Added per-row audio download: fetch → streamed blob → object-URL
+  anchor. WHY blob: the `download` attribute is ignored cross-origin
+  and Firebase serves inline. CORS proven by the existing fetch in
+  `prescribe-atc.component.ts:1157`; COEP `require-corp` is scoped to
+  Zoom routes only, so this route is clear.
+- New scoped `audio-dashboard.component.css` (col-act 124px for three
+  buttons, a-down styles) so shared `content-upload-shared.css` stays
+  untouched for the other dashboards.
+- graphify rebuild skipped — no `graphify-out/` or python package on
+  this machine.
 
 ## Pending
-- Operator: run `node backfillEiflixDailyWatchers.js` (v2) to fill 90
-  days of platforms/profileids; then Device Breakdown + Non-Active fill.
-- Route still unguarded (needs Firestore `dashboard` route-config entry
-  BEFORE adding authGuard); PII listed — pre-production requirement.
-- Script's '__proto__' exposure — operator to patch or authorize.
+- Confirm `ng build --configuration production` result (running at
+  session end); operator to review, commit, and deploy when ready.
+- Carried from 2026-08-19 (`nanda-development`, status unknown on this
+  branch): eiflix register backfill, `/eiflixoperationsdashboard`
+  route guard, backfill script `__proto__` exposure — see that journal.
