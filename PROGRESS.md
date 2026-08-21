@@ -23,7 +23,8 @@ _Last updated: 2026-08-21 (Upload Studio)_
   the Upload Studio **route**. Round 2: **Edit** also moved into the studio
   (`/videodashboard/upload?edit=<id>` — prefilled job, replace-file support,
   metadata-only instant save, replaced files cleaned up after save); only
-  Delete still uses a dialog. `upload-episode-dialog/` is now dead code.
+  Delete still uses a dialog. NOTE: `upload-episode-dialog/` is NOT dead —
+  /workshopconfig "Upload Zoom Call" still opens it.
 - Episode Firestore docs keep the exact legacy field set (operator's hard
   rule — no new fields); `convertedtohls` untouched (backend-owned).
   Storage paths unchanged (`eiflix_episodes/`, `eiflix_images/`,
