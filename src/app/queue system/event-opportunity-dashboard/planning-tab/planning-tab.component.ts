@@ -635,26 +635,25 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   private computeCards(): void {
     const ap = this.approvedSet;
-    const holders = this.queueHolderIds(); // distinct in-queue people (for the "not in queue" split)
-    // Token-based in-queue counts — same population/logic as "Total in the queue" (no dedup).
-    const filtering = this.selectedJourneys.length > 0 || this.dfuOn || this.selectedCohorts.length > 0;
-    let inQueueTokens = 0, confInQueueTokens = 0;
-    for (const q of this.scope) {
-      for (const t of this.tokensForQueue(q)) {
-        const pid = t['profile_id'];
-        if (!pid) continue;
-        if (filtering && !this.passesParticipantFilters(pid)) continue;
-        inQueueTokens++;
-        if (ap.has(pid)) confInQueueTokens++;
-      }
-    }
+    // Every "in queue" card counts DISTINCT PEOPLE (deduped by profileid), so the set
+    // is deterministic across machines and the cards reconcile with each other AND with
+    // their own drill-downs (drillIds() already returns distinct holders). A person who
+    // holds several active tokens — e.g. sits in more than one selected queue — is one
+    // person here, not N. Token-based counting (one row per token) double-counted them,
+    // which is why "Confirmed + in queue" + "Confirmed + not in queue" overshot
+    // "Confirmed for the event".
+    const holders = this.queueHolderIds(); // distinct in-queue people (journey/DFU/cohort filtered)
+    const confInQueue = [...holders].filter(id => ap.has(id)).length;
+    const notConfInQueue = holders.size - confInQueue;
     const confNotInQueue = [...ap].filter(id => !holders.has(id)).length;
+    // Identities that now hold: confInQueue + confNotInQueue = confEvent (ap.size),
+    // and confInQueue + notConfInQueue = inQueue (holders.size).
     this.cards = [
       { key: 'confEvent', label: 'Confirmed for the event', value: ap.size, desc: 'Approved/attended event requests' },
-      { key: 'inQueue', label: 'Total in the queue', value: inQueueTokens, desc: 'Active tokens in the selected queue' },
-      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQueueTokens, desc: 'Event-confirmed AND in the queue' },
-      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: confNotInQueue, desc: 'Event-confirmed but no queue token' },
-      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: Math.max(0, inQueueTokens - confInQueueTokens), desc: 'In queue but not event-confirmed' },
+      { key: 'inQueue', label: 'Total in the queue', value: holders.size, desc: 'Distinct people in the selected queue' },
+      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQueue, desc: 'Event-confirmed AND in the queue' },
+      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: confNotInQueue, desc: 'Event-confirmed but not in the queue' },
+      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: notConfInQueue, desc: 'In queue but not event-confirmed' },
       { key: 'potential', label: 'Potential', value: this.potentialTotal, desc: 'Own the product, not yet in the event' },
       { key: 'type2', label: 'Eligible · not in queue', value: this.type2Ids().length, desc: 'Potential in a queue segment, not in queue' }
     ];

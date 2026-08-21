@@ -1,0 +1,284 @@
+# branch channels — THE NEW FLOW, deliberately separate from preview.yml.
+#
+# WHY A SEPARATE FILE, AND WHY THIS NAME
+#   The release console tracks workflows by file name and, when the webhook payload omits `path`,
+#   by display name (console/functions/src/index.ts — PREVIEW_WORKFLOW='preview.yml',
+#   DEPLOY_WORKFLOW='deploy_19.yml', E2E_GATE_HINT='e2e'). Anything else is logged as
+#   "not a tracked lane" and ignored.
+#
+#   So this workflow — a different file, and a display name containing none of the strings
+#   `preview`, `deploy` or `e2e` — is INVISIBLE to handleWorkflowRun. It cannot touch
+#   preview.buildState, derivedStatus, or any button. That is what makes it safe to run on every
+#   push while the old flow continues untouched.
+#
+#   ⚠️ Do NOT rename this workflow to anything containing preview/deploy/e2e. That single word
+#      would hand control of the old flow's status fields to this one.
+#
+# THE TWO FLOWS, SIDE BY SIDE
+#   OLD  developer clicks Deploy in the console → preview.yml → ONE channel (starlabs-test)
+#        → recordPreviewUrl → preview.url / preview.buildState → drives status, tester, PR.  UNCHANGED.
+#   NEW  push → this workflow → TWO channels (dev + prod) + the suite-alignment check
+#        → previewStatus / testSuiteStatus — NEW fields, read by nothing that gates today.
+#
+# ⚠️ THE `prod` LEG USES LIVE PRODUCTION CONFIG (operator decision 2026-08-19, trade-off stated):
+#    the Firebase config compiled into the bundle — not the hosting site — decides the backend, so
+#    this publishes unreviewed branch code on a public URL against real customer data, production
+#    Watson/SalesCRM, and the project that also holds ATC. Channels expire after 7 days.
+name: branch channels (dev + prod)
+
+on:
+  push:
+    branches-ignore:
+      - development     # ships via deploy_19.yml
+      - production      # ships via deploy_19.yml
+      - main            # repo default branch, not a feature branch
+      - cicd-dev        # protected-branch stand-in
+      - cicd-prod       # protected-branch stand-in
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to build channels for'
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  INGEST_BASE: https://us-central1-starlabs-cicd.cloudfunctions.net
+
+jobs:
+  # ── 1. Is this diff testable? ──────────────────────────────────────────────────────────────────
+  #    Coverage (does a suite exist for every changed path), alignment (do the selectors those
+  #    suites drive still exist) and missing test cases (new elements no spec references).
+  #    ~40s: no build, no emulator, no network beyond the two checkouts.
+  suite-status:
+    name: suite status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      state: ${{ steps.check.outputs.verdict }}
+      payload: ${{ steps.check.outputs.payload }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+          fetch-depth: 0          # the check diffs against origin/development
+
+      - name: Clone the e2e hub (suites manifest + the checker)
+        uses: actions/checkout@v4
+        with:
+          repository: School-of-Excellence/starlabs-e2e-tests
+          ref: main
+          path: e2e
+          token: ${{ secrets.REPO_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # fetch-depth: 0 normally brings every branch, but make the base explicit so the diff can
+      # never silently resolve against a missing ref (which would report "no app code changed").
+      - name: Ensure the diff base is present
+        run: |
+          git fetch --no-tags origin development:refs/remotes/origin/development || \
+            echo "::warning::could not fetch origin/development — the verdict will be reported as not-applicable"
+          git rev-parse --verify --quiet origin/development >/dev/null \
+            || echo "::warning::origin/development is unavailable in this checkout"
+
+      - name: Check suite alignment
+        id: check
+        run: |
+          node e2e/scripts/readiness/readiness.cjs \
+            --app "$GITHUB_WORKSPACE" \
+            --base origin/development \
+            --head HEAD
+
+      - name: Report suite status
+        if: always() && steps.check.outputs.payload != ''
+        continue-on-error: true    # reporting must never fail the build
+        env:
+          INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
+          PAYLOAD: ${{ steps.check.outputs.payload }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.event.inputs.ref || github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping."; exit 0; fi
+          curl -fsS -X POST "$INGEST_BASE/recordSuiteStatus" \
+            -H "Authorization: Bearer $INGEST_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg repo "$REPO_NAME" --arg branch "$BRANCH" \
+                        --arg runId "$RUN_ID" --arg runUrl "$RUN_URL" \
+                        --argjson r "$PAYLOAD" \
+                  '{repo:$repo, branch:$branch, runId:$runId, runUrl:$runUrl} + $r')" \
+            && echo "Reported suite status." \
+            || echo "console update failed (non-fatal — endpoint may not be deployed yet)"
+
+  # ── 2. Two hosting channels from the same commit ───────────────────────────────────────────────
+  channels:
+    name: channel (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: ${{ matrix.soft }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: dev
+            project: starlabs-test
+            site: breakthroughs-test
+            soft: false
+          - env: prod
+            project: fir-sample-aae4a
+            site: star-labs
+            soft: true            # a prod-channel failure must not cost us the dev channel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Announce the target
+        run: |
+          echo "env=${{ matrix.env }} project=${{ matrix.project }} site=${{ matrix.site }}"
+          if [ "${{ matrix.env }}" = "prod" ]; then
+            echo "::warning::This channel runs the branch against the LIVE production project (${{ matrix.project }}) — real customer data, for 7 days."
+          fi
+
+      - name: Install dependencies
+        run: npm install
+
+      # Byte-for-byte the environment file deploy_19.yml writes for this environment, so a channel
+      # and its eventual deploy differ only in the hosting channel.
+      - name: Generate environment files (${{ matrix.env }})
+        env:
+          FIREBASE_TEST_CONFIG: ${{ secrets.FIREBASE_TEST_CONFIG }}
+          FIREBASE_PROD_CONFIG: ${{ secrets.FIREBASE_PROD_CONFIG }}
+          WATSON_TEST_CONFIG: ${{ secrets.WATSON_TEST_CONFIG }}
+          WATSON_PROD_CONFIG: ${{ secrets.WATSON_PROD_CONFIG }}
+          SALESCRM_TEST_CONFIG: ${{ secrets.SALESCRM_TEST_CONFIG }}
+          SALESCRM_PROD_CONFIG: ${{ secrets.SALESCRM_PROD_CONFIG }}
+          PICOVOICE_ACCESS_KEY: ${{ secrets.PICOVOICE_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p src/environments
+          if [ "${{ matrix.env }}" = "dev" ]; then
+            FIREBASE_CONFIG="$FIREBASE_TEST_CONFIG"; WATSON_CONFIG="$WATSON_TEST_CONFIG"
+            SALESCRM_CONFIG="$SALESCRM_TEST_CONFIG"
+            CDN_URL='https://breakthroughs-test.web.app/assets/df3'
+            ZOOM_API_URL='https://zoom-to-dropbox-server-rhdwzw46ya-uc.a.run.app'
+          else
+            FIREBASE_CONFIG="$FIREBASE_PROD_CONFIG"; WATSON_CONFIG="$WATSON_PROD_CONFIG"
+            SALESCRM_CONFIG="$SALESCRM_PROD_CONFIG"
+            CDN_URL='https://breakthroughs.app/assets/df3'
+            ZOOM_API_URL=''     # what production ships — no prod zoom-to-dropbox service exists
+          fi
+          if [ -z "$FIREBASE_CONFIG" ]; then
+            echo "::error::Firebase config secret for ${{ matrix.env }} is empty."; exit 1
+          fi
+          cat > src/environments/environment.development.ts << EOF
+          export const environment = {
+            production: true,
+            firebase: $FIREBASE_CONFIG,
+            watson: $WATSON_CONFIG,
+            salescrm: $SALESCRM_CONFIG,
+            df3CdnUrl: '$CDN_URL',
+            zoomMigrationApiUrl: '$ZOOM_API_URL',
+            picovoiceAccessKey: $PICOVOICE_ACCESS_KEY
+          };
+          EOF
+          cp src/environments/environment.development.ts src/environments/environment.ts
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@14.4.0
+
+      - name: Build (hard gate — no build, no channel)
+        run: npx ng build --configuration production
+
+      - name: Compute channel id
+        id: ch
+        run: |
+          ID=$(echo "${{ github.event.inputs.ref || github.ref_name }}" | tr '/' '-' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | cut -c1-40)
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      # The channel URL contains a random hash, so it is READ BACK from --json for THIS SITE
+      # specifically — never reconstructed, never "first match in the payload".
+      - name: Publish channel (7-day expiry)
+        id: deploy
+        env:
+          GOOGLE_SERVICE_TEST: ${{ secrets.GOOGLE_SERVICE_TEST }}
+          GOOGLE_SERVICE_PROD: ${{ secrets.GOOGLE_SERVICE_PROD }}
+          SITE: ${{ matrix.site }}
+          CHANNEL: ${{ steps.ch.outputs.id }}
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.env }}" = "dev" ]; then SA="$GOOGLE_SERVICE_TEST"; else SA="$GOOGLE_SERVICE_PROD"; fi
+          if [ -z "$SA" ]; then echo "::error::deploy service-account secret for ${{ matrix.env }} is empty."; exit 1; fi
+          echo "$SA" > "$HOME/firebase-key.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/firebase-key.json"
+          jq --arg site "$SITE" '.hosting.site = $site' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
+          OUT=$(firebase hosting:channel:deploy "$CHANNEL" --expires 7d --project "${{ matrix.project }}" --json)
+          echo "$OUT"
+          URL=$(echo "$OUT" | jq -r --arg site "$SITE" '.result[$site].url // empty')
+          EXPIRES=$(echo "$OUT" | jq -r --arg site "$SITE" '.result[$site].expireTime // empty')
+          if [ -z "$URL" ]; then
+            echo "::error::could not read the channel URL for site '$SITE' — refusing to report a guessed URL."; exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "expires=$EXPIRES" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### channel · ${{ matrix.env }}"
+            echo "- project: \`${{ matrix.project }}\` · site: \`${{ matrix.site }}\`"
+            if [ -n "${{ steps.deploy.outputs.url }}" ]; then
+              echo "- ✅ ${{ steps.deploy.outputs.url }}"
+              echo "- expires: ${{ steps.deploy.outputs.expires }}"
+            else
+              echo "- ❌ channel not published"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Always reports — SUCCESS with a URL, or FAILED so the console can show a red channel
+      # rather than a stale one. Writes ONLY the new previewStatus field.
+      - name: Report channel status
+        if: always()
+        continue-on-error: true
+        env:
+          INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.event.inputs.ref || github.ref_name }}
+          ENVIRONMENT: ${{ matrix.env }}
+          PROJECT: ${{ matrix.project }}
+          SITE: ${{ matrix.site }}
+          URL: ${{ steps.deploy.outputs.url }}
+          EXPIRES: ${{ steps.deploy.outputs.expires }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping."; exit 0; fi
+          STATUS=FAILED; [ "$OUTCOME" = "success" ] && [ -n "$URL" ] && STATUS=SUCCESS
+          MSG=$(git log -1 --pretty=%s || echo "")
+          WHO=$(git log -1 --pretty=%an || echo "")
+          curl -fsS -X POST "$INGEST_BASE/recordBranchChannel" \
+            -H "Authorization: Bearer $INGEST_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -nc \
+                  --arg repo "$REPO_NAME" --arg branch "$BRANCH" --arg env "$ENVIRONMENT" \
+                  --arg status "$STATUS" --arg url "$URL" --arg expires "$EXPIRES" \
+                  --arg project "$PROJECT" --arg site "$SITE" \
+                  --arg sha "$SHA" --arg msg "$MSG" --arg author "$WHO" \
+                  --arg runId "$RUN_ID" --arg runUrl "$RUN_URL" \
+                  '{repo:$repo, branch:$branch, env:$env, status:$status, project:$project,
+                    site:$site, sha:$sha, commitMsg:$msg, author:$author,
+                    runId:$runId, runUrl:$runUrl}
+                   + (if $url     == "" then {} else {url:$url} end)
+                   + (if $expires == "" then {} else {expiresAt:$expires} end)')" \
+            && echo "Reported ${ENVIRONMENT} channel: $STATUS" \
+            || echo "console update failed (non-fatal — endpoint may not be deployed yet)"

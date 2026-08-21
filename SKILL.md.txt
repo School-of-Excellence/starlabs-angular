@@ -1,0 +1,159 @@
+---
+name: starlabs-bugfix
+description: >-
+  Structured, gated bug-fixing workflow for the StarLabs Angular project (in the
+  starlabs-development folder). Use this skill WHENEVER the user reports a bug,
+  defect, error, crash, regression, or something "not working", "broken", or
+  "behaving wrong" in StarLabs / the starlabs-development codebase, or asks to
+  investigate, diagnose, or fix an issue there — even if they never say the word
+  "bug". It enforces a four-stage process (Read & Report → Analyze → Plan →
+  Implement) with the user in the loop at every gate, so each fix is understood,
+  root-caused, and scoped to avoid breaking other flows BEFORE any code changes.
+  Do not jump straight to editing code — always run the stages.
+---
+
+# StarLabs Bug-Fix Workflow
+
+A disciplined process for fixing bugs in the **StarLabs** Angular project
+(`starlabs-development`). The point of this skill is to slow down at exactly the
+right moments: understand the defect, agree on the true cause, and prove the fix
+is safe *before* touching code. The user drives; you investigate, reason, and
+propose. You never race ahead to a code edit.
+
+## Operating principles
+
+- **One stage at a time.** Finish a stage, present your findings, then STOP and
+  wait for the user. Don't chain stages together unless the user explicitly says
+  something like "go all the way through" or "just fix it end to end."
+- **Root cause, not symptom.** A fix that only suppresses the visible symptom is
+  a failure. Keep asking "why does that happen?" until you reach the actual
+  cause.
+- **No collateral damage.** The user cares a lot about *not affecting other
+  flows*. Before proposing any change, trace what else depends on the code you'd
+  touch. The smallest correct diff wins.
+- **Evidence over assumption.** Cite concrete file paths, line numbers, and the
+  actual code you read. Don't guess at how StarLabs works — open the files.
+
+## The user starts: they report the bug
+
+The user identifies the bug and describes it to you (symptoms, where they saw it,
+repro steps if any). That is your input. Then you begin at Stage 1.
+
+---
+
+## Stage 1 — Read & Report
+
+Investigate the reported bug in the `starlabs-development` codebase and report
+back. **Do not write or propose a fix in this stage.**
+
+Read the relevant components, services, templates, and modules. Then report:
+
+1. **What the bug is** — the observed behavior vs. the expected behavior, stated
+   precisely.
+2. **Where it lives** — the specific files, components, services, and lines
+   involved (cite exact paths and line numbers).
+3. **Root-cause hypothesis** — your best explanation of *why* it happens, grounded
+   in the code you read. If you're not yet certain, say what you'd need to confirm
+   it (a log, a repro, another file to read).
+
+Keep it tight and factual. End Stage 1 by explicitly pausing:
+> "That's my read of the bug and its root cause. Do you agree, or do you see it
+> differently before we analyze deeper?"
+
+Then **STOP** and wait.
+
+---
+
+## Stage 2 — Analyze together: obvious or hidden?
+
+With the user, decide whether this is an **obvious/surface cause** (the code
+plainly does the wrong thing) or whether there's a **hidden/deeper cause** (the
+visible defect is a downstream symptom of something else).
+
+Actively look for hidden causes before concluding it's obvious. In an Angular
+codebase, the usual suspects are:
+
+- **RxJS / async**: leaked or missing subscriptions, `takeUntil`/`async` pipe
+  misuse, hot vs. cold observables, out-of-order emissions, `switchMap` vs.
+  `mergeMap` choice, race conditions, forgotten `unsubscribe`.
+- **Change detection**: `OnPush` not firing on mutation, mutating objects/arrays
+  instead of replacing them, work done outside `NgZone`,
+  `ExpressionChangedAfterItHasBeenCheckedError`, missing `markForCheck`.
+- **Dependency injection / services**: unexpected shared singleton state,
+  `providedIn` scope, a service accidentally provided twice (two instances),
+  state bleeding across components.
+- **Component lifecycle**: work done in the wrong hook, `ngOnChanges` vs.
+  `ngOnInit` timing, accessing `@ViewChild` before it exists.
+- **Forms**: reactive vs. template-driven mismatch, `valueChanges` feedback
+  loops, validator timing, `patchValue`/`setValue` side effects.
+- **Routing**: guards, resolvers, param-map subscriptions not firing on re-nav,
+  route reuse strategy, lazy-module boundaries.
+- **Template binding**: missing `trackBy`, `async` pipe re-subscribing, unsafe
+  nested property access, two-way binding drift.
+- **State / inputs**: mutating an `@Input`, parent/child binding assumptions,
+  stale state after navigation.
+
+Present your analysis: is it obvious, or is there a deeper cause? Show the
+reasoning. Invite the user to push back — they may know context the code doesn't
+reveal. Converge together on the *real* cause.
+
+End Stage 2 by pausing:
+> "So the real cause looks like [X]. Agreed? If so, I'll plan a fix."
+
+Then **STOP** and wait for agreement.
+
+---
+
+## Stage 3 — Plan the fix (without affecting other flows)
+
+Now design the fix. **Still no code edits.** Produce a plan the user can approve:
+
+1. **The change** — what you'll modify, in which files, and the approach.
+2. **Blast radius** — every place this change touches. Before proposing it, find
+   all usages of any symbol/function/service/component you'd alter (search the
+   codebase). List what else consumes it and confirm they stay correct.
+3. **How other flows are protected** — explicitly state why existing behavior
+   elsewhere is preserved. Prefer the narrowest change that fixes the root cause.
+   Keep public signatures and existing behavior intact unless the fix genuinely
+   requires changing them — and if it does, flag that loudly.
+4. **Risks & alternatives** — anything that could go wrong, and any alternative
+   approach worth considering with its trade-offs.
+5. **How we'll verify** — how the user (or you) will confirm the fix works and
+   nothing else broke.
+
+Present the plan and pause:
+> "Here's the plan and its blast radius. Approve and I'll implement, or want
+> changes?"
+
+Then **STOP** and wait for approval.
+
+---
+
+## Stage 4 — Implement
+
+Only after the user approves the plan.
+
+- Apply the **minimal diff** that executes the approved plan. No opportunistic
+  refactors or unrelated cleanups.
+- Keep changes reviewable and reversible.
+- After editing, show exactly what changed (the diff / edited regions) and
+  restate how to verify it — the repro that should now pass, plus a quick check
+  that the flows identified in Stage 3 still behave.
+- If, while implementing, you discover the plan was wrong or the blast radius is
+  bigger than thought, **stop and go back to Stage 3** rather than improvising.
+
+---
+
+## Gates, in short
+
+```
+User reports bug
+  → Stage 1: Read & Report        → STOP (user confirms the read)
+  → Stage 2: Analyze obvious/hidden → STOP (user agrees on real cause)
+  → Stage 3: Plan (protect flows)  → STOP (user approves plan)
+  → Stage 4: Implement minimal fix → show diff + verify
+```
+
+Honor the gates. The whole value of this workflow is that the user reviews your
+understanding before you spend a change on it. If the user ever says to skip
+ahead or run straight through, you can — but default to stopping.

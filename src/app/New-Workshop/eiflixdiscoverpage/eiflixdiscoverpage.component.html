@@ -1,0 +1,1074 @@
+<div class="discover-wrap">
+  <!-- Loading gate -->
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+  </div>
+
+  <form *ngIf="!loading" [formGroup]="form" (ngSubmit)="save()">
+    <!-- Sticky header -->
+    <div class="page-head">
+      <div class="head-text">
+        <div class="head-title-row">
+          <span class="brand-badge">EiFlix</span>
+          <h1>Discover Page</h1>
+        </div>
+        <p>Craft the rich content shown on the EiFlix Discover screen.</p>
+      </div>
+
+      <div class="head-actions">
+        <span class="dirty-dot" *ngIf="isDirty" matTooltip="You have unsaved changes">
+          <span class="dot"></span> Unsaved changes
+        </span>
+
+        <div
+          class="size-meter"
+          [class.warn]="sizeLevel === 'warn'"
+          [class.danger]="sizeLevel === 'danger'"
+          [matTooltip]="documentUsedLabel + ' of ' + documentLimitLabel + ' used (' + documentPercent + '%). Firestore allows about 1 MB per document.'">
+          <mat-icon>data_usage</mat-icon>
+          <div class="size-meter-body">
+            <div class="size-meter-top">
+              <span class="size-meter-value">{{ documentUsedLabel }}</span>
+              <span class="size-meter-limit">/ {{ documentLimitLabel }}</span>
+              <span class="size-meter-pct">{{ documentPercent }}%</span>
+            </div>
+            <div class="size-bar">
+              <div class="size-bar-fill" [style.width.%]="sizeBarWidth"></div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          mat-stroked-button
+          class="reset-btn"
+          (click)="reset()"
+          [disabled]="isSaving || !isDirty"
+          matTooltip="Revert to last saved content">
+          <mat-icon>undo</mat-icon> Reset
+        </button>
+
+        <button
+          type="submit"
+          mat-flat-button
+          color="primary"
+          class="save-btn"
+          [disabled]="isSaving || !isDirty || documentBytes > maxDocBytes"
+          [matTooltip]="documentBytes > maxDocBytes ? 'Over the 1 MB limit — remove some content' : ''">
+          <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+          <ng-container *ngIf="!isSaving">
+            <mat-icon>save</mat-icon> Save changes
+          </ng-container>
+        </button>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <!-- Left section navigator -->
+      <aside class="side-nav">
+        <button
+          type="button"
+          class="nav-item"
+          *ngFor="let s of sections"
+          [class.active]="activeSection === s.id"
+          (click)="activeSection = s.id">
+          <span class="nav-index">{{ s.id }}</span>
+          <mat-icon>{{ s.icon }}</mat-icon>
+          <span class="nav-title">{{ s.title }}</span>
+        </button>
+      </aside>
+
+      <div class="content-pane">
+
+    <!-- Section 1 -->
+    <div class="section-pane" [hidden]="activeSection !== 1">
+      <button
+        type="button"
+        class="section-header"
+        (click)="section1Open = !section1Open"
+        [attr.aria-expanded]="section1Open">
+        <div class="section-header-left">
+          <span class="section-index">1</span>
+          <div class="section-title-text">
+            <h2>Section 1</h2>
+            <p>Welcome, headline, buttons, media &amp; proof numbers.</p>
+          </div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ sectionFieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section1Open">expand_more</mat-icon>
+        </div>
+      </button>
+
+      <div class="section-body" [hidden]="!section1Open">
+        <!-- Field cards -->
+        <div class="fields-grid">
+          <!-- Rich-text fields -->
+      <section class="field-card" *ngFor="let field of richFields">
+        <div class="field-head">
+          <div class="field-label">
+            <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+            <div class="field-label-text">
+              <h3>{{ field.label }}</h3>
+              <p>{{ field.hint }}</p>
+            </div>
+          </div>
+          <span class="rich-chip">
+            <mat-icon>auto_awesome</mat-icon> Rich text
+          </span>
+        </div>
+
+        <div class="editor-shell">
+          <div class="NgxEditor__Wrapper">
+            <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+            <ngx-editor
+              [editor]="editors[field.key]"
+              [formControlName]="field.key"
+              [outputFormat]="'html'"
+              [placeholder]="field.placeholder">
+            </ngx-editor>
+          </div>
+        </div>
+      </section>
+
+      <!-- Plain text fields -->
+      <section class="field-card" *ngFor="let field of textFields">
+        <div class="field-head">
+          <div class="field-label">
+            <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+            <div class="field-label-text">
+              <h3>{{ field.label }}</h3>
+              <p>{{ field.hint }}</p>
+            </div>
+          </div>
+          <span class="type-chip">
+            <mat-icon>text_fields</mat-icon> Text
+          </span>
+        </div>
+
+        <mat-form-field appearance="outline" class="text-field">
+          <input matInput [formControlName]="field.key" [placeholder]="field.placeholder" autocomplete="off" />
+        </mat-form-field>
+      </section>
+
+      <!-- Media upload fields (reusable uploader) -->
+      <section class="field-card" *ngFor="let field of mediaFields">
+        <div class="field-head">
+          <div class="field-label">
+            <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+            <div class="field-label-text">
+              <h3>{{ field.label }}</h3>
+              <p>{{ field.hint }}</p>
+            </div>
+          </div>
+          <span class="type-chip" [class.media-chip]="true">
+            <mat-icon>{{ field.type === 'video' ? 'videocam' : 'photo_camera' }}</mat-icon>
+            {{ field.type === 'video' ? 'Video' : 'Image' }}
+          </span>
+        </div>
+
+        <app-media-upload
+          [type]="field.type"
+          [folder]="storageFolder"
+          [formControlName]="field.key">
+        </app-media-upload>
+      </section>
+
+          <!-- Proofs in Number (array of {number, proof} maps) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>leaderboard</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>Proofs in Number</h3>
+                  <p>Impact stats shown as a number and a label — e.g. “1M+” / “Lives Reached”.</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>format_list_numbered</mat-icon> List
+              </span>
+            </div>
+
+            <div class="proofs" formArrayName="proofsinnumber">
+              <div class="proof-row" *ngFor="let row of proofRows.controls; let i = index" [formGroupName]="i">
+                <span class="proof-index">{{ i + 1 }}</span>
+                <mat-form-field appearance="outline" class="proof-number" subscriptSizing="dynamic">
+                  <mat-label>Number</mat-label>
+                  <input matInput formControlName="number" placeholder="1M+" autocomplete="off" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="proof-proof" subscriptSizing="dynamic">
+                  <mat-label>Proof</mat-label>
+                  <input matInput formControlName="proof" placeholder="Lives Reached" autocomplete="off" />
+                </mat-form-field>
+                <button
+                  type="button"
+                  mat-icon-button
+                  class="proof-remove"
+                  (click)="removeProof(i)"
+                  matTooltip="Remove this proof">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addProof()">
+                <mat-icon>add</mat-icon> Add proof
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section-pane" [hidden]="activeSection !== 2">
+      <button
+        type="button"
+        class="section-header"
+        (click)="section2Open = !section2Open"
+        [attr.aria-expanded]="section2Open">
+        <div class="section-header-left">
+          <span class="section-index">2</span>
+          <div class="section-title-text">
+            <h2>Section 2</h2>
+            <p>Coverage title, publication strip &amp; awards and recognition.</p>
+          </div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section2FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section2Open">expand_more</mat-icon>
+        </div>
+      </button>
+
+      <div class="section-body" [hidden]="!section2Open">
+        <div class="fields-grid">
+
+          <!-- Coverage Title (rich) -->
+          <section class="field-card" *ngFor="let field of section2RichFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>{{ field.label }}</h3>
+                  <p>{{ field.hint }}</p>
+                </div>
+              </div>
+              <span class="rich-chip">
+                <mat-icon>auto_awesome</mat-icon> Rich text
+              </span>
+            </div>
+
+            <div class="editor-shell">
+              <div class="NgxEditor__Wrapper">
+                <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+                <ngx-editor
+                  [editor]="editors[field.key]"
+                  [formControlName]="field.key"
+                  [outputFormat]="'html'"
+                  [placeholder]="field.placeholder">
+                </ngx-editor>
+              </div>
+            </div>
+          </section>
+
+          <!-- Publication Strip (array of strings) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>newspaper</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>Publication Strip</h3>
+                  <p>Press outlets that featured you — e.g. Forbes India, NDTV.</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>format_list_bulleted</mat-icon> List
+              </span>
+            </div>
+
+            <div class="strip-list" formArrayName="publicationStrip">
+              <div class="strip-row" *ngFor="let ctrl of pubRows.controls; let i = index">
+                <span class="proof-index">{{ i + 1 }}</span>
+                <mat-form-field appearance="outline" class="strip-input" subscriptSizing="dynamic">
+                  <mat-label>Publication</mat-label>
+                  <input matInput [formControlName]="i" placeholder="Forbes India" autocomplete="off" />
+                </mat-form-field>
+                <button type="button" mat-icon-button class="proof-remove" (click)="removePublication(i)" matTooltip="Remove">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addPublication()">
+                <mat-icon>add</mat-icon> Add publication
+              </button>
+            </div>
+          </section>
+
+          <!-- Awards & Recognition (array of maps) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>workspace_premium</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>Awards &amp; Recognition</h3>
+                  <p>Honours &amp; recognitions — organization, department, award &amp; date, and an emoji.</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>format_list_bulleted</mat-icon> List
+              </span>
+            </div>
+
+            <div class="awards" formArrayName="awardsandrecognition">
+              <div class="award-card" *ngFor="let row of awardRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title">
+                    <span class="award-emoji" *ngIf="row.get('emoji')?.value">{{ row.get('emoji')?.value }}</span>
+                    Award {{ i + 1 }}
+                  </span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAward(i)" matTooltip="Remove award">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <div class="award-grid">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Organization</mat-label>
+                    <input matInput formControlName="organization" placeholder="Government of India" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Department</mat-label>
+                    <input matInput formControlName="department" placeholder="Ministry of Social Justice &amp; Empowerment" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Award &amp; date</mat-label>
+                    <input matInput formControlName="awardanddate" placeholder="Award of Honour April 2019" autocomplete="off" />
+                  </mat-form-field>
+                </div>
+
+                <div class="award-emoji-row">
+                  <span class="award-emoji-label">Emoji</span>
+                  <button type="button" mat-stroked-button class="emoji-pick-btn" (click)="toggleEmoji(i)">
+                    <span class="emoji-current" *ngIf="row.get('emoji')?.value">{{ row.get('emoji')?.value }}</span>
+                    <mat-icon *ngIf="!row.get('emoji')?.value">mood</mat-icon>
+                    {{ row.get('emoji')?.value ? 'Change' : 'Pick emoji' }}
+                  </button>
+                  <button type="button" mat-icon-button class="proof-remove" *ngIf="row.get('emoji')?.value" (click)="clearEmoji(i)" matTooltip="Clear emoji">
+                    <mat-icon>backspace</mat-icon>
+                  </button>
+                </div>
+
+                <div class="emoji-picker-wrap" *ngIf="openEmojiRow === i">
+                  <emoji-mart
+                    [isNative]="true"
+                    [showPreview]="false"
+                    [emojiSize]="20"
+                    [perLine]="8"
+                    title="Pick an emoji"
+                    (emojiSelect)="pickEmoji(i, $event)">
+                  </emoji-mart>
+                </div>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAward()">
+                <mat-icon>add</mat-icon> Add award
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section-pane" [hidden]="activeSection !== 3">
+      <button
+        type="button"
+        class="section-header"
+        (click)="section3Open = !section3Open"
+        [attr.aria-expanded]="section3Open">
+        <div class="section-header-left">
+          <span class="section-index">3</span>
+          <div class="section-title-text">
+            <h2>The Science in Action</h2>
+            <p>Head, title, context &amp; the demonstration videos.</p>
+          </div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section3FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section3Open">expand_more</mat-icon>
+        </div>
+      </button>
+
+      <div class="section-body" [hidden]="!section3Open">
+        <div class="fields-grid">
+
+          <!-- Science-in-Action rich fields -->
+          <section class="field-card" *ngFor="let field of section3RichFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>{{ field.label }}</h3>
+                  <p>{{ field.hint }}</p>
+                </div>
+              </div>
+              <span class="rich-chip">
+                <mat-icon>auto_awesome</mat-icon> Rich text
+              </span>
+            </div>
+
+            <div class="editor-shell">
+              <div class="NgxEditor__Wrapper">
+                <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+                <ngx-editor
+                  [editor]="editors[field.key]"
+                  [formControlName]="field.key"
+                  [outputFormat]="'html'"
+                  [placeholder]="field.placeholder">
+                </ngx-editor>
+              </div>
+            </div>
+          </section>
+
+          <!-- Science-in-Action videos (array of {thumbnail, video} uploads) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>smart_display</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>Science in Action — Videos</h3>
+                  <p>Each item has a video file and a thumbnail image.</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>format_list_bulleted</mat-icon> List
+              </span>
+            </div>
+
+            <div class="awards" formArrayName="scienceinactionvideos">
+              <div class="award-card" *ngFor="let row of scienceVideoRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title">
+                    <mat-icon class="award-lead-icon">movie</mat-icon>
+                    Video {{ i + 1 }}
+                  </span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeScienceVideo(i)" matTooltip="Remove video">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <div class="ahvideo-uploads">
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
+                    <app-media-upload type="video" [folder]="storageFolder" formControlName="video"></app-media-upload>
+                  </div>
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>image</mat-icon> Thumbnail</span>
+                    <app-media-upload type="image" [folder]="storageFolder" formControlName="thumbnail"></app-media-upload>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addScienceVideo()">
+                <mat-icon>add</mat-icon> Add video
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section-pane" [hidden]="activeSection !== 4">
+      <button
+        type="button"
+        class="section-header"
+        (click)="section4Open = !section4Open"
+        [attr.aria-expanded]="section4Open">
+        <div class="section-header-left">
+          <span class="section-index">4</span>
+          <div class="section-title-text">
+            <h2>Section 4</h2>
+            <p>Video title &amp; the AH videos list.</p>
+          </div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section4FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section4Open">expand_more</mat-icon>
+        </div>
+      </button>
+
+      <div class="section-body" [hidden]="!section4Open">
+        <div class="fields-grid">
+
+          <!-- Video Title (plain text) -->
+          <section class="field-card" *ngFor="let field of section4TextFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>{{ field.label }}</h3>
+                  <p>{{ field.hint }}</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>text_fields</mat-icon> Text
+              </span>
+            </div>
+
+            <mat-form-field appearance="outline" class="text-field">
+              <input matInput [formControlName]="field.key" [placeholder]="field.placeholder" autocomplete="off" />
+            </mat-form-field>
+          </section>
+
+          <!-- AH Videos (array of maps with media uploads) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>video_library</mat-icon></span>
+                <div class="field-label-text">
+                  <h3>AH Videos</h3>
+                  <p>Each video has a name, a video file and a thumbnail image.</p>
+                </div>
+              </div>
+              <span class="type-chip">
+                <mat-icon>format_list_bulleted</mat-icon> List
+              </span>
+            </div>
+
+            <div class="awards" formArrayName="ahvideos">
+              <div class="award-card" *ngFor="let row of ahVideoRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title">
+                    <mat-icon class="award-lead-icon">movie</mat-icon>
+                    Video {{ i + 1 }}
+                  </span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAhVideo(i)" matTooltip="Remove video">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <mat-form-field appearance="outline" class="text-field" subscriptSizing="dynamic">
+                  <mat-label>Video name</mat-label>
+                  <input matInput formControlName="videoname" placeholder="e.g. Founder's story" autocomplete="off" />
+                </mat-form-field>
+
+                <div class="ahvideo-uploads">
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
+                    <app-media-upload type="video" [folder]="storageFolder" formControlName="video"></app-media-upload>
+                  </div>
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>image</mat-icon> Thumbnail</span>
+                    <app-media-upload type="image" [folder]="storageFolder" formControlName="thumbnail"></app-media-upload>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAhVideo()">
+                <mat-icon>add</mat-icon> Add video
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section-pane" [hidden]="activeSection !== 5">
+      <button
+        type="button"
+        class="section-header"
+        (click)="section5Open = !section5Open"
+        [attr.aria-expanded]="section5Open">
+        <div class="section-header-left">
+          <span class="section-index">5</span>
+          <div class="section-title-text">
+            <h2>What is Excellence Installation?</h2>
+            <p>EI intro, videos, the A·T·C framework &amp; description.</p>
+          </div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section5FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section5Open">expand_more</mat-icon>
+        </div>
+      </button>
+
+      <div class="section-body" [hidden]="!section5Open">
+        <div class="fields-grid">
+
+          <!-- EI Head (rich) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>auto_awesome</mat-icon></span>
+                <div class="field-label-text"><h3>EI — Head</h3><p>Small heading/eyebrow above the section.</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors['eihead']" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors['eihead']" formControlName="eihead" [outputFormat]="'html'" placeholder="What is Excellence Installation?"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- EI Title (rich) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>title</mat-icon></span>
+                <div class="field-label-text"><h3>EI — Title</h3><p>The main title of the section.</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors['eititle']" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors['eititle']" formControlName="eititle" [outputFormat]="'html'" placeholder="Installing excellence, step by step"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- EI Content (rich) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>notes</mat-icon></span>
+                <div class="field-label-text"><h3>EI — Content</h3><p>Supporting paragraph / content for the section.</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors['eicontent']" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors['eicontent']" formControlName="eicontent" [outputFormat]="'html'" placeholder="Explain Excellence Installation…"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- EI Videos Title (plain text) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>video_label</mat-icon></span>
+                <div class="field-label-text"><h3>EI Videos Title</h3><p>Heading shown above the EI videos.</p></div>
+              </div>
+              <span class="type-chip"><mat-icon>text_fields</mat-icon> Text</span>
+            </div>
+            <mat-form-field appearance="outline" class="text-field">
+              <input matInput formControlName="eivideostitle" placeholder="e.g. Watch it in action" autocomplete="off" />
+            </mat-form-field>
+          </section>
+
+          <!-- EI Videos (array of {thumbnail, video} uploads) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>smart_display</mat-icon></span>
+                <div class="field-label-text"><h3>EI Videos</h3><p>Each item has a video file and a thumbnail image.</p></div>
+              </div>
+              <span class="type-chip"><mat-icon>format_list_bulleted</mat-icon> List</span>
+            </div>
+
+            <div class="awards" formArrayName="eivideos">
+              <div class="award-card" *ngFor="let row of eiVideoRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeEiVideo(i)" matTooltip="Remove video">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+                <div class="ahvideo-uploads">
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
+                    <app-media-upload type="video" [folder]="storageFolder" formControlName="video"></app-media-upload>
+                  </div>
+                  <div class="ahvideo-upload">
+                    <span class="upload-label"><mat-icon>image</mat-icon> Thumbnail</span>
+                    <app-media-upload type="image" [folder]="storageFolder" formControlName="thumbnail"></app-media-upload>
+                  </div>
+                </div>
+              </div>
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addEiVideo()">
+                <mat-icon>add</mat-icon> Add video
+              </button>
+            </div>
+          </section>
+
+          <!-- ATC Head (rich) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>psychology</mat-icon></span>
+                <div class="field-label-text"><h3>ATC — Head</h3><p>Heading above the Adjustment / Time / Consequences block.</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors['atchead']" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors['atchead']" formControlName="atchead" [outputFormat]="'html'" placeholder="The A·T·C framework"></ngx-editor>
+            </div></div>
+
+            <!-- differentiated A·T·C pillars -->
+            <div class="atc-block">
+              <div class="atc-block-label"><mat-icon>hub</mat-icon> Adjustment · Time · Consequences</div>
+              <div class="atc-pillars">
+                <div class="atc-pillar">
+                  <span class="atc-pillar-tag atc-a">A · Adjustment</span>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Title</mat-label>
+                    <input matInput formControlName="adjustmenttitle" placeholder="Adjustment" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Explain</mat-label>
+                    <input matInput formControlName="adjustmentexplain" placeholder="Explain the adjustment…" autocomplete="off" />
+                  </mat-form-field>
+                </div>
+                <div class="atc-pillar">
+                  <span class="atc-pillar-tag atc-t">T · Time</span>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Title</mat-label>
+                    <input matInput formControlName="Timettitle" placeholder="Time" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Explain</mat-label>
+                    <input matInput formControlName="timeexplain" placeholder="Explain the time…" autocomplete="off" />
+                  </mat-form-field>
+                </div>
+                <div class="atc-pillar">
+                  <span class="atc-pillar-tag atc-c">C · Consequences</span>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Title</mat-label>
+                    <input matInput formControlName="consequencestitle" placeholder="Consequences" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Explain</mat-label>
+                    <input matInput formControlName="consequencesexplain" placeholder="Explain the consequences…" autocomplete="off" />
+                  </mat-form-field>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ATC Description (rich) -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>subject</mat-icon></span>
+                <div class="field-label-text"><h3>ATC — Description</h3><p>Closing description shown below the A·T·C block.</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors['atcdescription']" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors['atcdescription']" formControlName="atcdescription" [outputFormat]="'html'" placeholder="Describe the ATC framework…"></ngx-editor>
+            </div></div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section-pane" [hidden]="activeSection !== 6">
+      <button type="button" class="section-header" (click)="section6Open = !section6Open" [attr.aria-expanded]="section6Open">
+        <div class="section-header-left">
+          <span class="section-index">6</span>
+          <div class="section-title-text"><h2>Reflection of Growth</h2><p>Love-letter intro &amp; the participant letters.</p></div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section6FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section6Open">expand_more</mat-icon>
+        </div>
+      </button>
+      <div class="section-body" [hidden]="!section6Open">
+        <div class="fields-grid">
+
+          <!-- Section 6 rich fields -->
+          <section class="field-card" *ngFor="let field of section6RichFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text"><h3>{{ field.label }}</h3><p>{{ field.hint }}</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors[field.key]" [formControlName]="field.key" [outputFormat]="'html'" [placeholder]="field.placeholder"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- Blur profile toggle -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>blur_on</mat-icon></span>
+                <div class="field-label-text"><h3>Blur Profile</h3><p>Blur participant profiles in this section.</p></div>
+              </div>
+              <mat-slide-toggle formControlName="blurprofile" color="primary"></mat-slide-toggle>
+            </div>
+          </section>
+
+          <!-- Love letters: [{profileid (select), letter (rich)}] -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>mail</mat-icon></span>
+                <div class="field-label-text"><h3>Love Letters</h3><p>Pick a participant, then write their letter.</p></div>
+              </div>
+              <span class="type-chip"><mat-icon>format_list_bulleted</mat-icon> List</span>
+            </div>
+            <div class="awards" formArrayName="loveletters">
+              <div class="award-card" *ngFor="let row of loveLetterRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title"><mat-icon class="award-lead-icon">favorite</mat-icon> Letter {{ i + 1 }}</span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeLoveLetter(i)" matTooltip="Remove letter"><mat-icon>close</mat-icon></button>
+                </div>
+                <mat-form-field appearance="outline" class="text-field" subscriptSizing="dynamic">
+                  <mat-label>Participant</mat-label>
+                  <mat-select formControlName="profileid">
+                    <mat-option *ngFor="let p of participantOptions" [value]="p.profileid">{{ p.name }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <div class="editor-shell"><div class="NgxEditor__Wrapper">
+                  <ngx-editor-menu [editor]="getLetterEditor(i)" [toolbar]="toolbar"></ngx-editor-menu>
+                  <ngx-editor [editor]="getLetterEditor(i)" formControlName="letter" [outputFormat]="'html'" placeholder="Write the letter…"></ngx-editor>
+                </div></div>
+              </div>
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addLoveLetter()"><mat-icon>add</mat-icon> Add letter</button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7 -->
+    <div class="section-pane" [hidden]="activeSection !== 7">
+      <button type="button" class="section-header" (click)="section7Open = !section7Open" [attr.aria-expanded]="section7Open">
+        <div class="section-header-left">
+          <span class="section-index">7</span>
+          <div class="section-title-text"><h2>Live From The Arena</h2><p>Intro &amp; the live-arena videos.</p></div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section7FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section7Open">expand_more</mat-icon>
+        </div>
+      </button>
+      <div class="section-body" [hidden]="!section7Open">
+        <div class="fields-grid">
+
+          <!-- Section 7 rich fields -->
+          <section class="field-card" *ngFor="let field of section7RichFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text"><h3>{{ field.label }}</h3><p>{{ field.hint }}</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors[field.key]" [formControlName]="field.key" [outputFormat]="'html'" [placeholder]="field.placeholder"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- Live-arena videos: [{thumbnail, video}] -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>smart_display</mat-icon></span>
+                <div class="field-label-text"><h3>Live Arena Videos</h3><p>Each item has a video file and a thumbnail image.</p></div>
+              </div>
+              <span class="type-chip"><mat-icon>format_list_bulleted</mat-icon> List</span>
+            </div>
+            <div class="awards" formArrayName="livearenavideos">
+              <div class="award-card" *ngFor="let row of liveArenaVideoRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeLiveArenaVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
+                </div>
+                <div class="ahvideo-uploads">
+                  <div class="ahvideo-upload"><span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
+                    <app-media-upload type="video" [folder]="storageFolder" formControlName="video"></app-media-upload>
+                  </div>
+                  <div class="ahvideo-upload"><span class="upload-label"><mat-icon>image</mat-icon> Thumbnail</span>
+                    <app-media-upload type="image" [folder]="storageFolder" formControlName="thumbnail"></app-media-upload>
+                  </div>
+                </div>
+              </div>
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addLiveArenaVideo()"><mat-icon>add</mat-icon> Add video</button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 8 -->
+    <div class="section-pane" [hidden]="activeSection !== 8">
+      <button type="button" class="section-header" (click)="section8Open = !section8Open" [attr.aria-expanded]="section8Open">
+        <div class="section-header-left">
+          <span class="section-index">8</span>
+          <div class="section-title-text"><h2>Antano &amp; Prodigies</h2><p>Prodigies, videos, the Ads block &amp; rights reserved.</p></div>
+        </div>
+        <div class="section-header-right">
+          <span class="section-count">{{ section8FieldCount }} fields</span>
+          <mat-icon class="section-chevron" [class.open]="section8Open">expand_more</mat-icon>
+        </div>
+      </button>
+      <div class="section-body" [hidden]="!section8Open">
+        <div class="fields-grid">
+
+          <!-- Section 8 prodigies rich fields -->
+          <section class="field-card" *ngFor="let field of section8RichFields">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text"><h3>{{ field.label }}</h3><p>{{ field.hint }}</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors[field.key]" [formControlName]="field.key" [outputFormat]="'html'" [placeholder]="field.placeholder"></ngx-editor>
+            </div></div>
+          </section>
+
+          <!-- Prodigies videos: [{thumbnail, video}] -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>smart_display</mat-icon></span>
+                <div class="field-label-text"><h3>Prodigies Videos</h3><p>Each item has a video file and a thumbnail image.</p></div>
+              </div>
+              <span class="type-chip"><mat-icon>format_list_bulleted</mat-icon> List</span>
+            </div>
+            <div class="awards" formArrayName="prodigiesvideos">
+              <div class="award-card" *ngFor="let row of prodigiesVideoRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeProdigiesVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
+                </div>
+                <div class="ahvideo-uploads">
+                  <div class="ahvideo-upload"><span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
+                    <app-media-upload type="video" [folder]="storageFolder" formControlName="video"></app-media-upload>
+                  </div>
+                  <div class="ahvideo-upload"><span class="upload-label"><mat-icon>image</mat-icon> Thumbnail</span>
+                    <app-media-upload type="image" [folder]="storageFolder" formControlName="thumbnail"></app-media-upload>
+                  </div>
+                </div>
+              </div>
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addProdigiesVideo()"><mat-icon>add</mat-icon> Add video</button>
+            </div>
+          </section>
+
+          <!-- Ads: adtag + adsleftmap[{head,title1,title2,content (rich), buttonname, buttonbelowtext, proof[]}] -->
+          <section class="field-card">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>ads_click</mat-icon></span>
+                <div class="field-label-text"><h3>Ads</h3><p>Ad tag and the left-hand ad cards, each with its own proof list.</p></div>
+              </div>
+              <span class="type-chip media-chip"><mat-icon>campaign</mat-icon> Ads</span>
+            </div>
+
+            <mat-form-field appearance="outline" class="text-field">
+              <mat-label>Ad Tag</mat-label>
+              <input matInput formControlName="adtag" placeholder="e.g. Limited seats" autocomplete="off" />
+            </mat-form-field>
+
+            <div class="awards" formArrayName="adsleftmap">
+              <div class="award-card" *ngFor="let row of adRows.controls; let i = index" [formGroupName]="i">
+                <div class="award-head">
+                  <span class="award-title"><mat-icon class="award-lead-icon">ad_units</mat-icon> Ad {{ i + 1 }}</span>
+                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAd(i)" matTooltip="Remove ad"><mat-icon>close</mat-icon></button>
+                </div>
+
+                <div class="ad-editor">
+                  <span class="ad-editor-label">Head</span>
+                  <div class="NgxEditor__Wrapper">
+                    <ngx-editor-menu [editor]="getAdEditor(i, 'head')" [toolbar]="toolbar"></ngx-editor-menu>
+                    <ngx-editor [editor]="getAdEditor(i, 'head')" formControlName="head" [outputFormat]="'html'" placeholder="Ad head…"></ngx-editor>
+                  </div>
+                </div>
+                <div class="ad-editor">
+                  <span class="ad-editor-label">Title 1</span>
+                  <div class="NgxEditor__Wrapper">
+                    <ngx-editor-menu [editor]="getAdEditor(i, 'title1')" [toolbar]="toolbar"></ngx-editor-menu>
+                    <ngx-editor [editor]="getAdEditor(i, 'title1')" formControlName="title1" [outputFormat]="'html'" placeholder="Ad title 1…"></ngx-editor>
+                  </div>
+                </div>
+                <div class="ad-editor">
+                  <span class="ad-editor-label">Title 2</span>
+                  <div class="NgxEditor__Wrapper">
+                    <ngx-editor-menu [editor]="getAdEditor(i, 'title2')" [toolbar]="toolbar"></ngx-editor-menu>
+                    <ngx-editor [editor]="getAdEditor(i, 'title2')" formControlName="title2" [outputFormat]="'html'" placeholder="Ad title 2…"></ngx-editor>
+                  </div>
+                </div>
+                <div class="ad-editor">
+                  <span class="ad-editor-label">Content</span>
+                  <div class="NgxEditor__Wrapper">
+                    <ngx-editor-menu [editor]="getAdEditor(i, 'content')" [toolbar]="toolbar"></ngx-editor-menu>
+                    <ngx-editor [editor]="getAdEditor(i, 'content')" formControlName="content" [outputFormat]="'html'" placeholder="Ad content…"></ngx-editor>
+                  </div>
+                </div>
+
+                <div class="award-grid">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Button name</mat-label>
+                    <input matInput formControlName="buttonname" placeholder="Get started" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Button navigation link</mat-label>
+                    <input matInput formControlName="buttonnavigationlink" placeholder="https://…" autocomplete="off" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Button below text</mat-label>
+                    <input matInput formControlName="buttonbelowtext" placeholder="No card required" autocomplete="off" />
+                  </mat-form-field>
+                </div>
+
+                <div class="ad-proofs" formArrayName="proof">
+                  <span class="ad-editor-label">Proof</span>
+                  <div class="proof-row" *ngFor="let prow of adProofRows(i).controls; let j = index" [formGroupName]="j">
+                    <span class="proof-index">{{ j + 1 }}</span>
+                    <mat-form-field appearance="outline" class="proof-number" subscriptSizing="dynamic">
+                      <mat-label>Number</mat-label>
+                      <input matInput formControlName="number" placeholder="1M+" autocomplete="off" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="proof-proof" subscriptSizing="dynamic">
+                      <mat-label>Proof</mat-label>
+                      <input matInput formControlName="proof" placeholder="Lives Reached" autocomplete="off" />
+                    </mat-form-field>
+                    <button type="button" mat-icon-button class="proof-remove" (click)="removeAdProof(i, j)" matTooltip="Remove proof"><mat-icon>close</mat-icon></button>
+                  </div>
+                  <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAdProof(i)"><mat-icon>add</mat-icon> Add proof</button>
+                </div>
+              </div>
+
+              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAd()"><mat-icon>add</mat-icon> Add ad</button>
+            </div>
+          </section>
+
+          <!-- Rights reserved (last field) -->
+          <section class="field-card" *ngFor="let field of section8FooterRich">
+            <div class="field-head">
+              <div class="field-label">
+                <span class="field-icon"><mat-icon>{{ field.icon }}</mat-icon></span>
+                <div class="field-label-text"><h3>{{ field.label }}</h3><p>{{ field.hint }}</p></div>
+              </div>
+              <span class="rich-chip"><mat-icon>auto_awesome</mat-icon> Rich text</span>
+            </div>
+            <div class="editor-shell"><div class="NgxEditor__Wrapper">
+              <ngx-editor-menu [editor]="editors[field.key]" [toolbar]="toolbar"></ngx-editor-menu>
+              <ngx-editor [editor]="editors[field.key]" [formControlName]="field.key" [outputFormat]="'html'" [placeholder]="field.placeholder"></ngx-editor>
+            </div></div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </form>
+</div>

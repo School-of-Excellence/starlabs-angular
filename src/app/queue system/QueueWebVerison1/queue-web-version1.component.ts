@@ -55,6 +55,13 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
   showInlineForm: boolean = false;
   inlineFormId: string = null;
   inlineQueueId: string = null;
+  hasOpenSlot: boolean = false;
+  openSlotStageName: string | null = null;
+  hasBookedSlot: boolean = false;
+  bookedSlotStageName: string | null = null;
+  bookedSlotData: any = null;
+  bookedSlotTitle: string = '';
+  bookedSlotDescription: string = '';
 
   // --- Single-tab guard -------------------------------------------------
   // Ensures queue-web is effectively a single tab per browser. When the
@@ -154,6 +161,26 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
     return this.profileJourneyProduct?.['queuetoken']?.['status'] === 'instudio';
   }
 
+  private async getParticipantSegments(): Promise<string[]> {
+    const result: string[] = [];
+  
+    const listSnap = await getDocs(query(
+      collection(this.firestore, 'participant list'),
+      where('profilelist', 'array-contains', this.user.profileid)
+    ));
+  
+    for (const doc of listSnap.docs) {
+      const segmentIds: string[] = doc.data()['segmentid'] ?? [];
+      for (const id of segmentIds) {
+        if (!result.includes(id)) {
+          result.push(id);
+        }
+      }
+    }
+  
+    return result;
+  }
+
   async fetchOngoingQueue(): Promise<void> {
     this.loadingQueue = true;
     this.profileJourneyProduct = { group: {} };
@@ -216,7 +243,8 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     this.profileJourneyProduct['queuetoken']   = queuetoken.data();
     this.profileJourneyProduct['currentstage'] = queuetoken.data()!['currentstage'];
-
+    
+    this.hasOpenSlot = await this.resolveOpenSlotForParticipant();
 
     // Fetch variation stages if variationid exists
     const variationId = queuetoken.data()!['variationid'];
@@ -243,7 +271,7 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     // Live listener on queue token — registered AFTER queueData is set
     this.queueTokenUnsub?.();
-    this.queueTokenUnsub = onSnapshot(lastFileref, (tokenSnap) => {
+    this.queueTokenUnsub = onSnapshot(lastFileref, async (tokenSnap) => {
       if (!tokenSnap.exists()) return;
       const tokenData = tokenSnap.data();
 
@@ -264,6 +292,8 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
       };
 
       this.currentQueueStageIndex = newIndex;
+
+      this.hasOpenSlot = await this.resolveOpenSlotForParticipant();
     });
 
     //  Check if this queue is actually live 
@@ -431,8 +461,283 @@ export class QueueWebVersion1Component implements OnInit, OnDestroy {
 
     this.pinnedChatUnsub = onSnapshot( query( stageChatCol, where('senderprofileid', '==', this.user.profileid),  where('pinned', '==', true), orderBy('date', 'desc')), (snap) => {this.pinnedChatList = snap.docs.map((d) => d.data()); } );
     this.loadingQueue = false;
-    
-}
+    this.hasOpenSlot = await this.resolveOpenSlotForParticipant();   
+  }
+
+
+  private buildStageSlotConfig(planning: any[],activeStages: string[],participantSegments: string[],variationId: string | null): { stageName: string; slotConfigured: boolean }[] {
+    const now = new Date();
+    const config = activeStages.map(s => ({ stageName: s, slotConfigured: false }));
+
+    for (const plan of planning) {
+      if (variationId && `${plan.variationid}` !== `${variationId}`) continue;
+
+      const segments = plan.segments || [];
+
+      for (const segment of segments) {
+        const segmentId = `${segment.segmentid}`;
+        const participantBelongsToSegment = participantSegments.includes(segmentId);
+
+        if (!participantBelongsToSegment) continue;
+
+        const slots = segment.slots || [];
+
+        for (const slot of slots) {
+          const endDate: Date = slot.enddate?.toDate ? slot.enddate.toDate() : new Date(slot.enddate);
+          const slotAlreadyEnded = endDate <= now;
+
+          if (slotAlreadyEnded) continue;
+
+          const matchIndex = config.findIndex(c => c.stageName === slot.stagename);
+          if (matchIndex >= 0) {
+            config[matchIndex].slotConfigured = true;
+          }
+        }
+      }
+    }
+
+    return config;
+  }
+
+  private findNextStageWithSlot(currentStageIndex: number,stageConfig: { stageName: string; slotConfigured: boolean }[]): { index: number; stageName: string | null } 
+  {
+    for (let i = currentStageIndex; i < stageConfig.length; i++) {
+      if (stageConfig[i].slotConfigured) {
+        return { index: i, stageName: stageConfig[i].stageName };
+      }
+    }
+    return { index: -1, stageName: null };
+  }
+
+  async checkStageHasOpenSlot(stageName: string, participantSegments: string[]): Promise<boolean> {
+    const queueId = this.profileJourneyProduct['queueData']['docid'];
+    const variationId = this.profileJourneyProduct['queuetoken']['variationid'] ?? null;
+    const selectedSlots = this.profileJourneyProduct['queuetoken']['selectedstageslot'] || {};
+    const now = new Date();
+
+    const alreadyBooked = selectedSlots[stageName] != null;
+    if (alreadyBooked) return false;
+
+    const snap = await getDocs(query(
+      collection(this.firestore, 'queue planning'),
+      where('queueid', '==', queueId)
+    ));
+    if (snap.empty) return false;
+
+    const planning = snap.docs[0].data()['planning'] || [];
+
+    for (const plan of planning) {
+      if (variationId && `${plan.variationid}` !== `${variationId}`) continue;
+
+      const segments = plan.segments || [];
+
+      for (const segment of segments) {
+        const segmentId = `${segment.segmentid}`;
+        const participantBelongsToSegment = participantSegments.includes(segmentId);
+
+        if (!participantBelongsToSegment) continue;
+
+        const slots = segment.slots || [];
+
+        for (const slot of slots) {
+          const isWrongStage = slot.stagename !== stageName;
+          if (isWrongStage) continue;
+
+          const endDate: Date = slot.enddate?.toDate ? slot.enddate.toDate() : new Date(slot.enddate);
+          const slotAlreadyEnded = endDate <= now;
+          if (slotAlreadyEnded) continue;
+
+          const maxslot: number = slot.maxslot ?? 0;
+          const usedslot: number = slot.usedslot ?? 0;
+          const isFull = maxslot !== 0 && usedslot >= maxslot;
+
+          if (!isFull) return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private formatOrdinalDate(date: Date): string {
+    const day = date.getDate();
+    const suffix = (day % 10 === 1 && day !== 11) ? 'st'
+      : (day % 10 === 2 && day !== 12) ? 'nd'
+      : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${day}${suffix} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  private formatDayName(date: Date): string {
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return days[date.getDay()];
+  }
+
+  private formatTime12Hour(date: Date): string {
+    const h = date.getHours();
+    const m = date.getMinutes().toString().padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  }
+
+  getBookedSlotSummary(): string {
+    if (!this.bookedSlotData) return '';
+
+    const toDate = (d: any): Date | null => d?.toDate ? d.toDate() : (d ? new Date(d) : null);
+    const start = toDate(this.bookedSlotData.startdate);
+    const end = toDate(this.bookedSlotData.enddate);
+
+    if (!start) return '';
+
+    const sameDay = end && start.toDateString() === end.toDateString();
+
+    if (!end || sameDay) {
+      return `${this.formatOrdinalDate(start)} (${this.formatDayName(start)})`;
+    }
+
+    const sameMonthYear = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    if (sameMonthYear) {
+      const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      return `${start.getDate()}${this.getOrdinalSuffix(start.getDate())} & ${end.getDate()}${this.getOrdinalSuffix(end.getDate())} ${months[start.getMonth()]} ${start.getFullYear()} (${this.formatDayName(start)} & ${this.formatDayName(end)})`;
+    }
+
+    return `${this.formatOrdinalDate(start)} – ${this.formatOrdinalDate(end)}`;
+  }
+
+  private getOrdinalSuffix(day: number): string {
+    return (day % 10 === 1 && day !== 11) ? 'st'
+      : (day % 10 === 2 && day !== 12) ? 'nd'
+      : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+  }
+
+  getBookedSlotStartTime(): string {
+    if (!this.bookedSlotData?.startdate) return '';
+    const toDate = (d: any) => d?.toDate ? d.toDate() : new Date(d);
+    return this.formatTime12Hour(toDate(this.bookedSlotData.startdate));
+  }
+
+  private async resolveBookedSlotDetails(): Promise<{ title: string; description: string }> {
+    const empty = { title: '', description: '' };
+    if (!this.bookedSlotData) return empty;
+
+    const queueplanid = this.bookedSlotData['queueplanid'];
+    const segmentid   = this.bookedSlotData['segmentid'];
+    const stagename   = this.bookedSlotStageName;
+
+    if (!queueplanid || !segmentid || !stagename) return empty;
+
+    const planDoc = await getDoc(doc(this.firestore, 'queue planning', queueplanid));
+    if (!planDoc.exists()) return empty;
+
+    const bookedStart = this.bookedSlotData['startdate']?.toDate
+      ? this.bookedSlotData['startdate'].toDate().getTime()
+      : new Date(this.bookedSlotData['startdate']).getTime();
+
+    const planning = planDoc.data()['planning'] || [];
+
+    for (const plan of planning) {
+      for (const segment of (plan.segments || [])) {
+        if (`${segment.segmentid}` !== `${segmentid}`) continue;
+
+        for (const slot of (segment.slots || [])) {
+          if (slot.stagename !== stagename) continue;
+
+          const slotStart = slot.startdate?.toDate
+            ? slot.startdate.toDate().getTime()
+            : new Date(slot.startdate).getTime();
+
+          if (slotStart === bookedStart) {
+            return { title: slot.title || '', description: slot.description || '' };
+          }
+        }
+      }
+    }
+
+    return empty;
+  }
+  
+  async resolveOpenSlotForParticipant(): Promise<boolean> {
+    const queueData  = this.profileJourneyProduct?.['queueData'];
+    const queueToken = this.profileJourneyProduct?.['queuetoken'];
+
+    const resetOpen   = () => { this.openSlotStageName = null; };
+    const resetBooked = () => { this.hasBookedSlot = false; this.bookedSlotStageName = null; this.bookedSlotData = null; };
+
+    if (!queueData || !queueToken) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const queueId = queueData['docid'];
+    if (!queueId) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const currentStage: string = queueToken['currentstage'];
+    if (!currentStage) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const variationId: string | null = queueToken['variationid'] ?? null;
+    const snap = await getDocs(query(
+      collection(this.firestore, 'queue planning'),
+      where('queueid', '==', queueId)
+    ));
+    if (snap.empty) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const planning = snap.docs[0].data()['planning'] || [];
+    const activeStages: string[] = this.profileJourneyProduct['variationStages']
+      ?? queueData['stages']
+      ?? [];
+
+    const currentStageIndex = activeStages.indexOf(currentStage);
+
+    if (currentStageIndex === -1) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const participantSegments = await this.getParticipantSegments();
+    const stageConfig = this.buildStageSlotConfig(planning, activeStages, participantSegments, variationId);
+    const nextSlotStage = this.findNextStageWithSlot(currentStageIndex, stageConfig);
+
+    if (nextSlotStage.index === -1 || !nextSlotStage.stageName) {
+      resetOpen(); resetBooked(); return false;
+    }
+
+    const selectedSlots = queueToken['selectedstageslot'] || {};
+    const bookedSlot    = selectedSlots[nextSlotStage.stageName];
+
+    if (bookedSlot != null) {
+      const bookedEnd: Date = bookedSlot.enddate?.toDate
+        ? bookedSlot.enddate.toDate()
+        : new Date(bookedSlot.enddate);
+
+      const bookedSlotExpired = bookedEnd <= new Date();
+
+      if (!bookedSlotExpired) {
+    this.hasBookedSlot       = true;
+    this.bookedSlotStageName = nextSlotStage.stageName;
+    this.bookedSlotData      = bookedSlot;
+
+    const { title, description } = await this.resolveBookedSlotDetails();
+    this.bookedSlotTitle       = title;
+    this.bookedSlotDescription = description;
+
+    resetOpen();
+    return false;
+  }
+
+      resetBooked();
+    }
+
+    resetBooked();
+
+    const hasCapacity = await this.checkStageHasOpenSlot(nextSlotStage.stageName, participantSegments);
+    this.openSlotStageName = hasCapacity ? nextSlotStage.stageName : null;
+    return hasCapacity;
+  }
 
   
   isDifferentDay(msgA: any, msgB: any): boolean {

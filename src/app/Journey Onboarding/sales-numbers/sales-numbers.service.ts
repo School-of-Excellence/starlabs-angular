@@ -1,29 +1,53 @@
 import { Injectable } from '@angular/core';
 import {
-  Firestore, collection, query, where, getDocs, Timestamp,
+  Firestore, collection, query, where, getDocs, getDoc, Timestamp,
   doc, setDoc, updateDoc, deleteDoc,
 } from '@angular/fire/firestore';
 import {
-  SaleLead, SalesTeam, SalesGroupMetric,
+  SaleLead, SalesTeam, SalesGroupMetric, SalespersonRef, SourceOption,
   MonthlyPoint, DashboardData,
 } from './sales-numbers.models';
 
 export interface SalesFilters {
   sources: string[];
-  originalSources: string[];
   salespeople: string[];
   team: string; // '' = all teams
 }
 
-// map a product category to its card segment (FTO + Gift are clubbed)
-const SEGMENT_OF: Record<string, string> = { Ecosystem: 'Ecosystem', DFU: 'DFU', FTO: 'FTO + Gift', Gift: 'FTO + Gift' };
+// journeys excluded from the metrics (mirrors journeycoach-dashboard)
+const EXCLUDE_ONBOARDING_JOURNEY = 'InLXMl7OBAqlDTZcXwK0';
+const EXCLUDE_TEST_JOURNEY = 'RXvsMYoK0g4SstvDDURZ';
+
+// product-segment cards; a category maps 1:1 to a segment (FTO + Gift already merged in ensureJourneys)
 const SEGMENT_ORDER = ['Ecosystem', 'DFU', 'FTO + Gift'];
 
-const DOWNGRADE_TYPES = ['downgradetoold', 'downgradetonew', 'downgrade'];
+const notEmpty = (v: any) => ![null, undefined, ''].includes(v);
 
 @Injectable({ providedIn: 'root' })
 export class SalesNumbersService {
   constructor(private firestore: Firestore) {}
+
+  // ---- journey collection -> product category / name -------------------------
+  private journeyCat = new Map<string, string>();
+  private journeyName = new Map<string, string>();
+  private journeysLoaded = false;
+
+  async ensureJourneys(): Promise<void> {
+    if (this.journeysLoaded) return;
+    const snap = await getDocs(collection(this.firestore, 'journey'));
+    for (const d of snap.docs) {
+      const v = d.data() as any;
+      const name = v['journey'] ?? v['name'] ?? d.id;
+      const type = v['type'];
+      const category = name === 'FTO' ? 'FTO + Gift'
+        : type === 'Eco system' ? 'Ecosystem'
+        : type === 'DFU' ? 'DFU'
+        : 'Other';
+      this.journeyName.set(d.id, name);
+      this.journeyCat.set(d.id, category);
+    }
+    this.journeysLoaded = true;
+  }
 
   // ---- Firestore reads -------------------------------------------------------
 
@@ -35,50 +59,82 @@ export class SalesNumbersService {
     });
   }
 
-  // Sales whose SALE date OR cancellation date falls in [start, end]. Two single-field
-  // range queries merged by docid (avoids a composite `or` index).
-  async loadSalesInRange(start: Date, end: Date): Promise<SaleLead[]> {
-    const s = Timestamp.fromDate(start);
-    const e = Timestamp.fromDate(end);
-    const col = collection(this.firestore, 'salesleads');
+  // Flagged salespeople (users_roles where salesperson == true) -> name + profileid.
+  async loadSalespersonRoster(): Promise<SalespersonRef[]> {
+    const snap = await getDocs(query(collection(this.firestore, 'users_roles'), where('salesperson', '==', true)));
+    return snap.docs.map((d) => {
+      const v = d.data() as any;
+      return { roleDocId: d.id, profileid: v['profile_ref']?.id ?? d.id, name: v['name'] ?? '' } as SalespersonRef;
+    }).filter((r) => r.name);
+  }
 
+  // Configurable lead sources (classify/source_options -> { sources: [{id, name}] }).
+  async loadSourceOptions(): Promise<SourceOption[]> {
+    const snap = await getDoc(doc(this.firestore, 'classify', 'source_options'));
+    const list = (snap.exists() ? (snap.data() as any)['sources'] : null);
+    return Array.isArray(list)
+      ? list.filter((s) => s && s.id).map((s) => ({ id: String(s.id), name: String(s.name ?? s.id) }))
+      : [];
+  }
+
+  // Resolve salesperson display names -> profileid via users_roles.
+  // salesleads carries short names ("Harish") while users_roles holds full names ("Harish R"),
+  // so we match exact OR unique first-name prefix: a name links only when EXACTLY one profile
+  // matches (`name` itself, or a `name `-prefixed full name). Ambiguous names (two real "Meena"s)
+  // and junk stay unresolved by design. One bounded prefix-range query per distinct name.
+  async loadProfileIdsForNames(names: string[]): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const uniq = [...new Set(names.map((n) => (n ?? '').trim()).filter(Boolean))];
+    await Promise.all(uniq.map(async (name) => {
+      const n = norm(name);
+      // case-sensitive prefix range on the stored name (single-field index, no composite needed)
+      const snap = await getDocs(query(
+        collection(this.firestore, 'users_roles'),
+        where('name', '>=', name),
+        where('name', '<=', name + ''),
+      ));
+      const candidatePids = new Set<string>();
+      for (const d of snap.docs) {
+        const v = d.data() as any;
+        const rn = norm((v['name'] ?? '').toString());
+        const pid = v['profile_ref']?.id;
+        if (pid && (rn === n || rn.startsWith(n + ' '))) candidatePids.add(pid);
+      }
+      if (candidatePids.size === 1) map.set(name, [...candidatePids][0]); // unique match only
+    }));
+    return map;
+  }
+
+  // Find users_roles docs matching a display name (for the in-screen flag helper).
+  async findRolesByName(name: string): Promise<{ roleDocId: string; profileid: string; name: string }[]> {
+    const snap = await getDocs(query(collection(this.firestore, 'users_roles'), where('name', '==', name)));
+    return snap.docs.map((d) => {
+      const v = d.data() as any;
+      return { roleDocId: d.id, profileid: v['profile_ref']?.id ?? d.id, name: v['name'] ?? name };
+    });
+  }
+
+  async setSalespersonFlag(roleDocId: string, value: boolean): Promise<void> {
+    await updateDoc(doc(this.firestore, 'users_roles', roleDocId), { salesperson: value });
+  }
+
+  // Sales whose sale date OR cancel/downgrade date falls in [start, end].
+  // Two single-field range queries merged by docid (no composite index needed).
+  async loadSalesInRange(start: Date, end: Date): Promise<SaleLead[]> {
+    await this.ensureJourneys();
+    const s = Timestamp.fromDate(start), e = Timestamp.fromDate(end);
+    const col = collection(this.firestore, 'salesleads');
     const [byPurchase, byDate] = await Promise.all([
       getDocs(query(col, where('purchasedate', '>=', s), where('purchasedate', '<=', e))),
       getDocs(query(col, where('date', '>=', s), where('date', '<=', e))),
     ]);
-
     const merged = new Map<string, SaleLead>();
     for (const d of [...byPurchase.docs, ...byDate.docs]) {
       const lead = this.mapLead(d.id, d.data());
       merged.set(lead.docid, lead);
     }
     return [...merged.values()];
-  }
-
-  // Distinct salesperson names present in `salesleads` (test-scale read of the collection).
-  async loadAllSalespeople(): Promise<string[]> {
-    const snap = await getDocs(collection(this.firestore, 'salesleads'));
-    const names = snap.docs.map((d) => (d.data() as any)['salespersonname']).filter(Boolean);
-    return this.distinct(names);
-  }
-
-  // ---- team-management writes (sales_teams) ----
-  async saveTeamMembers(teamId: string, members: string[]): Promise<void> {
-    await updateDoc(doc(this.firestore, 'sales_teams', teamId), {
-      members, lastupdate: Timestamp.fromDate(new Date()),
-    });
-  }
-
-  async createTeam(name: string): Promise<string> {
-    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `team_${Date.now()}`;
-    await setDoc(doc(this.firestore, 'sales_teams', id), {
-      team: name.trim(), members: [], seedTag: 'sales-numbers', lastupdate: Timestamp.fromDate(new Date()),
-    });
-    return id;
-  }
-
-  async deleteTeam(teamId: string): Promise<void> {
-    await deleteDoc(doc(this.firestore, 'sales_teams', teamId));
   }
 
   private monthsAgoStart(months: number): Date {
@@ -88,44 +144,74 @@ export class SalesNumbersService {
     return start;
   }
 
-  // Cancellations over the last `months` months, for the per-month chart.
-  async loadCancellations(months: number): Promise<SaleLead[]> {
-    const snap = await getDocs(query(
-      collection(this.firestore, 'salesleads'),
-      where('date', '>=', Timestamp.fromDate(this.monthsAgoStart(months))),
-    ));
-    return snap.docs
-      .map((d) => this.mapLead(d.id, d.data()))
-      .filter((l) => l.journeytype === 'cancelled');
-  }
-
-  // Gross sales over the last `months` months, for the per-month chart.
+  // Sales (by purchasedate) over the last `months` months, for the trend chart.
   async loadSalesSince(months: number): Promise<SaleLead[]> {
+    await this.ensureJourneys();
     const snap = await getDocs(query(
       collection(this.firestore, 'salesleads'),
       where('purchasedate', '>=', Timestamp.fromDate(this.monthsAgoStart(months))),
     ));
-    return snap.docs
-      .map((d) => this.mapLead(d.id, d.data()))
-      .filter((l) => this.isGross(l));
+    return snap.docs.map((d) => this.mapLead(d.id, d.data()));
+  }
+
+  // Cancellations (by cancel date) over the last `months` months, for the chart.
+  async loadCancellations(months: number): Promise<SaleLead[]> {
+    await this.ensureJourneys();
+    const snap = await getDocs(query(
+      collection(this.firestore, 'salesleads'),
+      where('date', '>=', Timestamp.fromDate(this.monthsAgoStart(months))),
+    ));
+    return snap.docs.map((d) => this.mapLead(d.id, d.data())).filter((l) => l.journeytype === 'cancelled');
+  }
+
+  // Distinct salespeople over the last 12 months (bounded read; used by the teams roster
+  // until the screens merge). Avoids the old whole-collection scan.
+  async loadAllSalespeople(): Promise<string[]> {
+    const snap = await getDocs(query(
+      collection(this.firestore, 'salesleads'),
+      where('purchasedate', '>=', Timestamp.fromDate(this.monthsAgoStart(12))),
+    ));
+    return this.distinct(snap.docs.map((d) => (d.data() as any)['salespersonname']).filter(Boolean));
+  }
+
+  // ---- writes ----
+  async saveTeamMembers(teamId: string, members: string[]): Promise<void> {
+    await updateDoc(doc(this.firestore, 'sales_teams', teamId), { members, lastupdate: Timestamp.fromDate(new Date()) });
+  }
+  async createTeam(name: string): Promise<string> {
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `team_${Date.now()}`;
+    await setDoc(doc(this.firestore, 'sales_teams', id), { team: name.trim(), members: [], lastupdate: Timestamp.fromDate(new Date()) });
+    return id;
+  }
+  async deleteTeam(teamId: string): Promise<void> {
+    await deleteDoc(doc(this.firestore, 'sales_teams', teamId));
+  }
+  // #8 — set/update the lead source on a sale
+  async updateSaleSource(docid: string, source: string): Promise<void> {
+    await updateDoc(doc(this.firestore, 'salesleads', docid), { source });
   }
 
   private mapLead(id: string, v: any): SaleLead {
+    const journey = v['journey'] ?? '';
+    const participantName = (v['name'] ?? `${v['firstname'] ?? ''} ${v['lastname'] ?? ''}`).trim();
     return {
       docid: v['docid'] ?? id,
+      participantName: participantName || '(unnamed)',
       salespersonname: v['salespersonname'] ?? 'Unknown',
       presalespersonname: v['presalespersonname'] ?? 'Unknown',
-      source: v['source'] ?? '',
-      originalsource: v['originalsource'] ?? '',
-      product: v['product'] ?? '',
-      productName: v['productName'] ?? '',
-      saleType: v['saletype'] ?? (['new', 'upgrade', 'addons'].includes(v['journeytype']) ? v['journeytype'] : ''),
+      journey,
       journeytype: v['journeytype'] ?? '',
+      status: v['status'] ?? '',
+      email: v['email'] ?? '',
+      paymentplan: v['paymentplan'] ?? '',
+      source: v['source'] ?? '',
+      category: this.journeyCat.get(journey) ?? 'Other',
+      productName: this.journeyName.get(journey) ?? '(unknown)',
       totalpurchasevalue: Number(v['totalpurchasevalue']) || 0,
+      installmentamount: Number(v['installmentamount']) || 0,
       purchasedate: this.toDate(v['purchasedate']),
       date: this.toDate(v['date']),
       paymentplanassureddate: this.toDate(v['paymentplanassureddate']),
-      canceldocid: v['canceldocid'] ?? undefined,
     };
   }
 
@@ -137,17 +223,18 @@ export class SalesNumbersService {
     return null;
   }
 
-  // ---- classification helpers ------------------------------------------------
-
-  private isCancelled = (l: SaleLead) => l.journeytype === 'cancelled';
-  private isDowngrade = (l: SaleLead) => DOWNGRADE_TYPES.includes(l.journeytype);
-  private isGross = (l: SaleLead) => !this.isCancelled(l) && !this.isDowngrade(l);
-  // a record (sale OR cancellation) is "assured" if it carries an assured payment plan
-  private hasAssured = (l: SaleLead) => !!l.paymentplanassureddate;
-  private isAssured = (l: SaleLead) => this.isGross(l) && this.hasAssured(l);
+  // ---- classification (journey-coach dashboard rules) ------------------------
+  private isExcluded = (l: SaleLead) =>
+    (l.journey === EXCLUDE_TEST_JOURNEY && l.email.toLowerCase().includes('soexcellence.com')) ||
+    l.journey === EXCLUDE_ONBOARDING_JOURNEY ||
+    l.status.toLowerCase() === 'rejected';
+  private isApproved = (l: SaleLead) => l.status.toLowerCase() === 'approved';
+  private hasPlan = (l: SaleLead) => notEmpty(l.paymentplan);
+  isGrossInRange(l: SaleLead, start: Date, end: Date): boolean {
+    return !this.isExcluded(l) && !!l.purchasedate && l.purchasedate >= start && l.purchasedate <= end;
+  }
 
   // ---- pure aggregation ------------------------------------------------------
-
   aggregate(
     sales: SaleLead[],
     teams: SalesTeam[],
@@ -158,71 +245,64 @@ export class SalesNumbersService {
     metric: 'gsv' | 'asv',
     start: Date,
     end: Date,
+    nameToProfileId: Map<string, string>,
+    sourceIdToName: Map<string, string>,
   ): DashboardData {
     const asv = metric === 'asv';
-    const memberToTeam = new Map<string, string>();
-    for (const t of teams) for (const m of t.members) memberToTeam.set(m, t.team);
-    const teamOf = (person: string) => memberToTeam.get(person) ?? 'Unassigned';
+    // teams store profileids; resolve a sale's salespersonname -> profileid -> team
+    const profileIdToTeam = new Map<string, string>();
+    for (const t of teams) for (const pid of t.members) profileIdToTeam.set(pid, t.team);
+    const teamOf = (person: string) => {
+      const pid = nameToProfileId.get(person);
+      return (pid && profileIdToTeam.get(pid)) ?? 'Unassigned';
+    };
 
-    // composable per-field filter predicates (an empty filter passes everything).
-    // NOTE: there is no product/type filter any more — product is shown as segment cards,
-    // and sale type is folded into each card as the New/Upgrade/Add-on split.
     const fSource = (l: SaleLead) => !filters.sources.length || filters.sources.includes(l.source);
-    const fOriginal = (l: SaleLead) => !filters.originalSources.length || filters.originalSources.includes(l.originalsource);
     const fPerson = (l: SaleLead) => !filters.salespeople.length || filters.salespeople.includes(l.salespersonname);
     const fTeam = (l: SaleLead) => !filters.team || teamOf(l.salespersonname) === filters.team;
 
-    const passesFilters = (l: SaleLead) => fSource(l) && fOriginal(l) && fPerson(l) && fTeam(l);
-    // the source breakdown ignores its own source filter (so all sources always show) but honours the rest
-    const passesExceptSource = (l: SaleLead) => fOriginal(l) && fPerson(l) && fTeam(l);
+    const passesFilters = (l: SaleLead) => fSource(l) && fPerson(l) && fTeam(l);
+    const passesExceptSource = (l: SaleLead) => fPerson(l) && fTeam(l);
 
     const filtered = sales.filter(passesFilters);
     const groupKey = (l: SaleLead) => (view === 'team' ? teamOf(l.salespersonname) : l.salespersonname);
-
     const aValue = (m: SalesGroupMetric) => (asv ? m.asv : m.gsv);
     const byActive = (a: SalesGroupMetric, b: SalesGroupMetric) => aValue(b) - aValue(a);
 
-    // person/team breakdown table
+    const sourceLabel = (l: SaleLead) => (l.source ? (sourceIdToName.get(l.source) ?? l.source) : 'Unspecified');
     const groups = [...this.accumulate(filtered, groupKey, start, end).values()].sort(byActive);
+    const bySource = [...this.accumulate(sales.filter(passesExceptSource), sourceLabel, start, end).values()].sort(byActive);
 
-    // source breakdown — ignores the source filter, honours the rest
-    const bySource = [...this.accumulate(sales.filter(passesExceptSource), (l) => l.source || 'Unspecified', start, end).values()].sort(byActive);
-
-    // product-segment cards (Ecosystem / DFU / FTO+Gift), plus the All rollup
-    const segMap = this.accumulate(filtered, (l) => SEGMENT_OF[l.product] || 'Other', start, end);
+    const segMap = this.accumulate(filtered, (l) => (SEGMENT_ORDER.includes(l.category) ? l.category : 'Other'), start, end);
     const segments = SEGMENT_ORDER.map((key) => segMap.get(key) ?? this.zeroMetric(key));
     const allSegment = [...this.accumulate(filtered, () => 'All', start, end).values()][0] ?? this.zeroMetric('All');
-    const totals = allSegment; // the All card is also the table roll-up
+    const totals = allSegment;
 
-    // ---- monthly sales vs cancellations (chart) — honours filters AND the active metric ----
-    const chartSales = salesForChart
-      .filter(passesFilters)
-      .filter((s) => this.isGross(s) && (!asv || this.hasAssured(s)));
-    const chartCancellations = cancellationsForChart
-      .filter(passesFilters)
-      .filter((c) => !asv || this.hasAssured(c));
+    // chart (6-month) — honours filters + active metric
+    const chartSales = salesForChart.filter(passesFilters)
+      .filter((s) => !this.isExcluded(s) && !!s.purchasedate && (!asv || this.hasPlan(s)));
+    const chartCancellations = cancellationsForChart.filter(passesFilters)
+      .filter((c) => !this.isExcluded(c) && c.journeytype === 'cancelled' && this.isApproved(c));
     const monthly = this.buildMonthly(chartSales, chartCancellations, 6);
 
-    // ---- filter option lists ----
+    // filter option lists (derived from loaded data — no whole-collection read)
     const sources = this.distinct(sales.map((l) => l.source));
-    const originalSources = this.distinct(sales.map((l) => l.originalsource));
-    const salespeople = this.distinct([...sales.map((l) => l.salespersonname), ...memberToTeam.keys()]);
+    const salespeople = this.distinct([
+      ...sales.map((l) => l.salespersonname),
+      ...salesForChart.map((l) => l.salespersonname),
+    ]);
     const teamNames = this.distinct(teams.map((t) => t.team));
 
-    return { segments, allSegment, groups, bySource, totals, monthly, sources, originalSources, salespeople, teams: teamNames };
+    return { segments, allSegment, groups, bySource, totals, monthly, sources, salespeople, teams: teamNames };
   }
 
   private zeroMetric(group: string): SalesGroupMetric {
     return {
       group, grossCount: 0, gsv: 0, assuredCount: 0, asv: 0, cancelledCount: 0, cancelledValue: 0,
-      assuredCancelledCount: 0, assuredCancelledValue: 0,
       newGrossCount: 0, newAssuredCount: 0, upgradeGrossCount: 0, upgradeAssuredCount: 0, addonsGrossCount: 0, addonsAssuredCount: 0,
     };
   }
 
-  // Build a per-group metric map: gross/assured sales (by purchasedate in range) and
-  // gross/assured cancellations (by cancel date in range). Shared by the person/team
-  // and the product breakdowns.
   private accumulate(list: SaleLead[], keyOf: (l: SaleLead) => string, start: Date, end: Date): Map<string, SalesGroupMetric> {
     const map = new Map<string, SalesGroupMetric>();
     const ensure = (g: string): SalesGroupMetric => {
@@ -232,26 +312,35 @@ export class SalesNumbersService {
     };
     const inRange = (d: Date | null) => !!d && d >= start && d <= end;
     for (const l of list) {
+      if (this.isExcluded(l)) continue;
       const m = ensure(keyOf(l));
-      if (this.isGross(l) && inRange(l.purchasedate)) {
-        m.grossCount++;
-        m.gsv += l.totalpurchasevalue;
-        const assured = this.isAssured(l);
-        if (assured) { m.assuredCount++; m.asv += l.totalpurchasevalue; }
-        if (l.saleType === 'new') { m.newGrossCount++; if (assured) m.newAssuredCount++; }
-        else if (l.saleType === 'upgrade') { m.upgradeGrossCount++; if (assured) m.upgradeAssuredCount++; }
-        else if (l.saleType === 'addons') { m.addonsGrossCount++; if (assured) m.addonsAssuredCount++; }
+      const v = l.totalpurchasevalue;
+      // gross = purchasedate in window (any journeytype)
+      if (inRange(l.purchasedate)) {
+        m.grossCount++; m.gsv += v;
+        const plan = this.hasPlan(l);
+        if (plan) { m.assuredCount++; m.asv += v; }
+        // gross type split is approved-only
+        if (this.isApproved(l)) {
+          if (l.journeytype === 'new') m.newGrossCount++;
+          else if (l.journeytype === 'upgrade') m.upgradeGrossCount++;
+          else if (l.journeytype === 'addons') m.addonsGrossCount++;
+        }
+        // assured type split (within plan)
+        if (plan) {
+          if (l.journeytype === 'new') m.newAssuredCount++;
+          else if (l.journeytype === 'upgrade') m.upgradeAssuredCount++;
+          else if (l.journeytype === 'addons') m.addonsAssuredCount++;
+        }
       }
-      if (this.isCancelled(l) && inRange(l.date)) {
-        m.cancelledCount++;
-        m.cancelledValue += l.totalpurchasevalue;
-        if (this.hasAssured(l)) { m.assuredCancelledCount++; m.assuredCancelledValue += l.totalpurchasevalue; }
+      // cancellation = journeytype cancelled, cancel date in window, approved
+      if (l.journeytype === 'cancelled' && inRange(l.date) && this.isApproved(l)) {
+        m.cancelledCount++; m.cancelledValue += v;
       }
     }
     return map;
   }
 
-  // sales bucketed by purchasedate, cancellations bucketed by cancel date — both pre-filtered by caller.
   private buildMonthly(sales: SaleLead[], cancellations: SaleLead[], months: number): MonthlyPoint[] {
     const buckets = new Map<string, MonthlyPoint>();
     const labels: string[] = [];
@@ -259,8 +348,7 @@ export class SalesNumbersService {
     for (let i = months - 1; i >= 0; i--) {
       const d = new Date(base); d.setMonth(d.getMonth() - i);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      buckets.set(key, { month: label, salesCount: 0, salesValue: 0, cancelledCount: 0, cancelledValue: 0 });
+      buckets.set(key, { month: d.toLocaleString('en-US', { month: 'short', year: 'numeric' }), salesCount: 0, salesValue: 0, cancelledCount: 0, cancelledValue: 0 });
       labels.push(key);
     }
     for (const s of sales) {

@@ -16,6 +16,23 @@
     </div>
   </header>
 
+  <!-- Initial load spinner — shown until the first board data arrives, so the
+       coordinator doesn't see a flash of empty "— none —" columns. -->
+  <div class="arena__loader" *ngIf="isLoading && !loadError" role="status" aria-live="polite">
+    <span class="arena__spinner"></span>
+    <span class="arena__loader-text">Loading board…</span>
+  </div>
+
+  <!-- Board-data load failure (silent-blank guard). Surfaces a stalled Listen
+       stream / index / rules error instead of an empty board, with recovery. -->
+  <div class="arena__load-error" *ngIf="loadError" role="alert">
+    <mat-icon>cloud_off</mat-icon>
+    <span>{{ loadError }}</span>
+    <button type="button" class="arena__load-retry" (click)="retryLoad()">
+      <mat-icon>refresh</mat-icon> Retry
+    </button>
+  </div>
+
   <!-- ============================== BODY ============================== -->
   <main class="arena__body" [class.is-left-closed]="!leftOpen" [class.is-right-closed]="!rightOpen">
 
@@ -39,7 +56,7 @@
         </button>
         <button class="ltab" [class.ltab--active]="leftTab === 'specialists'" (click)="leftTab = 'specialists'">
           <mat-icon>person</mat-icon> Specialists
-          <span class="ltab__count">{{ studios.length }}</span>
+          <span class="ltab__count">{{ stageStudios.length }}</span>
         </button>
       </div>
 
@@ -297,6 +314,13 @@
                   {{ sp.name }}
                   <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
                 </span>
+                <!-- per-specialist join status (each specialist has their own) -->
+                <span class="kc__role-pres"
+                      [class.kc__role-pres--ok]="specialistPresentById(a, sp.id)"
+                      [class.kc__role-pres--off]="!specialistPresentById(a, sp.id)"
+                      [matTooltip]="specialistPresentById(a, sp.id) ? 'In the call' : (specialistJoinedById(a, sp.id) ? 'Left the call' : 'Not joined yet')">
+                  <mat-icon>{{ specialistPresentById(a, sp.id) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                </span>
               </div>
               <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
                 <span class="kc__role-label">Bonus</span>
@@ -304,17 +328,18 @@
                   {{ bs.name }}
                   <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
                 </span>
+                <span class="kc__role-pres"
+                      [class.kc__role-pres--ok]="specialistPresentById(a, bs.id)"
+                      [class.kc__role-pres--off]="!specialistPresentById(a, bs.id)"
+                      [matTooltip]="specialistPresentById(a, bs.id) ? 'In the call' : (specialistJoinedById(a, bs.id) ? 'Left the call' : 'Not joined yet')">
+                  <mat-icon>{{ specialistPresentById(a, bs.id) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                </span>
               </div>
             </div>
 
-            <!-- Who is in the meet right now -->
+            <!-- Who is in the meet right now. Specialist status is now per-specialist
+                 above (kc__role-pres); this row shows the participant. -->
             <div class="kc__presence">
-              <span class="kc__pres"
-                    [class.kc__pres--ok]="specialistInCall(a)"
-                    [class.kc__pres--off]="!specialistInCall(a)">
-                <mat-icon>{{ specialistInCall(a) ? 'check_circle' : 'remove_circle' }}</mat-icon>
-                Specialist
-              </span>
               <span class="kc__pres"
                     [class.kc__pres--ok]="participantInCall(a)"
                     [class.kc__pres--off]="!participantInCall(a)">
@@ -359,7 +384,7 @@
             </div>
 
             <!-- Live session — show the call start clock time inline -->
-            <div class="kc__started" *ngIf="!callEnded(a) && a.specialistJoinedAt">
+            <div class="kc__started" *ngIf="!callEnded(a) && specialistJoined(a)">
               <mat-icon>play_circle</mat-icon>
               <span>Call started at <b>{{ callStartedClock(a) }}</b></span>
             </div>

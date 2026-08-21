@@ -108,37 +108,15 @@ export class ParticipantEvolutionMappingComponent {
 
         if (diff <= 0) return '00:00:00';
 
-        const hours   = Math.floor(diff / (1000 * 60 * 60));
+        const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }),
-      takeWhile(val => val !== '00:00:00', true),
-      tap(async val => {
-        if (val === '00:00:00' && !this.expiredLive) {
-          this.expiredLive = true;
-          try {
-            const liveDocRef = doc(
-              this.firestore,
-              'liveevolutionmapping',
-              this.currentProfile['profileid']
-            );
-            await updateDoc(liveDocRef, { live: false });
-          } catch (err) {
-            console.error('Error updating live status on expiry', err);
-          }
-          if (this.liveEvolutionMapping.length > 0) {
-            this.liveEvolutionMapping = [
-              { ...this.liveEvolutionMapping[0], live: false }
-            ];
-          }
-        }
-      })
+      takeWhile(val => val !== '00:00:00', true)
     );
   }
-
-
 
   async fetchOngoingLiveEvolutionMapping() {
   this.profileJourneyProduct['group'] = {};

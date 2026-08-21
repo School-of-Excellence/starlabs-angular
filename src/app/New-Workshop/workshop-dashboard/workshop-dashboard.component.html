@@ -33,20 +33,6 @@
           </div>
         </mat-card-content>
         <mat-card-actions align="end">
-        <button 
-          mat-icon-button 
-          (click)="refreshData()" 
-          [disabled]="isRefreshing" 
-          matTooltip="Refresh data"
-          style="background-color: #ff4081; color: white;">
-
-          <mat-icon 
-            [class.spin]="isRefreshing"
-            style="color: white;">
-            refresh
-          </mat-icon>
-
-        </button>&nbsp;&nbsp;
           <!-- <button mat-raised-button color="accent" (click)="openNewUserDialog()">
             {{'New Users ' + '( ' +objectKeys(mapProfileNew).length + ' )'}} 
           </button>&nbsp;&nbsp; -->
@@ -324,8 +310,103 @@
             </mat-card>
           </ng-container>
 
+          <!-- Evergreen-only referral cards -->
+          <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">share</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClicked }}</h2>
+                    <p class="metric-label">Share Clicked</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClaimed')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">redeem</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ shareClaimed }}</h2>
+                    <p class="metric-label">Share Claimed</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+
+            <!-- Purchasers: evergreen + paid workshops only -->
+            <mat-card class="metric-card clickable-metric" *ngIf="workshopData?.payment === true"
+              (click)="onMetricClick('purchase')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon">shopping_cart</mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ purchase }}</h2>
+                    <p class="metric-label">Purchase</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </ng-container>
+
         </div>
       </div>
+
+      <!-- ===== Evergreen: participant day-journey timeline ===== -->
+      <section class="ev-day-section"
+               *ngIf="workshopData?.evergreenWorkshop === true && evergreenWorkshopDays > 0">
+        <div class="ev-day-head">
+          <div class="ev-day-heading">
+            <h3 class="ev-day-title">Participant Journey</h3>
+            <p class="ev-day-sub">
+              {{ evergreenWorkshopDays }}-day workshop
+              <span class="ev-day-dot">•</span>
+              {{ evergreenDayTotal }} {{ evergreenDayTotal === 1 ? 'participant' : 'participants' }}
+            </p>
+          </div>
+          <span class="ev-day-pill">{{ evergreenWorkshopDays }} Days</span>
+        </div>
+
+        <div class="ev-day-track">
+          <button type="button"
+                  class="ev-day-node"
+                  *ngFor="let d of evergreenDayDistribution"
+                  [class.is-empty]="d.count === 0"
+                  [disabled]="d.count === 0"
+                  (click)="onDayClick(d)">
+            <span class="ev-day-badge">{{ d.day }}</span>
+            <span class="ev-day-count">{{ d.count }}</span>
+            <span class="ev-day-caption">Day {{ d.day }}</span>
+          </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--done"
+                  *ngIf="evergreenCompletedBucket.count > 0"
+                  (click)="onDayClick(evergreenCompletedBucket)">
+            <span class="ev-day-badge ev-day-badge--done">
+              <mat-icon>check</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenCompletedBucket.count }}</span>
+            <span class="ev-day-caption">Completed</span>
+          </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--ext"
+                  *ngIf="evergreenExtendedBucket.count > 0"
+                  [matTooltip]="evergreenExtendedBucket.activeCount + ' active · '
+                    + (evergreenExtendedBucket.count - evergreenExtendedBucket.activeCount) + ' lapsed'"
+                  (click)="openExtendedTimeline()">
+            <span class="ev-day-badge ev-day-badge--ext">
+              <mat-icon>more_time</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenExtendedBucket.count }}</span>
+            <span class="ev-day-caption">Extended</span>
+          </button>
+        </div>
+      </section>
+
       <!-- <div class="metrics-section">
         <div class="metrics-grid">
 
@@ -1607,7 +1688,7 @@
       </div>
 
       <div class="panel-actions">
-        <button mat-icon-button class="close-button" (click)="sendMail()">
+        <button mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
           <i class="fa-solid fa-envelope"></i>
         </button>
         <button mat-icon-button class="close-button" (click)="sendWatti()">
@@ -1980,6 +2061,7 @@
         <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a
+              *ngIf="!selectedStatusInfo?.evergreenCompleted"
               class="participant-item"
               [href]="'/userprofile/' + participant.profileid"
               target="_blank"
@@ -2003,8 +2085,51 @@
                     <ng-container *ngIf="!participant.isFacilitator && !participant.isCohort">{{ participant.categoryName }}</ng-container>
                   </span>
                 </ng-container>
+                <span *ngIf="participant.referredNames?.length"
+                      style="font-size: 11px; margin-top: 3px; display: block; opacity: 0.7;">
+                  Enrolled via code: {{ participant.referredNames.join(', ') }}
+                </span>
               </div>
             </a>
+
+            <!-- Evergreen Completed panel: no profile navigation — clicking a
+                 participant opens the extend-until date picker instead. -->
+            <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted">
+              <button type="button" class="participant-item extend-item"
+                      (click)="toggleExtendTarget(participant.profileid)">
+                <mat-icon class="participant-avatar">person</mat-icon>
+                <div class="participant-details">
+                  <span class="participant-name">{{ participant.name }}</span>
+                  <span class="extend-hint">Click to extend workshop access</span>
+                </div>
+                <mat-icon class="extend-caret">
+                  {{ extendTargetProfileId === participant.profileid ? 'expand_less' : 'more_time' }}
+                </mat-icon>
+              </button>
+
+              <div class="extend-box"
+                   *ngIf="extendTargetProfileId === participant.profileid"
+                   (click)="$event.stopPropagation()">
+                <mat-form-field appearance="outline" class="extend-field">
+                  <mat-label>Extend until</mat-label>
+                  <input matInput [matDatepicker]="extendPicker" [min]="extendMinDate"
+                         [(ngModel)]="extendDate" [ngModelOptions]="{ standalone: true }"
+                         readonly (click)="extendPicker.open()" />
+                  <mat-datepicker-toggle matIconSuffix [for]="extendPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #extendPicker></mat-datepicker>
+                </mat-form-field>
+                <div class="extend-actions">
+                  <button mat-button type="button" (click)="toggleExtendTarget(participant.profileid)"
+                          [disabled]="extendSaving">Cancel</button>
+                  <button mat-flat-button color="primary" type="button"
+                          (click)="confirmExtend(participant)"
+                          [disabled]="!extendDate || extendSaving">
+                    <mat-spinner diameter="16" *ngIf="extendSaving"></mat-spinner>
+                    <span *ngIf="!extendSaving">Extend</span>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
           </mat-card-content>
         </mat-card>
       </div>

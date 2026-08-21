@@ -8,7 +8,7 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { collection, collectionData, doc, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, collectionData, doc, docData, Firestore, getDoc, getDocs, getCountFromServer, orderBy, query, updateDoc , arrayUnion, deleteDoc, setDoc, serverTimestamp, arrayRemove, addDoc, writeBatch, collectionSnapshots, documentId, limit, where, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
@@ -109,11 +109,25 @@ export class DynamicStudioV2Component {
   liveAssignmentSubStudioIds = ''
   liveAssignment = null
   mapStudioLiveAssignment = {}
+
+  // Webhook-derived presence truth (collection `live assignment log`, keyed by the
+  // live assignment docid). Populated by the zoomActivitylog webhook from Zoom's
+  // participant_joined/left + meeting.started/ended events. `presenceView` overlays
+  // these onto `liveAssignment` so the existing presence getters read the reliable
+  // server truth instead of the client-stamped one-shots. See specs/plans/2026-07-11.
+  liveAssignmentLog: any = null
+  private liveAssignmentLogSub: Subscription | null = null
+  private liveAssignmentLogSubId = ''
   // Token
   tokenSubscription:Subscription = null
   stageTokenList = []
   // Studio Invitation
   invitationCountdown:MatDialogRef<any> = null
+  // The "select activity & profiles" assign dialog (EnterStudioAssign) opened
+  // from assignStudio(). Tracked so that in a collaborator studio, once ANY
+  // collaborator submits it and the shared live assignment appears, the other
+  // collaborator's still-open copy is auto-closed as they enter the studio.
+  enterStudioAssignRef:MatDialogRef<any> = null
   studioInvitationSubscription: Subscription
   studioInvitation = null
   studioGroupingInvitationSubscription: Subscription = null
@@ -546,6 +560,11 @@ export class DynamicStudioV2Component {
         const tok: any = snap.docs[0].data()
         if (this.liveAssignment?.['docid'] === la['docid']) {
           this.liveAssignment = { ...this.liveAssignment, token: tok }
+          // The AI-ATC check needs token.docid + token.queueref. On the deep-link
+          // path (`?step=prescribe-atc`) the step activates — and runs the check —
+          // BEFORE this hydration lands, so that first run bails and nothing ever
+          // re-ran it. Re-fire it here now the token exists.
+          if (this.activeStepId === 'prescribe-atc') this.checkAiAtcAvailability()
         }
       }
     } catch (err) {
@@ -555,12 +574,87 @@ export class DynamicStudioV2Component {
     }
   }
 
+  // Subscribe to this assignment's `live assignment log` doc (webhook presence).
+  // Re-subscribes only when the docid actually changes, so selecting the same
+  // studio twice doesn't churn the listener. Cleared when no assignment is selected.
+  private subscribeLiveAssignmentLog(): void {
+    const docid = this.liveAssignment?.['docid'] || ''
+    if (docid === this.liveAssignmentLogSubId) return
+    this.liveAssignmentLogSub?.unsubscribe()
+    this.liveAssignmentLogSub = null
+    this.liveAssignmentLog = null
+    this.liveAssignmentLogSubId = docid
+    if (!docid) return
+    this.liveAssignmentLogSub = docData(
+      doc(this.firestore, 'live assignment log', docid)
+    ).subscribe(
+      (log: any) => { this.liveAssignmentLog = log || null },
+      (err: any) => console.warn('[presence] live assignment log sub failed', err)
+    )
+  }
+
+  // Overlay webhook presence (`live assignment log`) onto `liveAssignment` so the
+  // presence getters read reliable server truth. Only fields the log actually has
+  // override the client one-shots; everything else falls through unchanged (old
+  // calls with no log doc keep their existing behaviour). `participantReadyAt` is
+  // NEVER overridden — it is a pre-Zoom "arrived at wait screen" state the webhook
+  // cannot see, and stays client-stamped.
+  get presenceView(): any {
+    const la: any = this.liveAssignment || {}
+    const log: any = this.liveAssignmentLog
+    if (!log) return la
+    const specialists: any = log['specialists'] || {}
+    const specVals: any[] = Object.values(specialists)
+    const specialistPresent = specVals.some(s => s && s.joinedAt && !s.leftAt)
+    const specialistEverJoined = specVals.some(s => s && s.joinedAt)
+    const anyJoinedAt = (specVals.find(s => s && s.joinedAt) || {})['joinedAt']
+    const anyLeftAt = (specVals.filter(s => s && s.leftAt).pop() || {})['leftAt']
+    const overlay: any = {}
+    if (log['participantInCallAt']) overlay['participantInCallAt'] = log['participantInCallAt']
+    if (log['participantLeftAt']) overlay['participantLeftAt'] = log['participantLeftAt']
+    if (specialistEverJoined) {
+      // Collapse the per-specialist map into the single-field semantics the getters
+      // expect: joined = anyone ever joined; left = everyone who joined has left.
+      overlay['specialistJoinedAt'] = anyJoinedAt || true
+      overlay['specialistLeftAt'] = specialistPresent ? null : (anyLeftAt || log['meetingEndedAt'] || true)
+    }
+    // Only treat the session as ended if the ended event was for the CURRENT
+    // meeting — after a regenerate the OLD meeting's end must not end the new one.
+    const currentMeetingId = la?.['zoomdata']?.['id']
+    if (log['meetingEndedAt'] && log['endedMeetingId'] != null &&
+        String(log['endedMeetingId']) === String(currentMeetingId)) {
+      overlay['meetingEndedAt'] = log['meetingEndedAt']
+    }
+    return { ...la, ...overlay }
+  }
+
+  // ---- Regenerate availability ----------------------------------------------
+  // The link is EXPIRED when the join token's lifetime (linkExpiresAt, written by
+  // studioZoomLink/regenerate) has passed.
+  get linkExpired(): boolean {
+    void this.presenceTick
+    const exp: any = this.liveAssignment?.['linkExpiresAt']
+    if (!exp) return false
+    const ms = typeof exp?.toMillis === 'function' ? exp.toMillis()
+             : typeof exp?.seconds === 'number' ? exp.seconds * 1000
+             : new Date(exp).getTime()
+    return Number.isFinite(ms) && ms < Date.now()
+  }
+  // Offer regenerate ONLY when the link is unusable — meeting ended (callEnded
+  // already folds in the webhook meetingEndedAt), token expired, or link broken.
+  // While the call is healthy the specialist uses "Start Meeting" (rejoin) instead.
+  // With the backend ending the old meeting first, regenerating here can never hit
+  // "other meeting in progress". (isZoomLinkBroken is defined below.)
+  get canRegenerate(): boolean {
+    return this.callEnded || this.linkExpired || this.isZoomLinkBroken
+  }
+
   // True only when the participant is currently in the wait screen (which
   // is the moment the specialist might want to jump to the meeting button).
   // Used to gate the topbar "Jump to Meeting" CTA.
   get participantInWaitingRoom(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     const ready = la['participantReadyAt']
     const inCall = la['participantInCallAt']
     const left = la['participantLeftAt']
@@ -571,7 +665,7 @@ export class DynamicStudioV2Component {
   // True when the participant is actually live in the Zoom call.
   get participantHasJoinedCall(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     if (!la['participantInCallAt']) return false
     if (la['participantLeftAt']) return false
     return true
@@ -734,17 +828,17 @@ export class DynamicStudioV2Component {
   // tones: primary | green | amber | slate. icons are Material icon names.
   get topBarStatus(): { tone: string; icon: string; title: string; sub: string } {
     void this.presenceTick // re-run on tick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     const readyAt = la['participantReadyAt']
     const inCallAt = la['participantInCallAt']
     const leftAt = la['participantLeftAt']
     const specialistJoinedAt = la['specialistJoinedAt']
     const specialistLeftAt = la['specialistLeftAt']
 
-    // call ended — BOTH parties left after the call had started (e.g. "End
-    // meeting for all"). Must be checked before the participant-left branch,
+    // call ended — the webhook `meeting.ended` (via callEnded) OR the legacy
+    // both-parties-left signal. Must be checked before the participant-left branch,
     // otherwise an ended call reads as "participant left · waiting for rejoin".
-    if (leftAt && specialistLeftAt && specialistJoinedAt) {
+    if (this.callEnded || (leftAt && specialistLeftAt && specialistJoinedAt)) {
       return { tone: 'slate', icon: 'check_circle', title: 'Call ended', sub: 'Complete the activity to finish this session.' }
     }
     // participant in call (joined live) — readyAt/leftAt are nulled on join
@@ -880,6 +974,14 @@ export class DynamicStudioV2Component {
       // Reflect the (possibly auto-selected) step in the URL too, so a refresh
       // on the very first step — before any manual switch — still reopens it.
       // syncStepUrl is idempotent, so this no-ops once the URL matches.
+      this.syncStepUrl(this.activeStepId)
+    }
+
+    // Default-step URL guarantee: if they arrived WITHOUT a `?step=` (or the step
+    // list didn't change so the block above was skipped on re-entry), still put
+    // the resolved active step — the first step by default — into the URL.
+    // Idempotent: syncStepUrl no-ops when the URL already matches.
+    if (this.activeStepId && this.route.snapshot.queryParamMap.get('step') !== this.activeStepId) {
       this.syncStepUrl(this.activeStepId)
     }
 
@@ -1276,6 +1378,8 @@ export class DynamicStudioV2Component {
    this.studioChannel = null
    this.chatUnreadSub?.unsubscribe()
    this.chatLiveSub?.unsubscribe()
+   this.liveAssignmentLogSub?.unsubscribe()
+   this.liveAssignmentLogSub = null
    // takeUntil tears down only on a notifier `next` — emitting it BEFORE
    // `complete()` is what actually unsubscribes every takeUntil(subscriptionHandle)
    // stream. The previous order (complete() then next()) left ~18 realtime
@@ -1908,10 +2012,23 @@ export class DynamicStudioV2Component {
             }
 
             if(this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != null && this.mapStudioLiveAssignment[this.selectedStudio["docid"]] != undefined){
+              // A collaborator submitted the assign dialog and created the shared
+              // live assignment — both specialists now enter the studio. If this
+              // specialist still has the "select activity & profiles" dialog open,
+              // close it so it doesn't linger over the live studio.
+              if (this.enterStudioAssignRef) {
+                this.enterStudioAssignRef.close()
+                this.enterStudioAssignRef = null
+              }
               this.liveAssignment = {
                 ...{token: (this.liveAssignment ?? {})["token"]},
                 ...this.mapStudioLiveAssignment[this.selectedStudio["docid"]]
               }
+              // Keep the webhook presence log subscribed for THIS assignment. This
+              // realtime path (auto-enter / collaborator) sets liveAssignment without
+              // going through selectStudio, so without this the log (and therefore
+              // callEnded / presence) would never load. No-op if already subscribed.
+              this.subscribeLiveAssignmentLog()
               // Fetch the participant's active journey + ensure their profile
               // is in mapProfile (in case they were created after the initial load).
               const profId = this.liveAssignment?.['participantid'] || this.liveAssignment?.['token']?.['profile_id']
@@ -1936,6 +2053,7 @@ export class DynamicStudioV2Component {
             }
             else{
               this.liveAssignment = null
+              this.subscribeLiveAssignmentLog()
               this.participantJourneyName = null
               this.journeyLoadedForProfile = ''
               // Session ended (e.g. participant moved to another stage) — drop the
@@ -2023,14 +2141,19 @@ export class DynamicStudioV2Component {
                     })
                   }
                   // Denied by B!G Participant
-                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(result=>{
+                  this.invitationCountdown?.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
                     console.log(result)
                     if(result == "invitation cancelled"){
-                      deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
-                        console.log(err)
-                      }).catch(err =>{
-                        console.log(err)
-                      })
+                      try {
+                        const docid = this.studioInvitation["docid"]
+                        const url = `https://cutstudiocall-kakybqnyrq-uc.a.run.app?docid=${encodeURIComponent(docid)}`
+                        await this.http.get(url).toPromise()
+                        await deleteDoc(doc(this.firestore, 'studioinvitation', this.studioInvitation["docid"])).catch(err=>{
+                          console.log(err)
+                        })
+                      } catch(err) {
+                        console.error("Error cutting call", err)
+                      }
                     }
                     this.studioInvitation = null
                     this.invitationCountdown = null
@@ -2072,8 +2195,11 @@ export class DynamicStudioV2Component {
     this.selectedStudio = studio
     console.log(this.selectedStudio)
     this.liveAssignment = this.mapStudioLiveAssignment[this.selectedStudio["docid"]] ?? null
+    this.subscribeLiveAssignmentLog()
     this.initChatThread()
     console.log(this.liveAssignment, 'this.liveAssignment');
+    console.log('[studio] queue studio pairing id:', this.selectedStudio?.['docid'] ?? null,
+      '| live assignment id:', this.liveAssignment?.['docid'] ?? null);
     // Switching the active studio changes which invitations count as
     // "another studio's" — re-derive the chip map.
     this.subscribeOtherStudioInvitations()
@@ -2146,7 +2272,14 @@ export class DynamicStudioV2Component {
       this.tokenSubscription = collectionData(query(collection(this.firestore,"queue_token"), where("queueref", "==", doc(this.firestore,'queue generation',this.ongoingQueue["docid"])),where("stagestatus", "==", "Approved"),where("tokenstatus", "==", "Active"),where("currentstage", "in", studioStage))).pipe(takeUntil(this.subscriptionHandle)).subscribe(async token=>{
         console.log(token)
         if(this.liveAssignment != null && token.length != 0){
-          this.liveAssignment["token"] = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
+          // Only overwrite when this emission actually contains OUR token. The query is
+          // scoped (this queue + Approved + Active + currentstage in studioStage), so a
+          // participant whose token falls outside it makes `find` return undefined — and
+          // the old unconditional assignment then WIPED a token ensureTokenForAssignment
+          // had already hydrated, taking the AI-ATC check (and the sidebar's product /
+          // queue-position fields) down with it.
+          const matchedToken = token.find(e => e["liveassignmentid"] == this.liveAssignment["docid"])
+          if (matchedToken) this.liveAssignment["token"] = matchedToken
           console.log(this.liveAssignment['docid']);
           console.log(this.liveAssignment['token']);
           // If the specialist is already on the prescribe step, refresh the AI-ATC button for the
@@ -2378,23 +2511,56 @@ export class DynamicStudioV2Component {
         .filter((p: string) => p !== this.profileid)
       if (collaborators.length === 0) return []
 
+      const thisStudioId = studio?.['docid']
+      // Restrict "checked into another studio" to the specialist's currently
+      // live/ongoing queues (mirrors findActiveCheckins) — a check-in on a
+      // studio whose queue has ended shouldn't block.
+      const liveQueueIds = new Set(
+        (this.ongoingQueueList || []).map((q: any) => q['docid'])
+      )
+
       const conflicts: any[] = []
-      const seen = new Set<string>()
       for (const collab of collaborators) {
-        const snap = await getDocs(query(
+        // 1) In a LIVE activity in another studio — hard busy, carries the stage.
+        let matched = false
+        const laSnap = await getDocs(query(
           collection(this.firestore, 'live assignment'),
           where('pairing', 'array-contains', collab),
         ))
-        for (const d of snap.docs) {
+        for (const d of laSnap.docs) {
           const la: any = d.data()
-          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== studio?.['docid']) {
-            if (seen.has(collab)) continue
-            seen.add(collab)
+          if (la['status'] === 'live' && la['studioid'] && la['studioid'] !== thisStudioId) {
             conflicts.push({
               collaborator: collab,
               collaboratorName: this.mapProfile[collab] ?? collab,
               studioid: la['studioid'],
               stageName: la['stagename'] ?? '',
+              isLive: true,
+            })
+            matched = true
+            break
+          }
+        }
+        if (matched) continue
+
+        // 2) Checked into another studio (even with no live activity yet) —
+        //    still blocks this check-in.
+        const pairSnap = await getDocs(query(
+          collection(this.firestore, 'queue studio pairing'),
+          where('participants', 'array-contains', collab),
+          where('checkin', '==', true),
+        ))
+        for (const d of pairSnap.docs) {
+          const s: any = d.data()
+          if (s['docid'] && s['docid'] !== thisStudioId &&
+              [null, undefined, false].includes(s['delete']) &&
+              (liveQueueIds.size === 0 || liveQueueIds.has(s['queueref']?.id))) {
+            conflicts.push({
+              collaborator: collab,
+              collaboratorName: this.mapProfile[collab] ?? collab,
+              studioid: s['docid'],
+              stageName: '',
+              isLive: false,
             })
             break
           }
@@ -2684,7 +2850,13 @@ export class DynamicStudioV2Component {
       maxWidth: "90vw",
       maxHeight: "90vh"
     })
+    // Track this dialog so the live-assignment listener can auto-close it for a
+    // collaborator once the shared live assignment appears (see #enterStudioAssignRef).
+    this.enterStudioAssignRef = assignStudio
     assignStudio.afterClosed().pipe(takeUntil(this.subscriptionHandle)).subscribe(async result=>{
+      // Closed (submitted, cancelled, or auto-closed on entering the studio) —
+      // drop the tracked ref.
+      this.enterStudioAssignRef = null
       console.log(result)
       if(result != null && this.liveAssignment == null){
         var loading = this.dialog.open(LoadingProgressComponent,{
@@ -3288,6 +3460,14 @@ export class DynamicStudioV2Component {
     // below already consumes. The "Confirm who attended" flow (reviewSpecialist
     // == true, from moveStage) keeps the AssignQueueStudio dialog since it also
     // needs studio selection + attendance semantics.
+    // Everyone already in this live assignment (main pairing + already-invited
+    // bonus specialists) — hidden from the activity specialist lists so you can't
+    // re-invite someone who's already been called into the session.
+    const alreadyInAssignment = Array.from(new Set<string>([
+      ...(this.liveAssignment['pairing'] ?? []),
+      ...(this.liveAssignment['bonusactivityparticipant'] ?? []),
+      ...Object.keys(this.liveAssignment['bonusactivity'] ?? {}),
+    ]))
     let inviteParticipant: any
     if (!reviewSpecialist) {
       inviteParticipant = await this.openEnterStudioAssign({
@@ -3299,7 +3479,8 @@ export class DynamicStudioV2Component {
           currentprofileid: this.profileid,
           mapprofile: this.mapProfile,
           mapactivity: this.mapActivity,
-          activityspecialists: this.activitySpecialistMap
+          activityspecialists: this.activitySpecialistMap,
+          excludeprofileids: alreadyInAssignment
         },
         autoFocus: false,
         panelClass: "enter-studio-dialog",
@@ -3406,19 +3587,26 @@ export class DynamicStudioV2Component {
       console.log('[regenerateZoomLink] error (ignored, link regenerates server-side)', err)
     }
 
-    // A fresh link is a fresh session: clear the ended-session presence one-shots
-    // so `callEnded` resets (re-enabling "Start Meeting" for the new link) and no
-    // stale status (e.g. "participant in call") lingers from the old meeting.
+    // A fresh link is a fresh session: clear the participant's `participantReadyAt`
+    // wait-screen one-shot. The in-call/leave presence lives in `live assignment
+    // log`, which is reset by the deleteDoc below — so no other fields to clear.
     try {
       await updateDoc(doc(this.firestore, 'live assignment', this.liveAssignment['docid']), {
-        specialistJoinedAt: null,
-        specialistLeftAt: null,
-        participantLeftAt: null,
-        participantInCallAt: null,
         participantReadyAt: null
       })
     } catch (e) {
       console.warn('[regenerateZoomLink] could not reset presence one-shots', e)
+    }
+
+    // A fresh link is a fresh session: drop the webhook presence log so the old
+    // meeting's join/leave/ended state doesn't bleed into the new one. The next
+    // Zoom event for the new meeting recreates it fresh (an OLD meeting.ended that
+    // lands afterwards is harmless — it carries endedMeetingId of the old meeting,
+    // which presenceView ignores).
+    try {
+      await deleteDoc(doc(this.firestore, 'live assignment log', this.liveAssignment['docid']))
+    } catch (e) {
+      console.warn('[regenerateZoomLink] could not reset presence log', e)
     }
 
     generateLoading.close()
@@ -3659,6 +3847,17 @@ export class DynamicStudioV2Component {
     try {
       const cfgSnap = await getDoc(doc(this.firestore, 'classify', 'queue-atc-edit-config'));
       const cfg: any = cfgSnap.exists() ? cfgSnap.data() : null;
+      // One line that answers "is the gate open, and which mode am I in" — the config
+      // is fail-closed on several fields at once (doc exists / enabled / global), and
+      // `profileid` here is the ?profileid= OVERRIDE when one is present, which is what
+      // the allowlist branch below matches on.
+      // console.log('[AI-ATC] access config', {
+      //   exists: cfgSnap.exists(),
+      //   enabled: cfg?.enabled,
+      //   global: cfg?.global,
+      //   specialistProfileId: this.profileid,
+      //   project: environment.firebase.projectId,
+      // });
       if (!cfg || cfg.enabled !== true) { this.aiAtcAllowedForUser = false; return; }  // feature off
       if (cfg.global === true) { this.aiAtcAllowedForUser = true; this.maybeRecheckAiAtc(); return; }  // enabled globally for everyone
       // Not global → restrict to the configured allowed users (by profileid / email / role).
@@ -3683,15 +3882,111 @@ export class DynamicStudioV2Component {
     }
   }
 
+  /**
+   * Millis for a Firestore Timestamp / Date / epoch number — null when absent.
+   * `createdAt` is OPTIONAL on queue_atc_generation, so every use must tolerate
+   * its absence (see the ranking sort below).
+   */
+  private aiAtcTsMs(v: any): number | null {
+    if (!v) return null;
+    if (typeof v === 'number') return v;
+    if (typeof v?.toMillis === 'function') return v.toMillis();
+    if (typeof v?.toDate === 'function') return v.toDate().getTime();
+    if (v instanceof Date) return v.getTime();
+    return null;
+  }
+
+  /** Doc id of a queueref stored either as a DocumentReference or as a path string. */
+  private aiAtcRefId(v: any): string {
+    if (!v) return '';
+    if (typeof v === 'string') return v.split('/').pop() || '';
+    return v.id || '';
+  }
+
+  /**
+   * The current queue_token id plus every token it is linked to in BOTH transfer
+   * directions, tagged with which direction it came from.
+   *
+   * A participant who moves queues gets a NEW queue_token, but a generation stays
+   * stamped with the token that was current when it ran — so the doc can sit on
+   * either side of the token we are holding:
+   *
+   *   - `tokentransferredfrom` **ancestors** — they transferred IN, and the doc was
+   *     generated back in the queue they came from.
+   *   - `tokentransferredto` **descendants** — they transferred OUT, and the doc was
+   *     generated in the queue they went to (a studio can still be open on the older
+   *     token while the pipeline attributes to the newer one).
+   *
+   * Both happen, so both are walked; `evolution-prep-participants-v2` resolves the
+   * same two directions for the same reason (`applyGenDoc`, `:917-930`). Forward hops
+   * require the `transferredto` + `tokentransferredto` PAIR, matching that component's
+   * `isTransferredOut` (`:524`) — a half-written transfer is not a transfer.
+   *
+   * Same 12-level cap as `walkPairings`, and the shared `seen` map doubles as the
+   * cycle guard. Failures are swallowed: an unreadable hop just shortens that
+   * direction, it must never take down the availability check.
+   */
+  private async aiAtcTokenLineage(
+    token: any,
+  ): Promise<Map<string, 'self' | 'ancestor' | 'descendant'>> {
+    const seen = new Map<string, 'self' | 'ancestor' | 'descendant'>();
+    const first = token?.['docid'];
+    if (first) seen.set(first, 'self');
+
+    // Forward hops need the pair; backward hops are a single ref (the from-side has
+    // no such convention — `walkPairings` climbs `tokentransferredfrom` alone).
+    const nextOf = (data: any, dir: 'ancestor' | 'descendant'): DocumentReference | null =>
+      dir === 'ancestor'
+        ? (data?.['tokentransferredfrom'] ?? null)
+        : (data?.['transferredto'] && data?.['tokentransferredto'] ? data['tokentransferredto'] : null);
+
+    const walk = async (start: DocumentReference | null, dir: 'ancestor' | 'descendant') => {
+      let cursor: DocumentReference | null = start;
+      let level = 0;
+      while (cursor && level < 12) {
+        level++;
+        try {
+          const snap = await getDoc(doc(this.firestore, cursor.path));
+          if (!snap.exists()) break;
+          const data: any = snap.data();
+          const id = data?.['docid'] || snap.id;
+          if (seen.has(id)) break;  // cycle, or the other direction already claimed it
+          seen.set(id, dir);
+          cursor = nextOf(data, dir);
+        } catch {
+          break;
+        }
+      }
+    };
+
+    await Promise.all([
+      walk(token?.['tokentransferredfrom'] ?? null, 'ancestor'),
+      walk(nextOf(token, 'descendant'), 'descendant'),
+    ]);
+    return seen;
+  }
+
   async checkAiAtcAvailability() {
-    if (!this.aiAtcAllowedForUser) { this.aiAtcAvailable = false; return; }  // not configured for this user — no query, no buttons
+    if (!this.aiAtcAllowedForUser) {
+      // console.log('[AI-ATC] skipped — feature not enabled for this user (classify/queue-atc-edit-config)');
+      this.aiAtcAvailable = false;
+      return;
+    }
     const token = this.liveAssignment?.['token'];
     const profileid = this.participantProfileId;
     const queueTokenId = token?.['docid'];
     const tokenQueueRef = token?.['queueref'];
 
     if (!profileid || !queueTokenId || !tokenQueueRef?.id) {
-      // token not hydrated yet — reset so a later token update re-checks.
+      // Token not hydrated yet — reset so a later token update re-checks. This is the
+      // silent path that used to strand the button on the `?step=prescribe-atc`
+      // deep-link (the step activates before the token lands); ensureTokenForAssignment
+      // and the queue_token subscription both re-fire the check now.
+      // console.log('[AI-ATC] deferred — waiting for token hydration', {
+      //   profileid: profileid || '(none)',
+      //   queueTokenId: queueTokenId || '(none)',
+      //   tokenQueueId: tokenQueueRef?.id || '(none)',
+      // });
       this.aiAtcAvailable = false;
       this.aiAtcDocId = null;
       this.aiAtcCheckedKey = null;
@@ -3709,33 +4004,77 @@ export class DynamicStudioV2Component {
 
     try {
       const firestoreATC = getFirestore("firestore-atc");
-      // queue_atc_generation stores queueref as a firestore-atc reference
-      // (cloud fn: adminATC.doc(queueRef.path)); the studio token's queueref points at the default
-      // DB, so rebuild it against firestore-atc for the equality query to match.
-      const atcQueueRef = doc(firestoreATC, 'queue generation', tokenQueueRef.id);
-      // Match on participant + token + queue, newest first (stage filter removed, no limit). Take the
-      // latest generation that has actually COMPLETED — an incomplete doc (pending/processing/error)
-      // has no usable `output`, so offering it would open prescribe-ATC with nothing to prefill and
-      // draft creation fails. Status is filtered client-side to reuse the existing composite index.
+      const lineage = await this.aiAtcTokenLineage(token);
+
+      // ONE equality filter (participant), then rank client-side.
+      //
+      // The previous query pinned profileid + queue_token_id + queueref AND ordered by
+      // createdAt. Three ways that hid a real generation: an orderBy silently drops docs
+      // missing the field (createdAt is optional on this collection), the composite index
+      // it needs can be absent, and a transferred participant's doc carries an ANCESTOR
+      // token id so the equality never matched. A participant has a handful of generations
+      // at most, so reading them all and scoring in memory is both cheaper to reason about
+      // and fully observable in the log below.
       const aiSnap = await getDocs(query(
         collection(firestoreATC, 'queue_atc_generation'),
         where('profileid', '==', profileid),
-        where('queue_token_id', '==', queueTokenId),
-        where('queueref', '==', atcQueueRef),
-        orderBy('createdAt', 'desc')
       ));
 
       // Guard against a participant switch that happened while this query was awaiting.
       if (this.aiAtcCheckedKey !== key) return;
 
-      // docs are newest-first, so the first completed one is the latest completed generation.
-      const completedDoc = aiSnap.docs.find(d => d.data()?.['status'] === 'completed');
-      if (completedDoc) {
-        this.aiAtcDocId = completedDoc.id;
+      const rows = aiSnap.docs.map(d => ({ id: d.id, data: d.data() as any }));
+      // Scope score — 0 means "belongs to some other queue", never offered. The order
+      // mirrors how evolution-prep-participants-v2 resolves the same question
+      // (`applyGenDoc`, `:917-930`): a doc generated HERE always beats an inherited one,
+      // and an ancestor beats a destination.
+      //   4 this exact token · 3 transferredfrom ancestor · 2 transferredto descendant
+      //   · 1 same queue, other token
+      const scopeOf = (r: { data: any }): number => {
+        const t = r.data?.['queue_token_id'];
+        if (t && t === queueTokenId) return 4;
+        const via = t ? lineage.get(t) : undefined;
+        if (via === 'ancestor') return 3;
+        if (via === 'descendant') return 2;
+        if (this.aiAtcRefId(r.data?.['queueref']) === tokenQueueRef.id) return 1;
+        return 0;
+      };
+      // Only COMPLETED docs are usable: pending/processing/error have no `output`, so the
+      // prescribe form would open with nothing to prefill and draft creation fails.
+      const usable = rows
+        .map(r => ({ ...r, scope: scopeOf(r), ms: this.aiAtcTsMs(r.data?.['createdAt']) }))
+        .filter(r => r.data?.['status'] === 'completed' && r.scope > 0)
+        .sort((a, b) => (b.scope - a.scope) || ((b.ms ?? 0) - (a.ms ?? 0)));
+
+      const chosen = usable[0];
+      if (chosen) {
+        this.aiAtcDocId = chosen.id;
         this.aiAtcAvailable = true;
       }
+
+      // Diagnostic — uncomment when a "the doc exists but the button is hidden" report
+      // comes in. Prints every candidate with the gate that rejected it. Stringified
+      // because Chrome collapses a logged object to `{…}`, losing exactly these fields.
+      // console.log('[AI-ATC] availability check ' + JSON.stringify({
+      //   participantProfileId: profileid,
+      //   studioTokenId: queueTokenId,
+      //   studioQueueId: tokenQueueRef.id,
+      //   tokenLineage: [...lineage].map(([id, dir]) => `${dir}:${id}`),
+      //   docsForParticipant: rows.length,
+      //   candidates: rows.map(r => ({
+      //     id: r.id,
+      //     status: r.data?.['status'],
+      //     queue_token_id: r.data?.['queue_token_id'] ?? '(none)',
+      //     via: (r.data?.['queue_token_id'] ? lineage.get(r.data['queue_token_id']) : undefined) ?? '(off-lineage)',
+      //     queueref: this.aiAtcRefId(r.data?.['queueref']) || '(none)',
+      //     hasCreatedAt: !!r.data?.['createdAt'],
+      //     scope: scopeOf(r),
+      //   })),
+      //   chosen: chosen ? { id: chosen.id, scope: chosen.scope } : null,
+      //   aiAtcAvailable: this.aiAtcAvailable,
+      // }));
     } catch (err) {
-      console.error('AI ATC availability check failed; hiding AI button', err);
+      console.error('[AI-ATC] availability check failed; hiding AI button', err);
       this.aiAtcCheckedKey = null;  // allow a retry on the next entry
     }
   }
@@ -4445,7 +4784,9 @@ export class DynamicStudioV2Component {
   // page — they MUST generate a fresh link instead.
   get callEnded(): boolean {
     void this.presenceTick // re-run this getter on the presence tick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
+    // Webhook says the meeting ended → definitively ended (cleanest signal).
+    if (la['meetingEndedAt']) return true
     return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
   }
 
@@ -4454,7 +4795,7 @@ export class DynamicStudioV2Component {
   // Meeting" so they know they're already in.
   get specialistInMeeting(): boolean {
     void this.presenceTick
-    const la: any = this.liveAssignment || {}
+    const la: any = this.presenceView
     return !!la['specialistJoinedAt'] && !la['specialistLeftAt'] && !this.callEnded
   }
 

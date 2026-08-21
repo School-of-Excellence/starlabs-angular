@@ -1,0 +1,525 @@
+<div class="dialog-wrap" [class.wide]="widgettype === 'ads'">
+  <div class="dialog-head">
+    <h2 mat-dialog-title>
+      {{ isEditMode ? 'Edit ' : 'Add ' }}{{ widgettype === 'ads' ? 'Ad' : 'Upcoming Workshop' }}
+    </h2>
+    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <mat-dialog-content class="dialog-body">
+
+      <!-- Coming Soon / Upcoming Workshop fields -->
+      <ng-container *ngIf="widgettype === 'comingsoon'">
+        <div class="grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Event Date</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="eventdate" readonly (click)="picker.open()" />
+            <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+            <mat-error *ngIf="form.get('eventdate')?.hasError('required')">Event date is required.</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Type</mat-label>
+            <input matInput formControlName="type" placeholder="Enter type" />
+            <mat-error *ngIf="form.get('type')?.hasError('required')">Type is required.</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Cost</mat-label>
+            <mat-select formControlName="cost">
+              <mat-option value="Free">Free</mat-option>
+              <mat-option value="Paid">Paid</mat-option>
+            </mat-select>
+            <mat-error *ngIf="form.get('cost')?.hasError('required')">Cost is required.</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Title</mat-label>
+            <input matInput formControlName="title" placeholder="Enter title" />
+            <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>With</mat-label>
+            <input matInput formControlName="with" placeholder="Enter with" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Location</mat-label>
+            <input matInput formControlName="location" placeholder="Enter location" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Button Name</mat-label>
+            <input matInput formControlName="buttonname" placeholder="Enter button name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>URL Name</mat-label>
+            <input matInput formControlName="urlname" placeholder="Enter URL name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>URL Button Name</mat-label>
+            <input matInput formControlName="urlbuttonname" placeholder="Enter URL button name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Notified Text</mat-label>
+            <input matInput formControlName="notifiedtext" placeholder="Enter notified text" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Total Seats</mat-label>
+            <input matInput type="number" min="0" formControlName="totalseats" placeholder="Enter total seats" />
+            <mat-hint *ngIf="form.get('unlimitedseat')?.value">Unlimited seats enabled</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Color</mat-label>
+            <input matInput formControlName="color" placeholder="#FFFFFF" maxlength="7" />
+            <input matSuffix type="color" class="color-swatch" [value]="colorSwatchValue"
+              (input)="onSwatchChange($event)" matTooltip="Pick a colour" aria-label="Pick a colour" />
+            <mat-error *ngIf="form.get('color')?.hasError('pattern')">
+              Use a hex code like #FFFFFF.
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="toggles">
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Unlimited Seat</span>
+              <span class="toggle-desc">Turn on to allow unlimited seats (total seats is disabled).</span>
+            </div>
+            <mat-slide-toggle formControlName="unlimitedseat" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Show Confirmed Seat</span>
+              <span class="toggle-desc">Display confirmed seats to participants.</span>
+            </div>
+            <mat-slide-toggle formControlName="showconfirmedseat" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Show</span>
+              <span class="toggle-desc">Display this workshop.</span>
+            </div>
+            <mat-slide-toggle formControlName="show" color="primary"></mat-slide-toggle>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Tentative</span>
+              <span class="toggle-desc">Mark this workshop as tentative.</span>
+            </div>
+            <mat-slide-toggle formControlName="tentative" color="primary"></mat-slide-toggle>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Ads: sectioned near-fullscreen layout -->
+      <ng-container *ngIf="widgettype === 'ads'">
+
+        <!-- Ad content -->
+        <section class="sect">
+          <div class="sect-head">
+            <mat-icon>edit_note</mat-icon>
+            <div class="sect-text">
+              <h3>Ad Content</h3>
+              <p>Texts shown on the ad card.</p>
+            </div>
+          </div>
+
+          <div class="grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Head</mat-label>
+              <input matInput formControlName="head" placeholder="Enter head" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Head Right</mat-label>
+              <input matInput formControlName="headright" placeholder="Enter head right" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Title</mat-label>
+              <input matInput formControlName="title" placeholder="Enter title" />
+              <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Subtitle</mat-label>
+              <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Footer</mat-label>
+              <input matInput formControlName="footer" placeholder="Enter footer" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Button Name</mat-label>
+              <input matInput formControlName="buttonname" placeholder="Enter button name" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Navigation Link</mat-label>
+              <input matInput formControlName="navigationlink" placeholder="Enter navigation link" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-span">
+              <mat-label>Description</mat-label>
+              <textarea matInput formControlName="description" rows="3" placeholder="Enter description"></textarea>
+            </mat-form-field>
+          </div>
+        </section>
+
+        <!-- Display options -->
+        <section class="sect">
+          <div class="sect-head">
+            <mat-icon>tune</mat-icon>
+            <div class="sect-text">
+              <h3>Display</h3>
+              <p>Visibility and behaviour of this ad.</p>
+            </div>
+          </div>
+
+          <div class="toggle-cards">
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-title">Image Only</span>
+                <span class="toggle-desc">Show only the image for this ad.</span>
+              </div>
+              <mat-slide-toggle formControlName="imageonly" color="primary"></mat-slide-toggle>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-title">Show</span>
+                <span class="toggle-desc">Display this ad.</span>
+              </div>
+              <mat-slide-toggle formControlName="show" color="primary"></mat-slide-toggle>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-title">Auto Notification</span>
+                <span class="toggle-desc">Schedule daily messages for this ad.</span>
+              </div>
+              <mat-slide-toggle formControlName="autonotification" color="primary"></mat-slide-toggle>
+            </div>
+          </div>
+        </section>
+
+        <!-- Audience & schedule -->
+        <section class="sect" *ngIf="form.get('autonotification')?.value">
+          <div class="sect-head">
+            <mat-icon>campaign</mat-icon>
+            <div class="sect-text">
+              <h3>Audience &amp; Schedule</h3>
+              <p>Who receives the daily messages, and on which days.</p>
+            </div>
+            <span class="day-chip" *ngIf="notificationDayCount > 0">
+              {{ notificationDayCount }} {{ notificationDayCount === 1 ? 'day' : 'days' }} ·
+              {{ notificationDayCount }} {{ notificationDayCount === 1 ? 'message' : 'messages' }} per channel
+            </span>
+          </div>
+
+          <div class="grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Notify To</mat-label>
+              <mat-select formControlName="notifyto" multiple>
+                <mat-option *ngFor="let opt of notifyToOptions" [value]="opt">{{ opt | titlecase }}</mat-option>
+              </mat-select>
+              <mat-error *ngIf="form.get('notifyto')?.hasError('required')">
+                Select at least one audience.
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" *ngIf="notifyToIncludesJourney">
+              <mat-label>Journeys</mat-label>
+              <mat-select formControlName="selectedjourneys" multiple>
+                <mat-option *ngFor="let j of journeyOptions" [value]="j.id">{{ j.label }}</mat-option>
+              </mat-select>
+              <mat-hint *ngIf="journeysLoading">Loading journeys…</mat-hint>
+              <mat-error *ngIf="form.get('selectedjourneys')?.hasError('required')">
+                Select at least one journey.
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" *ngIf="notifyToIncludesFunnel">
+              <mat-label>Funnel Workshops</mat-label>
+              <mat-select formControlName="selectedfunnels" multiple>
+                <mat-option *ngFor="let f of funnelOptions" [value]="f.id">{{ f.label }}</mat-option>
+              </mat-select>
+              <mat-hint *ngIf="funnelsLoading">Loading funnel workshops…</mat-hint>
+              <mat-error *ngIf="form.get('selectedfunnels')?.hasError('required')">
+                Select at least one funnel workshop.
+              </mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Start Date</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="startdate" readonly
+                (click)="startPicker.open()" />
+              <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+              <mat-hint *ngIf="isStartdateLocked">
+                <mat-icon class="lock-icon">lock</mat-icon> Locked while “Show” is on.
+              </mat-hint>
+              <mat-error *ngIf="form.get('startdate')?.hasError('required')">Start date is required.</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>End Date</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="enddate" [min]="minEndDate" readonly
+                (click)="endPicker.open()" />
+              <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+              <mat-error *ngIf="form.get('enddate')?.hasError('required')">End date is required.</mat-error>
+              <mat-error *ngIf="form.get('enddate')?.hasError('daterange')">
+                End date must be after the start date.
+              </mat-error>
+            </mat-form-field>
+          </div>
+        </section>
+
+        <!-- Daily messages: app notification + wati side by side per day -->
+        <section class="sect" *ngIf="form.get('autonotification')?.value">
+          <div class="sect-head">
+            <mat-icon>notifications_active</mat-icon>
+            <div class="sect-text">
+              <h3>Daily Messages</h3>
+              <p>One message per scheduled day — app notification and Wati side by side.</p>
+            </div>
+            <div class="wati-toolbar" *ngIf="form.get('enablewati')?.value">
+              <span class="wati-count" *ngIf="watiTemplates.length > 0">
+                {{ watiTemplates.length }} template(s) loaded
+              </span>
+              <span class="wati-error" *ngIf="watiTemplatesError">{{ watiTemplatesError }}</span>
+              <button mat-stroked-button type="button" (click)="loadWatiTemplates(true)"
+                [disabled]="watiTemplatesLoading">
+                <mat-icon>refresh</mat-icon>
+                {{ watiTemplatesLoading ? 'Loading templates…' : (watiTemplates.length ? 'Reload templates' : 'Load templates') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="toggle-cards two">
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-title">Enable App Notification</span>
+                <span class="toggle-desc">Send one in-app notification per scheduled day.</span>
+              </div>
+              <mat-slide-toggle formControlName="enableappnotification" color="primary"></mat-slide-toggle>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-title">Enable Wati</span>
+                <span class="toggle-desc">Send one WhatsApp template message per scheduled day.</span>
+              </div>
+              <mat-slide-toggle formControlName="enablewati" color="primary"></mat-slide-toggle>
+            </div>
+          </div>
+
+          <ng-container
+            *ngIf="form.get('enableappnotification')?.value || form.get('enablewati')?.value">
+            <div class="notif-empty" *ngIf="scheduleDays.length === 0">
+              <mat-icon>event_busy</mat-icon>
+              Pick a valid start and end date to generate the daily messages.
+            </div>
+
+            <div class="day-list" *ngIf="scheduleDays.length > 0">
+              <div class="day-row" *ngFor="let i of scheduleDays">
+                <div class="day-row-head">
+                  <span class="notif-day">Day {{ i + 1 }}</span>
+                  <span class="notif-date">{{ notificationDateAt(i) | date: 'EEE, MMM d, y' }}</span>
+                </div>
+
+                <div class="day-cols" [class.two]="bothDailyColumns">
+                  <!-- Left: app notification -->
+                  <div class="day-col" *ngIf="form.get('enableappnotification')?.value"
+                    formArrayName="appnotificationmap">
+                    <ng-container [formGroupName]="i">
+                      <div class="col-tag">
+                        <mat-icon>notifications</mat-icon> App Notification
+                      </div>
+
+                      <div class="col-grid">
+                        <mat-form-field appearance="outline">
+                          <mat-label>Title</mat-label>
+                          <input matInput formControlName="title" placeholder="Enter title" />
+                          <mat-error *ngIf="adsNotifications.at(i)?.get('title')?.hasError('required')">
+                            Title is required.
+                          </mat-error>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                          <mat-label>Subtitle</mat-label>
+                          <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="full-span">
+                          <mat-label>Message</mat-label>
+                          <textarea matInput formControlName="message" rows="2" placeholder="Enter message"></textarea>
+                          <mat-error *ngIf="adsNotifications.at(i)?.get('message')?.hasError('required')">
+                            Message is required.
+                          </mat-error>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="full-span">
+                          <mat-label>Landing Page</mat-label>
+                          <input matInput formControlName="landingPage" placeholder="Enter landing page" />
+                        </mat-form-field>
+                      </div>
+
+                      <div class="notif-flags">
+                        <mat-slide-toggle formControlName="sticky" color="primary">Sticky</mat-slide-toggle>
+                        <mat-slide-toggle formControlName="logged" color="primary">Logged</mat-slide-toggle>
+                      </div>
+                    </ng-container>
+                  </div>
+
+                  <!-- Right: wati -->
+                  <div class="day-col wati-col" *ngIf="form.get('enablewati')?.value" formArrayName="watimap">
+                    <ng-container [formGroupName]="i">
+                      <div class="col-tag wati-tag">
+                        <mat-icon>chat</mat-icon> Wati
+                      </div>
+
+                      <mat-form-field appearance="outline" class="wati-template-field">
+                        <mat-label>Template</mat-label>
+                        <mat-select formControlName="templateName"
+                          (selectionChange)="onWatiTemplateChange(i, $event.value)"
+                          (openedChange)="onWatiSelectOpened($event)">
+                          <mat-option>
+                            <ngx-mat-select-search [formControl]="watiTemplateSearchCtrl"
+                              placeholderLabel="Search templates…"
+                              noEntriesFoundLabel="No templates found">
+                            </ngx-mat-select-search>
+                          </mat-option>
+                          <mat-option *ngFor="let name of watiTemplateOptionsFor(i)" [value]="name">
+                            {{ name }}{{ watiTemplateNames.includes(name) ? '' : ' (not loaded)' }}
+                          </mat-option>
+                        </mat-select>
+                        <mat-hint *ngIf="watiTemplates.length === 0 && !watiTemplatesLoading">
+                          Load templates to choose.
+                        </mat-hint>
+                        <mat-error *ngIf="adsWati.at(i)?.get('templateName')?.hasError('required')">
+                          Template is required.
+                        </mat-error>
+                      </mat-form-field>
+
+                      <div class="wati-vars" formArrayName="variables">
+                        <div class="wati-var" *ngFor="let v of watiVariables(i).controls; let vi = index"
+                          [formGroupName]="vi">
+                          <span class="wati-var-name">{{ '{{' + v.get('name')?.value + '}}' }}</span>
+
+                          <mat-form-field appearance="outline" class="wati-var-type">
+                            <mat-label>Source</mat-label>
+                            <mat-select formControlName="type" (selectionChange)="onWatiVarTypeChange(i, vi)">
+                              <mat-option value="static">Static</mat-option>
+                              <mat-option value="metadata">Metadata</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+
+                          <mat-form-field appearance="outline" class="wati-var-value"
+                            *ngIf="v.get('type')?.value === 'static'">
+                            <mat-label>Value</mat-label>
+                            <textarea matInput formControlName="value" rows="1" placeholder="Enter value"
+                              (paste)="onWatiValuePaste($event, i, vi)"></textarea>
+                            <mat-error *ngIf="v.get('value')?.hasError('required')">Value is required.</mat-error>
+                          </mat-form-field>
+
+                          <mat-form-field appearance="outline" class="wati-var-value"
+                            *ngIf="v.get('type')?.value === 'metadata'">
+                            <mat-label>Metadata field</mat-label>
+                            <mat-select formControlName="value">
+                              <mat-option *ngFor="let m of watiMetadataOptions" [value]="m">{{ m }}</mat-option>
+                            </mat-select>
+                            <mat-error *ngIf="v.get('value')?.hasError('required')">Pick a metadata field.</mat-error>
+                          </mat-form-field>
+                        </div>
+
+                        <div class="wati-novars" *ngIf="dayTemplateName(i) && watiVariables(i).length === 0">
+                          This template has no variables.
+                        </div>
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </section>
+      </ng-container>
+
+      <!-- Image uploads — ads => adimage / adimagetab / adimagemobile, coming soon => upcomingimage -->
+      <div class="uploads-wrap" [class.sect]="widgettype === 'ads'">
+        <div class="sect-head" *ngIf="widgettype === 'ads'">
+          <mat-icon>image</mat-icon>
+          <div class="sect-text">
+            <h3>Images</h3>
+            <p>Uploaded to the <strong>eiflixhome</strong> folder.</p>
+          </div>
+        </div>
+
+        <div class="uploads-row">
+          <div class="upload-block" *ngFor="let f of uploadFields">
+            <div class="upload-head">
+              <span class="upload-title">
+                {{ f.label }}
+                <span class="upload-size" *ngIf="f.hint">{{ f.hint }}</span>
+              </span>
+              <span class="upload-desc">Images only. Uploaded to the <strong>eiflixhome</strong> folder.</span>
+            </div>
+
+            <div class="upload-body">
+              <img *ngIf="imageUrlOf(f.key)" [src]="imageUrlOf(f.key)" class="upload-preview" alt="Selected image" />
+              <div class="upload-empty" *ngIf="!imageUrlOf(f.key)">
+                <mat-icon>image</mat-icon>
+              </div>
+
+              <div class="upload-side">
+                <div class="upload-actions">
+                  <button mat-stroked-button type="button" (click)="uploadImage(f.key)"
+                    [disabled]="isUploadingKey(f.key)">
+                    <mat-icon>upload</mat-icon>
+                    {{ isUploadingKey(f.key) ? 'Uploading…' : (imageUrlOf(f.key) ? 'Replace image' : 'Upload image') }}
+                  </button>
+                  <button mat-button type="button" class="upload-remove"
+                    *ngIf="imageUrlOf(f.key) && !isUploadingKey(f.key)" (click)="removeImage(f.key)">
+                    Remove
+                  </button>
+                </div>
+
+                <div class="upload-progress" *ngIf="isUploadingKey(f.key)">
+                  <mat-progress-bar mode="determinate" [value]="progressOf(f.key)"></mat-progress-bar>
+                  <span class="upload-percent">{{ progressOf(f.key) }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="dialog-actions">
+      <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving || isUploadingAny">
+        <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+        <span *ngIf="!isSaving">{{ isUploadingAny ? 'Uploading…' : (isEditMode ? 'Update' : 'Save') }}</span>
+      </button>
+    </mat-dialog-actions>
+  </form>
+</div>
