@@ -1,123 +1,126 @@
-<div class="audio-dashboard">
-  <div class="dash-header">
+<div class="lib">
+
+  <!-- header -->
+  <div class="lib-head">
     <div>
-      <h1 class="dash-title">Episodes</h1>
-      <p class="dash-sub">Manage uploaded episodes</p>
+      <div class="crumb">Content <span>›</span> <b>EiFlix / Episodes</b></div>
+      <h1 class="pg">Episodes</h1>
+      <p class="pg-sub">Manage uploaded episodes — search, edit metadata, and track processing status.</p>
     </div>
-    <div class="header-actions">
-      <!-- <button class="btn-primary" (click)="reconvertSelected()"
-        [disabled]="selectedRows.length === 0 || reconverting">
-        <mat-icon>hd</mat-icon>
-        <span>{{ reconverting ? 'Reconverting…' : 'Reconvert HLS (' + selectedRows.length + ')' }}</span>
-      </button> -->
-      <button class="btn-primary" (click)="openUploadDialog()">
-        <mat-icon>cloud_upload</mat-icon>
-        <span>Upload New Episode</span>
-      </button>
+    <button class="btn btn-primary" (click)="openUploadStudio()">
+      <mat-icon>cloud_upload</mat-icon>
+      Open Upload Studio
+    </button>
+  </div>
+
+  <!-- stats -->
+  <div class="stats">
+    <div class="stat">
+      <div class="k">Total episodes</div>
+      <div class="v">{{ stats.total }}</div>
+      <div class="d">in the library</div>
+    </div>
+    <div class="stat">
+      <div class="k">Library size</div>
+      <div class="v">{{ fmtSize(stats.sizeBytes) }}</div>
+      <div class="d">video + images</div>
+    </div>
+    <div class="stat">
+      <div class="k">HLS converted</div>
+      <div class="v">{{ stats.hlsPct }}<small>%</small></div>
+      <div class="d">{{ stats.hlsPending }} pending backend</div>
+    </div>
+    <div class="stat">
+      <div class="k">Subtitles (SRT)</div>
+      <div class="v">{{ stats.srtPct }}<small>%</small></div>
+      <div class="d">{{ stats.srtMissing }} episodes missing</div>
     </div>
   </div>
-  <div class="filters-row">
-    <div class="input-box search-box">
-      <mat-icon class="ib-icon">search</mat-icon>
-      <input type="text" class="ib-input" placeholder="Filter by name..."
-        #input (keyup)="ApplyFilter($event)" autocomplete="off" />
+
+  <!-- toolbar -->
+  <div class="toolbar">
+    <div class="search">
+      <mat-icon>search</mat-icon>
+      <input type="text" placeholder="Search by title or reference title…"
+        [(ngModel)]="searchText" (ngModelChange)="refreshFilter()" autocomplete="off">
     </div>
+    <button class="fchip" [class.on]="activeChip === 'all'" (click)="setChip('all')">All</button>
+    <button class="fchip" [class.on]="activeChip === 'hlspending'" (click)="setChip('hlspending')">HLS pending</button>
+    <button class="fchip" [class.on]="activeChip === 'nosrt'" (click)="setChip('nosrt')">Missing SRT</button>
   </div>
-  <div class="table-outer">
-    <div class="table-card">
+
+  <!-- table -->
+  <div class="tbl-card">
+    <div class="tbl-scroll">
       <table mat-table matSort [dataSource]="dataSource">
-        <!-- <ng-container matColumnDef="select">
-          <th mat-header-cell *matHeaderCellDef class="col-select"></th>
-          <td mat-cell *matCellDef="let row" class="col-select">
-            <mat-checkbox
-              *ngIf="isEligible(row)"
-              [checked]="isSelected(row)"
-              [disabled]="isSelectionDisabled(row)"
-              (change)="toggleSelection(row)">
-            </mat-checkbox>
-          </td>
-        </ng-container> -->
+
         <ng-container matColumnDef="Title">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>Title</th>
-          <td mat-cell *matCellDef="let row" class="col-title-big"><span class="c-name">{{ row.title }}</span></td>
-        </ng-container>
-        <ng-container matColumnDef="Referencetitle">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-desc">Reference Title</th>
-          <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.reftitle }}</span></td>
-        </ng-container>
-        <ng-container matColumnDef="Duration">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-desc">Duration</th>
-          <td mat-cell *matCellDef="let row" class="col-desc"><span class="c-desc">{{ row.duration }}</span></td>
-        </ng-container>
-        <ng-container matColumnDef="added">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-date">Added</th>
-          <td mat-cell *matCellDef="let row" class="col-date">
-            <span class="c-date">{{ row.date.toDate() | date }}</span>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="tags">
-          <th mat-header-cell *matHeaderCellDef class="col-tags">Tags</th>
-          <td mat-cell *matCellDef="let row" class="col-tags">
-            <div class="tags-wrap">
-              <span class="chip chip-sm" *ngFor="let tag of row.tags">{{ mapTaxonomy[tag] }}</span>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Episode</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="ep">
+              <div class="thumb">
+                <img *ngIf="row.imageUrl" [src]="row.imageUrl" loading="lazy" alt="">
+                <span *ngIf="!row.imageUrl" class="thumb-letter">{{ (row.title || '?').charAt(0) | uppercase }}</span>
+              </div>
+              <div class="ep-txt">
+                <div class="ep-t">{{ row.title }}</div>
+                <div class="ep-r" *ngIf="row.reftitle">{{ row.reftitle }}</div>
+              </div>
             </div>
           </td>
         </ng-container>
+
+        <ng-container matColumnDef="Duration">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Duration</th>
+          <td mat-cell *matCellDef="let row"><span class="num">{{ row.duration || '—' }}</span></td>
+        </ng-container>
+
+        <ng-container matColumnDef="added">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Added</th>
+          <td mat-cell *matCellDef="let row"><span class="num">{{ row.date?.toDate() | date }}</span></td>
+        </ng-container>
+
         <ng-container matColumnDef="convertedtohls">
           <th mat-header-cell *matHeaderCellDef>HLS</th>
           <td mat-cell *matCellDef="let row">
-            <span class="status-badge" [class.active]="row.convertedtohls" [class.deleted]="!row.convertedtohls">
-              {{ row.convertedtohls ? 'Yes' : 'No' }}
-            </span>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="srt">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header>SRT</th>
-          <td mat-cell *matCellDef="let row">
-            <span class="status-badge" [class.active]="row.srt" [class.deleted]="!row.srt">
-              {{ row.srt ? 'Available' : 'Not Available' }}
-            </span>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="videosize">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Video Size</th>
-          <td mat-cell *matCellDef="let row" class="col-size">
-            <span class="c-size">
-              {{
-                row.videoSizeBytes >= (1024 * 1024 * 1024)
-                  ? (row.videoSizeBytes / (1024 * 1024 * 1024) | number:'1.2-2') + ' GB'
-                  : (row.videoSizeBytes / (1024 * 1024) | number:'1.2-2') + ' MB'
-              }}
-            </span>
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="Series">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header class="col-size">Img Size</th>
-          <td mat-cell *matCellDef="let row" class="col-size">
-            <span class="c-size">
-              {{
-                row.imagesize >= (1024 * 1024)
-                  ? (row.imagesize / (1024 * 1024) | number:'1.2-2') + ' MB'
-                  : (row.imagesize / 1024 | number:'1.0-0') + ' KB'
-              }}
+            <span class="pill" [class.p-ok]="row.convertedtohls" [class.p-warn]="!row.convertedtohls">
+              <span class="dot" *ngIf="!row.convertedtohls"></span>
+              {{ row.convertedtohls ? 'Ready' : 'Processing' }}
             </span>
           </td>
         </ng-container>
 
-        <ng-container matColumnDef="Edit">
-          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
-          <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-edit" (click)="openEditDialog(row)">
-              <mat-icon>edit</mat-icon>
-            </button>
+        <ng-container matColumnDef="srt">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>SRT</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="pill" [class.p-acc]="row.srt" [class.p-mute]="!row.srt">
+              {{ row.srt ? 'SRT ✓' : 'None' }}
+            </span>
           </td>
         </ng-container>
-        <ng-container matColumnDef="Delete">
-          <th mat-header-cell *matHeaderCellDef class="col-act"></th>
-          <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-del" (click)="openDeleteDialog(row.id, row.srt, row.imageUrl, row.videoUrl, row.screenshot)">
-              <mat-icon>delete_outline</mat-icon>
-            </button>
+
+        <ng-container matColumnDef="videosize">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Video</th>
+          <td mat-cell *matCellDef="let row"><span class="num">{{ fmtSize(row.videoSizeBytes) }}</span></td>
+        </ng-container>
+
+        <ng-container matColumnDef="imagesize">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Image</th>
+          <td mat-cell *matCellDef="let row"><span class="num">{{ fmtSize(row.imagesize) }}</span></td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <div class="rowact">
+              <button class="abtn" title="Edit" (click)="openEditInStudio(row)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button class="abtn del" title="Delete"
+                (click)="openDeleteDialog(row.id, row.srt, row.imageUrl, row.videoUrl, row.screenshot)">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
           </td>
         </ng-container>
 
@@ -128,7 +131,7 @@
           <td class="mat-cell" [attr.colspan]="displayedColumns.length">
             <div class="empty">
               <mat-icon>videocam_off</mat-icon>
-              <p>No episodes</p>
+              <p>No episodes match</p>
             </div>
           </td>
         </tr>
