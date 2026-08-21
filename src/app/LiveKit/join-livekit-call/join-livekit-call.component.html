@@ -524,8 +524,8 @@
         </button>
         <div class="device-menu-header" mat-menu-item disabled>Picture-in-Picture</div>
         <button mat-menu-item (click)="togglePip()">
-          <mat-icon>picture_in_picture_alt</mat-icon>
-          <span>Pop out video</span>
+          <mat-icon>{{ pipEnabled ? 'picture_in_picture' : 'picture_in_picture_alt' }}</mat-icon>
+          <span>{{ pipEnabled ? 'Turn off pop-out' : 'Pop out video (stays while you switch tabs)' }}</span>
         </button>
       </mat-menu>
 

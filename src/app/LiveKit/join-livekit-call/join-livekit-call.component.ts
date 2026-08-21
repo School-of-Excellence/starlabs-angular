@@ -95,6 +95,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private lastActiveSpeaker: string | null = null;
   private pipCanvas: HTMLCanvasElement | null = null;
   private pipVisibilityHandler: (() => void) | null = null;
+  private pipNameCardCache: { name: string; stream: MediaStream } | null = null;
+  /** True while the user has Picture-in-Picture turned on for this call (persists across tab switches). */
+  pipEnabled = false;
 
   // "Open Journey Plan" (bottom-center) — shown only for journey-coach/onboarding
   // appointments (twin of the appointment-studio button; opens /journeysupport/<client>).
@@ -605,7 +608,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
       // Default to the built-in system mic on join (not the OS default, which may be a
       // Bluetooth headset in HFP mode → low-quality/choppy). Only switch if it isn't already.
-      const builtInMic = this.mics.find(m => /built[\s-]?in|internal|macbook/i.test(m.label));
+      // Label patterns: macOS "MacBook Pro Microphone (Built-in)"; Windows laptops expose
+      // the internal mic as "Microphone Array (…)".
+      const builtInMic = this.mics.find(m => /built[\s-]?in|internal|macbook|microphone array/i.test(m.label));
       if (builtInMic && builtInMic.deviceId !== this.selectedMicId) {
         await this.selectMic(builtInMic.deviceId);
       }
@@ -1084,8 +1089,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       isInstalledPwa: window.matchMedia?.('(display-mode: standalone)').matches ?? false,
     });
 
-    el.addEventListener('enterpictureinpicture', () => console.log('[pip] entered'));
-    el.addEventListener('leavepictureinpicture', () => console.log('[pip] left'));
+    el.addEventListener('enterpictureinpicture', () => { this.pipEnabled = true; console.log('[pip] entered'); });
+    el.addEventListener('leavepictureinpicture', () => { this.pipEnabled = false; console.log('[pip] left'); });
 
     // Belt-and-suspenders auto-PiP. mediaSession action = the "official" hook; the
     // visibilitychange handler = the one that actually fires reliably, because Chrome permits
@@ -1118,27 +1123,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // without a user gesture (confirmed: NotAllowedError). The only gesture-free auto-enter paths
     // are (A) the mediaSession enterpictureinpicture action above, or the autoPictureInPicture
     // attribute — both Chrome-internal. This listener only EXITS PiP when returning to the tab.
+    // Persistent PiP: once the user turns PiP on (togglePip), it stays on across tab switches AND
+    // while the tab is focused, until they turn it off or leave the call. We deliberately do NOT
+    // exit on return — re-entering later would need a fresh user gesture Chrome will not grant on
+    // a tab switch (confirmed: NotAllowedError). Chrome's own auto-action (armed above) may
+    // additionally open PiP on tab-hide where it's eligible (installed PWA / production origin).
     this.pipVisibilityHandler = () => {
-      if (document.hidden) {
-        // Diagnosis step 1: state at the exact moment of tab switch. If Chrome's auto-PiP
-        // doesn't pop, this line shows which prerequisite was false when it mattered.
-        const stream = el.srcObject as MediaStream | null;
-        console.log('%c[pip] tab hidden — auto-PiP state', 'font-weight:bold;color:#03a9f4', {
-          videoPlaying: !el.paused && el.readyState >= 2,
-          paused: el.paused,
-          readyState: el.readyState,
-          hasSource: !!stream,
-          sourceTracks: stream?.getVideoTracks().map(t => t.label || t.id) ?? [],
-          alreadyInPip: !!(document as any).pictureInPictureElement,
-          mediaSessionPlaybackState: (navigator as any).mediaSession?.playbackState ?? 'n/a',
-          remoteParticipants: this.remoteParticipants().size,
-        });
-        console.log('[pip] now waiting for Chrome to fire the mediaSession enterpictureinpicture action — if no "[pip] mediaSession … FIRED" line follows, Chrome declined auto-PiP (version < 134, site setting blocked, or video not eligible)');
-        return;
-      }
-      if ((document as any).pictureInPictureElement === el) {
-        (document as any).exitPictureInPicture?.().catch(() => {});
-      }
+      if (!document.hidden) return;
+      console.log('[pip] tab hidden', { pipOn: this.pipEnabled, inPip: !!(document as any).pictureInPictureElement, hasSource: !!el.srcObject });
     };
     document.addEventListener('visibilitychange', this.pipVisibilityHandler);
   }
@@ -1147,10 +1139,15 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private async enterPipAuto(): Promise<void> {
     const el = this.pipVideo?.nativeElement;
     if (!el || (document as any).pictureInPictureElement) return;
-    if (!el.srcObject) this.resolvePipSource();       // remote-only (solo = no auto-PiP by design)
-    if (!el.srcObject) { console.log('[pip] auto skipped — no remote source'); return; }
+    this.resolvePipSource();                            // refresh to the best current source (remote, name card, or our own screen share)
+    if (!el.srcObject) { console.log('[pip] auto skipped — no source to show'); return; }
     try {
       await el.play().catch(() => {});
+      // requestPictureInPicture() rejects if the video has no decoded frame yet — a freshly
+      // attached source (esp. the name-card canvas) needs one frame first. Wait briefly.
+      if (el.readyState < 2) {
+        await new Promise<void>(res => { const done = () => res(); el.addEventListener('loadeddata', done, { once: true }); setTimeout(done, 1000); });
+      }
       await (el as any).requestPictureInPicture();
       console.log('[pip] entered (auto)');
     } catch (e: any) {
@@ -1169,6 +1166,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
     try {
       if ((document as any).pictureInPictureElement) {
+        this.pipEnabled = false;
         await (document as any).exitPictureInPicture();
         return;
       }
@@ -1189,6 +1187,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         await new Promise<void>(res => { el.onloadeddata = () => res(); setTimeout(res, 1000); });
       }
       await (el as any).requestPictureInPicture();
+      this.pipEnabled = true;
       console.log('[pip] entered (manual)');
     } catch (e: any) {
       console.warn('[pip] manual request failed:', e?.name, e?.message);
@@ -1215,7 +1214,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     const names = this.remoteNames();
     let target = this.lastActiveSpeaker && names.has(this.lastActiveSpeaker) ? this.lastActiveSpeaker : null;
     if (!target) target = names.keys().next().value ?? null; // any remote
-    if (!target) { this.clearPip(); return; } // scenario 6: no remote → no PiP
+    if (!target) {
+      // No remote yet — keep PiP meaningful (never clearPip() here: that would close a PiP the
+      // user deliberately enabled). Priority: our own screen share → our own camera → a card.
+      const localShare = share && share.isLocal ? share.track?.mediaStreamTrack : null;
+      const localCam = (this.localParticipant() as any)?.mediaStreamTrack ?? null;
+      if (localShare) this.setPipStream(new MediaStream([localShare]));
+      else if (localCam && localCam.readyState === 'live') this.setPipStream(new MediaStream([localCam]));
+      else this.setPipStream(this.nameCardStream('Waiting for others…'));
+      return;
+    }
 
     const camTrack = this.remoteVideoTracks.get(target);
     if (camTrack?.mediaStreamTrack) {
@@ -1236,12 +1244,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       el.srcObject = stream;
       el.muted = true;
       (el as any).autoPictureInPicture = true;
-      el.play().then(() => console.log('[pip] source attached & playing')).catch(err => console.warn('[pip] play failed:', err));
+      // A rapid source swap (active-speaker change) can abort an in-flight play() — harmless, so
+      // swallow AbortError and surface only real failures. Swapping srcObject while already in PiP
+      // updates the PiP window in place, so it follows the active speaker without flicker.
+      el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
     }
   }
 
   /** Render a participant's initials/name onto a canvas and return it as a video stream. */
   private nameCardStream(name: string): MediaStream {
+    if (this.pipNameCardCache && this.pipNameCardCache.name === name) return this.pipNameCardCache.stream;
     if (!this.pipCanvas) {
       this.pipCanvas = document.createElement('canvas');
       this.pipCanvas.width = 320; this.pipCanvas.height = 180;
@@ -1253,13 +1265,19 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     ctx.fillStyle = '#fff'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(initial, c.width / 2, 70);
     ctx.font = '16px sans-serif'; ctx.fillText(name, c.width / 2, 140);
-    return (c as any).captureStream(1);
+    // 15 fps (not 1) so the first frame lands promptly — enterPipAuto()/togglePip() wait for it
+    // before requestPictureInPicture(), and a slow first frame would stall or reject the request.
+    const stream = (c as any).captureStream(15);
+    this.pipNameCardCache = { name, stream };
+    return stream;
   }
 
   private clearPip(): void {
     const el = this.pipVideo?.nativeElement;
     try { if ((document as any).pictureInPictureElement === el) (document as any).exitPictureInPicture?.(); } catch {}
     if (el) el.srcObject = null;
+    this.pipEnabled = false;
+    this.pipNameCardCache = null;
   }
 
   // ── Device selection (mic / speaker / camera) ─────────────────────────────
