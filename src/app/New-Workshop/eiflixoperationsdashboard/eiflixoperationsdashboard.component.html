@@ -1,1 +1,646 @@
-<p>eiflixoperationsdashboard works!</p>
+<div class="eod-page" [@.disabled]="reducedMotion">
+
+  <!-- ============ Page header ============ -->
+  <header class="eod-header">
+    <div class="eod-header-titles">
+      <span class="eod-eyebrow">EiFlix &middot; Operations</span>
+      <h1 class="eod-title">Operations Dashboard</h1>
+    </div>
+    <div class="eod-header-meta">
+      <span class="eod-live"><span class="eod-live-dot"></span>Live</span>
+      <span class="eod-date">{{ today | date: 'EEEE, MMM d, y' }}</span>
+    </div>
+  </header>
+
+  <!-- ============ New Users section ============ -->
+  <section class="eod-section">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">Users</h2>
+      <span class="eod-section-rule"></span>
+    </div>
+
+    @if (loadError) {
+      <div class="eod-error">
+        <mat-icon>error_outline</mat-icon>
+        <span>Couldn&rsquo;t load new user data. Please refresh to try again.</span>
+      </div>
+    }
+
+    <div class="eod-grid">
+      @for (card of cards; track card.key; let i = $index) {
+        <button
+          type="button"
+          class="eod-card"
+          [class.eod-accent-indigo]="card.accent === 'indigo'"
+          [class.eod-accent-emerald]="card.accent === 'emerald'"
+          [class.eod-accent-violet]="card.accent === 'violet'"
+          [style.animation-delay.ms]="80 + i * 90"
+          (click)="openPanel(card)"
+          [attr.aria-label]="card.title + ', ' + card.users.length + ' users. Open details panel'">
+          <div class="eod-card-top">
+            <span class="eod-chip"><mat-icon>{{ card.icon }}</mat-icon></span>
+            <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
+          </div>
+          <span class="eod-card-label">{{ card.title }}</span>
+          @if (cardLoading(card)) {
+            <span class="eod-skeleton eod-gh-num" aria-hidden="true"></span>
+          } @else {
+            <div class="eod-count-row">
+              <span class="eod-count">{{ card.displayCount | number }}</span>
+              @if (card.breakdown?.length) {
+                <div class="eod-card-chips">
+                  @for (b of card.breakdown; track b.label) {
+                    <span class="eod-card-chip"><strong>{{ b.count | number }}</strong>{{ b.label }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+          <span class="eod-card-caption">{{ card.caption }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- ============ Engagement section ============ -->
+  <section class="eod-section eod-section-gap" #engSection tabindex="-1">
+    <div class="eod-section-head eod-section-head-controls">
+      <h2 class="eod-section-title">Engagement</h2>
+      <span class="eod-section-rule"></span>
+
+      <!-- one shared filter drives BOTH engagement cards -->
+      <div class="eod-eng-controls">
+        <div class="eod-seg" role="group" aria-label="Engagement date range">
+          <button type="button" [class.eod-seg-active]="engRange === 'today'" [attr.aria-pressed]="engRange === 'today'" (click)="setEngRange('today')">Today</button>
+          <button type="button" [class.eod-seg-active]="engRange === '7d'" [attr.aria-pressed]="engRange === '7d'" (click)="setEngRange('7d')">7D</button>
+          <button type="button" [class.eod-seg-active]="engRange === '30d'" [attr.aria-pressed]="engRange === '30d'" (click)="setEngRange('30d')">30D</button>
+        </div>
+        <label class="eod-datefield">
+          <span>From</span>
+          <input type="date" [(ngModel)]="engCustomStart" (change)="applyEngCustom()" [max]="engCustomEnd || todayStr">
+        </label>
+        <label class="eod-datefield">
+          <span>To</span>
+          <input type="date" [(ngModel)]="engCustomEnd" (change)="applyEngCustom()" [min]="engCustomStart" [max]="todayStr">
+        </label>
+        @if (engRange === 'custom') {
+          <button type="button" class="eod-clear" (click)="setEngRange('today')">
+            <mat-icon>close</mat-icon>&nbsp;Clear
+          </button>
+        }
+      </div>
+    </div>
+    @if (engCustomHint) {
+      <span class="eod-date-hint eod-date-hint-head" role="status">Pick both dates to apply the range</span>
+    }
+
+    @if (engError) {
+      <div class="eod-error">
+        <mat-icon>error_outline</mat-icon>
+        <span>Couldn&rsquo;t load watch data.</span>
+        <button type="button" class="eod-retry" (click)="retryEngagement()">Retry</button>
+      </div>
+    }
+
+    <div class="eod-grid-big">
+
+      <!-- Card 1 · Total Watch Hours -->
+      <article class="eod-bigcard eod-accent-amber" [style.animation-delay.ms]="260">
+        <header class="eod-bigcard-head">
+          <div class="eod-bigcard-titles">
+            <span class="eod-chip"><mat-icon>movie</mat-icon></span>
+            <div>
+              <h3 class="eod-bigcard-title">Total Watch Hours</h3>
+              <span class="eod-bigcard-caption">New users + participants &middot; {{ engRangeLabel }}</span>
+            </div>
+          </div>
+        </header>
+
+        <button
+          type="button"
+          class="eod-bigcard-metric"
+          (click)="openViewersPanel('all')"
+          [disabled]="engLoading || engError"
+          [attr.aria-label]="'Total watch hours ' + (engHours | number: '1.0-1') + ', ' + engUniqueIds.length + ' unique viewers. Open viewers panel'">
+          @if (engLoading) {
+            <span class="eod-skeleton eod-skeleton-big" aria-hidden="true"></span>
+          } @else if (engError) {
+            <span class="eod-count eod-count-big">&mdash;</span>
+          } @else {
+            <span class="eod-count eod-count-big">{{ engHours | number: '1.0-1' }}<span class="eod-count-unit">h</span></span>
+            <span class="eod-metric-sub">
+              <mat-icon aria-hidden="true">group</mat-icon>
+              <strong>{{ engUniqueIds.length | number }}</strong>&nbsp;unique viewers
+              <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
+            </span>
+          }
+        </button>
+
+        @if (engLoading) {
+          <div class="eod-cohorts">
+            <span class="eod-skeleton eod-skeleton-tile" aria-hidden="true"></span>
+            <span class="eod-skeleton eod-skeleton-tile" aria-hidden="true"></span>
+          </div>
+          <span class="eod-skeleton eod-skeleton-trend" aria-hidden="true"></span>
+        } @else if (!engError) {
+          <div class="eod-cohorts">
+            <button type="button" class="eod-cohort" (click)="openViewersPanel('nud')"
+              [attr.aria-label]="'New users: ' + (engNudHours | number: '1.0-1') + ' hours, ' + engNudViewers + ' viewers. Open viewers panel'">
+              <span class="eod-cohort-value">{{ engNudHours | number: '1.0-1' }}h</span>
+              <span class="eod-cohort-label">New Users</span>
+              <span class="eod-cohort-sub">{{ engNudViewers | number }} viewers</span>
+            </button>
+            <button type="button" class="eod-cohort" (click)="openViewersPanel('pm')"
+              [attr.aria-label]="'Participants: ' + (engPmHours | number: '1.0-1') + ' hours, ' + engPmViewers + ' viewers. Open viewers panel'">
+              <span class="eod-cohort-value">{{ engPmHours | number: '1.0-1' }}h</span>
+              <span class="eod-cohort-label">Participants</span>
+              <span class="eod-cohort-sub">{{ engPmViewers | number }} viewers</span>
+            </button>
+          </div>
+          @if (pmFailed) {
+            <span class="eod-cohort-note">Participant directory unavailable &mdash; the split may undercount Participants.</span>
+          }
+          @if (engUnknownSeconds > 0) {
+            <span class="eod-cohort-note">+ {{ engUnknownHours | number: '1.0-1' }}h &middot; {{ engUnknownViewers | number }} unattributed profiles</span>
+          }
+
+          <!-- cohort watch-time trend -->
+          <div class="eod-trend">
+            <div class="eod-trend-legend">
+              <span class="eod-legend-item"><span class="eod-legend-dot eod-dot-nud"></span>New Users</span>
+              <span class="eod-legend-item"><span class="eod-legend-dot eod-dot-pm"></span>Participants</span>
+            </div>
+            <div class="eod-trend-plot" (mousemove)="onTrendMove($event)" (mouseleave)="onTrendLeave()">
+              <svg class="eod-trend-svg" viewBox="0 0 100 32" preserveAspectRatio="none" role="img" [attr.aria-label]="engTrendAria">
+                <defs>
+                  <linearGradient id="eodGradNud" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#4753e6" stop-opacity="0.16" />
+                    <stop offset="100%" stop-color="#4753e6" stop-opacity="0" />
+                  </linearGradient>
+                  <linearGradient id="eodGradPm" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0c8a5f" stop-opacity="0.16" />
+                    <stop offset="100%" stop-color="#0c8a5f" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path [attr.d]="engTrendPmArea" fill="url(#eodGradPm)" />
+                <path [attr.d]="engTrendNudArea" fill="url(#eodGradNud)" />
+                <path [attr.d]="engTrendPmLine" class="eod-trend-line eod-trend-line-pm" vector-effect="non-scaling-stroke" />
+                <path [attr.d]="engTrendNudLine" class="eod-trend-line eod-trend-line-nud" vector-effect="non-scaling-stroke" />
+                @if (engTrendHover; as h) {
+                  <line class="eod-trend-cursor" [attr.x1]="h.x" [attr.x2]="h.x" y1="0" y2="32" vector-effect="non-scaling-stroke" />
+                }
+              </svg>
+              @if (engTrendHover; as h) {
+                <div class="eod-trend-tip" [style.left.%]="h.tipX">
+                  <span class="eod-trend-tip-label">{{ h.label }}</span>
+                  <span class="eod-trend-tip-row"><span class="eod-legend-dot eod-dot-nud"></span>{{ h.nud | number: '1.0-1' }}h</span>
+                  <span class="eod-trend-tip-row"><span class="eod-legend-dot eod-dot-pm"></span>{{ h.pm | number: '1.0-1' }}h</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </article>
+
+      <!-- Card 2 · Top Performing Content -->
+      <article class="eod-bigcard eod-accent-violet" [style.animation-delay.ms]="340">
+        <header class="eod-bigcard-head">
+          <div class="eod-bigcard-titles">
+            <span class="eod-chip"><mat-icon>insights</mat-icon></span>
+            <div>
+              <h3 class="eod-bigcard-title">Top Performing Content</h3>
+              <span class="eod-bigcard-caption">Ranked by watch hours &middot; {{ engRangeLabel }}</span>
+            </div>
+          </div>
+        </header>
+
+        <div class="eod-content-list">
+          @if (engLoading) {
+            @for (i of skeletonRows; track i) {
+              <span class="eod-skeleton eod-skeleton-row" aria-hidden="true"></span>
+            }
+          } @else if (engError) {
+            <div class="eod-empty eod-empty-slim">
+              <mat-icon>error_outline</mat-icon>
+              <p>Couldn&rsquo;t load content data.</p>
+            </div>
+          } @else if (engContentAll.length === 0) {
+            <div class="eod-empty eod-empty-slim">
+              <mat-icon>movie_filter</mat-icon>
+              <p>No content watched in this range.</p>
+            </div>
+          } @else {
+            @for (row of engContentRows; track row.videoid; let i = $index) {
+              <div class="eod-content-row">
+                <span class="eod-content-rank">{{ engContentPage * engContentPageSize + i + 1 }}</span>
+                <div class="eod-content-main">
+                  <span class="eod-content-title">{{ row.title }}</span>
+                </div>
+                <span class="eod-content-hours">{{ row.hours | number: '1.0-1' }}h</span>
+                <span class="eod-content-bar" aria-hidden="true"><span [style.width.%]="row.pct"></span></span>
+              </div>
+            }
+          }
+        </div>
+
+        @if (!engLoading && !engError && engContentAll.length > engContentPageSize) {
+          <footer class="eod-pager">
+            <button type="button" class="eod-clear" [disabled]="!engContentHasPrev" (click)="prevContentPage()" aria-label="Previous 10">
+              <mat-icon>chevron_left</mat-icon>&nbsp;Prev
+            </button>
+            <span class="eod-pager-label">{{ engContentPageLabel }}</span>
+            <button type="button" class="eod-clear" [disabled]="!engContentHasNext" (click)="nextContentPage()" aria-label="Next 10">
+              Next&nbsp;<mat-icon>chevron_right</mat-icon>
+            </button>
+          </footer>
+        }
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ Hot Leads Today ============ -->
+  <section class="eod-section eod-section-gap">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">🔥 Hot Leads Today</h2>
+      <span class="eod-section-rule"></span>
+      <button type="button" class="eod-clear" (click)="openHotSettings()" aria-label="Configure hot leads threshold and date range">
+        <mat-icon>tune</mat-icon>&nbsp;Configure
+      </button>
+    </div>
+
+    <button
+      type="button"
+      class="eod-hotcard"
+      (click)="hotError ? retryHot() : openHotLeadsPanel()"
+      [disabled]="hotLoading"
+      [attr.aria-label]="hotError ? 'Hot leads failed to load. Retry' : hotLeadIds.length + ' hot leads, ' + hotSub + '. Open list'">
+      @if (hotLoading) {
+        <span class="eod-gh-banner" aria-hidden="true">
+          <span class="eod-skeleton eod-gh-bignum"></span>
+          <span class="eod-gh-lines">
+            <span class="eod-skeleton eod-gh-l1"></span>
+            <span class="eod-skeleton eod-gh-l2"></span>
+          </span>
+        </span>
+      } @else if (hotError) {
+        <span class="eod-hot-count">&mdash;</span>
+        <div class="eod-hot-labels">
+          <span class="eod-hot-title">{{ hotTitle }}</span>
+          <span class="eod-hot-sub">Couldn&rsquo;t load &middot; click to retry</span>
+        </div>
+        <mat-icon class="eod-hot-arrow" aria-hidden="true">refresh</mat-icon>
+      } @else {
+        <span class="eod-hot-count">{{ hotLeadIds.length | number }}</span>
+        <div class="eod-hot-labels">
+          <span class="eod-hot-title">{{ hotTitle }}</span>
+          <span class="eod-hot-sub">{{ hotSub }} &middot; click to view the full list</span>
+        </div>
+        <mat-icon class="eod-hot-arrow" aria-hidden="true">arrow_forward</mat-icon>
+      }
+    </button>
+  </section>
+
+  <!-- ============ Non-Active Users ============ -->
+  <section class="eod-section eod-section-gap">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">Non-Active Users</h2>
+      <span class="eod-section-rule"></span>
+    </div>
+
+    @if (naError) {
+      <div class="eod-error">
+        <mat-icon>error_outline</mat-icon>
+        <span>Couldn&rsquo;t load the watch register.</span>
+        <button type="button" class="eod-retry" (click)="loadNaRegister()">Retry</button>
+      </div>
+    }
+
+    <div class="eod-na-grid">
+      @for (bucket of naBuckets; track bucket.key; let i = $index) {
+        @if (naLoading) {
+          <div class="eod-card eod-gh-holder">
+            <div class="eod-gh-card" aria-hidden="true">
+              <span class="eod-skeleton eod-gh-chip"></span>
+              <span class="eod-skeleton eod-gh-label"></span>
+              <span class="eod-skeleton eod-gh-num"></span>
+              <span class="eod-skeleton eod-gh-cap"></span>
+            </div>
+          </div>
+        } @else {
+          <article
+            class="eod-card"
+            role="button"
+            tabindex="0"
+            [class.eod-accent-amber]="bucket.accent === 'amber'"
+            [class.eod-accent-orange]="bucket.accent === 'orange'"
+            [class.eod-accent-red]="bucket.accent === 'red'"
+            [style.animation-delay.ms]="80 + i * 90"
+            (click)="openNonActivePanel(bucket, 'all')"
+            (keydown.enter)="openNonActivePanel(bucket, 'all')"
+            (keydown.space)="$event.preventDefault(); openNonActivePanel(bucket, 'all')"
+            [attr.aria-label]="bucket.title + ', ' + bucket.total + ' users. Open full list'">
+            <div class="eod-card-top">
+              <span class="eod-chip"><mat-icon>{{ bucket.icon }}</mat-icon></span>
+              <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
+            </div>
+            <span class="eod-card-label">{{ bucket.title }}</span>
+            <div class="eod-count-row">
+              <span class="eod-count">{{ bucket.total | number }}</span>
+              <div class="eod-card-chips">
+                <button
+                  type="button"
+                  class="eod-card-chip eod-chip-btn"
+                  (click)="$event.stopPropagation(); openNonActivePanel(bucket, 'nud')"
+                  [attr.aria-label]="bucket.title + ', new users only: ' + bucket.nudCount + '. Open list'">
+                  <strong>{{ bucket.nudCount | number }}</strong>New Users
+                </button>
+                <button
+                  type="button"
+                  class="eod-card-chip eod-chip-btn"
+                  (click)="$event.stopPropagation(); openNonActivePanel(bucket, 'pm')"
+                  [attr.aria-label]="bucket.title + ', participants only: ' + bucket.pmCount + '. Open list'">
+                  <strong>{{ bucket.pmCount | number }}</strong>Participants
+                </button>
+              </div>
+            </div>
+            <span class="eod-card-caption">{{ bucket.caption }}</span>
+          </article>
+        }
+      }
+    </div>
+  </section>
+
+  <!-- ============ Device Breakdown ============ -->
+  <section class="eod-section eod-section-gap">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">Device Breakdown</h2>
+      <span class="eod-section-rule"></span>
+      <div class="eod-seg" role="group" aria-label="Device breakdown period">
+        <button type="button" [class.eod-seg-active]="dbRange === 1" [attr.aria-pressed]="dbRange === 1" (click)="setDbRange(1)">1M</button>
+        <button type="button" [class.eod-seg-active]="dbRange === 2" [attr.aria-pressed]="dbRange === 2" (click)="setDbRange(2)">2M</button>
+        <button type="button" [class.eod-seg-active]="dbRange === 3" [attr.aria-pressed]="dbRange === 3" (click)="setDbRange(3)">3M</button>
+      </div>
+    </div>
+
+    <article class="eod-bigcard eod-dbcard" [style.animation-delay.ms]="120">
+      @if (naLoading) {
+        <div class="eod-gh-db" aria-hidden="true">
+          <span class="eod-skeleton eod-gh-ring"></span>
+          <div class="eod-gh-leg">
+            @for (i of [0, 1, 2]; track i) {
+              <div class="eod-gh-legrow">
+                <span class="eod-skeleton eod-gh-dot"></span>
+                <span class="eod-skeleton eod-gh-legname"></span>
+                <span class="eod-skeleton eod-gh-legbar"></span>
+                <span class="eod-skeleton eod-gh-legpct"></span>
+              </div>
+            }
+          </div>
+        </div>
+      } @else if (naError) {
+        <div class="eod-empty eod-empty-slim">
+          <mat-icon>error_outline</mat-icon>
+          <p>Couldn&rsquo;t load the watch register.</p>
+        </div>
+      } @else if (dbRows.length === 0) {
+        <div class="eod-empty eod-empty-slim">
+          <mat-icon>donut_large</mat-icon>
+          <p>No platform data in this range yet &mdash; run the platforms backfill script.</p>
+        </div>
+      } @else {
+        <div class="eod-db-body">
+          <div class="eod-db-donut">
+            <svg viewBox="0 0 120 120" role="img"
+              [attr.aria-label]="'Platform share of watch time: ' + dbRows[0].label + ' leads with ' + dbRows[0].pct + ' percent'">
+              <g transform="rotate(-90 60 60)">
+                <circle cx="60" cy="60" r="48" fill="none" stroke="#eeeeea" stroke-width="16"></circle>
+                @for (row of dbRows; track row.key) {
+                  <circle
+                    cx="60" cy="60" r="48" fill="none"
+                    pathLength="100"
+                    stroke-width="16"
+                    [attr.stroke]="row.color"
+                    [attr.stroke-dasharray]="row.pctExact + ' ' + (100 - row.pctExact)"
+                    [attr.stroke-dashoffset]="row.dashOffset"></circle>
+                }
+              </g>
+            </svg>
+            <div class="eod-db-center">
+              <strong>{{ dbRows[0].pct }}%</strong>
+              <span [title]="dbRows[0].label">{{ dbRows[0].label }}</span>
+            </div>
+          </div>
+          <div class="eod-db-legend">
+            @for (row of dbRows; track row.key) {
+              <button
+                type="button"
+                class="eod-db-row"
+                (click)="openPlatformPanel(row.key)"
+                [attr.aria-label]="row.label + ', ' + row.pct + ' percent, ' + (row.hours | number: '1.0-1') + ' hours. Open viewers panel'">
+                <span class="eod-db-dot" [style.background]="row.color" aria-hidden="true"></span>
+                <span class="eod-db-name">{{ row.label }}</span>
+                <span class="eod-db-bar" aria-hidden="true"><span [style.width.%]="row.pctExact" [style.background]="row.color"></span></span>
+                <span class="eod-db-hours">{{ row.hours | number: '1.0-1' }}h</span>
+                <span class="eod-db-pct">{{ row.pct }}%</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </article>
+  </section>
+
+  <!-- ============ Detail side panel ============ -->
+  @if (activePanel; as p) {
+    <div class="eod-backdrop" @fade (click)="closePanel()" aria-hidden="true"></div>
+
+    <aside
+      class="eod-panel"
+      @slide
+      role="dialog"
+      aria-modal="true"
+      cdkTrapFocus
+      cdkTrapFocusAutoCapture
+      tabindex="-1"
+      [class.eod-accent-indigo]="p.accent === 'indigo'"
+      [class.eod-accent-emerald]="p.accent === 'emerald'"
+      [class.eod-accent-amber]="p.accent === 'amber'"
+      [class.eod-accent-violet]="p.accent === 'violet'"
+      [class.eod-accent-rose]="p.accent === 'rose'"
+      [class.eod-accent-orange]="p.accent === 'orange'"
+      [class.eod-accent-red]="p.accent === 'red'"
+      [attr.aria-label]="p.title"
+      (click)="p.sortOpen = false">
+      <header class="eod-panel-head">
+        <div class="eod-panel-titles">
+          <span class="eod-panel-chip"><mat-icon>{{ p.icon }}</mat-icon></span>
+          <div>
+            <h3 class="eod-panel-title">{{ p.title }}</h3>
+            <span class="eod-panel-caption">{{ p.caption }}</span>
+          </div>
+        </div>
+        <div class="eod-panel-actions">
+          <span class="eod-panel-count">{{ p.count | number }}</span>
+          <button type="button" class="eod-close" (click)="closePanel()" aria-label="Close panel">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </header>
+
+      <div class="eod-panel-tools">
+        <div class="eod-psearch">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input
+            type="text"
+            placeholder="Search name, email or phone…"
+            autocomplete="off"
+            [ngModel]="p.q"
+            (ngModelChange)="onPanelSearch(p, $event)" />
+          @if (p.q) {
+            <button type="button" class="eod-psearch-clear" (click)="onPanelSearch(p, '')" aria-label="Clear search">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </div>
+        <div class="eod-ptool-row">
+          @if (p.showCohort) {
+            <div class="eod-seg eod-pseg" role="group" aria-label="Filter by cohort">
+              <button type="button" [class.eod-seg-active]="p.cohort === 'all'" [attr.aria-pressed]="p.cohort === 'all'" (click)="setPanelCohort(p, 'all')">All</button>
+              <button type="button" [class.eod-seg-active]="p.cohort === 'nud'" [attr.aria-pressed]="p.cohort === 'nud'" (click)="setPanelCohort(p, 'nud')">New Users</button>
+              <button type="button" [class.eod-seg-active]="p.cohort === 'pm'" [attr.aria-pressed]="p.cohort === 'pm'" (click)="setPanelCohort(p, 'pm')">Participants</button>
+            </div>
+          }
+          <div class="eod-psort">
+            <button
+              type="button"
+              class="eod-psort-btn"
+              (click)="$event.stopPropagation(); p.sortOpen = !p.sortOpen"
+              [attr.aria-expanded]="p.sortOpen"
+              aria-label="Sort rows">
+              <mat-icon aria-hidden="true">swap_vert</mat-icon>{{ sortLabel(p.sortKey) }}
+            </button>
+            @if (p.sortOpen) {
+              <div class="eod-psort-menu" (click)="$event.stopPropagation()">
+                @for (opt of p.sortOptions; track opt) {
+                  <button type="button" [class.eod-psort-on]="p.sortKey === opt" (click)="setPanelSort(p, opt)">{{ sortLabel(opt) }}</button>
+                }
+              </div>
+            }
+          </div>
+          <button
+            type="button"
+            class="eod-psort-btn eod-pexport"
+            (click)="exportPanel(p)"
+            [disabled]="p.loading || p.error || !p.viewRows.length"
+            aria-label="Export the shown rows as Excel">
+            <mat-icon aria-hidden="true">download</mat-icon>Export
+          </button>
+        </div>
+        @if (p.journeyOptions.length) {
+          <mat-form-field class="eod-pjourney" appearance="outline" subscriptSizing="dynamic">
+            <mat-select
+              [value]="p.journeyFilter"
+              (selectionChange)="setPanelJourney(p, $event.value)"
+              aria-label="Filter by journey"
+              panelClass="eod-pjourney-panel">
+              <mat-option value="all">All journeys</mat-option>
+              @for (j of p.journeyOptions; track j) {
+                <mat-option [value]="j">{{ j }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+        @if (!p.loading && !p.error) {
+          <span class="eod-panel-meta">
+            <strong>{{ p.viewRows.length | number }}</strong>&nbsp;of {{ p.rows.length | number }} shown
+          </span>
+        }
+      </div>
+
+      <div class="eod-panel-body">
+        @if (p.loading) {
+          @for (i of skeletonRows; track i) {
+            <div class="eod-gh-row" aria-hidden="true">
+              <span class="eod-skeleton eod-gh-av"></span>
+              <span class="eod-gh-lines">
+                <span class="eod-skeleton eod-gh-l1"></span>
+                <span class="eod-skeleton eod-gh-l2"></span>
+              </span>
+              <span class="eod-skeleton eod-gh-side"></span>
+            </div>
+          }
+        } @else if (p.error) {
+          <div class="eod-empty">
+            <mat-icon>error_outline</mat-icon>
+            <p>Couldn&rsquo;t load profiles. Please try again.</p>
+          </div>
+        } @else if (p.viewRows.length === 0) {
+          <div class="eod-empty">
+            <mat-icon>{{ p.q ? 'search_off' : 'hourglass_empty' }}</mat-icon>
+            @if (p.q) {
+              <p>No matches for &ldquo;{{ p.q }}&rdquo;</p>
+              <button type="button" class="eod-clear" (click)="onPanelSearch(p, '')">Clear search</button>
+            } @else {
+              <p>{{ p.emptyText }}</p>
+            }
+          </div>
+        } @else {
+          @for (row of p.viewRows; track row.id) {
+            <article
+              class="eod-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-expanded]="row.expandable ? !!row.expanded : null"
+              (click)="onRowClick(p, row)"
+              (keydown.enter)="onRowClick(p, row)"
+              (keydown.space)="$event.preventDefault(); onRowClick(p, row)">
+              <div class="eod-row-line">
+                <span class="eod-avatar" aria-hidden="true">{{ row.initialsLabel }}</span>
+                <div class="eod-row-main">
+                  <span class="eod-row-namewrap">
+                    <span class="eod-row-name">@if (row.hl) {{{ row.hl.name[0] }}@if (row.hl.name[1]) {<mark>{{ row.hl.name[1] }}</mark>}{{ row.hl.name[2] }}} @else {{{ row.name || '—' }}}</span>
+                    @if (row.sourceTag) {
+                      <span class="eod-tag">{{ row.sourceTag }}</span>
+                    }
+                    @if (row.journeyTag) {
+                      <span class="eod-tag eod-tag-journey">{{ row.journeyTag }}</span>
+                    }
+                  </span>
+                  <span class="eod-row-email">@if (row.hl) {{{ row.hl.email[0] }}@if (row.hl.email[1]) {<mark>{{ row.hl.email[1] }}</mark>}{{ row.hl.email[2] }}} @else {{{ row.email || '—' }}}</span>
+                </div>
+                <div class="eod-row-side">
+                  @if (row.hoursLabel) {
+                    <span class="eod-row-hours">{{ row.hoursLabel }}</span>
+                  }
+                  <span class="eod-row-phone">@if (row.hl) {{{ row.hl.phone[0] }}@if (row.hl.phone[1]) {<mark>{{ row.hl.phone[1] }}</mark>}{{ row.hl.phone[2] }}} @else {{{ row.phonenumber || '—' }}}</span>
+                  @if (row.lastSeenLabel) {
+                    <span class="eod-row-date">{{ row.lastSeenLabel }}</span>
+                  }
+                  @if (row.createdLabel) {
+                    <span class="eod-row-date">{{ row.createdLabel }}</span>
+                  }
+                </div>
+                @if (row.expandable) {
+                  <mat-icon class="eod-row-chevron" [class.eod-open]="row.expanded" aria-hidden="true">expand_more</mat-icon>
+                }
+              </div>
+              @if (row.expandable && row.expanded) {
+                <div class="eod-row-videos">
+                  @for (v of row.videos; track v.videoid) {
+                    <div class="eod-video-row">
+                      <mat-icon aria-hidden="true">play_circle</mat-icon>
+                      <span class="eod-video-title">{{ v.title }}</span>
+                      <span class="eod-video-hours">{{ v.hours | number: '1.0-1' }}h</span>
+                    </div>
+                  }
+                </div>
+              }
+            </article>
+          }
+        }
+      </div>
+    </aside>
+  }
+
+</div>
