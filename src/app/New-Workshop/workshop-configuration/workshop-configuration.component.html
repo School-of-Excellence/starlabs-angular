@@ -1124,6 +1124,16 @@
                     <div class="setting-row">
                       <div class="setting-row-main">
                         <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Active Web</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('webactive')?.value ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="webactive" (change)="onToggleChange('webactive', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
                           <h4 class="setting-row-title">Enable Home Screen Widget</h4>
                           <p class="setting-row-desc">{{ settingsForm.get('homescreenwidget')?.value ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</p>
                         </div>
