@@ -7,8 +7,11 @@ import {
   doc, setDoc, serverTimestamp
 } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { trigger, transition, style, animate } from '@angular/animations';
 import { Subject, takeUntil } from 'rxjs';
+import * as XLSX from 'xlsx';
 import { EodDialogService } from './eod-dialog/eod-dialog.service';
 
 type Accent = 'indigo' | 'emerald' | 'amber' | 'violet' | 'rose' | 'orange' | 'red';
@@ -56,6 +59,8 @@ interface PanelState {
   sortOptions: ('default' | 'name' | 'hours')[];
   sortOpen: boolean;
   showCohort: boolean;
+  journeyFilter: string;
+  journeyOptions: string[];
   viewRows: any[];
 }
 
@@ -72,7 +77,7 @@ interface ContentRow {
 @Component({
   selector: 'app-eiflixoperationsdashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, A11yModule],
+  imports: [CommonModule, FormsModule, MatIconModule, A11yModule, MatSelectModule, MatFormFieldModule],
   templateUrl: './eiflixoperationsdashboard.component.html',
   styleUrl: './eiflixoperationsdashboard.component.css',
   animations: [
@@ -353,6 +358,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           this.pmFailed = false;
           this.pmLoading = false;
           this.updateBigParticipantsCard();
+          this.rebuildPaidCard();
           if (!this.naLoading) this.computeNonActive();
           this.pmReadyResolve();
         },
@@ -394,21 +400,28 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** The three B!G journey docs -> their `journey` name field. */
+  /** Entire `journey` collection -> id to `journey` name — participant rows
+   *  in ANY panel can carry any activejourney, so all names are needed. */
   private async loadJourneyNames(): Promise<void> {
     try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'journey'),
-        where(documentId(), 'in', this.bigJourneyIdList)
-      ));
+      const snap = await getDocs(collection(this.firestore, 'journey'));
       snap.forEach(d => this.journeyNames.set(d.id, (d.data() as any).journey || ''));
     } catch (err) {
       console.error('eiflixoperationsdashboard: journey names load failed', err);
     }
-    // Names may land after the pm listener has already built the card —
-    // but never rebuild before the first pm emission (an open panel would
+    // Names may land after the listeners have already built cards — but
+    // never rebuild before the first pm emission (an open panel would
     // flash a false empty state off the still-empty pmMap).
-    if (!this.pmLoading) this.updateBigParticipantsCard();
+    if (!this.pmLoading) {
+      this.updateBigParticipantsCard();
+      this.rebuildPaidCard();
+    }
+  }
+
+  /** journeyTag for any participant doc, when its journey has a name. */
+  private journeyTagFor(pmDoc: any): string | undefined {
+    if (!pmDoc?.activejourney) return undefined;
+    return this.journeyNames.get(pmDoc.activejourney) || undefined;
   }
 
   private journeyName(id: string): string {
@@ -435,13 +448,12 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         sourceTag: 'New User'
       }))
       .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
-    for (const card of this.cards) {
-      if (card.key === 'big-participants') continue;
-      card.users = sorted.filter(u =>
-        card.key === 'new-users-to-paid' ? u.movedtoexist === true : u.movedtoexist !== true
-      );
-      this.animateCount(card, card.users.length);
+    const newCard = this.cards.find(c => c.key === 'total-new-users');
+    if (newCard) {
+      newCard.users = sorted.filter(u => u.movedtoexist !== true);
+      this.animateCount(newCard, newCard.users.length);
     }
+    this.rebuildPaidCard();
     // Keep an open users panel in sync with realtime updates.
     if (this.activePanel?.kind === 'users') {
       const card = this.cards.find(c => c.key === this.activePanel!.cardKey);
@@ -472,6 +484,37 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       card.rafId = t < 1 ? requestAnimationFrame(tick) : undefined;
     };
     card.rafId = requestAnimationFrame(tick);
+  }
+
+  /**
+   * New Users to Paid (operator): the ids still come from new_user_data
+   * (movedtoexist == true), but each row shows the PARTICIPANT METADATA
+   * profile (primary) with its journey — falling back to the nud doc only
+   * while pm hasn't loaded or the twin doc is missing.
+   */
+  private rebuildPaidCard(): void {
+    const card = this.cards.find(c => c.key === 'new-users-to-paid');
+    if (!card) return;
+    const rows: any[] = [];
+    this.nudMap.forEach((nud, id) => {
+      if (nud.movedtoexist !== true) return;
+      const pm = this.pmMap.get(id);
+      const src = pm || nud;
+      rows.push({
+        ...src, id,
+        created: src.created ?? nud.created,
+        createdLabel: this.formatCreated(src.created ?? nud.created),
+        initialsLabel: this.initials(src.name),
+        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' })
+      });
+    });
+    rows.sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
+    card.users = rows;
+    this.animateCount(card, rows.length);
+    if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
+      this.setPanelRows(this.activePanel, rows);
+      this.activePanel.loading = false;
+    }
   }
 
   /** The Users cards load from two different listeners. */
@@ -529,6 +572,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       sortOptions: ['default', 'name'],
       sortOpen: false,
       showCohort: false,
+      journeyFilter: 'all',
+      journeyOptions: [],
       viewRows: [],
       rows: []
     };
@@ -1004,6 +1049,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       sortOptions: ['default', 'name'],
       sortOpen: false,
       showCohort: false,
+      journeyFilter: 'all',
+      journeyOptions: [],
       viewRows: [],
       rows: []
     };
@@ -1041,6 +1088,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       sortOptions: ['default', 'name'],
       sortOpen: false,
       showCohort: false,
+      journeyFilter: 'all',
+      journeyOptions: [],
       viewRows: [],
       rows: []
     };
@@ -1079,7 +1128,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     return ids
       .map(id => {
         const pm = this.pmMap.get(id);
-        if (pm) return { ...pm, id, initialsLabel: this.initials(pm.name) };
+        if (pm) return { ...pm, id, initialsLabel: this.initials(pm.name), journeyTag: this.journeyTagFor(pm) };
         const nud = this.nudMap.get(id);
         if (nud) return { ...nud, id, initialsLabel: this.initials(nud.name), sourceTag: 'New User' };
         return { id, name: 'Unknown profile', email: id, phonenumber: '—', initialsLabel: '?', unknown: true };
@@ -1336,6 +1385,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       sortOptions: ['default', 'name'],
       sortOpen: false,
       showCohort: false,
+      journeyFilter: 'all',
+      journeyOptions: [],
       viewRows: [],
       rows: []
     };
@@ -1509,6 +1560,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       sortOptions: ['default', 'name'],
       sortOpen: false,
       showCohort: false,
+      journeyFilter: 'all',
+      journeyOptions: [],
       viewRows: [],
       rows: []
     };
@@ -1538,6 +1591,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     const hasNud = rows.some(r => !!r.sourceTag);
     const hasPm = rows.some(r => !r.sourceTag && !r.unknown);
     panel.showCohort = (hasNud && hasPm) || panel.cohort !== 'all';
+    panel.journeyOptions = [...new Set(rows.map(r => r.journeyTag).filter(Boolean))].sort() as string[];
+    if (panel.journeyFilter !== 'all' && !panel.journeyOptions.includes(panel.journeyFilter)) {
+      panel.journeyFilter = 'all';
+    }
     this.updatePanelView(panel);
   }
 
@@ -1547,6 +1604,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     let rows = panel.rows;
     if (panel.cohort === 'nud') rows = rows.filter(r => !!r.sourceTag);
     else if (panel.cohort === 'pm') rows = rows.filter(r => !r.sourceTag && !r.unknown);
+    if (panel.journeyFilter !== 'all') {
+      rows = rows.filter(r => r.journeyTag === panel.journeyFilter);
+    }
     if (q) {
       rows = rows.filter(r =>
         ((r.name || '') + ' ' + (r.email || '') + ' ' + (r.phonenumber || '')).toLowerCase().includes(q));
@@ -1577,6 +1637,57 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
   setPanelCohort(panel: PanelState, cohort: 'all' | 'nud' | 'pm'): void {
     panel.cohort = cohort;
+    this.updatePanelView(panel);
+  }
+
+  /**
+   * Export the panel's CURRENTLY SHOWN rows (search/cohort/journey/sort all
+   * applied) as an .xlsx — base columns always, extras only when that panel
+   * actually displays them.
+   */
+  exportPanel(panel: PanelState): void {
+    const rows = panel.viewRows;
+    if (!rows.length) return;
+    const hasHours = rows.some(r => r.hoursSeconds !== undefined || r.hoursLabel);
+    const hasLastSeen = rows.some(r => r.lastSeenLabel);
+    const hasCreated = rows.some(r => r.createdLabel);
+    const hasVideos = rows.some(r => Array.isArray(r.videos));
+    const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
+    if (hasHours) header.push('Watch Hours');
+    if (hasVideos) header.push('Videos Watched');
+    if (hasLastSeen) header.push('Last Seen');
+    if (hasCreated) header.push('Created');
+    const data = rows.map(r => {
+      const line: (string | number)[] = [
+        String(r.name ?? ''),
+        String(r.phonenumber ?? ''),
+        String(r.email ?? ''),
+        r.journeyTag || '',
+        r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
+      ];
+      if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
+      if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
+      if (hasLastSeen) line.push(r.lastSeenLabel || '');
+      if (hasCreated) line.push(r.createdLabel || '');
+      return line;
+    });
+    const worksheetData = [header, ...data];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    const maxWidths: number[] = [];
+    worksheetData.forEach(row => row.forEach((cell, i) => {
+      const len = cell ? String(cell).length : 10;
+      maxWidths[i] = Math.max(maxWidths[i] || 10, len);
+    }));
+    ws['!cols'] = maxWidths.map(w => ({ wch: Math.min(w + 2, 50) }));
+    const sheetName = panel.title.replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 31) || 'Export';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const slug = panel.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    XLSX.writeFile(wb, slug + '-' + this.todayStr + '.xlsx');
+  }
+
+  setPanelJourney(panel: PanelState, value: string): void {
+    panel.journeyFilter = value || 'all';
     this.updatePanelView(panel);
   }
 
@@ -1618,8 +1729,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.unlockScroll();
   }
 
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event: KeyboardEvent): void {
+    if (event.defaultPrevented) return; // e.g. MatSelect just closed its dropdown
     if (!this.activePanel) return;
     if (this.activePanel.sortOpen) {
       this.activePanel.sortOpen = false;
