@@ -120,6 +120,13 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="col-act"></th>
           <td mat-cell *matCellDef="let row" class="col-act">
+            <button class="a-btn a-down" [class.is-downloading]="downloadingIds.has(row.id)"
+              [disabled]="downloadingIds.has(row.id)" (click)="downloadAudio(row)" title="Download audio">
+              <span *ngIf="downloadingIds.has(row.id) && downloadProgress[row.id]; else dlIcon" class="dl-pct">{{ downloadProgress[row.id] }}%</span>
+              <ng-template #dlIcon>
+                <mat-icon>{{ downloadingIds.has(row.id) ? 'downloading' : 'download' }}</mat-icon>
+              </ng-template>
+            </button>
             <button class="a-btn a-edit" [disabled]="userRole == 'viewer'" (click)="onaudioedit(row.id,row.url,row.name,row.description,row.imageUrl,row.tags,row.hlsurl)">
               <mat-icon>edit</mat-icon>
             </button>
