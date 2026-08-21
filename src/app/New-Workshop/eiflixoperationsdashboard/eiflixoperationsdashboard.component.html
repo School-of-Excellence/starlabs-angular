@@ -528,7 +528,29 @@
               </div>
             }
           </div>
+          <button
+            type="button"
+            class="eod-psort-btn eod-pexport"
+            (click)="exportPanel(p)"
+            [disabled]="p.loading || p.error || !p.viewRows.length"
+            aria-label="Export the shown rows as Excel">
+            <mat-icon aria-hidden="true">download</mat-icon>Export
+          </button>
         </div>
+        @if (p.journeyOptions.length) {
+          <mat-form-field class="eod-pjourney" appearance="outline" subscriptSizing="dynamic">
+            <mat-select
+              [value]="p.journeyFilter"
+              (selectionChange)="setPanelJourney(p, $event.value)"
+              aria-label="Filter by journey"
+              panelClass="eod-pjourney-panel">
+              <mat-option value="all">All journeys</mat-option>
+              @for (j of p.journeyOptions; track j) {
+                <mat-option [value]="j">{{ j }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
         @if (!p.loading && !p.error) {
           <span class="eod-panel-meta">
             <strong>{{ p.viewRows.length | number }}</strong>&nbsp;of {{ p.rows.length | number }} shown

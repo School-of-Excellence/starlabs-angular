@@ -1021,6 +1021,9 @@ section.eod-section:focus { outline: none; }
 .eod-pseg { flex: 1; }
 .eod-pseg button { flex: 1; padding: 6px 4px; font-size: 11.5px; }
 .eod-psort { position: relative; margin-left: auto; }
+.eod-pexport { flex: none; }
+.eod-pexport:disabled { opacity: 0.45; cursor: default; }
+.eod-pexport:disabled:hover { background: #fff; color: var(--eod-ink-2, #5d6169); }
 .eod-psort-btn {
   display: inline-flex;
   align-items: center;
@@ -1068,6 +1071,25 @@ section.eod-section:focus { outline: none; }
   background: var(--eod-indigo-tint, rgba(71, 83, 230, 0.09));
   color: var(--eod-indigo, #4753e6);
 }
+.eod-pjourney { width: 100%; --mdc-outlined-text-field-container-shape: 12px; }
+.eod-pjourney ::ng-deep .mat-mdc-text-field-wrapper {
+  background: #fbfbf9;
+  border-radius: 12px;
+  height: 44px;
+}
+.eod-pjourney ::ng-deep .mat-mdc-form-field-infix {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  min-height: 0;
+  font-family: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13.5px;
+}
+.eod-pjourney ::ng-deep .mdc-notched-outline__leading,
+.eod-pjourney ::ng-deep .mdc-notched-outline__notch,
+.eod-pjourney ::ng-deep .mdc-notched-outline__trailing {
+  border-color: var(--eod-hairline, #e8e8e3) !important;
+}
+
 .eod-panel-meta {
   font-family: 'Geist Mono', monospace;
   font-size: 11px;
