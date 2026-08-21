@@ -165,17 +165,22 @@ export class CreateWatsonProfileComponent {
               const newUserDoc = newUserData.docs[0];
               const newUser = newUserDoc.data();
               const userDataRef = doc(this.firestore, "user_data", newUser['uid']);
+              const profileDataRef = doc(this.firestore, "profile_data", newUserDoc.id);
+              const rolesRef = doc(collection(this.firestore, "users_roles"));
               const profileData = { ...newUser };
               profileData['countrycode'] = newUser['countryCode'];
               profileData['number'] = newUser['phonenumber'];
               profileData['user_ref'] = userDataRef;
+              profileData['role_ref'] = rolesRef;
               delete profileData['countryCode'];
               delete profileData['phonenumber'];
-              await setDoc(doc(this.firestore, "profile_data", newUserDoc.id), profileData);
+              await setDoc(profileDataRef, profileData);
               this.selectedProfile = newUser;
               this.selectedProfileEmail = newUser['email'];
               this.selectedProfileID = newUser['profileid'];
               console.log("new to profile_data", newUserDoc.id);
+              await updateDoc(newUserDoc.ref, { movedtoexist: true });
+              console.log("new_user_data marked movedtoexist", newUserDoc.id);
               const userDataSnap = await getDoc(userDataRef);
               if (!userDataSnap.exists()) {
                 await setDoc(userDataRef, {
@@ -185,6 +190,13 @@ export class CreateWatsonProfileComponent {
                   number: newUser['phonenumber'],
                 });
                 console.log("new to user_data", newUser['uid']);
+                await setDoc(rolesRef, {
+                  name: newUser['name'],
+                  participant: true,
+                  profile_ref: profileDataRef,
+                  id: rolesRef.id,
+                });
+                console.log("new to users_roles", rolesRef.id);
               } else {
                 console.log("user_data already exists", newUser['uid']);
               }

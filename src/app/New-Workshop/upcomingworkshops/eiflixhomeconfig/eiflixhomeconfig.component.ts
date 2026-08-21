@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray } from '@angular/forms';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -39,6 +40,7 @@ interface ConfigOption {
     MatSelectModule,
     MatButtonModule,
     MatIconModule,
+    MatSlideToggleModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     DragDropModule
@@ -138,18 +140,40 @@ export class EiflixHomeConfigComponent implements OnInit {
       }
 
       keys.push(key);
-      this.items.push(this.makeItem(key, entry?.title, entry?.subtitle, entry?.showto));
+      this.items.push(this.makeItem(key, entry?.title, entry?.subtitle, entry?.showto, entry?.enabletag, entry?.tags));
     });
     this.selectedControl?.setValue(keys, { emitEvent: false });
   }
 
-  private makeItem(key: string, title = '', subtitle = '', showto = 'both'): FormGroup {
+  private makeItem(
+    key: string, title = '', subtitle = '', showto = 'both',
+    enabletag = false, tags: any = []
+  ): FormGroup {
+    // tags is an array of strings, max 3 (index 0..2). Home Series items only.
+    const tagList = (Array.isArray(tags) ? tags : []).slice(0, 3).map((t: any) => (t ?? '').toString());
     return this.fb.group({
       key: [key],
       title: [title || ''],
       subtitle: [subtitle || ''],
-      showto: [showto || 'both']
+      showto: [showto || 'both'],
+      enabletag: [!!enabletag],
+      tags: this.fb.array(tagList.map(t => this.fb.control(t)))
     });
+  }
+
+  // Home Series per-item tag helpers (max 3 tags).
+  itemTags(index: number): FormArray {
+    return this.items.at(index)?.get('tags') as FormArray;
+  }
+
+  addTag(index: number): void {
+    const arr = this.itemTags(index);
+    if (arr && arr.length < 3) arr.push(this.fb.control(''));
+  }
+
+  removeTag(index: number, tagIndex: number): void {
+    const arr = this.itemTags(index);
+    if (arr && tagIndex >= 0 && tagIndex < arr.length) arr.removeAt(tagIndex);
   }
 
   optionLabel(key: string): string {
@@ -224,6 +248,12 @@ export class EiflixHomeConfigComponent implements OnInit {
       if (opt?.type === 'homeseries' && opt.id) {
         base.value = opt.id;
         base.seriesref = doc(this.firestore, 'eiflixhomeseries', opt.id);
+        base.enabletag = !!v.enabletag;
+        // Array of strings, max 3.
+        base.tags = (Array.isArray(v.tags) ? v.tags : [])
+          .map((t: any) => (t ?? '').toString().trim())
+          .filter(Boolean)
+          .slice(0, 3);
       } else {
         base.value = opt?.type || v.key;
       }

@@ -1,0 +1,59 @@
+<!-- Full overlay handled by this component -->
+<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div class="overlay-panel" (click)="$event.stopPropagation()">
+    <div class="overlay-header">
+      <h2>{{ overlayTitle }}</h2>
+      <div class="overlay-header-actions">
+        <button mat-icon-button (click)="closeOverlay()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="overlay-content">
+      <div *ngIf="overlayLoading" class="loading-spinner">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <ng-container *ngIf="!overlayLoading && overlayMode === 'individual' && overlayFormData">
+        <div class="form-view">
+          <div class="form-banner"></div>
+          <div class="form-participant">{{ overlayFormData.participantName }}</div>
+          <div class="form-title">{{ overlayFormData.formTitle }}</div>
+          <div class="form-description" *ngIf="overlayFormData.formDescription">{{ overlayFormData.formDescription }}</div>
+          <div class="form-meta">
+            Queue: {{ overlayFormData.queue }} | Workshop: {{ overlayFormData.workshop }} | Submitted: {{ overlayFormData.date }}
+          </div>
+          <hr class="form-divider">
+          <div *ngFor="let field of overlayFormData.fields" class="form-field-item">
+            <div *ngIf="field.type === 'label'" class="form-section-label">
+              <div class="section-title">{{ field.fieldname }}</div>
+              <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+            </div>
+            <div *ngIf="field.type === 'field'" class="form-question">
+              <div class="question-title">
+                {{ field.number }}. {{ field.fieldname }}
+                <span class="required-star" *ngIf="field.required">*</span>
+              </div>
+              <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
+              <div class="question-value" [class.empty-value]="field.isEmpty">
+                <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
+                  <div *ngFor="let line of field.value.split('\n')" class="array-sub-item">
+                    <ng-container *ngIf="line.includes(':'); else noColon">
+                      <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
+                      <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
+                    </ng-container>
+                    <ng-template #noColon>{{ line }}</ng-template>
+                  </div>
+                </ng-container>
+                <ng-template #plainValue>{{ field.value }}</ng-template>
+              </div>
+              <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+    </div>
+  </div>
+</div>

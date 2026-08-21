@@ -36,12 +36,24 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   // WATCH: if two concurrent Arena boards blank out on the production network,
   // WebChannel is stalling again — restore `{ experimentalForceLongPolling: true }`.
   initializeFirestore(app, {});
-  // Named DB `firestore-atc`: force long-polling here — this is the canonical,
-  // earliest initializer, so every consumer (getFirestore('firestore-atc') and
-  // AtcFirebaseService) reuses this one instance with a consistent transport.
-  // The network blocks Firestore WebChannel streaming, so long-polling avoids
-  // the "RPC 'Listen' stream transport errored" first-load stall for all ATC screens.
-  initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-atc');
+  // Named DB `firestore-atc`: AUTO-DETECT long-polling (canonical, earliest
+  // initializer — every consumer reuses this instance with this transport).
+  // CHANGED 2026-08-01 (live-event-dashboard perf, measured): the previous
+  // experimentalForceLongPolling made every ATC backfill crawl on EVERY network
+  // (~29 sequential polls, single polls 14-30s, ~50s for ~600 docs — the bulk
+  // of the dashboard's 40-60s load). Auto-detect streams on healthy networks
+  // and still falls back to long-polling BY ITSELF on networks that block
+  // WebChannel streaming (the original "RPC 'Listen' stream transport errored"
+  // venue incident), at the cost of a short first-load detection delay there.
+  // REVERT to { experimentalForceLongPolling: true } if ATC screens blank out
+  // at a venue again.
+  initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, 'firestore-atc');
+  // Named DB `firestore-forms`: same long-polling transport, same reason (blocked
+  // WebChannel streaming). The ATC ops screens read participant form submissions
+  // (formsByClient) to tell whether a config-stage own source exists. Initialized
+  // here, at the earliest point, so getFirestore('firestore-forms') consumers reuse
+  // this instance with a consistent transport.
+  initializeFirestore(app, { experimentalForceLongPolling: true }, 'firestore-forms');
 }
 
 (window as any).process = {

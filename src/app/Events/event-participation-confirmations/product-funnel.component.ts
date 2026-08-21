@@ -121,7 +121,7 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
-    { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
+    { key: 'attended', label: 'Attended', cls: 'att', desc: 'marked attended', tip: 'Of the approved, how many have request status “attended”' },
     { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event. Product is kept.' },
     { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' },
     { key: 'revoked', label: 'Revoked', cls: 'rv', desc: 'cancelled — product pulled', tip: 'Manually revoked — the product is cancelled and the event profile removed (status “revoked”).' }
@@ -521,9 +521,9 @@ export class ProductFunnelComponent implements OnInit {
         }
         else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
-      // Unattended and revoked participants are terminal (product cancelled) — they never belong to any live bucket.
-      unattendedIds.forEach(p => requestedData.delete(p));
-      revokedIds.forEach(p => requestedData.delete(p));
+      // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
+      // live bucket they still qualify for (owner / requested), in ADDITION to their own
+      // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
 
       // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
       // When every requested participant carries one, use them and SKIP the queue_token scan;
@@ -542,16 +542,19 @@ export class ProductFunnelComponent implements OnInit {
       const scanned = new Set<string>();
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
 
-      // Approved cohort = EPR approved/attended OR physically scanned (a scan means they were ticketed).
-      // Cohort members are not "requested", so attended is always a subset of approved.
-      const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
+      // Approved cohort = `event participation request` with status 'approved' or 'attended', ONLY.
+      // (operator directive) A physical e-ticket scan no longer confers membership of any bucket — it is
+      // kept solely as the `· scanned` badge on the row. Every 'attended' EPR doc also lands in
+      // approvedReq, so attended stays a subset of approved.
+      // Cohort members are not "requested" — they are removed from requestedData below.
+      const cohort = new Set<string>([...approvedReq.keys()]);
       cohort.forEach(p => requestedData.delete(p));
 
-      // Unattended/revoked are terminal — drop them from the live cohort/owner sets so they only show in their terminal segment.
-      // `cohort` must lose them too: someone scanned at the event and revoked afterwards would otherwise be counted
-      // in BOTH `approved` (cohort.size) and `revoked`, double-counting them in `overallRequested`.
-      unattendedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); cohort.delete(p); });
-      revokedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); cohort.delete(p); });
+      // (removed) previously unattended/revoked were dropped from cohort/owner sets so they only showed in
+      // their terminal segment. Per operator directive they now stay in every live bucket they qualify for.
+      // Consequence: a revoked person who still owns the product is in BOTH `potential` and `revoked`; the
+      // counts and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid
+      // inflation.
 
       const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
       const rows: PRow[] = [];
@@ -559,18 +562,23 @@ export class ProductFunnelComponent implements OnInit {
         const prof = this.mapProfile[pid] ?? {};
         const isUnattended = unattendedIds.has(pid);
         const isRevoked = revokedIds.has(pid);
-        const isTerminal = isUnattended || isRevoked;
-        const isOwner = !isTerminal && owners.has(pid);
-        const isScanned = !isTerminal && scanned.has(pid);
-        const isAttended = !isTerminal && (attendedIds.has(pid) || isScanned);
-        const inCohort = !isTerminal && (approvedReq.has(pid) || isScanned);
-        const isRequested = !isTerminal && requestedData.has(pid);
+        // Terminal states (unattended/revoked) are no longer gated out of the live buckets: a person keeps
+        // whatever live membership their source data still gives them AND retains their terminal flag.
+        const isOwner = owners.has(pid);
+        const isScanned = scanned.has(pid);
+        // Approval and attendance are both EPR-only (operator directive): a row is approved when its
+        // `event participation request` doc has status 'approved' or 'attended', and attended only when
+        // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
+        // `· scanned` badge and nothing else.
+        const isAttended = attendedIds.has(pid);
+        const inCohort = approvedReq.has(pid);
+        const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
-        const isEligible = isTerminal ? false : (bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue));
-        const isNoProduct = isTerminal ? false : (bucket ? (bucket === 'noProduct') : (isRequested && !isOwner));
-        const isInQueueReq = isTerminal ? false : (bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue));
-        const isNotRequested = !isTerminal && isOwner && !isRequested && !inCohort;
+        const isEligible = bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue);
+        const isNoProduct = bucket ? (bucket === 'noProduct') : (isRequested && !isOwner);
+        const isInQueueReq = bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue);
+        const isNotRequested = isOwner && !isRequested && !inCohort;
         const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : (isUnattended ? 'Product cancelled' : (isRevoked ? 'Revoked — product cancelled' : '')));
         rows.push({
           profileid: pid,
@@ -606,8 +614,9 @@ export class ProductFunnelComponent implements OnInit {
       this.counts = {
         potential: owners.size,
         requested: requestedData.size,
-        notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)
-          && !unattendedIds.has(o) && !revokedIds.has(o)).length,
+        // Row-derived (de-duplicated): a terminal person can now also be an owner, so counting owner keys
+        // directly would mis-classify them. `isNotRequested` already excludes requested/cohort membership.
+        notRequested: rows.filter(r => r.isNotRequested).length,
         eligible: rows.filter(r => r.isEligible).length,
         noProduct: rows.filter(r => r.isNoProduct).length,
         inQueue: rows.filter(r => r.isInQueueReq).length,
@@ -616,7 +625,10 @@ export class ProductFunnelComponent implements OnInit {
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
         unattended: rows.filter(r => r.isUnattended).length,
         revoked: rows.filter(r => r.isRevoked).length,
-        overallRequested: requestedData.size + cohort.size + unattendedIds.size + revokedIds.size
+        // De-duplicated union — a revoked person who still owns the product / has a live request sits in
+        // more than one source set, so a raw sum would double-count. Count unique rows matching the same
+        // predicate as the segment filter.
+        overallRequested: rows.filter(r => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked).length
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -861,6 +873,8 @@ export class ProductFunnelComponent implements OnInit {
   get readyCount() { return this.selection.selected.filter(r => this.isApprovable(r)).length; }
   get selectedToMark() { return this.selection.selected.filter(r => r.isApproved && !r.attended); }
   get selectedToUnattend() { return this.selection.selected.filter(r => r.isApproved); }
+  // Requested (not yet approved) rows that have an actual request doc to revoke.
+  get selectedToRevokeRequested() { return this.selection.selected.filter(r => !!r.requestData?.['docid'] && !r.isApproved); }
 
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
@@ -1179,6 +1193,52 @@ export class ProductFunnelComponent implements OnInit {
       this.selectedDeliverySet = seq;
       this.selectedQueueVariation = variation;
     });
+  }
+
+  // Single per-row entry point: approved rows take the heavy path (cancel product etc.),
+  // requested rows take the lightweight status-only path.
+  revoke(row: PRow) {
+    if (row.isApproved) this.markRevoked([row]);
+    else this.markRevokedRequested([row]);
+  }
+
+  // ---- Revoke a still-REQUESTED participant (lightweight): status -> 'revoked' only. ----
+  // Requested people have no initiated product / event profile / deliverables yet, so unlike
+  // markRevoked() this ONLY flips the request status and records who/when — nothing else is touched.
+  async markRevokedRequested(rows: PRow[]) {
+    const targets = rows.filter(r => r.requestData?.['docid'] && !r.isApproved);
+    if (!targets.length) return;
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '440px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Revoke requested participation',
+        body: `Revoke ${targets.length} requested participant(s). Their request will be cancelled.`,
+        warn: 'This cancels the participation request. It cannot be undone.',
+        confirm: `Revoke ${targets.length}`
+      }
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Revoking…', value: 0, total: targets.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      const batch = writeBatch(this.firestore);
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      for (const r of targets) {
+        batch.update(doc(this.firestore, 'event participation request', r.requestData['docid']),
+          { status: 'revoked', revoked_by: revokedBy, revoked_date: serverTimestamp() });
+      }
+      await batch.commit();
+      this.snackbar.open(`Revoked ${targets.length}`, 'OK', { duration: 4000 });
+      this.selection.clear();
+      await this.loadData();
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not revoke', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
   }
 
   // ---- Finalize attendance (after the event): mark no-show + lock the frozen snapshot ----

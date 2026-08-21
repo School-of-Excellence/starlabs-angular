@@ -25,7 +25,7 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
- 
+
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Participant</mat-label>
         <mat-select [(ngModel)]="selectedParticipants" (selectionChange)="onParticipantSelect()" multiple>
@@ -58,13 +58,13 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Prescribed Date</mat-label>
-      
+
         <mat-date-range-input [rangePicker]="picker">
           <input matStartDate placeholder="Start date" [(ngModel)]="startDate">
-      
+
           <input matEndDate placeholder="End date" [(ngModel)]="endDate" (ngModelChange)="onDateRangeChange()">
         </mat-date-range-input>
-      
+
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
       </mat-form-field>
@@ -116,9 +116,9 @@
         <span class="summary-label">Unvalidated</span>
       </div>
     </div>
-  
+
     <div class="group-divider"></div>
-  
+
     <div class="summary-group">
       <div class="summary-item">
         <span class="summary-value blue">{{ reportSummary.totalAdjustment }}</span>
@@ -133,9 +133,9 @@
         <span class="summary-label">Adj. Completed</span>
       </div>
     </div>
-  
+
     <div class="group-divider"></div>
-  
+
     <div class="summary-group">
       <div class="summary-item">
         <span class="summary-value purple">{{ reportSummary.totalProcedure }}</span>
@@ -160,7 +160,7 @@
             <!-- ATC Meta Data -->
             <div class="atc-meta">
               <div class="atcdate">
-                <span class="nonprintable" (click)="onPrint(atc, printSection, $event)">{{(i + 1) + (pageIndex * pageSize)}}. </span> 
+                <span class="nonprintable" (click)="onPrint(atc, printSection, $event)">{{(i + 1) + (pageIndex * pageSize)}}. </span>
                 <u>{{atcData['prescription_date']?.toDate() | date:'medium'}}</u>
               </div>
               <label *ngIf="atcData['lasteditedon']" class="lastedittext nonprintable">
@@ -185,7 +185,7 @@
                     <mat-icon class="view-icon" (click)="openParticipantView(atcData['profileid'], $event)">open_in_new</mat-icon>
                   </label>
                 </div>
-                
+
                 <!-- Author, Observer Name -->
                 <div *ngIf="atcData['bigactivity'] == null">
                   <div *ngIf="(atcData['author'] || []).length != 0">
@@ -205,25 +205,45 @@
                     </label>
                   </div>
                 </div>
-                
+
                 <!-- Big Activity Name - OPTIMIZED VERSION -->
                 <div *ngIf="atcData['bigactivity'] != null && getBigActivityEntries(atcData['bigactivity']) as bigActivityEntries">
                   <div *ngFor="let activity of bigActivityEntries; trackBy: trackByActivityKey">
                     <label class="info-label">{{mapBigActivity[activity.key]}}:</label>
                     <label class="info-value">
-                      <span [ngClass]="{'hoverprofile': superRoles}" 
-                            *ngFor="let author of activity.value; let isLast = last; trackBy: trackByAuthorId" 
+                      <span [ngClass]="{'hoverprofile': superRoles}"
+                            *ngFor="let author of activity.value; let isLast = last; trackBy: trackByAuthorId"
                             (click)="selectAuthorName('profile_data/'+author)">
                         {{(profileMap[author] || {})['name']}}<span *ngIf="!isLast">, </span>
                       </span>
                     </label>
                   </div>
                 </div>
-                
+
                 <!-- Product -->
                 <div>
                   <label class="info-label">Product:</label>
-                  <label class="info-value">{{atcData['product'] ? atcData['product'] : 'No Product Mentioned'}}</label>
+
+                  <!-- View Mode -->
+                  <label *ngIf="updateProductPath != atc.ref.path" class="info-value">
+                    {{atcData['product'] ? atcData['product'] : 'No Product Mentioned'}}
+                    <button mat-icon-button>
+                      <mat-icon *ngIf="profileRoles['developer'] || profileRoles['tester']" (click)="onSelectProductEdit(atc)">edit</mat-icon>
+                    </button>
+                  </label>
+
+                  <!-- Edit Mode -->
+                  <span *ngIf="updateProductPath == atc.ref.path" class="nonprintable product-edit-inline">
+                    <mat-form-field class="product-select" appearance="outline">
+                      <mat-select [(ngModel)]="newProductValue">
+                        <mat-option *ngFor="let atcmodel of atcModelList" [value]="atcmodel.atcmodel">
+                          {{atcmodel.atcmodel}}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button class="cancelbtn-sm" mat-stroked-button (click)="updateProductPath = null; clearUpdateEdit()">Cancel</button>
+                    <button class="submitbtn-sm" mat-flat-button color="primary" (click)="updateProductValue(atc)">Update</button>
+                  </span>
                 </div>
 
                 <!-- ATC Directive -->
@@ -243,7 +263,7 @@
           <!-- ATC Status -->
           <div class="atc-status nonprintable">
             <label *ngIf="atcData['status'] == 'atc given'">This ATC is yet to validate.</label>
-            <label *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor. 
+            <label *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor.
               <span *ngIf="(atcData['validator'] || []).length != 0">
                 <!-- OPTIMIZED: Show names in a more efficient way -->
                 <span class="validator-names">
@@ -283,12 +303,12 @@
                       <b>{{j+1}}. Adjustment</b><label *ngIf="adjustmentData['newlyadded']" class="addednew nonprintable">&nbsp;(New)</label>:&nbsp;
                       {{adjustmentData["name"]}}
                     </label>
-  
+
                     <!-- Subtext -->
                     <div class="text-secondary font-italic mb-2 nonprintable" *ngIf="adjustmentData['editedby']">
                       * This adjustment has been {{mentorProfileid.includes(adjustmentData['editedby']?.id) ? 'enhanced' : ' last edited'}} by {{(profileMap[adjustmentData['editedby']?.id] ||{})['name']}}
                     </div>
-  
+
                     <!-- Comment -->
                     <div class="font-italic nonprintable" *ngIf="adjustmentData['comment'] != null && adjustmentData['comment']?.trim().length != 0">
                       <u>Comment:&nbsp;</u> <label>{{adjustmentData['comment']}}</label>
@@ -327,7 +347,7 @@
                         <mat-form-field class="filteritem" appearance="outline">
                           <input type="number" matInput [(ngModel)]="newAwarenessValue['potentialyears']">
                         </mat-form-field>
-                      </div>                      
+                      </div>
                       <button class="cancelbtn" mat-stroked-button (click)="updateAdjustmentPath = null; clearUpdateEdit()">Cancel</button>
                       <button class="submitbtn" mat-stroked-button (click)="updateAwarenessValue(transcription.adjustment)">Update</button>
                     </div>

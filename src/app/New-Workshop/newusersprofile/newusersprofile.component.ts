@@ -21,10 +21,21 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
-import { Firestore, collection, collectionData, doc, setDoc, writeBatch } from '@angular/fire/firestore';
+import {
+  Firestore,
+  collection,
+  collectionData,
+  doc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+  writeBatch
+} from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { AssignTagsDialogComponent } from './assign-tags-dialog/assign-tags-dialog.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
@@ -47,7 +58,8 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
     MatChipsModule,
     MatMenuModule,
     MatDatepickerModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatSlideToggleModule
   ],
   templateUrl: './newusersprofile.component.html',
   styleUrl: './newusersprofile.component.css'
@@ -55,7 +67,10 @@ import { EmailInputComponent } from '../../Participants Profile Management/parti
 export class NewusersprofileComponent implements OnInit, OnDestroy {
   dataSource = new MatTableDataSource<any>([]);
   loading = true;
-  displayedColumns = ['select', 'name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags'];
+  private readonly baseColumns =
+    ['select', 'name', 'phonenumber', 'email', 'created', 'enable', 'referredby', 'tags'];
+  // The `workshop` column appears only while the workshop filter is active.
+  displayedColumns = [...this.baseColumns];
   // Keyed by user id so selection survives live data refreshes.
   selection = new SelectionModel<string>(true, []);
   applyingBulk = false;
@@ -75,6 +90,15 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   ];
   // Default: all columns selected.
   selectedExportKeys: string[] = this.exportColumns.map(c => c.key);
+  // Workshop titles export column — offered only while the workshop filter is
+  // active; titles come from the cached enrolled reads, same as the table column.
+  private readonly workshopExportColumn = {
+    key: 'workshop',
+    label: 'Workshop',
+    value: (u: any) => this.workshopNames(u).join(', ')
+  };
+  // What the export panel offers right now (base + Workshop when filtering).
+  exportColumnsView = this.exportColumns;
 
   // tag id -> name, from the newusertags collection (live).
   tagMap: Record<string, string> = {};
@@ -94,10 +118,36 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   showComm = false;
   allTags: { id: string; name: string }[] = [];
   selectByTagMode: 'all' | 'any' = 'all';
+  // include = show profiles matching the tag condition; exclude = show the rest.
+  selectByTagPolarity: 'include' | 'exclude' = 'include';
   selectByTagIds = new Set<string>();
   // Date range filter on the `created` column.
   startDate: Date | null = null;
   endDate: Date | null = null;
+  // Workshop filter: options from workshopconfiguration (label detailpage.title),
+  // matching rows via `workshop participant enrolled` (workshopref -> profileid).
+  workshopOptions: { id: string; title: string; evergreen: boolean }[] = [];
+  selectedWorkshopIds = new Set<string>();
+  workshopFilterLoading = false;
+  // Funnel only (default ON): offer only evergreenWorkshop == true configs.
+  funnelOnly = true;
+  // include = show enrolled profiles; exclude = show profiles NOT enrolled in
+  // any selected workshop.
+  workshopFilterMode: 'include' | 'exclude' = 'include';
+  // profileids enrolled in any selected workshop; null while inactive/loading.
+  private workshopProfileIds: Set<string> | null = null;
+  // workshop id -> enrolled profileids, so re-selections don't refetch.
+  private enrolledCache = new Map<string, string[]>();
+  // profileid -> selected workshop ids (drives the `workshop` column) — built
+  // from the per-workshop cache only, never a collection-wide read.
+  private workshopsByProfile = new Map<string, string[]>();
+  private workshopTitleById: Record<string, string> = {};
+  // Tracks selection-active transitions for the export-chip sync.
+  private lastWorkshopFilterActive = false;
+  // Guards against out-of-order async results; bumped to invalidate in-flight loads.
+  private workshopFilterToken = 0;
+  // Bumped when the async load lands so the filter string changes and re-runs.
+  private workshopFilterVersion = 0;
   private destroy$ = new Subject<void>();
 
   constructor(
@@ -115,12 +165,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Resolve refferedprofile ids to names (read-only use of the shared map).
     this.authguard.getParticipantMetaMap()
       .then(res => (this.metaMap = res?.map || {}))
       .catch(err => console.error('Error loading participant meta map:', err));
-
-    // Live tag id -> name map for rendering the Tags column.
     collectionData(collection(this.firestore, 'newusertags'), { idField: 'id' }).subscribe({
       next: (rows: any[]) => {
         const map: Record<string, string> = {};
@@ -134,12 +181,30 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       error: (err) => console.error('Error loading tags:', err)
     });
 
+    // Workshop filter options: every workshopconfiguration doc, titled by
+    // detailpage.title.
+    getDocs(collection(this.firestore, 'workshopconfiguration'))
+      .then(snap => {
+        this.workshopOptions = snap.docs
+          .map(d => ({
+            id: d.id,
+            title: (d.data()?.['detailpage']?.['title'] || 'Untitled workshop').toString(),
+            evergreen: d.data()?.['evergreenWorkshop'] === true
+          }))
+          .sort((a, b) => a.title.localeCompare(b.title));
+        const titles: Record<string, string> = {};
+        this.workshopOptions.forEach(w => (titles[w.id] = w.title));
+        this.workshopTitleById = titles;
+      })
+      .catch(err => console.error('Error loading workshops:', err));
+
     // Combined filter: free-text search (all columns) AND tag filter.
     // The filter string encodes both so both apply together.
     this.dataSource.filterPredicate = (u: any, filter: string) => {
       let q = '';
       let tags: string[] = [];
       let mode: 'all' | 'any' = 'all';
+      let tpol: 'include' | 'exclude' = 'include';
       let start: number | null = null;
       let end: number | null = null;
       try {
@@ -147,6 +212,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         q = f.q || '';
         tags = f.tags || [];
         mode = f.mode || 'all';
+        tpol = f.tpol === 'exclude' ? 'exclude' : 'include';
         start = f.start ?? null;
         end = f.end ?? null;
       } catch {
@@ -171,13 +237,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (!haystack.includes(q)) return false;
       }
 
-      // Tag filter — show only profiles matching the chosen tags.
+      // Tag filter — include keeps profiles matching the chosen tags
+      // (per the all/any mode); exclude keeps the complement.
       if (tags.length) {
         const userTags: string[] = Array.isArray(u.tags) ? u.tags : [];
         const tagMatch = mode === 'all'
           ? tags.every(t => userTags.includes(t))
           : tags.some(t => userTags.includes(t));
-        if (!tagMatch) return false;
+        if (tpol === 'include' ? !tagMatch : tagMatch) return false;
       }
 
       // Date range filter on the `created` column.
@@ -186,6 +253,17 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (created == null) return false;
         if (start != null && created < start) return false;
         if (end != null && created > end) return false;
+      }
+
+      // Workshop filter — only profiles enrolled in a selected workshop.
+      // The enrolled set lives on `this` (not the filter string); while it is
+      // still loading, show nothing rather than a flash of unfiltered rows.
+      if (this.selectedWorkshopIds.size) {
+        if (!this.workshopProfileIds) return false;
+        const pid = (u.profileid || this.rowId(u) || '').toString();
+        const enrolled = this.workshopProfileIds.has(pid);
+        // include -> keep enrolled profiles; exclude -> keep the rest.
+        if (this.workshopFilterMode === 'include' ? !enrolled : enrolled) return false;
       }
 
       return true;
@@ -226,14 +304,17 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   get hasAnyFilter(): boolean {
-    return !!(this.searchText || this.selectByTagIds.size > 0 || this.hasDateFilter);
+    return !!(this.searchText || this.selectByTagIds.size > 0 || this.hasDateFilter
+      || this.selectedWorkshopIds.size > 0);
   }
 
   clearAllFilters(): void {
     this.searchText = '';
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
+    this.resetWorkshopFilter();
     this.refreshFilter();
   }
 
@@ -251,8 +332,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       q: this.searchText.trim().toLowerCase(),
       tags: [...this.selectByTagIds],
       mode: this.selectByTagMode,
+      tpol: this.selectByTagPolarity,
       start,
-      end
+      end,
+      // The predicate reads the workshop state off `this`; these only make the
+      // filter string change so the table re-filters.
+      workshops: [...this.selectedWorkshopIds],
+      wmode: this.workshopFilterMode,
+      wv: this.workshopFilterVersion
     });
     this.dataSource.paginator?.firstPage();
   }
@@ -301,10 +388,23 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   openTags(user: any): void {
     this.dialog.open(AssignTagsDialogComponent, {
-      width: '480px',
-      maxWidth: '92vw',
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
       autoFocus: false,
       data: { user }
+    });
+  }
+
+  // Toolbar "Tags" button: opens the same dialog in manage mode (create tags +
+  // All Tags / copy segment), not tied to a specific user.
+  openTagsManager(): void {
+    this.dialog.open(AssignTagsDialogComponent, {
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: { mode: 'manage' }
     });
   }
 
@@ -341,11 +441,15 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   selectAllExportColumns(): void {
-    this.selectedExportKeys = this.exportColumns.map(c => c.key);
+    this.selectedExportKeys = this.exportColumnsView.map(c => c.key);
   }
 
   exportExcel(): void {
-    const cols = this.exportColumns.filter(c => this.selectedExportKeys.includes(c.key));
+    if (this.workshopFilterLoading) {
+      this.snackBar.open('Workshop filter is still loading. Please wait.', 'Close', { duration: 3000 });
+      return;
+    }
+    const cols = this.exportColumnsView.filter(c => this.selectedExportKeys.includes(c.key));
     if (cols.length === 0) {
       this.snackBar.open('Select at least one column to export.', 'Close', { duration: 3000 });
       return;
@@ -372,6 +476,111 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.snackBar.open(`Exported ${users.length} profile${users.length === 1 ? '' : 's'}.`, 'Close', { duration: 2500 });
   }
 
+  // ---- import (Excel -> select matching profiles) ----
+  // Expected sheet: A1 header "email", emails from row 2 down. Importing
+  // replaces the current selection with the profiles matching those emails.
+  importing = false;
+  // Kept on the component so the detached input can't be GC'd while the
+  // native file picker is open.
+  private importFileInput: HTMLInputElement | null = null;
+
+  importFromExcel(): void {
+    const input = document.createElement('input');
+    this.importFileInput = input;
+    input.type = 'file';
+    input.accept = '.xlsx,.xls';
+    input.onchange = async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const name = (file.name || '').toLowerCase();
+      if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+        this.snackBar.open('Please select an Excel file (.xlsx or .xls).', 'Close', { duration: 3000 });
+        return;
+      }
+
+      this.importing = true;
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) {
+          this.snackBar.open('The Excel file has no sheets.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+        const head = (rows[0]?.[0] ?? '').toString().trim().toLowerCase();
+        if (head !== 'email') {
+          this.snackBar.open('The first column\'s header must be "email".', 'Close', { duration: 3500 });
+          return;
+        }
+
+        const values = rows.slice(1)
+          .map(r => (r?.[0] ?? '').toString().trim().toLowerCase())
+          .filter(Boolean);
+        // Stray notes/numbers in column A would inflate the counts — keep
+        // email-shaped values only and report the rest.
+        const emailList = values.filter(v => v.includes('@'));
+        const invalidCount = values.length - emailList.length;
+        const emails = new Set(emailList);
+        if (emails.size === 0) {
+          this.snackBar.open('No email ids found in the file.', 'Close', { duration: 3000 });
+          return;
+        }
+
+        // Work out the matches BEFORE touching the selection — a zero-match
+        // import must not destroy the user's existing selection.
+        const matchedRowIds: string[] = [];
+        const matched = new Set<string>();
+        this.dataSource.data.forEach(u => {
+          const mail = (u.email || '').toString().trim().toLowerCase();
+          if (mail && emails.has(mail)) {
+            const id = this.rowId(u);
+            if (id) {
+              matchedRowIds.push(id);
+              matched.add(mail);
+            }
+          }
+        });
+
+        if (matchedRowIds.length === 0) {
+          this.snackBar.open(
+            'None of the imported emails matched a profile. Selection unchanged.'
+            + (invalidCount > 0 ? ` ${invalidCount} non-email value(s) ignored.` : ''),
+            'Close',
+            { duration: 5000 }
+          );
+          return;
+        }
+
+        // Select exactly the imported emails (matched case-insensitively).
+        const replaced = this.selection.selected.length > 0;
+        this.selection.clear();
+        matchedRowIds.forEach(id => this.selection.select(id));
+
+        // Selection spans ALL profiles; active filters may hide some of them.
+        const visible = new Set(this.dataSource.filteredData.map(u => this.rowId(u)));
+        const hidden = matchedRowIds.filter(id => !visible.has(id)).length;
+        const missing = emails.size - matched.size;
+
+        const parts = [
+          `Selected ${matchedRowIds.length} profile(s) for ${matched.size} of ${emails.size} imported email(s)`
+        ];
+        if (missing > 0) parts.push(`${missing} email(s) not found`);
+        if (hidden > 0) parts.push(`${hidden} hidden by the current filters`);
+        if (invalidCount > 0) parts.push(`${invalidCount} non-email value(s) ignored`);
+        if (replaced) parts.push('previous selection replaced');
+        this.snackBar.open(parts.join(' · ') + '.', 'Close', { duration: 6000 });
+      } catch (err) {
+        console.error('Error importing Excel:', err);
+        this.snackBar.open('Error reading the Excel file. Please try again.', 'Close', { duration: 3000 });
+      } finally {
+        this.importing = false;
+      }
+    };
+    input.click();
+  }
+
   // ---- bulk add tags ----
   openBulkTags(): void {
     const ids = this.selection.selected;
@@ -379,8 +588,9 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     const byId = new Map<string, any>(this.dataSource.data.map(u => [this.rowId(u), u]));
     const users = ids.map(id => byId.get(id)).filter(Boolean);
     const ref = this.dialog.open(AssignTagsDialogComponent, {
-      width: '480px',
-      maxWidth: '92vw',
+      width: '760px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
       autoFocus: false,
       data: { mode: 'bulk', users }
     });
@@ -439,6 +649,16 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.refreshFilter();
   }
 
+  setTagPolarity(polarity: 'include' | 'exclude'): void {
+    if (this.selectByTagPolarity === polarity) return;
+    this.selectByTagPolarity = polarity;
+    // Exclude reads as "hide anyone with ANY of these tags" — align the mode
+    // with that (and with the workshop filter's Exclude). Match all stays
+    // selectable afterwards for the rarer "not all of them" case.
+    if (polarity === 'exclude') this.selectByTagMode = 'any';
+    this.refreshFilter();
+  }
+
   toggleTagSelect(id: string): void {
     if (this.selectByTagIds.has(id)) this.selectByTagIds.delete(id);
     else this.selectByTagIds.add(id);
@@ -447,11 +667,167 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   clearTagFilter(): void {
     this.selectByTagIds.clear();
+    this.selectByTagPolarity = 'include'; // back to the default
     this.refreshFilter();
   }
 
   matchCount(): number {
     return this.dataSource.filteredData.length;
+  }
+
+  // ---- filter by workshops (mat-menu, same UI as filter by tags) ----
+  // Options offered in the dropdown; Funnel only narrows to evergreen configs.
+  get visibleWorkshopOptions(): { id: string; title: string; evergreen: boolean }[] {
+    return this.funnelOnly ? this.workshopOptions.filter(w => w.evergreen) : this.workshopOptions;
+  }
+
+  setFunnelOnly(on: boolean): void {
+    if (this.funnelOnly === on) return;
+    this.funnelOnly = on;
+    if (!on) return;
+    // Selections that are no longer offered would filter invisibly — drop them.
+    let changed = false;
+    [...this.selectedWorkshopIds].forEach(id => {
+      const opt = this.workshopOptions.find(w => w.id === id);
+      if (opt && !opt.evergreen) {
+        this.selectedWorkshopIds.delete(id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.updateDisplayedColumns();
+      this.refreshWorkshopFilter();
+    }
+  }
+
+  // Switching include/exclude reuses the already-loaded enrolled sets — no refetch.
+  setWorkshopFilterMode(mode: 'include' | 'exclude'): void {
+    if (this.workshopFilterMode === mode) return;
+    this.workshopFilterMode = mode;
+    this.updateDisplayedColumns();
+    this.refreshFilter();
+  }
+
+  toggleWorkshopSelect(id: string): void {
+    if (this.selectedWorkshopIds.has(id)) this.selectedWorkshopIds.delete(id);
+    else this.selectedWorkshopIds.add(id);
+    this.updateDisplayedColumns();
+    this.refreshWorkshopFilter();
+  }
+
+  // Resolve the selected workshops' doc refs against `workshop participant
+  // enrolled` (workshopref == ref) and keep only rows whose profileid is
+  // enrolled in at least one of them. Reads are per-workshop and cached —
+  // never a scan of the whole (huge) enrolled collection.
+  private async refreshWorkshopFilter(): Promise<void> {
+    const ids = [...this.selectedWorkshopIds];
+    const token = ++this.workshopFilterToken;
+
+    if (!ids.length) {
+      this.workshopProfileIds = null;
+      this.workshopsByProfile.clear();
+      this.workshopFilterLoading = false;
+      this.refreshFilter();
+      return;
+    }
+
+    this.workshopFilterLoading = true;
+    this.workshopProfileIds = null; // predicate hides rows while loading
+    // Clear now (not just on completion) so a mid-load export can't read the
+    // previous selection's titles.
+    this.workshopsByProfile.clear();
+    this.refreshFilter();
+
+    try {
+      const uncached = ids.filter(id => !this.enrolledCache.has(id));
+      await Promise.all(uncached.map(async id => {
+        const workshopref = doc(this.firestore, 'workshopconfiguration', id);
+        const snap = await getDocs(query(
+          collection(this.firestore, 'workshop participant enrolled'),
+          where('workshopref', '==', workshopref)
+        ));
+        this.enrolledCache.set(
+          id,
+          snap.docs.map(d => (d.data()?.['profileid'] || '').toString()).filter(Boolean)
+        );
+      }));
+      if (token !== this.workshopFilterToken) return; // superseded by a newer change
+      const set = new Set<string>();
+      const byProfile = new Map<string, string[]>();
+      ids.forEach(id => (this.enrolledCache.get(id) || []).forEach(p => {
+        set.add(p);
+        const list = byProfile.get(p) || [];
+        list.push(id);
+        byProfile.set(p, list);
+      }));
+      this.workshopProfileIds = set;
+      this.workshopsByProfile = byProfile;
+    } catch (err) {
+      console.error('Error loading enrolled participants:', err);
+      if (token === this.workshopFilterToken) {
+        // Fail closed in BOTH modes: null keeps the predicate hiding rows. An
+        // empty set would fail open in exclude mode — every profile would
+        // count as "not enrolled" and show up.
+        this.workshopProfileIds = null;
+        this.workshopsByProfile.clear();
+        this.snackBar.open('Error loading enrolled participants. Please try again.', 'Close', { duration: 3000 });
+      }
+    } finally {
+      if (token === this.workshopFilterToken) {
+        this.workshopFilterLoading = false;
+        this.workshopFilterVersion++;
+        this.refreshFilter();
+      }
+    }
+  }
+
+  clearWorkshopFilter(): void {
+    this.resetWorkshopFilter();
+    this.refreshFilter();
+  }
+
+  private resetWorkshopFilter(): void {
+    this.selectedWorkshopIds.clear();
+    this.workshopProfileIds = null;
+    this.workshopsByProfile.clear();
+    this.workshopFilterLoading = false;
+    this.workshopFilterMode = 'include'; // back to the default; funnelOnly is a list preference, kept
+    this.workshopFilterToken++; // invalidate any in-flight load
+    this.updateDisplayedColumns();
+  }
+
+  private updateDisplayedColumns(): void {
+    // The Workshop column/export only means something in include mode — in
+    // exclude mode every visible row is by definition not enrolled.
+    const filterActive = this.selectedWorkshopIds.size > 0;
+    const columnActive = filterActive && this.workshopFilterMode === 'include';
+    this.displayedColumns = columnActive ? [...this.baseColumns, 'workshop'] : [...this.baseColumns];
+    this.exportColumnsView = columnActive
+      ? [...this.exportColumns, this.workshopExportColumn]
+      : this.exportColumns;
+
+    // Sync the export chip selection only when the filter itself turns on/off
+    // — not on include/exclude round-trips or workshop toggles — so a manual
+    // deselection isn't fought. A lingering key is inert while the view
+    // doesn't offer the column.
+    if (filterActive === this.lastWorkshopFilterActive) return;
+    this.lastWorkshopFilterActive = filterActive;
+    if (filterActive) {
+      if (!this.selectedExportKeys.includes('workshop')) {
+        this.selectedExportKeys = [...this.selectedExportKeys, 'workshop'];
+      }
+    } else {
+      this.selectedExportKeys = this.selectedExportKeys.filter(k => k !== 'workshop');
+    }
+  }
+
+  // Titles for the `workshop` column: the selected workshops this profile is
+  // enrolled in, from the cached per-workshop reads.
+  workshopNames(u: any): string[] {
+    const pid = (u.profileid || this.rowId(u) || '').toString();
+    return (this.workshopsByProfile.get(pid) || [])
+      .map(id => this.workshopTitleById[id])
+      .filter(Boolean);
   }
 
   toggleComm(): void {
@@ -883,3 +1259,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     });
   }
 }
+
+
+
+//https://eiflix.com?segment=nRpMxgeTYEzhGHEeigrL
+// https://eiflix.com/eiflix?segment=3ZLQDG4RiVklI2HUz00D,nRpMxgeTYEzhGHEeigrL

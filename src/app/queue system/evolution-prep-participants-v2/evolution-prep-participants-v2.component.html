@@ -1,0 +1,568 @@
+<div class="mainscreen">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <mat-icon class="header-icon">graphic_eq</mat-icon>
+      <div>
+        <h2 class="page-title">ATC Transcript Ops <span class="v2-tag">v2</span></h2>
+        <p class="page-subtitle">
+          Resolve each participant's studio session across the queue lineage, attach a Dropbox
+          recording where the transcript is missing, and watch the ATC doc through to completion.
+        </p>
+      </div>
+    </div>
+    <button mat-flat-button color="primary" (click)="load()"
+            [disabled]="loading || !selectedAtcStage || !selectedQueueId" class="refresh-btn">
+      <mat-icon>refresh</mat-icon> Load participants
+    </button>
+  </div>
+
+  <!-- Queue + stage pickers -->
+  <div class="selector-bar mat-elevation-z1">
+    <mat-form-field appearance="outline" class="queue-field">
+      <mat-label>Queue <span class="hint">(has atcrequiredstages)</span></mat-label>
+      <mat-select [(ngModel)]="selectedQueueId" (ngModelChange)="onQueueChange()"
+                  [disabled]="queuesLoading">
+        <mat-option *ngFor="let q of queues" [value]="q.id">{{ q.name }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="stage-field">
+      <mat-label>ATC stage <span class="hint">(atcrequiredstages.stage)</span></mat-label>
+      <mat-select [(ngModel)]="selectedAtcStage" [disabled]="!availableAtcStages.length">
+        <mat-option *ngFor="let a of availableAtcStages" [value]="a.stage">{{ a.stage }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <span class="gen-note" *ngIf="atcCfg">
+      pairing sources: <strong>{{ pairingSummary }}</strong>
+    </span>
+
+    <mat-spinner *ngIf="queuesLoading" diameter="20" strokeWidth="2"></mat-spinner>
+  </div>
+
+  <div class="err-box" *ngIf="queuesError">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ queuesError }}</span>
+    <button mat-button (click)="loadQueues()">Retry</button>
+  </div>
+
+  <div class="warn-box" *ngIf="!queuesLoading && selectedQueueId && atcCfg && !zoomPairings.length">
+    <mat-icon>info_outline</mat-icon>
+    <span>This ATC stage has no studio (zoom) pairing — there is no transcript to attach here.</span>
+  </div>
+
+  <div class="loading-box" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading participants &amp; ATC generation docs…</p>
+  </div>
+
+  <ng-container *ngIf="!loading && totalAll">
+
+    <div class="progress-banner" *ngIf="walking">
+      <mat-spinner diameter="16" strokeWidth="2"></mat-spinner>
+      <span>Walking transfer chains — {{ walkProgress }} / {{ walkTotal }}</span>
+    </div>
+
+    <!-- ── METADATA: where these participants came from ─────────────────── -->
+    <div class="meta-bar">
+      <span class="meta-item">
+        <strong>{{ totalAll }}</strong> total participants
+        <span class="meta-hint">Active + Approved in this queue</span>
+      </span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item clickable" (click)="focus('here')"
+            matTooltip="No transferredfrom on the token — they started in THIS queue, so their lineage is a single level with nothing to climb">
+        <strong>{{ countHere }}</strong> started here
+      </span>
+      <span class="meta-sep">·</span>
+      <span class="meta-item clickable" (click)="focus('transferred')"
+            matTooltip="Token carries transferredfrom + tokentransferredfrom — the walk can reach their ancestor queues">
+        <strong>{{ countTransferred }}</strong> transferred in
+      </span>
+      <span class="meta-sep" *ngIf="countTransferredOut">·</span>
+      <span class="meta-item clickable" *ngIf="countTransferredOut" (click)="focus('transferredOut')"
+            matTooltip="Token carries transferredto + tokentransferredto — these participants have LEFT this queue. Being transferred does not by itself move their ATC doc, so the destination queue is checked rather than assumed. A recording attached here still counts: the destination token's lineage points back to this queue.">
+        <mat-icon>logout</mat-icon>
+        <strong>{{ countTransferredOut }}</strong> transferred out
+      </span>
+      <span class="meta-sep" *ngIf="countGenElsewhere">·</span>
+      <span class="meta-item clickable" *ngIf="countGenElsewhere" (click)="focus('genElsewhere')"
+            matTooltip="Their ATC doc was found in another queue on their lineage — the queue they transferred FROM or TO. Nothing is missing for these.">
+        <mat-icon>swap_horiz</mat-icon>
+        <strong>{{ countGenElsewhere }}</strong> ATC doc in another queue
+      </span>
+      <span class="meta-sep" *ngIf="countGenOtherToken">·</span>
+      <span class="meta-item warn" *ngIf="countGenOtherToken"
+            matTooltip="A gen doc exists for the profile but keyed to a different queue_token — a duplicate or rebuilt token.">
+        <mat-icon>warning</mat-icon>
+        <strong>{{ countGenOtherToken }}</strong> doc under another token
+      </span>
+      <span class="meta-sep" *ngIf="countOffLineage">·</span>
+      <span class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
+            matTooltip="No studio session on their lineage, but sessions DO exist under other queues. The token is disconnected from the participant's history — link the token; do not attach a recording.">
+        <mat-icon>link_off</mat-icon>
+        <strong>{{ countOffLineage }}</strong> off-lineage sessions
+      </span>
+    </div>
+
+    <!-- ── TELEMETRY: the funnel, left to right ─────────────────────────── -->
+    <div class="funnel">
+      <div class="fstep" (click)="clearFilters()" matTooltip="All Active + Approved participants in the selected queue">
+        <span class="fnum">{{ totalAll }}</span>
+        <span class="flabel">participants</span>
+      </div>
+      <mat-icon class="farrow">chevron_right</mat-icon>
+
+      <div class="fstep clickable" (click)="focus('crossed')"
+           matTooltip="Moved past the studio stage. A currentstage that is off the queue's stage list counts as crossed (token variations drop trailing stages).">
+        <span class="fnum">{{ countCrossed }}</span>
+        <span class="flabel">crossed {{ selectedAtcStage }}</span>
+      </div>
+      <mat-icon class="farrow">chevron_right</mat-icon>
+
+      <div class="fstep ok" matTooltip="A transcript exists on the session the resolver actually reads">
+        <span class="fnum">{{ countWith }}</span>
+        <span class="flabel">have transcript</span>
+      </div>
+      <mat-icon class="farrow">chevron_right</mat-icon>
+
+      <div class="fstep clickable" [class.ok]="!countNoGen" [class.warn]="countNoGen"
+           (click)="focus('noGen')"
+           matTooltip="Crossed the stage and no queue_atc_generation doc exists in THIS queue or in the queue they were transferred to. This is the genuine repair backlog.">
+        <span class="fnum">{{ countNoGen }}</span>
+        <span class="flabel">crossed, no ATC doc</span>
+      </div>
+      <mat-icon class="farrow">chevron_right</mat-icon>
+
+      <div class="fstep done" matTooltip="ATC generation completed">
+        <span class="fnum">{{ countGen['completed'] || 0 }}</span>
+        <span class="flabel">ATC completed</span>
+      </div>
+    </div>
+
+    <!-- ── TELEMETRY: what to do next ───────────────────────────────────── -->
+    <div class="summary-bar">
+      <div class="stat need clickable" (click)="focus('needsLink')"
+           matTooltip="Crossed the stage, a studio session exists, but no transcript — paste a Dropbox recording">
+        <mat-icon>upload_file</mat-icon>
+        <div><strong>{{ countNeeds }}</strong><span>needs a recording</span></div>
+      </div>
+
+      <div class="stat rebuild clickable" *ngIf="countRebuildable" (click)="focus('rebuildable')"
+           matTooltip="Every studio transcript is present, the ATC doc (owned by this queue) is still dataincomplete, and one Rebuild click will re-resolve it">
+        <mat-icon>autorenew</mat-icon>
+        <div><strong>{{ countRebuildable }}</strong><span>ready to rebuild</span></div>
+      </div>
+
+      <div class="stat superseded clickable" *ngIf="countSuperseded" (click)="focus('superseded')"
+           matTooltip="A transcript exists, but on an OLDER session at the same level. The resolver only reads the newest session per level, so the pipeline cannot see it — re-attach to the current session.">
+        <mat-icon>history</mat-icon>
+        <div><strong>{{ countSuperseded }}</strong><span>on superseded session</span></div>
+      </div>
+
+      <div class="stat none clickable" (click)="focus('noSession')"
+           matTooltip="Crossed the stage but no 'instudio' log exists anywhere on the lineage — nothing to attach a recording to">
+        <mat-icon>block</mat-icon>
+        <div><strong>{{ countNoSession }}</strong><span>no studio session</span></div>
+      </div>
+
+      <div class="stat gap clickable" *ngIf="countNoDocFormPresent" (click)="focus('noDocFormPresent')"
+           matTooltip="Crossed, no ATC doc anywhere, but the config-stage form WAS submitted in this queue — the doc should exist. Genuine recovery gap; run the backfill.">
+        <mat-icon>report_problem</mat-icon>
+        <div><strong>{{ countNoDocFormPresent }}</strong><span>no doc · form present (gap)</span></div>
+      </div>
+
+      <div class="stat expected clickable" *ngIf="countNoDocFormMissing" (click)="focus('noDocFormMissing')"
+           matTooltip="Crossed but no config-stage form was submitted in this queue — so no ATC doc is created, by design. Expected, not a gap.">
+        <mat-icon>rule</mat-icon>
+        <div><strong>{{ countNoDocFormMissing }}</strong><span>no doc · no form (expected)</span></div>
+      </div>
+
+      <div class="stat gen" *ngIf="countGen['dataincomplete']">
+        <mat-icon>hourglass_bottom</mat-icon>
+        <div><strong>{{ countGen['dataincomplete'] }}</strong><span>ATC dataincomplete</span></div>
+      </div>
+      <div class="stat gen" *ngIf="countGen['pending'] || countGen['processing']">
+        <mat-icon>schedule</mat-icon>
+        <div>
+          <strong>{{ (countGen['pending'] || 0) + (countGen['processing'] || 0) }}</strong>
+          <span>ATC queued / running</span>
+        </div>
+      </div>
+      <div class="stat err" *ngIf="countGen['error']">
+        <mat-icon>report</mat-icon>
+        <div><strong>{{ countGen['error'] }}</strong><span>ATC error</span></div>
+      </div>
+    </div>
+
+    <!-- ── FILTERS ──────────────────────────────────────────────────────── -->
+    <div class="filter-bar mat-elevation-z1">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search name / profile ID</mat-label>
+        <input matInput [(ngModel)]="searchText" (ngModelChange)="applyFilters()" autocomplete="off">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Crossed {{ selectedAtcStage }}</mat-label>
+        <mat-select [(ngModel)]="filterCrossed" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="yes">✅ Crossed</mat-option>
+          <mat-option value="no">⏳ Not yet</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Transcript</mat-label>
+        <mat-select [(ngModel)]="filterTranscript" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="yes">✅ Present</mat-option>
+          <mat-option value="no">📤 Needs a recording</mat-option>
+          <mat-option value="superseded">🕓 On a superseded session</mat-option>
+          <mat-option value="nosession">🚫 No studio session</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>ATC generation doc</mat-label>
+        <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
+          <mat-option value="none">— not created —</mat-option>
+          <mat-option value="out">— doc in another queue —</mat-option>
+          <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Config-stage form (no-doc rows)</mat-label>
+        <mat-select [(ngModel)]="filterConfigData" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="present">✅ Form present — doc missing (gap)</mat-option>
+          <mat-option value="missing">➖ No form — no doc (expected)</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Origin</mat-label>
+        <mat-select [(ngModel)]="filterOrigin" (ngModelChange)="applyFilters()">
+          <mat-option value="">All</mat-option>
+          <mat-option value="here">Started in this queue</mat-option>
+          <mat-option value="transferred">Transferred in</mat-option>
+          <mat-option value="out">➜ Transferred OUT</mat-option>
+          <mat-option value="instay">Still in this queue</mat-option>
+          <mat-option value="offlineage">🔗 Off-lineage session</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-stroked-button (click)="clearFilters()" class="clear-btn">
+        <mat-icon>filter_alt_off</mat-icon> Clear
+      </button>
+
+      <span class="result-count">
+        Showing <strong>{{ totalFiltered }}</strong> / <strong>{{ totalAll }}</strong>
+      </span>
+    </div>
+
+    <!-- ── TABLE ────────────────────────────────────────────────────────── -->
+    <div class="body mat-elevation-z2">
+      <table mat-table [dataSource]="dataSource" matSort>
+
+        <ng-container matColumnDef="profile_name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Participant</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="name-cell">
+              <div class="avatar">{{ row.profile_name?.charAt(0)?.toUpperCase() || '?' }}</div>
+              <div class="name-info">
+                <span class="name-text">{{ row.profile_name || '—' }}</span>
+                <span class="profile-id">{{ row.profile_id }}</span>
+                <span class="origin-tag origin-out" *ngIf="row.transferredOut"
+                      matTooltip="currentstage is 'Transfered' — left this queue; the ATC doc belongs to the destination queue">
+                  transferred out
+                </span>
+                <span class="origin-tag" *ngIf="!row.transferredOut"
+                      [class.origin-here]="row.origin === 'here'"
+                      [matTooltip]="row.origin === 'here'
+                        ? 'Started in this queue — no transferredfrom, so the lineage is a single level'
+                        : 'Transferred in — the walk can climb to the ancestor queues'">
+                  {{ row.origin === 'here' ? 'started here' : 'transferred in' }}
+                </span>
+                <span class="next-action" [matTooltip]="'Suggested next step'">{{ nextAction(row) }}</span>
+              </div>
+              <!-- Re-resolve just this participant. Everything on a row comes from
+                   reads that can change while the table is open (a transcript
+                   lands, a transfer is repaired, a doc is rebuilt elsewhere) —
+                   without this the only way to see that is a full 700-row walk. -->
+              <button mat-icon-button class="row-refresh-btn"
+                      [disabled]="row.walking"
+                      (click)="refreshRow(row)"
+                      matTooltip="Refresh this row only — re-reads the token, re-walks its transfer chain, re-checks the studio sessions and the ATC doc. The rest of the table is left alone.">
+                <mat-spinner *ngIf="row.walking" diameter="14" strokeWidth="2"></mat-spinner>
+                <mat-icon *ngIf="!row.walking">refresh</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="currentstage">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Current Stage</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="stage-badge">{{ row.currentstage || '—' }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="crossed">
+          <th mat-header-cell *matHeaderCellDef class="col-narrow">Crossed</th>
+          <td mat-cell *matCellDef="let row" class="col-narrow">
+            <mat-spinner *ngIf="row.crossed === null" diameter="14" strokeWidth="2"></mat-spinner>
+            <span *ngIf="row.crossed === true" class="yes-badge"><mat-icon>done_all</mat-icon> Yes</span>
+            <span *ngIf="row.crossed === false" class="none-badge"><mat-icon>schedule</mat-icon> Not yet</span>
+          </td>
+        </ng-container>
+
+        <!-- every pairing source of the selected ATC stage -->
+        <ng-container matColumnDef="sources">
+          <th mat-header-cell *matHeaderCellDef class="col-sources">Pairing sources</th>
+          <td mat-cell *matCellDef="let row" class="col-sources">
+            <span class="src-chip" *ngFor="let p of row.pairings"
+                  [class.src-ok]="p.status === 'resolved'"
+                  [class.src-bad]="p.status === 'missing' && p.category === 'mandatory'"
+                  [class.src-warn]="p.status === 'missing' && p.category === 'atleastonerequired'"
+                  [class.src-unknown]="p.status === 'unknown'"
+                  [matTooltip]="p.stage + ' · ' + p.category +
+                                (p.zoom ? ' · studio' : ' · form') +
+                                ' · ' + p.status +
+                                (p.source === 'gendoc' ? ' (from the ATC doc)' :
+                                 p.source === 'walk' ? ' (resolved by chain walk)' :
+                                 ' (no ATC doc yet — not resolved)')">
+              <mat-icon>{{ p.status === 'resolved' ? 'check' :
+                           p.status === 'unknown' ? 'help_outline' : 'close' }}</mat-icon>
+              {{ p.stage }}<span class="one-of" *ngIf="p.category === 'atleastonerequired'">one-of</span>
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- studio pairings: session chips + transcript state + attach box -->
+        <ng-container matColumnDef="studio">
+          <th mat-header-cell *matHeaderCellDef class="col-studio">
+            Studio session <span class="hint">(chain walk)</span>
+          </th>
+          <td mat-cell *matCellDef="let row" class="col-studio">
+            <mat-spinner *ngIf="row.walking" diameter="14" strokeWidth="2"></mat-spinner>
+            <span *ngIf="row.walkError" class="no-badge" [matTooltip]="row.walkError">
+              <mat-icon>error_outline</mat-icon> walk failed
+            </span>
+
+            <div class="studio-block" *ngFor="let p of studio(row)">
+              <div class="studio-head" *ngIf="!row.walking && !row.walkError">
+                <span class="studio-stage" *ngIf="studio(row).length > 1">{{ p.stage }}</span>
+
+                <span *ngIf="p.status === 'resolved'" class="yes-badge">
+                  <mat-icon>check_circle</mat-icon> Transcript
+                </span>
+                <span *ngIf="p.status !== 'resolved' && !p.hits.length && !p.offLineage.length" class="none-badge"
+                      matTooltip="No 'instudio' log for this stage anywhere on the transferredfrom lineage">
+                  <mat-icon>block</mat-icon> No session
+                </span>
+                <span *ngIf="!p.hits.length && p.offLineage.length" class="offlin-badge"
+                      matTooltip="Sessions exist for this participant, but under queues that are NOT on their transferredfrom lineage. Neither this screen nor the ATC resolver can reach them — the token needs linking, not a recording.">
+                  <mat-icon>link_off</mat-icon> Off-lineage
+                </span>
+
+                <button mat-icon-button class="view-btn" *ngIf="viewableLa(p)"
+                        (click)="viewTranscript(row, p)" matTooltip="View transcript">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+                <span *ngIf="p.status !== 'resolved' && p.hits.length && pairingBusy(p)" class="busy-badge">
+                  <mat-spinner diameter="12" strokeWidth="2"></mat-spinner> {{ pairingStatus(p) }}
+                </span>
+                <span *ngIf="p.status !== 'resolved' && p.hits.length && !pairingBusy(p) && pairingStatus(p) === 'failed'"
+                      class="fail-badge" [matTooltip]="p.hits[0]?.lastError || 'transcription failed'">
+                  <mat-icon>report</mat-icon> Failed
+                </span>
+                <span *ngIf="p.status !== 'resolved' && p.hits.length && !pairingBusy(p) && pairingStatus(p) !== 'failed' && pairingSuperseded(p)"
+                      class="superseded-badge"
+                      matTooltip="A transcript exists on an OLDER session at the same level. The resolver reads only the newest session per level, so the pipeline cannot use it — attach the recording here to fix.">
+                  <mat-icon>history</mat-icon> Superseded
+                </span>
+                <span *ngIf="p.status !== 'resolved' && p.hits.length && !pairingBusy(p) && pairingStatus(p) !== 'failed' && !pairingSuperseded(p)"
+                      class="no-badge">
+                  <mat-icon>upload_file</mat-icon> Missing
+                </span>
+
+                <span class="la-chip" *ngFor="let h of p.hits"
+                      [class.la-ok]="h.hasTranscript && h.primary"
+                      [class.la-stale]="h.hasTranscript && !h.primary"
+                      [class.la-secondary]="!h.primary"
+                      [class.la-target]="h.laId === p.targetLaId"
+                      [matTooltip]="'live assignment ' + h.laId +
+                                    ' · queue ' + h.queueId + ' · level ' + h.level +
+                                    (h.primary ? ' · NEWEST at this level (the resolver reads this one)'
+                                               : ' · superseded by a newer session — the resolver ignores it') +
+                                    (h.hasTranscript ? ' · transcript present' : ' · no transcript')">
+                  <mat-icon>{{ h.hasTranscript ? 'check' : 'radio_button_unchecked' }}</mat-icon>
+                  L{{ h.level }}<span *ngIf="!h.primary" class="stale-mark">old</span>
+                </span>
+              </div>
+
+              <div class="link-cell" *ngIf="!row.walking && !row.walkError && p.hits.length">
+                <input class="link-input" type="url" placeholder="Paste Dropbox link…"
+                       [(ngModel)]="p.dropboxLink"
+                       [disabled]="p.saving || pairingBusy(p)"
+                       (keyup.enter)="saveLink(row, p)">
+                <!-- On a FAILED job the stored link is unchanged and is exactly what
+                     we want to re-run, so this same button IS the retry: saveLink()
+                     stamps retranscribeAt, which re-fires seLiveTranscribeSubmit. -->
+                <button mat-icon-button class="link-save-btn"
+                        [matTooltip]="pairingStatus(p) === 'failed'
+                                        ? 'Retry transcription with this recording'
+                                        : (p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe')"
+                        [disabled]="p.saving || pairingBusy(p)"
+                        (click)="saveLink(row, p)">
+                  <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
+                  <mat-icon *ngIf="!p.saving">{{ pairingStatus(p) === 'failed' ? 'refresh'
+                                                 : (p.status === 'resolved' ? 'autorenew' : 'send') }}</mat-icon>
+                </button>
+                <a *ngIf="p.dropboxLink" [href]="p.dropboxLink" target="_blank"
+                   class="link-open-btn" matTooltip="Open recording">
+                  <mat-icon>open_in_new</mat-icon>
+                </a>
+              </div>
+
+              <!-- No session logged anywhere on the lineage (studio session happened
+                   OFFLINE, no Zoom) — attachOffline() creates the live-assignment doc
+                   AND the gen-doc override pointer; saveLink() above can't, since it
+                   only writes onto an already-discovered target. -->
+              <div class="link-cell offline-cell"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && row.genDocId && row.genIn === 'this'">
+                <input class="link-input" type="url" placeholder="Offline session — paste Dropbox link…"
+                       [(ngModel)]="p.dropboxLink"
+                       [disabled]="p.saving"
+                       (keyup.enter)="attachOffline(row, p)">
+                <button mat-icon-button class="link-save-btn"
+                        matTooltip="No studio-session log exists — confirm this was an OFFLINE session and attach the recording directly"
+                        [disabled]="p.saving"
+                        (click)="attachOffline(row, p)">
+                  <mat-spinner *ngIf="p.saving" diameter="16" strokeWidth="2"></mat-spinner>
+                  <mat-icon *ngIf="!p.saving">cloud_upload</mat-icon>
+                </button>
+              </div>
+              <div class="offline-hint"
+                   *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && (!row.genDocId || row.genIn !== 'this')"
+                   [matTooltip]="row.genDocId ? ('ATC doc belongs to ' + (row.genInQueueName || 'another queue') + ' — attach it from there') : 'No ATC generation doc exists here yet for this participant'">
+                no ATC doc here — cannot attach offline recording
+              </div>
+
+              <div class="trail" *ngIf="!row.walking && p.trail.length"
+                   matTooltip="queue[stage-type-at-that-level]:sessions found, nearest level first">
+                {{ p.trail.join('  →  ') }}
+              </div>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- ATC generation doc -->
+        <ng-container matColumnDef="genDoc">
+          <th mat-header-cell *matHeaderCellDef class="col-gen">ATC doc</th>
+          <td mat-cell *matCellDef="let row" class="col-gen">
+            <span *ngIf="!row.genDocId && row.transferredOut" class="xfer-badge"
+                  [matTooltip]="'Transferred to ' + (row.toQueueName || 'another queue') +
+                                ', and no ATC doc exists there either — genuinely missing.'">
+              <mat-icon>logout</mat-icon> none (transferred)
+            </span>
+            <span *ngIf="!row.genDocId && !row.transferredOut" class="none-badge"
+                  matTooltip="No queue_atc_generation doc is keyed to this queue_token">
+              <mat-icon>remove</mat-icon> none
+            </span>
+            <div class="cfgform" *ngIf="!row.genDocId && row.ownFormPresent !== null"
+                 [class.cfg-gap]="row.ownFormPresent === true"
+                 [class.cfg-ok]="row.ownFormPresent === false"
+                 [matTooltip]="row.ownFormPresent
+                   ? 'The config-stage form WAS submitted in this queue, yet no ATC doc exists — the pipeline should have created one. Recovery gap; backfill will create it.'
+                   : 'No config-stage form was submitted in this queue, so no ATC doc is created — expected, not a gap.'">
+              <mat-icon>{{ row.ownFormPresent ? 'report_problem' : 'info' }}</mat-icon>
+              {{ row.ownFormPresent ? 'form present — doc missing' : 'no config form' }}
+            </div>
+            <div class="othertok" *ngIf="row.genOtherToken"
+                 matTooltip="A gen doc exists for this PROFILE but under a different queue_token. Docs are keyed to a token, so this one still has none — usually a duplicate or rebuilt token.">
+              <mat-icon>warning</mat-icon> doc under another token
+            </div>
+
+            <ng-container *ngIf="row.genDocId">
+              <span class="gen-badge" [ngClass]="'gen-' + row.genStatus"
+                    [matTooltip]="'doc ' + row.genDocId +
+                                  (row.genIn === 'this' ? ' · in this queue'
+                                   : row.genIn === 'ancestor' ? ' · in the queue they transferred FROM'
+                                   : ' · in the queue they transferred TO') +
+                                  (row.genMissing.length ? ' · missing: ' + row.genMissing.join(', ') : '')">
+                {{ row.genStatus }}
+              </span>
+              <span class="in-dest" *ngIf="row.genIn !== 'this'"
+                    [matTooltip]="'This doc belongs to ' + row.genInQueueName + ', not this queue'">
+                <mat-icon>{{ row.genIn === 'ancestor' ? 'call_received' : 'call_made' }}</mat-icon>
+                in {{ row.genInQueueName }}
+              </span>
+              <div class="gen-missing" *ngIf="row.genMissing.length">
+                missing: {{ row.genMissing.join(', ') }}
+              </div>
+              <button mat-stroked-button class="rebuild-btn"
+                      *ngIf="row.genStatus !== 'completed' && row.genIn === 'this'"
+                      [disabled]="row.rebuilding"
+                      (click)="rebuild(row)"
+                      matTooltip="Re-run the ATC resolver for this doc (regenerateAtcDoc)">
+                <mat-spinner *ngIf="row.rebuilding" diameter="14" strokeWidth="2"></mat-spinner>
+                <mat-icon *ngIf="!row.rebuilding">autorenew</mat-icon>
+                Rebuild
+              </button>
+            </ng-container>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="dropboxLink">
+          <th mat-header-cell *matHeaderCellDef class="col-link">Dropbox recording</th>
+          <td mat-cell *matCellDef="let row" class="col-link">
+            <div class="link-cell" *ngIf="!row.walking && row.hits.length">
+              <input class="link-input" type="url" placeholder="Paste Dropbox link…"
+                     [(ngModel)]="row.dropboxLink"
+                     [disabled]="row.saving || isBusy(row)"
+                     (keyup.enter)="saveLink(row)">
+              <button mat-icon-button class="link-save-btn"
+                      [matTooltip]="hasTranscript(row) ? 'Replace transcript' : 'Attach & transcribe'"
+                      [disabled]="row.saving || isBusy(row)"
+                      (click)="saveLink(row)">
+                <mat-spinner *ngIf="row.saving" diameter="16" strokeWidth="2"></mat-spinner>
+                <mat-icon *ngIf="!row.saving">{{ hasTranscript(row) ? 'autorenew' : 'send' }}</mat-icon>
+              </button>
+              <a *ngIf="row.dropboxLink" [href]="row.dropboxLink" target="_blank"
+                 class="link-open-btn" matTooltip="Open recording">
+                <mat-icon>open_in_new</mat-icon>
+              </a>
+            </div>
+            <span class="muted" *ngIf="!row.walking && !row.hits.length"
+                  matTooltip="Nothing to attach to — no studio session was ever logged for this participant on this lineage">
+              no target
+            </span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="data-row"></tr>
+
+        <tr class="mat-row" *matNoDataRow>
+          <td class="no-data-cell" [attr.colspan]="displayedColumns.length">
+            <mat-icon>search_off</mat-icon>
+            <p>No participants match the current filters.</p>
+          </td>
+        </tr>
+      </table>
+
+      <mat-paginator [pageSizeOptions]="[25, 50, 100, 200]" pageSize="25" showFirstLastButtons>
+      </mat-paginator>
+    </div>
+  </ng-container>
+
+  <div class="empty-hint" *ngIf="!loading && !totalAll && selectedAtcStage">
+    <mat-icon>touch_app</mat-icon>
+    <p>Pick a queue and an ATC stage, then <strong>Load participants</strong>.</p>
+  </div>
+</div>

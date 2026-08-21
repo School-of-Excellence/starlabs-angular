@@ -8,7 +8,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatTableModule } from '@angular/material/table';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Clipboard } from '@angular/cdk/clipboard';
+import { SelectionModel } from '@angular/cdk/collections';
 import {
   Firestore,
   collection,
@@ -37,7 +42,10 @@ interface Tag {
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatTabsModule,
+    MatTableModule,
+    MatCheckboxModule
   ],
   templateUrl: './assign-tags-dialog.component.html',
   styleUrl: './assign-tags-dialog.component.css'
@@ -50,20 +58,31 @@ export class AssignTagsDialogComponent implements OnInit {
   isSaving = false;
   isCreating = false;
   userName = '';
-  // 'single' = assign to one user; 'bulk' = pick tags to add to many users.
-  mode: 'single' | 'bulk' = 'single';
+  // 'single' = assign to one user; 'bulk' = add to many users;
+  // 'manage' = global tag manager (create + All Tags / copy segment), no user.
+  mode: 'single' | 'bulk' | 'manage' = 'single';
   bulkCount = 0;
   private userId = '';
   // Bulk mode: tags shared by ALL selected users at open time (pre-checked).
   private initialSelected = new Set<string>();
 
+  // ---- Tab 2: All Tags / copy segment ----
+  activeTab = 0;
+  segmentColumns = ['select', 'name', 'id', 'copy'];
+  copySelection = new SelectionModel<string>(true, []);
+  readonly segmentHint =
+    'https://eiflix.com/web/workshop/NlMLGPs4uj1cDl44H7io?segment=nRpMxgeTYEzhGHEeigrL,3ZLQDG4RiVklI2HUz00D';
+
   constructor(
     private firestore: Firestore,
     private snackBar: MatSnackBar,
+    private clipboard: Clipboard,
     private dialogRef: MatDialogRef<AssignTagsDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {
-    if (data?.mode === 'bulk') {
+    if (data?.mode === 'manage') {
+      this.mode = 'manage';
+    } else if (data?.mode === 'bulk') {
       this.mode = 'bulk';
       const users: any[] = Array.isArray(data?.users) ? data.users : [];
       this.bulkCount = users.length;
@@ -119,8 +138,18 @@ export class AssignTagsDialogComponent implements OnInit {
   }
 
   toggle(id: string): void {
+    if (this.mode === 'manage') return; // no user to assign to in manage mode
     if (this.selected.has(id)) this.selected.delete(id);
     else this.selected.add(id);
+  }
+
+  // Footer visibility: assign actions only when assigning to user(s).
+  get showAssignFooter(): boolean {
+    return !this.loading && this.activeTab === 0 && this.mode !== 'manage';
+  }
+
+  get showCloseFooter(): boolean {
+    return !this.loading && (this.activeTab === 1 || (this.activeTab === 0 && this.mode === 'manage'));
   }
 
   tagName(id: string): string {
@@ -176,6 +205,40 @@ export class AssignTagsDialogComponent implements OnInit {
       this.snackBar.open('Error saving tags.', 'Close', { duration: 3000 });
       this.isSaving = false;
     }
+  }
+
+  // ---- Tab 2: copy segment ----
+  isAllTagsSelected(): boolean {
+    return this.tags.length > 0 && this.tags.every(t => this.copySelection.isSelected(t.id));
+  }
+
+  someTagsSelected(): boolean {
+    return this.copySelection.hasValue() && !this.isAllTagsSelected();
+  }
+
+  masterToggleTags(): void {
+    if (this.isAllTagsSelected()) {
+      this.copySelection.clear();
+    } else {
+      this.tags.forEach(t => this.copySelection.select(t.id));
+    }
+  }
+
+  // Copy a single tag's segment: ?segment=<id>
+  copySegment(id: string): void {
+    this.clipboard.copy(`?segment=${id}`);
+    this.snackBar.open('Segment copied.', 'Close', { duration: 1500 });
+  }
+
+  // Copy the selected rows' segment: ?segment=<id1>,<id2>,...
+  copySelectedSegments(): void {
+    const ids = this.tags.map(t => t.id).filter(id => this.copySelection.isSelected(id));
+    if (ids.length === 0) {
+      this.snackBar.open('Select at least one tag.', 'Close', { duration: 2000 });
+      return;
+    }
+    this.clipboard.copy(`?segment=${ids.join(',')}`);
+    this.snackBar.open(`Segment copied (${ids.length} tag${ids.length === 1 ? '' : 's'}).`, 'Close', { duration: 1800 });
   }
 
   cancel(): void {
