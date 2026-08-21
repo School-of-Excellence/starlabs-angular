@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, Optional } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import {
   Firestore, collection, collectionData, doc, setDoc, serverTimestamp, Timestamp
 } from '@angular/fire/firestore';
 import { firstValueFrom } from 'rxjs';
+import { normalizeUrl } from '../campaigndashboard.component';
 
 interface Tag {
   id: string;
@@ -77,11 +78,36 @@ export class NewCampaignDialogComponent implements OnInit {
   loadingTags = true;
   isSaving = false;
 
+  /** When set, the dialog edits this existing eiflixcampaign doc instead of creating one. */
+  editId: string | null = null;
+
   constructor(
     private firestore: Firestore,
     private snackBar: MatSnackBar,
-    private dialogRef: MatDialogRef<NewCampaignDialogComponent>
-  ) {}
+    private dialogRef: MatDialogRef<NewCampaignDialogComponent>,
+    @Optional() @Inject(MAT_DIALOG_DATA) data: { campaign?: any } | null
+  ) {
+    const c = data?.campaign;
+    if (c) {
+      this.editId = c.id;
+      this.campaignName = c.campaignname || '';
+      this.startDate = c.startdate?.toDate ? c.startdate.toDate()
+        : c.startdate instanceof Date ? c.startdate : null;
+      this.endDate = c.enddate?.toDate ? c.enddate.toDate()
+        : c.enddate instanceof Date ? c.enddate : null;
+      this.segment = c.segment || '';
+      this.expectedSaleValue = c.expectedsalevalue ?? null;
+      this.achievedSalesValue = c.achievedsalesvalue ?? 0;
+      this.numberOfSales = c.numberofsales ?? 0;
+      this.channelSelected = new Set<string>(c.channels || []);
+      this.manualNotes = [...(c.manualnotes || [])];
+      this.campaignAssets = (c.campaignassets || []).map((a: CampaignAsset) => ({ ...a }));
+    }
+  }
+
+  get isEdit(): boolean {
+    return this.editId !== null;
+  }
 
   async ngOnInit(): Promise<void> {
     try {
@@ -128,7 +154,7 @@ export class NewCampaignDialogComponent implements OnInit {
     this.campaignAssets = [...this.campaignAssets, {
       type: this.assetType,
       name: this.assetName.trim(),
-      url: this.assetUrl.trim()
+      url: normalizeUrl(this.assetUrl)
     }];
     this.assetType = '';
     this.assetName = '';
@@ -160,23 +186,26 @@ export class NewCampaignDialogComponent implements OnInit {
 
     this.isSaving = true;
     try {
-      const ref = doc(collection(this.firestore, 'eiflixcampaign'));
-      await setDoc(ref, {
+      const ref = this.editId
+        ? doc(this.firestore, 'eiflixcampaign', this.editId)
+        : doc(collection(this.firestore, 'eiflixcampaign'));
+      const payload: any = {
         id: ref.id,
         campaignname: this.campaignName.trim(),
         startdate: Timestamp.fromDate(this.startDate!),
         enddate: Timestamp.fromDate(this.endDate!),
         segment: this.segment,
-        expectedsalevalue: this.expectedSaleValue ?? 0,
-        achievedsalesvalue: this.achievedSalesValue ?? 0,
-        numberofsales: this.numberOfSales ?? 0,
+        expectedsalevalue: Math.max(0, this.expectedSaleValue ?? 0),
+        achievedsalesvalue: Math.max(0, this.achievedSalesValue ?? 0),
+        numberofsales: Math.max(0, this.numberOfSales ?? 0),
         channels: [...this.channelSelected],
         manualnotes: this.manualNotes,
         campaignassets: this.campaignAssets,
-        created: serverTimestamp(),
         updated: serverTimestamp()
-      });
-      this.snackBar.open('Campaign saved.', 'Close', { duration: 2500 });
+      };
+      if (!this.editId) payload.created = serverTimestamp();
+      await setDoc(ref, payload, { merge: true });
+      this.snackBar.open(this.isEdit ? 'Campaign updated.' : 'Campaign saved.', 'Close', { duration: 2500 });
       this.dialogRef.close(true);
     } catch (err) {
       console.error('Error saving campaign:', err);
