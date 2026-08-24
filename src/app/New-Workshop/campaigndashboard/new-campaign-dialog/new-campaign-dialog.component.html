@@ -1,5 +1,5 @@
 <div class="dialog-header">
-  <h2>🆕 New Campaign</h2>
+  <h2>{{ isEdit ? '✏️ Edit Campaign' : '🆕 New Campaign' }}</h2>
   <button mat-icon-button class="close-btn" (click)="cancel()" aria-label="Close">
     <mat-icon>close</mat-icon>
   </button>
@@ -147,7 +147,7 @@
     @if (isSaving) {
       <mat-spinner diameter="18" class="save-spinner"></mat-spinner>
     }
-    Create Campaign
+    {{ isEdit ? 'Update Campaign' : 'Create Campaign' }}
   </button>
 
 </mat-dialog-content>

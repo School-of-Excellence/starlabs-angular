@@ -168,7 +168,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.authguard.getParticipantMetaMap()
       .then(res => (this.metaMap = res?.map || {}))
       .catch(err => console.error('Error loading participant meta map:', err));
-    collectionData(collection(this.firestore, 'newusertags'), { idField: 'id' }).subscribe({
+    collectionData(
+      query(collection(this.firestore, 'newusertags'), where('type', '==', 'newusersegments')),
+      { idField: 'id' }
+    ).subscribe({
       next: (rows: any[]) => {
         const map: Record<string, string> = {};
         rows.forEach(r => (map[r.id] = (r.name || '').toString()));

@@ -38,7 +38,7 @@ import { NewusersComponent } from '../newusers/newusers.component';
   styleUrl: './workshops.component.css'
 })
 export class WorkshopsComponent implements OnInit {
-  displayedColumns: string[] = ['active', 'title', 'type', 'created', 'startDate', 'endDate', 'status', 'edit'];
+  displayedColumns: string[] = ['active', 'webactive', 'title', 'type', 'created', 'startDate', 'endDate', 'status', 'edit'];
   workshops$: Observable<any[]>;
   mapProfileNew: any = {};
   mapProfile: any = {};
@@ -212,6 +212,31 @@ export class WorkshopsComponent implements OnInit {
       console.error('Error updating workshop status:', error);
       event.source.checked = !isActive;
       this.snackBar.open('Error updating workshop status. Please try again.', 'Close', { duration: 3000 });
+    }
+  }
+
+  async onWorkshopWebStatusChange(workshop: any, event: any): Promise<void> {
+    const isActive = event.checked;
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(
+      `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}" on the web?`
+    );
+    if (!confirmed) {
+      event.source.checked = !isActive;
+      return;
+    }
+    try {
+      const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);
+      await updateDoc(workshopRef, { webactive: isActive });
+      this.snackBar.open(
+        `Workshop ${isActive ? 'activated' : 'deactivated'} on web successfully!`,
+        'Close', { duration: 2000 }
+      );
+      workshop.webactive = isActive;
+    } catch (error) {
+      console.error('Error updating workshop web status:', error);
+      event.source.checked = !isActive;
+      this.snackBar.open('Error updating workshop web status. Please try again.', 'Close', { duration: 3000 });
     }
   }
 

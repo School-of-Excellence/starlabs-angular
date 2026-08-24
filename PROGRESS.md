@@ -1,33 +1,49 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-20 (Audio Library download button)_
+_Last updated: 2026-08-21 (Upload Studio)_
 · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-20-audio-download-button.md`.
+`specs/journals/2026-08-21-upload-studio.md`.
 
 ## Current state
-- Branch `production` (HEAD `871ccc3c`). UNCOMMITTED: the download
-  feature (3 files in `src/app/content/audio-dashboard/`) + the
-  operator's own staged edit to `ah-notification.component.html`.
-  Operator commits manually — standing directive. NOT pushed.
-- `/audiodashboard` rows now have Download → Edit → Delete actions.
-  Download streams the storage file with a live %, saves it locally
-  with a clean filename, and falls back to opening the URL on failure.
+- Branch `nanda-development`. UNCOMMITTED working tree: the new **Upload
+  Studio** (5 new files under `src/app/content/episodes-dashboard/upload-studio/`
+  + redesigned `episodes-dashboard.*` + `app.routes.ts`), plus earlier
+  uncommitted work from other sessions (campaigndashboard, wccalendar,
+  newusersprofile, styles.css). Operator commits manually — standing
+  directive. NOT pushed, NOT deployed.
+- `/videodashboard` = redesigned light-premium Episodes library (stats,
+  search, chip filters, thumbnails). `/videodashboard/upload` = new
+  route-based Upload Studio: multi-video parallel uploads (3 slots +
+  auto-queue), live network speed + ETA + sparkline, pause/resume/cancel/
+  retry, canDeactivate + beforeunload lock. Also mounted under
+  `/content-upload-v2/videodashboard[/upload]`. Prod build passes.
 
-## Last session changes (2026-08-20)
-- Added per-row audio download: fetch → streamed blob → object-URL
-  anchor. WHY blob: the `download` attribute is ignored cross-origin
-  and Firebase serves inline. CORS proven by the existing fetch in
-  `prescribe-atc.component.ts:1157`; COEP `require-corp` is scoped to
-  Zoom routes only, so this route is clear.
-- New scoped `audio-dashboard.component.css` (col-act 124px for three
-  buttons, a-down styles) so shared `content-upload-shared.css` stays
-  untouched for the other dashboards.
-- graphify rebuild skipped — no `graphify-out/` or python package on
-  this machine.
+## Last session changes (2026-08-21, Upload Studio session)
+- Replaced the accidental-close-prone "Upload New Episode" **dialog** with
+  the Upload Studio **route**. Round 2: **Edit** also moved into the studio
+  (`/videodashboard/upload?edit=<id>` — prefilled job, replace-file support,
+  metadata-only instant save, replaced files cleaned up after save); only
+  Delete still uses a dialog. NOTE: `upload-episode-dialog/` is NOT dead —
+  /workshopconfig "Upload Zoom Call" still opens it.
+- Episode Firestore docs keep the exact legacy field set (operator's hard
+  rule — no new fields); `convertedtohls` untouched (backend-owned).
+  Storage paths unchanged (`eiflix_episodes/`, `eiflix_images/`,
+  `eiflix_srt/`).
+- Gotchas fixed en route: blob: preview URLs need
+  `bypassSecurityTrustUrl` (cached per job); MatTableDataSource ignores
+  filterPredicate on empty filter string; Firebase callbacks wrapped in
+  `zone.run`. Dead reconvertEpisodesHLS UI code removed (git history has
+  it). WHY-details: `specs/journals/2026-08-21-upload-studio.md`.
 
 ## Pending
-- Confirm `ng build --configuration production` result (running at
-  session end); operator to review, commit, and deploy when ready.
-- Carried from 2026-08-19 (`nanda-development`, status unknown on this
-  branch): eiflix register backfill, `/eiflixoperationsdashboard`
-  route guard, backfill script `__proto__` exposure — see that journal.
+- **Operator visual pass + real upload test** of `/videodashboard` and
+  `/videodashboard/upload` behind login (Claude verified compile only —
+  no prod login available). Then commit & deploy when satisfied.
+- Carried: newusertags backfill decision (11 prod docs lack `type`;
+  profile/assign-tags screens list zero tags until backfilled);
+  `eiflixcampaign` Firestore rules unverified; eiflix register backfill +
+  `/eiflixoperationsdashboard` route guard + backfill-script `__proto__`
+  exposure (2026-08-19 journal).
+- Pre-existing episode-delete gaps (not touched): SRT file never deleted
+  from Storage on episode delete; delete-dialog Cancel button has no
+  click handler.
