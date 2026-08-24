@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
+import { pendingUploadsGuard } from './content/episodes-dashboard/upload-studio/pending-uploads.guard';
 
 export const routes: Routes = [
   {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
@@ -56,6 +57,13 @@ export const routes: Routes = [
             .then(m => m.EpisodesDashboardComponent),canActivate:[authGuard]
       },
 
+      { path: 'videodashboard/upload',
+        loadComponent: () =>
+          import('./content/episodes-dashboard/upload-studio/upload-studio.component')
+            .then(m => m.UploadStudioComponent),
+        canActivate:[authGuard], canDeactivate:[pendingUploadsGuard]
+      },
+
       { path: 'ads',
         loadComponent: () =>
           import('./content/click-ads/click-ads.component')
@@ -105,6 +113,7 @@ export const routes: Routes = [
   {path: 'dynamicstudio', loadComponent: () => import('./queue system/dynamic-studio-v2/dynamic-studio-v2.component').then(m => m.DynamicStudioV2Component), canActivate:[authGuard]},
   {path: 'view-participants-form', loadComponent: () => import('./Participants Profile Management/view-participants-form/view-participants-form.component').then(m => m.ViewParticipantsFormComponent), canActivate:[authGuard]},
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
+  {path: 'videodashboard/upload', loadComponent: () => import('./content/episodes-dashboard/upload-studio/upload-studio.component').then(m => m.UploadStudioComponent), canActivate:[authGuard], canDeactivate:[pendingUploadsGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
   {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
   {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
@@ -283,6 +292,8 @@ export const routes: Routes = [
   {path: 'bigengagementdashboard', loadComponent: () => import('./New-Workshop/capacity-dashboard/capacity-dashboard.component').then(m => m.CapacityDashboardComponent),canActivate:[authGuard]},
   {path: 'bigeventmentor', loadComponent: () => import('./New-Workshop/bigeventmentor/bigeventmentor.component').then(m => m.BigeventmentorComponent),canActivate:[authGuard]},
   {path: 'eiflixoperationsdashboard', loadComponent: () => import('./New-Workshop/eiflixoperationsdashboard/eiflixoperationsdashboard.component').then(m => m.EiflixoperationsdashboardComponent),canActivate:[authGuard]},
+  {path: 'campaigndashboard', loadComponent: () => import('./New-Workshop/campaigndashboard/campaigndashboard.component').then(m => m.CampaigndashboardComponent)},
+  {path: 'wccalendar', loadComponent: () => import('./New-Workshop/wccalendar/wccalendar.component').then(m => m.WccalendarComponent)},
   
   // Evolution Mapping
   {path: 'evolutionmapping', loadComponent: () => import('./EvolutionMapping/evolution-mapping/evolution-mapping.component').then(m => m.EvolutionMappingComponent), canActivate:[authGuard]},
