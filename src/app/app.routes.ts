@@ -262,6 +262,7 @@ export const routes: Routes = [
 
   // Chat
   {path: 'group-chat', loadComponent: () => import('./Events/Chat/chat-screen/chat-screen.component').then(m => m.ChatScreenComponent), canActivate:[authGuard]},
+  {path: 'group-chat-screen', loadComponent: () => import('./Events/Chat/group-chat-screen/group-chat-screen.component').then(m => m.GroupChatScreenComponent), canActivate:[authGuard]},
 
   // Communication Center
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
