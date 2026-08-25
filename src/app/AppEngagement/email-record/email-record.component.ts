@@ -1151,14 +1151,15 @@ exportCategoryParticipants(): void {
   private buildParticipantsList(record: any): void {
     this.allParticipants = [];
     const logs: EmailLog[] = record.logs || [];
-    const allRecipients: string[] = record.emailid || [];
-    
+    const rawRecipients = record.emailid || [];
+    const allRecipients: string[] = (Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients])
+      .filter((r: any): r is string => typeof r === 'string' && r.trim() !== '');    
     // Create a map to track each participant's statuses
     const participantMap = new Map<string, Participant>();
     
     // Initialize all recipients
     allRecipients.forEach((emailOrProfileId: string) => {
-      const email = emailOrProfileId.toLowerCase();
+      const email = emailOrProfileId.trim().toLowerCase();      
       const profileId = record.emailmap?.[emailOrProfileId] || null;
       const profile = profileId ? this.mapProfile[profileId] : this.findProfileByEmail(email);
       
