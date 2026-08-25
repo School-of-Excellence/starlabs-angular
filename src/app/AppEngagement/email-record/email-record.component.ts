@@ -541,7 +541,10 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       const logs = this.emailLogsMap.get(archiveId) || [];
 
       // Get all recipients from the archive
-      const allRecipients = archive.emailid || archive.profileid || [];
+      const rawRecipients = archive.emailid || archive.profileid || [];
+      const allRecipients: string[] = (Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients])
+        .filter((r: any): r is string => typeof r === 'string' && r.trim() !== '')
+        .map((r: string) => r.trim().toLowerCase());
       const totalRecipients = allRecipients.length;
 
       // Calculate status counts from logs
@@ -612,7 +615,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       statusCounts.failed = failedEmails.size;
 
       // Calculate not sent (recipients who don't have a 'sent' log)
-      const allRecipientEmails = new Set<string>(allRecipients.map((r: string) => r.toLowerCase()));
+      const allRecipientEmails = new Set<string>(allRecipients);      
       const notSentCount = [...allRecipientEmails].filter((email: string) => !sentEmails.has(email)).length;
       statusCounts.notSent = notSentCount;
 
