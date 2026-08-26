@@ -17930,3 +17930,84 @@ i.seat-chip {
 :host .board .column .col-header .col-mini-stats .mini-stat:nth-child(4) .mini-stat-val {
   color: #64748b !important;
 }
+.stage-stat-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.stage-stat-card {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stage-stat-card:hover {
+  background: #f1f5f9;
+}
+
+.stage-stat-num {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stage-stat-num--completed { color: #10b981; }
+.stage-stat-num--cancelled { color: #94a3b8; }
+
+.stage-stat-arrow {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.stage-stat-lbl {
+  margin-left: auto;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  align-self: center;
+}
+
+.stage-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  margin: 4px 0 8px;
+  background: #f1f5f9;
+  border-radius: 8px;
+}
+
+.stage-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.stage-tab.is-active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.card-status.s-scheduled {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.card-status.s-waiting {
+  background: #fff7ed;
+  color: #c2703d;
+}

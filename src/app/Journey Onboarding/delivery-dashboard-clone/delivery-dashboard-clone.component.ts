@@ -22,6 +22,7 @@ import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
+import { BookAppointmentDialogComponent } from '../../Scheduling/book-appointment-dialog/book-appointment-dialog/book-appointment-dialog.component';
 
 interface TableHeader {
     key: string;
@@ -145,7 +146,8 @@ interface UtilizationRow {
         MatNativeDateModule,
         MatInputModule,
         MatSlideToggleModule,
-        ProfilePictureComponent
+        ProfilePictureComponent,
+        FormOverlayViewComponent
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -165,6 +167,9 @@ export class DeliveryDashboardCloneComponent {
 
     // Stages chip loading state (5-8s data fetch needs visible feedback)
     stagesLoading: boolean = false;
+
+    // Only super role can book appointment
+    superRole: boolean = false;
 
     // Boolean declarations
     isLoading = true;
@@ -289,6 +294,8 @@ export class DeliveryDashboardCloneComponent {
             'SMP Diagnostic & Implementation (Appointment)',
         ]
     };
+
+    stageTabFilter: { [key: string]: 'all' | 'scheduled' | 'waiting' } = {};
 
     showHiddenProducts = false;
 
@@ -604,6 +611,18 @@ export class DeliveryDashboardCloneComponent {
         }
     };
 
+    stageExportModalOpen = false;
+    exportFieldOptions: { key: string; label: string; selected: boolean }[] = [
+        { key: 'sno', label: 'S.No', selected: true },
+        { key: 'name', label: 'Participant Name', selected: true },
+        { key: 'diagnosticsSpecialist', label: 'Diagnostics Specialist', selected: true },
+        { key: 'implementationSpecialist', label: 'Implementation Specialist', selected: true },
+        { key: 'initiationDate', label: 'Initiation Date', selected: true },
+        { key: 'currentStage', label: 'Current Stage', selected: true },
+        { key: 'currentStageStatus', label: 'Current Stage Status', selected: true },
+        { key: 'scheduledDateOrDelay', label: 'Scheduled Date / Delayed Days', selected: true },
+    ];
+
     private readonly terminalStageKey: { [productType: string]: string } = {
         eiStarterPack: 'celebration call',
         eiCustomSolutions: 'celebration call',
@@ -768,6 +787,14 @@ export class DeliveryDashboardCloneComponent {
         this.productFilterControl?.setValue(checked ? [...this.availableCardLabels] : []);
     }
 
+    getStageTab(col: string): 'all' | 'scheduled' | 'waiting' {
+        return this.stageTabFilter[col] || 'all';
+    }
+
+    setStageTab(col: string, tab: 'all' | 'scheduled' | 'waiting') {
+        this.stageTabFilter[col] = tab;
+    }
+
     get activeFilterSummary(): string {
         const parts: string[] = [];
         const sel = (this.productFilterControl?.value as string[]) || [];
@@ -791,6 +818,193 @@ export class DeliveryDashboardCloneComponent {
         const label = this.cardLabelForProductId(pid);
         if (!label) return false;
         return ((this.productFilterControl.value as string[]) || []).includes(label);
+    }
+
+    openStageExportModal(): void {
+        if (!this.selectedProductLabel) {
+            alert('Please select a product to export stage data.');
+            return;
+        }
+        this.stageExportModalOpen = true;
+    }
+
+    closeStageExportModal(): void {
+        this.stageExportModalOpen = false;
+    }
+
+    toggleExportField(key: string): void {
+        const field = this.exportFieldOptions.find(f => f.key === key);
+        if (field) field.selected = !field.selected;
+    }
+
+    exportStageData(format: 'excel' | 'jpg'): void {
+        const selectedFields = this.exportFieldOptions.filter(f => f.selected);
+        if (selectedFields.length === 0) {
+            alert('Please select at least one field to export.');
+            return;
+        }
+
+        const rows = this.buildStageExportRows();
+        if (rows.length === 0) {
+            alert('No stage data available to export.');
+            return;
+        }
+
+        const filename = `${this.selectedProductLabel}_Stages_Export_${new Date().toISOString().split('T')[0]}`;
+
+        if (format === 'excel') {
+            const excelRows = rows.map(row => {
+                const excelRow: any = {};
+                selectedFields.forEach(f => excelRow[f.label] = row[f.key]);
+                return excelRow;
+            });
+            this.downloadExcel(excelRows, filename);
+        } else {
+            const headers = selectedFields.map(f => f.label);
+            const jpgRows = rows.map(row => selectedFields.map(f => row[f.key]));
+            this.renderTableToCanvas(headers, jpgRows, filename);
+        }
+
+        this.closeStageExportModal();
+    }
+
+    private buildStageExportRows(): any[] {
+        const rows: any[] = [];
+        let serial = 1;
+
+        for (const col of this.selectedColumns) {
+            const stageKey = col.toLowerCase().trim();
+            const stage = this.stageData[stageKey];
+            if (!stage) continue; // non-stage columns (Total Eligible, months) have no stageData entry
+
+            const scheduledCards = stage.all || [];
+            const completedCards = this.getStageCompletedCards(stageKey);
+            const waitingCards = this.getNotScheduledCards(stageKey);
+
+            for (const app of scheduledCards) {
+                const profileId = this.getStageModalProfileId(app);
+                if (!profileId) continue;
+                const scheduledDate = app.starttime ? this.formatDateTime(app.starttime) : 'N/A';
+                rows.push(this.buildExportRow(serial++, profileId, col, 'Scheduled', scheduledDate));
+            }
+
+            for (const card of completedCards) {
+                const profileId = this.getStageModalProfileId(card) || card.profileid || card.clientid;
+                if (!profileId) continue;
+                const completedDate = card.endtime
+                    ? this.formatDateTime(card.endtime)
+                    : (card.statusdate?.completed ? this.formatDate(card.statusdate.completed) : 'N/A');
+                rows.push(this.buildExportRow(serial++, profileId, col, 'Completed', completedDate));
+            }
+
+            for (const card of waitingCards) {
+                const profileId = card.profileid || card.clientid;
+                if (!profileId) continue;
+                const delayInfo = this.showDelayDate(card) || 'N/A';
+                rows.push(this.buildExportRow(serial++, profileId, col, 'Waiting', delayInfo));
+            }
+        }
+
+        return rows;
+    }
+
+    private buildExportRow(serial: number, profileId: string, stage: string, statusLabel: string, dateOrDelay: string): any {
+        const meta = this.mapMetaData[profileId] || {};
+        const initiationSource = meta['initiatedtime'] || meta['onboardedtime'];
+        const initiationDate = initiationSource ? this.formatDate(initiationSource) : 'N/A';
+
+        return {
+            sno: serial,
+            name: meta['name'] || profileId,
+            diagnosticsSpecialist: this.getSpecialistNameForStage(profileId, 'diagnostics'),
+            implementationSpecialist: this.getSpecialistNameForStage(profileId, 'implementation'),
+            initiationDate,
+            currentStage: stage,
+            currentStageStatus: statusLabel,
+            scheduledDateOrDelay: dateOrDelay
+        };
+    }
+
+    private getSpecialistNameForStage(profileId: string, stageKey: string): string {
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
+        if (!appointmentTypeName) return 'N/A';
+
+        const match = this.allAppointments.find((app: any) =>
+            app.appointmentTypeName === appointmentTypeName &&
+            this.getStageModalProfileId(app) === profileId
+        );
+        if (!match?.hosts?.length) return 'N/A';
+
+        const hostRef = match.hosts[0];
+        const hostId = (hostRef?.path || hostRef || '').toString().split('/').pop();
+        return this.mapMetaData[hostId]?.['name'] || this.mapprofile[hostId] || 'N/A';
+    }
+
+    private renderTableToCanvas(headers: string[], rows: any[][], filename: string): void {
+        const cellPadding = 10;
+        const rowHeight = 32;
+        const fontSize = 13;
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        ctx.font = `${fontSize}px Arial`;
+
+        const colWidths = headers.map((header, colIndex) => {
+            const cellTexts = [header, ...rows.map(row => String(row[colIndex] ?? ''))];
+            const widest = Math.max(...cellTexts.map(text => ctx.measureText(text).width));
+            return widest + cellPadding * 2;
+        });
+
+        const tableWidth = colWidths.reduce((sum, w) => sum + w, 0);
+        const tableHeight = rowHeight * (rows.length + 1);
+        canvas.width = tableWidth;
+        canvas.height = tableHeight;
+
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#eef0fb';
+        ctx.fillRect(0, 0, tableWidth, rowHeight);
+        ctx.fillStyle = '#1f2937';
+        let x = 0;
+        headers.forEach((header, i) => {
+            ctx.fillText(header, x + cellPadding, rowHeight / 2);
+            x += colWidths[i];
+        });
+
+        ctx.font = `${fontSize}px Arial`;
+        rows.forEach((row, rowIndex) => {
+            const y = rowHeight * (rowIndex + 1);
+            ctx.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#f9fafb';
+            ctx.fillRect(0, y, tableWidth, rowHeight);
+            ctx.fillStyle = '#111827';
+            x = 0;
+            row.forEach((cell, colIndex) => {
+                ctx.fillText(String(cell ?? ''), x + cellPadding, y + rowHeight / 2);
+                x += colWidths[colIndex];
+            });
+        });
+
+        ctx.strokeStyle = '#e5e7eb';
+        for (let i = 0; i <= rows.length + 1; i++) {
+            const y = i * rowHeight;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(tableWidth, y);
+            ctx.stroke();
+        }
+        x = 0;
+        colWidths.forEach(w => {
+            x += w;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, tableHeight);
+            ctx.stroke();
+        });
+
+        const link = document.createElement('a');
+        link.download = `${filename}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
     }
 
     private resolveProductLabel(picked: string): string | null {
@@ -832,6 +1046,12 @@ export class DeliveryDashboardCloneComponent {
     }
 
     async ngOnInit() {
+        const roles = await this.guard.getRoles();
+        const adminRole = roles.admin != null ? roles.admin : false;
+        const schedulerRole = roles.scheduler != null ? roles.scheduler : false;
+        const ahRole = roles.ah != null ? roles.ah : false;
+        this.superRole = adminRole || schedulerRole || ahRole;
+
         this.startLastUpdatedTimer();
         this.setCurrentMonth();
         this.initializeMonthFilter();
@@ -3596,6 +3816,50 @@ export class DeliveryDashboardCloneComponent {
         this.selectedFilter = 'all';
         this.selectedStageFilter = stageFilter;
         this.groupedByStageProfileAll = participantData;
+    }
+
+    getAppointmentTypeIdForStage(): string | null {
+        const stageKey = this.selectedStage?.toLowerCase();
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
+        const match = this.mappedAppointmentTypes.find(t => t.appointmenttype === appointmentTypeName);
+        return match?.id || null;
+    }
+
+    private resolveAppointmentTypeId(stageKey: string): string | null {
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
+        const match = this.mappedAppointmentTypes.find(t => t.appointmenttype === appointmentTypeName);
+        return match?.id || null;
+    }
+
+    openBookAppointmentForCard(card: any, stageKey: string) {
+        if (!this.superRole) return;
+
+        const profileId = card?.profileid || card?.clientid;
+        const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
+
+        if (!profileId || !appointmentTypeId) {
+            alert('Unable to resolve appointment type for booking.');
+            return;
+        }
+
+        const dialogRef = this.dialog.open(BookAppointmentDialogComponent, {
+            data: {
+                profileId,
+                profileName: this.mapMetaData[profileId]?.['name'] || profileId,
+                appointmentTypeId,
+                appointmentTypeName
+            },
+            width: '640px',
+            autoFocus: false,
+            panelClass: 'custom-dialog-container'
+        });
+
+        dialogRef.afterClosed().subscribe((booked: boolean) => {
+            if (!booked) return;
+            this.closeStageModal();
+            if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+        });
     }
 
     onFilterChange(selectedFilter: string) {

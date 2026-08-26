@@ -1,0 +1,37 @@
+<div class="mainscreen">
+  <label class="title">Book Appointment</label>
+  <p class="dd-section-sub" style="margin: 4px 0 16px;">
+    {{ data.profileName }} — {{ data.appointmentTypeName }}
+  </p>
+
+  <div *ngIf="resolving">Loading availability…</div>
+
+  <div *ngIf="!resolving && resolveError" class="analytics-empty">
+    {{ resolveError }}
+  </div>
+
+  <ng-container *ngIf="!resolving && !resolveError">
+    <mat-form-field appearance="outline">
+      <mat-label>Preferred Date</mat-label>
+      <input matInput [(ngModel)]="selectedDate" [min]="mindate" [matDatepicker]="picker"
+        (click)="picker.open()" (dateChange)="onDateSelect()" placeholder="MM-DD-YYYY">
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+
+    <div class="slotsbox" *ngIf="userAvailableSlots.length != 0">
+      <label class="slotheading">Available Slots</label>
+      <mat-chip-listbox [multiple]="false" [selectable]="true">
+        <mat-chip-option *ngFor="let slot of userAvailableSlots; let i = index"
+          (click)="selectedSlot = i" [selected]="selectedSlot == i">
+          {{ slot.start | date:'shortTime' }} - {{ slot.end | date:'shortTime' }} with {{ slot.specialist }}
+        </mat-chip-option>
+      </mat-chip-listbox>
+      <button class="bookbtn" mat-stroked-button (click)="confirmSlot()">Book Appointment</button>
+    </div>
+  </ng-container>
+
+  <div class="dd-modal-actions" style="margin-top: 16px; text-align: right;">
+    <button mat-button (click)="close()">Cancel</button>
+  </div>
+</div>

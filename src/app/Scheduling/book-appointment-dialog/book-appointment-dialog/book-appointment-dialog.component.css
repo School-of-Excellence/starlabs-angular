@@ -1,0 +1,78 @@
+.mainscreen {
+  padding: 4px 2px 8px;
+  font-family: inherit;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.dd-section-sub {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mainscreen > div:first-of-type {
+  padding: 24px 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.analytics-empty {
+  padding: 16px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  text-align: center;
+}
+
+mat-form-field {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.slotsbox {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.slotheading {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+mat-chip-listbox {
+  display: block;
+  margin-bottom: 16px;
+}
+
+mat-chip-option {
+  --mdc-chip-label-text-size: 13px;
+  margin: 4px 6px 4px 0;
+}
+
+.bookbtn {
+  width: 100%;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.bookbtn:hover {
+  background: #eff6ff;
+}
+
+/* Footer actions */
+.dd-modal-actions {
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
