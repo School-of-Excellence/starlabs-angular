@@ -1566,6 +1566,29 @@
                             </mat-select>
                           </mat-form-field>
                           <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Payment Based on Customer Status</mat-label>
+                            <mat-select formControlName="customerstatus" multiple>
+                              <mat-option value="non active">non active</mat-option>
+                              <mat-option value="active">active</mat-option>
+                              <mat-option value="discontinued">discontinued</mat-option>
+                              <mat-option value="none">none</mat-option>
+                              <mat-option value="banned">banned</mat-option>
+                              <mat-option value="late">late</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Payment Based on Financial Status</mat-label>
+                            <mat-select formControlName="financialstatus" multiple>
+                              <mat-option value="fully paid">fully paid</mat-option>
+                              <mat-option value="regular">regular</mat-option>
+                              <mat-option value="discontinued">discontinued</mat-option>
+                              <mat-option value="locked">locked</mat-option>
+                              <mat-option value="defaulted">defaulted</mat-option>
+                              <mat-option value="banned">banned</mat-option>
+                              <mat-option value="late">late</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
                             <mat-label>Hint</mat-label>
                             <input matInput type="text" formControlName="hint" placeholder="Enter hint" />
                           </mat-form-field>
