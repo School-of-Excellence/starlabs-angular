@@ -187,6 +187,131 @@ mat-paginator {
   color: #777;
 }
 
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 25px;
+  flex-wrap: nowrap;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.search-field {
+  width: 320px;
+}
+
+.btn-cancel-selected {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 0 18px;
+  height: 38px;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-cancel-selected:hover:not([disabled]) {
+  background-color: #1d4ed8 !important;
+  box-shadow: none;
+}
+
+.btn-cancel-selected[disabled] {
+  background-color: #93b4f5 !important;
+  color: #ffffff !important;
+  box-shadow: none;
+}
+
+.btn-export {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 0 18px;
+  height: 38px;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-export:hover {
+  background-color: #1d4ed8 !important;
+  box-shadow: none;
+}
+
+/* ================= TABLE CONTAINER ================= */
+
+.table-container {
+  margin: 0 25px 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.table-container table {
+  margin-top: 0;
+}
+
+.table-container mat-paginator {
+  margin-top: 0;
+  border-top: 1px solid #eee;
+  padding: 8px 12px;
+}
+
+.no-data-row td {
+  text-align: center;
+  padding: 24px !important;
+  color: #777;
+  font-size: 13px;
+}
+
+.header-filter mat-select {
+  width: 140px;
+  font-size: 11px;
+  min-height: 28px;
+}
+
+.header-filter .mat-mdc-select-trigger {
+  width: 140px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: inline-block;
+}
+
+/* dropdown panel itself can stay wide enough to fit long option text */
+::ng-deep .mat-mdc-select-panel {
+  min-width: 220px !important;
+}
+
+.kpi-card.active {
+  background-color: #e3f2fd;
+  border: 2px solid #1565c0;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.25);
+}
+
+.kpi-card.active .kpi-value {
+  color: #1565c0;
+}
+
+.kpi-card {
+  min-height: 72px;
+  justify-content: center;
+}
+
+.kpi-value {
+  min-height: 26px;
+}
+
 /* ================= RESPONSIVE ================= */
 
 @media (max-width: 768px) {
