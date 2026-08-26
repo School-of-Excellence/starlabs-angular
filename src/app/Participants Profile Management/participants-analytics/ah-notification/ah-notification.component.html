@@ -6,6 +6,51 @@
     </button>
   </header>
 
+  <!-- ══════════════ RECIPIENTS ══════════════ -->
+  <div class="rc-bar" *ngIf="sendableRecipients.length || heldRecipients.length">
+    <button type="button" class="rc-toggle" (click)="onShowRecipients()">
+      <mat-icon>group</mat-icon>
+      <span>{{sendableRecipients.length + heldRecipients.length}} recipient(s)</span>
+      <span class="hold-count-badge" *ngIf="heldRecipients.length > 0"
+        [matTooltip]="heldRecipients.length + ' on delivery hold — will be skipped'">
+        <mat-icon>block</mat-icon>{{heldRecipients.length}}
+      </span>
+      <mat-icon>{{showRecipients ? 'expand_less' : 'expand_more'}}</mat-icon>
+    </button>
+
+    <div class="rc-panel" *ngIf="showRecipients">
+      <div class="rc-group-head rc-group-send" *ngIf="heldRecipients.length > 0">
+        <mat-icon>send</mat-icon>
+        <span>Will be notified</span>
+        <span class="rc-group-count">{{sendableRecipients.length}}</span>
+      </div>
+      <div class="rc-grid">
+        <div class="rc-chip" *ngFor="let r of sendableRecipients; trackBy: trackRecipient">
+          <span class="rc-name">{{r['name'] || 'Unknown'}}</span>
+          <span class="rc-email">{{r['email']}}</span>
+        </div>
+        <div class="rc-empty-note" *ngIf="sendableRecipients.length === 0">
+          No one to notify — every selected profile is on delivery hold.
+        </div>
+      </div>
+
+      <ng-container *ngIf="heldRecipients.length > 0">
+        <div class="rc-group-head rc-group-hold">
+          <mat-icon>block</mat-icon>
+          <span>On delivery hold — excluded from this notification</span>
+          <span class="rc-group-count">{{heldRecipients.length}}</span>
+        </div>
+        <div class="rc-grid">
+          <div class="rc-chip on-hold" *ngFor="let r of heldRecipients; trackBy: trackRecipient"
+            matTooltip="deliveryonhold is set on this profile — clear it in Update Profile to notify them again">
+            <span class="rc-name">{{r['name'] || 'Unknown'}}</span>
+            <span class="rc-email">{{r['email']}}</span>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+
   <div class="mainscreen">
 
     <!-- <div class="row justify-content-center">
