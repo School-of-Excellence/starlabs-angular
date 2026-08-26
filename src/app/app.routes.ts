@@ -87,8 +87,8 @@ export const routes: Routes = [
             .then(m => m.LearningMaterialComponent),canActivate:[authGuard]
       },
       {path: 'communitymanager', loadComponent: () => import('./AppEngagement/community-manager/community-manager.component').then(m => m.CommunityManagerComponent), canActivate:[authGuard]},
-      {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
-      {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent), canActivate:[authGuard]},
+      {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent),},
+      // {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent),},
       {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard]},
       // {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
       // {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
@@ -122,6 +122,7 @@ export const routes: Routes = [
     {path:'editseries', loadComponent: () => import('./content/series-dashboard/edit-series/edit-series.component').then(m => m.EditSeriesComponent), canActivate:[authGuard]},
   ]},
   {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
+  {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent),},
   {path: 'zoomaccount', loadComponent: () => import('./queue system/zoom-account/zoom-account.component').then(m => m.ZoomAccountComponent), canActivate:[authGuard]},
   {path: 'arenastudioactivity', loadComponent: () => import('./queue system/arenastudioactivity/arenastudioactivity.component').then(m => m.ArenastudioactivityComponent), canActivate:[authGuard, roleGuard(['developer','admin','ah'])]},
   {path: 'queuetransfer', loadComponent: () => import('./queue system/queue-transfer/queue-transfer.component').then(m => m.QueueTransferComponent), canActivate:[authGuard]},

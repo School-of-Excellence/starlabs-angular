@@ -1008,6 +1008,8 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         api: [''],
         id: [''],
         paymentfor: [''],
+        customerstatus: [[]],
+        financialstatus: [[]],
         hint: ['']
       }),
       referallowedusers: this.fb.group({
@@ -2391,6 +2393,8 @@ private rebuildActivityIds(): void {
           api: data['paymentmap']?.api ?? '',
           id: data['paymentmap']?.id ?? '',
           paymentfor: data['paymentmap']?.paymentfor ?? '',
+          customerstatus: Array.isArray(data['paymentmap']?.customerstatus) ? data['paymentmap'].customerstatus : [],
+          financialstatus: Array.isArray(data['paymentmap']?.financialstatus) ? data['paymentmap'].financialstatus : [],
           hint: data['paymentmap']?.hint ?? '',
         },
         referallowedusers: {
