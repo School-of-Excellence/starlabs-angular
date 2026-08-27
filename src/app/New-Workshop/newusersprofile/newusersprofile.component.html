@@ -156,6 +156,15 @@
         </mat-form-field>
       </div>
 
+      <button mat-stroked-button type="button" class="tag-select-btn converted-filter-btn"
+        [class.active]="convertedOnly" (click)="toggleConvertedFilter()"
+        matTooltip="Show only profiles converted to existing users">
+        <mat-icon>swap_horiz</mat-icon>
+        Converted
+        <mat-icon *ngIf="convertedOnly" class="df-clear" matTooltip="Clear converted filter"
+          (click)="$event.stopPropagation(); toggleConvertedFilter()">close</mat-icon>
+      </button>
+
       <button mat-stroked-button class="tags-manage-btn" (click)="openTagsManager()">
         <mat-icon>sell</mat-icon>
         Tags
@@ -260,6 +269,12 @@
               <span *ngIf="workshopNames(u).length === 0">—</span>
             </div>
           </td>
+        </ng-container>
+
+        <!-- Shown only while the Converted filter is active. -->
+        <ng-container matColumnDef="movedon">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Moved On</th>
+          <td mat-cell *matCellDef="let u">{{ toDate(u.movedon) ? (toDate(u.movedon) | date: 'medium') : '—' }}</td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
