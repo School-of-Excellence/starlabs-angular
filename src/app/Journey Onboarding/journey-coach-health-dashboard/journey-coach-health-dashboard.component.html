@@ -76,6 +76,8 @@
           <button type="button" [class.on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">Active</button>
           <button type="button" [class.on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">Non-active</button>
           <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
+          <button type="button" *ngIf="summary.noStatus || shownLifecycle==='nostatus'"
+                  [class.on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')">No status</button>
         </div>
         <div class="fb-journey">
           <button type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
@@ -124,14 +126,18 @@
             <span class="ios2-title">{{ selectedCoachId === ALL ? 'All participants' : (selectedCoachId === UNASSIGNED ? 'Unassigned' : 'Assigned to me') }}</span>
             <span class="ios2-tot">{{ summary.total }}</span>
           </div>
+          <!-- Lifecycle split = participant-metadata customerstatus (active / non active /
+               discontinued). "No status" is the residual — blank or unrecognised customerstatus —
+               shown only when it is non-zero so those people are never counted as Active. -->
           <div class="sb-bar" *ngIf="summary.total">
-            <span class="sb-seg sb-active" [style.width.%]="(summary.total - summary.nonActive - summary.discontinued) / summary.total * 100"></span>
+            <span class="sb-seg sb-active" [style.width.%]="summary.active / summary.total * 100"></span>
             <span class="sb-seg sb-nonactive" [style.width.%]="summary.nonActive / summary.total * 100"></span>
             <span class="sb-seg sb-disc" [style.width.%]="summary.discontinued / summary.total * 100"></span>
+            <span class="sb-seg sb-nostatus" *ngIf="summary.noStatus" [style.width.%]="summary.noStatus / summary.total * 100"></span>
           </div>
           <div class="sb-segs">
             <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">
-              <span class="sb-num">{{ summary.total - summary.nonActive - summary.discontinued }}</span>
+              <span class="sb-num">{{ summary.active }}</span>
               <span class="sb-label"><i class="sb-dot dot-active"></i>Active</span>
             </button>
             <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">
@@ -141,6 +147,11 @@
             <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">
               <span class="sb-num">{{ summary.discontinued }}</span>
               <span class="sb-label"><i class="sb-dot dot-disc"></i>Discontinued</span>
+            </button>
+            <button type="button" class="sb-tile" *ngIf="summary.noStatus" [class.is-on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')"
+                    matTooltip="Participants whose metadata customerstatus is blank or unrecognised">
+              <span class="sb-num">{{ summary.noStatus }}</span>
+              <span class="sb-label"><i class="sb-dot dot-nostatus"></i>No status</span>
             </button>
           </div>
         </section>
