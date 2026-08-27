@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { doc, docData, DocumentReference, Firestore, query, where, getDocs, serverTimestamp, setDoc, collection, orderBy, limit, getDoc } from '@angular/fire/firestore';
+import { doc, docData, DocumentReference, Firestore, query, where, getDocs, serverTimestamp, setDoc, updateDoc, arrayUnion, collection, orderBy, limit, getDoc } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WatiService } from '../../../wati.service';
 import { AuthguardService } from '../../../authguard.service';
@@ -92,6 +92,8 @@ export class WatiInputComponent {
   mapProfile: Record<string, any> = {};
   selectedQueuedTemplate: any = null;
   queuedRecipients: any[] = [];
+  sendableRecipients: any[] = [];
+  heldRecipients: any[] = [];
 
   bufferDoc: any = {
     profileid: [], createdby: null, date: new Date(), status: 'created',
@@ -192,6 +194,7 @@ export class WatiInputComponent {
       this.bufferDoc.broadcastname = (this.bufferDoc.profileid.length === 1)
         ? `Individual_${tag}` : `Broadcast_${tag}`;
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
+      this.refreshRecipientBuckets();
     } else {
       this.dialogRef.close();
     }
@@ -441,6 +444,7 @@ export class WatiInputComponent {
       this.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p['number']);
       this.filteredProfiles = [...this.profiles];
       snap.docs.forEach(d => { const pd = d.data(); if (pd['number']) this.mapProfile[d.id] = { id: d.id, ...pd }; });
+      this.refreshRecipientBuckets();
     } catch (e) { console.error(e); }
     finally { this.isLoadingProfiles = false; }
   }
@@ -585,11 +589,12 @@ export class WatiInputComponent {
       }
       this.queuedRecipients = recipients;
       this.bufferDoc.profileid = profileIds;
+      this.refreshRecipientBuckets();
     } catch (e) { console.error(e); }
     finally { this.isLoadingQueuedRecipients = false; }
   }
 
-  resetQueuedTemplateState() { this.isQueuedTemplate = false; this.selectedQueuedTemplate = null; this.queuedRecipients = []; }
+  resetQueuedTemplateState() { this.isQueuedTemplate = false; this.selectedQueuedTemplate = null; this.queuedRecipients = []; this.refreshRecipientBuckets(); }
 
   // ══════════════════════════════════════════════════════════════════════
   // EXCEL HELPERS
@@ -724,17 +729,88 @@ export class WatiInputComponent {
   onShowRecipients() { this.showRecipients = !this.showRecipients; }
   getRecipientCount() { return this.bufferDoc.profileid.length; }
   getRecipientList() {
-    if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'] }));
+    if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'], profileid: id }));
     return this.data || [];
   }
+
+  /** Splits the recipient list into what will actually go out and what is held back.
+   *  Cached in fields — the template must not rebuild these arrays every change-detection cycle. */
+  refreshRecipientBuckets() {
+    const all = this.getRecipientList();
+    this.sendableRecipients = all.filter((r: any) => !this.isDeliveryOnHold(r?.profileid));
+    this.heldRecipients = all.filter((r: any) => this.isDeliveryOnHold(r?.profileid));
+  }
+
+  trackRecipient(_: number, r: any) { return r?.profileid ?? r?.email ?? _; }
   canUploadExcel() { return this.isTemplatePresent() && !this.isTestMode; }
 
   private populateNumbersAndMap() {
     this.bufferDoc.numbers = []; this.bufferDoc.numbermap = {};
     this.bufferDoc.profileid.forEach((id: string) => {
+      if (this.isDeliveryOnHold(id)) return; // delivery on hold — never dispatched
       const p = this.mapProfile[id];
       if (p) { const num = p.phone || p.phoneNumber || p.number || ''; if (num) { this.bufferDoc.numbers.push(num); this.bufferDoc.numbermap[num] = id; } }
     });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // DELIVERY HOLD  (profile_data.deliveryonhold === true)
+  // ══════════════════════════════════════════════════════════════════════
+  isDeliveryOnHold(profileid: string): boolean {
+    return this.mapProfile[profileid]?.['deliveryonhold'] === true;
+  }
+
+  getHeldProfileIds(): string[] {
+    return (this.bufferDoc.profileid || []).filter((id: string) => this.isDeliveryOnHold(id));
+  }
+
+  getSendableProfileIds(): string[] {
+    return (this.bufferDoc.profileid || []).filter((id: string) => !this.isDeliveryOnHold(id));
+  }
+
+  getHeldCount(): number { return this.getHeldProfileIds().length; }
+
+  /** Blocks dispatch when nothing is left to send. Returns true when the caller may continue. */
+  private assertHasSendableRecipients(): boolean {
+    if (this.bufferDoc.numbers.length > 0) return true;
+    const held = this.getHeldCount();
+    this.snackBar.open(
+      held > 0
+        ? `Nothing to send — all ${held} recipient(s) are on delivery hold.`
+        : 'Nothing to send — no valid phone numbers for the selected recipients.',
+      'Close', { duration: 5000 });
+    return false;
+  }
+
+  /** A profile may have been put on delivery hold after the broadcast was queued.
+   *  Re-check against profile_data and rewrite the archive doc before the send
+   *  function reads it. Returns false when nothing sendable is left. */
+  private async stripHeldFromQueuedArchive(archiveid: string): Promise<boolean> {
+    const held = this.getHeldProfileIds();
+    if (held.length) {
+      const heldSet = new Set(held);
+      const numbermap: Record<string, string> = this.bufferDoc.numbermap || {};
+      const numbers: string[] = (this.bufferDoc.numbers || []).filter((n: string) => !heldSet.has(numbermap[n]));
+      const cleanMap: Record<string, string> = {};
+      Object.entries(numbermap).forEach(([n, pid]) => { if (!heldSet.has(pid)) cleanMap[n] = pid; });
+
+      this.bufferDoc.numbers = numbers;
+      this.bufferDoc.numbermap = cleanMap;
+      this.bufferDoc.profileid = this.getSendableProfileIds();
+
+      await updateDoc(doc(this.firestore, 'wati archive', archiveid), {
+        profileid: this.bufferDoc.profileid,
+        numbers, numbermap: cleanMap, pending: numbers,
+        // arrayUnion, not assignment — the doc may already carry holds from queue time.
+        communicationhold: arrayUnion(...held),
+      });
+      this.snackBar.open(`${held.length} recipient(s) on delivery hold were removed from this broadcast.`, 'Close', { duration: 5000 });
+    }
+    if (!(this.bufferDoc.numbers || []).length) {
+      this.snackBar.open('Nothing to send — all queued recipients are on delivery hold.', 'Close', { duration: 5000 });
+      return false;
+    }
+    return true;
   }
 
   async sendQueuedTemplate() {
@@ -743,6 +819,7 @@ export class WatiInputComponent {
     if (!archiveid) { this.snackBar.open('Archive ID not found', 'Close', { duration: 3000 }); return; }
     this.isSendingQueued = true;
     try {
+      if (!(await this.stripHeldFromQueuedArchive(archiveid))) { this.isSendingQueued = false; return; }
       const projectId = (environment as any)['projectId'] ?? (environment as any)['firebase']?.['projectId'] ?? '';
       await this.http.post(this.PROD_SEND_FUNCTION_URL, { archiveid, projectId }, { headers: { 'Content-Type': 'application/json' } }).toPromise();
       this.snackBar.open('Message sent successfully!', 'Close', { duration: 4000 });
@@ -782,6 +859,10 @@ export class WatiInputComponent {
       templateData: { ...this.selectedTemplate },
       watiCategory: this.selectedWatiCategory || null,
       workshopTitle: this.workshopTitle,
+      profileid: this.getSendableProfileIds(),
+      // Held profiles, recorded alongside sent/failed. The send function appends any
+      // it additionally finds (a hold set between compose and dispatch).
+      communicationhold: this.getHeldProfileIds(),
     };
     if (status === 'queued') { archiveDoc.queuedAt = serverTimestamp(); archiveDoc.templatevalidated = false; }
     if (this.uploadedFile && this.fileUploadUrl) {
@@ -807,6 +888,7 @@ export class WatiInputComponent {
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'created'))
       .then(() => this.dialogRef.close({ status: 'success', archiveid }))
       .catch(() => this.dialogRef.close({ status: 'failed' }));
@@ -819,6 +901,7 @@ export class WatiInputComponent {
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'queued'))
       .then(() => { this.snackBar.open('Added to queue', 'Close', { duration: 3000 }); this.dialogRef.close('queued'); })
       .catch(() => this.dialogRef.close('failed'));
@@ -893,6 +976,7 @@ export class WatiInputComponent {
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     const scheduledAt = this.getScheduledDateTime()!;
     const archiveDoc = this.buildArchiveDoc(archiveid, 'scheduled');
     archiveDoc.scheduledAt = scheduledAt;

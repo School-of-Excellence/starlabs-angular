@@ -2000,7 +2000,11 @@ td.mat-mdc-cell span {
 .sb-active { background: #34c759; }
 .sb-nonactive { background: #ff9500; }
 .sb-disc { background: #8e8e93; }
-.sb-segs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+/* No status = blank/unrecognised customerstatus. Hatched, not a flat grey, so it can never be
+   mistaken for the solid grey Discontinued segment. */
+.sb-nostatus { background: repeating-linear-gradient(45deg, #d1d1d6 0 5px, #e9e9ed 5px 10px); }
+/* auto-fit: 3 tiles normally, 4 when the No-status tile appears, wrapping on narrow widths. */
+.sb-segs { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 12px; }
 .sb-tile { text-align: left; border: none; font: inherit; background: #f2f2f7; border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: background .15s ease, box-shadow .15s ease, transform .1s ease; }
 .sb-tile:hover { background: #ebebf0; }
 .sb-tile.is-on { box-shadow: inset 0 0 0 2px #007aff; }
@@ -2010,6 +2014,7 @@ td.mat-mdc-cell span {
 .sb-dot.dot-active { background: #34c759; }
 .sb-dot.dot-nonactive { background: #ff9500; }
 .sb-dot.dot-disc { background: #8e8e93; }
+.sb-dot.dot-nostatus { background: #fff; box-shadow: inset 0 0 0 2px #c7c7cc; }
 .sb-num { display: block; font-size: 24px; font-weight: 600; color: #1c1c1e; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .sb-sub { display: block; font-size: 11px; color: #aeaeb2; }
 
@@ -2090,7 +2095,7 @@ td.mat-mdc-cell span {
 
 /* --- Row-1 status band: sub-tiles go FLAT (no gray inset), share the 24px metric --- */
 .ios2-card .sb-bar { height: 10px; margin: var(--gap) 0; }
-.ios2-card .sb-segs { grid-template-columns: repeat(3, 1fr); gap: var(--stack); margin-top: auto; }
+.ios2-card .sb-segs { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: var(--stack); margin-top: auto; }
 .ios2-card .sb-tile { background: transparent; border-radius: var(--nest-radius); padding: 8px 10px;
   transition: background .15s ease, box-shadow .15s ease, transform .1s ease; }
 .ios2-card .sb-tile:hover { background: rgba(120,120,128,0.08); }
