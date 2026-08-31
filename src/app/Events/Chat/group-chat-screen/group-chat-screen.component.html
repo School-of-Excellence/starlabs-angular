@@ -5,11 +5,17 @@
     <!-- ── Left pane ────────────────────────────────────────────────── -->
     <div class="wc-left">
 
-      <div class="wc-tabs">
+      <div class="wc-tabsrow">
+        <!-- The app toolbar is hidden on this screen, so the nav lives here -->
+        <button class="wc-navbtn" (click)="openAppNav()" matTooltip="Open navigation">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <div class="wc-tabs">
         <button *ngFor="let t of TABS" class="wc-tab" [class.on]="tab === t.k" (click)="switchTab(t.k)">
           {{ t.label }}
           <span class="wc-tab-count" *ngIf="unread(t.k) > 0">{{ unread(t.k) }}</span>
         </button>
+        </div>
       </div>
 
       <!-- Archived splits into deleted groups / deleted channels -->
@@ -22,11 +28,15 @@
         <div class="wc-search">
           <mat-icon>search</mat-icon>
           <input [ngModel]="search" (ngModelChange)="onSearchChange($event)"
-                 [placeholder]="tab === 'archived' ? 'Search archived…' : 'Search groups and messages…'"/>
+                 [placeholder]="tab === 'archived' ? 'Search archived' : 'Search'"/>
           <button class="wc-search-clear" *ngIf="search" (click)="onSearchChange('')" matTooltip="Clear">
             <mat-icon>close</mat-icon>
           </button>
         </div>
+        <button class="wc-create" (click)="toggleTheme()"
+                [matTooltip]="theme === 'dark' ? 'Switch to light' : 'Switch to dark'">
+          <mat-icon>{{ theme === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
+        </button>
         <button class="wc-create" *ngIf="tab !== 'archived'" (click)="openCreate()"
                 [matTooltip]="tab === 'groups' ? 'New group' : 'New channel'">
           <mat-icon>add</mat-icon>
@@ -49,7 +59,8 @@
              (click)="openItem(c)">
           <div class="wc-row-emoji">
             <img *ngIf="c.photoUrl; else rowEmoji" [src]="c.photoUrl" [alt]="c.name"/>
-            <ng-template #rowEmoji>{{ c.emoji || '💬' }}</ng-template>
+            <!-- No group picture: fall back to an icon rather than an emoji glyph -->
+            <ng-template #rowEmoji><mat-icon>notifications</mat-icon></ng-template>
           </div>
           <div class="wc-row-body">
             <div class="wc-row-top">
@@ -57,10 +68,7 @@
               <span class="wc-row-time">{{ timeLabel(c.lastAt) }}</span>
             </div>
             <div class="wc-row-bottom">
-              <span class="wc-row-preview">
-                <ng-container *ngIf="c.members">{{ c.members.length }} member{{ c.members.length === 1 ? '' : 's' }} · </ng-container>
-                {{ c.lastMessage || '—' }}
-              </span>
+              <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
               <button class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
                       [matTooltip]="c.pinned ? 'Unpin chat' : 'Pin chat'">
@@ -82,8 +90,7 @@
               <span class="wc-hit-time">{{ msgTime(hit.msg.at) }}</span>
             </div>
             <div class="wc-hit-body">
-              <div class="wc-avatar xs" [style.background]="avatarBg(hit.msg.from === 'team' ? selfName : hit.msg.senderName)"
-                   [style.color]="senderColor(hit.msg.from === 'team' ? selfName : hit.msg.senderName)">
+              <div class="wc-avatar xs" [style.background]="avatarBg(hit.msg.from === 'team' ? selfName : hit.msg.senderName)">
                 <img *ngIf="photoOf(hit.msg.from === 'team' ? selfName : hit.msg.senderName) as url" [src]="url" alt=""/>
                 <ng-container *ngIf="!photoOf(hit.msg.from === 'team' ? selfName : hit.msg.senderName)">
                   {{ initials(hit.msg.from === 'team' ? selfName : hit.msg.senderName) }}
@@ -119,7 +126,7 @@
           <div class="wc-thead-main" (click)="showInfo = true; infoMsg = null; person = null" matTooltip="Open group info">
             <div class="wc-thead-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
               <img *ngIf="a.photoUrl; else headEmoji" [src]="a.photoUrl" [alt]="a.name"/>
-              <ng-template #headEmoji>{{ a.emoji || '💬' }}</ng-template>
+              <ng-template #headEmoji><mat-icon>notifications</mat-icon></ng-template>
             </div>
             <div class="wc-thead-text">
               <div class="wc-thead-name">{{ a.name }}</div>
@@ -175,35 +182,23 @@
         </div>
 
         <!-- Pinned strip -->
+        <!-- Pinned strip: label + preview, expanding to timestamp · excerpt · Jump (design spec) -->
         <div class="wc-pinned" *ngIf="pinnedMessages.length > 0 && !selectMode">
-          <div class="wc-pinned-head" (click)="pinnedOpen = !pinnedOpen">
-            <mat-icon>push_pin</mat-icon>
-            <span class="wc-pinned-count">{{ pinnedMessages.length }} pinned</span>
+          <button class="wc-pinned-head" (click)="pinnedOpen = !pinnedOpen">
+            <span class="wc-pinned-count">Pinned {{ pinnedMessages.length }}</span>
             <span class="wc-pinned-preview" *ngIf="!pinnedOpen">{{ lastPinnedPreview }}</span>
             <span class="wc-pinned-toggle">{{ pinnedOpen ? 'Hide' : 'View all' }}</span>
-          </div>
+          </button>
           <div class="wc-pinned-list" *ngIf="pinnedOpen">
-            <div class="wc-pinned-item" *ngFor="let pm of pinnedReversed; trackBy: trackById" (click)="scrollToMessage(pm.id)">
-              <mat-icon>push_pin</mat-icon>
-              <div class="wc-avatar xs" [style.background]="avatarBg(pm.from === 'team' ? selfName : pm.senderName)"
-                   [style.color]="senderColor(pm.from === 'team' ? selfName : pm.senderName)">
-                <img *ngIf="photoOf(pm.from === 'team' ? selfName : pm.senderName) as url" [src]="url" [alt]="pm.senderName"/>
-                <ng-container *ngIf="!photoOf(pm.from === 'team' ? selfName : pm.senderName)">{{ initials(pm.from === 'team' ? selfName : pm.senderName) }}</ng-container>
-              </div>
-              <div class="wc-pinned-item-body">
-                <div class="wc-pinned-item-name"
-                     [style.color]="pm.from === 'team' ? '#7C3AED' : senderColor(pm.senderName)">
-                  {{ senderLabel(pm) }}
-                </div>
-                <div class="wc-pinned-item-text">
-                  {{ plainPreview(pm.text) || (pm.attachment ? '📎 ' + (pm.attachment.name || pm.attachment.type) : '—') }}
-                </div>
-              </div>
+            <button class="wc-pinned-item" *ngFor="let pm of pinnedReversed; trackBy: trackById"
+                    (click)="scrollToMessage(pm.id)">
               <span class="wc-pinned-item-time">{{ msgTime(pm.at) }}</span>
-              <button class="wc-pinned-unpin" matTooltip="Unpin" (click)="$event.stopPropagation(); togglePin(pm)">
-                <mat-icon>close</mat-icon>
-              </button>
-            </div>
+              <span class="wc-pinned-item-text">
+                {{ senderLabel(pm) }} · {{ plainPreview(pm.text) || (pm.attachment ? (pm.attachment.name || pm.attachment.type) : '—') }}
+              </span>
+              <span class="wc-pinned-jump">Jump</span>
+              <span class="wc-pinned-unpin" matTooltip="Unpin" (click)="$event.stopPropagation(); togglePin(pm)">Unpin</span>
+            </button>
           </div>
         </div>
 
@@ -265,7 +260,7 @@
                   </a>
                 </div>
                 <div class="wc-ann-foot">
-                  <span class="wc-avatar xs" [style.background]="avatarBg(m.senderName)" [style.color]="senderColor(m.senderName)">
+                  <span class="wc-avatar xs" [style.background]="avatarBg(m.senderName)">
                     <img *ngIf="photoOf(m.senderName) as url" [src]="url" [alt]="m.senderName"/>
                     <ng-container *ngIf="!photoOf(m.senderName)">{{ initials(m.senderName) }}</ng-container>
                   </span>
@@ -309,38 +304,45 @@
 
                 <ng-container *ngIf="features.sender && m.from !== 'team'">
                   <div class="wc-avatar clickable" *ngIf="m._runStart"
-                       [style.background]="avatarBg(m.senderName)" [style.color]="senderColor(m.senderName)"
+                       [style.background]="avatarBg(m.senderName)"
                        (click)="openAvatar(m.senderName, $event)" [title]="m.senderName">
                     <img *ngIf="photoOf(m.senderName) as url" [src]="url" [alt]="m.senderName"/>
                     <ng-container *ngIf="!photoOf(m.senderName)">{{ initials(m.senderName) }}</ng-container>
                   </div>
                   <div class="wc-avatar-spacer" *ngIf="!m._runStart"></div>
                 </ng-container>
-                <ng-container *ngIf="features.sender && m.from === 'team'">
-                  <div class="wc-avatar mine clickable" *ngIf="m._runStart"
-                       [style.background]="avatarBg(selfName)" [style.color]="senderColor(selfName)"
-                       (click)="openAvatar(selfName, $event)" [title]="selfName">
-                    <img *ngIf="photoOf(selfName) as url" [src]="url" [alt]="selfName"/>
-                    <ng-container *ngIf="!photoOf(selfName)">{{ initials(selfName) }}</ng-container>
-                  </div>
-                  <div class="wc-avatar-spacer" *ngIf="!m._runStart"></div>
-                </ng-container>
 
-                <div class="wc-msg-col" [class.right]="alignRight(m)"
-                     (mouseenter)="hoverId = m.id" (mouseleave)="hoverId = null; pickerId = null">
+                <div class="wc-msg-col" [class.right]="alignRight(m)">
 
                   <div class="wc-bubble-wrap">
+                    <!-- Sender sits above the card, timestamp below it — the card holds content only. -->
+                    <div class="wc-bubble-sender" *ngIf="features.sender && m.from !== 'team' && m._runStart"
+                         (click)="openPerson(m.senderName)">
+                      {{ senderLabel(m) }}
+                    </div>
+
+                    <!-- Card and its stamp share a row; the stamp sits beside the card. -->
+                    <div class="wc-bubble-line"
+                         (mouseenter)="hoverId = m.id" (mouseleave)="hoverId = null; pickerId = null">
                     <div class="wc-bubble"
                          [class.mine]="alignRight(m)"
                          [class.mention]="mentionsMe(m) && !isLight(m)">
 
-                      <div class="wc-bubble-pinned" *ngIf="m.pinned">
-                        <mat-icon>push_pin</mat-icon> Pinned
+                      <!-- Anchored to the card, so it always hugs the message it belongs to -->
+                      <div class="wc-hover" *ngIf="hoverId === m.id && !selectMode">
+                        <button *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
+                                [class.danger]="o.danger" [matTooltip]="o.label"
+                                (click)="handleMenuAction(o.k, m)">
+                          <mat-icon>{{ o.icon }}</mat-icon>
+                        </button>
                       </div>
 
-                      <div class="wc-bubble-sender" *ngIf="features.sender && m.from !== 'team' && m._runStart"
-                           [style.color]="senderColor(m.senderName)" (click)="openPerson(m.senderName)">
-                        {{ senderLabel(m) }}
+                      <div class="wc-picker" *ngIf="pickerId === m.id">
+                        <button *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
+                      </div>
+
+                      <div class="wc-bubble-pinned" *ngIf="m.pinned">
+                        <mat-icon>push_pin</mat-icon> Pinned
                       </div>
 
                       <div class="wc-quote" *ngIf="m.replyTo" [class.linked]="m.replyTo.messageId"
@@ -379,10 +381,6 @@
                       <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: isLight(m) }"></ng-container>
                       <span class="wc-edited" *ngIf="m.edited">(edited)</span>
 
-                      <div class="wc-bubble-foot">
-                        <span class="wc-bubble-time">{{ clockTime(m.at) }}</span>
-                        <span class="wc-ticks" *ngIf="alignRight(m)"><mat-icon>done_all</mat-icon></span>
-                      </div>
 
                       <div class="wc-ctas" *ngIf="ctasOf(m).length" [class.light]="isLight(m)">
                         <a *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
@@ -393,18 +391,12 @@
                       </div>
                     </div>
 
-                    <!-- Hover actions — everything inline, no overflow menu -->
-                    <div class="wc-hover" *ngIf="hoverId === m.id && !selectMode">
-                      <button *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
-                              [class.danger]="o.danger" [matTooltip]="o.label"
-                              (click)="handleMenuAction(o.k, m)">
-                        <mat-icon>{{ o.icon }}</mat-icon>
-                      </button>
+                    <div class="wc-bubble-foot">
+                      <span class="wc-bubble-time">{{ clockTime(m.at) }}</span>
+                      <span class="wc-edited" *ngIf="m.edited">edited</span>
+                      <span class="wc-ticks" *ngIf="alignRight(m)"><mat-icon>done_all</mat-icon></span>
                     </div>
 
-                    <!-- Quick emoji picker -->
-                    <div class="wc-picker" *ngIf="pickerId === m.id">
-                      <button *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
                     </div>
                   </div>
 
@@ -422,10 +414,20 @@
         </div>
 
         <!-- Reply preview -->
+        <div class="wc-readonly" *ngIf="features.readOnly">
+          <mat-icon>archive</mat-icon>
+          <span>This {{ a._kind === 'channel' ? 'channel' : 'group' }} is archived — history stays readable, but nobody can post here.</span>
+        </div>
+        <div class="wc-noaccess" *ngIf="!features.readOnly && !canMessage">
+          <mat-icon>lock</mat-icon>
+          <span>Contact the group admin or developer for access to message.</span>
+        </div>
+
+        <!-- Composer card: notices, pickers and the input row all live inside one panel. -->
+        <div class="wc-composer-card" *ngIf="!features.readOnly && canMessage">
         <div class="wc-strip" *ngIf="replyTo">
           <div class="wc-reply">
-            <div class="wc-avatar sm" [style.background]="avatarBg(replyTo.senderName)"
-                 [style.color]="senderColor(replyTo.senderName)">
+            <div class="wc-avatar sm" [style.background]="avatarBg(replyTo.senderName)">
               <img *ngIf="photoOf(replyTo.senderName) as url" [src]="url" [alt]="replyTo.senderName"/>
               <ng-container *ngIf="!photoOf(replyTo.senderName)">{{ initials(replyTo.senderName) }}</ng-container>
             </div>
@@ -442,10 +444,6 @@
         <div class="wc-attach-error" *ngIf="attachError">{{ attachError }}</div>
 
         <!-- Archived -->
-        <div class="wc-readonly" *ngIf="features.readOnly">
-          <mat-icon>archive</mat-icon>
-          <span>This {{ a._kind === 'channel' ? 'channel' : 'group' }} is archived — history stays readable, but nobody can post here.</span>
-        </div>
 
         <!-- Editing banner -->
         <div class="wc-strip" *ngIf="editing">
@@ -457,10 +455,6 @@
         </div>
 
         <!-- Only group admins may post -->
-        <div class="wc-noaccess" *ngIf="!features.readOnly && !canMessage">
-          <mat-icon>lock</mat-icon>
-          <span>Contact the group admin or developer for access to message.</span>
-        </div>
 
         <!-- Formatting toolbar -->
         <div class="wc-toolbar" *ngIf="!recording && !features.readOnly && canMessage">
@@ -490,7 +484,7 @@
             <div class="wc-mention-row" *ngFor="let o of mentionOptions; let i = index; trackBy: trackByIndex"
                  [class.first]="i === 0" (mousedown)="$event.preventDefault(); pickMention(o)">
               <div class="wc-avatar sm"
-                   [style.background]="avatarBg(o.name)" [style.color]="senderColor(o.name)">
+                   [style.background]="avatarBg(o.name)">
                 <img *ngIf="photoOf(o.name) as url" [src]="url" [alt]="o.name"/>
                 <ng-container *ngIf="!photoOf(o.name)">{{ initials(o.name) }}</ng-container>
               </div>
@@ -563,7 +557,7 @@
         </div>
 
         <!-- Composer -->
-        <div class="wc-composer" *ngIf="!features.readOnly && canMessage">
+        <div class="wc-composer">
           <ng-container *ngIf="recording; else notRecording">
             <div class="wc-recording">
               <span class="wc-rec-dot"></span>
@@ -596,9 +590,10 @@
               </ng-container>
             </div>
 
-            <input #composer class="wc-input" [class.announce]="announceMode"
-                   [ngModel]="draft" (ngModelChange)="onDraftChange($event)"
-                   (keydown)="onComposerKeydown($event)" [placeholder]="composerPlaceholder()"/>
+            <!-- textarea, not input: Shift+Enter must insert a newline, which an input cannot hold -->
+            <textarea #composer class="wc-input" [class.announce]="announceMode" rows="1"
+                      [ngModel]="draft" (ngModelChange)="onDraftChange($event)"
+                      (keydown)="onComposerKeydown($event)" [placeholder]="composerPlaceholder()"></textarea>
 
             <button class="wc-send" *ngIf="draft.trim() || pendingFiles.length"
                     [disabled]="uploadingFiles" [matTooltip]="editing ? 'Save edit' : 'Send'"
@@ -611,6 +606,7 @@
             </button>
           </ng-template>
         </div>
+        </div>
       </ng-container>
     </div>
 
@@ -622,11 +618,31 @@
       </div>
       <div class="wc-slide-body">
         <div class="wc-slide-hero">
-          <div class="wc-slide-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
-            <img *ngIf="a.photoUrl; else slideEmoji" [src]="a.photoUrl" [alt]="a.name"/>
-            <ng-template #slideEmoji>{{ a.emoji || '💬' }}</ng-template>
+          <div class="wc-slide-photo">
+            <div class="wc-slide-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
+              <img *ngIf="a.photoUrl; else slideEmoji" [src]="a.photoUrl" [alt]="a.name"/>
+              <ng-template #slideEmoji><mat-icon>notifications</mat-icon></ng-template>
+            </div>
+            <!-- Admins can replace the picture; it writes group_profile, the field the old screen reads -->
+            <input #groupPhotoInput type="file" accept="image/*" hidden (change)="onGroupPhotoPicked($event)"/>
+            <button class="wc-slide-photobtn" *ngIf="canManageAdmins" [disabled]="savingGroupPhoto"
+                    (click)="groupPhotoInput.click()"
+                    [matTooltip]="a.photoUrl ? 'Change group picture' : 'Add a group picture'">
+              <mat-icon>{{ savingGroupPhoto ? 'hourglass_empty' : 'photo_camera' }}</mat-icon>
+            </button>
           </div>
-          <div class="wc-slide-name">{{ a.name }}</div>
+          <div class="wc-slide-name" *ngIf="!editingName">
+            {{ a.name }}
+            <button class="wc-slide-editbtn" *ngIf="canManageAdmins" (click)="startEditName()" matTooltip="Rename group">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </div>
+          <div class="wc-slide-rename" *ngIf="editingName">
+            <input [(ngModel)]="nameDraft" (keydown.enter)="saveGroupName()" (keydown.escape)="cancelEditName()"
+                   placeholder="Group name" autofocus/>
+            <button class="wc-icon-btn on" (click)="saveGroupName()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+            <button class="wc-icon-btn" (click)="cancelEditName()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
+          </div>
           <div class="wc-slide-desc" *ngIf="a.description">{{ a.description }}</div>
           <div class="wc-slide-meta" *ngIf="isChannel(a)">{{ a.followers || 0 }} followers</div>
         </div>
@@ -663,7 +679,7 @@
             </div>
             <div class="wc-member" *ngFor="let mem of teamMembers; trackBy: trackByIndex">
               <div class="wc-member-main" (click)="openPerson(mem.name)">
-                <div class="wc-avatar" [style.background]="avatarBg(mem.name)" [style.color]="senderColor(mem.name)">
+                <div class="wc-avatar" [style.background]="avatarBg(mem.name)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
                 </div>
@@ -678,14 +694,30 @@
 
           <div class="wc-block">
             <div class="wc-block-title">
-              <mat-icon>account_circle</mat-icon> <span class="grow">Participants · {{ participantMembers.length }}</span>
+              <mat-icon>account_circle</mat-icon>
+              <span class="grow">Participants · {{ memberSearch ? filteredParticipants.length + ' of ' + participantMembers.length : participantMembers.length }}</span>
               <span class="wc-badge purple" *ngIf="groupAdminCount">{{ groupAdminCount }} admin{{ groupAdminCount === 1 ? '' : 's' }}</span>
               <button class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
             <div class="wc-note" *ngIf="participantMembers.length === 0">No participants yet</div>
-            <div class="wc-member" *ngFor="let mem of participantMembers; trackBy: trackByIndex">
+
+            <!-- Worth its space only once the list is long enough to scan -->
+            <div class="wc-search plain membersearch" *ngIf="participantMembers.length > 5">
+              <mat-icon>search</mat-icon>
+              <input [(ngModel)]="memberSearch" placeholder="Search participants"/>
+              <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="wc-note" *ngIf="memberSearch && filteredParticipants.length === 0">
+              No participant matches “{{ memberSearch }}”
+            </div>
+
+            <!-- Scrolls within itself: a large group must not push the sections below out of reach -->
+            <div class="wc-memberlist">
+            <div class="wc-member" *ngFor="let mem of filteredParticipants; trackBy: trackByIndex">
               <div class="wc-member-main" (click)="openPerson(mem.name)">
-                <div class="wc-avatar clickable" [style.background]="avatarBg(mem.name)" [style.color]="senderColor(mem.name)"
+                <div class="wc-avatar clickable" [style.background]="avatarBg(mem.name)"
                      (click)="openAvatar(mem.name, $event)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
@@ -703,6 +735,7 @@
               <button class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
+            </div>
             </div>
           </div>
         </ng-container>
@@ -813,8 +846,8 @@
       </div>
       <div class="wc-slide-body">
         <div class="wc-profile-hero">
-          <div class="wc-avatar xl ring clickable" [style.background]="avatarBg(pp.name)" [style.color]="senderColor(pp.name)"
-               [style.box-shadow]="'0 0 0 2px white, 0 0 0 3.5px ' + senderColor(pp.name)"
+          <div class="wc-avatar xl ring clickable" [style.background]="avatarBg(pp.name)"
+               [style.box-shadow]="'0 0 0 3px var(--panel), 0 0 0 4px var(--line3)'"
                (click)="openAvatar(pp.name, $event)">
             <img *ngIf="photoOf(pp.name) as url" [src]="url" [alt]="pp.name"/>
             <ng-container *ngIf="!photoOf(pp.name)">{{ initials(pp.name) }}</ng-container>
@@ -907,10 +940,7 @@
 
         <div class="wc-info-strip">
           <div class="wc-info-tile seen">
-            <div class="n">{{ infoReadBy.length }}</div><div class="l">Seen</div>
-          </div>
-          <div class="wc-info-tile recv">
-            <div class="n">{{ infoReceived.length }}</div><div class="l">Received</div>
+            <div class="n">{{ infoReadBy.length }}</div><div class="l">Read</div>
           </div>
           <div class="wc-info-tile sent">
             <div class="n">{{ infoSentOnly.length }}</div><div class="l">Sent</div>
@@ -918,47 +948,32 @@
         </div>
 
         <div class="wc-info-sec seen">
-          <div class="wc-info-sec-title"><mat-icon>done_all</mat-icon> Seen · {{ infoReadBy.length }}</div>
+          <div class="wc-info-sec-title"><mat-icon>done_all</mat-icon> Read · {{ infoReadBy.length }}</div>
           <div class="wc-note" *ngIf="!infoReadBy.length">Nobody has opened this yet</div>
           <div class="wc-member" *ngFor="let r of infoReadBy; trackBy: trackByIndex">
             <div class="wc-member-main" (click)="openPerson(r.name)">
-              <div class="wc-avatar" [style.background]="avatarBg(r.name)" [style.color]="senderColor(r.name)">
+              <div class="wc-avatar" [style.background]="avatarBg(r.name)">
                 <img *ngIf="photoOf(r.name) as url" [src]="url" [alt]="r.name"/>
                 <ng-container *ngIf="!photoOf(r.name)">{{ initials(r.name) }}</ng-container>
               </div>
               <span class="wc-member-name">{{ r.name }}</span>
             </div>
-            <span class="wc-member-time">{{ timeLabel(r.at) }}</span>
-          </div>
-        </div>
-
-        <div class="wc-info-sec recv">
-          <div class="wc-info-sec-title"><mat-icon>done_all</mat-icon> Received · {{ infoReceived.length }}</div>
-          <div class="wc-note" *ngIf="!infoReceived.length">Nobody is pending a read</div>
-          <div class="wc-member" *ngFor="let r of infoReceived; trackBy: trackByIndex">
-            <div class="wc-member-main" (click)="openPerson(r.name)">
-              <div class="wc-avatar" [style.background]="avatarBg(r.name)" [style.color]="senderColor(r.name)">
-                <img *ngIf="photoOf(r.name) as url" [src]="url" [alt]="r.name"/>
-                <ng-container *ngIf="!photoOf(r.name)">{{ initials(r.name) }}</ng-container>
-              </div>
-              <span class="wc-member-name">{{ r.name }}</span>
-            </div>
-            <span class="wc-member-time">{{ timeLabel(r.at) }}</span>
+            <span class="wc-member-time" *ngIf="r.at">{{ timeLabel(r.at) }}</span>
           </div>
         </div>
 
         <div class="wc-info-sec sent">
-          <div class="wc-info-sec-title"><mat-icon>check</mat-icon> Sent · not delivered · {{ infoSentOnly.length }}</div>
-          <div class="wc-note" *ngIf="!infoSentOnly.length">Delivered to everyone</div>
+          <div class="wc-info-sec-title"><mat-icon>check</mat-icon> Sent · {{ infoSentOnly.length }}</div>
+          <div class="wc-note" *ngIf="!infoSentOnly.length">Everyone has read this</div>
           <div class="wc-member" *ngFor="let r of infoSentOnly; trackBy: trackByIndex">
             <div class="wc-member-main" (click)="openPerson(r.name)">
-              <div class="wc-avatar" [style.background]="avatarBg(r.name)" [style.color]="senderColor(r.name)">
+              <div class="wc-avatar" [style.background]="avatarBg(r.name)">
                 <img *ngIf="photoOf(r.name) as url" [src]="url" [alt]="r.name"/>
                 <ng-container *ngIf="!photoOf(r.name)">{{ initials(r.name) }}</ng-container>
               </div>
               <span class="wc-member-name">{{ r.name }}</span>
             </div>
-            <span class="wc-member-time">{{ timeLabel(r.at) }}</span>
+            <span class="wc-member-time" *ngIf="r.at">{{ timeLabel(r.at) }}</span>
           </div>
         </div>
       </div>
@@ -1044,7 +1059,7 @@
               <div class="wc-check sm" [class.on]="isPicked(p.id)">
                 <mat-icon *ngIf="isPicked(p.id)">check</mat-icon>
               </div>
-              <div class="wc-avatar sm" [style.background]="avatarBg(p.name)" [style.color]="senderColor(p.name)">
+              <div class="wc-avatar sm" [style.background]="avatarBg(p.name)">
                 <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
                 <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
               </div>
@@ -1094,7 +1109,7 @@
           <div class="wc-check sm" [class.on]="isAddPicked(p.id)">
             <mat-icon *ngIf="isAddPicked(p.id)">check</mat-icon>
           </div>
-          <div class="wc-avatar sm" [style.background]="avatarBg(p.name)" [style.color]="senderColor(p.name)">
+          <div class="wc-avatar sm" [style.background]="avatarBg(p.name)">
             <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
             <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
           </div>
