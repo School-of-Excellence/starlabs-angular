@@ -970,32 +970,30 @@
                     </div>
                     <div>
                       <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
-                        <ng-container *ngIf="col.toLowerCase().trim() !== 'onboarded'">
-                          <div class="stage-stat-row">
-                            <button type="button" class="stage-stat-card"
-                              (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
-                              <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
-                              <span class="stage-stat-arrow">›</span>
-                              <span class="stage-stat-lbl">Completed</span>
-                            </button>
-                            <button type="button" class="stage-stat-card"
-                              (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
-                              <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
-                              <span class="stage-stat-arrow">›</span>
-                              <span class="stage-stat-lbl">Cancelled</span>
-                            </button>
-                          </div>
+                        <div class="stage-stat-row">
+                          <button type="button" class="stage-stat-card"
+                            (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
+                            <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
+                            <span class="stage-stat-arrow">›</span>
+                            <span class="stage-stat-lbl">Completed</span>
+                          </button>
+                          <button type="button" class="stage-stat-card"
+                            (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
+                            <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
+                            <span class="stage-stat-arrow">›</span>
+                            <span class="stage-stat-lbl">Cancelled</span>
+                          </button>
+                        </div>
 
-                          <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
-                            <div class="stage-tabs">
-                              <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
-                                (click)="setStageTab(col, 'all')">All {{ stage.all.length + notScheduledCards.length }}</button>
-                              <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
-                                (click)="setStageTab(col, 'scheduled')">Scheduled {{ stage.all.length }}</button>
-                              <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
-                                (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
-                            </div>
-                          </ng-container>
+                        <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
+                          <div class="stage-tabs">
+                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
+                              (click)="setStageTab(col, 'all')">All {{ stage.all.length + notScheduledCards.length }}</button>
+                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
+                              (click)="setStageTab(col, 'scheduled')">Scheduled {{ stage.all.length }}</button>
+                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
+                              (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
+                          </div>
                         </ng-container>
                       </ng-container>
                     </div>
@@ -1027,12 +1025,86 @@
                         </div>
                       </ng-container>
 
-                      <ng-container *ngIf="getStageTab(col) !== 'scheduled'">
+                      <ng-container *ngIf="getStageTab(col) !== 'scheduled' && col.toLowerCase().trim() === 'onboarding'">
+                        <ng-container *ngIf="getOnboardingWaitingGroups() as groups">
+
+                          <div class="stage-subgroup-label" *ngIf="groups.overdue.length > 0">
+                            Overdue Tentative Start ({{ groups.overdue.length }})
+                          </div>
+                          <div class="card card--overdue" *ngFor="let c of groups.overdue; trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
+                            </div>
+                            <span class="card-status s-waiting">WAITING</span>
+                            <div class="detail-row">
+                              <span class="d-flex flex-column">
+                                <span>
+                                  <span class="detail-label">Tentative Start: </span>
+                                  <span class="detail-val">{{ showParticipantActiveDate(c) }}</span>
+                                </span>
+                                <span *ngIf="showDelayDate(c) as delay">
+                                  <span class="detail-label">Overdue By: </span>
+                                  <span class="detail-val">{{ delay }}</span>
+                                </span>
+                              </span>
+                            </div>
+                            <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                              </svg>
+                              Book Appointment
+                            </button>
+                          </div>
+
+                          <div class="stage-subgroup-label" *ngIf="groups.upcoming.length > 0">
+                            Upcoming Tentative Start ({{ groups.upcoming.length }})
+                          </div>
+                          <div class="card" *ngFor="let c of groups.upcoming; trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
+                            </div>
+                            <span class="card-status s-waiting">WAITING</span>
+                            <div class="detail-row">
+                              <span class="d-flex flex-column">
+                                <span>
+                                  <span class="detail-label">Tentative Start: </span>
+                                  <span class="detail-val">{{ showParticipantActiveDate(c) }}</span>
+                                </span>
+                              </span>
+                            </div>
+                            <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                              </svg>
+                              Book Appointment
+                            </button>
+                          </div>
+
+                          <div class="stage-subgroup-label" *ngIf="groups.noDate.length > 0">
+                            No Tentative Date ({{ groups.noDate.length }})
+                          </div>
+                          <div class="card" *ngFor="let c of groups.noDate; trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
+                            </div>
+                            <span class="card-status s-waiting">WAITING</span>
+                            <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                              </svg>
+                              Book Appointment
+                            </button>
+                          </div>
+                        </ng-container>
+                      </ng-container>
+
+                      <ng-container *ngIf="getStageTab(col) !== 'scheduled' && col.toLowerCase().trim() !== 'onboarding'">
                         <div class="card" *ngFor="let c of getNotScheduledCards(col.toLowerCase().trim()); trackBy: trackByCard">
                           <div class="card-top">
-                            <div class="card-info">
-                              <div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div>
-                            </div>
+                            <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
                           </div>
                           <span class="card-status s-waiting">WAITING</span>
                           <div class="detail-row">
@@ -1049,28 +1121,20 @@
                           </div>
                           <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                              <rect x="3" y="4" width="18" height="18" rx="2" />
-                              <line x1="16" y1="2" x2="16" y2="6" />
-                              <line x1="8" y1="2" x2="8" y2="6" />
-                              <line x1="3" y1="10" x2="21" y2="10" />
+                              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                              <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                             </svg>
                             Book Appointment
                           </button>
                         </div>
                       </ng-container>
 
-                      <div class="no-data-card"
-                        *ngIf="stage.all.length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
+                      <div class="no-data-card" *ngIf="stage.all.length === 0 && getNotScheduledCards(col.toLowerCase().trim()).length === 0">
                         No Data Yet
                       </div>
                     </ng-container>
-
                     <ng-template #legacyBody>
-                      <ng-container *ngIf="filteredCardsMap[i]?.length > 0; else noData">
-                      </ng-container>
-                      <ng-template #noData>
-                        <div class="no-data-card">No Data Yet</div>
-                      </ng-template>
+                      <div class="no-data-card">No Data Yet</div>
                     </ng-template>
                   </div>
                 </div>

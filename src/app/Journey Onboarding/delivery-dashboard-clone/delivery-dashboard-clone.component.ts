@@ -23,6 +23,7 @@ import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
 import { BookAppointmentDialogComponent } from '../../Scheduling/book-appointment-dialog/book-appointment-dialog/book-appointment-dialog.component';
+import { ScheduleDialogComponent } from '../schedule-dialog/schedule-dialog.component';
 
 interface TableHeader {
     key: string;
@@ -400,7 +401,7 @@ export class DeliveryDashboardCloneComponent {
             "Past Month",
             "This Month",
             "Next Month",
-            "Onboarded",
+            "Onboarding",
             "Pre-Process",
             "Diagnostics",
             "Implementation",
@@ -421,6 +422,7 @@ export class DeliveryDashboardCloneComponent {
 
         "eiCustomSolutions": [
             "Total Eligible",
+            "Onboarding",
             "Diagnostics",
             "Implementation",
             "Review",
@@ -593,13 +595,14 @@ export class DeliveryDashboardCloneComponent {
     
     private readonly stagePopulationSource: { [product: string]: { [stageKey: string]: string } } = {
         eiStarterPack: {
-            onboarded: 'totalEligible',
-            diagnostics: 'onBoarded',
+            onboarding: 'totalEligible',
+            diagnostics: 'onBoarding',
             implementation: 'diagnostics',
             'celebration call': 'implementation'
         },
         eiCustomSolutions: {
-            diagnostics: 'totalEligible',
+            onboarding: 'totalEligible',
+            diagnostics: 'onBoarding',
             implementation: 'diagnostics',
             review: 'implementation',
             'celebration call': 'review'
@@ -631,38 +634,16 @@ export class DeliveryDashboardCloneComponent {
 
     productData: any = {
         eiStarterPack: {
-            totalEligible: [],
-            pastMonth: [],
-            thisMonth: [],
-            nextMonth: [],
-            onBoarded: [],
-            preprocess: [],
-            diagnostics: [],
-            implementation: [],
-            reports: [],
-            celebrationCall: []
+            totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+            implementation: [], reports: [], celebrationCall: []
         },
-
         eiCustomSolutions: {
-            totalEligible: [],
-            pastMonth: [],
-            thisMonth: [],
-            nextMonth: [],
-            diagnostics: [],
-            implementation: [],
-            review: [],
-            celebrationCall: []
+            totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+            review: [], celebrationCall: []
         },
-
         criticalSupport: {
-            totalEligible: [],
-            request: [],
-            preprocess: [],
-            diagnostics: [],
-            implementation: [],
-            review: [],
-            postForm: [],
-            completion: []
+            totalEligible: [], request: [], preprocess: [], diagnostics: [],
+            implementation: [], review: [], postForm: [], completion: []
         }
     };
 
@@ -1432,8 +1413,8 @@ export class DeliveryDashboardCloneComponent {
         this.participantLoading = true;
         // Clear previous product's data immediately so stale cards don't show while loading
         this.productData = {
-            eiStarterPack: { totalEligible: [], pastMonth: [], thisMonth: [], nextMonth: [], onBoarded: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
-            eiCustomSolutions: { totalEligible: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
+            eiStarterPack: { totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [], implementation: [], reports: [], celebrationCall: [] },
+            eiCustomSolutions: { totalEligible: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
         const productId = this.mapProductGroupId[product];
@@ -1575,66 +1556,40 @@ export class DeliveryDashboardCloneComponent {
     async filterProductData(productType: string, product: string, productId: string) {
         let productData: any = {
             eiStarterPack: {
-                totalEligible: [],
-                pastMonth: [],
-                thisMonth: [],
-                nextMonth: [],
-                onBoarded: [],
-                preprocess: [],
-                diagnostics: [],
-                implementation: [],
-                reports: [],
-                celebrationCall: []
+                totalEligible: [], onBoarding: [], preprocess: [], diagnostics: [],
+                implementation: [], reports: [], celebrationCall: []
             },
-
             eiCustomSolutions: {
-                totalEligible: [],
-                diagnostics: [],
-                implementation: [],
-                review: [],
-                celebrationCall: []
+                totalEligible: [], onBoarding: [], diagnostics: [], implementation: [],
+                review: [], celebrationCall: []
             },
-
             criticalSupport: {
-                totalEligible: [],
-                request: this.ticketRequest.length ? this.ticketRequest : [],
-                preprocess: [],
-                diagnostics: [],
-                implementation: [],
-                review: [],
-                postForm: [],
-                completion: []
+                totalEligible: [], request: this.ticketRequest.length ? this.ticketRequest : [],
+                preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: []
             }
         };
 
         this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
         try {
-            const totalEligibleAll = this.getCardGroupedFiltered(productId);
+            const productItemsAll = this.getCardGroupedAll(productId);
 
-            const totalEligible = totalEligibleAll.filter(
-                data => data.status === 'initiated'
-            );
+            const totalEligible = productItemsAll.filter(data => {
+                const status = (data?.status || '').toString().toLowerCase().trim();
+                const mode = (this.mapMetaData?.[data?.profileid]?.['participantmode'] || '')
+                    .toString().toLowerCase().trim();
+                const modeAllowed = !this.excludedModes.has(mode); 
+                return modeAllowed && (!status || status === 'initiated');
+            });
+
             if (this.selectedProductType === 'criticalSupport') {
                 productData.criticalSupport.totalEligible = [...totalEligible];
             }
             else if (this.selectedProductType === 'eiStarterPack') {
-                for (let data of totalEligible) {
-                    const { status, tentativestart } = data;
-
-                    if (status === "initiated") {
-                        if (!tentativestart) productData.eiStarterPack.totalEligible.push(data);
-                        else if (tentativestart) {
-                            const date = tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiStarterPack');
-                        }
-                    }
-                };
+                productData.eiStarterPack.totalEligible.push(...totalEligible);
             }
             else if (this.selectedProductType === 'eiCustomSolutions') {
-                productData.eiCustomSolutions.totalEligible = [...totalEligible];
+                productData.eiCustomSolutions.totalEligible.push(...totalEligible);
             }
 
             // Total Eligible
@@ -1662,18 +1617,9 @@ export class DeliveryDashboardCloneComponent {
                     if (this.selectedProductType === 'criticalSupport') {
                         productData.criticalSupport.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiStarterPack') {
-                        if (!data.tentativestart) {
-                            productData.eiStarterPack.totalEligible.push(mergedData);
-                        } else {
-                            const date = data.tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiStarterPack');
-                        }
+                        productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
-                        if (!data.tentativestart) {
-                            productData.eiCustomSolutions.totalEligible.push(mergedData);
-                        }
+                        productData.eiCustomSolutions.totalEligible.push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1687,6 +1633,9 @@ export class DeliveryDashboardCloneComponent {
                         );
                         const diagnosticsAppointment = attendedAppointments.find(app =>
                             app.appointmentTypeName?.toLowerCase() === `ei diagnostics`
+                        );
+                        const onboardedAppointment = attendedAppointments.find(app =>
+                            app.appointmentTypeName?.toLowerCase() === `ei welcome call`
                         );
 
                         if (reviewAppointment) {
@@ -1704,6 +1653,8 @@ export class DeliveryDashboardCloneComponent {
                                 ...mergedData,
                                 ...diagnosticsAppointment
                             });
+                        } else if (onboardedAppointment) {
+                            productData.eiCustomSolutions.onBoarding.push({ ...mergedData, ...onboardedAppointment });
                         }
                     }
                     // ========================= EI STARTER PACK =========================
@@ -1737,10 +1688,10 @@ export class DeliveryDashboardCloneComponent {
                                 ...(diagnosticsAppointment)
                             });
                         } else if (welcomeCallAppointment) {
-                            productData.eiStarterPack.onBoarded.push({
+                            productData.eiStarterPack.onBoarding.push({ 
                                 ...mergedData,
-                                ...welcomeCallAppointment
-                            });
+                                 ...welcomeCallAppointment
+                                 });
                         }
                     }
                     // ========================= CRITICAL SUPPORT =========================
@@ -2005,13 +1956,14 @@ export class DeliveryDashboardCloneComponent {
             ];
         } else if (product === 'eiStarterPack') {
             stageConfig = [
-                { key: 'onboarded', appointmentType: 'EI Starter Pack Welcome Call' },
+                { key: 'onboarding', appointmentType: 'EI Starter Pack Welcome Call' },
                 { key: 'diagnostics', appointmentType: 'EI Starter Pack Diagnostics' },
                 { key: 'implementation', appointmentType: 'EI Starter Pack Implementation' },
                 { key: 'celebration call', appointmentType: 'EI Starter Pack Celebration Call' }
             ];
         } else if (product === 'eiCustomSolutions') {
             stageConfig = [
+                { key: 'onboarding', appointmentType: 'EI Welcome Call' },
                 { key: 'diagnostics', appointmentType: 'EI Diagnostics' },
                 { key: 'implementation', appointmentType: 'EI Implementation' },
                 { key: 'review', appointmentType: 'EI Review' },
@@ -2032,7 +1984,14 @@ export class DeliveryDashboardCloneComponent {
 
         if (!populationSourceKey || !appointmentTypeName) return [];
 
-        const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+        let populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+        if (stageKey === 'onboarding') {
+            populationPool = populationPool.filter((card: any) => {
+                const status = (card?.status || '').toString().toLowerCase().trim();
+                return !status;
+            });
+        }
+
         const bookedProfileIds = this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
 
         return populationPool.filter((card: any) => {
@@ -2152,24 +2111,22 @@ export class DeliveryDashboardCloneComponent {
         if (this.selectedProductType === 'eiStarterPack') {
             sources = {
                 0: this.productData.eiStarterPack.totalEligible || [],
-                1: this.productData.eiStarterPack.pastMonth || [],
-                2: this.productData.eiStarterPack.thisMonth || [],
-                3: this.productData.eiStarterPack.nextMonth || [],
-                4: this.productData.eiStarterPack.onBoarded || [],
-                5: this.productData.eiStarterPack.preprocess || [],
-                6: this.productData.eiStarterPack.diagnostics || [],
-                7: this.productData.eiStarterPack.implementation || [],
-                8: this.productData.eiStarterPack.reports || [],
-                9: this.productData.eiStarterPack.celebrationCall || []
+                1: this.productData.eiStarterPack.onBoarding || [],
+                2: this.productData.eiStarterPack.preprocess || [],
+                3: this.productData.eiStarterPack.diagnostics || [],
+                4: this.productData.eiStarterPack.implementation || [],
+                5: this.productData.eiStarterPack.reports || [],
+                6: this.productData.eiStarterPack.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'eiCustomSolutions') {
             sources = {
                 0: this.productData.eiCustomSolutions.totalEligible || [],
-                1: this.productData.eiCustomSolutions.diagnostics || [],
-                2: this.productData.eiCustomSolutions.implementation || [],
-                3: this.productData.eiCustomSolutions.review || [],
-                4: this.productData.eiCustomSolutions.celebrationCall || []
+                1: this.productData.eiCustomSolutions.onBoarding || [],
+                2: this.productData.eiCustomSolutions.diagnostics || [],
+                3: this.productData.eiCustomSolutions.implementation || [],
+                4: this.productData.eiCustomSolutions.review || [],
+                5: this.productData.eiCustomSolutions.celebrationCall || []
             };
         }
         else if (this.selectedProductType === 'criticalSupport') {
@@ -3831,36 +3788,120 @@ export class DeliveryDashboardCloneComponent {
         return match?.id || null;
     }
 
+    if (!this.superRole) return;
+
     openBookAppointmentForCard(card: any, stageKey: string) {
-        if (!this.superRole) return;
+    const isOnboarding = stageKey?.toLowerCase().trim() === 'onboarding';
 
-        const profileId = card?.profileid || card?.clientid;
-        const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
-        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
+    if (isOnboarding) {
+        this.openOnboardingScheduleDialog(card);
+        return;
+    }
 
-        if (!profileId || !appointmentTypeId) {
-            alert('Unable to resolve appointment type for booking.');
-            return;
+
+    const profileId = card?.profileid || card?.clientid;
+    const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
+    const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
+
+    if (!profileId || !appointmentTypeId) {
+        alert('Unable to resolve appointment type for booking.');
+        return;
+    }
+
+    const dialogRef = this.dialog.open(BookAppointmentDialogComponent, {
+        data: {
+            profileId,
+            profileName: this.mapMetaData[profileId]?.['name'] || profileId,
+            appointmentTypeId,
+            appointmentTypeName
+        },
+        width: '640px',
+        autoFocus: false,
+        panelClass: 'custom-dialog-container'
+    });
+
+    dialogRef.afterClosed().subscribe((booked: boolean) => {
+        if (!booked) return;
+        this.closeStageModal();
+        if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+    });
+}
+
+    getOnboardingWaitingGroups(): { overdue: any[]; upcoming: any[]; noDate: any[] } {
+        const cards = this.getNotScheduledCards('onboarding');
+        const today = new Date();
+        const overdue: any[] = [];
+        const upcoming: any[] = [];
+        const noDate: any[] = [];
+
+        for (const card of cards) {
+            const tentativeStart = card?.tentativestart;
+            if (!tentativeStart) {
+                noDate.push(card);
+                continue;
+            }
+
+            const startDate = tentativeStart?.toDate ? tentativeStart.toDate() : new Date(tentativeStart);
+            const isOverdue = startDate < today;
+
+            if (isOverdue) {
+                overdue.push(card);
+            } else {
+                upcoming.push(card);
+            }
         }
 
-        const dialogRef = this.dialog.open(BookAppointmentDialogComponent, {
-            data: {
-                profileId,
-                profileName: this.mapMetaData[profileId]?.['name'] || profileId,
-                appointmentTypeId,
-                appointmentTypeName
-            },
-            width: '640px',
-            autoFocus: false,
-            panelClass: 'custom-dialog-container'
-        });
-
-        dialogRef.afterClosed().subscribe((booked: boolean) => {
-            if (!booked) return;
-            this.closeStageModal();
-            if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
-        });
+        return { overdue, upcoming, noDate };
     }
+
+private openOnboardingScheduleDialog(card: any) {
+    const profileId = card?.profileid || card?.clientid;
+    if (!profileId || !card?.docid) {
+        alert('Unable to resolve participant/product for this card.');
+        return;
+    }
+
+    const dfuOnboardingType = this.mappedAppointmentTypes.find(
+        t => t.appointmenttype === 'DFU Onboarding'
+    );
+    if (!dfuOnboardingType) {
+        alert('"DFU Onboarding" appointment type is not configured.');
+        return;
+    }
+
+    card['isReschedule'] = !!card['onboardingscheduled'];
+    card['appointmentid'] = card['onboardingappointmentid'] ?? null;
+    card['mapProfile'] = this.mapprofile;
+    card['mapJourney'] = this.mapjourneyname;
+    card['calltype'] = 'onboarding';
+    card['appointmentTypeId'] = dfuOnboardingType.id;
+    card['appointmentTypeName'] = 'DFU Onboarding';
+    card['targetCollection'] = 'participantsproduct';
+    card['targetDocId'] = card.docid;
+
+    const dialogRef = this.dialog.open(ScheduleDialogComponent, {
+        data: card,
+        autoFocus: false,
+        disableClose: true,
+        panelClass: 'custom-dialog-container',
+        maxHeight: '90vh'
+    });
+
+    dialogRef.afterClosed().subscribe(async (result: any) => {
+        if (!result?.appointmentid) return; 
+
+        await updateDoc(
+            doc(this.firestore, 'participantsproduct', card.docid),
+            {
+                onboardingscheduled: result.starttime ?? serverTimestamp(),
+                onboardingappointmentid: result.appointmentid
+            }
+        );
+
+        this.closeStageModal();
+        if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+    });
+}
 
     onFilterChange(selectedFilter: string) {
         this.selectedFilter = selectedFilter;
