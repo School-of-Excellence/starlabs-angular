@@ -7,7 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Firestore, CollectionReference, collection, collectionData, collectionSnapshots, doc, getDocs,
-  query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion,
+  query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
   startAt, endAt, limit,
 } from '@angular/fire/firestore';
 import { writeBatch } from 'firebase/firestore';
@@ -16,6 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
+import { NavDrawerService } from '../../../nav-drawer.service';
 import { AddIssueComponent } from '../../../Customer Support/add-issue/add-issue.component';
 import { ChatAudioComponent } from './audio-player.component';
 
@@ -285,7 +286,47 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* Ticket modal */
 
-  @ViewChild('composer') composerRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('composer') composerRef?: ElementRef<HTMLTextAreaElement>;
+
+  /** Grows the composer with its content up to COMPOSER_MAX_ROWS lines, then it scrolls. */
+  private static readonly COMPOSER_MAX_ROWS = 8;
+
+  /**
+   * Clearing `draft` in code does not fire (ngModelChange), so the textarea kept the inline height it
+   * had grown to and stayed tall after sending. Every programmatic clear goes through here.
+   */
+  private clearDraft(): void {
+    this.draft = '';
+    // The resize measures the DOM, and Angular has not pushed the empty value into the textarea yet at
+    // this point — measuring here would still see the old text and keep the grown height. Clear the
+    // element directly, then let a frame pass before re-measuring.
+    const el = this.composerRef?.nativeElement;
+    if (el) el.value = '';
+    requestAnimationFrame(() => this.autoGrowComposer());
+    setTimeout(() => this.autoGrowComposer(), 60);
+  }
+
+  autoGrowComposer(): void {
+    const el = this.composerRef?.nativeElement;
+    if (!el) return;
+
+    // An EMPTY textarea reports a nonsense scrollHeight here (543px against a 38px clientHeight —
+    // it is a flex item with `flex: 1` and `height: auto` at measure time), which is why the box
+    // stayed tall after sending. With no content there is nothing to measure: drop the inline height
+    // and let the CSS min-height define the resting size.
+    if (!el.value) { el.style.height = ''; return; }
+
+    const cs = getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight) || 22;
+    const chrome = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+                 + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    const max = line * GroupChatScreenComponent.COMPOSER_MAX_ROWS + chrome;
+    const wasAtBottom = this.isNearBottom();
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, max) + 'px';
+    // Growing the composer shortens the thread pane; hold the newest message in view.
+    if (wasAtBottom) this.scrollToBottomSoon();
+  }
   @ViewChild('messagePane') messagePane?: ElementRef<HTMLDivElement>;
   @ViewChild('imgInput') imgInput?: ElementRef<HTMLInputElement>;
   @ViewChild('vidInput') vidInput?: ElementRef<HTMLInputElement>;
@@ -294,6 +335,31 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private toastTimer: any = null;
   private flashTimer: any = null;
+
+  /* ── Appearance ─────────────────────────────────────────────────────
+     The design ships light and dark token sets. The attribute is set on THIS component's host, not on
+     <html>, so the rest of the app — which has no dark styling — is unaffected. */
+  theme: 'light' | 'dark' = 'light';
+  private static readonly THEME_KEY = 'groupChatTheme';
+
+  /** This screen hides the app toolbar, so it carries the app-navigation trigger itself. */
+  openAppNav(): void { this.navDrawer.toggle(); }
+
+  toggleTheme(): void {
+    this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
+    try { localStorage.setItem(GroupChatScreenComponent.THEME_KEY, this.theme); } catch { /* private mode */ }
+  }
+
+  private applyTheme(theme: 'light' | 'dark'): void {
+    this.theme = theme;
+    this.hostEl.nativeElement.setAttribute('data-theme', theme);
+  }
+
+  private restoreTheme(): void {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(GroupChatScreenComponent.THEME_KEY); } catch { /* SSR / private mode */ }
+    this.applyTheme(saved === 'dark' ? 'dark' : 'light');
+  }
 
   /** Height of the screen in px — measured, so the whole UI fits with no page scroll. */
   screenHeight: number | null = null;
@@ -336,6 +402,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     private guard: AuthguardService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
+    private navDrawer: NavDrawerService,
   ) {
     this.supportchat = collection(this.firestore, 'supportchat');
   }
@@ -343,6 +410,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /* ── Lifecycle ──────────────────────────────────────────────────────── */
 
   ngOnInit(): void {
+    this.restoreTheme();
     // Static rows first so the screen is never blank; live groups replace them once auth resolves.
     this.seedDemoData();
     this.loading = false;
@@ -587,6 +655,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Live thread: real-time messages, ordered oldest→newest, exactly as chat-screen reads them. */
   private subscribeMessages(group: ChatItem): void {
     this.messagesSub?.unsubscribe();
+    this.markedRead.clear();
     this.messagesLoading = true;
     this.messagesError = '';
     this.messagesSub = collectionSnapshots(
@@ -604,8 +673,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
           catch (e) { console.error('group-chat: skipped a message', d?.id, e); return null; }
         }).filter(Boolean) as ChatMessage[];
         this.messagesLoading = false;
+        // Anything that lands while this thread is open counts as read.
+        this.markArrivalsRead(docs);
         const isFirstLoad = before === 0;
-        if (isFirstLoad || (target.messages.length > before && wasAtBottom)) this.scrollToBottomSoon();
+        const grew = target.messages.length > before;
+        // Your own send always jumps to the bottom; someone else's message only if you were already there.
+        if (isFirstLoad || this.justSent || (grew && wasAtBottom)) {
+          this.scrollToBottomSoon();
+          if (grew) this.justSent = false;
+        }
       },
       error: e => {
         console.error('group messages', e);
@@ -753,10 +829,64 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return (group._memberUids || []).filter(uid => uid !== this.currentUid);
   }
 
-  /** chat-screen semantics: drop me from last_pending when I open the thread. */
+  /**
+   * Opening a thread marks it read, the same way the Flutter participant app does:
+   *   group doc  → last_pending drops me, and my `pendingcount` entry is deleted
+   *   each message where `pending` contains me → read_by: arrayUnion(me), pending: arrayRemove(me)
+   *
+   * chat-screen only ever cleared the group-level flag, so a read on web was never recorded per
+   * message and the receipts under-reported the web side.
+   */
   private async markRead(group: ChatItem): Promise<void> {
-    try { await updateDoc(group._ref, { last_pending: arrayRemove(this.currentUid) }); }
-    catch (e) { console.error('mark read', e); }
+    try {
+      await updateDoc(group._ref, {
+        last_pending: arrayRemove(this.currentUid),
+        [`pendingcount.${this.currentUid}`]: deleteField(),
+      });
+    } catch (e) { console.error('mark read (group)', e); }
+
+    // Firestore batches cap at 500 writes; loop in case a thread has more unread than that.
+    try {
+      for (let round = 0; round < 5; round++) {
+        const snap = await getDocs(query(
+          collection(this.supportchat, group.id, 'messages'),
+          where('pending', 'array-contains', this.currentUid),
+          limit(400),
+        ));
+        if (snap.empty) return;
+        const batch = writeBatch(this.firestore);
+        snap.docs.forEach(d => {
+          batch.update(d.ref, {
+            read_by: arrayUnion(this.currentUid),
+            pending: arrayRemove(this.currentUid),
+          });
+          this.markedRead.add(d.id);
+        });
+        await batch.commit();
+        if (snap.size < 400) return;
+      }
+    } catch (e) { console.error('mark read (messages)', e); }
+  }
+
+  /** Message ids already receipted this session, so a live snapshot cannot re-write them in a loop. */
+  private markedRead = new Set<string>();
+
+  /**
+   * Messages that arrive while the thread is open are receipted too — the app keeps a listener doing
+   * the same. Guarded by `markedRead` so the write's own snapshot does not trigger another write.
+   */
+  private markArrivalsRead(docs: any[]): void {
+    const unread = docs.filter(d => {
+      const data = d.data();
+      return !this.markedRead.has(d.id) && (data['pending'] || []).includes(this.currentUid);
+    });
+    if (!unread.length) return;
+    const batch = writeBatch(this.firestore);
+    unread.slice(0, 400).forEach(d => {
+      batch.update(d.ref, { read_by: arrayUnion(this.currentUid), pending: arrayRemove(this.currentUid) });
+      this.markedRead.add(d.id);
+    });
+    batch.commit().catch(e => console.error('mark arrivals read', e));
   }
 
   private async writeMessage(group: ChatItem, body: string, files: any[], replyTarget?: ChatMessage | null,
@@ -826,17 +956,20 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
 
-  senderColor(name: string): string {
-    let h = 0;
-    for (let i = 0; i < (name || '').length; i++) h = (h + name.charCodeAt(i)) % SENDER_COLORS.length;
-    return SENDER_COLORS[h];
-  }
+  /**
+   * The console design drops the per-sender rainbow: names are plain ink, and identity is carried by
+   * the avatar (blue for team/admins, neutral for everyone else).
+   */
+  senderColor(_name: string): string { return 'var(--ink)'; }
 
   initials(name: string): string {
     return (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
-  avatarBg(name: string): string { return this.senderColor(name) + '1F'; }
+  avatarBg(name: string): string {
+    // --chip-low is a mid grey in BOTH themes; --ink2 flips light/dark and white initials vanish on it.
+    return this.isAdminSender(name) || this.directory[name]?.source === 'team' ? 'var(--blue)' : 'var(--chip-low)';
+  }
 
   timeLabel(iso?: string): string {
     if (!iso) return '';
@@ -1261,6 +1394,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.person = null; this.attachError = ''; this.pinnedOpen = false;
     this.clearPendingFiles();
     this.messagesError = '';
+    this.memberSearch = ''; this.editingName = false;
     if (this.isLive(c)) {
       this.subscribeMessages(c);
       if (c.unread) { this.sourceOf(c).unread = 0; this.markRead(c); }
@@ -1390,6 +1524,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   toggleGroupInfo(): void {
     this.showInfo = !this.showInfo; this.infoMsg = null; this.person = null;
+    this.memberSearch = ''; this.editingName = false;
   }
 
   /* ── Thread derived state ───────────────────────────────────────────── */
@@ -1551,6 +1686,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'link'; }
   }
 
+  /** Filters the participant list in the info panel; shown once a group is big enough to need it. */
+  memberSearch = '';
+
+  get filteredParticipants(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    if (!q) return this.participantMembers;
+    return this.participantMembers.filter(m => (m.name || '').toLowerCase().includes(q));
+  }
+
   /** Live groups have no team/participant split in `supportchat` — everyone is a participant. */
   get teamMembers(): Member[] {
     if (this.isLive(this.active)) return [];
@@ -1568,7 +1712,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   isTeamMsg(m: ChatMessage): boolean { return m.from === 'team'; }
 
   /** A team message in a two-way thread is drawn light-on-purple. */
-  isLight(m: ChatMessage): boolean { return m.from === 'team' && !this.features.oneWay; }
+  /**
+   * "Light" meant white-on-dark content inside a solid purple own-bubble. The console design has no
+   * dark bubble — own messages are a pale tinted card — so nothing renders light any more. Leaving this
+   * true made links, mentions, CTAs and the audio player white on near-white, i.e. invisible.
+   */
+  isLight(_m: ChatMessage): boolean { return false; }
 
   alignRight(m: ChatMessage): boolean { return !this.features.oneWay && m.from === 'team'; }
 
@@ -1667,7 +1816,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
     if (!text) return;
-    this.draft = '';
+    this.clearDraft();
 
     if (this.isLive(active)) {
       // Announcement framing still has no field behind it; the reply does — see reply_to above.
@@ -1676,6 +1825,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       const buttons = this.pendingButtons;
       this.replyTo = null;
       this.pendingButtons = [];
+      this.justSent = true;
       this.writeMessage(active, text, [], replyTarget, buttons)
         .catch(e => { console.error('send', e); this.notify('Error sending message'); });
       return;
@@ -1705,7 +1855,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!active || !this.editing) return;
     const text = this.draft.trim();
     const editing = this.editing;
-    this.draft = ''; this.editing = null;
+    this.clearDraft(); this.editing = null;
     if (!text) return;
     if (this.isLive(active)) {
       // Only the `message` field is written — chat-screen has no edit marker to set.
@@ -1723,11 +1873,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   onComposerKeydown(e: KeyboardEvent): void {
     if (e.key === 'Enter') {
       if (this.mentionOptions.length) { e.preventDefault(); this.pickMention(this.mentionOptions[0]); return; }
+      // Shift+Enter (and Alt/Ctrl/Cmd+Enter) insert a newline; plain Enter sends.
+      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
       this.editing ? this.saveEdit() : this.send();
+      return;
     }
     if (e.key === 'Escape') {
       if (this.mentionQuery !== null) { this.mentionQuery = null; return; }
-      if (this.editing) { this.editing = null; this.draft = ''; }
+      if (this.editing) { this.editing = null; this.clearDraft(); }
     }
   }
 
@@ -1801,6 +1955,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const pos = this.composerRef?.nativeElement.selectionStart ?? val.length;
     const m = val.slice(0, pos).match(MENTION_TOKEN_RE);
     this.mentionQuery = m ? m[1] : null;
+    setTimeout(() => this.autoGrowComposer(), 0);
   }
 
   get mentionOptions(): MentionOption[] {
@@ -1911,7 +2066,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const staged = this.pendingFiles;
     const replyTarget = this.replyTo;
     const buttons = this.pendingButtons;
-    this.draft = ''; this.replyTo = null; this.pendingButtons = [];
+    this.justSent = true;
+    this.clearDraft(); this.replyTo = null; this.pendingButtons = [];
     this.uploadingFiles = true;
     try {
       if (this.isLive(active)) {
@@ -2002,6 +2158,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         const record = await this.uploadToStorage(target.id, blob, `voice-note-${secs}s.${ext}`, mime);
         const replyTarget = this.replyTo;
         this.replyTo = null;
+        this.justSent = true;
         await this.writeMessage(target, '', [record], replyTarget);
       } catch (err: any) {
         console.error('voice note', err);
@@ -2340,6 +2497,63 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.activeIds = { ...this.activeIds, [this.tab]: id };
   }
 
+  /* ── Editing a live group's name and picture ────────────────────────
+     Both are existing fields on the supportchat doc (`group_name`, `group_profile`), and the picture
+     goes to the same Storage path buildGroup() uses, so the old screen shows the change too. */
+
+  editingName = false;
+  nameDraft = '';
+  savingGroupPhoto = false;
+
+  startEditName(): void {
+    if (!this.canManageAdmins) { this.notify('Only a group admin can rename this group'); return; }
+    this.nameDraft = this.active?.name || '';
+    this.editingName = true;
+  }
+
+  cancelEditName(): void { this.editingName = false; this.nameDraft = ''; }
+
+  saveGroupName(): void {
+    const active = this.active;
+    const name = this.nameDraft.trim();
+    if (!active || !name || name === active.name) { this.cancelEditName(); return; }
+    this.editingName = false;
+    if (this.isLive(active)) {
+      updateDoc(active._ref, { group_name: name })
+        .then(() => this.notify('Group renamed'))
+        .catch(e => { console.error('rename group', e); this.notify('Error renaming group'); });
+    } else {
+      this.sourceOf(active).name = name;
+    }
+  }
+
+  async onGroupPhotoPicked(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const active = this.active;
+    if (!file || !active) return;
+    if (!this.canManageAdmins) { this.notify('Only a group admin can change the picture'); return; }
+
+    this.savingGroupPhoto = true;
+    try {
+      if (this.isLive(active)) {
+        const imgRef = ref(this.storage, `Chat/${file.name}${file.lastModified}${file.size}`);
+        const uploaded = await uploadBytes(imgRef, file);
+        const url = await getDownloadURL(uploaded.ref);
+        await updateDoc(active._ref, { group_profile: url });
+        this.notify('Group picture updated');
+      } else {
+        this.sourceOf(active).photoUrl = URL.createObjectURL(file);
+      }
+    } catch (e) {
+      console.error('group picture', e);
+      this.notify('Could not update the picture');
+    } finally {
+      this.savingGroupPhoto = false;
+    }
+  }
+
   /** buildGroup() from chat-screen: same doc shape, plus the emoji this UI picks. */
   private async createLiveGroup(): Promise<void> {
     const members = this.cSelected.map(m => m.id);
@@ -2493,18 +2707,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* ── Message info panel ─────────────────────────────────────────────── */
 
+  /**
+   * Two tiers only — Read and Sent. `supportchat` messages carry `read_by` and `pending`; there is no
+   * delivery signal between them, so the old "Received" column was always empty by construction.
+   */
   get infoReadBy(): Receipt[] { return this.infoMsg?.readBy || []; }
 
-  get infoReceived(): Receipt[] {
-    const names = this.infoReadBy.map(r => r.name);
-    return (this.infoMsg?.deliveredTo || []).filter(d => !names.includes(d.name));
-  }
-
+  /** Everyone in the group who has not read it yet (the message's `pending` set, by name). */
   get infoSentOnly(): Receipt[] {
-    const reached = [...this.infoReadBy.map(r => r.name), ...this.infoReceived.map(d => d.name)];
+    const read = this.infoReadBy.map(r => r.name);
+    const senderName = this.infoMsg ? (this.infoMsg.from === 'team' ? this.selfName : this.infoMsg.senderName) : '';
     return (this.active?.members || [])
-      .filter(mem => !reached.includes(mem.name))
-      .map(mem => ({ name: mem.name, at: this.infoMsg?.at || '' }));
+      .filter(mem => mem.name !== senderName && !read.includes(mem.name))
+      .map(mem => ({ name: mem.name, at: '' }));
   }
 
   /* ── Scrolling ──────────────────────────────────────────────────────── */
@@ -2516,11 +2731,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
   }
 
+  /** Set when this user posts, so the incoming snapshot scrolls even if they had scrolled up. */
+  private justSent = false;
+
+  /**
+   * A single tick lands short: the row is in the DOM but reactions, stamps and media have not settled,
+   * so scrollHeight is still growing. Scroll on the next frame and again once layout has quiesced.
+   */
   private scrollToBottomSoon(): void {
-    setTimeout(() => {
+    const jump = () => {
       const el = this.messagePane?.nativeElement;
       if (el) el.scrollTop = el.scrollHeight;
-    }, 0);
+    };
+    requestAnimationFrame(() => { jump(); requestAnimationFrame(jump); });
+    setTimeout(jump, 120);
+    setTimeout(jump, 320);
   }
 
   trackById(_i: number, item: { id: string }): string { return item.id; }
@@ -2567,11 +2792,16 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         notes: 'Paid on 12 Aug, no email yet.', date: '2026-08-13', raisedBy: this.TEAM_NAME },
     ];
 
+    // Enough people that the participant search and the scrolling member list are exercised in the demo.
     const groupMembers: Member[] = [
       { id: 't1', name: 'Sanjeev R Jain', journey: null },
       { id: 'p1', name: 'Arjun Menon', journey: 'up' },
       { id: 'p2', name: 'Divya Rao', journey: 'lyl' },
       { id: 'p4', name: 'Nisha Verma', journey: 'up' },
+      { id: 'p5', name: 'Rahul Nair', journey: 'big' },
+      { id: 'p6', name: 'Aditi Sharma', journey: 'lyl' },
+      { id: 'p7', name: 'Vikram Rao', journey: 'up' },
+      { id: 'p8', name: 'Priya Menon', journey: 'up' },
     ];
 
     this.groups = [
