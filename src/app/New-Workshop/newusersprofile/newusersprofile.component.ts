@@ -97,8 +97,18 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     label: 'Workshop',
     value: (u: any) => this.workshopNames(u).join(', ')
   };
-  // What the export panel offers right now (base + Workshop when filtering).
+  // Moved On export column — offered only while the Converted filter is active.
+  private readonly movedonExportColumn = {
+    key: 'movedon',
+    label: 'Moved On',
+    value: (u: any) => this.datePipe.transform(this.toDate(u.movedon), 'medium') || ''
+  };
+  // What the export panel offers right now (base + Workshop/Moved On when filtering).
   exportColumnsView = this.exportColumns;
+
+  // Converted filter: only profiles moved to existing users (movedtoexist == true).
+  convertedOnly = false;
+  private lastConvertedActive = false;
 
   // tag id -> name, from the newusertags collection (live).
   tagMap: Record<string, string> = {};
@@ -258,6 +268,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
         if (end != null && created > end) return false;
       }
 
+      // Converted filter — only profiles moved to existing users. State lives
+      // on `this`; the filter string carries a flag so the table re-filters.
+      if (this.convertedOnly && u.movedtoexist !== true) return false;
+
       // Workshop filter — only profiles enrolled in a selected workshop.
       // The enrolled set lives on `this` (not the filter string); while it is
       // still loading, show nothing rather than a flash of unfiltered rows.
@@ -276,6 +290,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       switch (id) {
         case 'created':
           return this.toDate(u.created)?.getTime() || 0;
+        case 'movedon':
+          return this.toDate(u.movedon)?.getTime() || 0;
         case 'enable':
           return u.enable ? 1 : 0;
         case 'referredby':
@@ -308,7 +324,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
   get hasAnyFilter(): boolean {
     return !!(this.searchText || this.selectByTagIds.size > 0 || this.hasDateFilter
-      || this.selectedWorkshopIds.size > 0);
+      || this.selectedWorkshopIds.size > 0 || this.convertedOnly);
   }
 
   clearAllFilters(): void {
@@ -317,7 +333,14 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     this.selectByTagPolarity = 'include';
     this.startDate = null;
     this.endDate = null;
+    this.convertedOnly = false;
     this.resetWorkshopFilter();
+    this.refreshFilter();
+  }
+
+  toggleConvertedFilter(): void {
+    this.convertedOnly = !this.convertedOnly;
+    this.updateDisplayedColumns();
     this.refreshFilter();
   }
 
@@ -342,7 +365,8 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
       // filter string change so the table re-filters.
       workshops: [...this.selectedWorkshopIds],
       wmode: this.workshopFilterMode,
-      wv: this.workshopFilterVersion
+      wv: this.workshopFilterVersion,
+      conv: this.convertedOnly
     });
     this.dataSource.paginator?.firstPage();
   }
@@ -804,23 +828,45 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
     // exclude mode every visible row is by definition not enrolled.
     const filterActive = this.selectedWorkshopIds.size > 0;
     const columnActive = filterActive && this.workshopFilterMode === 'include';
-    this.displayedColumns = columnActive ? [...this.baseColumns, 'workshop'] : [...this.baseColumns];
-    this.exportColumnsView = columnActive
-      ? [...this.exportColumns, this.workshopExportColumn]
-      : this.exportColumns;
 
-    // Sync the export chip selection only when the filter itself turns on/off
+    const cols = [...this.baseColumns];
+    const exportCols = [...this.exportColumns];
+    if (columnActive) {
+      cols.push('workshop');
+      exportCols.push(this.workshopExportColumn);
+    }
+    // The Moved On column/export only appears while the Converted filter is on.
+    if (this.convertedOnly) {
+      cols.push('movedon');
+      exportCols.push(this.movedonExportColumn);
+    }
+    this.displayedColumns = cols;
+    this.exportColumnsView = exportCols;
+
+    // Sync the export chip selection only when a filter itself turns on/off
     // — not on include/exclude round-trips or workshop toggles — so a manual
     // deselection isn't fought. A lingering key is inert while the view
     // doesn't offer the column.
-    if (filterActive === this.lastWorkshopFilterActive) return;
-    this.lastWorkshopFilterActive = filterActive;
-    if (filterActive) {
-      if (!this.selectedExportKeys.includes('workshop')) {
-        this.selectedExportKeys = [...this.selectedExportKeys, 'workshop'];
+    if (filterActive !== this.lastWorkshopFilterActive) {
+      this.lastWorkshopFilterActive = filterActive;
+      if (filterActive) {
+        if (!this.selectedExportKeys.includes('workshop')) {
+          this.selectedExportKeys = [...this.selectedExportKeys, 'workshop'];
+        }
+      } else {
+        this.selectedExportKeys = this.selectedExportKeys.filter(k => k !== 'workshop');
       }
-    } else {
-      this.selectedExportKeys = this.selectedExportKeys.filter(k => k !== 'workshop');
+    }
+
+    if (this.convertedOnly !== this.lastConvertedActive) {
+      this.lastConvertedActive = this.convertedOnly;
+      if (this.convertedOnly) {
+        if (!this.selectedExportKeys.includes('movedon')) {
+          this.selectedExportKeys = [...this.selectedExportKeys, 'movedon'];
+        }
+      } else {
+        this.selectedExportKeys = this.selectedExportKeys.filter(k => k !== 'movedon');
+      }
     }
   }
 

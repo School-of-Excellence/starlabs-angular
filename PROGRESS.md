@@ -1,49 +1,42 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-21 (Upload Studio)_
+_Last updated: 2026-08-27 (EiFlix home builder redesign)_
 · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-08-21-upload-studio.md`.
+`specs/journals/2026-08-27-eiflixhomeconfig-builder-redesign.md`.
 
 ## Current state
-- Branch `nanda-development`. UNCOMMITTED working tree: the new **Upload
-  Studio** (5 new files under `src/app/content/episodes-dashboard/upload-studio/`
-  + redesigned `episodes-dashboard.*` + `app.routes.ts`), plus earlier
-  uncommitted work from other sessions (campaigndashboard, wccalendar,
-  newusersprofile, styles.css). Operator commits manually — standing
-  directive. NOT pushed, NOT deployed.
-- `/videodashboard` = redesigned light-premium Episodes library (stats,
-  search, chip filters, thumbnails). `/videodashboard/upload` = new
-  route-based Upload Studio: multi-video parallel uploads (3 slots +
-  auto-queue), live network speed + ETA + sparkline, pause/resume/cancel/
-  retry, canDeactivate + beforeunload lock. Also mounted under
-  `/content-upload-v2/videodashboard[/upload]`. Prod build passes.
+- Branch `nanda-development`. UNCOMMITTED working tree: the redesigned
+  **eiflixhomeconfig** tab (this session) + earlier uncommitted work
+  (Upload Studio under `src/app/content/episodes-dashboard/`,
+  newusersprofile, and others — see git status). Operator commits
+  manually — standing directive. NOT pushed, NOT deployed.
+- `/eiflixhomeconfig` tab 1 ("Create / Assign EiFlix Home") is now a
+  two-pane builder: sticky searchable Library rail (Widgets / Home
+  Series / Ads, click-to-add) + single-surface Layout list with
+  collapsed-by-default expandable rows, sticky Save bar with
+  unsaved-changes pill, drag-reorder, segmented Show-To, pill-style
+  tags. Prod build passes.
 
-## Last session changes (2026-08-21, Upload Studio session)
-- Replaced the accidental-close-prone "Upload New Episode" **dialog** with
-  the Upload Studio **route**. Round 2: **Edit** also moved into the studio
-  (`/videodashboard/upload?edit=<id>` — prefilled job, replace-file support,
-  metadata-only instant save, replaced files cleaned up after save); only
-  Delete still uses a dialog. NOTE: `upload-episode-dialog/` is NOT dead —
-  /workshopconfig "Upload Zoom Call" still opens it.
-- Episode Firestore docs keep the exact legacy field set (operator's hard
-  rule — no new fields); `convertedtohls` untouched (backend-owned).
-  Storage paths unchanged (`eiflix_episodes/`, `eiflix_images/`,
-  `eiflix_srt/`).
-- Gotchas fixed en route: blob: preview URLs need
-  `bypassSecurityTrustUrl` (cached per job); MatTableDataSource ignores
-  filterPredicate on empty filter string; Firebase callbacks wrapped in
-  `zone.run`. Dead reconvertEpisodesHLS UI code removed (git history has
-  it). WHY-details: `specs/journals/2026-08-21-upload-studio.md`.
+## Last session changes (2026-08-27)
+- Full UI/UX rewrite of `eiflixhomeconfig.component.{ts,html,css}` to
+  fix the "multiple scroll / unusable" tab: the mat-select multi-picker
+  and the stack of always-expanded form cards are gone. Firestore
+  read/save logic untouched (same homeconfig shape, ad pairing ≤2 per
+  index with adref, seriesref/enabletag/tags, merge write). Removed the
+  now-dead `selected` FormControl; added-state derives from items.
+- Custom segmented control + custom tag pills instead of
+  mat-button-toggle / mat-chip-grid on purpose: avoids Material theme
+  tokens the app theme may not emit. WHY details in the 2026-08-27
+  journal.
+- graphify module not installed in this env — code-graph rebuild
+  skipped.
 
 ## Pending
-- **Operator visual pass + real upload test** of `/videodashboard` and
-  `/videodashboard/upload` behind login (Claude verified compile only —
-  no prod login available). Then commit & deploy when satisfied.
-- Carried: newusertags backfill decision (11 prod docs lack `type`;
-  profile/assign-tags screens list zero tags until backfilled);
-  `eiflixcampaign` Firestore rules unverified; eiflix register backfill +
-  `/eiflixoperationsdashboard` route guard + backfill-script `__proto__`
-  exposure (2026-08-19 journal).
-- Pre-existing episode-delete gaps (not touched): SRT file never deleted
-  from Storage on episode delete; delete-dialog Cancel button has no
-  click handler.
+- **Operator visual pass** of the redesigned `/eiflixhomeconfig` tab 1
+  behind login (Claude verified compile only), then manual commit.
+- Carried: operator visual pass + real upload test of
+  `/videodashboard[/upload]`; consumers to wire (webactive, payment
+  statuses, paired-ads rendering in EiFlix web app); newusertags
+  backfill decision; `eiflixcampaign` rules unverified; eiflix register
+  backfill + `/eiflixoperationsdashboard` route guard; episode-delete
+  gaps (SRT not deleted, delete-dialog Cancel dead).

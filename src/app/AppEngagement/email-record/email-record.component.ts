@@ -177,6 +177,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   allParticipants: Participant[] = [];
   filteredParticipants: Participant[] = [];
   participantSearchFilter = '';
+  heldParticipants: any[] = [];
   selectedStatusFilters: string[] = ['all']; // 'all', 'sent', 'delivery', 'open', 'click', 'bounce', 'subscriptionchange', 'failed', 'notSent'
   participantStatusCounts: StatusCounts = {
     sent: 0,
@@ -1262,7 +1263,16 @@ exportCategoryParticipants(): void {
     });
     
     this.allParticipants = Array.from(participantMap.values());
-    
+
+    // Profiles excluded by the delivery-hold filter. They are not in `emailid`, so they
+    // cannot appear in the list above — hence a separate section, not a badge.
+    const held: string[] = record.communicationhold || [];
+    this.heldParticipants = held.map((pid: string) => ({
+      profileid: pid,
+      name: this.mapProfile[pid]?.['name'] || 'Unknown',
+      email: this.mapProfile[pid]?.['email'] || ''
+    }));
+
     // Calculate status counts
     this.calculateParticipantStatusCounts();
   }
@@ -1375,6 +1385,7 @@ exportCategoryParticipants(): void {
     this.showParticipantsModal = false;
     this.selectedArchiveForPopup = null;
     this.allParticipants = [];
+    this.heldParticipants = [];
     this.filteredParticipants = [];
     this.participantSearchFilter = '';
     this.selectedStatusFilters = ['all'];

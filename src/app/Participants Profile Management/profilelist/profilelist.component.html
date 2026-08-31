@@ -7,6 +7,18 @@
         <input matInput #filter (keyup)="filterData(filter.value)" autocomplete="off">
       </mat-form-field>
     </div>
+    <div class="filter-toggles">
+      <mat-slide-toggle color="warn" [(ngModel)]="holdOnly" (change)="applyFilters()"
+        matTooltip="Show only profiles with deliveryonhold set — these are excluded from all sends">
+        Delivery on hold
+        <span class="toggle-count hold">{{ holdCount }}</span>
+      </mat-slide-toggle>
+      <mat-slide-toggle color="primary" [(ngModel)]="ahcrmOnly" (change)="applyFilters()"
+        matTooltip="Show only profiles with ahcrm app access enabled">
+        AHCRM access
+        <span class="toggle-count ahcrm">{{ ahcrmCount }}</span>
+      </mat-slide-toggle>
+    </div>
     <div>
       <!-- <button class="addprofile" mat-stroked-button (click)="updateProfile(null)">Add New Profile</button> -->
       <!-- <button class="addprofile" mat-stroked-button (click)="addCustomer(true, null)">Add New Customer</button> -->
