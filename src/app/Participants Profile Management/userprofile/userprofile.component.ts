@@ -162,6 +162,10 @@ export class UserprofileComponent {
     touchpoint: 0
   };
 
+  // map delivery sequence
+  mapProductSteps: any = {};
+  expandedProduct: any = {};
+
   // Paginated data getters
   get paginatedAllEvents() {
     const startIndex = this.currentPages.allEvents * this.pageSize;
@@ -333,7 +337,8 @@ export class UserprofileComponent {
     try {
       // Only load essential data and Journey tab (default) 
       await Promise.all([
-        this.loadTabData('Journey')
+        this.loadTabData('Journey'),
+        this.loadDeliverySequenceData()
       ]);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -353,6 +358,55 @@ export class UserprofileComponent {
   async seteventTab(tabName: string) {
     const previousTab = this.eventTab;
     this.eventTab = tabName;
+  }
+
+  // load delivery se
+  toggleProgress(product) {
+    const id = product['participantproductid'];
+    this.expandedProduct[id] = !this.expandedProduct[id];
+  }
+
+  async loadDeliverySequenceData() {
+    const seqDoc = await getDoc(doc(this.firestoreDefault, 'participantdeliverysequence', this.profileId));
+    const products = seqDoc.exists() ? seqDoc.data()['products'] ?? [] : [];
+
+    const deliverables = await getDocs(query(collection(this.firestoreDefault, 'deliverables'), where('profileid', '==', this.profileId)));
+    const mapDeliveryDoc = {};
+    deliverables.docs.forEach(d => mapDeliveryDoc[d.ref.path] = d.data());
+
+    const sources = [
+      ['appointmenttype', 'appointmenttype'],
+      ['delivery forms', 'formname'],
+      ['delivery report', 'reportname'],
+      ['delivery events', 'eventname'],
+      ['delivery queue', 'queuename'],
+      ['delivery fieldwork', 'fieldworkname']
+    ];
+    const mapDeliveryName = {};
+    for (const [col, field] of sources) {
+      const snap = await getDocs(collection(this.firestoreDefault, col));
+      snap.docs.forEach(d => mapDeliveryName[d.ref.path] = d.data()[field]);
+    }
+
+    for (const p of products) {
+      const steps = (p['delivery'] ?? []).map(d => {
+        const deliverable = mapDeliveryDoc[d.sequenceref.path] ?? {};
+        const status = deliverable.status;
+
+        let stepClass = 'step-pending';
+        let statusLabel = 'Pending';
+        if (status === 'completed') { stepClass = 'step-completed'; statusLabel = 'Completed'; }
+        else if (status === 'ready') { stepClass = 'step-ready'; statusLabel = 'Ready'; }
+
+        return {
+          name: mapDeliveryName[deliverable.deliveryref?.path] || 'Unknown',
+          stepClass,
+          status: statusLabel
+        };
+      });
+
+      this.mapProductSteps[p['participantproductid']] = steps;
+    }
   }
 
 

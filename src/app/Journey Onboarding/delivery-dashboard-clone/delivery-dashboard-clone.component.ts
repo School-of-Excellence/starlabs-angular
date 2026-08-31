@@ -22,6 +22,8 @@ import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
+import { ScheduleDialogComponent } from '../schedule-dialog/schedule-dialog.component';
+import { SpecialistAppointmentSlotsComponent } from '../specialist-appointment-slot/specialist-appointment-slots.component';
 
 interface TableHeader {
     key: string;
@@ -145,7 +147,9 @@ interface UtilizationRow {
         MatNativeDateModule,
         MatInputModule,
         MatSlideToggleModule,
-        ProfilePictureComponent
+        ProfilePictureComponent,
+        FormOverlayViewComponent,
+        SpecialistAppointmentSlotsComponent
     ],
     providers: [DatePipe],
     templateUrl: './delivery-dashboard-clone.component.html',
@@ -262,7 +266,7 @@ export class DeliveryDashboardCloneComponent {
     ]);
 
     // Specialist section collapsed-by-default UX state (Option A redesign)
-    specialistCollapsed = true;
+    // specialistCollapsed = true;
 
     // Merged product groups: display name -> product names
     mergedGroups: { [groupName: string]: string[] } = {
@@ -374,13 +378,13 @@ export class DeliveryDashboardCloneComponent {
     selectedProductType: string = '';
     selectedColumns: string[] = [];
 
-    filteredBookedAppointments: any[] = [];
+    // filteredBookedAppointments: any[] = [];
     // The specialist's booked appointments across ALL appointment types — used to
     // resolve who/what occupies a slot (incl. "unavailable" slots that are blocked
     // because the specialist is booked for a different appointment type).
-    specialistBookedAll: any[] = [];
-    expandedSpecialist: string | null = null;
-    minDate: Date = new Date();
+    // specialistBookedAll: any[] = [];
+    // expandedSpecialist: string | null = null;
+    // minDate: Date = new Date();
 
     private appointmentsSubscription: Subscription | null = null;
     private participantsProductDataSubscription: Subscription;
@@ -499,23 +503,23 @@ export class DeliveryDashboardCloneComponent {
         modes: false
     };
 
-    specialistLoading = false;
-    specialistLoadProgress = '';   // e.g. "12 / 53"
-    specialistSlotsInitialized = false;
-    specialistDisplayMonth = '';
-    specialistStartDate: Date | null = null;
-    specialistEndDate: Date | null = null;
-    specialistRange = new FormGroup({
-        start: new FormControl<Date | null>(null),
-        end: new FormControl<Date | null>(null),
-    });
-    specialistSequences: any[] = [];
-    specialistRolesMap: { [id: string]: string[] } = {};
-    specialistEISMap: { [id: string]: { [role: string]: string[] } } = {};
-    specialistAllSlots: any[] = [];
-    slotOverview: SlotOverview = { totalSlots: 0, booked: 0, available: 0, bookingRate: 0 };
-    slotsByProduct: SlotByProduct[] = [];
-    specialistData: SpecialistRow[] = [];
+    // specialistLoading = false;
+    // specialistLoadProgress = '';   // e.g. "12 / 53"
+    // specialistSlotsInitialized = false;
+    // specialistDisplayMonth = '';
+    // specialistStartDate: Date | null = null;
+    // specialistEndDate: Date | null = null;
+    // specialistRange = new FormGroup({
+    //     start: new FormControl<Date | null>(null),
+    //     end: new FormControl<Date | null>(null),
+    // });
+    // specialistSequences: any[] = [];
+    // specialistRolesMap: { [id: string]: string[] } = {};
+    // specialistEISMap: { [id: string]: { [role: string]: string[] } } = {};
+    // specialistAllSlots: any[] = [];
+    // slotOverview: SlotOverview = { totalSlots: 0, booked: 0, available: 0, bookingRate: 0 };
+    // slotsByProduct: SlotByProduct[] = [];
+    // specialistData: SpecialistRow[] = [];
 
     currentMonth: number = new Date().getMonth();
     currentYear: number = new Date().getFullYear();
@@ -535,27 +539,27 @@ export class DeliveryDashboardCloneComponent {
     openAppointmentModal = false;
     participantLoading = false;
 
-    selectedSpecialistSlots: any;
-    availableDates: any[] = [];
-    selectedDate: string = '';
-    selectedEisProfile: string = '';
-    selectedEISId = null;
-    selectedAppointmentTypeId = null;
-    selectedActivity: string | null = null;
-    selectedView: string = 'booked';
+    // selectedSpecialistSlots: any;
+    // availableDates: any[] = [];
+    // selectedDate: string = '';
+    // selectedEisProfile: string = '';
+    // selectedEISId = null;
+    // selectedAppointmentTypeId = null;
+    // selectedActivity: string | null = null;
+    // selectedView: string = 'booked';
 
-    profileList = [];
-    mapProfile = {};
-    selectedUser: string = null
-    filteredProfile = ""
-    slotSelected = false;
-    selectedSlotData: any;
-    loggedInPID: any;
+    // profileList = [];
+    // mapProfile = {};
+    // selectedUser: string = null
+    // filteredProfile = ""
+    // slotSelected = false;
+    // selectedSlotData: any;
+    // loggedInPID: any;
 
     // Profiles that actually have a ready appointment deliverable for the
     // selected activity — used to pre-filter the booking profile picker.
-    eligibleProfileIds = new Set<string>();
-    eligibleProfilesLoading = false;
+    // eligibleProfileIds = new Set<string>();
+    // eligibleProfilesLoading = false;
 
     initiateProductOptions: any = {};
     deliveryTypes: string[] = [];
@@ -563,7 +567,7 @@ export class DeliveryDashboardCloneComponent {
     minimumPayment: number | null = null;
     tentativeStartDate: Date | null = null;
     selectedDeliveryType: string = '';
-    mergedSeatSlots: any[] = [];
+    // mergedSeatSlots: any[] = [];
 
     upConfirmedMap: any = {};
     upConfirmedModalOpen = false;
@@ -932,11 +936,11 @@ export class DeliveryDashboardCloneComponent {
 
             // Specialist Appointment Slots section is always visible (no longer
             // collapsible) — initialise the date range and load its base data.
-            if (!this.specialistSlotsInitialized) {
-                this.specialistSlotsInitialized = true;
-                this.initSpecialistDateRange();
-                this.loadSpecialistBaseData();
-            }
+            // if (!this.specialistSlotsInitialized) {
+            //     this.specialistSlotsInitialized = true;
+            //     this.initSpecialistDateRange();
+            //     this.loadSpecialistBaseData();
+            // }
 
             // this.specialistRange.valueChanges.subscribe((val) => {
             //   if (val.start && val.end) {
@@ -965,6 +969,17 @@ export class DeliveryDashboardCloneComponent {
             clearInterval(this._lastUpdatedTimer);
             this._lastUpdatedTimer = null;
         }
+    }
+
+    get specialistAllowedProductIds(): Set<string> | null {
+        if (!this.productFilterActive) return null;
+        const selected = (this.productFilterControl.value as string[]) || [];
+        const ids = new Set<string>();
+        for (const label of selected) {
+            const cardId = [...this.visibleCardIds, ...this.hiddenCardIds].find(id => this.getCardName(id) === label);
+            if (cardId) for (const pid of this.getCardProductIds(cardId)) ids.add(pid);
+        }
+        return ids;
     }
 
     onFilterClick(filter: string) {
@@ -2064,797 +2079,797 @@ export class DeliveryDashboardCloneComponent {
         });
     };
 
-    async onSpecialistExpandToggle() {
-        this.specialistCollapsed = !this.specialistCollapsed;
-        if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
-            this.initSpecialistDateRange();
-            await this.loadSpecialistBaseData();
-        }
-    }
+    // async onSpecialistExpandToggle() {
+    //     this.specialistCollapsed = !this.specialistCollapsed;
+    //     if (!this.specialistCollapsed && !this.specialistSlotsInitialized) {
+    //         this.initSpecialistDateRange();
+    //         await this.loadSpecialistBaseData();
+    //     }
+    // }
 
-    initSpecialistDateRange() {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+    // initSpecialistDateRange() {
+    //     const today = new Date();
+    //     today.setHours(0, 0, 0, 0);
 
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
+    //     const nextWeek = new Date(today);
+    //     nextWeek.setDate(today.getDate() + 7);
 
-        this.specialistStartDate = today;
-        this.specialistEndDate = nextWeek;
+    //     this.specialistStartDate = today;
+    //     this.specialistEndDate = nextWeek;
 
-        this.specialistRange.setValue({
-            start: today,
-            end: nextWeek,
-        });
-        this.updateSpecialistDisplayMonth();
-    }
+    //     this.specialistRange.setValue({
+    //         start: today,
+    //         end: nextWeek,
+    //     });
+    //     this.updateSpecialistDisplayMonth();
+    // }
 
     // Native <input type="date"> emits a 'yyyy-MM-dd' string; parse to a
     // local Date and delegate to the existing range logic.
-    onSpecialistStartInput(event: Event) {
-        const value = (event.target as HTMLInputElement)?.value;
-        if (!value) return;
-        const parsed = new Date(`${value}T00:00:00`);
-        if (isNaN(parsed.getTime())) return;
-        this.onSpecialistDateChange(parsed);
-    }
-
-    // WHEN USER CHANGES START DATE
-    async onSpecialistDateChange(selectedDate: Date) {
-        this.specialistLoading = true;
-        if (!selectedDate) return;
-
-        const start = new Date(selectedDate);
-        start.setHours(0, 0, 0, 0);
-
-        const end = new Date(start);
-        end.setDate(start.getDate() + 7);
-
-        this.specialistStartDate = start;
-        this.specialistEndDate = end;
-
-        this.specialistRange.patchValue({
-            start,
-            end,
-        });
-
-        this.updateSpecialistDisplayMonth();
-        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
-    }
-
-    updateSpecialistDisplayMonth() {
-        const start = this.specialistStartDate;
-        const end = this.specialistEndDate;
-
-        if (!start || !end) return;
-
-        this.specialistDisplayMonth =
-            `${start.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            })} - ${end.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            })}`;
-    }
-
-    async loadSpecialistBaseData() {
-        this.specialistLoading = true;
-        this.cdr.detectChanges();
-        this.specialistAllSlots = [];
-        this.specialistData = [];
-        this.filteredBookedAppointments = [];
-        this.availableDates = [];
-
-        try {
-            const productsSnap = await runInInjectionContext(this.injector, () =>
-                getDocs(query(
-                    collection(this.firestore, 'products'),
-                    where('mode', '==', 'Priority Mode'),
-                ))
-            );
-
-            const deliveryPromises = productsSnap.docs.map((productDoc) =>
-                runInInjectionContext(this.injector, () =>
-                    getDocs(query(
-                        collection(this.firestore, 'productToDeliverySequence'),
-                        where('product', '==', productDoc.ref)
-                    ))
-                ).then((snapshot) => ({ productDoc, snapshot }))
-            );
-
-            const allDeliveryResults = await Promise.all(deliveryPromises);
-
-            const activityFetchList: { productDoc: any; productName: string; activityRef: any }[] = [];
-
-            for (const { productDoc, snapshot } of allDeliveryResults) {
-                const productName = productDoc.data()['product'];
-
-                for (const deliveryDoc of snapshot.docs) {
-                    const deliveryOptions = deliveryDoc.data()['deliveryoptions'];
-                    if (!Array.isArray(deliveryOptions) || deliveryOptions.length === 0) continue;
-
-                    for (const option of deliveryOptions) {
-                        const deliverySequence = option?.deliverysequence;
-                        if (!Array.isArray(deliverySequence)) continue;
-
-                        for (const sequenceItem of deliverySequence) {
-                            if (sequenceItem.activity) {
-                                activityFetchList.push({
-                                    productDoc,
-                                    productName,
-                                    activityRef: sequenceItem.activity,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
-            const actBatchSize = 15;
-
-            for (let i = 0; i < activityFetchList.length; i += actBatchSize) {
-                const batch = activityFetchList.slice(i, i + actBatchSize);
-                const batchResults = await Promise.all(
-                    batch.map((item) =>
-                        runInInjectionContext(this.injector, () =>
-                            getDoc(item.activityRef)
-                        ).then((snap) => ({ ...item, snap }))
-                    )
-                );
-                activityResults.push(...batchResults);
-            }
-
-            const seenTypeIds = new Map<string, any>();
-            this.specialistSequences = [];
-
-            for (const { productDoc, productName, snap: activitySnap } of activityResults) {
-                if (!activitySnap.exists()) continue;
-
-                const activityData = activitySnap.data();
-                const appointmentTypeId = activityData['id'];
-                const appointmentTypeName = activityData['appointmenttype'];
-
-                if (!appointmentTypeId || !appointmentTypeName) continue;
-
-                if (seenTypeIds.has(appointmentTypeId)) {
-                    seenTypeIds.get(appointmentTypeId).productIds.add(productDoc.id);
-                } else {
-                    const entry = {
-                        productId: productDoc.id,
-                        productIds: new Set<string>([productDoc.id]),
-                        productName,
-                        appointmentType: appointmentTypeName,
-                        appointmentTypeId,
-                    };
-                    seenTypeIds.set(appointmentTypeId, entry);
-                    this.specialistSequences.push(entry);
-                }
-            }
-
-            this.specialistSequences.sort((a: any, b: any) =>
-                (a.appointmentType || '').localeCompare(b.appointmentType || '')
-            );
-
-            this.specialistLoading = false;
-        } catch (error) {
-            console.error('Error loading specialist base data:', error);
-            this.specialistLoading = false;
-            this.cdr.detectChanges();
-        }
-    }
-
-    get filteredSpecialistSequences(): any[] {
-        const selected = (this.productFilterControl?.value as string[]) || [];
-        if (!selected.length || this.allProductsSelected) return this.specialistSequences;
-
-        const selectedProductIds = new Set<string>();
-
-        for (const label of selected) {
-            const cardId = [...this.visibleCardIds, ...this.hiddenCardIds]
-                .find(id => this.getCardName(id) === label);
-
-            if (cardId) {
-                for (const pid of this.getCardProductIds(cardId)) {
-                    selectedProductIds.add(pid);
-                }
-            }
-        }
-
-        if (selectedProductIds.size === 0) return this.specialistSequences;
-
-        return this.specialistSequences.filter(seq => {
-            for (const pid of seq.productIds) {
-                if (selectedProductIds.has(pid)) return true;
-            }
-            return false;
-        });
-    }
-
-    async fetchSpecialistSlotsAndCompute(appointmentTypeId: string) {
-        if (!this.specialistStartDate || !this.specialistEndDate) return;
-
-        const filteredSequences = appointmentTypeId
-            ? this.specialistSequences.filter(
-                (seq: any) => seq.appointmentTypeId === this.selectedAppointmentTypeId
-            )
-            : this.specialistSequences;
-        const total = filteredSequences.length;
-
-        this.specialistLoading = true;
-        this.cdr.detectChanges();
-        try {
-            const rangeStart = new Date(this.specialistStartDate);
-            rangeStart.setHours(0, 0, 0, 0);
-
-            const rangeEnd = new Date(this.specialistEndDate);
-            rangeEnd.setHours(23, 59, 59, 999);
-
-            const results: any[] = [];
-
-            for (let i = 0; i < filteredSequences.length; i++) {
-                const seq = filteredSequences[i];
-                const typeId = seq.appointmentTypeId;
-                const roles = this.specialistRolesMap[typeId] || [];
-                const eisMap = this.specialistEISMap[typeId] || {};
-                const matchedSlots: any[] = [];
-
-                for (const role of roles) {
-                    const eisProfiles = eisMap[role] || [];
-                    for (const eisProfile of eisProfiles) {
-                        const snapshot = await runInInjectionContext(this.injector, () =>
-                            getDocs(query(
-                                collection(this.firestore, 'availability'),
-                                where('profileref', '==', doc(this.firestore, eisProfile)),
-                                where(
-                                    'appointments',
-                                    'array-contains',
-                                    doc(this.firestore, 'appointmenttype/' + typeId)
-                                ),
-                                where('starttime', '>=', rangeStart),
-                                where('starttime', '<=', rangeEnd)
-                            ))
-                        );
-
-                        snapshot.forEach((slotDoc) => {
-                            const slotArray = slotDoc.data()[typeId];
-                            if (!Array.isArray(slotArray)) return;
-
-                            for (let a = 0; a < slotArray.length; a++) {
-                                const slot = slotArray[a];
-                                const slotStart =
-                                    slot.slotstart?.toDate?.()
-                                    || (slot.slotstart ? new Date(slot.slotstart) : null);
-                                if (
-                                    !slotStart
-                                    || slotStart < rangeStart
-                                    || slotStart > rangeEnd
-                                ) continue;
-
-                                matchedSlots.push({
-                                    slotStart: slot.slotstart,
-                                    slotEnd: slot.slotend,
-                                    booked: slot.booked || false,
-                                    available: slot.available || false,
-                                    eisprofile: eisProfile,
-                                    // Identifiers needed to write the appointment's
-                                    // `slotdata` and to flip the slot to booked.
-                                    docid: slotDoc.id,
-                                    index: a,
-                                    appointmentrole: role,
-                                });
-                            }
-                        });
-                    }
-                }
-
-                results.push({
-                    appointmentTypeId: typeId,
-                    appointmentTypeName: seq.appointmentType,
-                    productName: seq.productName,
-                    productId: seq.productId,
-                    slots: matchedSlots,
-                });
-
-                // progress update
-                if ((i + 1) % 5 === 0 || i === total - 1) {
-                    this.specialistLoadProgress = `${i + 1} / ${total}`;
-                    this.cdr.detectChanges();
-                }
-            }
-
-            this.specialistAllSlots = results;
-            this.specialistLoadProgress = '';
-            const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
-            this.computeSpecialistDisplayData();
-        } catch (error) {
-            console.error('Error fetching specialist slots:', error);
-        } finally {
-            this.specialistLoading = false;
-            this.cdr.detectChanges();
-        }
-    }
-
-    computeSpecialistDisplayData() {
-        let totalSlots = 0;
-        let totalBooked = 0;
-        let totalAvailable = 0;
-
-        const productMap = new Map<string, { name: string; booked: number; total: number }>();
-        const specialistMap = new Map<string, {
-            productId: string;
-            productNames: Set<string>;
-            appointmentTypeName: string;
-            appointmentTypeId: string;
-            totalSlots: number;
-            booked: number;
-            available: number;
-        }>();
-
-        const productColors = [
-            '#3b82f6', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444',
-            '#6366f1', '#10b981', '#0891b2', '#be123c', '#7c3aed'
-        ];
-
-        for (const appointmentSlot of this.specialistAllSlots) {
-            const productName = appointmentSlot.productName || 'Unknown';
-            const productId = appointmentSlot.productId;
-            const appointmentTypeName = appointmentSlot.appointmentTypeName;
-            const appointmentTypeId = appointmentSlot.appointmentTypeId;
-
-            if (!productMap.has(productId)) {
-                productMap.set(productId, { name: productName, booked: 0, total: 0 });
-            }
-            const productEntry = productMap.get(productId)!;
-            for (const slot of appointmentSlot.slots) {
-                totalSlots++;
-                productEntry.total++;
-
-                const eisId = (slot.eisprofile || '').split('/').pop() || 'unknown';
-
-                if (!specialistMap.has(eisId)) {
-                    specialistMap.set(eisId, {
-                        productId: '',
-                        productNames: new Set(),
-                        appointmentTypeName: '',
-                        appointmentTypeId: '',
-                        totalSlots: 0,
-                        booked: 0,
-                        available: 0,
-                    });
-                }
-                const specialistEntry = specialistMap.get(eisId)!;
-                specialistEntry.productId = productId;
-                specialistEntry.appointmentTypeName = appointmentTypeName;
-                specialistEntry.appointmentTypeId = appointmentTypeId;
-                specialistEntry.productNames.add(productName);
-                specialistEntry.totalSlots++;
-
-                if (slot.booked) {
-                    totalBooked++;
-                    productEntry.booked++;
-                    specialistEntry.booked++;
-                } else if (slot.available) {
-                    totalAvailable++;
-                    specialistEntry.available++;
-                }
-            }
-        }
-
-        this.slotOverview = {
-            totalSlots,
-            booked: totalBooked,
-            available: totalAvailable,
-            bookingRate: totalSlots > 0 ? Math.round((totalBooked / totalSlots) * 100) : 0,
-        };
-
-        let colorIndex = 0;
-        this.slotsByProduct = [];
-
-        for (const [, entry] of productMap) {
-            if (entry.total > 0) {
-                this.slotsByProduct.push({
-                    name: entry.name,
-                    booked: entry.booked,
-                    total: entry.total,
-                    pct: Math.round((entry.booked / entry.total) * 100),
-                    color: productColors[colorIndex % productColors.length],
-                });
-                colorIndex++;
-            }
-        }
-        this.slotsByProduct.sort((a, b) => b.total - a.total);
-
-        const productClassList = ['upi', 'wig', 'ftm', 'pto', 'ei', 'cs'];
-        this.specialistData = [];
-        for (const [eisId, entry] of specialistMap) {
-            if (entry.totalSlots === 0) continue;
-
-            const name = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || eisId;
-            const utilizationPct = Math.round((entry.booked / entry.totalSlots) * 100);
-
-            let utilizationNote = '';
-            let utilizationNoteColor = '';
-            if (entry.available > 0 && utilizationPct < 60) {
-                utilizationNote = 'needs bookings';
-                utilizationNoteColor = '#f59e0b';
-            } else if (entry.available > 0) {
-                utilizationNote = `${entry.available} open`;
-                utilizationNoteColor = '#10b981';
-            }
-
-            this.specialistData.push({
-                name,
-                eisId,
-                role: 'Specialist',
-                appointmentTypeName: entry.appointmentTypeName,
-                appointmentTypeId: entry.appointmentTypeId,
-                productId: entry.productId,
-                productClass: productClassList[this.specialistData.length % productClassList.length],
-                appointmentsGiven: entry.totalSlots,
-                booked: entry.booked,
-                availableSlots: entry.available,
-                utilizationPct,
-                utilizationNote: utilizationNote || undefined,
-                utilizationNoteColor: utilizationNoteColor || undefined,
-            });
-        }
-        this.specialistData.sort((a, b) => b.appointmentsGiven - a.appointmentsGiven);
-    }
-
-    async onActivityChange(appointmentTypeId: string) {
-        this.selectedAppointmentTypeId = appointmentTypeId;
-        if (!appointmentTypeId) return;
-
-        const rolesSnap = await runInInjectionContext(this.injector, () =>
-            getDocs(query(
-                collection(this.firestore, 'AppointmentType-To-Roles'),
-                where(
-                    'assigned_appttype_ref',
-                    '==',
-                    doc(this.firestore, `appointmenttype/${this.selectedAppointmentTypeId}`)
-                ),
-                limit(1)
-            ))
-        );
-
-        const roles: string[] = [];
-        rolesSnap.forEach((roleDoc) => {
-            const requiredRoles = roleDoc.data()['required_role'] ?? [];
-            const additionalRoles = roleDoc.data()['additional_role'] ?? [];
-            [...requiredRoles, ...additionalRoles].forEach((role: any) => {
-                if (role?.path) roles.push(role.path);
-            });
-        });
-        this.specialistRolesMap[this.selectedAppointmentTypeId] = roles;
-
-        const eisMap: { [role: string]: string[] } = {};
-        await Promise.all(
-            roles.map(async (rolePath) => {
-                const eisSnap = await runInInjectionContext(this.injector, () =>
-                    getDocs(query(
-                        collection(this.firestore, 'Roles-To-EIS'),
-                        where(
-                            'assigned_role_ref',
-                            '==',
-                            doc(this.firestore, rolePath)
-                        )
-                    ))
-                );
-                const eisRefs: string[] = [];
-                eisSnap.forEach((eisDoc) => {
-                    const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
-                    assignedEis.forEach((eis: any) => {
-                        eisRefs.push(eis.path);
-                    });
-                });
-                eisMap[rolePath] = eisRefs;
-            })
-        );
-        this.specialistEISMap[this.selectedAppointmentTypeId] = eisMap;
-        await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
-    }
-
-    async openSpecialistSlots(eisId: string) {
-        if (this.expandedSpecialist === eisId) {
-            this.expandedSpecialist = null;
-            this.filteredBookedAppointments = [];
-            return;
-        }
-        this.selectedEISId = eisId;
-        this.filteredBookedAppointments = [];
-        this.specialistBookedAll = [];
-        this.expandedSpecialist = eisId;
-
-        // Load ALL appointments for the month (cancelled==false + starttime range —
-        // an index that already exists). We deliberately DON'T use the 'custom'
-        // mode here: adding `appointment ==` needs a separate composite index that
-        // isn't provisioned. Filtering by type/host client-side avoids that and
-        // also lets us label cross-type "busy" slots.
-        await this.filterAppointmentsByType('all', null);
-        // Appointment hosts are stored as profile_data/<eisId> refs, so the host
-        // path's last segment IS the specialist's eisId (NOT mapMetaData[eisId].profileid).
-        const hostIsThisSpecialist = (appointment: any) =>
-            appointment?.hosts?.some((host: any) => {
-                const hostPath = host?.path || host?.id || host || '';
-                return String(hostPath).split('/').pop() === eisId;
-            });
-
-        // All of this specialist's active bookings, regardless of appointment type
-        // (drives the "who/what occupies this slot" labels in the seat map).
-        this.specialistBookedAll = this.allAppointments.filter(
-            (appointment: any) => hostIsThisSpecialist(appointment) && !appointment?.attended
-        );
-
-        // Bookings for the currently selected appointment type only (booked-list).
-        this.filteredBookedAppointments = this.specialistBookedAll.filter(
-            (appointment: any) =>
-                appointment?.appointment?.id === this.selectedAppointmentTypeId
-        );
-
-        this.mergedSeatSlots = this.computeMergedSeatSlots();
-    }
-
-    // Extract the booked participant id from an appointment's stored reference.
-    private getBookedParticipantId(appointment: any): string | null {
-        return (
-            appointment?.bookedby?.id ||
-            appointment?.bookedby?.path?.split('/')?.pop() || null
-        );
-    }
-
-    getSpecialistAvailability(eisProfile: string) {
-        this.selectedEisProfile = eisProfile;
-        this.generateWeekDates();
-
-        // Auto-select the first day that actually has slots (skip empty days).
-        const firstWithSlots =
-            this.availableDates.find((d: any) => d.hasSlots) || this.availableDates[0];
-        if (firstWithSlots) {
-            this.onDateSelect(firstWithSlots);
-        }
-    }
-
-    setSpecialistView(view: string) {
-        this.selectedView = view;
-        if (
-            view === 'available' &&
-            this.availableDates.length > 0
-        ) {
-            this.onDateSelect(this.availableDates[0]);
-        }
-    }
+    // onSpecialistStartInput(event: Event) {
+    //     const value = (event.target as HTMLInputElement)?.value;
+    //     if (!value) return;
+    //     const parsed = new Date(`${value}T00:00:00`);
+    //     if (isNaN(parsed.getTime())) return;
+    //     this.onSpecialistDateChange(parsed);
+    // }
+
+    // // WHEN USER CHANGES START DATE
+    // async onSpecialistDateChange(selectedDate: Date) {
+    //     this.specialistLoading = true;
+    //     if (!selectedDate) return;
+
+    //     const start = new Date(selectedDate);
+    //     start.setHours(0, 0, 0, 0);
+
+    //     const end = new Date(start);
+    //     end.setDate(start.getDate() + 7);
+
+    //     this.specialistStartDate = start;
+    //     this.specialistEndDate = end;
+
+    //     this.specialistRange.patchValue({
+    //         start,
+    //         end,
+    //     });
+
+    //     this.updateSpecialistDisplayMonth();
+    //     await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    // }
+
+    // updateSpecialistDisplayMonth() {
+    //     const start = this.specialistStartDate;
+    //     const end = this.specialistEndDate;
+
+    //     if (!start || !end) return;
+
+    //     this.specialistDisplayMonth =
+    //         `${start.toLocaleDateString('en-GB', {
+    //             day: '2-digit',
+    //             month: 'short',
+    //             year: 'numeric'
+    //         })} - ${end.toLocaleDateString('en-GB', {
+    //             day: '2-digit',
+    //             month: 'short',
+    //             year: 'numeric'
+    //         })}`;
+    // }
+
+    // async loadSpecialistBaseData() {
+    //     this.specialistLoading = true;
+    //     this.cdr.detectChanges();
+    //     this.specialistAllSlots = [];
+    //     this.specialistData = [];
+    //     this.filteredBookedAppointments = [];
+    //     this.availableDates = [];
+
+    //     try {
+    //         const productsSnap = await runInInjectionContext(this.injector, () =>
+    //             getDocs(query(
+    //                 collection(this.firestore, 'products'),
+    //                 where('mode', '==', 'Priority Mode'),
+    //             ))
+    //         );
+
+    //         const deliveryPromises = productsSnap.docs.map((productDoc) =>
+    //             runInInjectionContext(this.injector, () =>
+    //                 getDocs(query(
+    //                     collection(this.firestore, 'productToDeliverySequence'),
+    //                     where('product', '==', productDoc.ref)
+    //                 ))
+    //             ).then((snapshot) => ({ productDoc, snapshot }))
+    //         );
+
+    //         const allDeliveryResults = await Promise.all(deliveryPromises);
+
+    //         const activityFetchList: { productDoc: any; productName: string; activityRef: any }[] = [];
+
+    //         for (const { productDoc, snapshot } of allDeliveryResults) {
+    //             const productName = productDoc.data()['product'];
+
+    //             for (const deliveryDoc of snapshot.docs) {
+    //                 const deliveryOptions = deliveryDoc.data()['deliveryoptions'];
+    //                 if (!Array.isArray(deliveryOptions) || deliveryOptions.length === 0) continue;
+
+    //                 for (const option of deliveryOptions) {
+    //                     const deliverySequence = option?.deliverysequence;
+    //                     if (!Array.isArray(deliverySequence)) continue;
+
+    //                     for (const sequenceItem of deliverySequence) {
+    //                         if (sequenceItem.activity) {
+    //                             activityFetchList.push({
+    //                                 productDoc,
+    //                                 productName,
+    //                                 activityRef: sequenceItem.activity,
+    //                             });
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         const activityResults: { productDoc: any; productName: string; activityRef: any; snap: any }[] = [];
+    //         const actBatchSize = 15;
+
+    //         for (let i = 0; i < activityFetchList.length; i += actBatchSize) {
+    //             const batch = activityFetchList.slice(i, i + actBatchSize);
+    //             const batchResults = await Promise.all(
+    //                 batch.map((item) =>
+    //                     runInInjectionContext(this.injector, () =>
+    //                         getDoc(item.activityRef)
+    //                     ).then((snap) => ({ ...item, snap }))
+    //                 )
+    //             );
+    //             activityResults.push(...batchResults);
+    //         }
+
+    //         const seenTypeIds = new Map<string, any>();
+    //         this.specialistSequences = [];
+
+    //         for (const { productDoc, productName, snap: activitySnap } of activityResults) {
+    //             if (!activitySnap.exists()) continue;
+
+    //             const activityData = activitySnap.data();
+    //             const appointmentTypeId = activityData['id'];
+    //             const appointmentTypeName = activityData['appointmenttype'];
+
+    //             if (!appointmentTypeId || !appointmentTypeName) continue;
+
+    //             if (seenTypeIds.has(appointmentTypeId)) {
+    //                 seenTypeIds.get(appointmentTypeId).productIds.add(productDoc.id);
+    //             } else {
+    //                 const entry = {
+    //                     productId: productDoc.id,
+    //                     productIds: new Set<string>([productDoc.id]),
+    //                     productName,
+    //                     appointmentType: appointmentTypeName,
+    //                     appointmentTypeId,
+    //                 };
+    //                 seenTypeIds.set(appointmentTypeId, entry);
+    //                 this.specialistSequences.push(entry);
+    //             }
+    //         }
+
+    //         this.specialistSequences.sort((a: any, b: any) =>
+    //             (a.appointmentType || '').localeCompare(b.appointmentType || '')
+    //         );
+
+    //         this.specialistLoading = false;
+    //     } catch (error) {
+    //         console.error('Error loading specialist base data:', error);
+    //         this.specialistLoading = false;
+    //         this.cdr.detectChanges();
+    //     }
+    // }
+
+    // get filteredSpecialistSequences(): any[] {
+    //     const selected = (this.productFilterControl?.value as string[]) || [];
+    //     if (!selected.length || this.allProductsSelected) return this.specialistSequences;
+
+    //     const selectedProductIds = new Set<string>();
+
+    //     for (const label of selected) {
+    //         const cardId = [...this.visibleCardIds, ...this.hiddenCardIds]
+    //             .find(id => this.getCardName(id) === label);
+
+    //         if (cardId) {
+    //             for (const pid of this.getCardProductIds(cardId)) {
+    //                 selectedProductIds.add(pid);
+    //             }
+    //         }
+    //     }
+
+    //     if (selectedProductIds.size === 0) return this.specialistSequences;
+
+    //     return this.specialistSequences.filter(seq => {
+    //         for (const pid of seq.productIds) {
+    //             if (selectedProductIds.has(pid)) return true;
+    //         }
+    //         return false;
+    //     });
+    // }
+
+    // async fetchSpecialistSlotsAndCompute(appointmentTypeId: string) {
+    //     if (!this.specialistStartDate || !this.specialistEndDate) return;
+
+    //     const filteredSequences = appointmentTypeId
+    //         ? this.specialistSequences.filter(
+    //             (seq: any) => seq.appointmentTypeId === this.selectedAppointmentTypeId
+    //         )
+    //         : this.specialistSequences;
+    //     const total = filteredSequences.length;
+
+    //     this.specialistLoading = true;
+    //     this.cdr.detectChanges();
+    //     try {
+    //         const rangeStart = new Date(this.specialistStartDate);
+    //         rangeStart.setHours(0, 0, 0, 0);
+
+    //         const rangeEnd = new Date(this.specialistEndDate);
+    //         rangeEnd.setHours(23, 59, 59, 999);
+
+    //         const results: any[] = [];
+
+    //         for (let i = 0; i < filteredSequences.length; i++) {
+    //             const seq = filteredSequences[i];
+    //             const typeId = seq.appointmentTypeId;
+    //             const roles = this.specialistRolesMap[typeId] || [];
+    //             const eisMap = this.specialistEISMap[typeId] || {};
+    //             const matchedSlots: any[] = [];
+
+    //             for (const role of roles) {
+    //                 const eisProfiles = eisMap[role] || [];
+    //                 for (const eisProfile of eisProfiles) {
+    //                     const snapshot = await runInInjectionContext(this.injector, () =>
+    //                         getDocs(query(
+    //                             collection(this.firestore, 'availability'),
+    //                             where('profileref', '==', doc(this.firestore, eisProfile)),
+    //                             where(
+    //                                 'appointments',
+    //                                 'array-contains',
+    //                                 doc(this.firestore, 'appointmenttype/' + typeId)
+    //                             ),
+    //                             where('starttime', '>=', rangeStart),
+    //                             where('starttime', '<=', rangeEnd)
+    //                         ))
+    //                     );
+
+    //                     snapshot.forEach((slotDoc) => {
+    //                         const slotArray = slotDoc.data()[typeId];
+    //                         if (!Array.isArray(slotArray)) return;
+
+    //                         for (let a = 0; a < slotArray.length; a++) {
+    //                             const slot = slotArray[a];
+    //                             const slotStart =
+    //                                 slot.slotstart?.toDate?.()
+    //                                 || (slot.slotstart ? new Date(slot.slotstart) : null);
+    //                             if (
+    //                                 !slotStart
+    //                                 || slotStart < rangeStart
+    //                                 || slotStart > rangeEnd
+    //                             ) continue;
+
+    //                             matchedSlots.push({
+    //                                 slotStart: slot.slotstart,
+    //                                 slotEnd: slot.slotend,
+    //                                 booked: slot.booked || false,
+    //                                 available: slot.available || false,
+    //                                 eisprofile: eisProfile,
+    //                                 // Identifiers needed to write the appointment's
+    //                                 // `slotdata` and to flip the slot to booked.
+    //                                 docid: slotDoc.id,
+    //                                 index: a,
+    //                                 appointmentrole: role,
+    //                             });
+    //                         }
+    //                     });
+    //                 }
+    //             }
+
+    //             results.push({
+    //                 appointmentTypeId: typeId,
+    //                 appointmentTypeName: seq.appointmentType,
+    //                 productName: seq.productName,
+    //                 productId: seq.productId,
+    //                 slots: matchedSlots,
+    //             });
+
+    //             // progress update
+    //             if ((i + 1) % 5 === 0 || i === total - 1) {
+    //                 this.specialistLoadProgress = `${i + 1} / ${total}`;
+    //                 this.cdr.detectChanges();
+    //             }
+    //         }
+
+    //         this.specialistAllSlots = results;
+    //         this.specialistLoadProgress = '';
+    //         const totalSlotsFetched = results.reduce((sum, r) => sum + r.slots.length, 0);
+    //         this.computeSpecialistDisplayData();
+    //     } catch (error) {
+    //         console.error('Error fetching specialist slots:', error);
+    //     } finally {
+    //         this.specialistLoading = false;
+    //         this.cdr.detectChanges();
+    //     }
+    // }
+
+    // computeSpecialistDisplayData() {
+    //     let totalSlots = 0;
+    //     let totalBooked = 0;
+    //     let totalAvailable = 0;
+
+    //     const productMap = new Map<string, { name: string; booked: number; total: number }>();
+    //     const specialistMap = new Map<string, {
+    //         productId: string;
+    //         productNames: Set<string>;
+    //         appointmentTypeName: string;
+    //         appointmentTypeId: string;
+    //         totalSlots: number;
+    //         booked: number;
+    //         available: number;
+    //     }>();
+
+    //     const productColors = [
+    //         '#3b82f6', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444',
+    //         '#6366f1', '#10b981', '#0891b2', '#be123c', '#7c3aed'
+    //     ];
+
+    //     for (const appointmentSlot of this.specialistAllSlots) {
+    //         const productName = appointmentSlot.productName || 'Unknown';
+    //         const productId = appointmentSlot.productId;
+    //         const appointmentTypeName = appointmentSlot.appointmentTypeName;
+    //         const appointmentTypeId = appointmentSlot.appointmentTypeId;
+
+    //         if (!productMap.has(productId)) {
+    //             productMap.set(productId, { name: productName, booked: 0, total: 0 });
+    //         }
+    //         const productEntry = productMap.get(productId)!;
+    //         for (const slot of appointmentSlot.slots) {
+    //             totalSlots++;
+    //             productEntry.total++;
+
+    //             const eisId = (slot.eisprofile || '').split('/').pop() || 'unknown';
+
+    //             if (!specialistMap.has(eisId)) {
+    //                 specialistMap.set(eisId, {
+    //                     productId: '',
+    //                     productNames: new Set(),
+    //                     appointmentTypeName: '',
+    //                     appointmentTypeId: '',
+    //                     totalSlots: 0,
+    //                     booked: 0,
+    //                     available: 0,
+    //                 });
+    //             }
+    //             const specialistEntry = specialistMap.get(eisId)!;
+    //             specialistEntry.productId = productId;
+    //             specialistEntry.appointmentTypeName = appointmentTypeName;
+    //             specialistEntry.appointmentTypeId = appointmentTypeId;
+    //             specialistEntry.productNames.add(productName);
+    //             specialistEntry.totalSlots++;
+
+    //             if (slot.booked) {
+    //                 totalBooked++;
+    //                 productEntry.booked++;
+    //                 specialistEntry.booked++;
+    //             } else if (slot.available) {
+    //                 totalAvailable++;
+    //                 specialistEntry.available++;
+    //             }
+    //         }
+    //     }
+
+    //     this.slotOverview = {
+    //         totalSlots,
+    //         booked: totalBooked,
+    //         available: totalAvailable,
+    //         bookingRate: totalSlots > 0 ? Math.round((totalBooked / totalSlots) * 100) : 0,
+    //     };
+
+    //     let colorIndex = 0;
+    //     this.slotsByProduct = [];
+
+    //     for (const [, entry] of productMap) {
+    //         if (entry.total > 0) {
+    //             this.slotsByProduct.push({
+    //                 name: entry.name,
+    //                 booked: entry.booked,
+    //                 total: entry.total,
+    //                 pct: Math.round((entry.booked / entry.total) * 100),
+    //                 color: productColors[colorIndex % productColors.length],
+    //             });
+    //             colorIndex++;
+    //         }
+    //     }
+    //     this.slotsByProduct.sort((a, b) => b.total - a.total);
+
+    //     const productClassList = ['upi', 'wig', 'ftm', 'pto', 'ei', 'cs'];
+    //     this.specialistData = [];
+    //     for (const [eisId, entry] of specialistMap) {
+    //         if (entry.totalSlots === 0) continue;
+
+    //         const name = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || eisId;
+    //         const utilizationPct = Math.round((entry.booked / entry.totalSlots) * 100);
+
+    //         let utilizationNote = '';
+    //         let utilizationNoteColor = '';
+    //         if (entry.available > 0 && utilizationPct < 60) {
+    //             utilizationNote = 'needs bookings';
+    //             utilizationNoteColor = '#f59e0b';
+    //         } else if (entry.available > 0) {
+    //             utilizationNote = `${entry.available} open`;
+    //             utilizationNoteColor = '#10b981';
+    //         }
+
+    //         this.specialistData.push({
+    //             name,
+    //             eisId,
+    //             role: 'Specialist',
+    //             appointmentTypeName: entry.appointmentTypeName,
+    //             appointmentTypeId: entry.appointmentTypeId,
+    //             productId: entry.productId,
+    //             productClass: productClassList[this.specialistData.length % productClassList.length],
+    //             appointmentsGiven: entry.totalSlots,
+    //             booked: entry.booked,
+    //             availableSlots: entry.available,
+    //             utilizationPct,
+    //             utilizationNote: utilizationNote || undefined,
+    //             utilizationNoteColor: utilizationNoteColor || undefined,
+    //         });
+    //     }
+    //     this.specialistData.sort((a, b) => b.appointmentsGiven - a.appointmentsGiven);
+    // }
+
+    // async onActivityChange(appointmentTypeId: string) {
+    //     this.selectedAppointmentTypeId = appointmentTypeId;
+    //     if (!appointmentTypeId) return;
+
+    //     const rolesSnap = await runInInjectionContext(this.injector, () =>
+    //         getDocs(query(
+    //             collection(this.firestore, 'AppointmentType-To-Roles'),
+    //             where(
+    //                 'assigned_appttype_ref',
+    //                 '==',
+    //                 doc(this.firestore, `appointmenttype/${this.selectedAppointmentTypeId}`)
+    //             ),
+    //             limit(1)
+    //         ))
+    //     );
+
+    //     const roles: string[] = [];
+    //     rolesSnap.forEach((roleDoc) => {
+    //         const requiredRoles = roleDoc.data()['required_role'] ?? [];
+    //         const additionalRoles = roleDoc.data()['additional_role'] ?? [];
+    //         [...requiredRoles, ...additionalRoles].forEach((role: any) => {
+    //             if (role?.path) roles.push(role.path);
+    //         });
+    //     });
+    //     this.specialistRolesMap[this.selectedAppointmentTypeId] = roles;
+
+    //     const eisMap: { [role: string]: string[] } = {};
+    //     await Promise.all(
+    //         roles.map(async (rolePath) => {
+    //             const eisSnap = await runInInjectionContext(this.injector, () =>
+    //                 getDocs(query(
+    //                     collection(this.firestore, 'Roles-To-EIS'),
+    //                     where(
+    //                         'assigned_role_ref',
+    //                         '==',
+    //                         doc(this.firestore, rolePath)
+    //                     )
+    //                 ))
+    //             );
+    //             const eisRefs: string[] = [];
+    //             eisSnap.forEach((eisDoc) => {
+    //                 const assignedEis = eisDoc.data()['assigned_eis'] ?? [];
+    //                 assignedEis.forEach((eis: any) => {
+    //                     eisRefs.push(eis.path);
+    //                 });
+    //             });
+    //             eisMap[rolePath] = eisRefs;
+    //         })
+    //     );
+    //     this.specialistEISMap[this.selectedAppointmentTypeId] = eisMap;
+    //     await this.fetchSpecialistSlotsAndCompute(this.selectedAppointmentTypeId);
+    // }
+
+    // async openSpecialistSlots(eisId: string) {
+    //     if (this.expandedSpecialist === eisId) {
+    //         this.expandedSpecialist = null;
+    //         this.filteredBookedAppointments = [];
+    //         return;
+    //     }
+    //     this.selectedEISId = eisId;
+    //     this.filteredBookedAppointments = [];
+    //     this.specialistBookedAll = [];
+    //     this.expandedSpecialist = eisId;
+
+    //     // Load ALL appointments for the month (cancelled==false + starttime range —
+    //     // an index that already exists). We deliberately DON'T use the 'custom'
+    //     // mode here: adding `appointment ==` needs a separate composite index that
+    //     // isn't provisioned. Filtering by type/host client-side avoids that and
+    //     // also lets us label cross-type "busy" slots.
+    //     await this.filterAppointmentsByType('all', null);
+    //     // Appointment hosts are stored as profile_data/<eisId> refs, so the host
+    //     // path's last segment IS the specialist's eisId (NOT mapMetaData[eisId].profileid).
+    //     const hostIsThisSpecialist = (appointment: any) =>
+    //         appointment?.hosts?.some((host: any) => {
+    //             const hostPath = host?.path || host?.id || host || '';
+    //             return String(hostPath).split('/').pop() === eisId;
+    //         });
+
+    //     // All of this specialist's active bookings, regardless of appointment type
+    //     // (drives the "who/what occupies this slot" labels in the seat map).
+    //     this.specialistBookedAll = this.allAppointments.filter(
+    //         (appointment: any) => hostIsThisSpecialist(appointment) && !appointment?.attended
+    //     );
+
+    //     // Bookings for the currently selected appointment type only (booked-list).
+    //     this.filteredBookedAppointments = this.specialistBookedAll.filter(
+    //         (appointment: any) =>
+    //             appointment?.appointment?.id === this.selectedAppointmentTypeId
+    //     );
+
+    //     this.mergedSeatSlots = this.computeMergedSeatSlots();
+    // }
+
+    // // Extract the booked participant id from an appointment's stored reference.
+    // private getBookedParticipantId(appointment: any): string | null {
+    //     return (
+    //         appointment?.bookedby?.id ||
+    //         appointment?.bookedby?.path?.split('/')?.pop() || null
+    //     );
+    // }
+
+    // getSpecialistAvailability(eisProfile: string) {
+    //     this.selectedEisProfile = eisProfile;
+    //     this.generateWeekDates();
+
+    //     // Auto-select the first day that actually has slots (skip empty days).
+    //     const firstWithSlots =
+    //         this.availableDates.find((d: any) => d.hasSlots) || this.availableDates[0];
+    //     if (firstWithSlots) {
+    //         this.onDateSelect(firstWithSlots);
+    //     }
+    // }
+
+    // setSpecialistView(view: string) {
+    //     this.selectedView = view;
+    //     if (
+    //         view === 'available' &&
+    //         this.availableDates.length > 0
+    //     ) {
+    //         this.onDateSelect(this.availableDates[0]);
+    //     }
+    // }
 
     // All slots (booked + available) for the selected specialist on a given day.
-    private getSlotsForDate(dateStr: string): any[] {
-        const appointmentData = this.specialistAllSlots.find(
-            (item: any) => item.appointmentTypeId === this.selectedAppointmentTypeId
-        );
-        if (!appointmentData) return [];
-        return (appointmentData.slots || []).filter(
-            (slot: any) =>
-                slot?.eisprofile?.split('/').pop() === this.selectedEisProfile &&
-                slot.slotStart?.toDate?.().toDateString() === dateStr
-        );
-    }
+    // private getSlotsForDate(dateStr: string): any[] {
+    //     const appointmentData = this.specialistAllSlots.find(
+    //         (item: any) => item.appointmentTypeId === this.selectedAppointmentTypeId
+    //     );
+    //     if (!appointmentData) return [];
+    //     return (appointmentData.slots || []).filter(
+    //         (slot: any) =>
+    //             slot?.eisprofile?.split('/').pop() === this.selectedEisProfile &&
+    //             slot.slotStart?.toDate?.().toDateString() === dateStr
+    //     );
+    // }
 
-    onDateSelect(date: any) {
-        this.selectedDate = date.fullDate.toDateString();
+    // onDateSelect(date: any) {
+    //     this.selectedDate = date.fullDate.toDateString();
 
-        const raw = this.getSlotsForDate(this.selectedDate)
-            .sort((a: any, b: any) =>
-                (a.slotStart?.toDate?.()?.getTime() || 0) - (b.slotStart?.toDate?.()?.getTime() || 0)
-            );
+    //     const raw = this.getSlotsForDate(this.selectedDate)
+    //         .sort((a: any, b: any) =>
+    //             (a.slotStart?.toDate?.()?.getTime() || 0) - (b.slotStart?.toDate?.()?.getTime() || 0)
+    //         );
 
-        // Deduplicate: same time + same booked/available state = duplicate
-        const seen = new Set<string>();
-        this.selectedSpecialistSlots = raw.filter((slot: any) => {
-            const key = `${slot.slotStart?.toDate?.()?.getTime()}_${slot.booked}_${slot.available}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
+    //     // Deduplicate: same time + same booked/available state = duplicate
+    //     const seen = new Set<string>();
+    //     this.selectedSpecialistSlots = raw.filter((slot: any) => {
+    //         const key = `${slot.slotStart?.toDate?.()?.getTime()}_${slot.booked}_${slot.available}`;
+    //         if (seen.has(key)) return false;
+    //         seen.add(key);
+    //         return true;
+    //     });
 
-        this.mergedSeatSlots = this.computeMergedSeatSlots();
-    }
+    //     this.mergedSeatSlots = this.computeMergedSeatSlots();
+    // }
 
-    // Slot counts for the currently selected day (drive the seat-map summary).
-    get selectedDayAvailableCount(): number {
-        return (this.selectedSpecialistSlots || []).filter((s: any) => s.available && !s.booked).length;
-    }
-    get selectedDayBookedCount(): number {
-        return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
-    }
-    get selectedDayUnavailableCount(): number {
-        return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
-    }
+    // // Slot counts for the currently selected day (drive the seat-map summary).
+    // get selectedDayAvailableCount(): number {
+    //     return (this.selectedSpecialistSlots || []).filter((s: any) => s.available && !s.booked).length;
+    // }
+    // get selectedDayBookedCount(): number {
+    //     return (this.selectedSpecialistSlots || []).filter((s: any) => s.booked).length;
+    // }
+    // get selectedDayUnavailableCount(): number {
+    //     return (this.selectedSpecialistSlots || []).filter((s: any) => !s.available && !s.booked).length;
+    // }
 
     // Find the appointment occupying a slot's time for this specialist — works for
     // both "booked" slots (this appointment type) and "unavailable" slots (the
     // specialist is busy with a DIFFERENT appointment type that overlaps).
-    getSlotBookingInfo(slot: any): { name: string; type: string } | null {
-        const start: Date | null = slot?.slotStart?.toDate?.() ?? null;
-        const end: Date | null = slot?.slotEnd?.toDate?.() ?? null;
-        if (!start) return null;
+    // getSlotBookingInfo(slot: any): { name: string; type: string } | null {
+    //     const start: Date | null = slot?.slotStart?.toDate?.() ?? null;
+    //     const end: Date | null = slot?.slotEnd?.toDate?.() ?? null;
+    //     if (!start) return null;
 
-        const match = (this.specialistBookedAll || []).find((a: any) => {
-            const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
-            const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
-            if (!aStart) return false;
-            // Prefer a true time-overlap test; fall back to same-minute start.
-            if (aEnd && end) return aStart < end && aEnd > start;
-            return Math.floor(aStart.getTime() / 60000) === Math.floor(start.getTime() / 60000);
-        });
-        if (!match) return null;
+    //     const match = (this.specialistBookedAll || []).find((a: any) => {
+    //         const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
+    //         const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+    //         if (!aStart) return false;
+    //         // Prefer a true time-overlap test; fall back to same-minute start.
+    //         if (aEnd && end) return aStart < end && aEnd > start;
+    //         return Math.floor(aStart.getTime() / 60000) === Math.floor(start.getTime() / 60000);
+    //     });
+    //     if (!match) return null;
 
-        return {
-            name: this.resolveBookedParticipantName(match),
-            type: this.resolveAppointmentType(match) || '',
-        };
-    }
+    //     return {
+    //         name: this.resolveBookedParticipantName(match),
+    //         type: this.resolveAppointmentType(match) || '',
+    //     };
+    // }
 
-    // Merges consecutive booked slots for the same participant into one card.
-    private getAppointmentTypeId(appointment: any): string | null {
-        return (
-            appointment?.appointment?.id ||
-            appointment?.appointment?.path?.split('/')?.pop() ||
-            null
-        );
-    }
+    // // Merges consecutive booked slots for the same participant into one card.
+    // private getAppointmentTypeId(appointment: any): string | null {
+    //     return (
+    //         appointment?.appointment?.id ||
+    //         appointment?.appointment?.path?.split('/')?.pop() ||
+    //         null
+    //     );
+    // }
 
-    private computeMergedSeatSlots(): any[] {
-        const slots = [...(this.selectedSpecialistSlots || [])];
-        const result: any[] = [];
+    // private computeMergedSeatSlots(): any[] {
+    //     const slots = [...(this.selectedSpecialistSlots || [])];
+    //     const result: any[] = [];
 
-        const findAppointmentForSlot = (s: any) => {
-            const start: Date | null = s?.slotStart?.toDate?.() ?? null;
-            const end: Date | null = s?.slotEnd?.toDate?.() ?? null;
+    //     const findAppointmentForSlot = (s: any) => {
+    //         const start: Date | null = s?.slotStart?.toDate?.() ?? null;
+    //         const end: Date | null = s?.slotEnd?.toDate?.() ?? null;
 
-            if (!start) return null;
+    //         if (!start) return null;
 
-            return (this.specialistBookedAll || []).find((a: any) => {
-                const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
-                const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
+    //         return (this.specialistBookedAll || []).find((a: any) => {
+    //             const aStart: Date | null = a?.starttime?.toDate?.() ?? null;
+    //             const aEnd: Date | null = a?.endtime?.toDate?.() ?? null;
 
-                if (!aStart) return false;
-                if (aEnd && end) {
-                    return aStart < end && aEnd > start;
-                }
-                return (
-                    Math.floor(aStart.getTime() / 60000) ===
-                    Math.floor(start.getTime() / 60000)
-                );
-            });
-        };
+    //             if (!aStart) return false;
+    //             if (aEnd && end) {
+    //                 return aStart < end && aEnd > start;
+    //             }
+    //             return (
+    //                 Math.floor(aStart.getTime() / 60000) ===
+    //                 Math.floor(start.getTime() / 60000)
+    //             );
+    //         });
+    //     };
 
-        const participantIds: (string | null)[] = slots.map((s: any) => {
-            if (s.available && !s.booked) return null;
-            const match = findAppointmentForSlot(s);
-            return this.getBookedParticipantId(match);
-        });
+    //     const participantIds: (string | null)[] = slots.map((s: any) => {
+    //         if (s.available && !s.booked) return null;
+    //         const match = findAppointmentForSlot(s);
+    //         return this.getBookedParticipantId(match);
+    //     });
 
-        const appointmentTypeIds: (string | null)[] = slots.map((s: any) => {
-            if (s.available && !s.booked) return null;
-            const match = findAppointmentForSlot(s);
-            return this.getAppointmentTypeId(match);
-        });
+    //     const appointmentTypeIds: (string | null)[] = slots.map((s: any) => {
+    //         if (s.available && !s.booked) return null;
+    //         const match = findAppointmentForSlot(s);
+    //         return this.getAppointmentTypeId(match);
+    //     });
 
-        const isOccupied = (s: any) => s.booked || (!s.available && !s.booked);
+    //     const isOccupied = (s: any) => s.booked || (!s.available && !s.booked);
 
-        let i = 0;
+    //     let i = 0;
 
-        while (i < slots.length) {
-            const slot = slots[i];
+    //     while (i < slots.length) {
+    //         const slot = slots[i];
 
-            if (!isOccupied(slot)) {
-                result.push({
-                    ...slot,
-                    _merged: false,
-                    _mergedEnd: slot.slotEnd
-                });
+    //         if (!isOccupied(slot)) {
+    //             result.push({
+    //                 ...slot,
+    //                 _merged: false,
+    //                 _mergedEnd: slot.slotEnd
+    //             });
 
-                i++;
-                continue;
-            }
+    //             i++;
+    //             continue;
+    //         }
 
-            const participantId = participantIds[i];
-            const appointmentTypeId = appointmentTypeIds[i];
+    //         const participantId = participantIds[i];
+    //         const appointmentTypeId = appointmentTypeIds[i];
 
-            if (!participantId) {
-                result.push({
-                    ...slot,
-                    _merged: false,
-                    _mergedEnd: slot.slotEnd
-                });
+    //         if (!participantId) {
+    //             result.push({
+    //                 ...slot,
+    //                 _merged: false,
+    //                 _mergedEnd: slot.slotEnd
+    //             });
 
-                i++;
-                continue;
-            }
+    //             i++;
+    //             continue;
+    //         }
 
-            let j = i + 1;
+    //         let j = i + 1;
 
-            while (
-                j < slots.length &&
-                isOccupied(slots[j]) &&
-                participantIds[j] === participantId &&
-                appointmentTypeIds[j] === appointmentTypeId
-            ) {
-                j++;
-            }
+    //         while (
+    //             j < slots.length &&
+    //             isOccupied(slots[j]) &&
+    //             participantIds[j] === participantId &&
+    //             appointmentTypeIds[j] === appointmentTypeId
+    //         ) {
+    //             j++;
+    //         }
 
-            if (j > i + 1) {
-                result.push({
-                    ...slot,
-                    _merged: true,
-                    _mergedEnd:
-                        slots[j - 1]?.slotEnd ??
-                        slots[j - 1]?.slotStart,
-                    _mergeCount: j - i
-                });
-            } else {
-                result.push({
-                    ...slot,
-                    _merged: false,
-                    _mergedEnd: slot.slotEnd
-                });
-            }
-            i = j;
-        }
-        return result;
-    }
+    //         if (j > i + 1) {
+    //             result.push({
+    //                 ...slot,
+    //                 _merged: true,
+    //                 _mergedEnd:
+    //                     slots[j - 1]?.slotEnd ??
+    //                     slots[j - 1]?.slotStart,
+    //                 _mergeCount: j - i
+    //             });
+    //         } else {
+    //             result.push({
+    //                 ...slot,
+    //                 _merged: false,
+    //                 _mergedEnd: slot.slotEnd
+    //             });
+    //         }
+    //         i = j;
+    //     }
+    //     return result;
+    // }
 
     // Resolve the participant a booking belongs to. Real appointment docs store
     // the client in `bookedby` (a profile_data ref → has `.id`/`.path`); our
     // optimistic local appointments use `profileid`. Handle both + a name map.
-    private resolveBookedParticipantName(appointment: any): string {
-        const participantId = this.getBookedParticipantId(appointment);
-        if (!participantId) return 'Booked';
-        // Resolve the display name straight from loaded metadata.
-        return (
-            this.mapMetaData[participantId]?.name ||
-            this.mapprofile[participantId] ||
-            'Booked'
-        );
-    }
+    // private resolveBookedParticipantName(appointment: any): string {
+    //     const participantId = this.getBookedParticipantId(appointment);
+    //     if (!participantId) return 'Booked';
+    //     // Resolve the display name straight from loaded metadata.
+    //     return (
+    //         this.mapMetaData[participantId]?.name ||
+    //         this.mapprofile[participantId] ||
+    //         'Booked'
+    //     );
+    // }
 
-    // Convenience: just the participant name for a booked slot (used in tooltips).
-    getBookedProfileName(slot: any): string {
-        return this.getSlotBookingInfo(slot)?.name || '';
-    }
+    // // Convenience: just the participant name for a booked slot (used in tooltips).
+    // getBookedProfileName(slot: any): string {
+    //     return this.getSlotBookingInfo(slot)?.name || '';
+    // }
 
-    // Booked client appointments for the currently selected day.
-    get bookedForSelectedDate(): any[] {
-        if (!this.selectedDate) return [];
-        return (this.filteredBookedAppointments || []).filter(
-            (a: any) => a?.starttime?.toDate?.().toDateString() === this.selectedDate
-        );
-    }
+    // // Booked client appointments for the currently selected day.
+    // get bookedForSelectedDate(): any[] {
+    //     if (!this.selectedDate) return [];
+    //     return (this.filteredBookedAppointments || []).filter(
+    //         (a: any) => a?.starttime?.toDate?.().toDateString() === this.selectedDate
+    //     );
+    // }
 
-    generateWeekDates() {
-        this.availableDates = [];
-        const currentDate = new Date(this.specialistStartDate);
-        while (currentDate <= this.specialistEndDate) {
-            const dateStr = new Date(currentDate).toDateString();
-            const slots = this.getSlotsForDate(dateStr);
-            const availableCount = slots.filter((s: any) => s.available && !s.booked).length;
-            this.availableDates.push({
-                fullDate: new Date(currentDate),
-                date: currentDate.getDate(),
-                day: currentDate
-                    .toLocaleDateString('en-US', {
-                        weekday: 'short',
-                    })
-                    .toUpperCase(),
-                hasSlots: slots.length > 0,
-                slotCount: slots.length,
-                availableCount,
-            });
-            currentDate.setDate(currentDate.getDate() + 1);
-        }
-    }
+    // generateWeekDates() {
+    //     this.availableDates = [];
+    //     const currentDate = new Date(this.specialistStartDate);
+    //     while (currentDate <= this.specialistEndDate) {
+    //         const dateStr = new Date(currentDate).toDateString();
+    //         const slots = this.getSlotsForDate(dateStr);
+    //         const availableCount = slots.filter((s: any) => s.available && !s.booked).length;
+    //         this.availableDates.push({
+    //             fullDate: new Date(currentDate),
+    //             date: currentDate.getDate(),
+    //             day: currentDate
+    //                 .toLocaleDateString('en-US', {
+    //                     weekday: 'short',
+    //                 })
+    //                 .toUpperCase(),
+    //             hasSlots: slots.length > 0,
+    //             slotCount: slots.length,
+    //             availableCount,
+    //         });
+    //         currentDate.setDate(currentDate.getDate() + 1);
+    //     }
+    // }
 
     get visibleCardIds(): string[] {
         return this.memoGet('vci', () => {
@@ -2926,9 +2941,9 @@ export class DeliveryDashboardCloneComponent {
     get kpiAvgComplete(): number {
         return this.getCompletionSummary().avgStartToDone;
     }
-    get hasSpecialistData(): boolean {
-        return (this.slotOverview?.totalSlots || 0) > 0;
-    }
+    // get hasSpecialistData(): boolean {
+    //     return (this.slotOverview?.totalSlots || 0) > 0;
+    // }
 
     // ===== Ported design getters (delivery-dashboard hero focuses on ongoing) =====
     // (kpiOngoingTotal already exists above; ongoingByCard delegates to getCardOngoing)
@@ -5822,370 +5837,370 @@ export class DeliveryDashboardCloneComponent {
         this.selectedStageFilter = '';
     }
 
-    async goToBooking(selectedSlot: any) {
-        this.selectedUser = null;
-        this.filteredProfile = "";
-        this.selectedSlotData = selectedSlot;
+    // async goToBooking(selectedSlot: any) {
+    //     this.selectedUser = null;
+    //     this.filteredProfile = "";
+    //     this.selectedSlotData = selectedSlot;
 
-        // Open the picker IMMEDIATELY (with its loading state) so the click feels
-        // responsive — profile map + eligible profiles then stream in.
-        this.slotSelected = true;
-        this.eligibleProfilesLoading = true;
-        this.cdr.detectChanges();
+    //     // Open the picker IMMEDIATELY (with its loading state) so the click feels
+    //     // responsive — profile map + eligible profiles then stream in.
+    //     this.slotSelected = true;
+    //     this.eligibleProfilesLoading = true;
+    //     this.cdr.detectChanges();
 
-        // Load which profiles are eligible to book this activity (Option A).
-        this.loadEligibleProfiles(this.selectedAppointmentTypeId);
+    //     // Load which profiles are eligible to book this activity (Option A).
+    //     this.loadEligibleProfiles(this.selectedAppointmentTypeId);
 
-        this.guard.getProfileMap().then(data => {
-            this.profileList = data.list;
-            this.mapProfile = data.map;
-            this.cdr.detectChanges();
-        });
+    //     this.guard.getProfileMap().then(data => {
+    //         this.profileList = data.list;
+    //         this.mapProfile = data.map;
+    //         this.cdr.detectChanges();
+    //     });
 
-        const roles = await this.guard.getRoles();
-        this.loggedInPID = roles.profile_ref.id;
-    }
+    //     const roles = await this.guard.getRoles();
+    //     this.loggedInPID = roles.profile_ref.id;
+    // }
 
-    // Human-readable label for the slot currently being booked (shown in the
-    // picker header so the user knows exactly which slot they're filling).
-    get selectedSlotLabel(): string {
-        const slot = this.selectedSlotData;
-        if (!slot) return '';
-        const start = slot?.slotStart?.toDate?.();
-        const end = slot?.slotEnd?.toDate?.();
-        if (!start) return '';
-        const fmt = (d: Date) =>
-            d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const eisId = (slot?.eisprofile || '').split('/').pop();
-        const who = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || '';
-        const day = start.toLocaleDateString([], { day: '2-digit', month: 'short' });
-        const time = end ? `${fmt(start)} – ${fmt(end)}` : fmt(start);
-        return who ? `${day} · ${time} · ${who}` : `${day} · ${time}`;
-    }
+    // // Human-readable label for the slot currently being booked (shown in the
+    // // picker header so the user knows exactly which slot they're filling).
+    // get selectedSlotLabel(): string {
+    //     const slot = this.selectedSlotData;
+    //     if (!slot) return '';
+    //     const start = slot?.slotStart?.toDate?.();
+    //     const end = slot?.slotEnd?.toDate?.();
+    //     if (!start) return '';
+    //     const fmt = (d: Date) =>
+    //         d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    //     const eisId = (slot?.eisprofile || '').split('/').pop();
+    //     const who = this.mapprofile[eisId] || this.mapMetaData[eisId]?.['name'] || '';
+    //     const day = start.toLocaleDateString([], { day: '2-digit', month: 'short' });
+    //     const time = end ? `${fmt(start)} – ${fmt(end)}` : fmt(start);
+    //     return who ? `${day} · ${time} · ${who}` : `${day} · ${time}`;
+    // }
 
     // Fetch the set of profiles that have a ready appointment deliverable for
     // the given activity, so the picker only offers bookable profiles.
-    async loadEligibleProfiles(appointmentTypeId: string) {
-        this.eligibleProfileIds = new Set<string>();
-        if (!appointmentTypeId) return;
-        this.eligibleProfilesLoading = true;
-        this.cdr.detectChanges();
-        try {
-            const snap = await runInInjectionContext(this.injector, () =>
-                getDocs(query(
-                    collection(this.firestore, 'deliverables'),
-                    where('deliveryref', '==', doc(this.firestore, 'appointmenttype/' + appointmentTypeId)),
-                    where('type', '==', 'appointment'),
-                    where('status', '==', 'ready'),
-                ))
-            );
-            snap.forEach((d) => {
-                const pid = d.data()['profileid'];
-                if (pid) this.eligibleProfileIds.add(pid);
-            });
-        } catch (e) {
-            console.error('Error loading eligible profiles:', e);
-        } finally {
-            this.eligibleProfilesLoading = false;
-            this.cdr.detectChanges();
-        }
-    }
+    // async loadEligibleProfiles(appointmentTypeId: string) {
+    //     this.eligibleProfileIds = new Set<string>();
+    //     if (!appointmentTypeId) return;
+    //     this.eligibleProfilesLoading = true;
+    //     this.cdr.detectChanges();
+    //     try {
+    //         const snap = await runInInjectionContext(this.injector, () =>
+    //             getDocs(query(
+    //                 collection(this.firestore, 'deliverables'),
+    //                 where('deliveryref', '==', doc(this.firestore, 'appointmenttype/' + appointmentTypeId)),
+    //                 where('type', '==', 'appointment'),
+    //                 where('status', '==', 'ready'),
+    //             ))
+    //         );
+    //         snap.forEach((d) => {
+    //             const pid = d.data()['profileid'];
+    //             if (pid) this.eligibleProfileIds.add(pid);
+    //         });
+    //     } catch (e) {
+    //         console.error('Error loading eligible profiles:', e);
+    //     } finally {
+    //         this.eligibleProfilesLoading = false;
+    //         this.cdr.detectChanges();
+    //     }
+    // }
 
-    returnClient() {
-        const search = (this.filteredProfile || '').toLowerCase();
-        return this.profileList.filter(
-            (e: any) =>
-                this.eligibleProfileIds.has(e.id) &&
-                (e.name || '').toLowerCase().includes(search)
-        );
-    }
+    // returnClient() {
+    //     const search = (this.filteredProfile || '').toLowerCase();
+    //     return this.profileList.filter(
+    //         (e: any) =>
+    //             this.eligibleProfileIds.has(e.id) &&
+    //             (e.name || '').toLowerCase().includes(search)
+    //     );
+    // }
 
     // Pick a profile from the custom searchable list and start the booking.
-    selectProfileForBooking(user: any) {
-        this.selectedUser = user.id;
-        this.onProfileSelect(user.id);
-    }
+    // selectProfileForBooking(user: any) {
+    //     this.selectedUser = user.id;
+    //     this.onProfileSelect(user.id);
+    // }
 
-    async directBookAppointment(appointmentTypeId: string, profileId: string) {
-        const injector = this.injector;
-        try {
-            const selectedSlotData = this.selectedSlotData;
-            await runInInjectionContext(injector, async () => {
+    // async directBookAppointment(appointmentTypeId: string, profileId: string) {
+    //     const injector = this.injector;
+    //     try {
+    //         const selectedSlotData = this.selectedSlotData;
+    //         await runInInjectionContext(injector, async () => {
 
-                const deliverableCollection = collection(this.firestore, "deliverables");
-                const deliverableQuery = query(
-                    deliverableCollection,
-                    where("profileid", "==", profileId),
-                    where("type", "==", "appointment"),
-                    where("deliveryref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId))
-                );
+    //             const deliverableCollection = collection(this.firestore, "deliverables");
+    //             const deliverableQuery = query(
+    //                 deliverableCollection,
+    //                 where("profileid", "==", profileId),
+    //                 where("type", "==", "appointment"),
+    //                 where("deliveryref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId))
+    //             );
 
-                const deliverableDocs = await getDocs(deliverableQuery);
-                if (deliverableDocs.empty) {
-                    alert("No matching deliverable found for this appointment type.");
-                    return;
-                }
+    //             const deliverableDocs = await getDocs(deliverableQuery);
+    //             if (deliverableDocs.empty) {
+    //                 alert("No matching deliverable found for this appointment type.");
+    //                 return;
+    //             }
 
-                // ---- Item 4: honor the customer's per-role specialist mapping.
-                // book-appointment only offers EIS that are assigned to THIS
-                // customer (customer_eismapping.eisroles[role]); DDC fetches the
-                // whole role pool, so verify the chosen specialist is allowed for
-                // this customer before booking.
-                const chosenRole: string = selectedSlotData?.appointmentrole;
-                const chosenEis: string = selectedSlotData?.eisprofile;
-                if (chosenRole && chosenEis) {
-                    const custMapSnap = await getDoc(
-                        doc(this.firestore, "customer_eismapping/" + profileId)
-                    );
-                    if (custMapSnap.exists()) {
-                        const eisroles = custMapSnap.data()?.["eisroles"] || {};
-                        const assigned = (eisroles[chosenRole] || [])
-                            .map((e: any) => e?.path || e)
-                            .filter(Boolean);
-                        // Only enforce when the customer has an explicit mapping
-                        // for this role; otherwise fall back to the global pool.
-                        if (assigned.length > 0 && !assigned.includes(chosenEis)) {
-                            alert("The selected specialist is not assigned to this customer for this appointment role.");
-                            return;
-                        }
-                    }
-                }
+    //             // ---- Item 4: honor the customer's per-role specialist mapping.
+    //             // book-appointment only offers EIS that are assigned to THIS
+    //             // customer (customer_eismapping.eisroles[role]); DDC fetches the
+    //             // whole role pool, so verify the chosen specialist is allowed for
+    //             // this customer before booking.
+    //             const chosenRole: string = selectedSlotData?.appointmentrole;
+    //             const chosenEis: string = selectedSlotData?.eisprofile;
+    //             if (chosenRole && chosenEis) {
+    //                 const custMapSnap = await getDoc(
+    //                     doc(this.firestore, "customer_eismapping/" + profileId)
+    //                 );
+    //                 if (custMapSnap.exists()) {
+    //                     const eisroles = custMapSnap.data()?.["eisroles"] || {};
+    //                     const assigned = (eisroles[chosenRole] || [])
+    //                         .map((e: any) => e?.path || e)
+    //                         .filter(Boolean);
+    //                     // Only enforce when the customer has an explicit mapping
+    //                     // for this role; otherwise fall back to the global pool.
+    //                     if (assigned.length > 0 && !assigned.includes(chosenEis)) {
+    //                         alert("The selected specialist is not assigned to this customer for this appointment role.");
+    //                         return;
+    //                     }
+    //                 }
+    //             }
 
-                const deliverableMap: { [path: string]: any } = {};
-                deliverableDocs.docs.forEach(d => {
-                    deliverableMap[d.ref.path] = d;
-                });
+    //             const deliverableMap: { [path: string]: any } = {};
+    //             deliverableDocs.docs.forEach(d => {
+    //                 deliverableMap[d.ref.path] = d;
+    //             });
 
-                const deliverySequenceDoc = doc(this.firestore, "participantdeliverysequence/" + profileId);
-                const participantDelivery = await getDoc(deliverySequenceDoc);
-                if (!participantDelivery.exists()) {
-                    alert("No Delivery Sequence Found");
-                    return;
-                }
+    //             const deliverySequenceDoc = doc(this.firestore, "participantdeliverysequence/" + profileId);
+    //             const participantDelivery = await getDoc(deliverySequenceDoc);
+    //             if (!participantDelivery.exists()) {
+    //                 alert("No Delivery Sequence Found");
+    //                 return;
+    //             }
 
-                const products = participantDelivery.data()["products"];
-                let matchedProduct: any = null;
-                let matchedDelivery: any = null;
-                let deliverablePath: string = null;
+    //             const products = participantDelivery.data()["products"];
+    //             let matchedProduct: any = null;
+    //             let matchedDelivery: any = null;
+    //             let deliverablePath: string = null;
 
-                for (const product of products) {
-                    if (!product.delivery) continue;
-                    for (const delivery of product.delivery) {
-                        if (
-                            delivery.type === "appointment" &&
-                            (delivery.status === "ready" || delivery.status == null) &&
-                            deliverableMap[delivery.sequenceref?.path] !== undefined
-                        ) {
-                            matchedProduct = product;
-                            matchedDelivery = delivery;
-                            deliverablePath = delivery.sequenceref.path;
-                            break;
-                        }
-                    }
-                    if (matchedProduct) break;
-                }
+    //             for (const product of products) {
+    //                 if (!product.delivery) continue;
+    //                 for (const delivery of product.delivery) {
+    //                     if (
+    //                         delivery.type === "appointment" &&
+    //                         (delivery.status === "ready" || delivery.status == null) &&
+    //                         deliverableMap[delivery.sequenceref?.path] !== undefined
+    //                     ) {
+    //                         matchedProduct = product;
+    //                         matchedDelivery = delivery;
+    //                         deliverablePath = delivery.sequenceref.path;
+    //                         break;
+    //                     }
+    //                 }
+    //                 if (matchedProduct) break;
+    //             }
 
-                if (!matchedProduct || !matchedDelivery || !deliverablePath) {
-                    alert("No matching delivery sequence entry found.");
-                    return;
-                }
+    //             if (!matchedProduct || !matchedDelivery || !deliverablePath) {
+    //                 alert("No matching delivery sequence entry found.");
+    //                 return;
+    //             }
 
-                // Get appointment roles
-                const apptRoleCollection = collection(this.firestore, "AppointmentType-To-Roles");
-                const apptRoleQuery = query(
-                    apptRoleCollection,
-                    where("assigned_appttype_ref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId)),
-                    limit(1)
-                );
+    //             // Get appointment roles
+    //             const apptRoleCollection = collection(this.firestore, "AppointmentType-To-Roles");
+    //             const apptRoleQuery = query(
+    //                 apptRoleCollection,
+    //                 where("assigned_appttype_ref", "==", doc(this.firestore, "appointmenttype/" + appointmentTypeId)),
+    //                 limit(1)
+    //             );
 
-                let appointmentRoles: string[] = [];
-                const rolesDocs = await getDocs(apptRoleQuery);
-                rolesDocs.forEach(d => {
-                    (d.data()["required_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
-                    (d.data()["additional_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
-                });
+    //             let appointmentRoles: string[] = [];
+    //             const rolesDocs = await getDocs(apptRoleQuery);
+    //             rolesDocs.forEach(d => {
+    //                 (d.data()["required_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
+    //                 (d.data()["additional_role"] ?? []).forEach((r: any) => appointmentRoles.push(r.path));
+    //             });
 
-                if (appointmentRoles.length === 0) {
-                    alert("No roles configured for this appointment type.");
-                    return;
-                }
+    //             if (appointmentRoles.length === 0) {
+    //                 alert("No roles configured for this appointment type.");
+    //                 return;
+    //             }
 
-                const slotStart: Date = selectedSlotData.slotStart;
-                const slotEnd: Date = selectedSlotData.slotEnd;
-                const eisprofile: string = selectedSlotData.eisprofile;
+    //             const slotStart: Date = selectedSlotData.slotStart;
+    //             const slotEnd: Date = selectedSlotData.slotEnd;
+    //             const eisprofile: string = selectedSlotData.eisprofile;
 
-                const docdata: { id: string, index: number }[] = selectedSlotData.docdata ?? [
-                    { id: selectedSlotData.docid, index: selectedSlotData.index ?? 0 }
-                ];
+    //             const docdata: { id: string, index: number }[] = selectedSlotData.docdata ?? [
+    //                 { id: selectedSlotData.docid, index: selectedSlotData.index ?? 0 }
+    //             ];
 
-                // Map the chosen host to the role its slot actually fills (fall
-                // back to the first required role if the slot didn't carry one).
-                const slotRole: string = selectedSlotData.appointmentrole || appointmentRoles[0];
-                const hostRole: { [key: string]: any[] } = {};
-                hostRole[slotRole] = [doc(this.firestore, eisprofile)];
+    //             // Map the chosen host to the role its slot actually fills (fall
+    //             // back to the first required role if the slot didn't carry one).
+    //             const slotRole: string = selectedSlotData.appointmentrole || appointmentRoles[0];
+    //             const hostRole: { [key: string]: any[] } = {};
+    //             hostRole[slotRole] = [doc(this.firestore, eisprofile)];
 
-                const availabilityDocRef = doc(this.firestore, "availability/" + docdata[0].id);
-                const availabilitySnap = await getDoc(availabilityDocRef);
-                const availabilityData: any = availabilitySnap.data() || {};
+    //             const availabilityDocRef = doc(this.firestore, "availability/" + docdata[0].id);
+    //             const availabilitySnap = await getDoc(availabilityDocRef);
+    //             const availabilityData: any = availabilitySnap.data() || {};
 
-                // ---- Item 2: flip the chosen slot to booked and mark any
-                // overlapping slots (across appointment types) unavailable, so
-                // the availability doc reflects the booking (mirrors book-appointment).
-                const toDate = (v: any): Date | null =>
-                    v?.toDate?.() ?? (v ? new Date(v) : null);
-                const targetStart = toDate(slotStart);
-                const targetEnd = toDate(slotEnd);
-                const apptTypeRefs: any[] = availabilityData["appointments"] ?? [];
-                for (const apptRef of apptTypeRefs) {
-                    const apptId = apptRef?.id;
-                    if (!apptId) continue;
-                    const computedSlots = availabilityData[apptId];
-                    if (!Array.isArray(computedSlots)) continue;
-                    for (let k = 0; k < computedSlots.length; k++) {
-                        const se = computedSlots[k];
-                        const sStart = toDate(se.slotstart);
-                        const sEnd = toDate(se.slotend);
-                        if (!sStart || !sEnd || !targetStart || !targetEnd) continue;
-                        const overlaps =
-                            (sStart >= targetStart && sStart < targetEnd) ||
-                            (sEnd > targetStart && sEnd < targetEnd) ||
-                            (targetStart >= sStart && targetStart < sEnd);
-                        if (!overlaps) continue;
-                        if (!se.booked) se.available = false;
-                        if (apptId === appointmentTypeId && k === docdata[0].index) {
-                            se.booked = true;
-                        }
-                    }
-                }
+    //             // ---- Item 2: flip the chosen slot to booked and mark any
+    //             // overlapping slots (across appointment types) unavailable, so
+    //             // the availability doc reflects the booking (mirrors book-appointment).
+    //             const toDate = (v: any): Date | null =>
+    //                 v?.toDate?.() ?? (v ? new Date(v) : null);
+    //             const targetStart = toDate(slotStart);
+    //             const targetEnd = toDate(slotEnd);
+    //             const apptTypeRefs: any[] = availabilityData["appointments"] ?? [];
+    //             for (const apptRef of apptTypeRefs) {
+    //                 const apptId = apptRef?.id;
+    //                 if (!apptId) continue;
+    //                 const computedSlots = availabilityData[apptId];
+    //                 if (!Array.isArray(computedSlots)) continue;
+    //                 for (let k = 0; k < computedSlots.length; k++) {
+    //                     const se = computedSlots[k];
+    //                     const sStart = toDate(se.slotstart);
+    //                     const sEnd = toDate(se.slotend);
+    //                     if (!sStart || !sEnd || !targetStart || !targetEnd) continue;
+    //                     const overlaps =
+    //                         (sStart >= targetStart && sStart < targetEnd) ||
+    //                         (sEnd > targetStart && sEnd < targetEnd) ||
+    //                         (targetStart >= sStart && targetStart < sEnd);
+    //                     if (!overlaps) continue;
+    //                     if (!se.booked) se.available = false;
+    //                     if (apptId === appointmentTypeId && k === docdata[0].index) {
+    //                         se.booked = true;
+    //                     }
+    //                 }
+    //             }
 
-                const requiredRoles = appointmentRoles.map(r => doc(this.firestore, r));
-                const hostRefs = [doc(this.firestore, eisprofile)];
-                const docid = doc(collection(this.firestore, "appointments")).id;
-                const appointmentDocRef = doc(this.firestore, "appointments/" + docid);
-                const appointmentData = {
-                    docid,
-                    starttime: slotStart,
-                    endtime: slotEnd,
-                    appointment: doc(this.firestore, "appointmenttype/" + appointmentTypeId),
-                    appointmentrole: requiredRoles,
-                    bookedby: doc(this.firestore, "profile_data/" + profileId),
-                    hosts: hostRefs,
-                    hostRole,
-                    slotdata: docdata,
-                    attended: false,
-                    cancelled: false,
-                    created: serverTimestamp(),
-                    loggedid: this.loggedInPID,
-                    productid: matchedProduct.productref.id
-                };
+    //             const requiredRoles = appointmentRoles.map(r => doc(this.firestore, r));
+    //             const hostRefs = [doc(this.firestore, eisprofile)];
+    //             const docid = doc(collection(this.firestore, "appointments")).id;
+    //             const appointmentDocRef = doc(this.firestore, "appointments/" + docid);
+    //             const appointmentData = {
+    //                 docid,
+    //                 starttime: slotStart,
+    //                 endtime: slotEnd,
+    //                 appointment: doc(this.firestore, "appointmenttype/" + appointmentTypeId),
+    //                 appointmentrole: requiredRoles,
+    //                 bookedby: doc(this.firestore, "profile_data/" + profileId),
+    //                 hosts: hostRefs,
+    //                 hostRole,
+    //                 slotdata: docdata,
+    //                 attended: false,
+    //                 cancelled: false,
+    //                 created: serverTimestamp(),
+    //                 loggedid: this.loggedInPID,
+    //                 productid: matchedProduct.productref.id
+    //             };
 
-                const batch = writeBatch(this.firestore);
+    //             const batch = writeBatch(this.firestore);
 
-                batch.update(availabilityDocRef, availabilityData);
-                batch.set(appointmentDocRef, appointmentData);
-                await batch.commit();
+    //             batch.update(availabilityDocRef, availabilityData);
+    //             batch.set(appointmentDocRef, appointmentData);
+    //             await batch.commit();
 
-                const updatedProducts = products.map((p: any) => {
-                    if (p.participantproductid !== matchedProduct.participantproductid) return p;
-                    const updatedDelivery = (p.delivery ?? []).map((d: any) => {
-                        if (d.sequenceref?.path === deliverablePath) {
-                            return { ...d, status: "ongoing" };
-                        }
-                        return d;
-                    });
-                    return { ...p, delivery: updatedDelivery };
-                });
+    //             const updatedProducts = products.map((p: any) => {
+    //                 if (p.participantproductid !== matchedProduct.participantproductid) return p;
+    //                 const updatedDelivery = (p.delivery ?? []).map((d: any) => {
+    //                     if (d.sequenceref?.path === deliverablePath) {
+    //                         return { ...d, status: "ongoing" };
+    //                     }
+    //                     return d;
+    //                 });
+    //                 return { ...p, delivery: updatedDelivery };
+    //             });
 
-                const sequenceDocRef = doc(this.firestore, "participantdeliverysequence/" + profileId);
-                await updateDoc(sequenceDocRef, { products: updatedProducts });
+    //             const sequenceDocRef = doc(this.firestore, "participantdeliverysequence/" + profileId);
+    //             await updateDoc(sequenceDocRef, { products: updatedProducts });
 
-                const deliverableDocRef = doc(this.firestore, deliverablePath);
-                await updateDoc(deliverableDocRef, {
-                    fileref: arrayUnion(doc(this.firestore, appointmentDocRef.path)),
-                    status: "ongoing"
-                });
+    //             const deliverableDocRef = doc(this.firestore, deliverablePath);
+    //             await updateDoc(deliverableDocRef, {
+    //                 fileref: arrayUnion(doc(this.firestore, appointmentDocRef.path)),
+    //                 status: "ongoing"
+    //             });
 
-                const participantProductDocRef = doc(this.firestore, "participantsproduct/" + matchedProduct.participantproductid);
-                await updateDoc(participantProductDocRef, { status: "ongoing" });
+    //             const participantProductDocRef = doc(this.firestore, "participantsproduct/" + matchedProduct.participantproductid);
+    //             await updateDoc(participantProductDocRef, { status: "ongoing" });
 
-                alert("Appointment Booked Successfully!");
+    //             alert("Appointment Booked Successfully!");
 
-                // ---- Reflect the booking immediately + clear the booking state.
-                // Optimistically lock the chosen slot so it shows as booked.
-                const wasAvailable = !!selectedSlotData?.available && !selectedSlotData?.booked;
-                if (selectedSlotData) {
-                    selectedSlotData.booked = true;
-                    selectedSlotData.available = false;
-                }
-                // Keep the aggregate counts (header "BOOKED / OPEN" badge + day
-                // pill) in sync with the slot we just flipped, without a re-fetch.
-                if (wasAvailable) {
-                    const slotEisId = (selectedSlotData?.eisprofile || '').split('/').pop();
-                    const spec = (this.specialistData || []).find((s: any) => s.eisId === slotEisId);
-                    if (spec) {
-                        spec.booked = (spec.booked || 0) + 1;
-                        spec.availableSlots = Math.max(0, (spec.availableSlots || 0) - 1);
-                        spec.utilizationPct = spec.appointmentsGiven
-                            ? Math.round((spec.booked / spec.appointmentsGiven) * 100)
-                            : 0;
-                        if (spec.availableSlots > 0 && spec.utilizationPct < 60) {
-                            spec.utilizationNote = 'needs bookings';
-                            spec.utilizationNoteColor = '#f59e0b';
-                        } else if (spec.availableSlots > 0) {
-                            spec.utilizationNote = `${spec.availableSlots} open`;
-                            spec.utilizationNoteColor = '#10b981';
-                        } else {
-                            spec.utilizationNote = '';
-                        }
-                    }
-                    // Decrement the "N OPEN" count on the matching day pill.
-                    const slotDay = selectedSlotData?.slotStart?.toDate?.()?.toDateString?.();
-                    const dayEntry = (this.availableDates || []).find(
-                        (d: any) => d.fullDate?.toDateString?.() === slotDay
-                    );
-                    if (dayEntry && dayEntry.availableCount > 0) {
-                        dayEntry.availableCount--;
-                    }
-                }
-                // Add the new appointment locally so the slot/booked-list show the
-                // profile name without needing a full re-fetch.
-                const newAppt = {
-                    starttime: slotStart,
-                    endtime: slotEnd,
-                    profileid: profileId,
-                    appointment: { id: appointmentTypeId },
-                };
-                this.filteredBookedAppointments = [
-                    ...(this.filteredBookedAppointments || []),
-                    newAppt,
-                ];
-                this.specialistBookedAll = [
-                    ...(this.specialistBookedAll || []),
-                    newAppt,
-                ];
-                // Clear the picker / selection state.
-                this.slotSelected = false;
-                this.selectedUser = null;
-                this.filteredProfile = "";
-                this.selectedSlotData = null;
-                this.cdr.detectChanges();
-            });
+    //             // ---- Reflect the booking immediately + clear the booking state.
+    //             // Optimistically lock the chosen slot so it shows as booked.
+    //             const wasAvailable = !!selectedSlotData?.available && !selectedSlotData?.booked;
+    //             if (selectedSlotData) {
+    //                 selectedSlotData.booked = true;
+    //                 selectedSlotData.available = false;
+    //             }
+    //             // Keep the aggregate counts (header "BOOKED / OPEN" badge + day
+    //             // pill) in sync with the slot we just flipped, without a re-fetch.
+    //             if (wasAvailable) {
+    //                 const slotEisId = (selectedSlotData?.eisprofile || '').split('/').pop();
+    //                 const spec = (this.specialistData || []).find((s: any) => s.eisId === slotEisId);
+    //                 if (spec) {
+    //                     spec.booked = (spec.booked || 0) + 1;
+    //                     spec.availableSlots = Math.max(0, (spec.availableSlots || 0) - 1);
+    //                     spec.utilizationPct = spec.appointmentsGiven
+    //                         ? Math.round((spec.booked / spec.appointmentsGiven) * 100)
+    //                         : 0;
+    //                     if (spec.availableSlots > 0 && spec.utilizationPct < 60) {
+    //                         spec.utilizationNote = 'needs bookings';
+    //                         spec.utilizationNoteColor = '#f59e0b';
+    //                     } else if (spec.availableSlots > 0) {
+    //                         spec.utilizationNote = `${spec.availableSlots} open`;
+    //                         spec.utilizationNoteColor = '#10b981';
+    //                     } else {
+    //                         spec.utilizationNote = '';
+    //                     }
+    //                 }
+    //                 // Decrement the "N OPEN" count on the matching day pill.
+    //                 const slotDay = selectedSlotData?.slotStart?.toDate?.()?.toDateString?.();
+    //                 const dayEntry = (this.availableDates || []).find(
+    //                     (d: any) => d.fullDate?.toDateString?.() === slotDay
+    //                 );
+    //                 if (dayEntry && dayEntry.availableCount > 0) {
+    //                     dayEntry.availableCount--;
+    //                 }
+    //             }
+    //             // Add the new appointment locally so the slot/booked-list show the
+    //             // profile name without needing a full re-fetch.
+    //             const newAppt = {
+    //                 starttime: slotStart,
+    //                 endtime: slotEnd,
+    //                 profileid: profileId,
+    //                 appointment: { id: appointmentTypeId },
+    //             };
+    //             this.filteredBookedAppointments = [
+    //                 ...(this.filteredBookedAppointments || []),
+    //                 newAppt,
+    //             ];
+    //             this.specialistBookedAll = [
+    //                 ...(this.specialistBookedAll || []),
+    //                 newAppt,
+    //             ];
+    //             // Clear the picker / selection state.
+    //             this.slotSelected = false;
+    //             this.selectedUser = null;
+    //             this.filteredProfile = "";
+    //             this.selectedSlotData = null;
+    //             this.cdr.detectChanges();
+    //         });
 
-        } catch (err) {
-            console.error("directBookAppointment error:", err);
-            alert("Error booking appointment. Please try again.");
-        }
-    }
+    //     } catch (err) {
+    //         console.error("directBookAppointment error:", err);
+    //         alert("Error booking appointment. Please try again.");
+    //     }
+    // }
 
-    async onProfileSelect(selectedprofile: string) {
-        const confirmed = confirm('Are you sure you want to book this appointment?');
-        if (confirmed) {
-            await this.directBookAppointment(
-                this.selectedAppointmentTypeId,
-                selectedprofile
-            );
-        }
-    }
+    // async onProfileSelect(selectedprofile: string) {
+    //     const confirmed = confirm('Are you sure you want to book this appointment?');
+    //     if (confirmed) {
+    //         await this.directBookAppointment(
+    //             this.selectedAppointmentTypeId,
+    //             selectedprofile
+    //         );
+    //     }
+    // }
 
     // ===== Analytics tab =================================================
 
@@ -6704,7 +6719,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     openFormOverlay(row: any) {
-        this.formOverlay.mapProfile = this.mapProfile;
+        this.formOverlay.mapProfile = this.mapprofile;
         this.formOverlay.mapProfileNew = this.mapProfileNew;
         this.formOverlay.mapQueue = this.mapQueue;
         this.formOverlay.mapWorkshop = this.mapWorkshop;

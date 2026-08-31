@@ -190,17 +190,22 @@
                                 <span class="badge status" [ngClass]="getStatusClass(participantproductlist[product['participantproductid']]?.status)">
                                     {{ getStatusText(participantproductlist[product['participantproductid']]?.status) }}
                                 </span>
-                            </td>
-                              <!-- <td class="dates-column">
-                                  <span class="badge journey-dates">
-                                    {{ participantproductlist[product['participantproductid']]?.statusdate?.ongoing ? 
-                                      (participantproductlist[product['participantproductid']].statusdate.ongoing.toDate() | date: 'mediumDate') : 'N/A' }} 
-                                    - 
-                                    {{ participantproductlist[product['participantproductid']]?.statusdate?.completed ? 
-                                      (participantproductlist[product['participantproductid']].statusdate.completed.toDate() | date: 'mediumDate') : 'N/A' }}  
-                                  </span>
-                              </td> -->
-                          </tr>
+                                <button mat-button class="view-progress-btn" (click)="toggleProgress(product)">
+                                  {{ expandedProduct[product['participantproductid']] ? 'Hide Progress' : 'View Progress' }}
+                                </button>
+                              </td>
+                              </tr>
+                              <tr *ngIf="expandedProduct[product['participantproductid']]">
+                                <td colspan="2" class="progress-row">
+                                  <div class="delivery-stepper">
+                                    <div class="stepper-step" *ngFor="let step of mapProductSteps[product['participantproductid']]; let i = index">
+                                      <div class="stepper-circle" [ngClass]="step.stepClass">{{ i + 1 }}</div>
+                                      <div class="stepper-label">{{ step.name }}</div>
+                                      <div class="stepper-status" [ngClass]="step.stepClass">{{ step.status }}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
                       </ng-container>
                   </table>
               </div>
