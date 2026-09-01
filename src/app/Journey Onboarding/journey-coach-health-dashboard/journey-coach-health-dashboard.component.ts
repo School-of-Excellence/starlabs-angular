@@ -258,6 +258,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private pageCache = new Map<number, QueryDocumentSnapshot[]>();
   // full dataset cached so switching back to a specific coach doesn't re-read 10k each time
   private fullPjpData: any[] | null = null;
+  // profileids whose heavy joins (tickets / touchpoints / contacts / event-requests / health) are
+  // already loaded into the shared maps. Lets a later full-set build (export, or paging back over a
+  // page) skip re-querying Firestore for rows it has already fetched — see loadJoinsFor().
+  private loadedJoinIds = new Set<string>();
   // paged KPI: accurate server counts (countable cards) + accumulate-over-loaded (the rest)
   private countedProfiles = new Set<string>();
   private serverCounts = { total: 0, renewalsSoon: 0, notStarted: 0, inactive: 0, active: 0, openTickets: 0 };
@@ -284,7 +288,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   journeyFilter = '';
   statusFilter = '';
   // "Assigned to me" status-band segment filter (separate from the customerstatus `statusFilter`).
-  lifecycleFilter: '' | 'active' | 'nonactive' | 'discontinued' = '';
+  lifecycleFilter: '' | 'active' | 'nonactive' | 'discontinued' | 'nostatus' = '';
   activeLever: Lever = 'all';
   journeyOptions: string[] = [];
 
@@ -327,7 +331,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private matchedIds: string[] = [];
   private suppressPagedRender = false;   // guards computeRows→applyFilters re-entry during a matched render
 
-  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0 };
+  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
 
   // Current Firebase Auth uid, resolved during resolveCoach() so the audit-trail writes
   // (logCall / setHealthState / toggleFlag) can stamp actorUid synchronously. Never reused from
@@ -621,13 +625,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  computeRows only reads entries for the currently-matched profiles. */
   private async loadFullDependentsForBase(): Promise<void> {
     const baseProfileIds = this.currentBaseProfileIds();
-    await Promise.all([
-      this.loadOpenTicketCountsFor(baseProfileIds),
-      this.loadTouchpointsFor(baseProfileIds),
-      this.loadContactEventsFor(baseProfileIds),
-      this.loadRecentEventRequestsFor(baseProfileIds),
-      this.loadCoachHealthStatesFor(baseProfileIds),
-    ]);
+    await this.loadJoinsFor(baseProfileIds);
   }
 
   // ===================== server-side pagination (ALL / UNASSIGNED) =====================
@@ -689,7 +687,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // Only zero the summary BEFORE the base-wide numbers exist. Once the lite index is built the
     // counts are base-wide (not page-accumulated), so a page reload must not flash them to 0.
     if (!this.fullIndexBuilt) {
-      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0 };
+      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     }
     this.loadedRowCount = 0;
   }
@@ -753,13 +751,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         pjpForPage = pjpForPage.filter(d => this.isUnassigned(d['coachedby']));
       }
       const profileIds = Array.from(new Set(pjpForPage.map(d => d['profileid']).filter(Boolean)));
-      await Promise.all([
-        this.loadOpenTicketCountsFor(profileIds),
-        this.loadTouchpointsFor(profileIds),
-        this.loadContactEventsFor(profileIds),
-        this.loadRecentEventRequestsFor(profileIds),
-        this.loadCoachHealthStatesFor(profileIds),
-      ]);
+      await this.loadJoinsFor(profileIds);
       this.pjpData = pjpForPage;       // computeRows reads this.pjpData (page-local matching + scoring)
       this.computeRows();
       this.accumulatePagedSummary();
@@ -774,9 +766,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     for (const r of this.allRows()) {
       if (this.countedProfiles.has(r.profileid)) continue;
       this.countedProfiles.add(r.profileid);
-      // total / active / inactive / renewalsSoon are derived base-wide from the lite index once it
+      // total / lifecycle split / renewalsSoon are derived base-wide from the lite index once it
       // builds (see below); until then these page-accumulated values are the fallback.
-      if (r.subActive) this.summary.active++; else this.summary.inactive++;
+      // Lifecycle split = participant-metadata customerstatus (see lifecycleOf). `inactive` stays
+      // the SUBSCRIPTION-based counter (subActive) — it backs no tile, only internal reporting.
+      if (!r.subActive) this.summary.inactive++;
+      switch (this.lifecycleOf(r.customerstatus)) {
+        case 'active': this.summary.active++; break;
+        case 'nonactive': this.summary.nonActive++; break;
+        case 'discontinued': this.summary.discontinued++; break;
+        default: this.summary.noStatus++; break;
+      }
       if (r.renewalWindow) this.summary.renewalsSoon++;
       if (r.lapsed) this.summary.lapsed++;
       if (r.openTickets > 0) this.summary.withOpenTickets++;
@@ -809,10 +809,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const journeyIdx = this.fullIndex.filter(l => this.matchesSummaryJourneyLite(l));
       const filteredIdx = journeyIdx.filter(l => this.matchesSummaryLifecycleLite(l));
       this.summary.total = journeyIdx.length;                                       // distinct participants
-      this.summary.active = journeyIdx.reduce((n, l) => n + (l.subActive ? 1 : 0), 0);
+      // Lifecycle split reads the participant-metadata customerstatus ONLY (lifecycleOf); the four
+      // buckets are mutually exclusive and sum to total. `inactive` remains the subscription-based
+      // counter (subActive) and backs no tile.
       this.summary.inactive = journeyIdx.reduce((n, l) => n + (l.subActive ? 0 : 1), 0);
-      this.summary.discontinued = journeyIdx.reduce((n, l) => n + (this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
-      this.summary.nonActive = journeyIdx.reduce((n, l) => n + (!l.subActive && !this.isInactiveStatus(l.customerstatus) ? 1 : 0), 0);
+      this.summary.active = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'active' ? 1 : 0), 0);
+      this.summary.nonActive = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'nonactive' ? 1 : 0), 0);
+      this.summary.discontinued = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'discontinued' ? 1 : 0), 0);
+      this.summary.noStatus = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'nostatus' ? 1 : 0), 0);
       this.summary.renewalsSoon = filteredIdx.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
       this.summary.paymentsLocked = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
       this.summary.withOpenTickets = filteredIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
@@ -853,6 +857,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const out: T[][] = [];
     for (let i = 0; i < arr.length; i += 30) out.push(arr.slice(i, i + 30));
     return out;
+  }
+
+  /** Load the five heavy joins for exactly the ids not already loaded, then mark them loaded.
+   *  Repeat calls for the same ids (paging back, exporting after a full load) do NO Firestore reads.
+   *  Writes that mutate a participant's join data (logCall / setHealthState / toggleFlag) update the
+   *  shared maps directly, so a cached id stays consistent without a reload. */
+  private async loadJoinsFor(profileIds: string[]): Promise<void> {
+    const missing = profileIds.filter(id => id && !this.loadedJoinIds.has(id));
+    if (!missing.length) return;
+    await Promise.all([
+      this.loadOpenTicketCountsFor(missing),
+      this.loadTouchpointsFor(missing),
+      this.loadContactEventsFor(missing),
+      this.loadRecentEventRequestsFor(missing),
+      this.loadCoachHealthStatesFor(missing),
+    ]);
+    for (const id of missing) this.loadedJoinIds.add(id);
   }
 
   // page-scoped variants of the full-collection dependent loaders — merge into the same maps
@@ -1309,8 +1330,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return 'check in';
   }
 
+  /** SINGLE SOURCE OF TRUTH for the lifecycle split. Reads the PARTICIPANT METADATA
+   *  `customerstatus` field ONLY — never the subscription dates. The platform writes
+   *  'active' / 'non active' / 'discontinued' (plus the legacy 'late' / 'banned' tokens that
+   *  the sales + journeycoach dashboards already fold into discontinued, and 'inactive',
+   *  the older spelling of 'non active'). Anything else — blank, null, 'regular' — is
+   *  'nostatus' so those people stay visible instead of being silently counted as Active. */
+  lifecycleOf(s: string | null | undefined): 'active' | 'nonactive' | 'discontinued' | 'nostatus' {
+    const t = (s ?? '').toLowerCase().trim().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
+    if (t === 'active') return 'active';
+    if (t === 'non active' || t === 'nonactive' || t === 'inactive') return 'nonactive';
+    if (t === 'discontinued' || t === 'banned' || t === 'late') return 'discontinued';
+    return 'nostatus';
+  }
+
   isInactiveStatus(s: string | null | undefined): boolean {
-    return ['late', 'discontinued', 'banned'].includes((s ?? '').toLowerCase());
+    return this.lifecycleOf(s) === 'discontinued';
   }
 
   /** Map a journey's `type` field (and name) to a product type. Mirrors the sales/delivery
@@ -1950,7 +1985,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // from base-wide server/index counts that can't be row-filtered accurately, so the bar is disabled.
   // Default view is ACTIVE participants; other segments (All / Non-active / Discontinued) are opt-in.
   // Switching between them only re-slices the already-loaded allRows — never a new fetch.
-  sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued'>('active');
+  sumLifecycle = signal<'all' | 'active' | 'nonactive' | 'discontinued' | 'nostatus'>('active');
   // Multi-select By-journey: a set of the selected journey NAMES (union). A group contributes all of
   // its journeys; individual chips contribute one. Empty = all journeys (the default).
   sumJourneys = signal<Set<string>>(new Set());
@@ -1964,12 +1999,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return s.size === 0 || s.has(this.summaryJourneyName(r));
   }
   private matchesSummaryLifecycle(r: PortfolioRow): boolean {
-    switch (this.sumLifecycle()) {
-      case 'active': return r.subActive && !this.isInactiveStatus(r.customerstatus);
-      case 'nonactive': return !r.subActive && !this.isInactiveStatus(r.customerstatus);
-      case 'discontinued': return this.isInactiveStatus(r.customerstatus);
-      default: return true;
-    }
+    const kind = this.sumLifecycle();
+    return kind === 'all' || this.lifecycleOf(r.customerstatus) === kind;
   }
   /** allRows scoped by the JOURNEY filter only — the band shows the full lifecycle split for it. */
   journeyFilteredRows = computed<PortfolioRow[]>(() => this.allRows().filter(r => this.matchesSummaryJourney(r)));
@@ -1995,13 +2026,20 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   /** Same lifecycle predicate as matchesSummaryLifecycle, over a lite index row (base-wide). */
   private matchesSummaryLifecycleLite(l: LiteIndexRow): boolean {
-    switch (this.sumLifecycle()) {
-      case 'active': return l.subActive && !this.isInactiveStatus(l.customerstatus);
-      case 'nonactive': return !l.subActive && !this.isInactiveStatus(l.customerstatus);
-      case 'discontinued': return this.isInactiveStatus(l.customerstatus);
-      default: return true;
-    }
+    const kind = this.sumLifecycle();
+    return kind === 'all' || this.lifecycleOf(l.customerstatus) === kind;
   }
+  /** Page-size options for the table paginator: the fixed steps PLUS the overall matched count, so
+   *  the user can select "all" and show every matched row on one page. Total = pageLength in paged
+   *  mode (full matched set once the lite index is built), else the loaded base. Appended only when
+   *  it exceeds the largest fixed step, and de-duped so it never doubles up with 100. */
+  get pageSizeOptions(): number[] {
+    const total = this.pagedMode ? this.pageLength : this.dataSource.data.length;
+    const opts = [25, 50, 100];
+    if (total > 100) opts.push(total);
+    return opts;
+  }
+
   /** Base-wide count matching the applied filter — paged from the lite index, else the loaded rows. */
   get summaryShownCount(): number { return this.pagedMode ? this.pagedFilteredCount() : this.filteredRows().length; }
   get summaryScopeTotal(): number { return this.pagedMode ? this.fullIndex.length : this.allRows().length; }
@@ -2009,7 +2047,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Default is Active; a filter is "active" (Clear appears) only when it differs from that default. */
   get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourneys().size > 0; }
   /** Highlighted lifecycle segment — the filter now applies in both the coach and All views. */
-  get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' { return this.sumLifecycle(); }
+  get shownLifecycle(): 'all' | 'active' | 'nonactive' | 'discontinued' | 'nostatus' { return this.sumLifecycle(); }
   /** Pill label: 'All journeys' → the single chip's name → 'N journeys' for a multi-select. */
   get summaryJourneyLabel(): string {
     const s = this.sumJourneys();
@@ -2031,7 +2069,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Recompute the summary through the active filter — base-wide from the lite index when paged. */
   private recomputeSummary(): void { if (this.pagedMode) this.accumulatePagedSummary(); else this.computeSummary(); }
 
-  setSumLifecycle(kind: 'all' | 'active' | 'nonactive' | 'discontinued'): void {
+  setSumLifecycle(kind: 'all' | 'active' | 'nonactive' | 'discontinued' | 'nostatus'): void {
     if (!this.summaryFilterReady) return;
     this.sumLifecycle.set(kind);   // plain selector — pick one, no toggle back to 'all'
     this.journeyMenuOpen = false;
@@ -2190,7 +2228,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Summary "Assigned to me" status band → Participants tab filtered to one lifecycle segment.
    *  Toggling the same segment clears it. Discontinued reveals the normally-gated inactive rows. */
-  goToStatus(kind: 'active' | 'nonactive' | 'discontinued'): void {
+  goToStatus(kind: 'active' | 'nonactive' | 'discontinued' | 'nostatus'): void {
     this.statusFilter = '';
     this.financeFilters = [];
     this.activeLever = 'all';
@@ -2473,12 +2511,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return this.activeLever === this.kpiLever(which);
   }
 
-  exportCsv(): void {
+  async exportCsv(): Promise<void> {
+    // Export EVERY matched row, not just the visible page. In paged mode (ALL / UNASSIGNED)
+    // dataSource.data is only the current 50-row page, so collect the full matched set first.
+    const rows = await this.collectExportRows();
     const q = (v: any) => `"${(v ?? '').toString().replace(/"/g, '""')}"`;
     const headers = ['Priority', 'Band', 'Participant', 'Number', 'Coach', 'Reason', 'Journey', 'Tier',
       'Status', 'Financial', 'Renewal', 'DaysToRenewal', 'LastTouch', 'DaysSinceTouch', 'OpenTickets'];
     const lines = [headers.join(',')];
-    for (const r of this.dataSource.data) {
+    for (const r of rows) {
       lines.push([
         r.priority, r.priorityBand, q(r.name), q(r.number), q(r.coachname), q(r.reason), q(r.journeyname),
         q(r.atcmodel), q(r.customerstatus), q(r.financialstatus), this.fmtDate(r.subscriptionend),
@@ -2492,6 +2533,40 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     a.download = `base-${(this.selectedCoachName || 'export').replace(/\s+/g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  /** Every row matched by the active search/filters — the WHOLE set, not just the visible page.
+   *  Full mode: allRows is already the full base, so just filter it. Paged mode (ALL / UNASSIGNED):
+   *  build rows for every matched profile id (loading their joins), then restore the visible page. */
+  private async collectExportRows(): Promise<PortfolioRow[]> {
+    if (!this.pagedMode) {
+      return this.allRows().filter(r => this.rowMatches(r));
+    }
+    // ensure the base-wide lite index exists so the matched set spans ALL pages, not the loaded one.
+    await this.ensureFullIndex();
+    this.recomputeFullBaseMatch();
+    const ids = this.sortedMatchedIds();
+    if (!ids.length) return [];
+    // load the heavy joins ONLY for matched rows not already fetched (paging / a prior export cache
+    // them). Show the spinner only when there is genuinely something to fetch.
+    const needsFetch = ids.some(id => id && !this.loadedJoinIds.has(id));
+    if (needsFetch) this.pageLoading = true;
+    try {
+      await this.loadJoinsFor(ids);
+      const idSet = new Set(ids);
+      const savedPjp = this.pjpData;
+      this.suppressPagedRender = true;
+      this.pjpData = (this.fullPjpData ?? []).filter(d => idSet.has(d['profileid']));
+      this.computeRows();   // builds allRows for the ENTIRE matched set (applyFilters suppressed)
+      const rows = this.allRows().filter(r => this.rowMatches(r));
+      this.suppressPagedRender = false;
+      this.pjpData = savedPjp;
+      // restore the visible page (rebuilds allRows / dataSource for the current slice).
+      await this.renderMatchedPage();
+      return rows;
+    } finally {
+      this.pageLoading = false;
+    }
   }
 
   private coachNameFor(coachedby: any): string {
@@ -2650,18 +2725,24 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   private computeSummary(): void {
-    // allRows is already per-distinct-participant. Active/Inactive are SUBSCRIPTION-based
-    // (subActive), NOT customerstatus (empty on pjp — the prior bug). Total = distinct participants.
-    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0 };
+    // allRows is already per-distinct-participant. Total = distinct participants. The lifecycle
+    // split (Active / Non-active / Discontinued / No status) is CUSTOMERSTATUS-based, read from the
+    // participant metadata doc — NOT from the pjp record, whose customerstatus is empty.
+    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     // Band (lifecycle split) reflects the JOURNEY filter only, so all three segments stay visible and
     // switchable even while one is selected as the active lifecycle filter.
     for (const r of this.journeyFilteredRows()) {
       s.total++;
-      if (r.subActive) s.active++; else s.inactive++;
-      // 3-way lifecycle split for the "Assigned to me" band (discontinued wins over active/non-active):
-      // Discontinued = customerstatus late/discontinued/banned; Non-active = subscription ended, not discontinued.
-      if (this.isInactiveStatus(r.customerstatus)) s.discontinued++;
-      else if (!r.subActive) s.nonActive++;
+      if (!r.subActive) s.inactive++;   // subscription-based; backs no tile
+      // Lifecycle split for the status band — participant-metadata customerstatus ONLY:
+      // 'active' / 'non active' / 'discontinued' (+ legacy late|banned, and 'inactive' for
+      // 'non active'). Anything else lands in No status rather than inflating Active.
+      switch (this.lifecycleOf(r.customerstatus)) {
+        case 'active': s.active++; break;
+        case 'nonactive': s.nonActive++; break;
+        case 'discontinued': s.discontinued++; break;
+        default: s.noStatus++; break;
+      }
     }
     // Lever counts reflect BOTH filters (lifecycle + journey) — the fully-scoped subset.
     for (const r of this.filteredRows()) {
@@ -2715,13 +2796,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const start = this.currentPage * this.pageSize;
       const slice = this.matchedIds.slice(start, start + this.pageSize);
       const sliceSet = new Set(slice);
-      await Promise.all([
-        this.loadOpenTicketCountsFor(slice),
-        this.loadTouchpointsFor(slice),
-        this.loadContactEventsFor(slice),
-        this.loadRecentEventRequestsFor(slice),
-        this.loadCoachHealthStatesFor(slice),
-      ]);
+      await this.loadJoinsFor(slice);
       const pjpForPage = (this.fullPjpData ?? []).filter(d => sliceSet.has(d['profileid']));
       this.suppressPagedRender = true;
       this.pjpData = pjpForPage;
@@ -2738,24 +2813,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  In paged mode rows also have to be in the full-base match set (so off-page filtering counts). */
   private rowMatches(r: PortfolioRow): boolean {
     const term = this.search.trim().toLowerCase();
-    const wantInactive = this.activeLever === 'inactive';
-    // Active/Inactive are SUBSCRIPTION-based: by default the board shows only subActive participants
-    // (those with a live subscription); the Inactive lever flips it to show only !subActive.
-    // The Lapsed / Not-started levers target lifecycle segments that legitimately include
-    // non-subActive people, so they bypass the default subActive gate.
-    // needs-attention spans lifecycle segments (lapsed / not-started) that legitimately include
-    // non-subActive people, so it bypasses the default subActive gate (same as lapsed / not-started).
-    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted'
-      || this.activeLever === 'flagged' || this.activeLever === 'needsAttention'
-      // the status-band Non-active / Discontinued segments legitimately show non-subActive people
-      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued'
-      // journey filter shows the WHOLE journey cohort (all lifecycle states), matching the split count
-      || !!this.journeyFilter || this.journeyGroupFilter.length > 0;
-    if (!bypassActiveGate && r.subActive === wantInactive) return false;
-    // "Assigned to me" status band segments (discontinued wins over active/non-active)
-    if (this.lifecycleFilter === 'discontinued' && !this.isInactiveStatus(r.customerstatus)) return false;
-    if (this.lifecycleFilter === 'active' && !(r.subActive && !this.isInactiveStatus(r.customerstatus))) return false;
-    if (this.lifecycleFilter === 'nonactive' && !(!r.subActive && !this.isInactiveStatus(r.customerstatus))) return false;
+    // NO DEFAULT SUBSCRIPTION GATE (operator directive, 2026-08-26). The board used to hide every
+    // participant whose subscriptionend had passed unless a lever/segment opted out; the unfiltered
+    // list therefore showed fewer people than the status band counted. The list now starts as the
+    // WHOLE base and only the explicitly-chosen filters below narrow it. Subscription state is
+    // still filterable on demand via the Active / Inactive levers (see below).
+    // Status-band segments — participant-metadata customerstatus, same predicate as the counts.
+    if (this.lifecycleFilter && this.lifecycleOf(r.customerstatus) !== this.lifecycleFilter) return false;
     // needsAttention: SAME predicate as needsAttentionRows() (goingQuiet | lapsed | notStarted |
     // renewalWindow | openTickets>0). No new scoring — reuses the existing per-row flags.
     if (this.activeLever === 'needsAttention'
@@ -2765,7 +2829,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
     if (this.activeLever === 'notStarted' && !r.notStarted) return false;
+    // subscription-based levers — the ONLY place subActive still filters the list.
     if (this.activeLever === 'active' && !r.subActive) return false;
+    if (this.activeLever === 'inactive' && r.subActive) return false;
     if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
     if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(r.journeyname)) return false;
@@ -2795,26 +2861,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  dependent data and stay page-local refinements (see report tradeoff). */
   private liteMatches(lite: LiteIndexRow): boolean {
     const term = this.search.trim().toLowerCase();
-    const wantInactive = this.activeLever === 'inactive';
     // scope to the current view (ALL = everyone; UNASSIGNED = no coach)
     if (this.selectedCoachId === this.UNASSIGNED) {
       if (!this.isUnassigned(lite.coachedby)) return false;
     }
-    // subscription-based active/inactive (same as rowMatches): default board = subActive only.
-    // Lapsed / Not-started levers are page-local lifecycle segments that legitimately include
-    // non-subActive people, so they bypass the default subActive gate here too.
-    const bypassActiveGate = this.activeLever === 'lapsed' || this.activeLever === 'notStarted'
-      || this.activeLever === 'flagged' || this.activeLever === 'needsAttention'
-      || this.lifecycleFilter === 'nonactive' || this.lifecycleFilter === 'discontinued'
-      || !!this.journeyFilter;
-    if (!bypassActiveGate && lite.subActive === wantInactive) return false;
-    // "Assigned to me" status band segments (base-wide via the lite index)
-    if (this.lifecycleFilter === 'discontinued' && !this.isInactiveStatus(lite.customerstatus)) return false;
-    if (this.lifecycleFilter === 'active' && !(lite.subActive && !this.isInactiveStatus(lite.customerstatus))) return false;
-    if (this.lifecycleFilter === 'nonactive' && !(!lite.subActive && !this.isInactiveStatus(lite.customerstatus))) return false;
+    // No default subscription gate — mirrors rowMatches (operator directive, 2026-08-26).
+    // Status-band segments, base-wide via the lite index — same customerstatus predicate as the counts.
+    if (this.lifecycleFilter && this.lifecycleOf(lite.customerstatus) !== this.lifecycleFilter) return false;
     // flags are a base-wide global Set, so the flagged filter covers the WHOLE base in paged mode.
     if (this.activeLever === 'flagged' && !this.flaggedIds().has(lite.profileid)) return false;
     if (this.activeLever === 'active' && !lite.subActive) return false;
+    if (this.activeLever === 'inactive' && lite.subActive) return false;
     if (this.journeyFilter && lite.journeyname !== this.journeyFilter) return false;
     if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(lite.journeyname)) return false;
     if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;

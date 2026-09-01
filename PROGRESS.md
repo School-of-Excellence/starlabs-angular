@@ -1,48 +1,49 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-01 (dashboard rounds 1-5: profile-tile merge · header search · ATC slowness diagnosed EMPIRICALLY · duplicate-stream + ladder + transport fixes)_ · **New session? Read `specs/ORIENTATION.md` first**, then `specs/journals/2026-08-01-live-event-dashboard-v3-continued.md` (today: 5 rounds with WHYs + live measurements) and `specs/2026-07-30-perf-audit-live-event-dashboard-v3.md`.
+_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
+· **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
 
 ## Current state
-- Branch `nanda-development`; `ng build --configuration production` green
-  (only pre-existing canvg/leaflet + Bootstrap warnings).
-- HEAD holds the 07-30 arc through ~round 13-14; **UNCOMMITTED** (operator
-  commits manually after Chrome testing): 07-30 rounds ~14-24 delta PLUS all
-  of today: profile-card % tiles with done·pending sub-lines; header search
-  over the Total approved universe (opens the rich profile dialog); round-4
-  perf fixes (livechangework 3 listeners → 1 with in-memory day views,
-  atc_alpha single-pass, changed$ debounce, temporary_ATC bounded by
-  `lastupdated >= queueRangeStartDate` — the earliest selected queue start —
-  plus atc-draft `toServer()` timestamp normalization); round-5 ladder fixes
-  (metadata scan un-gated with re-kick incl. calculateJourneyCounts, ATC
-  pipeline attaches before the default-DB heavies and without awaiting the
-  legacy queue-variation read) and **main.ts: firestore-atc switched from
-  FORCED long-polling to auto-detect** (one-word revert if ATC screens ever
-  blank at a venue; firestore-forms left forced).
-- Composite index (temporary_ATC: delete ASC + lastupdated ASC) already
-  exists in prod — verified live (draft count 96-97 works).
+- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
+  documentation added this session plus one pre-existing, unrelated
+  `group-chat-screen.component.css` edit. Nothing committed, nothing
+  pushed, nothing deployed — operator commits manually (standing directive).
+- **No queue code was changed.** The slot/capacity flow is documented and
+  frozen as a baseline so a planned logic change can be made and reverted
+  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
 
-## Last session changes (2026-08-01, why)
-- ATC card took 40-60s. Measured ON the operator's Mac (their ng serve,
-  production data, in-app pane + `ng.getComponent` state reads): app boots
-  in <1s; firestore-atc's FIRST request was held to 15.5s by a serial init
-  ladder (3,376-doc metadata full scan gating selectEvent, then serial
-  participants + queue-variation hops), and the ATC backfill then crawled
-  ~50s on FORCED long-polling (19-29 sequential polls, singles 14-74s).
-  Ladder fixes cut attach to ~11-12s; numbers verified byte-identical
-  (buckets 451/10/1/82 · 506 atc docs · journeys 544). Every round was
-  adversarially verified by agent workflows; verifiers caught real defects
-  (journey counts stuck at zero; event-switch stale-changework blend;
-  zero-queue day-chip parity; ESC double-close; backdrop fall-through) —
-  all fixed. Videoask double-stream deliberately NOT merged (operator
-  comment 2026-07-29 in code).
+## Last session changes (2026-08-31)
+- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
+  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
+  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
+  paths** across Angular `queue-planner` / `queue-planner-review` and the
+  three Flutter cards, three mermaid flowcharts, a **divergence register
+  D-01…D-10**, six invariants, and the change/revert protocol.
+- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
+  four surprises, an append-only change log (CL-000) and the per-screen +
+  data-side revert playbook.
+- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
+  rendered reference artifact for the operator.
+- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
+  `usedslot = matching-token count` and every planner mutation auto-saves,
+  so it overwrites the counter that the four transactional booking paths
+  maintain — erasing Flutter self-service bookings and B!G pre-placements
+  that have no `queue_token` yet. Paired with D-01 (review offers slots
+  from a *derived* count while the transaction gates on the *stored* one),
+  this is the double-booking root cause.
 
 ## Pending
-- **CONFIRMED measured result: dashboard data 40-60s → ~7s** (metadata
-  1.5s; atc/buckets/changework all at 7.0s; numbers identical; transport
-  streaming). Remaining: operator's own Chrome pass + manual commit of
-  the day.
-- If a venue ever blanks ATC screens again: revert the one word in main.ts.
-- Phase-2 perf (H2 proper): scope/cache the `participant metadata` scan;
-  bound event-wide changework (3.4k) / videoask-tag (2.2k) streams.
-- Offered-not-built (07-30): DONE-pill tooltips with doc counts; cleanup
-  chip items; dropped debug of /livechangework/blkWuqSNB2XNco10GSDI.
+- **The logic change itself is unspecified** — awaiting the operator's
+  statement of the new rule. Recommended first target: D-02 + D-01
+  (one agreed source of truth for capacity). Follow §7 of the flow doc:
+  delta vs the register → check the six invariants → name the blast radius
+  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
+- Before any write-shape change: export the affected `queue planning`
+  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
+  fields have no history. First run against `starlabs-test` only.
+- Carried from 2026-08-27: operator visual pass of the redesigned
+  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
+  consumers to wire; newusertags backfill; `eiflixcampaign` rules
+  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
+  route guard; episode-delete gaps.

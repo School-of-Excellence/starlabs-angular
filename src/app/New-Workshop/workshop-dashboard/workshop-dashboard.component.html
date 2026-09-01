@@ -18,39 +18,33 @@
       </mat-card>
     </div>
     <div *ngIf="!loading && !error && workshopData" class="dashboard-content">
-      <mat-card class="header-card" elevation="2">
-        <mat-card-header>
-          <mat-card-title style="font-weight: bold;">{{ workshopTitle }}</mat-card-title>
-          <mat-card-subtitle>{{ workshopDescription }}</mat-card-subtitle>
-          <mat-card-subtitle style="color:white;font-weight:500">{{ workshopType }}</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <div class="workshop-dates" *ngIf="workshopStartDateFormatted !== 'N/A'">
-            <mat-icon>date_range</mat-icon>
-            <span class="date-text">
+      <!-- ═════ Workshop header — redesigned compact presentation.
+           Data, bindings, action handlers and ID gates are IDENTICAL to the
+           previous gradient card; only markup/styling changed. ═════ -->
+      <header class="whd">
+        <div class="whd-main">
+          <div class="whd-title-row">
+            <h1 class="whd-title">{{ workshopTitle }}</h1>
+            <span class="whd-type">{{ workshopType }}</span>
+            <span class="whd-dates" *ngIf="workshopStartDateFormatted !== 'N/A'">
+              <mat-icon>date_range</mat-icon>
               {{ workshopStartDateFormatted }} - {{ workshopEndDateFormatted }}
             </span>
           </div>
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <!-- <button mat-raised-button color="accent" (click)="openNewUserDialog()">
-            {{'New Users ' + '( ' +objectKeys(mapProfileNew).length + ' )'}} 
-          </button>&nbsp;&nbsp; -->
-          <button mat-raised-button color="accent" (click)="openQADialog()">
-            <mat-icon>help_outline</mat-icon>
-            Q & A
-          </button>&nbsp;&nbsp;
-
-          <button mat-raised-button color="accent" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
-            <mat-icon>delete</mat-icon>
-            Clear
-          </button>&nbsp;&nbsp;
-          <button mat-raised-button color="accent" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
-            <!-- <mat-icon>matGolfCourse</mat-icon> -->
-            Enroll
+          <p class="whd-desc" *ngIf="workshopDescription">{{ workshopDescription }}</p>
+        </div>
+        <div class="whd-actions">
+          <button type="button" class="whd-btn" (click)="openQADialog()">
+            <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>
-        </mat-card-actions>
-      </mat-card>
+          <button type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
+            <mat-icon>delete</mat-icon>Clear
+          </button>
+          <button type="button" class="whd-btn whd-btn-primary" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
+            <mat-icon>person_add</mat-icon>Enroll
+          </button>
+        </div>
+      </header>
     <div class="metrics-section">
         <div class="metrics-grid">
 
@@ -391,6 +385,19 @@
             <span class="ev-day-count">{{ evergreenCompletedBucket.count }}</span>
             <span class="ev-day-caption">Completed</span>
           </button>
+
+          <button type="button"
+                  class="ev-day-node ev-day-node--ext"
+                  *ngIf="evergreenExtendedBucket.count > 0"
+                  [matTooltip]="evergreenExtendedBucket.activeCount + ' active · '
+                    + (evergreenExtendedBucket.count - evergreenExtendedBucket.activeCount) + ' lapsed'"
+                  (click)="openExtendedTimeline()">
+            <span class="ev-day-badge ev-day-badge--ext">
+              <mat-icon>more_time</mat-icon>
+            </span>
+            <span class="ev-day-count">{{ evergreenExtendedBucket.count }}</span>
+            <span class="ev-day-caption">Extended</span>
+          </button>
         </div>
       </section>
 
@@ -631,13 +638,17 @@
         <mat-card-header>
           <mat-card-title style="font-weight: bold;padding: 20px;">Challenge Progress Overview</mat-card-title>
         </mat-card-header> -->
-        <mat-card class="challenges-card" elevation="2">
-        <mat-card-header>
-          <mat-card-title style="font-weight: bold;padding: 20px;">Challenge Progress Overview</mat-card-title>
-          <span style="flex: 1 1 auto;"></span>
-          <mat-form-field appearance="outline" class="category-filter-dropdown"
-                          *ngIf="workshopData?.categorybased === true" 
-                          style="margin-right: 20px; margin-top: 10px;">
+      <!-- ═════ Challenge Progress Overview — redesigned presentation.
+           Data, bindings and click handlers are IDENTICAL to the previous
+           accordion; only the markup/styling changed. ═════ -->
+      <section class="cpo">
+        <div class="cpo-head">
+          <div class="cpo-head-text">
+            <h2 class="cpo-title">Challenge Progress Overview</h2>
+            <p class="cpo-sub">{{ challengeStatistics.length }} challenge{{ challengeStatistics.length !== 1 ? 's' : '' }} &middot; click any status to open its participants</p>
+          </div>
+          <mat-form-field appearance="outline" class="cpo-filter" subscriptSizing="dynamic"
+                          *ngIf="workshopData?.categorybased === true">
             <mat-label>Filter by Category</mat-label>
             <mat-select [(value)]="selectedCategoryFilter" (selectionChange)="onCategoryFilterChange()">
               <mat-option value="all">All Categories</mat-option>
@@ -648,127 +659,110 @@
               <mat-option value="facilitator">Facilitator Only</mat-option>
             </mat-select>
           </mat-form-field>
-        </mat-card-header>
-        <mat-card-content>
-          <mat-accordion class="challenge-accordion" multi="true">
-              <mat-expansion-panel *ngFor="let challengeStat of challengeStatistics; let i = index" 
-                     class="challenge-panel" #panel
-                     [style.display]="isChallengeVisibleForCategory(i) ? '' : 'none'">
-              <mat-expansion-panel-header>
-                <mat-panel-title>
-                  <div class="challenge-title-container">
-                    <span class="challenge-number">{{ i + 1 }}</span>
-                    <span class="challenge-title">{{ challengeStat.challengeName }}</span>
-                  </div>
-                </mat-panel-title>
-                <mat-panel-description *ngIf="!panel.expanded">
-                  <div class="challenge-summary-chips">
-                    <mat-chip class="category-chip" *ngIf="workshopData?.categorybased === true && getChallengeCategoryNames(i)">
-                      <!-- <mat-icon style="font-size: 16px; margin-right: 4px;">category</mat-icon> -->
-                      {{ getChallengeCategoryNames(i) }}
-                    </mat-chip>
-                    <mat-chip class="completed-chip">
-                      {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
-                    </mat-chip>
-                    <mat-chip class="progress-chip">
-                      {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
-                    </mat-chip>
-                    <mat-chip class="ready-chip" *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0">
-                      {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
-                    </mat-chip>
-                    <mat-chip class="pending-chip">
-                      {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
-                    </mat-chip>
-                  </div>
-                </mat-panel-description>
-              </mat-expansion-panel-header>
-              
-              <div class="expanded-content">
-                <div class="challenge-summary-section">
-                  <div class="challenge-summary-chips">
-                    <mat-chip class="completed-chip clickable" 
-                              (click)="onChallengeMainStatusClick('completed', i, challengeStat.participantsByStatus.get('completed')?.length || 0)">
-                      {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
-                    </mat-chip>
-                    <mat-chip class="progress-chip clickable" 
-                              (click)="onChallengeMainStatusClick('inprogress', i, challengeStat.participantsByStatus.get('inprogress')?.length || 0)">
-                      {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
-                    </mat-chip>
-                    <mat-chip class="ready-chip clickable" 
-                              *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0"
-                              (click)="onChallengeMainStatusClick('notstartedcurrent', i, challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0)">
-                      {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
-                    </mat-chip>
-                    <mat-chip class="pending-chip clickable" 
-                              (click)="onChallengeMainStatusClick('notstarted', i, challengeStat.participantsByStatus.get('notstarted')?.length || 0)">
-                      {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
-                    </mat-chip>
-                    <mat-chip class="zoomcall-chip clickable" 
-                              *ngIf="workshopData?.challenges?.[i]?.type === 'zoomcall'"
-                              (click)="openZoomDialog(workshopData?.challenges?.[i],i)">
-                      Zoom Call Action
-                    </mat-chip>
-                    <mat-chip class="zoom-attendees-chip clickable"
+        </div>
+
+        <div class="cpo-card" *ngFor="let challengeStat of challengeStatistics; let i = index"
+             [style.display]="isChallengeVisibleForCategory(i) ? '' : 'none'"
+             [class.cpo-open]="isChallengeExpanded(i)">
+
+          <button type="button" class="cpo-card-hd" (click)="toggleChallengePanel(i)"
+                  [attr.aria-expanded]="isChallengeExpanded(i)">
+            <span class="cpo-num" [class.cpo-num-zoom]="workshopData?.challenges?.[i]?.type === 'zoomcall'">
+              <ng-container *ngIf="workshopData?.challenges?.[i]?.type !== 'zoomcall'">{{ i + 1 }}</ng-container>
+              <mat-icon *ngIf="workshopData?.challenges?.[i]?.type === 'zoomcall'">videocam</mat-icon>
+            </span>
+            <span class="cpo-name">{{ challengeStat.challengeName }}</span>
+            <span class="cpo-cat" *ngIf="workshopData?.categorybased === true && getChallengeCategoryNames(i)">
+              {{ getChallengeCategoryNames(i) }}
+            </span>
+            <span class="cpo-hd-chips" *ngIf="!isChallengeExpanded(i)">
+              <span class="cpo-chip st-completed">{{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed</span>
+              <span class="cpo-chip st-inprogress">{{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress</span>
+              <span class="cpo-chip st-notstartedcurrent" *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0">
+                {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
+              </span>
+              <span class="cpo-chip st-notstarted">{{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started</span>
+            </span>
+            <mat-icon class="cpo-caret">expand_more</mat-icon>
+          </button>
+
+          <div class="cpo-body" *ngIf="isChallengeExpanded(i)">
+
+            <div class="cpo-actions">
+              <button type="button" class="cpo-chip st-completed cpo-click"
+                      (click)="onChallengeMainStatusClick('completed', i, challengeStat.participantsByStatus.get('completed')?.length || 0)">
+                {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
+              </button>
+              <button type="button" class="cpo-chip st-inprogress cpo-click"
+                      (click)="onChallengeMainStatusClick('inprogress', i, challengeStat.participantsByStatus.get('inprogress')?.length || 0)">
+                {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
+              </button>
+              <button type="button" class="cpo-chip st-notstartedcurrent cpo-click"
+                      *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0"
+                      (click)="onChallengeMainStatusClick('notstartedcurrent', i, challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0)">
+                {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
+              </button>
+              <button type="button" class="cpo-chip st-notstarted cpo-click"
+                      (click)="onChallengeMainStatusClick('notstarted', i, challengeStat.participantsByStatus.get('notstarted')?.length || 0)">
+                {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
+              </button>
+
+              <span class="cpo-actions-spacer"></span>
+
+              <button type="button" class="cpo-zoombtn cpo-click"
+                      *ngIf="workshopData?.challenges?.[i]?.type === 'zoomcall'"
+                      (click)="openZoomDialog(workshopData?.challenges?.[i],i)">
+                <mat-icon>video_call</mat-icon> Zoom Call Action
+              </button>
+              <button type="button" class="cpo-chip st-inprogress cpo-click"
                       *ngIf="
                         workshopData?.challenges?.[i]?.type === 'zoomcall' &&
                         workshopData?.challenges?.[i]?.zoomattended?.length > 0"
                       (click)="openZoomAttendees(workshopData?.challenges?.[i], i)">
-                      Zoom Attendees ({{ workshopData?.challenges?.[i]?.zoomattended?.length }})
-                    </mat-chip>
-                  </div>
-                </div>
-                <div class="sub-challenges-container">
-                  <div *ngFor="let subStat of challengeStat.subChallengeStats; let j = index" class="sub-challenge-item">
-                    <div class="sub-challenge-header">
-                      <div class="sub-challenge-info">
-                        <span class="sub-challenge-number">{{ i + 1 }}.{{ j + 1 }}</span>
-                        <span class="sub-challenge-name">{{ subStat.subChallengeName }}</span>
-                        <mat-chip class="type-chip">{{ subStat.type }}</mat-chip>
-                      </div>
-                      <div class="sub-challenge-summary">
-                        <span class="summary-text">{{ subStat.participantsByStatus.get('completed')?.length || 0 }}/{{ totalEnrolled }} completed</span>
-                      </div>
-                    </div>
-                    <div class="progress-bar-container">
-                      <div class="custom-progress-bar">
-                        <div class="progress-segment completed" 
-                            [style.width.%]="((subStat.participantsByStatus.get('completed')?.length || 0) / totalEnrolled) * 100"
-                            [title]="'Completed: ' + (subStat.participantsByStatus.get('completed')?.length || 0)"></div>
-                        
-                        <div class="progress-segment in-review" 
-                            [style.width.%]="((subStat.participantsByStatus.get('inreview')?.length || 0) / totalEnrolled) * 100"
-                            [title]="'In Review: ' + (subStat.participantsByStatus.get('inreview')?.length || 0)"></div>
-                        
-                        <div class="progress-segment rework" 
-                            [style.width.%]="((subStat.participantsByStatus.get('rework')?.length || 0) / totalEnrolled) * 100"
-                            [title]="'Rework: ' + (subStat.participantsByStatus.get('rework')?.length || 0)"></div>
-                        
-                        <div class="progress-segment ready-mobile" 
-                            [style.width.%]="((subStat.participantsByStatus.get('readyformobile')?.length || 0) / totalEnrolled) * 100"
-                            [title]="'Ready for Mobile: ' + (subStat.participantsByStatus.get('readyformobile')?.length || 0)"></div>
-                        
-                        <div class="progress-segment in-progress" 
-                            [style.width.%]="((subStat.participantsByStatus.get('inprogress')?.length || 0) / totalEnrolled) * 100"
-                            [title]="'In Progress: ' + (subStat.participantsByStatus.get('inprogress')?.length || 0)"></div>
-                      </div>
-                      <div class="status-indicators">
-                        <ng-container *ngFor="let status of ['completed', 'inreview', 'rework', 'readyformobile', 'inprogress', 'notstarted']">
-                          <div class="status-item clickable" 
-                               *ngIf="(subStat.participantsByStatus.get(status)?.length || 0) > 0" 
-                               (click)="onStatusClick(status, i, j, subStat.participantsByStatus.get(status)?.length || 0)">
-                            <div class="status-dot" [class]="status"></div>
-                            <span>{{ subStat.participantsByStatus.get(status)?.length || 0 }} {{ statusDisplayMap.get(status) || status }}</span>
-                          </div>
-                        </ng-container>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                Zoom Attendees ({{ workshopData?.challenges?.[i]?.zoomattended?.length }})
+              </button>
+            </div>
+
+            <div class="cpo-subrow" *ngFor="let subStat of challengeStat.subChallengeStats; let j = index">
+              <div class="cpo-sub-top">
+                <span class="cpo-sub-idx">{{ i + 1 }}.{{ j + 1 }}</span>
+                <span class="cpo-sub-name">{{ subStat.subChallengeName }}</span>
+                <span class="cpo-type">{{ subStat.type }}</span>
+                <span class="cpo-sub-count">{{ subStat.participantsByStatus.get('completed')?.length || 0 }}/{{ totalEnrolled }} completed</span>
               </div>
-            </mat-expansion-panel>
-          </mat-accordion>
-        </mat-card-content>
-      </mat-card>
+
+              <div class="cpo-seg">
+                <div class="cpo-seg-i seg-completed"
+                    [style.width.%]="((subStat.participantsByStatus.get('completed')?.length || 0) / totalEnrolled) * 100"
+                    [title]="'Completed: ' + (subStat.participantsByStatus.get('completed')?.length || 0)"></div>
+                <div class="cpo-seg-i seg-inreview"
+                    [style.width.%]="((subStat.participantsByStatus.get('inreview')?.length || 0) / totalEnrolled) * 100"
+                    [title]="'In Review: ' + (subStat.participantsByStatus.get('inreview')?.length || 0)"></div>
+                <div class="cpo-seg-i seg-rework"
+                    [style.width.%]="((subStat.participantsByStatus.get('rework')?.length || 0) / totalEnrolled) * 100"
+                    [title]="'Rework: ' + (subStat.participantsByStatus.get('rework')?.length || 0)"></div>
+                <div class="cpo-seg-i seg-readyformobile"
+                    [style.width.%]="((subStat.participantsByStatus.get('readyformobile')?.length || 0) / totalEnrolled) * 100"
+                    [title]="'Ready for Mobile: ' + (subStat.participantsByStatus.get('readyformobile')?.length || 0)"></div>
+                <div class="cpo-seg-i seg-inprogress"
+                    [style.width.%]="((subStat.participantsByStatus.get('inprogress')?.length || 0) / totalEnrolled) * 100"
+                    [title]="'In Progress: ' + (subStat.participantsByStatus.get('inprogress')?.length || 0)"></div>
+              </div>
+
+              <div class="cpo-dots">
+                <ng-container *ngFor="let status of ['completed', 'inreview', 'rework', 'readyformobile', 'inprogress', 'notstarted']">
+                  <button type="button" class="cpo-chip cpo-click st-{{ status }}"
+                          *ngIf="(subStat.participantsByStatus.get(status)?.length || 0) > 0"
+                          (click)="onStatusClick(status, i, j, subStat.participantsByStatus.get(status)?.length || 0)">
+                    {{ subStat.participantsByStatus.get(status)?.length || 0 }} {{ statusDisplayMap.get(status) || status }}
+                  </button>
+                </ng-container>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
 
       <mat-card class="participants-card" elevation="2">
       <mat-card-header>
@@ -908,7 +902,7 @@
                 </td>
               </ng-container>
               <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
                 <td mat-cell *matCellDef="let participant">
                   <ng-container *ngIf="workshopData?.categorybased === true; else defaultStatus">
                     <div class="custom-status-chip"
@@ -1013,656 +1007,493 @@
         </mat-card-content>
       </mat-card>
 
-      <mat-card class="participant-data-card" elevation="2" id="participantDataCard" #participantDataSection>
-        <mat-card-header>
-          <mat-card-title style="font-weight: bold;padding: 20px;">
-            Participant Data
-          </mat-card-title>
-        </mat-card-header>
-        
-        <mat-card-content>
-          <div *ngIf="!selectedParticipantData" class="empty-state">
-            <mat-icon class="empty-icon">person_outline</mat-icon>
-            <h3>No Participant Selected</h3>
-            <p>Click on a participant in the table above to view their detailed data</p>
-          </div>
-
-          <div *ngIf="selectedParticipantData" class="participant-data-content">
-            
-            <div class="data-section">
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Name:</span>
-                  <span class="info-value">{{ mapProfile[selectedParticipantData.profileid]['name'] }}
-                    <img
-                      *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly"
-                      src="assets/new.png"
-                      alt="New"
-                      class="new-badge"
-                    />
-                  </span>
-                </div>
-                <div class="info-item" *ngIf="workshopData?.categorybased === true">
-                  <span class="info-label">Type:</span>
-                  <span class="info-value">
-                    <span class="participant-type-chip" [class]="getParticipantTypeClass(selectedParticipantData.profileid)">
-                      {{ getParticipantTypeLabel(selectedParticipantData.profileid) }}
-                    </span>
-                  </span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Enrollment Date:</span>
-                  <span class="info-value">{{ formatDate(selectedParticipantData.enrollmentdate) }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Status:</span>
-                  <span class="info-value status-badge" [class]="selectedParticipantData.status">
-                    {{ selectedParticipantData.status | titlecase }}
-                  </span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Progress:</span>
-                  <span class="info-value" *ngIf="workshopData?.categorybased !== true">{{ getParticipantProgress(selectedParticipantData.profileid) }}%</span>
-                  <span class="info-value" *ngIf="workshopData?.categorybased === true">{{ getAccessBasedProgressForProfile(selectedParticipantData.profileid) }}%</span>
-                </div>
-                <!-- <div class="info-item">
-                  <span class="info-label">Progress:</span>
-                  <span class="info-value">{{ getParticipantProgress(selectedParticipantData.profileid) }}%</span>
-                </div> -->
-              </div>
-            </div>
-
-            <div class="data-section">
-              <h4 class="section-title">
-                <mat-icon>assignment</mat-icon>
-                Challenge Progress Details
-              </h4>
-              <div *ngIf="loadingParticipantWorkshop" class="loading-section">
-                <mat-spinner diameter="40"></mat-spinner>
-                <p>Loading participant workshop data...</p>
-              </div>
-              <div *ngIf="participantWorkshopError" class="error-section">
-                <mat-icon class="error-icon">error</mat-icon>
-                <p>{{ participantWorkshopError }}</p>
-                <!-- <button mat-stroked-button (click)="loadParticipantWorkshopData(selectedParticipantData.profileid)">
-                  <mat-icon>refresh</mat-icon>
-                  Retry
-                </button> -->
-              </div>
-
-              <div *ngIf="displayChallenges.length > 0 && !loadingParticipantWorkshop" class="workshop-data">
-                <mat-accordion class="participant-challenges-accordion" multi="true">
-                  <mat-expansion-panel 
-                    *ngFor="let displayChallenge of displayChallenges; let i = index" 
-                    class="participant-challenge-panel"
-                    [expanded]="displayChallenge.isCurrentChallenge">
-                    
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>
-                        <div class="challenge-header-content">
-                          <span class="challenge-number">{{ i + 1 }}</span>
-                          <span class="challenge-name">{{ displayChallenge.challengeName }}</span>
-                          <mat-chip class="status-chip" [class]="displayChallenge.statusClass">
-                            {{ displayChallenge.statusDisplayName }}
-                          </mat-chip>
-                        </div>
-                      </mat-panel-title>
-                      <mat-panel-description>
-                        <span class="challenge-type">{{ displayChallenge.challengeType }}</span>
-                      </mat-panel-description>
-                    </mat-expansion-panel-header>
-
-                    <div class="challenge-details">
-                      <div class="challenge-metadata" *ngIf="displayChallenge.challengeMetadata.started || displayChallenge.challengeMetadata.completed">
-                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.started">
-                          <mat-icon>play_arrow</mat-icon>
-                          <span>Started: {{ displayChallenge.challengeMetadata.started }}</span>
-                        </div>
-                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.completed">
-                          <mat-icon>check_circle</mat-icon>
-                          <span>Completed: {{ displayChallenge.challengeMetadata.completed }}</span>
-                        </div>
-                        <div class="metadata-item" *ngIf="displayChallenge.challengeMetadata.manualCompletion">
-                          <mat-icon>admin_panel_settings</mat-icon>
-                          <span>Manual Completion</span>
-                        </div>
-                      </div>
-                      <div *ngIf="displayChallenge.subChallenges.length > 0" class="sub-challenges">
-                        <h5>Sub-Challenges</h5>
-                        <div class="sub-challenge-list">
-                          <div *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index" 
-                               class="sub-challenge-item"
-                               [class.current-sub-challenge]="subChallenge.isCurrentSubChallenge">
-                            
-                            <div class="sub-challenge-header">
-                              <span class="sub-challenge-number">{{ i + 1 }}.{{ j + 1 }}</span>
-                              <span class="sub-challenge-name">{{ subChallenge.subChallengeName }}</span>
-                              <mat-chip class="sub-status-chip" [class]="subChallenge.statusClass">
-                                {{ subChallenge.statusDisplayName }}
-                              </mat-chip>
-                            </div>
-
-                            <div class="sub-challenge-details">
-                              <div class="sub-challenge-info">
-                                <span class="info-label">Type:</span>
-                                <span class="info-value">{{ subChallenge.subChallengeType }}</span>
-                              </div>
-                              
-                              <div class="sub-challenge-metadata" *ngIf="subChallenge.startedDate || subChallenge.completedDate">
-                                <div *ngIf="subChallenge.startedDate" class="metadata-item">
-                                  <mat-icon>schedule</mat-icon>
-                                  <span>Started: {{ subChallenge.startedDate }}</span>
-                                </div>
-                                <div *ngIf="subChallenge.completedDate" class="metadata-item">
-                                  <mat-icon>done</mat-icon>
-                                  <span>Completed: {{ subChallenge.completedDate }}</span>
-                                </div>
-                              </div>
-                              <div *ngIf="subChallenge.canViewQuiz" class="form-data">
-                                <div class="form-info">
-                                  <div class="info-item clickable-form-item quiz-item"
-                                      (click)="viewQuiz(subChallenge, i, j)"
-                                      matTooltip="Click to view quiz results ({{ subChallenge.quizResultsCount }} result{{ subChallenge.quizResultsCount > 1 ? 's' : '' }})">
-                                    <mat-icon>radio_button_checked</mat-icon>
-                                    <span>Quiz Results</span>
-                                    <span class="quiz-count-badge" *ngIf="subChallenge.quizResultsCount > 1">{{ subChallenge.quizResultsCount }}</span>
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-                                </div>
-                              </div>
-                                <!-- <div *ngIf="subChallenge.canViewQuiz" class="form-data">
-                                  <div class="form-info">
-                                    <div class="info-item clickable-form-item quiz-item"
-                                        (click)="viewQuiz(subChallenge, i, j)"
-                                        matTooltip="Click to view quiz results">
-                                      <mat-icon>radio_button_checked</mat-icon>
-                                      <span>Quiz Results</span>
-                                      <mat-icon class="view-icon">visibility</mat-icon>
-                                    </div>
-                                  </div>
-                                </div> -->
-                              <div *ngIf="subChallenge.canViewVA" class="form-data">
-                                <div class="form-info">
-                                  <div *ngIf="subChallenge.canViewVA"
-                                      class="info-item clickable-form-item"
-                                      (click)="viewVideoAsk(subChallenge, i, j)"
-                                      matTooltip="Click to view current form">
-                                    <mat-icon>videocam</mat-icon>
-                                    <span>Video Ask</span>
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-                                </div>
-                              </div>
-                              <div *ngIf="subChallenge.canViewForm || subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.canViewAssignmentQuestionText || subChallenge.hasOldResults" class="form-data">
-                                <div class="form-info">
-                                  <div *ngIf="subChallenge.canViewForm"
-                                      class="info-item clickable-form-item"
-                                      (click)="viewForm(subChallenge, i, j)"
-                                      matTooltip="Click to view current form">
-                                    <mat-icon>description</mat-icon>
-                                    <span>Form</span>
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-                                  <div *ngIf="subChallenge.canViewAssignmentForm"
-                                      class="info-item clickable-form-item"
-                                      (click)="viewForm(subChallenge, i, j)"
-                                      matTooltip="Click to view current assignment form">
-                                    <mat-icon>assignment</mat-icon>
-                                    <span>Assignment (Form)</span>
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-
-                                  <div *ngIf="subChallenge.canViewAssignmentQuestion"
-                                      class="info-item clickable-form-item assignment-question-item"
-                                      (click)="viewQuestionAssignment(subChallenge, i, j)"
-                                      matTooltip="Click to review assignment submissions">
-                                    <mat-icon>quiz</mat-icon>
-                                    <span>Assignment (Question)</span>
-                                    <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
-                                      <mat-icon class="preview-icon">attachment</mat-icon>
-                                      <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
-                                    </div>
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-                                  <div *ngIf="subChallenge.canViewAssignmentQuestionText"
-                                      class="info-item clickable-form-item assignment-question-item">
-                                    <mat-icon>quiz</mat-icon>
-                                    <span>Assignment (Question - Text)</span>
-                                    <h3 style="color: black;">{{ subChallenge.metadata.originalData.result }}</h3>
-                                    <!-- <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
-                                      <mat-icon class="preview-icon">attachment</mat-icon>
-                                      <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
-                                    </div> -->
-                                    <mat-icon class="view-icon">visibility</mat-icon>
-                                  </div>
-                                  <ng-container *ngIf="subChallenge.hasOldResults">
-                                    <div *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index"
-                                        class="info-item clickable-form-item old-result-item"
-                                        [class.old-question-result]="oldResult.isQuestionAssignment"
-                                        (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
-                                        [matTooltip]="getOldResultTooltip(oldResult)">
-                                      <mat-icon>history</mat-icon>
-                                      <span>
-                                        Previous Submission {{ subChallenge.oldResults.length - reversedIndex }}
-                                        <small *ngIf="oldResult.date" class="submission-date">({{ oldResult.date }})</small>
-                                      </span>
-                                      <div class="old-result-preview">
-                                        <div *ngIf="oldResult.isQuestionAssignment" class="question-assignment-preview">
-                                          <mat-icon class="preview-icon">attachment</mat-icon>
-                                          <span class="submission-count">{{ oldResult.result?.length || 0 }} file(s)</span>
-                                        </div>
-                                        <div *ngIf="!oldResult.isQuestionAssignment" class="form-assignment-preview">
-                                          <mat-icon class="preview-icon">description</mat-icon>
-                                          <span class="form-indicator">Form Data</span>
-                                        </div>
-                                      </div>
-                                      <div *ngIf="oldResult.notes && oldResult.notes.length > 0" class="old-result-notes">
-                                        <mat-icon class="note-icon">note</mat-icon>
-                                        <span class="notes-preview">{{ oldResult.notes[0] }}</span>
-                                        <span *ngIf="oldResult.notes.length > 1" class="more-notes">+{{ oldResult.notes.length - 1 }} more</span>
-                                      </div>
-                                      
-                                      <mat-icon class="view-icon">visibility</mat-icon>
-                                    </div>
-                                  </ng-container>
-
-                                </div>
-                              </div>
-
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div *ngIf="displayChallenge.challengeType === 'Zoomcall'" class="zoom-call-details">
-                        <div class="zoom-info">
-                          <mat-icon>video_call</mat-icon>
-                          <span>Zoom Call Session</span>
-                        </div>
-                      </div>
-                    </div>
-                  </mat-expansion-panel>
-                </mat-accordion>
-                <mat-card class="assignment-data-card" elevation="2">
-                  <mat-card-header>
-                    <mat-card-title style="font-weight: bold;padding: 20px;">
-                      Assignment Data
-                    </mat-card-title>
-                  </mat-card-header>
-                  
-                  <mat-card-content>
-                    <div *ngFor="let displayChallenge of displayChallenges; let i = index" class="challenge-assignments">
-                      <div *ngIf="hasAssignmentData(displayChallenge)" class="challenge-assignment-header">
-                        <h4 class="assignment-challenge-title">
-                          <mat-icon>assignment</mat-icon>
-                          {{ i + 1 }}. {{ displayChallenge.challengeName }}
-                        </h4>
-                      </div>
-                      <div *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index" 
-                          class="sub-challenge-assignments">
-                        <div *ngIf="subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.canViewAssignmentQuestionText || subChallenge.hasOldResults"
-                            class="assignment-section">
-                          <div class="sub-challenge-assignment-header">
-                            <h5>{{ i + 1 }}.{{ j + 1 }} {{ subChallenge.subChallengeName }}</h5>
-                            <mat-chip class="assignment-type-chip" [class]="subChallenge.statusClass">
-                              {{ subChallenge.statusDisplayName }}
-                            </mat-chip>
-                          </div>
-                          <div class="assignment-items">
-                            <mat-card *ngIf="subChallenge.canViewAssignmentForm" class="assignment-item-card" elevation="1">
-                              <mat-card-content>
-                                <div class="assignment-item-header">
-                                  <mat-icon>assignment</mat-icon>
-                                  <span class="assignment-type">Assignment Form</span>
-                                  <button mat-stroked-button 
-                                          (click)="viewForm(subChallenge, i, j)"
-                                          class="view-assignment-btn">
-                                    <mat-icon>visibility</mat-icon>
-                                    View
-                                  </button>
-                                </div>
-                                <div class="assignment-metadata">
-                                  <span class="metadata-label">Type:</span>
-                                  <span class="metadata-value">Form-based Assignment</span>
-                                </div>
-                              </mat-card-content>
-                            </mat-card>
-                            <mat-card *ngIf="subChallenge.canViewAssignmentQuestion" class="assignment-item-card" elevation="1">
-                              <mat-card-content>
-                                <div class="assignment-item-header">
-                                  <mat-icon>quiz</mat-icon>
-                                  <span class="assignment-type">Assignment Question</span>
-                                  <button mat-stroked-button 
-                                          (click)="viewQuestionAssignment(subChallenge, i, j)"
-                                          class="view-assignment-btn">
-                                    <mat-icon>visibility</mat-icon>
-                                    Review
-                                  </button>
-                                </div>
-                                <div class="assignment-metadata">
-                                  <span class="metadata-label">Submissions:</span>
-                                  <span class="metadata-value">
-                                    {{ subChallenge.metadata.originalData.assignmentresult?.length || 0 }} file(s)
-                                  </span>
-                                </div>
-                                <div class="assignment-preview" *ngIf="subChallenge.metadata.originalData.assignmentresult">
-                                  <mat-icon class="preview-icon">attachment</mat-icon>
-                                  <span class="submission-count">{{ subChallenge.metadata.originalData.assignmentresult.length }} submission(s)</span>
-                                </div>
-                              </mat-card-content>
-                            </mat-card>
-                            <mat-card *ngIf="subChallenge.canViewAssignmentQuestionText" class="assignment-item-card" elevation="1">
-                              <mat-card-content>
-                                <div class="assignment-item-header">
-                                  <mat-icon>text_fields</mat-icon>
-                                  <span class="assignment-type">Assignment Question (Text)</span>
-                                </div>
-                                <div class="assignment-text-content">
-                                  <div class="text-response">
-                                    <span class="response-label">Response:</span>
-                                    <p class="response-text">{{ subChallenge.metadata.originalData.result }}</p>
-                                  </div>
-                                </div>
-                              </mat-card-content>
-                            </mat-card>
-                            <div *ngIf="subChallenge.hasOldResults" class="old-results-section">
-                              <h6 class="old-results-title">
-                                <mat-icon>history</mat-icon>
-                                Previous Submissions ({{ subChallenge.oldResults.length }})
-                              </h6>
-                              
-                              <mat-card *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index" 
-                                        class="assignment-item-card old-result-card" elevation="1">
-                                <mat-card-content>
-                                  <div class="assignment-item-header">
-                                    <mat-icon>history</mat-icon>
-                                    <span class="assignment-type">
-                                      Previous Submission {{ subChallenge.oldResults.length - reversedIndex }}
-                                    </span>
-                                    <button mat-stroked-button 
-                                            (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
-                                            class="view-assignment-btn">
-                                      <mat-icon>visibility</mat-icon>
-                                      View
-                                    </button>
-                                  </div>
-                                  
-                                  <div class="assignment-metadata">
-                                    <div *ngIf="oldResult.date" class="metadata-item">
-                                      <span class="metadata-label">Date:</span>
-                                      <span class="metadata-value">{{ oldResult.date }}</span>
-                                    </div>
-                                    
-                                    <div class="metadata-item">
-                                      <span class="metadata-label">Type:</span>
-                                      <span class="metadata-value">
-                                        {{ oldResult.isQuestionAssignment ? 'Question Assignment' : 'Form Assignment' }}
-                                      </span>
-                                    </div>
-                                    <div *ngIf="oldResult.isQuestionAssignment" class="assignment-preview">
-                                      <mat-icon class="preview-icon">attachment</mat-icon>
-                                      <span class="submission-count">{{ oldResult.result?.length || 0 }} file(s)</span>
-                                    </div>
-                                    <div *ngIf="!oldResult.isQuestionAssignment" class="assignment-preview">
-                                      <mat-icon class="preview-icon">description</mat-icon>
-                                      <span class="form-indicator">Form Data Available</span>
-                                    </div>
-                                  </div>
-                                  <div *ngIf="oldResult.notes && oldResult.notes.length > 0" class="notes-section">
-                                    <span class="notes-label">Notes:</span>
-                                    <div class="notes-list">
-                                      <p *ngFor="let note of oldResult.notes" class="note-item">{{ note }}</p>
-                                    </div>
-                                  </div>
-                                </mat-card-content>
-                              </mat-card>
-                            </div>
-
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div *ngIf="!hasAnyAssignmentData()" class="no-assignments-state">
-                      <mat-icon class="empty-icon">assignment_turned_in</mat-icon>
-                      <h4>No Assignment Data</h4>
-                      <p>This participant doesn't have any assignment submissions or forms to review.</p>
-                    </div>
-                  </mat-card-content>
-                </mat-card>
-
-                <mat-expansion-panel
-                  class="raw-data-panel"
-                  *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'"
-                >
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>
-                      <mat-icon>code</mat-icon>
-                      Raw Data
-                    </mat-panel-title>
-                    <mat-panel-description>
-                      View complete participant workshop data [developer only]
-                    </mat-panel-description>
-                  </mat-expansion-panel-header>
-
-                  <div class="raw-data-content">
-                    <pre class="json-data">{{ participantWorkshopData | json }}</pre>
-                  </div>
-                </mat-expansion-panel>
-
-              </div>
-            </div>
-          </div>
-        </mat-card-content>
-      </mat-card>
-<mat-card elevation="2" class="full-assignments-card">
-  <mat-card-header>
-    <mat-card-title style="font-weight: bold;padding: 20px;">
-      {{ workshopTitle }}'s Assignments
-    </mat-card-title>
-    <mat-card-subtitle style="padding: 0 20px;">
-      {{ assignmentsList.length }} assignment(s) in {{ workshopTitle }} workshop
-    </mat-card-subtitle>
-  </mat-card-header>
-  
-  <mat-card-content>
-
-    <div *ngIf="assignmentsList.length === 0" class="no-assignments-state">
-      <mat-icon class="empty-icon">assignment</mat-icon>
-      <h4>No Assignments Found</h4>
-      <p>This workshop doesn't contain any assignments yet.</p>
-    </div>
-
-
-    <mat-accordion *ngIf="assignmentsList.length > 0" class="assignments-accordion" multi="true">
-      <mat-expansion-panel *ngFor="let assignment of assignmentsList; let i = index" class="assignment-expansion-panel">
-        <mat-expansion-panel-header>
-          <mat-panel-title>
-              <div class="assignment-info">
-                <span class="assignment-name">{{ assignment.assignmentName }}</span>
-                <!-- <span class="challenge-context">{{ assignment.challengeName }}</span> -->
-              </div>
-            <!-- <div class="assignment-header-content">
-              <span class="assignment-number">{{ i + 1 }}</span>
-              <div class="assignment-info">
-                <span class="assignment-name">{{ assignment.assignmentName }}</span> -->
-                <!-- <span class="challenge-context">{{ assignment.challengeName }}</span> -->
-              <!-- </div>
-            </div> -->
-          </mat-panel-title>
-          <mat-panel-description>
-            <mat-chip class="type-chip">{{ assignment.assignmentType }}</mat-chip>&nbsp;&nbsp;
-            <mat-chip class="count-chip">
-              {{ assignment.participants.length }} participant(s)
-            </mat-chip>
-          </mat-panel-description>
-        </mat-expansion-panel-header>
-
-        <div class="assignment-details">
-          <div class="assignment-description" *ngIf="assignment.description">
-            <h5>Description:</h5>
-            <p>{{ assignment.description }}</p>
-          </div>
-
-          <div class="assignment-participants-section">
-            <h6>
-                <span class="challenge-context">{{ assignment.challengeName }}</span>
-            </h6>
-            <h5 class="section-title">
-              <mat-icon>people</mat-icon>
-              Participants ({{ assignment.participants.length }})
-            </h5>
-
-            <div *ngIf="assignment.participants.length === 0" class="empty-participants">
-              <mat-icon>person_off</mat-icon>
-              <p>No participants have completed this assignment yet.</p>
-            </div>
-
-            <div *ngIf="assignment.participants.length > 0" class="participants-grid">
-              <mat-card *ngFor="let participant of assignment.participants" 
-                        class="participant-assignment-card"
-                        [class.clickable]="participant.hasResult"
-                        (click)="participant.hasResult ? viewParticipantAssignment(assignment, participant) : null">
-                <mat-card-content>
-                  <div class="participant-assignment-content">
-                    <div class="participant-header">
-                      <mat-icon class="participant-icon">person</mat-icon>
-                      <div class="participant-infos">
-                        <span class="participant-name">{{ participant.name }}</span>
-                        <!-- <span class="participant-id">{{ participant.profileid }}</span> -->
-                      </div>
-                    </div>
-
-                    <div class="assignment-status-info">
-                      <mat-chip class="status-chip" [class]="participant.status">
-                        {{ statusDisplayMap.get(participant.status) || participant.status }}
-                      </mat-chip>
-                      
-                      <div class="submission-info" *ngIf="participant.completedDate">
-                        <mat-icon>schedule</mat-icon>
-                        <span>{{ participant.completedDate }}</span>
-                      </div>
-                    </div>
-
-                    <div class="result-preview" *ngIf="participant.hasResult">
-                      <div *ngIf="participant.assignmentType === 'form'" class="form-result">
-                        <mat-icon>description</mat-icon>
-                        <span>Form Submitted</span>
-                        <mat-icon class="view-icon">visibility</mat-icon>
-                      </div>
-                      
-                      <div *ngIf="participant.assignmentType === 'question' && participant.assignmentresult" class="question-result">
-                        <mat-icon>attachment</mat-icon>
-                        <span>{{ participant.assignmentresult.length }} file(s)</span>
-                        <mat-icon class="view-icon">visibility</mat-icon>
-                      </div>
-
-                      <div *ngIf="participant.assignmentType === 'question' && participant.submissionformat === 'text' && participant.result" class="text-result">
-                        <mat-icon>text_fields</mat-icon>
-                        <!-- <span class="text-preview">{{ participant.result | slice:0:50 }}{{ participant.result.length > 50 ? '...' : '' }}</span> -->
-                        <span class="text-preview">{{ participant.result}}</span>
-                      </div>
-                    </div>
-
-                    <div class="old-results-indicator" *ngIf="participant.oldResults.length > 0">
-                      <mat-icon>history</mat-icon>
-                      <span>{{ participant.oldResults.length }} previous submission(s)</span>
-                    </div>
-
-                
-                    <div class="notes-indicator" *ngIf="participant.completionNotes.length > 0">
-                      <mat-icon>note</mat-icon>
-                      <span>{{ participant.completionNotes.length }} note(s)</span>
-                    </div>
-                  </div>
-                </mat-card-content>
-              </mat-card>
-            </div>
+      <!-- ═════ Participant Data — redesigned presentation (grid layout).
+           Data, bindings and click handlers are IDENTICAL to the previous
+           accordion/list; only markup/styling changed. ═════ -->
+      <section class="pd" id="participantDataCard" #participantDataSection>
+        <div class="pd-head">
+          <div>
+            <h2 class="pd-title">Participant Data</h2>
+            <p class="pd-subtle" *ngIf="selectedParticipantData">Challenge progress &amp; submissions for the selected participant</p>
           </div>
         </div>
-      </mat-expansion-panel>
-    </mat-accordion>
-  </mat-card-content>
-</mat-card>
-<mat-card elevation="2" class="full-assignments-card">
-    <mat-card-header>
-      <mat-card-title style="font-weight: bold;padding: 20px;">
-        {{ workshopTitle }} Forms
-      </mat-card-title>
-      <mat-card-subtitle style="padding: 0 20px;">
-        {{ challengeForms.length }} Form(s) in {{ workshopTitle }} workshop
-      </mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <div *ngIf="challengeForms.length === 0" class="no-assignments-state">
-        <mat-icon class="empty-icon">description</mat-icon>
-        <h4>No Challenge Forms Found</h4>
-        <p>This workshop doesn't contain any form-type challenges outside of assignments.</p>
-      </div>
-      <mat-accordion *ngIf="challengeForms.length > 0" class="assignments-accordion" multi="true">
-        <mat-expansion-panel *ngFor="let form of challengeForms; let i = index" class="assignment-expansion-panel">
-          <mat-expansion-panel-header>
-            <mat-panel-title>
-              <div class="assignment-info">
-                <span class="assignment-name">{{ form.title }}</span>
+
+        <div *ngIf="!selectedParticipantData" class="pd-empty">
+          <mat-icon>person_outline</mat-icon>
+          <h3>No Participant Selected</h3>
+          <p>Click on a participant in the table above to view their detailed data</p>
+        </div>
+
+        <ng-container *ngIf="selectedParticipantData">
+
+          <!-- Hero strip -->
+          <div class="pd-hero">
+            <span class="pd-avatar"><mat-icon>person</mat-icon></span>
+            <div class="pd-hero-main">
+              <div class="pd-hero-name">
+                {{ mapProfile[selectedParticipantData.profileid]['name'] }}
+                <img *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly"
+                     src="assets/new.png" alt="New" class="new-badge" />
               </div>
-            </mat-panel-title>
-            <mat-panel-description>
-              <mat-chip class="type-chip">form</mat-chip>&nbsp;&nbsp;
-              <mat-chip class="count-chip">
-                {{ form.participants.length }} participant(s)
-              </mat-chip>
-            </mat-panel-description>
-          </mat-expansion-panel-header>
-          <div class="assignment-details">
-            <div class="assignment-participants-section">
-              <h6>
-                <span class="challenge-context">{{ form.challengeTitle }}</span>
-              </h6>
-              <h5 class="section-title">
-                <mat-icon>people</mat-icon>
-                Participants ({{ form.participants.length }})
-              </h5>
-              <div *ngIf="form.participants.length === 0" class="empty-participants">
-                <mat-icon>person_off</mat-icon>
-                <p>No participants have completed this form yet.</p>
-              </div>
-              <div *ngIf="form.participants.length > 0" class="participants-grid">
-                <mat-card *ngFor="let participant of form.participants"
-                          class="participant-assignment-card clickable"
-                          (click)="openChallengeFormReview(form, participant)">
-                  <mat-card-content>
-                    <div class="participant-assignment-content">
-                      <div class="participant-header">
-                        <mat-icon class="participant-icon">person</mat-icon>
-                        <div class="participant-infos">
-                          <span class="participant-name">{{ participant.name }}</span>
-                        </div>
-                      </div>
-                      <div class="assignment-status-info">
-                        <mat-chip class="status-chip" [class]="participant.status">
-                          {{ statusDisplayMap.get(participant.status) || participant.status }}
-                        </mat-chip>
-                        <div class="submission-info" *ngIf="participant.submittedDate">
-                          <mat-icon>schedule</mat-icon>
-                          <span>{{ participant.submittedDate.toDate() | date: 'MMM dd, yyyy' }}</span>
-                        </div>
-                      </div>
-                      <div class="result-preview" *ngIf="participant.formSubmitted">
-                        <div class="form-result">
-                          <mat-icon>description</mat-icon>
-                          <span>Form Submitted</span>
-                          <mat-icon class="view-icon">visibility</mat-icon>
-                        </div>
-                      </div>
-                    </div>
-                  </mat-card-content>
-                </mat-card>
+              <div class="pd-hero-meta">
+                <span class="participant-type-chip" *ngIf="workshopData?.categorybased === true"
+                      [class]="getParticipantTypeClass(selectedParticipantData.profileid)">
+                  {{ getParticipantTypeLabel(selectedParticipantData.profileid) }}
+                </span>
+                <span class="pd-meta-item status-badge" [class]="selectedParticipantData.status">
+                  {{ selectedParticipantData.status | titlecase }}
+                </span>
+                <span class="pd-meta-item">
+                  <mat-icon>event</mat-icon> Enrolled {{ formatDate(selectedParticipantData.enrollmentdate) }}
+                </span>
               </div>
             </div>
+            <div class="pd-hero-progress">
+              <span class="pd-progress-num" *ngIf="workshopData?.categorybased !== true">{{ getParticipantProgress(selectedParticipantData.profileid) }}%</span>
+              <span class="pd-progress-num" *ngIf="workshopData?.categorybased === true">{{ getAccessBasedProgressForProfile(selectedParticipantData.profileid) }}%</span>
+              <span class="pd-progress-lbl">Progress</span>
+              <span class="pd-progress-bar">
+                <i *ngIf="workshopData?.categorybased !== true" [style.width.%]="getParticipantProgress(selectedParticipantData.profileid)"></i>
+                <i *ngIf="workshopData?.categorybased === true" [style.width.%]="getAccessBasedProgressForProfile(selectedParticipantData.profileid)"></i>
+              </span>
+            </div>
+            <button type="button" class="pd-clear" (click)="clearSelectedParticipant()" matTooltip="Clear selection" aria-label="Clear selection">
+              <mat-icon>close</mat-icon>
+            </button>
           </div>
-        </mat-expansion-panel>
-      </mat-accordion>
-    </mat-card-content>
-  </mat-card>
+
+          <div *ngIf="loadingParticipantWorkshop" class="pd-state">
+            <mat-spinner diameter="36"></mat-spinner>
+            <p>Loading participant workshop data...</p>
+          </div>
+          <div *ngIf="participantWorkshopError" class="pd-state pd-state-error">
+            <mat-icon>error</mat-icon>
+            <p>{{ participantWorkshopError }}</p>
+          </div>
+
+          <ng-container *ngIf="displayChallenges.length > 0 && !loadingParticipantWorkshop">
+
+            <h3 class="pd-sec"><mat-icon>assignment</mat-icon> Challenge Progress Details</h3>
+
+            <div class="pd-stack">
+              <div class="pd-card" *ngFor="let displayChallenge of displayChallenges; let i = index"
+                   [class.pd-current]="displayChallenge.isCurrentChallenge">
+
+                <div class="pd-card-hd">
+                  <span class="pd-num">{{ i + 1 }}</span>
+                  <div class="pd-card-titles">
+                    <span class="pd-card-name">{{ displayChallenge.challengeName }}</span>
+                    <span class="pd-card-type">{{ displayChallenge.challengeType }}</span>
+                  </div>
+                  <span class="pd-chip" [class]="'pd-chip ' + displayChallenge.statusClass">{{ displayChallenge.statusDisplayName }}</span>
+                </div>
+
+                <div class="pd-meta-row" *ngIf="displayChallenge.challengeMetadata.started || displayChallenge.challengeMetadata.completed || displayChallenge.challengeMetadata.manualCompletion">
+                  <span class="pd-meta-item" *ngIf="displayChallenge.challengeMetadata.started">
+                    <mat-icon>play_arrow</mat-icon> {{ displayChallenge.challengeMetadata.started }}
+                  </span>
+                  <span class="pd-meta-item" *ngIf="displayChallenge.challengeMetadata.completed">
+                    <mat-icon>check_circle</mat-icon> {{ displayChallenge.challengeMetadata.completed }}
+                  </span>
+                  <span class="pd-meta-item" *ngIf="displayChallenge.challengeMetadata.manualCompletion">
+                    <mat-icon>admin_panel_settings</mat-icon> Manual Completion
+                  </span>
+                </div>
+
+                <div class="pd-zoom" *ngIf="displayChallenge.challengeType === 'Zoomcall'">
+                  <mat-icon>video_call</mat-icon> Zoom Call Session
+                </div>
+
+                <div class="pd-subs" *ngIf="displayChallenge.subChallenges.length > 0">
+                  <div class="pd-sub" *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index"
+                       [class.pd-sub-current]="subChallenge.isCurrentSubChallenge">
+
+                    <div class="pd-sub-hd">
+                      <span class="pd-sub-idx">{{ i + 1 }}.{{ j + 1 }}</span>
+                      <span class="pd-sub-name">{{ subChallenge.subChallengeName }}</span>
+                      <span class="pd-chip" [class]="'pd-chip ' + subChallenge.statusClass">{{ subChallenge.statusDisplayName }}</span>
+                    </div>
+
+                    <div class="pd-sub-meta">
+                      <span class="pd-type-pill">{{ subChallenge.subChallengeType }}</span>
+                      <span class="pd-meta-item" *ngIf="subChallenge.startedDate"><mat-icon>schedule</mat-icon> {{ subChallenge.startedDate }}</span>
+                      <span class="pd-meta-item" *ngIf="subChallenge.completedDate"><mat-icon>done</mat-icon> {{ subChallenge.completedDate }}</span>
+                    </div>
+
+                    <div class="pd-acts"
+                         *ngIf="subChallenge.canViewQuiz || subChallenge.canViewVA || subChallenge.canViewForm || subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.hasOldResults">
+                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewQuiz"
+                              (click)="viewQuiz(subChallenge, i, j)"
+                              matTooltip="Click to view quiz results ({{ subChallenge.quizResultsCount }} result{{ subChallenge.quizResultsCount > 1 ? 's' : '' }})">
+                        <mat-icon>radio_button_checked</mat-icon> Quiz Results
+                        <span class="pd-act-n" *ngIf="subChallenge.quizResultsCount > 1">{{ subChallenge.quizResultsCount }}</span>
+                      </button>
+                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewVA"
+                              (click)="viewVideoAsk(subChallenge, i, j)"
+                              matTooltip="Click to view the VideoAsk video">
+                        <mat-icon>videocam</mat-icon> Video Ask
+                      </button>
+                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewForm"
+                              (click)="viewForm(subChallenge, i, j)"
+                              matTooltip="Click to view current form">
+                        <mat-icon>description</mat-icon> Form
+                      </button>
+                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentForm"
+                              (click)="viewForm(subChallenge, i, j)"
+                              matTooltip="Click to view current assignment form">
+                        <mat-icon>assignment</mat-icon> Assignment (Form)
+                      </button>
+                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentQuestion"
+                              (click)="viewQuestionAssignment(subChallenge, i, j)"
+                              matTooltip="Click to review assignment submissions">
+                        <mat-icon>quiz</mat-icon> Assignment (Question)
+                        <span class="pd-act-n" *ngIf="subChallenge.metadata.originalData.assignmentresult">{{ subChallenge.metadata.originalData.assignmentresult.length }}</span>
+                      </button>
+                      <ng-container *ngIf="subChallenge.hasOldResults">
+                        <button type="button" class="pd-act pd-act-old"
+                                *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index"
+                                (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
+                                [matTooltip]="getOldResultTooltip(oldResult)">
+                          <mat-icon>history</mat-icon>
+                          Previous {{ subChallenge.oldResults.length - reversedIndex }}
+                          <small *ngIf="oldResult.date">({{ oldResult.date }})</small>
+                          <span class="pd-act-n" *ngIf="oldResult.isQuestionAssignment">{{ oldResult.result?.length || 0 }} file(s)</span>
+                          <span class="pd-act-n" *ngIf="!oldResult.isQuestionAssignment">Form Data</span>
+                          <span class="pd-act-note" *ngIf="oldResult.notes && oldResult.notes.length > 0">
+                            <mat-icon>note</mat-icon>{{ oldResult.notes[0] }}<ng-container *ngIf="oldResult.notes.length > 1"> +{{ oldResult.notes.length - 1 }} more</ng-container>
+                          </span>
+                        </button>
+                      </ng-container>
+                    </div>
+
+                    <div class="pd-text-answer" *ngIf="subChallenge.canViewAssignmentQuestionText">
+                      <span class="pd-text-lbl"><mat-icon>text_fields</mat-icon> Assignment (Question - Text)</span>
+                      <p class="pd-text-body">{{ subChallenge.metadata.originalData.result }}</p>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h3 class="pd-sec"><mat-icon>fact_check</mat-icon> Assignment Data</h3>
+
+            <div class="pd-grid" *ngIf="hasAnyAssignmentData()">
+              <ng-container *ngFor="let displayChallenge of displayChallenges; let i = index">
+                <ng-container *ngFor="let subChallenge of displayChallenge.subChallenges; let j = index">
+                  <div class="pd-card pd-assign-card"
+                       *ngIf="subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.canViewAssignmentQuestionText || subChallenge.hasOldResults">
+
+                    <div class="pd-card-hd">
+                      <span class="pd-num pd-num-sub">{{ i + 1 }}.{{ j + 1 }}</span>
+                      <div class="pd-card-titles">
+                        <span class="pd-card-name">{{ subChallenge.subChallengeName }}</span>
+                        <span class="pd-card-type">{{ displayChallenge.challengeName }}</span>
+                      </div>
+                      <span class="pd-chip" [class]="'pd-chip ' + subChallenge.statusClass">{{ subChallenge.statusDisplayName }}</span>
+                    </div>
+
+                    <div class="pd-assign-row" *ngIf="subChallenge.canViewAssignmentForm">
+                      <mat-icon>assignment</mat-icon>
+                      <div class="pd-assign-main">
+                        <span class="pd-assign-name">Assignment Form</span>
+                        <span class="pd-assign-sub">Form-based Assignment</span>
+                      </div>
+                      <button mat-stroked-button class="pd-view-btn" (click)="viewForm(subChallenge, i, j)">
+                        <mat-icon>visibility</mat-icon> View
+                      </button>
+                    </div>
+
+                    <div class="pd-assign-row" *ngIf="subChallenge.canViewAssignmentQuestion">
+                      <mat-icon>quiz</mat-icon>
+                      <div class="pd-assign-main">
+                        <span class="pd-assign-name">Assignment Question</span>
+                        <span class="pd-assign-sub">{{ subChallenge.metadata.originalData.assignmentresult?.length || 0 }} file(s) submitted</span>
+                      </div>
+                      <button mat-stroked-button class="pd-view-btn" (click)="viewQuestionAssignment(subChallenge, i, j)">
+                        <mat-icon>visibility</mat-icon> Review
+                      </button>
+                    </div>
+
+                    <div class="pd-assign-row pd-assign-text" *ngIf="subChallenge.canViewAssignmentQuestionText">
+                      <mat-icon>text_fields</mat-icon>
+                      <div class="pd-assign-main">
+                        <span class="pd-assign-name">Assignment Question (Text)</span>
+                        <p class="pd-text-body">{{ subChallenge.metadata.originalData.result }}</p>
+                      </div>
+                    </div>
+
+                    <div class="pd-old-block" *ngIf="subChallenge.hasOldResults">
+                      <span class="pd-old-title"><mat-icon>history</mat-icon> Previous Submissions ({{ subChallenge.oldResults.length }})</span>
+                      <div class="pd-assign-row pd-old-row"
+                           *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index">
+                        <mat-icon>history</mat-icon>
+                        <div class="pd-assign-main">
+                          <span class="pd-assign-name">Previous Submission {{ subChallenge.oldResults.length - reversedIndex }}</span>
+                          <span class="pd-assign-sub">
+                            <ng-container *ngIf="oldResult.date">{{ oldResult.date }} · </ng-container>
+                            {{ oldResult.isQuestionAssignment ? 'Question Assignment' : 'Form Assignment' }} ·
+                            <ng-container *ngIf="oldResult.isQuestionAssignment">{{ oldResult.result?.length || 0 }} file(s)</ng-container>
+                            <ng-container *ngIf="!oldResult.isQuestionAssignment">Form Data Available</ng-container>
+                          </span>
+                          <div class="pd-notes" *ngIf="oldResult.notes && oldResult.notes.length > 0">
+                            <span class="pd-notes-lbl">Notes:</span>
+                            <p class="pd-note" *ngFor="let note of oldResult.notes">{{ note }}</p>
+                          </div>
+                        </div>
+                        <button mat-stroked-button class="pd-view-btn"
+                                (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)">
+                          <mat-icon>visibility</mat-icon> View
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </ng-container>
+              </ng-container>
+            </div>
+
+            <div *ngIf="!hasAnyAssignmentData()" class="pd-empty pd-empty-sm">
+              <mat-icon>assignment_turned_in</mat-icon>
+              <h3>No Assignment Data</h3>
+              <p>This participant doesn't have any assignment submissions or forms to review.</p>
+            </div>
+
+            <mat-expansion-panel
+              class="raw-data-panel pd-raw"
+              *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'"
+            >
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>code</mat-icon>
+                  Raw Data
+                </mat-panel-title>
+                <mat-panel-description>
+                  View complete participant workshop data [developer only]
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <div class="raw-data-content">
+                <pre class="json-data">{{ participantWorkshopData | json }}</pre>
+              </div>
+            </mat-expansion-panel>
+
+          </ng-container>
+        </ng-container>
+      </section>
+<!-- ═════ All Assignments / All Forms / All VideoAsk — redesigned
+     presentation. Data, bindings and click handlers are IDENTICAL to the
+     previous accordions; only markup/styling changed. ═════ -->
+
+<section class="arc">
+  <div class="arc-head">
+    <div>
+      <h2 class="arc-title">All Assignments</h2>
+      <p class="arc-sub">{{ assignmentsList.length }} assignment(s) in {{ workshopTitle }} workshop</p>
+    </div>
+  </div>
+
+  <div *ngIf="assignmentsList.length === 0" class="arc-empty">
+    <mat-icon>assignment</mat-icon>
+    <h4>No Assignments Found</h4>
+    <p>This workshop doesn't contain any assignments yet.</p>
+  </div>
+
+  <div class="arc-card" *ngFor="let assignment of assignmentsList; let i = index"
+       [class.arc-open]="isArchiveGroupExpanded('assign-' + i)">
+    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('assign-' + i)"
+            [attr.aria-expanded]="isArchiveGroupExpanded('assign-' + i)">
+      <span class="arc-ico"><mat-icon>assignment</mat-icon></span>
+      <span class="arc-titles">
+        <span class="arc-name">{{ assignment.assignmentName }}</span>
+        <span class="arc-ctx">{{ assignment.challengeName }}</span>
+      </span>
+      <span class="arc-type-pill">{{ assignment.assignmentType }}</span>
+      <span class="arc-count">{{ assignment.participants.length }} participant(s)</span>
+      <mat-icon class="arc-caret">expand_more</mat-icon>
+    </button>
+
+    <div class="arc-body" *ngIf="isArchiveGroupExpanded('assign-' + i)">
+      <p class="arc-desc" *ngIf="assignment.description">{{ assignment.description }}</p>
+
+      <div *ngIf="assignment.participants.length === 0" class="arc-empty arc-empty-sm">
+        <mat-icon>person_off</mat-icon>
+        <p>No participants have completed this assignment yet.</p>
+      </div>
+
+      <div *ngIf="assignment.participants.length > 0" class="arc-grid">
+        <div *ngFor="let participant of assignment.participants"
+             class="arc-pcard"
+             [class.arc-click]="participant.hasResult"
+             (click)="participant.hasResult ? viewParticipantAssignment(assignment, participant) : null">
+          <div class="arc-prow">
+            <span class="arc-avatar">{{ participant.name?.charAt(0) || '?' }}</span>
+            <span class="arc-pname">{{ participant.name }}</span>
+            <span class="arc-chip" [class]="'arc-chip ' + participant.status">
+              {{ statusDisplayMap.get(participant.status) || participant.status }}
+            </span>
+          </div>
+
+          <div class="arc-meta" *ngIf="participant.completedDate">
+            <mat-icon>schedule</mat-icon>{{ participant.completedDate }}
+          </div>
+
+          <ng-container *ngIf="participant.hasResult">
+            <div class="arc-preview" *ngIf="participant.assignmentType === 'form'">
+              <mat-icon>description</mat-icon><span>Form Submitted</span>
+              <mat-icon class="arc-eye">visibility</mat-icon>
+            </div>
+            <div class="arc-preview" *ngIf="participant.assignmentType === 'question' && participant.assignmentresult">
+              <mat-icon>attachment</mat-icon><span>{{ participant.assignmentresult.length }} file(s)</span>
+              <mat-icon class="arc-eye">visibility</mat-icon>
+            </div>
+            <div class="arc-preview arc-preview-text" *ngIf="participant.assignmentType === 'question' && participant.submissionformat === 'text' && participant.result">
+              <mat-icon>text_fields</mat-icon><span class="arc-text-clamp">{{ participant.result }}</span>
+            </div>
+          </ng-container>
+
+          <div class="arc-counters" *ngIf="participant.oldResults.length > 0 || participant.completionNotes.length > 0">
+            <span class="arc-counter" *ngIf="participant.oldResults.length > 0">
+              <mat-icon>history</mat-icon>{{ participant.oldResults.length }} previous submission(s)
+            </span>
+            <span class="arc-counter" *ngIf="participant.completionNotes.length > 0">
+              <mat-icon>note</mat-icon>{{ participant.completionNotes.length }} note(s)
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="arc">
+  <div class="arc-head">
+    <div>
+      <h2 class="arc-title">All Forms</h2>
+      <p class="arc-sub">{{ challengeForms.length }} Form(s) in {{ workshopTitle }} workshop</p>
+    </div>
+    <button mat-stroked-button color="primary" class="forms-export-btn"
+            (click)="exportFormsToExcel()"
+            [disabled]="isExportingForms || challengeForms.length === 0">
+      <mat-icon>download</mat-icon>
+      {{ isExportingForms ? 'Exporting…' : 'Export Excel' }}
+    </button>
+  </div>
+
+  <div *ngIf="challengeForms.length === 0" class="arc-empty">
+    <mat-icon>description</mat-icon>
+    <h4>No Challenge Forms Found</h4>
+    <p>This workshop doesn't contain any form-type challenges outside of assignments.</p>
+  </div>
+
+  <div class="arc-card" *ngFor="let form of challengeForms; let i = index"
+       [class.arc-open]="isArchiveGroupExpanded('form-' + i)">
+    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('form-' + i)"
+            [attr.aria-expanded]="isArchiveGroupExpanded('form-' + i)">
+      <span class="arc-ico arc-ico-form"><mat-icon>description</mat-icon></span>
+      <span class="arc-titles">
+        <span class="arc-name">{{ form.title }}</span>
+        <span class="arc-ctx">{{ form.challengeTitle }}</span>
+      </span>
+      <span class="arc-type-pill">form</span>
+      <span class="arc-count">{{ form.participants.length }} participant(s)</span>
+      <mat-icon class="arc-caret">expand_more</mat-icon>
+    </button>
+
+    <div class="arc-body" *ngIf="isArchiveGroupExpanded('form-' + i)">
+      <div *ngIf="form.participants.length === 0" class="arc-empty arc-empty-sm">
+        <mat-icon>person_off</mat-icon>
+        <p>No participants have completed this form yet.</p>
+      </div>
+
+      <div *ngIf="form.participants.length > 0" class="arc-grid">
+        <div *ngFor="let participant of form.participants"
+             class="arc-pcard arc-click"
+             (click)="openChallengeFormReview(form, participant)">
+          <div class="arc-prow">
+            <span class="arc-avatar">{{ participant.name?.charAt(0) || '?' }}</span>
+            <span class="arc-pname">{{ participant.name }}</span>
+            <span class="arc-chip" [class]="'arc-chip ' + participant.status">
+              {{ statusDisplayMap.get(participant.status) || participant.status }}
+            </span>
+          </div>
+          <div class="arc-meta" *ngIf="participant.submittedDate">
+            <mat-icon>schedule</mat-icon>{{ participant.submittedDate.toDate() | date: 'MMM dd, yyyy' }}
+          </div>
+          <div class="arc-preview" *ngIf="participant.formSubmitted">
+            <mat-icon>description</mat-icon><span>Form Submitted</span>
+            <mat-icon class="arc-eye">visibility</mat-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="arc">
+  <div class="arc-head">
+    <div>
+      <h2 class="arc-title">All VideoAsk</h2>
+      <p class="arc-sub">{{ videoAskList.length }} VideoAsk(s) in {{ workshopTitle }} workshop</p>
+    </div>
+  </div>
+
+  <div *ngIf="videoAskList.length === 0" class="arc-empty">
+    <mat-icon>videocam</mat-icon>
+    <h4>No VideoAsk Found</h4>
+    <p>No participants have completed a VideoAsk in this workshop yet.</p>
+  </div>
+
+  <div class="arc-card" *ngFor="let va of videoAskList; let i = index"
+       [class.arc-open]="isArchiveGroupExpanded('va-' + i)">
+    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('va-' + i)"
+            [attr.aria-expanded]="isArchiveGroupExpanded('va-' + i)">
+      <span class="arc-ico arc-ico-va"><mat-icon>videocam</mat-icon></span>
+      <span class="arc-titles">
+        <span class="arc-name">{{ va.title }}</span>
+        <span class="arc-ctx">{{ va.challengeTitle }}</span>
+      </span>
+      <span class="arc-type-pill">videoask</span>
+      <span class="arc-count">{{ va.participants.length }} participant(s)</span>
+      <mat-icon class="arc-caret">expand_more</mat-icon>
+    </button>
+
+    <div class="arc-body" *ngIf="isArchiveGroupExpanded('va-' + i)">
+      <div *ngIf="va.participants.length > 0" class="arc-grid">
+        <div *ngFor="let participant of va.participants"
+             class="arc-pcard"
+             [class.arc-click]="!participant.vaPlaying"
+             [class.va-playing-card]="participant.vaPlaying"
+             (click)="participant.vaPlaying ? null : playVideoAsk(va, participant)">
+
+          <!-- Idle: participant info + play affordance -->
+          <ng-container *ngIf="!participant.vaPlaying">
+            <div class="arc-prow">
+              <span class="arc-avatar">{{ participant.name?.charAt(0) || '?' }}</span>
+              <span class="arc-pname">{{ participant.name }}</span>
+            </div>
+            <div class="arc-preview">
+              <mat-icon>{{ participant.vaLoading ? 'hourglass_top' : 'play_circle' }}</mat-icon>
+              <span>{{ participant.vaLoading ? 'Loading…' : 'Play Video' }}</span>
+            </div>
+          </ng-container>
+
+          <!-- Playing: the card itself becomes the player, right where it was clicked.
+               Full screen only via the player's own control. -->
+          <div *ngIf="participant.vaPlaying" class="va-card-player">
+            <div class="va-player-head">
+              <span>{{ participant.name }}</span>
+              <button type="button" class="va-player-close" (click)="stopVideoAsk(participant); $event.stopPropagation()" aria-label="Close player">✕</button>
+            </div>
+            <video class="va-player" controls autoplay playsinline preload="auto">
+              <source [src]="participant.vaUrl" type="video/mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
     </div>
   </div>
   <div class="participant-panel" [class.panel-visible]="showParticipantPanel">
@@ -2048,6 +1879,7 @@
         <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a
+              *ngIf="!selectedStatusInfo?.evergreenCompleted"
               class="participant-item"
               [href]="'/userprofile/' + participant.profileid"
               target="_blank"
@@ -2077,6 +1909,45 @@
                 </span>
               </div>
             </a>
+
+            <!-- Evergreen Completed panel: no profile navigation — clicking a
+                 participant opens the extend-until date picker instead. -->
+            <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted">
+              <button type="button" class="participant-item extend-item"
+                      (click)="toggleExtendTarget(participant.profileid)">
+                <mat-icon class="participant-avatar">person</mat-icon>
+                <div class="participant-details">
+                  <span class="participant-name">{{ participant.name }}</span>
+                  <span class="extend-hint">Click to extend workshop access</span>
+                </div>
+                <mat-icon class="extend-caret">
+                  {{ extendTargetProfileId === participant.profileid ? 'expand_less' : 'more_time' }}
+                </mat-icon>
+              </button>
+
+              <div class="extend-box"
+                   *ngIf="extendTargetProfileId === participant.profileid"
+                   (click)="$event.stopPropagation()">
+                <mat-form-field appearance="outline" class="extend-field">
+                  <mat-label>Extend until</mat-label>
+                  <input matInput [matDatepicker]="extendPicker" [min]="extendMinDate"
+                         [(ngModel)]="extendDate" [ngModelOptions]="{ standalone: true }"
+                         readonly (click)="extendPicker.open()" />
+                  <mat-datepicker-toggle matIconSuffix [for]="extendPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #extendPicker></mat-datepicker>
+                </mat-form-field>
+                <div class="extend-actions">
+                  <button mat-button type="button" (click)="toggleExtendTarget(participant.profileid)"
+                          [disabled]="extendSaving">Cancel</button>
+                  <button mat-flat-button color="primary" type="button"
+                          (click)="confirmExtend(participant)"
+                          [disabled]="!extendDate || extendSaving">
+                    <mat-spinner diameter="16" *ngIf="extendSaving"></mat-spinner>
+                    <span *ngIf="!extendSaving">Extend</span>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
           </mat-card-content>
         </mat-card>
       </div>

@@ -5,7 +5,8 @@
 
 .mainscreen{
   width: 100%;
-  padding: 20px;
+  padding: 16px 20px 8px;
+  box-sizing: border-box;
 }
 
 .btnarea{
@@ -22,12 +23,13 @@
   height: 500px;
 } */
 
+/* Fields fill their column instead of forcing a fixed 280px track. */
 .formfield{
-  width: 280px;
+  width: 100%;
 }
 
 .formfield1{
-  width: 500px;
+  width: 100%;
   height: auto;
 }
 .formfield2{
@@ -48,9 +50,32 @@
   /* overflow-y: scroll; */
 }
 
+/* Three columns that wrap instead of overflowing: the old layout was ~1500px wide,
+   so on anything narrower the dialog scrolled sideways. */
 .main{
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.col{
+  flex: 1 1 300px;
+  min-width: 280px;
+}
+.col-issue{
+  flex: 1.6 1 380px;
+}
+.col-inner{
+  padding: 16px;
+}
+.issue-card{
+  padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+mat-card{
+  box-sizing: border-box;
 }
 
 mat-card{

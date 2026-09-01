@@ -25,6 +25,23 @@
 .rc-name { font-size: 13px; font-weight: 600; color: #202124; line-height: 1.2; }
 .rc-email { font-size: 11px; color: #777; }
 
+/* ── Delivery hold ───────────────────────────────────────────────── */
+.rc-group-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.rc-group-head:first-child { margin-top: 0; }
+.rc-group-head mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.rc-group-count { border-radius: 9px; font-size: 11px; font-weight: 700; padding: 0 7px; letter-spacing: 0; }
+.rc-group-send { color: #1e8e3e; }
+.rc-group-send .rc-group-count { background: #e6f4ea; color: #1e8e3e; }
+.rc-group-hold { color: #b3261e; }
+.rc-group-hold .rc-group-count { background: #fdecea; color: #b3261e; }
+.recipient-chip.on-hold { background: #fdecea; border-color: #e57373; }
+.recipient-chip.on-hold .rc-name { color: #b3261e; text-decoration: line-through; }
+.recipient-chip.on-hold .rc-email { color: #a6635c; }
+.recipient-chip.on-hold .recipient-avatar-sm { opacity: .6; }
+.rc-empty-note { font-size: 12px; color: #b3261e; padding: 6px 2px; }
+.hold-count-badge { display: inline-flex; align-items: center; gap: 2px; background: #d93025; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 7px 1px 5px; margin-left: 6px; }
+.hold-count-badge mat-icon { font-size: 13px !important; width: 13px !important; height: 13px !important; color: #fff !important; }
+
 /* ── Broadcast ───────────────────────────────────────────────────── */
 .broadcast-row { background: white; padding: 14px 24px 0; border-bottom: 1px solid #eee; }
 .broadcast-field { width: 100%; }

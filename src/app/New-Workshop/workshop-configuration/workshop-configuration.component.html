@@ -1124,6 +1124,16 @@
                     <div class="setting-row">
                       <div class="setting-row-main">
                         <div class="setting-row-text">
+                          <h4 class="setting-row-title">Workshop Active Web</h4>
+                          <p class="setting-row-desc">{{ settingsForm.get('webactive')?.value ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</p>
+                        </div>
+                        <mat-slide-toggle formControlName="webactive" (change)="onToggleChange('webactive', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                    </div>
+
+                    <div class="setting-row">
+                      <div class="setting-row-main">
+                        <div class="setting-row-text">
                           <h4 class="setting-row-title">Enable Home Screen Widget</h4>
                           <p class="setting-row-desc">{{ settingsForm.get('homescreenwidget')?.value ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</p>
                         </div>
@@ -1148,6 +1158,13 @@
                           <p class="setting-row-desc">{{ settingsForm.get('enableshare')?.value ? 'Workshop can be shared with others' : 'Sharing is disabled' }}</p>
                         </div>
                         <mat-slide-toggle formControlName="enableshare" (change)="onToggleChange('enableshare', $event)" color="primary"></mat-slide-toggle>
+                      </div>
+                      <div *ngIf="settingsForm.get('enableshare')?.value" class="setting-row-expand">
+                        <mat-form-field appearance="outline" class="w-100">
+                          <mat-label>Share Message</mat-label>
+                          <textarea matInput formControlName="enablesharemessage" rows="3"
+                            placeholder="Enter the message shared along with the workshop"></textarea>
+                        </mat-form-field>
                       </div>
                     </div>
 
@@ -1546,6 +1563,29 @@
                               <mat-option value="new">New</mat-option>
                               <mat-option value="exist">Exist</mat-option>
                               <mat-option value="both">Both</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Payment Based on Customer Status</mat-label>
+                            <mat-select formControlName="customerstatus" multiple>
+                              <mat-option value="non active">non active</mat-option>
+                              <mat-option value="active">active</mat-option>
+                              <mat-option value="discontinued">discontinued</mat-option>
+                              <mat-option value="none">none</mat-option>
+                              <mat-option value="banned">banned</mat-option>
+                              <mat-option value="late">late</mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-100">
+                            <mat-label>Payment Based on Financial Status</mat-label>
+                            <mat-select formControlName="financialstatus" multiple>
+                              <mat-option value="fully paid">fully paid</mat-option>
+                              <mat-option value="regular">regular</mat-option>
+                              <mat-option value="discontinued">discontinued</mat-option>
+                              <mat-option value="locked">locked</mat-option>
+                              <mat-option value="defaulted">defaulted</mat-option>
+                              <mat-option value="banned">banned</mat-option>
+                              <mat-option value="late">late</mat-option>
                             </mat-select>
                           </mat-form-field>
                           <mat-form-field appearance="outline" class="w-100">

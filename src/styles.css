@@ -339,3 +339,38 @@ body:has(#zmmtg-root) { background: #000; }
 }
 .update-snackbar .mat-mdc-snack-bar-label,
 .update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; flex: 0 0 auto; }
+
+/* EiFlix operations dashboard — modal scroll lock (class-based so it beats
+   the body { overflow: auto !important } rule above; works on iOS Safari). */
+body.eod-scroll-lock,
+body.eod-scroll-lock .mat-drawer-content {
+  overflow: hidden !important;
+}
+/* While the dashboard's modal panel is open the app bar sits visually above
+   it (root stacking context) — make it inert so the hamburger can't stack
+   the nav drawer over an aria-modal dialog. */
+body.eod-scroll-lock .toolbar {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* EiFlix operations dashboard — shared dialog (EodDialogService). */
+.eod-dialog-panel .mat-mdc-dialog-container {
+  border-radius: 18px;
+  overflow: hidden;
+}
+.eod-dialog-panel .mat-mdc-dialog-surface {
+  border-radius: 18px !important;
+}
+
+/* Workshop & Campaign Calendar dark dialogs (reference .md modal surface) */
+.wc-dark-panel .mat-mdc-dialog-surface {
+  background: #0C0C14 !important;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .85);
+}
+.wc-dark-backdrop {
+  background: rgba(0, 0, 0, .78);
+  backdrop-filter: blur(8px);
+}

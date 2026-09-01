@@ -1309,3 +1309,11 @@
 .participants-modal-content::-webkit-scrollbar-thumb:hover {
   background: #aaa;
 }
+/* ── Delivery hold ───────────────────────────────────────────────── */
+.held-head { display: flex; align-items: center; gap: 6px; margin: 18px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #b3261e; }
+.held-head mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.held-count { background: #fdecea; color: #b3261e; border-radius: 9px; font-size: 11px; padding: 0 7px; letter-spacing: 0; }
+.held-note { font-size: 12px; color: #7a2e28; background: #fdecea; border: 1px solid #e57373; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.participant-item.held-item .participant-email { color: #b3261e; }
+.participant-item.held-item .participant-avatar mat-icon { color: #d93025; }
+.status-badge.held { background: #fdecea; color: #d93025; }
