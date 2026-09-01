@@ -617,7 +617,7 @@ export class ParticipantsAnalyticsComponent {
   }
 
   getProductForParticipant(profileId: string, key: string) {
-    return Object.entries(this.participantProductMap[profileId] || {}).map((d) => ({ key: d[0], count: d[1][key] }));
+    return Object.entries(this.participantProductMap[profileId] || {}).map((d) => ({ key: d[0], count: d[1][key] })).filter((data)=>data.count !== 0);
   }
 
   getEventsForProduct(eventId: string[]) {
@@ -1183,11 +1183,15 @@ export class ParticipantsAnalyticsComponent {
       const unconsumed = this.unconsumedProducts.value.filter((p: any) => p.productId !== '' && p.productId !== null);
       let matchesConsumed = consumed.length === 0;
       let matchesUnconsumed = unconsumed.length === 0;
+      const productObject = {
+        consumedCount: 0,
+        unConsumedCount: 0,
+      }
 
       // Check consumed filters (only if consumed filters exist)
       if (consumed.length > 0) {
         matchesConsumed = consumed.every(filter => {
-          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] : null;
+          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] ? this.participantProductMap[e['profileid']][filter.productId] : productObject : null;
           if (!productData) return false;
 
           if (filter.comparison === 'equalto') {
@@ -1204,7 +1208,7 @@ export class ParticipantsAnalyticsComponent {
       // Check unconsumed filters (only if unconsumed filters exist)
       if (unconsumed.length > 0) {
         matchesUnconsumed = unconsumed.every(filter => {
-          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] : null;
+          const productData = this.participantProductMap[e['profileid']] ? this.participantProductMap[e['profileid']][filter.productId] ? this.participantProductMap[e['profileid']][filter.productId] : productObject : null;
           if (!productData) return false;
 
           if (filter.comparison === 'equalto') {

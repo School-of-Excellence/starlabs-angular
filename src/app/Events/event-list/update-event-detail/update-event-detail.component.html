@@ -184,10 +184,99 @@
                                     </button>
                                 </div>
                             </div>
+                            &nbsp;&nbsp;
+                            <!-- journey list -->
+                            <mat-form-field class="inputfields">
+                                <mat-label>Eligible Journey</mat-label>
+                                <mat-select formControlName="journeyid" multiple>
+                                    <mat-option>
+                                        <ngx-mat-select-search [(ngModel)]="filterJourney" name="filterjourney" [placeholderLabel]="'Search'"
+                                            [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl [ngModelOptions]="{ standalone: true }"></ngx-mat-select-search>
+                                    </mat-option>
+                                    <mat-option *ngFor="let journey of onJourneySearch()" [value]="journey.docid">{{journey.journey}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                            &nbsp;&nbsp;
 
-                            
+                            <!-- cohorts list -->
+                            <mat-form-field class="inputfields">
+                                <mat-label>Cohorts</mat-label>
+                                <mat-select formControlName="cohortid" multiple>
+                                    <mat-option>
+                                        <ngx-mat-select-search [(ngModel)]="filterCohort" name="filtercohort" [placeholderLabel]="'Search'"
+                                            [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl [ngModelOptions]="{ standalone: true }"></ngx-mat-select-search>
+                                    </mat-option>
+                                    <mat-option *ngFor="let cohort of onCohortSearch()" [value]="cohort.docid">{{cohort.name}}</mat-option>
+                                </mat-select>
+                            </mat-form-field>
+                            &nbsp;&nbsp;
                             <!-- <button *ngIf="productsArray.controls.length - 1 == i" class="buttons me-2" mat-icon-button type="button" (click)="addproductsArray()"><mat-icon>add</mat-icon></button> -->
                             <!-- <button class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)" [disabled]="control.value['delete']"><mat-icon>remove</mat-icon></button> -->
+                            <!-- Consumed Products Section -->
+                            <div class="filter-section" >
+                                <h3>Consumed Products</h3>
+                                <div formArrayName="productconsumption">
+                                    <div *ngFor="let product of getProductConsumption(i).controls;let j = index" class="product-row">
+                                        <div [formGroupName]="j" class="product-group">
+                            
+                                            <mat-form-field appearance="outline">
+                                                <mat-label>Product</mat-label>
+                                                <mat-select formControlName="productid">
+                                                    <!-- <mat-option>
+                                                        <ngx-mat-select-search [(ngModel)]="filterproductlist" [ngModelOptions]="{standalone: true}"
+                                                            [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'">
+                                                        </ngx-mat-select-search>
+                                                    </mat-option> -->
+                                                    <mat-option *ngFor="let option of productsList" [value]="option.id">
+                                                        {{option.product}}
+                                                    </mat-option>
+                                                </mat-select>
+                                                <mat-error *ngIf="product.get('productid')?.hasError('required')">
+                                                    Product is required
+                                                </mat-error>
+                                            </mat-form-field>
+                            
+                                            <mat-form-field appearance="outline">
+                                                <mat-label>Operator</mat-label>
+                                                <mat-select formControlName="operator">
+                                                    <mat-option value="==">
+                                                        Equal To
+                                                    </mat-option>
+                                                    <mat-option value=">=">
+                                                        Greater Than or Equal to
+                                                    </mat-option>
+                                                    <mat-option value="<=">
+                                                        Less Than or Equal to
+                                                    </mat-option>
+                                                </mat-select>
+                                                <mat-error *ngIf="product.get('operator')?.hasError('required')">
+                                                    Comparison is required
+                                                </mat-error>
+                                            </mat-form-field>
+                            
+                                            <mat-form-field appearance="outline">
+                                                <mat-label>Minimum Count</mat-label>
+                                                <input matInput type="number" formControlName="count" placeholder="Min count" min="0">
+                                                <mat-error *ngIf="product.get('count')?.hasError('required')">
+                                                    Count is required
+                                                </mat-error>
+                                                <mat-error *ngIf="product.get('count')?.hasError('min')">
+                                                    Count must be greater than or equal to 0
+                                                </mat-error>
+                                            </mat-form-field>
+                                            <button mat-icon-button color="warn" (click)="removeProductConsumption(i,j)" type="button">
+                                                <mat-icon>delete</mat-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+        
+                        <button mat-stroked-button color="primary" (click)="addProductConsumption(i)" type="button">
+                            <mat-icon>add</mat-icon>
+                            Add Consumed Product
+                        </button>
+                    </div>
+                        
                         </div>
                         <button class="buttons mt-2" mat-stroked-button (click)="addproductsArray()">Add New Arena Events</button>
 
