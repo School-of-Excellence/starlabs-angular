@@ -8,7 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Firestore, CollectionReference, collection, collectionData, collectionSnapshots, doc, getDocs,
   query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
-  startAt, endAt, limit,
+  startAt, endAt, startAfter, limit,
 } from '@angular/fire/firestore';
 import { writeBatch } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
@@ -18,6 +18,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
 import { NavDrawerService } from '../../../nav-drawer.service';
 import { AddIssueComponent } from '../../../Customer Support/add-issue/add-issue.component';
+import { ChannelCommunicationComponent } from '../../../Channel Communication/channel-communication/channel-communication.component';
 import { ChatAudioComponent } from './audio-player.component';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -86,6 +87,12 @@ export interface ChatMessage {
   /** Sender / reader uids, kept so names can be re-resolved when profile_data arrives late. */
   _senderUid?: string;
   _readerUids?: string[];
+  /**
+   * Channel broadcasts only. The broadcast job writes a rich card rather than a chat line:
+   * an optional header image/video, an HTML body, file cards, link chips, CTA buttons and a
+   * footer — plus the profile-doc-id audiences that drive the delivery panel.
+   */
+  _broadcast?: Broadcast;
   /** First message of a same-sender run — the only one that shows the avatar and the name. */
   _runStart?: boolean;
   /** Set on the first message of each day; renders the sticky date separator above it. */
@@ -93,6 +100,20 @@ export interface ChatMessage {
   // template-side parse cache
   _parsedFor?: string;
   _parsed?: Parsed;
+}
+
+/** The `supportchat/{channelId}/messages` shape written by the channel broadcast job. */
+export interface Broadcast {
+  html: string;
+  headerType: string | null;
+  headerValue: string | null;
+  footer: string | null;
+  files: { name: string; url: string }[];
+  links: { label: string; url: string }[];
+  /** All three are profile_data DOC IDS, not uids — channels address people by profile. */
+  sentTo: string[];
+  readBy: string[];
+  pending: string[];
 }
 
 export interface DeletedEntry {
@@ -131,6 +152,13 @@ export interface ChatItem {
   _ref?: any;
   /** Member uids exactly as stored on the doc — names are resolved through `profile_data`. */
   _memberUids?: string[];
+  /**
+   * Channels store `members` as profile_data doc ids, not uids (see ChannelCommunication's
+   * createChannel). Kept separately so nothing mistakes one identifier for the other.
+   */
+  _memberProfileIds?: string[];
+  /** `admins` on a channel doc — profile doc ids allowed to broadcast. */
+  _channelAdmins?: string[];
   _creatorUid?: string;
 }
 
@@ -195,13 +223,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   readonly AVATAR_EMOJIS = ['💬', '🎪', '🧠', '✨', '⚡', '📣', '🌟', '🔥', '🎯', '🤝'];
   readonly TABS: { k: TabKey; label: string }[] = [
     { k: 'groups', label: 'Groups' },
-    // Channels are parked for now — the tab is commented out rather than removed, and everything
-    // behind it (broadcast features, demo channel rows) is left in place.
-    // { k: 'channels', label: 'Channels' },
+    { k: 'channels', label: 'Channels' },
     { k: 'archived', label: 'Archived' },
   ];
 
-  /** Archived is split in two: deleted groups, and deleted channels (empty for now). */
+  /** Archived is split in two: deleted groups and deleted channels. */
   archivedSub: 'groups' | 'channels' = 'groups';
   readonly ARCHIVED_TABS: { k: 'groups' | 'channels'; label: string }[] = [
     { k: 'groups', label: 'Groups' },
@@ -218,6 +244,30 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /* ── Data ───────────────────────────────────────────────────────────── */
   groups: ChatItem[] = [];
   channels: ChatItem[] = [];
+
+  /* ── Channel paging ──────────────────────────────────────────────────
+     Groups stream live because a chat is conversational. Channels are broadcast archives —
+     the old screen paged them 10 at a time with getDocs and no listener, and this does the same:
+     a channel can hold years of sends, and none of them change after they land. */
+  private readonly CHANNEL_PAGE = 10;
+  private lastChannelDoc: { active: any; archived: any } = { active: null, archived: null };
+  hasMoreChannels = { active: false, archived: false };
+  loadingMoreChannels = false;
+
+  /** Broadcasts inside an open channel page the same way, newest first. */
+  private readonly BROADCAST_PAGE = 10;
+  private oldestBroadcastDoc: any = null;
+  hasMoreBroadcasts = false;
+  loadingMoreBroadcasts = false;
+
+  /** The delivery panel for one broadcast — sent to / read / pending. */
+  broadcastInfo: ChatMessage | null = null;
+  broadcastTab: 'sent' | 'read' | 'pending' = 'read';
+
+  /** Broadcast composer: pick the audience here, then hand off to ChannelCommunication. */
+  audienceOpen = false;
+  audienceSearch = '';
+  audiencePicked: string[] = [];
   directory: { [name: string]: Person } = {};
   participants: Person[] = [];
   team: Person[] = [];
@@ -372,6 +422,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** uid of the signed-in user, i.e. their `user_data` doc id — the same key `members` holds. */
   currentUid = '';
   currentProfile: any = null;
+  /** profile_data doc id for the signed-in user — the identifier channels address people by. */
+  currentProfileDocId = '';
   chatAdmin = false;
   adminRole = false;
   /** `developer` on the roles doc — the escape hatch that can appoint the first admin. */
@@ -384,6 +436,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   private profilesByUid: { [uid: string]: any } = {};
   /** profileid → display name, for expanding stored `@profileid` mentions back to names. */
   private profileIdToName: { [profileId: string]: string } = {};
+  /** Keyed by profile_data DOC id — the identifier channel audiences are stored under. */
+  private profileByDocId: { [docId: string]: { name: string; photoUrl: string | null; uid: string } } = {};
   private nameToProfileId: { [name: string]: string } = {};
   private rolesByProfileId: { [profileId: string]: any } = {};
 
@@ -468,6 +522,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       if (profileSnap.empty) return;  // not a chat user — stay on the static demo rows
 
       this.currentProfile = profileSnap.docs[0].data();
+      this.currentProfileDocId = profileSnap.docs[0].id;
       this.currentUid = this.currentProfile['user_ref']?.id || '';
       if (!this.currentUid) return;
 
@@ -475,6 +530,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.watchRoles();
       this.loadTicketConfig();
       this.loadGroups();
+      this.loadChannels(false);
+      this.loadChannels(true);
       this.liveMode = true;
     } catch (e) {
       console.error('group-chat: live bootstrap failed, staying on demo data', e);
@@ -512,6 +569,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       .pipe(takeUntil(this.destroy$))
       .subscribe(docs => {
         this.profilesByUid = {};
+        this.profileByDocId = {};
         this.profileIdToName = {};
         this.nameToProfileId = {};
         const people: Person[] = [];
@@ -521,6 +579,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
           if (!uid || !data['name']) return;
           const profileId = data['profileid'] || data['profile_id'] || d.id;
           data['_profileId'] = profileId;
+          this.profileByDocId[d.id] = { name: data['name'], photoUrl: data['profile'] || null, uid };
           this.profilesByUid[uid] = data;
           this.profileIdToName[profileId] = data['name'];
           this.nameToProfileId[data['name']] = profileId;
@@ -626,8 +685,242 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     };
   }
 
+  /* ── Channels ───────────────────────────────────────────────────────
+     Same `supportchat` collection as groups, separated by `type`. Two things differ from the
+     group path and both are deliberate:
+
+     1. No listener. chat-screen fetched channels with getDocs in pages of 10 because a broadcast
+        archive only ever grows at one end, and re-reading the whole thing on every write is waste.
+     2. Membership is a profile_data DOC ID, not a uid. ChannelCommunication.createChannel() writes
+        `members: adminIds` where adminIds are profile ids, so the group filter
+        (members array-contains uid) matches nothing on a channel — which is why non-admins could
+        never see a channel on the old screen. Filtering by profile doc id fixes that here. */
+  private async loadChannels(archived: boolean, more = false): Promise<void> {
+    if (more && (this.loadingMoreChannels || !this.lastChannelDoc[archived ? 'archived' : 'active'])) return;
+    const key = archived ? 'archived' : 'active';
+    const baseFilter = (this.chatAdmin || this.adminRole)
+      ? []
+      : [where('members', 'array-contains', this.currentProfileDocId)];
+
+    const parts: any[] = [
+      ...baseFilter,
+      where('type', '==', 'channel'),
+      where('isdelete', '==', archived),
+      orderBy('last_modification', 'desc'),
+    ];
+    if (more) parts.push(startAfter(this.lastChannelDoc[key]));
+    parts.push(limit(this.CHANNEL_PAGE));
+
+    if (more) this.loadingMoreChannels = true;
+    try {
+      const snap = await getDocs(query(this.supportchat, ...parts));
+      const mapped = snap.docs.map(d => this.mapChannelDoc(d, archived));
+      const kept = more
+        ? this.channels
+        : this.channels.filter(c => c._live && !!c.archived !== archived);
+      this.channels = [...kept, ...mapped];
+      this.lastChannelDoc[key] = snap.docs[snap.docs.length - 1] ?? this.lastChannelDoc[key];
+      this.hasMoreChannels[key] = snap.docs.length === this.CHANNEL_PAGE;
+    } catch (e) {
+      console.error(archived ? 'archived channels' : 'active channels', e);
+    } finally {
+      this.loadingMoreChannels = false;
+    }
+  }
+
+  /** Channels run on the pink accent — including the archived sub-tab that lists deleted ones. */
+  get channelTheme(): boolean {
+    return this.tab === 'channels' || (this.tab === 'archived' && this.archivedSub === 'channels');
+  }
+
+  /** The paging control only belongs under a channel list that actually has another page. */
+  get showChannelPaging(): boolean {
+    if (this.tab === 'channels') return this.hasMoreChannels.active;
+    if (this.tab === 'archived' && this.archivedSub === 'channels') return this.hasMoreChannels.archived;
+    return false;
+  }
+
+  loadMoreChannels(): void {
+    this.loadChannels(this.tab === 'archived', true);
+  }
+
+  /** Re-read both channel buckets from page one — used after a restore/delete flips `isdelete`. */
+  private reloadChannels(): void {
+    this.lastChannelDoc = { active: null, archived: null };
+    this.loadChannels(false);
+    this.loadChannels(true);
+  }
+
+  private mapChannelDoc(d: any, archived: boolean): ChatItem {
+    const data: any = d.data();
+    const profileIds: string[] = data['members'] || [];
+    const existing = this.channels.find(c => c.id === d.id);
+    return {
+      id: d.id,
+      name: data['group_name'] || 'Untitled channel',
+      photoUrl: this.imageUrl(data['group_profile']),
+      emoji: '📣',
+      // Channels DO carry a description — ChannelCommunication writes one at create time.
+      description: data['description'] || '',
+      category: null,
+      eventId: null,
+      eventName: null,
+      createdBy: this.nameOfUid(data['creator_uid']),
+      members: profileIds.map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null })),
+      followers: profileIds.length,
+      messages: existing?.messages || [],
+      lastMessage: data['last_message'] || '',
+      lastAt: this.tsToIso(data['last_modification']),
+      unread: 0,
+      pinned: !!data['pinned'],
+      adminUids: [],
+      deletedLog: [],
+      archived,
+      _live: true,
+      _ref: d.ref,
+      _memberProfileIds: profileIds,
+      _channelAdmins: data['admins'] || [],
+      _creatorUid: data['creator_uid'],
+      _coll: 'supportchat',
+      _kind: 'channel',
+    };
+  }
+
+  /** Names for channel audiences, which are keyed by profile_data doc id. */
+  private nameOfProfileDoc(docId: string): string {
+    return this.profileByDocId[docId]?.name
+      || this.profileMapByDocId?.[docId]?.['name']
+      || 'Unknown User';
+  }
+
+  private photoOfProfileDoc(docId: string): string | null {
+    return this.profileByDocId[docId]?.photoUrl
+      || this.profileMapByDocId?.[docId]?.['profile']
+      || null;
+  }
+
+  /**
+   * Broadcasts, newest page first then reversed so the thread still reads oldest→newest.
+   * Deliberately a one-shot read, not a listener — see loadChannels().
+   */
+  private async loadBroadcasts(channel: ChatItem, more = false): Promise<void> {
+    if (more && (this.loadingMoreBroadcasts || !this.oldestBroadcastDoc)) return;
+    const col = collection(this.supportchat, channel.id, 'messages');
+    const parts: any[] = [orderBy('time', 'desc')];
+    if (more) parts.push(startAfter(this.oldestBroadcastDoc));
+    parts.push(limit(this.BROADCAST_PAGE));
+
+    if (more) this.loadingMoreBroadcasts = true;
+    else { this.messagesLoading = true; this.messagesError = ''; }
+    try {
+      let snap = await getDocs(query(col, ...parts));
+      let ordered = true;
+
+      /* Firestore drops any document that is MISSING the orderBy field. If the broadcast job stamps
+         its own timestamp under a different name, `orderBy('time')` returns an empty page while the
+         subcollection is full — indistinguishable from an empty channel. So: if the first page comes
+         back empty, re-read it unordered and sort on the client. Costs one extra read only in the
+         case that would otherwise show nothing. */
+      if (!more && snap.empty) {
+        // Wider page here: with no order there is no cursor to page from, so this read is the
+        // whole view, and it may also contain per-recipient duplicates to collapse.
+        snap = await getDocs(query(col, limit(60)));
+        ordered = false;
+        if (!snap.empty) {
+          console.warn('group-chat: channel messages have no usable `time` field; fell back to an '
+            + 'unordered read. Fields on the first doc:', Object.keys(snap.docs[0].data() || {}));
+        }
+      }
+
+      const target = this.channels.find(c => c.id === channel.id) || channel;
+      const docsOldestFirst = ordered ? [...snap.docs].reverse() : snap.docs;
+      const older = docsOldestFirst.map(d => {
+        try { return this.mapBroadcastDoc(d); }
+        catch (e) { console.error('group-chat: skipped a broadcast', d?.id, e); return null; }
+      }).filter(Boolean) as ChatMessage[];
+      if (!ordered) older.sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+      // channel-record queries these by `messageid` and iterates the result, so a broadcast is not
+      // guaranteed to be one document. Collapse by messageid — one card per send, either way.
+      const byId = new Map<string, ChatMessage>();
+      older.forEach(m => { if (!byId.has(m.id)) byId.set(m.id, m); });
+      const page = [...byId.values()];
+      target.messages = more ? [...page, ...target.messages] : page;
+      // docs came back newest-first, so the LAST one is the oldest — the cursor for the next page.
+      this.oldestBroadcastDoc = snap.docs[snap.docs.length - 1] ?? this.oldestBroadcastDoc;
+      // Paging needs the cursor to be meaningful; without an order there is nothing to page from.
+      this.hasMoreBroadcasts = ordered && snap.docs.length === this.BROADCAST_PAGE;
+      if (!more) this.scrollToBottomSoon();
+    } catch (e: any) {
+      console.error('channel broadcasts', e);
+      if (!more) {
+        this.messagesError = e?.code === 'permission-denied'
+          ? 'You do not have permission to read this channel.'
+          : `Could not load broadcasts${e?.code ? ' (' + e.code + ')' : ''}.`;
+      }
+    } finally {
+      this.messagesLoading = false;
+      this.loadingMoreBroadcasts = false;
+    }
+  }
+
+  loadMoreBroadcasts(): void {
+    if (this.active) this.loadBroadcasts(this.active, true);
+  }
+
+  /**
+   * A broadcast doc is a card, not a chat line: `htmlbody` holds the body, and header/footer/
+   * files/links/buttons hang off it. Everything lands on _broadcast so the normal bubble
+   * renderer is never asked to make sense of raw HTML.
+   */
+  private mapBroadcastDoc(d: any): ChatMessage {
+    const data: any = d.data();
+    const uid = data['sender_uid'] || '';
+    const files: any[] = data['files'] || [];
+    const links: any[] = data['links'] || [];
+    /* Field names are not guaranteed across the broadcast job's versions, and a card with no body is
+       worse than a plainly-rendered one. Fall through the known spellings rather than showing blank. */
+    const html: string = data['htmlbody'] || data['html_body'] || '';
+    const plain: string = data['textbody'] || data['text_body'] || data['message'] || '';
+    return {
+      id: data['messageid'] || d.id,
+      // Broadcasts have no "me" — chat-screen blanked isMyMessage on channels for the same reason.
+      from: 'member',
+      senderName: uid ? this.nameOfUid(uid) : this.TEAM_NAME,
+      text: plain,
+      at: this.tsToIso(data['time'] ?? data['createdat'] ?? data['created_on'] ?? data['senton']),
+      pinned: !!data['pinned'],
+      buttons: this.parseButtons(data['buttons']),
+      readBy: [],
+      deliveredTo: [],
+      _ref: d.ref,
+      _senderUid: uid,
+      _broadcast: {
+        html,
+        headerType: data['headertype'] ?? null,
+        headerValue: data['headervalue'] ?? null,
+        footer: data['footer'] ?? null,
+        files: files.map(f => ({ name: f?.['name'] || 'File', url: f?.['url'] || f?.['fileurl'] || '' }))
+                    .filter(f => !!f.url),
+        links: links.map(l => typeof l === 'string'
+          ? { label: l, url: l }
+          : { label: l?.['label'] || l?.['title'] || l?.['url'] || 'Link', url: l?.['url'] || '' })
+          .filter(l => !!l.url),
+        sentTo: data['members'] || [],
+        readBy: data['read_by'] || [],
+        pending: data['pending'] || [],
+      },
+    };
+  }
+
+  isBroadcast(m: ChatMessage): boolean { return !!m._broadcast; }
+
   /** Member and sender names come from profile_data, which can arrive after the groups do. */
   private refreshLiveNames(): void {
+    this.channels.filter(c => c._live).forEach(c => {
+      c.members = (c._memberProfileIds || []).map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null }));
+      c.createdBy = this.nameOfUid(c._creatorUid || '');
+      c.messages.forEach(m => { if (m._senderUid) m.senderName = this.nameOfUid(m._senderUid); });
+    });
     this.groups.filter(g => g._live).forEach(g => {
       g.members = (g._memberUids || []).map(uid => ({ id: uid, name: this.nameOfUid(uid), journey: null }));
       g.createdBy = this.nameOfUid(g._creatorUid || '');
@@ -1128,8 +1421,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       groups: this.groups.filter(g => !g.archived),
       channels: this.channels.filter(c => !c.archived),
       archived: (this.archivedSub === 'channels'
-        // Nothing to show under archived channels yet.
-        ? []
+        ? this.channels.filter(c => c.archived)
         : this.groups.filter(g => g.archived)
             .map(g => g._live ? g : { ...g, _coll: 'webchatGroups', _kind: 'group' as const })
       ).sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || '')),
@@ -1184,7 +1476,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * into the client is also matched mid-message, which is why both paths run.
    */
   private async runMessageSearch(q: string): Promise<void> {
-    const groups = this.list;
+    // Only groups: broadcasts have no `message_search` field, and their body is HTML.
+    const groups = this.list.filter(g => !this.isChannel(g));
     const hits: { group: ChatItem; msg: ChatMessage }[] = [];
 
     await Promise.all(groups.map(async g => {
@@ -1265,6 +1558,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get canManageAdmins(): boolean {
     const a = this.active;
     if (!a) return false;
+    // Channel membership and admins are owned by the broadcast flow, not edited from this panel.
+    if (this.isChannel(a)) return false;
     if (!this.isLive(a)) return true;               // demo rows stay fully editable
     return this.isSelfGroupAdmin || this.developerRole;
   }
@@ -1280,11 +1575,53 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get canMessage(): boolean {
     const a = this.active;
     if (!a) return false;
+    // A channel is one-way — the composer is replaced by the broadcast bar, not gated by access.
+    if (this.isChannel(a)) return false;
     if (!this.isLive(a)) return true;
     const isMember = (a._memberUids || []).includes(this.currentUid);
     if (!isMember) return false;
     if (!(a.adminUids || []).length) return true;   // legacy group: no admins recorded yet
     return this.isSelfGroupAdmin;
+  }
+
+  /**
+   * Broadcasting is gated on the channel's own `admins` array (profile doc ids), with the platform
+   * chat admin roles as the fallback — a channel created before `admins` existed has nobody in it.
+   */
+  /** Channel recipients, filtered by the same member-search box the group panel uses. */
+  get channelRecipients(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    return (this.active?.members || [])
+      .filter(m => !q || m.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  isChannelAdmin(profileDocId: string): boolean {
+    return (this.active?._channelAdmins || []).includes(profileDocId);
+  }
+
+  /** Channel members are profile doc ids, so their pictures resolve through profileByDocId. */
+  photoOfMemberDoc(profileDocId: string): string | null {
+    return this.photoOfProfileDoc(profileDocId);
+  }
+
+  get canManageChannel(): boolean {
+    const a = this.active;
+    if (!a || !this.isChannel(a) || a.archived) return false;
+    if (!this.isLive(a)) return true;               // demo rows stay fully exercisable
+    const admins = a._channelAdmins || [];
+    // An empty `admins` (a channel predating the field) would otherwise be frozen with nobody able
+    // to post or fix it — the platform chat admins are the escape hatch, as they are for groups.
+    if (!admins.length) return this.chatAdmin || this.adminRole;
+    return admins.includes(this.currentProfileDocId) || this.chatAdmin || this.adminRole;
+  }
+
+  /** Broadcasting and editing carry the same permission — both are "run this channel". */
+  get canBroadcast(): boolean { return this.canManageChannel; }
+
+  /** One gate for the info panel, whichever kind of chat is open. */
+  get canEditChat(): boolean {
+    return this.isChannel(this.active) ? this.canManageChannel : this.canManageAdmins;
   }
 
   toggleGroupAdmin(mem: Member, event?: Event): void {
@@ -1370,7 +1707,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get features(): Features {
     return {
       groups:   { sender: true,  reply: true,  react: true,  oneWay: false, info: true,  attach: true,  readOnly: false },
-      channels: { sender: false, reply: false, react: true,  oneWay: true,  info: false, attach: true,  readOnly: false },
+      // A broadcast has no reactions, replies or per-message read receipts to render — its
+      // delivery panel (sent / read / pending) replaces all of that.
+      channels: { sender: false, reply: false, react: false, oneWay: true,  info: true,  attach: false, readOnly: false },
       archived: { sender: true,  reply: false, react: false, oneWay: false, info: false, attach: false, readOnly: true  },
     }[this.tab];
   }
@@ -1395,9 +1734,17 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.clearPendingFiles();
     this.messagesError = '';
     this.memberSearch = ''; this.editingName = false;
+    this.broadcastInfo = null; this.audienceOpen = false;
+    this.oldestBroadcastDoc = null; this.hasMoreBroadcasts = false;
     if (this.isLive(c)) {
-      this.subscribeMessages(c);
-      if (c.unread) { this.sourceOf(c).unread = 0; this.markRead(c); }
+      if (this.isChannel(c)) {
+        // Broadcasts are read-only history: fetch a page, no listener, nothing to mark read.
+        this.messagesSub?.unsubscribe();
+        this.loadBroadcasts(c);
+      } else {
+        this.subscribeMessages(c);
+        if (c.unread) { this.sourceOf(c).unread = 0; this.markRead(c); }
+      }
     } else if (c.unread) {
       this.sourceOf(c).unread = 0;
     }
@@ -1641,10 +1988,25 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Newest first — ISO timestamps sort lexicographically, so no Date parsing needed. */
   get threadAttachments(): (Attachment & { mid: string; at: string; sender: string })[] {
     return (this.active?.messages || [])
-      .flatMap(m => this.attachmentsOf(m).map(att => ({
-        ...att, mid: m.id, at: m.at, sender: this.senderLabel(m),
-      })))
+      .flatMap(m => {
+        const own = this.attachmentsOf(m);
+        // A broadcast keeps its files under _broadcast, so surface those in the Docs list too.
+        const bc: Attachment[] = (m._broadcast?.files || [])
+          .map(f => ({ type: this.attachmentTypeForName(f.name || f.url), dataUrl: f.url, name: f.name }));
+        return [...own, ...bc].map(att => ({
+          ...att, mid: m.id, at: m.at, sender: this.senderLabel(m),
+        }));
+      })
       .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  }
+
+  /** Broadcast files carry no mediatype, so the bucket comes off the filename. */
+  private attachmentTypeForName(nameOrUrl: string): Attachment['type'] {
+    const lower = (nameOrUrl || '').toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/.test(lower)) return 'image';
+    if (/\.(mp4|mov|webm|avi)(\?|$)/.test(lower)) return 'video';
+    if (/\.(mp3|wav|ogg|m4a|aac)(\?|$)/.test(lower)) return 'voice';
+    return 'file';
   }
 
   /** Photos and videos — the thumbnail grid. */
@@ -1657,6 +2019,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /** Which of the three lists the info panel is showing — Media / Docs / Links, as WhatsApp does. */
   infoTab: 'media' | 'docs' | 'links' = 'media';
+
+  /**
+   * Whether the Media/links/docs block is rendered — the same condition its own *ngIf uses.
+   * The member list is height-capped only when this is true: with something below it, a long list
+   * would bury it; with nothing below, capping just adds a second scrollbar for no reason.
+   */
+  get hasMediaBlock(): boolean {
+    return !!(this.threadAttachments.length || this.threadLinks.length);
+  }
 
   /**
    * Every link shared in the thread: stored `buttons` plus bare URLs and `[Label](url)` still in the
@@ -1676,6 +2047,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         out.push({ label, href, host: this.hostOf(href), sender, at: m.at, mid: m.id });
       };
       (m.buttons || []).forEach(b => push(b.label, b.href));
+      (m._broadcast?.links || []).forEach(l => push(l.label, l.url));
       this.parsedOf(m).ctas.forEach(c => push(c.label, c.href));
       ((m.text || '').match(urlRe) || []).forEach(u => push(this.hostOf(u), u));
     }
@@ -1742,6 +2114,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   actionsFor(m: ChatMessage) {
     const isTeam = m.from === 'team';
     const f = this.features;
+    if (m._broadcast) {
+      // Broadcasts are an archive written by the send job — nothing here edits or deletes one.
+      // No ticket here: a ticket is raised against something a participant said, and a broadcast is
+      // outbound. There is no participant on the other end of it to open a ticket about.
+      return [
+        { k: 'copy',      label: 'Copy text', icon: 'content_copy', show: !!m.text, danger: false },
+        { k: 'delivered', label: 'Delivery',  icon: 'fact_check',   show: true,     danger: false },
+      ].filter(o => o.show);
+    }
     return [
       { k: 'copy',   label: 'Copy',                     icon: 'content_copy',   show: !!m.text,                  danger: false },
       { k: 'react',  label: 'React',                    icon: 'add_reaction',   show: f.react,                   danger: false },
@@ -1755,6 +2136,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onBubbleDblClick(m: ChatMessage): void {
+    // Broadcasts are an archive — there is nothing here that bulk-deletes one.
+    if (m._broadcast) return;
     if (this.selectMode) return;
     this.selectMode = true;
     this.selectedIds = [m.id];
@@ -2273,6 +2656,170 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (action === 'pin')    this.togglePin(m);
     if (action === 'react')  this.pickerId = m.id;
     if (action === 'ticket') this.raiseTicket(m);
+    if (action === 'delivered') this.openBroadcastInfo(m);
+  }
+
+  /* ── Broadcast delivery panel ───────────────────────────────────────
+     chat-screen's channel participants panel, re-cut for the console design. All three audiences
+     are profile_data doc ids, so they resolve through profileByDocId, not the uid directory. */
+
+  openBroadcastInfo(m: ChatMessage): void {
+    if (!m._broadcast) return;
+    this.broadcastInfo = m;
+    this.broadcastTab = 'read';
+    this.showInfo = false; this.infoMsg = null; this.person = null;
+  }
+
+  closeBroadcastInfo(): void { this.broadcastInfo = null; }
+
+  /** The audience list behind the panel's current tab, resolved to names and pictures. */
+  get broadcastAudience(): { id: string; name: string; photoUrl: string | null }[] {
+    const b = this.broadcastInfo?._broadcast;
+    if (!b) return [];
+    const ids = this.broadcastTab === 'sent' ? b.sentTo : this.broadcastTab === 'read' ? b.readBy : b.pending;
+    return ids
+      .map(id => ({ id, name: this.nameOfProfileDoc(id), photoUrl: this.photoOfProfileDoc(id) }))
+      .sort((a, b2) => a.name.localeCompare(b2.name));
+  }
+
+  broadcastCount(m: ChatMessage, which: 'sent' | 'read' | 'pending'): number {
+    const b = m._broadcast;
+    if (!b) return 0;
+    return (which === 'sent' ? b.sentTo : which === 'read' ? b.readBy : b.pending).length;
+  }
+
+  /** Header media on a broadcast card — the send job stores a type and a URL. */
+  broadcastHeaderIsVideo(m: ChatMessage): boolean {
+    const t = (m._broadcast?.headerType || '').toLowerCase();
+    return t.includes('video') || /\.(mp4|mov|webm)(\?|$)/i.test(m._broadcast?.headerValue || '');
+  }
+
+  broadcastHeaderIsImage(m: ChatMessage): boolean {
+    const b = m._broadcast;
+    if (!b?.headerValue) return false;
+    return !this.broadcastHeaderIsVideo(m);
+  }
+
+  /** Same extension mapping chat-screen used for channel file cards. */
+  fileIconFor(nameOrUrl: string): string {
+    const lower = (nameOrUrl || '').toLowerCase();
+    if (!lower) return 'attach_file';
+    if (lower.includes('.pdf')) return 'picture_as_pdf';
+    if (/\.(doc|docx)/.test(lower)) return 'description';
+    if (/\.(xls|xlsx|csv)/.test(lower)) return 'table_chart';
+    if (/\.(ppt|pptx)/.test(lower)) return 'slideshow';
+    if (/\.(mp4|mov|avi|webm)/.test(lower)) return 'videocam';
+    if (/\.(mp3|wav|ogg|m4a)/.test(lower)) return 'audiotrack';
+    if (/\.(jpg|jpeg|png|gif|webp)/.test(lower)) return 'image';
+    if (/\.(zip|rar|7z)/.test(lower)) return 'archive';
+    return 'attach_file';
+  }
+
+  fileExtFor(filename: string): string {
+    const parts = (filename || '').split('.');
+    return parts.length > 1 ? parts[parts.length - 1].toUpperCase().slice(0, 4) : 'FILE';
+  }
+
+  openExternal(url: string, event?: Event): void {
+    event?.stopPropagation();
+    if (url) window.open(url, '_blank', 'noopener');
+  }
+
+  /* ── Broadcasting ───────────────────────────────────────────────────
+     Two steps, exactly as chat-screen had them: choose the audience here, then hand the selection
+     to ChannelCommunicationComponent, which owns the template picker, the variable filling and the
+     write to `channelarchive`. Nothing about that contract changes — this screen only feeds it. */
+
+  openAudience(): void {
+    this.audienceOpen = true;
+    this.audienceSearch = '';
+    this.audiencePicked = [];
+  }
+
+  closeAudience(): void { this.audienceOpen = false; }
+
+  /** Every profile with a name, keyed by doc id — the identifier the broadcast expects. */
+  get audiencePool(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const source = Object.keys(this.profileByDocId).length ? this.profileByDocId : null;
+    if (!source) {
+      return Object.entries(this.profileMapByDocId || {})
+        .filter(([, p]: any) => !!p?.['name'])
+        .map(([id, p]: any) => ({ id, name: p['name'], email: p['email'] || '', photoUrl: p['profile'] || null }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return Object.entries(source)
+      .map(([id, p]) => ({
+        id, name: p.name, photoUrl: p.photoUrl,
+        email: this.profileMapByDocId?.[id]?.['email'] || '',
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  get audienceShown(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const q = this.audienceSearch.trim().toLowerCase();
+    return this.audiencePool
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+      .slice(0, 200);
+  }
+
+  isAudiencePicked(id: string): boolean { return this.audiencePicked.includes(id); }
+
+  toggleAudience(id: string): void {
+    this.audiencePicked = this.isAudiencePicked(id)
+      ? this.audiencePicked.filter(x => x !== id)
+      : [...this.audiencePicked, id];
+  }
+
+  /** Select-all applies to what the search is currently showing, not the whole directory. */
+  selectAllAudience(): void {
+    const shown = this.audienceShown.map(p => p.id);
+    const allPicked = shown.every(id => this.isAudiencePicked(id));
+    this.audiencePicked = allPicked
+      ? this.audiencePicked.filter(id => !shown.includes(id))
+      : [...new Set([...this.audiencePicked, ...shown])];
+  }
+
+  /** Pre-select everyone already on the channel. */
+  useChannelMembers(): void {
+    this.audiencePicked = [...(this.active?._memberProfileIds || [])];
+  }
+
+  proceedBroadcast(): void {
+    if (!this.audiencePicked.length) { this.notify('Pick at least one participant'); return; }
+    const byId = new Map(this.audiencePool.map(p => [p.id, p]));
+    const participants = this.audiencePicked.map(id => ({
+      profileid: id,
+      name: byId.get(id)?.name || '',
+      email: byId.get(id)?.email || '',
+    }));
+    this.audienceOpen = false;
+    this.dialog.open(ChannelCommunicationComponent, {
+      data: participants,
+      width: 'min(880px, 96vw)',
+      maxHeight: '92vh',
+      panelClass: 'ow-dialog-panel',
+    }).afterClosed().subscribe(result => {
+      if (!result?.success) return;
+      this.notify('Broadcast sent');
+      // The send job writes the message asynchronously, so re-read rather than guess.
+      if (this.active) { this.oldestBroadcastDoc = null; this.loadBroadcasts(this.active); }
+    });
+  }
+
+  /**
+   * "New channel" opens ChannelCommunication with no audience — its first step creates the channel.
+   * Creating one here would mean duplicating that form and its `admins` contract.
+   */
+  private openChannelCreate(): void {
+    this.dialog.open(ChannelCommunicationComponent, {
+      data: [],
+      width: 'min(880px, 96vw)',
+      maxHeight: '92vh',
+      panelClass: 'ow-dialog-panel',
+    }).afterClosed().subscribe(() => {
+      this.lastChannelDoc = { active: null, archived: null };
+      this.loadChannels(false);
+    });
   }
 
   togglePin(m: ChatMessage): void {
@@ -2375,9 +2922,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const active = this.active;
     if (!active) return;
     if (this.isLive(active)) {
+      const isChan = this.isChannel(active);
       updateDoc(active._ref, { isdelete: false })
-        .then(() => this.notify('Group restored to Active'))
-        .catch(e => { console.error('restore', e); this.notify('Error restoring group'); });
+        .then(() => {
+          this.notify(isChan ? 'Channel restored to Active' : 'Group restored to Active');
+          // Channels have no listener, so nothing would move between the lists on its own.
+          if (isChan) this.reloadChannels();
+        })
+        .catch(e => { console.error('restore', e); this.notify('Error restoring'); });
     } else {
       this.sourceOf(active).archived = false;
     }
@@ -2389,10 +2941,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const active = this.active;
     if (!active) return;
     if (this.isLive(active)) {
-      // chat-screen never hard-deletes a group — it sets isdelete, which lands it in Archived.
+      // chat-screen never hard-deletes a chat — it sets isdelete, which lands it in Archived.
+      const isChan = this.isChannel(active);
       updateDoc(active._ref, { isdelete: true })
-        .then(() => this.notify('Group moved to Archived'))
-        .catch(e => { console.error('delete group', e); this.notify('Error deleting group'); });
+        .then(() => {
+          this.notify(isChan ? 'Channel moved to Archived' : 'Group moved to Archived');
+          if (isChan) this.reloadChannels();
+        })
+        .catch(e => { console.error('delete chat', e); this.notify('Error deleting'); });
       this.activeIds = { ...this.activeIds, [this.tab]: null };
       this.showInfo = false;
       this.confirmDelete = null;
@@ -2410,6 +2966,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get isGroupCreate(): boolean { return this.tab === 'groups'; }
 
   openCreate(): void {
+    if (this.tab === 'channels') { this.openChannelCreate(); return; }
     this.createOpen = true;
     this.cName = ''; this.cEventId = '';
     this.cSearch = ''; this.cSelected = [];
@@ -2506,7 +3063,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   savingGroupPhoto = false;
 
   startEditName(): void {
-    if (!this.canManageAdmins) { this.notify('Only a group admin can rename this group'); return; }
+    if (!this.canEditChat) {
+      this.notify(this.isChannel(this.active)
+        ? 'Only a channel admin can rename this channel'
+        : 'Only a group admin can rename this group');
+      return;
+    }
     this.nameDraft = this.active?.name || '';
     this.editingName = true;
   }
@@ -2518,12 +3080,106 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const name = this.nameDraft.trim();
     if (!active || !name || name === active.name) { this.cancelEditName(); return; }
     this.editingName = false;
+    const isChan = this.isChannel(active);
     if (this.isLive(active)) {
+      // Channels have no listener, so the local copy is updated too or the change would not show.
       updateDoc(active._ref, { group_name: name })
-        .then(() => this.notify('Group renamed'))
-        .catch(e => { console.error('rename group', e); this.notify('Error renaming group'); });
+        .then(() => { if (isChan) this.sourceOf(active).name = name;
+                      this.notify(isChan ? 'Channel renamed' : 'Group renamed'); })
+        .catch(e => { console.error('rename chat', e); this.notify('Error renaming'); });
     } else {
       this.sourceOf(active).name = name;
+    }
+  }
+
+  /* ── Editing a channel's description and admins ─────────────────────
+     `description` and `admins` are both fields ChannelCommunication already writes at create time,
+     so nothing new is introduced here — this is the same document, edited later. */
+
+  editingDesc = false;
+  descDraft = '';
+
+  startEditDesc(): void {
+    if (!this.canManageChannel) { this.notify('Only a channel admin can edit the description'); return; }
+    this.descDraft = this.active?.description || '';
+    this.editingDesc = true;
+  }
+
+  cancelEditDesc(): void { this.editingDesc = false; this.descDraft = ''; }
+
+  saveChannelDesc(): void {
+    const active = this.active;
+    const desc = this.descDraft.trim();
+    if (!active || desc === (active.description || '')) { this.cancelEditDesc(); return; }
+    this.editingDesc = false;
+    if (!this.isLive(active)) { this.sourceOf(active).description = desc; return; }
+    updateDoc(active._ref, { description: desc })
+      .then(() => { this.sourceOf(active).description = desc; this.notify('Description updated'); })
+      .catch(e => { console.error('channel description', e); this.notify('Error saving description'); });
+  }
+
+  /** Admin picker — the same directory the audience picker uses, keyed by profile doc id. */
+  adminsOpen = false;
+  adminSearch = '';
+  adminPicked: string[] = [];
+  savingAdmins = false;
+
+  openEditAdmins(): void {
+    if (!this.canManageChannel) { this.notify('Only a channel admin can change admins'); return; }
+    this.adminSearch = '';
+    this.adminPicked = [...(this.active?._channelAdmins || [])];
+    this.adminsOpen = true;
+  }
+
+  closeEditAdmins(): void { this.adminsOpen = false; }
+
+  get adminShown(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const q = this.adminSearch.trim().toLowerCase();
+    return this.audiencePool
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+      .slice(0, 200);
+  }
+
+  isAdminPicked(id: string): boolean { return this.adminPicked.includes(id); }
+
+  toggleAdminPick(id: string): void {
+    this.adminPicked = this.isAdminPicked(id)
+      ? this.adminPicked.filter(x => x !== id)
+      : [...this.adminPicked, id];
+  }
+
+  async saveChannelAdmins(): Promise<void> {
+    const active = this.active;
+    if (!active || this.savingAdmins) return;
+    // ChannelCommunication refuses to create a channel with no admin; the same has to hold on edit,
+    // or a channel becomes unrunnable by anyone but a platform admin.
+    if (!this.adminPicked.length) { this.notify('A channel needs at least one admin'); return; }
+
+    const admins = [...this.adminPicked];
+    if (!this.isLive(active)) {
+      active._channelAdmins = admins;
+      this.adminsOpen = false;
+      return;
+    }
+
+    this.savingAdmins = true;
+    try {
+      // An admin must also be a recipient — createChannel seeds `members` with the admins, and the
+      // Recipients list (and so the ADMIN pill) is driven by `members`.
+      await updateDoc(active._ref, { admins, members: arrayUnion(...admins) });
+      const src = this.sourceOf(active);
+      src._channelAdmins = admins;
+      const merged = [...new Set([...(src._memberProfileIds || []), ...admins])];
+      src._memberProfileIds = merged;
+      src.members = merged.map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null }));
+      src.followers = merged.length;
+      this.adminsOpen = false;
+      this.notify('Channel admins updated');
+    } catch (e) {
+      console.error('channel admins', e);
+      this.notify('Error updating admins');
+    } finally {
+      this.savingAdmins = false;
     }
   }
 
@@ -2533,16 +3189,22 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     input.value = '';
     const active = this.active;
     if (!file || !active) return;
-    if (!this.canManageAdmins) { this.notify('Only a group admin can change the picture'); return; }
+    if (!this.canEditChat) { this.notify('Only an admin can change the picture'); return; }
+    const isChan = this.isChannel(active);
 
     this.savingGroupPhoto = true;
     try {
       if (this.isLive(active)) {
-        const imgRef = ref(this.storage, `Chat/${file.name}${file.lastModified}${file.size}`);
+        // Channels keep their pictures where ChannelCommunication puts them, groups where
+        // chat-screen's buildGroup puts them — so both screens read the same image either way.
+        const imgRef = ref(this.storage, isChan
+          ? `channel-images/${Date.now()}_${file.name}`
+          : `Chat/${file.name}${file.lastModified}${file.size}`);
         const uploaded = await uploadBytes(imgRef, file);
         const url = await getDownloadURL(uploaded.ref);
         await updateDoc(active._ref, { group_profile: url });
-        this.notify('Group picture updated');
+        if (isChan) this.sourceOf(active).photoUrl = url;
+        this.notify(isChan ? 'Channel picture updated' : 'Group picture updated');
       } else {
         this.sourceOf(active).photoUrl = URL.createObjectURL(file);
       }
@@ -2910,10 +3572,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         lastMessage: 'New journey dashboard is live',
         lastAt: iso(45),
         messages: [
+          // Shaped like a real broadcast so the demo path renders the same card as live data.
           {
-            id: 'cm1', from: 'team', senderName: this.TEAM_NAME,
-            text: '*New journey dashboard is live.*\nTrack marathons, sessions and payments in one place.\n[Open dashboard](https://example.com/dashboard)',
+            id: 'cm1', from: 'member', senderName: this.TEAM_NAME,
+            text: 'New journey dashboard is live. Track marathons, sessions and payments in one place.',
             at: iso(45), pinned: false,
+            buttons: [{ label: 'Open dashboard', href: 'https://example.com/dashboard' }],
+            _broadcast: {
+              html: '<p><strong>New journey dashboard is live.</strong></p>'
+                  + '<p>Track marathons, sessions and payments in one place.</p>',
+              headerType: null, headerValue: null,
+              footer: 'You are receiving this because you follow A&H Announcements.',
+              files: [{ name: 'release-notes.pdf', url: 'https://example.com/release-notes.pdf' }],
+              links: [{ label: 'What changed', url: 'https://example.com/changelog' }],
+              sentTo: [], readBy: [], pending: [],
+            },
           },
         ],
       },

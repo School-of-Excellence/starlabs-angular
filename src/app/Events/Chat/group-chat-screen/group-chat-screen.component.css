@@ -4,11 +4,17 @@
   --canvas:#EAEDF3; --panel:#FFFFFF; --field:#FFFFFF; --sunken:#F4F6FA; --raised:#EEF0F3; --chip:#E6E8EC;
   --line:rgba(60,60,67,0.10); --line2:rgba(60,60,67,0.06); --line3:rgba(60,60,67,0.14); --line4:rgba(60,60,67,0.20);
   --ink:#14161A; --ink2:rgba(60,60,67,0.62); --ink3:rgba(60,60,67,0.48); --ink4:rgba(60,60,67,0.32);
-  --on-accent:#FFFFFF;
-  --blue:#007AFF; --blue-text:#0062CC; --blue-hover:#004C9E; --blue-tint:#EAF3FF; --blue-tint2:#F4F9FF;
-  --blue-line:rgba(0,122,255,0.26);
-  --amber:#D1004A; --amber-text:#A3003A; --amber-tint:#FFF0F4; --amber-tint2:#FFF7F9;
-  --amber-line:rgba(255,55,95,0.26); --amber-deep:#FFFAFB; --mention:#FFF0F4; --amber-meta:#A86B7C;
+  /* Brand: #00AEEF blue, #EC008C pink — both used EXACTLY as given for fills, borders and tints.
+     White on #00AEEF measures 2.53:1, so the foreground on an accent fill is dark ink (6.28:1)
+     rather than the accent being darkened away from the brand. Channels flip it back to white,
+     which #EC008C can carry. Text on light backgrounds uses the deepened -text shades below,
+     since neither brand hex is legible as small text on white. */
+  --on-accent:#0B2530;
+  --blue:#00AEEF; --blue-text:#0076A3; --blue-hover:#005C7F; --blue-tint:#E0F5FD; --blue-tint2:#F0FAFE;
+  --blue-line:rgba(0,174,239,0.34);
+  --amber:#EC008C; --amber-text:#C90077; --amber-tint:#FDE0F1; --amber-tint2:#FEF0F8;
+  --amber-line:rgba(236,0,140,0.30); --amber-deep:#FFF7FB; --mention:#FDE0F1; --amber-meta:#A8567F;
+  --amber-hover:#A3005F;
   --red:#FF3B30; --red-fill:#D70015; --red-tint:#FFEFEE; --red-line:rgba(255,59,48,0.26);
   --green:#1F7A3D; --green-tint:#E8F8EC; --chip-low:#6E6E73; --scroll:rgba(60,60,67,0.28);
 
@@ -43,10 +49,13 @@
   --canvas:#060608; --panel:#17181B; --field:#1F1F22; --sunken:#0D0E11; --raised:#26262A; --chip:#2C2C30;
   --line:rgba(120,120,128,0.22); --line2:rgba(120,120,128,0.14); --line3:rgba(120,120,128,0.26); --line4:rgba(120,120,128,0.34);
   --ink:#F2F3F5; --ink2:rgba(235,235,245,0.60); --ink3:rgba(235,235,245,0.45); --ink4:rgba(235,235,245,0.32);
-  --blue:#0A84FF; --blue-text:#6CB2FF; --blue-hover:#9CCBFF; --blue-tint:#10243D; --blue-tint2:#0D1C2F;
-  --blue-line:rgba(10,132,255,0.36);
-  --amber:#FF5C7A; --amber-text:#FF8FA3; --amber-tint:#2A1219; --amber-tint2:#220F14;
-  --amber-line:rgba(255,92,122,0.34); --amber-deep:#1D0D11; --mention:#2A1219; --amber-meta:#D99AA8;
+  /* Same two brand hexes for the fills — they carry well on a dark ground. Only the -text and
+     -tint ramps change: lightened for text, darkened for washes. */
+  --blue:#00AEEF; --blue-text:#59CAF5; --blue-hover:#8CDBF8; --blue-tint:#133341; --blue-tint2:#152730;
+  --blue-line:rgba(0,174,239,0.40);
+  --amber:#EC008C; --amber-text:#F359B4; --amber-tint:#3D142F; --amber-tint2:#2C1626;
+  --amber-line:rgba(236,0,140,0.42); --amber-deep:#1F0C18; --mention:#3D142F; --amber-meta:#E39BC4;
+  --amber-hover:#F68CCB;
   --red:#FF453A; --red-fill:#C0392B; --red-tint:#2A1210; --red-line:rgba(255,69,58,0.34);
   --green:#30D158; --green-tint:#0F2418; --chip-low:#8E8E93; --scroll:rgba(120,120,128,0.40);
 }
@@ -54,6 +63,22 @@
 :host ::ng-deep .mat-icon {
   font-size: 16px; width: 16px; height: 16px; line-height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* Channels run pink, not blue. Rather than restyle 280-odd selectors, the accent tokens are
+   re-pointed at the existing pink ramp for the whole Channels surface — sidebar, thread, dialogs.
+   Both palettes already define that ramp, so this re-themes correctly in dark mode too. */
+.wc.channels {
+  /* Pink is dark enough to carry white text; the blue is not, which is why --on-accent moves too. */
+  --on-accent: #FFFFFF;
+  --blue: var(--amber);
+  --blue-text: var(--amber-text);
+  --blue-hover: var(--amber-hover);
+  --blue-tint: var(--amber-tint);
+  --blue-tint2: var(--amber-tint2);
+  --blue-line: var(--amber-line);
+  --accent: var(--amber);
+  --accent2: var(--amber-text);
 }
 
 /* Height is set at runtime (see fitToViewport) so the screen fills exactly the space
@@ -89,7 +114,13 @@
   letter-spacing: -0.01em; background: transparent; color: var(--ink2);
   display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.wc-tab.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.10); }
+/* The active tab carries the surface's own accent, so which surface you are on is readable at a
+   glance: blue on Groups, pink on Channels (the tokens are re-pointed by `.wc.channels`), and
+   Archived follows whichever sub-tab is selected. */
+.wc-tab.on {
+  background: var(--blue-tint); color: var(--blue-text);
+  box-shadow: inset 0 0 0 1px var(--blue-line);
+}
 .wc-tab-count {
   min-width: 18px; height: 18px; border-radius: 9px; background: var(--blue); color: var(--on-accent);
   font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 5px;
@@ -206,6 +237,17 @@
 .wc-thead-emoji mat-icon { font-size: 16px; width: 16px; height: 16px; }
 .wc-slide-emoji mat-icon { font-size: 26px; width: 26px; height: 26px; color: var(--blue-text); }
 
+/* Channels read as broadcast, not conversation: amber avatar plus a corner marker. */
+.wc-row-emoji { position: relative; }
+.wc-row-emoji.channel { background: var(--amber-tint2); color: var(--amber-text); }
+.wc-row.on .wc-row-emoji.channel { background: var(--panel); }
+.wc-row-badge {
+  position: absolute; right: -1px; bottom: -1px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--amber-text); color: #fff; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--panel);
+}
+.wc-row-badge mat-icon { font-size: 9px; width: 9px; height: 9px; }
+
 .wc-row-body { flex: 1; min-width: 0; }
 .wc-row-top { display: flex; align-items: baseline; gap: 8px; }
 .wc-row-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -291,9 +333,11 @@
 /* Selection bar */
 .wc-selectbar { padding: 9px 20px; background: var(--blue); color: var(--on-accent); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .wc-selectbar-count { font-size: 12.5px; font-variant-numeric: tabular-nums; flex: 1; }
-.wc-selectbar .wc-icon-btn { background: transparent; border-color: rgba(255,255,255,.4); color: var(--on-accent); }
-.wc-selectbar .wc-ghost-btn { background: transparent; border-color: rgba(255,255,255,.4); color: var(--on-accent); }
-.wc-selectbar .wc-danger-btn { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.4); color: var(--on-accent); }
+/* currentColor, not a hard-coded white: the foreground on an accent fill is dark ink under the
+   blue theme and white under the pink one, and these borders have to follow it. */
+.wc-selectbar .wc-icon-btn { background: transparent; border-color: currentColor; color: var(--on-accent); }
+.wc-selectbar .wc-ghost-btn { background: transparent; border-color: currentColor; color: var(--on-accent); }
+.wc-selectbar .wc-danger-btn { background: color-mix(in srgb, currentColor 16%, transparent); border-color: currentColor; color: var(--on-accent); }
 .wc-ghost-btn { height: 30px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line3); background: var(--field); font-size: 14px; color: var(--ink2); }
 .wc-ghost-btn:hover { border-color: var(--blue-text); color: var(--blue-text); }
 .wc-danger-btn {
@@ -333,6 +377,145 @@
 .wc-channel-name { font-size: 13px; font-weight: 800; color: var(--t1); margin-top: 4px; }
 .wc-channel-desc { font-size: 12px; color: var(--t2); margin-top: 3px; }
 .wc-channel-meta { font-size: 11px; color: var(--t3); margin-top: 6px; }
+
+/* Sidebar / thread paging — channels are fetched a page at a time, not streamed. */
+.wc-loadmore {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: calc(100% - 16px); margin: 6px 8px 10px; padding: 8px 12px;
+  border: 1px dashed var(--line3); border-radius: 10px; background: transparent;
+  color: var(--ink2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.wc-loadmore:hover:not(:disabled) { border-color: var(--blue-line); color: var(--blue-text); background: var(--blue-tint2); }
+.wc-loadmore:disabled { opacity: .55; cursor: default; }
+.wc-loadmore.inline { align-self: center; width: auto; margin: 2px auto 10px; flex-shrink: 0; }
+.wc-loadmore mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
+/* Channel intro card, shown once the whole archive is loaded */
+.wc-channel-emoji {
+  width: 46px; height: 46px; margin: 0 auto; border-radius: 14px; overflow: hidden;
+  background: var(--amber-tint2); color: var(--amber-text);
+  display: flex; align-items: center; justify-content: center;
+}
+.wc-channel-emoji img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wc-channel-emoji mat-icon { font-size: 24px; width: 24px; height: 24px; }
+
+/* ── Broadcast card ───────────────────────────────────────────────────
+   Full width rather than a bubble: a broadcast carries header media, an HTML body and CTAs,
+   none of which read well squeezed into a chat bubble. */
+.wc-bc {
+  position: relative; align-self: stretch; width: 100%; max-width: 720px; margin: 0 auto 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  /* `.wc-messages` is a flex column, and `overflow: hidden` (needed to round the header media)
+     zeroes a flex item's automatic minimum size. Without this the column shrinks every card down
+     to its header once the thread is taller than the pane, and the body is clipped away. */
+  flex-shrink: 0;
+}
+.wc-bc-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line2); }
+.wc-bc-tag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 6px;
+  background: var(--amber-tint2); color: var(--amber-text);
+  font-size: 10px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase;
+}
+.wc-bc-tag mat-icon { font-size: 11px; width: 11px; height: 11px; }
+.wc-bc-sender { font-size: 12.5px; font-weight: 700; color: var(--ink2); }
+.wc-bc-time { margin-left: auto; font-size: 11.5px; color: var(--ink4); font-variant-numeric: tabular-nums; }
+.wc-bc-actions { display: flex; gap: 2px; margin-left: 6px; }
+.wc-bc-actions button {
+  width: 26px; height: 26px; border-radius: 7px; border: none; background: var(--sunken);
+  color: var(--ink2); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.wc-bc-actions button:hover { background: var(--blue-tint); color: var(--blue-text); }
+.wc-bc-actions mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+.wc-bc-media img, .wc-bc-media video { display: block; width: 100%; max-height: 320px; object-fit: cover; background: var(--sunken); }
+.wc-bc-media img { cursor: zoom-in; }
+
+/* Stored markup: constrain it so a template's own styling cannot break the thread layout. */
+.wc-bc-body { padding: 11px 14px; font-size: 14.5px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.wc-bc-body.plain { white-space: pre-wrap; }
+.wc-bc-body :is(img, video, iframe, table) { max-width: 100%; }
+.wc-bc-body table { display: block; overflow-x: auto; border-collapse: collapse; }
+.wc-bc-body :is(h1, h2, h3) { font-size: 15.5px; margin: 6px 0; }
+.wc-bc-body p { margin: 0 0 6px; }
+.wc-bc-body a { color: var(--blue-text); }
+
+.wc-bc-files { display: flex; flex-direction: column; gap: 6px; padding: 0 14px 10px; }
+.wc-bc-file {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; width: 100%;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--sunken);
+  color: var(--ink); text-align: left; cursor: pointer;
+}
+.wc-bc-file:hover { border-color: var(--blue-line); background: var(--blue-tint2); }
+.wc-bc-file-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  background: var(--blue-tint); color: var(--blue-text);
+  display: flex; align-items: center; justify-content: center;
+}
+.wc-bc-file-icon mat-icon { font-size: 17px; width: 17px; height: 17px; }
+.wc-bc-file-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.wc-bc-file-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-bc-file-ext { font-size: 10.5px; color: var(--ink3); font-weight: 700; letter-spacing: .3px; }
+.wc-bc-file-open { font-size: 15px; width: 15px; height: 15px; color: var(--ink4); flex-shrink: 0; }
+
+.wc-bc-links { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+.wc-bc-link {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--sunken);
+  color: var(--blue-text); font-size: 12.5px; text-decoration: none;
+}
+.wc-bc-link:hover { border-color: var(--blue-line); background: var(--blue-tint2); }
+.wc-bc-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-bc-link mat-icon { font-size: 13px; width: 13px; height: 13px; flex-shrink: 0; }
+
+.wc-bc-ctas { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 14px 11px; }
+.wc-bc-ctas a {
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 9px;
+  background: var(--blue); color: #fff; font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.wc-bc-ctas a:hover { background: var(--blue-hover); }
+.wc-bc-ctas mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+.wc-bc-footer { padding: 0 14px 11px; font-size: 11.5px; color: var(--ink3); }
+
+.wc-bc-delivery {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 14px;
+  border: none; border-top: 1px solid var(--line2); background: var(--sunken);
+  color: var(--ink2); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.wc-bc-delivery:hover { color: var(--blue-text); background: var(--blue-tint2); }
+.wc-bc-delivery mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.wc-bc-delivery .dot { color: var(--ink4); }
+
+/* One-way bar — a channel has no composer at all */
+.wc-broadcastbar {
+  display: flex; align-items: center; gap: 9px; margin: 0 12px 12px; padding: 10px 14px;
+  border: 1px solid var(--amber-line); border-radius: 12px; background: var(--amber-tint2);
+  color: var(--amber-text);
+}
+.wc-broadcastbar > mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.wc-broadcastbar-label { font-size: 13px; font-weight: 600; flex: 1; }
+.wc-broadcastbar-note { font-size: 12px; color: var(--ink3); }
+.wc-broadcastbar-cta {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: none;
+  border-radius: 9px; background: var(--blue); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.wc-broadcastbar-cta:hover { background: var(--blue-hover); }
+.wc-broadcastbar-cta mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
+/* Audience / admin picker toolbar */
+.wc-audience-tools { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.wc-audience-count { font-size: 12px; font-weight: 700; color: var(--blue-text); }
+.wc-note-inline { font-size: 12px; color: var(--ink3); }
+
+/* With no description yet there is no text to hang an edit pencil off */
+.wc-slide-adddesc {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 10px;
+  border: 1px dashed var(--line3); border-radius: 999px; background: transparent;
+  color: var(--ink3); font-size: 12px; cursor: pointer;
+}
+.wc-slide-adddesc:hover { border-color: var(--blue-line); color: var(--blue-text); }
+.wc-slide-adddesc mat-icon { font-size: 13px; width: 13px; height: 13px; }
+.wc-slide-desc .wc-slide-editbtn { flex-shrink: 0; }
 
 /* Announcement */
 .wc-ann-wrap { display: flex; justify-content: center; padding: 4px 0; }
@@ -402,6 +585,9 @@
   position: relative; padding: 7px 11px; border-radius: 2px 10px 10px 10px;
   background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   font-size: 14.5px; line-height: 1.4;
+  /* A pasted URL or an unspaced keyboard-mash is one "word" — without this it refuses to wrap
+     and pushes straight out of the card. `anywhere` (not break-all) still breaks on spaces first. */
+  overflow-wrap: anywhere; word-break: break-word;
 }
 /* Own messages are a tinted card, not a solid fill — the iOS console design keeps ink readable. */
 .wc-bubble.mine { background: var(--blue-tint2); color: var(--ink); border: 1px solid var(--line); border-radius: 10px 10px 2px 10px; }
@@ -691,10 +877,23 @@
 .wc-slide-body { flex: 1; overflow-y: auto; padding: 16px; }
 .wc-slide-foot { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; gap: 7px; }
 
-.wc-slide-hero { text-align: center; margin-bottom: 14px; }
-.wc-slide-emoji { font-size: 34px; line-height: 1; }
-.wc-slide-emoji:has(img) { width: 64px; height: 64px; margin: 0 auto; border-radius: 50%; overflow: hidden; background: var(--raised); }
-.wc-slide-photo { position: relative; display: inline-block; }
+/* A real centred column. It used to be `text-align: center` over inline boxes, which put the
+   64px avatar and the inline-flex name on the SAME line, and left each edit pencil wherever the
+   inline flow dropped it. Applies to groups and channels alike. */
+.wc-slide-hero {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; margin-bottom: 14px;
+}
+/* Always a 64px circle, picture or not: the camera button is anchored to this box, and when the
+   box collapsed to a bare icon the button landed on top of the name below it. */
+.wc-slide-emoji {
+  width: 64px; height: 64px; margin: 0 auto; border-radius: 50%; overflow: hidden;
+  background: var(--raised); display: flex; align-items: center; justify-content: center;
+  font-size: 34px; line-height: 1;
+}
+/* Block, not inline-block: as an inline box the 64px avatar and the inline-flex name sat on the
+   same line instead of stacking. Fixed width so the camera button anchors to the circle. */
+.wc-slide-photo { position: relative; display: block; width: 64px; margin: 0 auto; }
 .wc-slide-photobtn {
   position: absolute; right: -4px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid var(--panel); background: var(--blue); color: var(--on-accent);
@@ -710,13 +909,19 @@
 .wc-slide-editbtn { border: none; background: none; padding: 0; display: flex; color: var(--ink3); }
 .wc-slide-editbtn:hover { color: var(--blue-text); }
 .wc-slide-editbtn mat-icon { font-size: 14px; width: 14px; height: 14px; }
-.wc-slide-rename { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+/* Stretch, or the column's `align-items: center` would shrink the row to its content width. */
+.wc-slide-rename { display: flex; align-items: center; gap: 6px; margin-top: 8px; align-self: stretch; }
 .wc-slide-rename input {
   flex: 1; min-width: 0; height: 32px; padding: 0 10px; border-radius: 10px;
   border: 1px solid var(--line3); background: var(--field); color: var(--ink); font-size: 14px;
 }
 .wc-slide-rename input:focus { border-color: var(--blue-text); }
-.wc-slide-desc { font-size: 12px; color: var(--t2); margin-top: 4px; }
+/* Flex, not a block: `.wc-slide-editbtn` is `display: flex`, so inside a block it would take its
+   own line instead of sitting after the text. */
+.wc-slide-desc {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 12px; color: var(--t2); margin-top: 4px;
+}
 .wc-slide-meta { font-size: 11px; color: var(--t3); margin-top: 6px; }
 
 .wc-block { margin-bottom: 16px; }
@@ -750,7 +955,11 @@
 
 /* Caps a long participant list at ~6 rows and scrolls it, so Media/links/docs and the footer stay
    reachable without scrolling past every member. */
-.wc-memberlist { max-height: 268px; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
+/* Capped only when something sits BELOW it that the reader would otherwise have to scroll a long
+   member list to reach — i.e. the Media/links/docs block. With nothing below, the list runs full
+   length and the panel's own scroll handles it. */
+.wc-memberlist { margin-right: -4px; padding-right: 4px; }
+.wc-memberlist.capped { max-height: 268px; overflow-y: auto; }
 .wc-memberlist { scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
 .wc-memberlist::-webkit-scrollbar { width: 10px; }
 .wc-memberlist::-webkit-scrollbar-track { background: transparent; }

@@ -1,4 +1,4 @@
-<div class="wc" [style.height.px]="screenHeight">
+<div class="wc" [class.channels]="channelTheme" [style.height.px]="screenHeight">
 
   <div class="wc-shell" [class.has-active]="!!active">
 
@@ -48,19 +48,25 @@
         <ng-container *ngIf="!search">
           <div class="wc-empty" *ngIf="loading">Loading…</div>
           <div class="wc-empty" *ngIf="!loading && filtered.length === 0">
-            {{ tab === 'groups' ? 'No groups yet — create one' : 'Nothing archived yet' }}
+            {{ tab === 'groups' ? 'No groups yet — create one'
+             : tab === 'channels' ? 'No channels yet — create one'
+             : archivedSub === 'channels' ? 'No deleted channels' : 'Nothing archived yet' }}
           </div>
         </ng-container>
 
         <!-- With a query: matching group names first, then matching messages -->
-        <div class="wc-sec" *ngIf="search && filtered.length">Groups · {{ filtered.length }}</div>
+        <div class="wc-sec" *ngIf="search && filtered.length">
+          {{ tab === 'channels' || archivedSub === 'channels' ? 'Channels' : 'Groups' }} · {{ filtered.length }}
+        </div>
 
         <div *ngFor="let c of filtered; trackBy: trackById" class="wc-row" [class.on]="c.id === activeIds[tab]"
              (click)="openItem(c)">
-          <div class="wc-row-emoji">
+          <div class="wc-row-emoji" [class.channel]="isChannel(c)">
             <img *ngIf="c.photoUrl; else rowEmoji" [src]="c.photoUrl" [alt]="c.name"/>
-            <!-- No group picture: fall back to an icon rather than an emoji glyph -->
-            <ng-template #rowEmoji><mat-icon>notifications</mat-icon></ng-template>
+            <!-- No picture: fall back to an icon rather than an emoji glyph -->
+            <ng-template #rowEmoji><mat-icon>{{ isChannel(c) ? 'campaign' : 'notifications' }}</mat-icon></ng-template>
+            <!-- Broadcast marker, so a channel is never mistaken for a group in a mixed list -->
+            <span class="wc-row-badge" *ngIf="isChannel(c)"><mat-icon>campaign</mat-icon></span>
           </div>
           <div class="wc-row-body">
             <div class="wc-row-top">
@@ -77,6 +83,12 @@
             </div>
           </div>
         </div>
+
+        <!-- Channels are paged, not streamed — the old screen loaded them 10 at a time. -->
+        <button class="wc-loadmore" *ngIf="!search && showChannelPaging"
+                (click)="loadMoreChannels()" [disabled]="loadingMoreChannels">
+          {{ loadingMoreChannels ? 'Loading…' : 'Load more channels' }}
+        </button>
 
         <ng-container *ngIf="search">
           <div class="wc-sec" *ngIf="searchingMessages || messageHits.length">
@@ -131,7 +143,9 @@
             <div class="wc-thead-text">
               <div class="wc-thead-name">{{ a.name }}</div>
               <div class="wc-thead-sub">
-                <ng-container *ngIf="isChannel(a); else groupSub">{{ a.followers || 0 }} followers · broadcast channel</ng-container>
+                <ng-container *ngIf="isChannel(a); else groupSub">
+                  {{ (a.members || []).length }} recipient{{ (a.members || []).length === 1 ? '' : 's' }} · broadcast
+                </ng-container>
                 <ng-template #groupSub>
                   {{ (a.members || []).length }} member{{ (a.members || []).length === 1 ? '' : 's' }}<ng-container *ngIf="a.eventName"> · {{ a.eventName }}</ng-container>
                 </ng-template>
@@ -215,11 +229,23 @@
         <!-- Messages -->
         <div class="wc-messages" #messagePane>
 
-          <div class="wc-channel-card" *ngIf="tab === 'channels'">
-            <div class="wc-channel-emoji">{{ a.emoji || '📣' }}</div>
+          <!-- Older broadcasts are fetched a page at a time; this sits above the oldest one loaded. -->
+          <button class="wc-loadmore inline" *ngIf="isChannel(a) && hasMoreBroadcasts"
+                  (click)="loadMoreBroadcasts()" [disabled]="loadingMoreBroadcasts">
+            <mat-icon>history</mat-icon>
+            {{ loadingMoreBroadcasts ? 'Loading…' : 'Load earlier broadcasts' }}
+          </button>
+
+          <div class="wc-channel-card" *ngIf="isChannel(a) && !hasMoreBroadcasts">
+            <div class="wc-channel-emoji">
+              <img *ngIf="a.photoUrl; else chanIcon" [src]="a.photoUrl" [alt]="a.name"/>
+              <ng-template #chanIcon><mat-icon>campaign</mat-icon></ng-template>
+            </div>
             <div class="wc-channel-name">{{ a.name }}</div>
             <div class="wc-channel-desc" *ngIf="a.description">{{ a.description }}</div>
-            <div class="wc-channel-meta">{{ a.followers || 0 }} followers · Only {{ TEAM_NAME }} can post</div>
+            <div class="wc-channel-meta">
+              {{ (a.members || []).length }} recipient{{ (a.members || []).length === 1 ? '' : 's' }} · one-way broadcast
+            </div>
           </div>
 
           <div class="wc-thread-state" *ngIf="messagesLoading">
@@ -231,8 +257,10 @@
             <span>{{ messagesError }}</span>
           </div>
           <div class="wc-thread-state" *ngIf="!messagesLoading && !messagesError && !visibleMessages.length">
-            <mat-icon>chat_bubble_outline</mat-icon>
-            <span>{{ (active?.messages || []).length ? 'No messages match this search' : 'No messages yet — say something' }}</span>
+            <mat-icon>{{ isChannel(a) ? 'campaign' : 'chat_bubble_outline' }}</mat-icon>
+            <span>{{ (active?.messages || []).length ? 'No messages match this search'
+                   : isChannel(a) ? 'Nothing has been broadcast on this channel yet'
+                   : 'No messages yet — say something' }}</span>
           </div>
 
           <ng-container *ngFor="let m of visibleMessages; trackBy: trackById">
@@ -240,6 +268,76 @@
             <!-- Sticky day separator -->
             <div class="wc-day" *ngIf="m._dayLabel"><span>{{ m._dayLabel }}</span></div>
 
+            <!-- ── Channel broadcast card ─────────────────────────────
+                 A broadcast is not a chat line: the send job writes an HTML body plus optional
+                 header media, file cards, link chips, CTA buttons and a footer. It renders as a
+                 full-width card so none of that has to squeeze into a bubble. -->
+            <div class="wc-bc" *ngIf="m._broadcast as b; else chatMessage" [id]="'msg-' + m.id"
+                 (mouseenter)="hoverId = m.id" (mouseleave)="hoverId = null">
+
+              <div class="wc-bc-head">
+                <span class="wc-bc-tag"><mat-icon>campaign</mat-icon> Broadcast</span>
+                <span class="wc-bc-sender">{{ senderLabel(m) }}</span>
+                <span class="wc-bc-time">{{ msgTime(m.at) }}</span>
+                <div class="wc-bc-actions" *ngIf="hoverId === m.id">
+                  <button *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
+                          [matTooltip]="o.label" (click)="handleMenuAction(o.k, m)">
+                    <mat-icon>{{ o.icon }}</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <div class="wc-bc-media" *ngIf="b.headerValue">
+                <video *ngIf="broadcastHeaderIsVideo(m); else bcImage"
+                       [src]="b.headerValue" controls preload="metadata"></video>
+                <ng-template #bcImage>
+                  <img [src]="b.headerValue" alt="" (click)="openImage(b.headerValue!)"/>
+                </ng-template>
+              </div>
+
+              <!-- Angular sanitises innerHTML, which is what makes rendering stored markup safe here -->
+              <div class="wc-bc-body" *ngIf="b.html" [innerHTML]="b.html"></div>
+              <div class="wc-bc-body plain" *ngIf="!b.html && m.text">{{ m.text }}</div>
+
+              <div class="wc-bc-files" *ngIf="b.files.length">
+                <button class="wc-bc-file" *ngFor="let f of b.files; trackBy: trackByIndex"
+                        (click)="openExternal(f.url)">
+                  <span class="wc-bc-file-icon"><mat-icon>{{ fileIconFor(f.url || f.name) }}</mat-icon></span>
+                  <span class="wc-bc-file-main">
+                    <span class="wc-bc-file-name">{{ f.name }}</span>
+                    <span class="wc-bc-file-ext">{{ fileExtFor(f.name) }}</span>
+                  </span>
+                  <mat-icon class="wc-bc-file-open">open_in_new</mat-icon>
+                </button>
+              </div>
+
+              <div class="wc-bc-links" *ngIf="b.links.length">
+                <a class="wc-bc-link" *ngFor="let l of b.links; trackBy: trackByIndex"
+                   [href]="l.url" target="_blank" rel="noreferrer" [title]="l.url">
+                  <mat-icon>link</mat-icon><span>{{ l.label }}</span><mat-icon>open_in_new</mat-icon>
+                </a>
+              </div>
+
+              <div class="wc-bc-ctas" *ngIf="m.buttons?.length">
+                <a *ngFor="let c of m.buttons; trackBy: trackByIndex"
+                   [href]="c.href" target="_blank" rel="noreferrer" [title]="c.href">
+                  <mat-icon>open_in_new</mat-icon><span>{{ c.label }}</span>
+                </a>
+              </div>
+
+              <div class="wc-bc-footer" *ngIf="b.footer">{{ b.footer }}</div>
+
+              <button class="wc-bc-delivery" (click)="openBroadcastInfo(m)">
+                <mat-icon>fact_check</mat-icon>
+                <span>Sent {{ b.sentTo.length }}</span>
+                <span class="dot">·</span>
+                <span>Read {{ b.readBy.length }}</span>
+                <span class="dot">·</span>
+                <span>Pending {{ b.pending.length }}</span>
+              </button>
+            </div>
+
+            <ng-template #chatMessage>
             <!-- Announcement -->
             <div class="wc-ann-wrap" *ngIf="m.kind === 'announcement'; else normalBubble"
                  [id]="'msg-' + m.id" (dblclick)="onBubbleDblClick(m)">
@@ -410,6 +508,7 @@
                 </div>
               </div>
             </ng-template>
+            </ng-template>
           </ng-container>
         </div>
 
@@ -418,7 +517,16 @@
           <mat-icon>archive</mat-icon>
           <span>This {{ a._kind === 'channel' ? 'channel' : 'group' }} is archived — history stays readable, but nobody can post here.</span>
         </div>
-        <div class="wc-noaccess" *ngIf="!features.readOnly && !canMessage">
+        <!-- A channel has no composer: it is one-way, and sending goes through the broadcast flow. -->
+        <div class="wc-broadcastbar" *ngIf="!features.readOnly && isChannel(a)">
+          <mat-icon>campaign</mat-icon>
+          <span class="wc-broadcastbar-label">One-way broadcast channel</span>
+          <button class="wc-broadcastbar-cta" *ngIf="canBroadcast" (click)="openAudience()">
+            <mat-icon>send</mat-icon> Send broadcast
+          </button>
+          <span class="wc-broadcastbar-note" *ngIf="!canBroadcast">Only channel admins can post here</span>
+        </div>
+        <div class="wc-noaccess" *ngIf="!features.readOnly && !isChannel(a) && !canMessage">
           <mat-icon>lock</mat-icon>
           <span>Contact the group admin or developer for access to message.</span>
         </div>
@@ -621,19 +729,20 @@
           <div class="wc-slide-photo">
             <div class="wc-slide-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
               <img *ngIf="a.photoUrl; else slideEmoji" [src]="a.photoUrl" [alt]="a.name"/>
-              <ng-template #slideEmoji><mat-icon>notifications</mat-icon></ng-template>
+              <ng-template #slideEmoji><mat-icon>{{ isChannel(a) ? 'campaign' : 'notifications' }}</mat-icon></ng-template>
             </div>
             <!-- Admins can replace the picture; it writes group_profile, the field the old screen reads -->
             <input #groupPhotoInput type="file" accept="image/*" hidden (change)="onGroupPhotoPicked($event)"/>
-            <button class="wc-slide-photobtn" *ngIf="canManageAdmins" [disabled]="savingGroupPhoto"
+            <button class="wc-slide-photobtn" *ngIf="canEditChat" [disabled]="savingGroupPhoto"
                     (click)="groupPhotoInput.click()"
-                    [matTooltip]="a.photoUrl ? 'Change group picture' : 'Add a group picture'">
+                    [matTooltip]="(a.photoUrl ? 'Change ' : 'Add a ') + (isChannel(a) ? 'channel' : 'group') + ' picture'">
               <mat-icon>{{ savingGroupPhoto ? 'hourglass_empty' : 'photo_camera' }}</mat-icon>
             </button>
           </div>
           <div class="wc-slide-name" *ngIf="!editingName">
             {{ a.name }}
-            <button class="wc-slide-editbtn" *ngIf="canManageAdmins" (click)="startEditName()" matTooltip="Rename group">
+            <button class="wc-slide-editbtn" *ngIf="canEditChat" (click)="startEditName()"
+                    [matTooltip]="isChannel(a) ? 'Rename channel' : 'Rename group'">
               <mat-icon>edit</mat-icon>
             </button>
           </div>
@@ -643,8 +752,25 @@
             <button class="wc-icon-btn on" (click)="saveGroupName()" matTooltip="Save"><mat-icon>check</mat-icon></button>
             <button class="wc-icon-btn" (click)="cancelEditName()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
-          <div class="wc-slide-desc" *ngIf="a.description">{{ a.description }}</div>
-          <div class="wc-slide-meta" *ngIf="isChannel(a)">{{ a.followers || 0 }} followers</div>
+          <div class="wc-slide-desc" *ngIf="a.description && !editingDesc">
+            {{ a.description }}
+            <button class="wc-slide-editbtn" *ngIf="isChannel(a) && canManageChannel"
+                    (click)="startEditDesc()" matTooltip="Edit description">
+              <mat-icon>edit</mat-icon>
+            </button>
+          </div>
+          <!-- With no description yet there is nothing to hang an edit button off, so offer one -->
+          <button class="wc-slide-adddesc" *ngIf="isChannel(a) && !a.description && !editingDesc && canManageChannel"
+                  (click)="startEditDesc()">
+            <mat-icon>add</mat-icon> Add a description
+          </button>
+          <div class="wc-slide-rename" *ngIf="editingDesc">
+            <input [(ngModel)]="descDraft" (keydown.enter)="saveChannelDesc()" (keydown.escape)="cancelEditDesc()"
+                   placeholder="Channel description"/>
+            <button class="wc-icon-btn on" (click)="saveChannelDesc()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+            <button class="wc-icon-btn" (click)="cancelEditDesc()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="wc-slide-meta" *ngIf="isChannel(a)">One-way broadcast channel</div>
         </div>
 
         <!-- Provenance -->
@@ -713,8 +839,8 @@
               No participant matches “{{ memberSearch }}”
             </div>
 
-            <!-- Scrolls within itself: a large group must not push the sections below out of reach -->
-            <div class="wc-memberlist">
+            <!-- Scrolls within itself only when Media/links/docs sits below it — see hasMediaBlock -->
+            <div class="wc-memberlist" [class.capped]="hasMediaBlock">
             <div class="wc-member" *ngFor="let mem of filteredParticipants; trackBy: trackByIndex">
               <div class="wc-member-main" (click)="openPerson(mem.name)">
                 <div class="wc-avatar clickable" [style.background]="avatarBg(mem.name)"
@@ -739,6 +865,38 @@
             </div>
           </div>
         </ng-container>
+
+        <!-- Channel recipients. Read-only: the audience is set per broadcast, not edited here. -->
+        <div class="wc-block" *ngIf="isChannel(a)">
+          <div class="wc-block-title">
+            <mat-icon>group</mat-icon>
+            <span class="grow">Recipients · {{ (a.members || []).length }}</span>
+            <button class="wc-add-btn" *ngIf="canManageChannel" (click)="openEditAdmins()">
+              <mat-icon>shield</mat-icon> Admins
+            </button>
+          </div>
+          <div class="wc-search plain membersearch" *ngIf="(a.members || []).length > 5">
+            <mat-icon>search</mat-icon>
+            <input [(ngModel)]="memberSearch" placeholder="Search recipients"/>
+            <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <div class="wc-note" *ngIf="!(a.members || []).length">Nobody has been sent a broadcast yet</div>
+          <!-- Same rule as a group's participants: capped only when Media sits below it -->
+          <div class="wc-memberlist" [class.capped]="hasMediaBlock">
+          <div class="wc-member" *ngFor="let mem of channelRecipients; trackBy: trackByIndex">
+            <div class="wc-member-main">
+              <div class="wc-avatar" [style.background]="avatarBg(mem.name)">
+                <img *ngIf="photoOfMemberDoc(mem.id) as url" [src]="url" [alt]="mem.name"/>
+                <ng-container *ngIf="!photoOfMemberDoc(mem.id)">{{ initials(mem.name) }}</ng-container>
+              </div>
+              <span class="wc-member-name">{{ mem.name }}</span>
+            </div>
+            <span class="wc-team-pill" *ngIf="isChannelAdmin(mem.id)">ADMIN</span>
+          </div>
+          </div>
+        </div>
 
         <!-- Media, links & docs -->
         <div class="wc-block" *ngIf="threadAttachments.length || threadLinks.length">
@@ -922,6 +1080,43 @@
       </div>
     </div>
 
+    <!-- ── Broadcast delivery slide-over ────────────────────────────── -->
+    <div class="wc-slide msginfo" *ngIf="broadcastInfo as bm">
+      <div class="wc-slide-head">
+        <span>Delivery</span>
+        <button class="wc-close-btn" (click)="closeBroadcastInfo()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="wc-slide-body">
+        <div class="wc-info-preview">📣 {{ plainPreview(bm.text) || bm._broadcast?.footer || 'Broadcast' }}</div>
+        <div class="wc-info-sent">Sent · {{ msgTime(bm.at) }}</div>
+
+        <div class="wc-infotabs">
+          <button [class.on]="broadcastTab === 'read'" (click)="broadcastTab = 'read'">
+            Read · {{ broadcastCount(bm, 'read') }}
+          </button>
+          <button [class.on]="broadcastTab === 'pending'" (click)="broadcastTab = 'pending'">
+            Pending · {{ broadcastCount(bm, 'pending') }}
+          </button>
+          <button [class.on]="broadcastTab === 'sent'" (click)="broadcastTab = 'sent'">
+            Sent · {{ broadcastCount(bm, 'sent') }}
+          </button>
+        </div>
+
+        <div class="wc-block">
+          <div class="wc-note" *ngIf="!broadcastAudience.length">Nobody in this list yet</div>
+          <div class="wc-member" *ngFor="let p of broadcastAudience; trackBy: trackByIndex">
+            <div class="wc-member-main">
+              <div class="wc-avatar" [style.background]="avatarBg(p.name)">
+                <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
+                <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
+              </div>
+              <span class="wc-member-name">{{ p.name }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Message info slide-over ──────────────────────────────────── -->
     <div class="wc-slide msginfo" *ngIf="infoMsg && active as a">
       <div class="wc-slide-head">
@@ -1082,6 +1277,102 @@
           {{ isGroupCreate
               ? 'Create Group' + (cSelected.length ? ' · ' + cSelected.length + ' members' : '')
               : 'Create Channel' }}
+        </button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ── Broadcast audience picker ──────────────────────────────────
+       Step one of the send: pick who receives it. Step two (template, variables, the write to
+       channelarchive) belongs to ChannelCommunicationComponent and is opened from here. -->
+  <ng-container *ngIf="audienceOpen">
+    <div class="wc-overlay" (click)="closeAudience()"></div>
+    <div class="wc-dialog narrow">
+      <div class="wc-dialog-head">
+        <mat-icon class="purple">campaign</mat-icon>
+        <span class="grow">Send broadcast · {{ active?.name }}</span>
+        <button class="wc-close-btn" (click)="closeAudience()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="wc-dialog-sub">
+        <div class="wc-search plain">
+          <mat-icon>search</mat-icon>
+          <input [(ngModel)]="audienceSearch" placeholder="Search by name or email…"/>
+        </div>
+        <div class="wc-audience-tools">
+          <button class="wc-ghost-btn" (click)="selectAllAudience()">Select all shown</button>
+          <button class="wc-ghost-btn" *ngIf="(active?.members || []).length" (click)="useChannelMembers()">
+            Existing recipients
+          </button>
+          <span class="grow"></span>
+          <span class="wc-audience-count">{{ audiencePicked.length }} selected</span>
+        </div>
+      </div>
+      <div class="wc-dialog-body flush">
+        <div class="wc-note center" *ngIf="!audienceShown.length">No participants match that search</div>
+        <div class="wc-pickrow rounded" *ngFor="let p of audienceShown; trackBy: trackById"
+             [class.on]="isAudiencePicked(p.id)" (click)="toggleAudience(p.id)">
+          <div class="wc-check sm" [class.on]="isAudiencePicked(p.id)">
+            <mat-icon *ngIf="isAudiencePicked(p.id)">check</mat-icon>
+          </div>
+          <div class="wc-avatar sm" [style.background]="avatarBg(p.name)">
+            <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
+            <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
+          </div>
+          <span class="wc-pickname">{{ p.name }}</span>
+          <span class="wc-role" *ngIf="p.email">{{ p.email }}</span>
+        </div>
+      </div>
+      <div class="wc-dialog-foot">
+        <button class="wc-ghost-btn grow" (click)="closeAudience()">Cancel</button>
+        <button class="wc-primary-btn grow2" [disabled]="!audiencePicked.length" (click)="proceedBroadcast()">
+          Continue{{ audiencePicked.length ? ' · ' + audiencePicked.length : '' }}
+        </button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ── Channel admins ─────────────────────────────────────────────
+       Writes `admins` on the channel doc — the same field ChannelCommunication sets at create time —
+       and unions the picks into `members`, since an admin has to be a recipient to appear at all. -->
+  <ng-container *ngIf="adminsOpen && active as a">
+    <div class="wc-overlay" (click)="closeEditAdmins()"></div>
+    <div class="wc-dialog narrow">
+      <div class="wc-dialog-head">
+        <mat-icon class="purple">shield</mat-icon>
+        <span class="grow">Channel admins · {{ a.name }}</span>
+        <button class="wc-close-btn" (click)="closeEditAdmins()"><mat-icon>close</mat-icon></button>
+      </div>
+      <div class="wc-dialog-sub">
+        <div class="wc-search plain">
+          <mat-icon>search</mat-icon>
+          <input [(ngModel)]="adminSearch" placeholder="Search by name or email…"/>
+        </div>
+        <div class="wc-audience-tools">
+          <span class="wc-note-inline">Admins can broadcast and edit this channel</span>
+          <span class="grow"></span>
+          <span class="wc-audience-count">{{ adminPicked.length }} admin{{ adminPicked.length === 1 ? '' : 's' }}</span>
+        </div>
+      </div>
+      <div class="wc-dialog-body flush">
+        <div class="wc-note center" *ngIf="!adminShown.length">No participants match that search</div>
+        <div class="wc-pickrow rounded" *ngFor="let p of adminShown; trackBy: trackById"
+             [class.on]="isAdminPicked(p.id)" (click)="toggleAdminPick(p.id)">
+          <div class="wc-check sm" [class.on]="isAdminPicked(p.id)">
+            <mat-icon *ngIf="isAdminPicked(p.id)">check</mat-icon>
+          </div>
+          <div class="wc-avatar sm" [style.background]="avatarBg(p.name)">
+            <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
+            <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
+          </div>
+          <span class="wc-pickname">{{ p.name }}</span>
+          <span class="wc-role" *ngIf="p.email">{{ p.email }}</span>
+        </div>
+      </div>
+      <div class="wc-dialog-foot">
+        <button class="wc-ghost-btn grow" (click)="closeEditAdmins()">Cancel</button>
+        <button class="wc-primary-btn grow2" [disabled]="!adminPicked.length || savingAdmins"
+                (click)="saveChannelAdmins()">
+          {{ savingAdmins ? 'Saving…' : 'Save admins' }}
         </button>
       </div>
     </div>
