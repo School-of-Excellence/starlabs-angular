@@ -192,8 +192,8 @@ export class UpdateEventDetailComponent {
         delete:[false,],
         docid:[doc(collection(this.firestore,"arena events")).id,],
         image:[null,],
-        journeyid : [[], {validators: [Validators.required], update:"change"}],
-        cohortid : [[], {validators: [Validators.required], update:"change"}],
+        journeyid : [[]],
+        cohortid : [[]],
         productconsumption : this.formbuilder.array([]),
       })
     )
@@ -215,13 +215,13 @@ export class UpdateEventDetailComponent {
   }
 
 
+  // function to add product consumption ( surya )
   addProductConsumption(productIndex){
     const product = this.getProductConsumption(productIndex);
     if (!product) {
       console.log('Invalid index');
       return
     }
-
     return product.push(
       this.formbuilder.group({
         productid: [null, {validators: [Validators.required], update:"change"}],
@@ -229,17 +229,14 @@ export class UpdateEventDetailComponent {
         count : [null, {validators: [Validators.required], update:"change"}],
       })
     )
-
   }
 
+  // function to add product consumption ( surya )
   removeProductConsumption(productIndex , productConsumpIndex){
     const product = this.getProductConsumption(productIndex);
-    if (!product) {
-      console.log('Invalid index');
-      return
+    if (product) {
+      product.removeAt(productConsumpIndex);
     }
-
-    product.removeAt(productConsumpIndex);
   }
 
   async fetchEvent(){
@@ -293,18 +290,23 @@ export class UpdateEventDetailComponent {
               docid:[element['docid'],],
               delete:[element['delete'],],
               image:[element['image'] ?? null,],
-              journeyid : [element['journeyid'], {validators: [Validators.required], update:"change"}],
-              cohortid : [element['cohortid'], {validators: [Validators.required], update:"change"}],
+              journeyid : [element['journeyid'] ?? []],
+              cohortid : [element['cohortid'] ?? []],
               productconsumption : this.formbuilder.array([])
             })
           );
 
+          // block to patch product consumption
           if (productConsumption.length > 0) {
-            this.getProductConsumption(i).push(this.formbuilder.group({
-              productid: [element['productid'] ?? null, { validators: [Validators.required], update: "change" }],
-              operator: [element['operator'] ?? null, { validators: [Validators.required], update: "change" }],
-              count: [element['count'] ?? null, { validators: [Validators.required], update: "change" }],
-            }))
+            const productConsumptionArray = this.getProductConsumption(i);
+            productConsumption.forEach((productConsump)=>{
+              productConsumptionArray.push(
+                this.formbuilder.group({
+                  productid: [productConsump['productid'] ?? null, { validators: [Validators.required], update: "change" }],
+                  operator: [productConsump['operator'] ?? null, { validators: [Validators.required], update: "change" }],
+                  count: [productConsump['count'] ?? null, { validators: [Validators.required], update: "change" }],
+                }))
+            })
           }
 
           this.productsArray.controls[i].get("productref").disable()
@@ -387,7 +389,7 @@ export class UpdateEventDetailComponent {
       }
     })
 
-    // fetch journey 
+    // fetch journey ( surya )
     const journeyList = [];
     getDocs(collection(this.firestore , 'journey')).then((journeySnap)=>{
       journeySnap.docs.forEach((journeyRef)=>{
@@ -455,31 +457,23 @@ export class UpdateEventDetailComponent {
       })
     })
 
-    // fetch cohorts 
+    // fetch cohorts ( surya )
     this.fetchCohorts();
     this.loading = false;
   }
 
+  // function to fetch cohorts
   async fetchCohorts(){
     const marathonref = collection(this.firestore , 'big marathon');
     const cohortsref = collection(this.firestore , 'big cohorts');
-
     try{
-
       const currentMarathon = (await getDocs(query(marathonref , where('status' , '==' , 'live')))).docs.map((d)=>d.ref);
-      
       const cohortsQuery = query(cohortsref , where('marathonref' , 'in' , currentMarathon));
-      
       const cohorts = await getDocs(cohortsQuery);
-
       this.cohortsList = cohorts.docs.map((docref)=>docref.data());
-      console.log('fetched cohorts list ')
-      console.log(this.cohortsList)
-
     }catch(error){
       console.log('error fetching cohorts' , error)
     }
-
   }
 
   compareFn(c1:any, c2:any): boolean {
