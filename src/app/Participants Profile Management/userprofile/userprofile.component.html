@@ -190,8 +190,8 @@
                                 <span class="badge status" [ngClass]="getStatusClass(participantproductlist[product['participantproductid']]?.status)">
                                     {{ getStatusText(participantproductlist[product['participantproductid']]?.status) }}
                                 </span>
-                                <button mat-button class="view-progress-btn" (click)="toggleProgress(product)">
-                                  {{ expandedProduct[product['participantproductid']] ? 'Hide Progress' : 'View Progress' }}
+                                <button mat-button class="view-progress-btn" [disabled]="productProgressLoading[product['participantproductid']]" (click)="toggleProgress(product)">
+                                  {{ productProgressLoading[product['participantproductid']] ? 'Loading...' : (expandedProduct[product['participantproductid']] ? 'Hide Progress' : 'View Progress') }}
                                 </button>
                               </td>
                               </tr>

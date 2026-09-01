@@ -165,6 +165,11 @@ export class UserprofileComponent {
   // map delivery sequence
   mapProductSteps: any = {};
   expandedProduct: any = {};
+  private seqProductsMap: any = null;
+  private mapDeliveryDoc: any = {};
+  private mapDeliveryName: any = {};
+  private deliveryLookupLoaded = false;
+  productProgressLoading: any = {};
 
   // Paginated data getters
   get paginatedAllEvents() {
@@ -338,7 +343,6 @@ export class UserprofileComponent {
       // Only load essential data and Journey tab (default) 
       await Promise.all([
         this.loadTabData('Journey'),
-        this.loadDeliverySequenceData()
       ]);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -360,19 +364,24 @@ export class UserprofileComponent {
     this.eventTab = tabName;
   }
 
-  // load delivery se
-  toggleProgress(product) {
+  // load delivery sequence data for all products
+  async toggleProgress(product) {
     const id = product['participantproductid'];
     this.expandedProduct[id] = !this.expandedProduct[id];
+
+    const needsSteps = this.expandedProduct[id] && !this.mapProductSteps[id];
+    if (needsSteps) {
+      await this.loadProductDeliverySequence(id);
+    }
   }
 
-  async loadDeliverySequenceData() {
-    const seqDoc = await getDoc(doc(this.firestoreDefault, 'participantdeliverysequence', this.profileId));
-    const products = seqDoc.exists() ? seqDoc.data()['products'] ?? [] : [];
+  private async loadDeliveryLookups() {
+    if (this.deliveryLookupLoaded) {
+      return;
+    }
 
     const deliverables = await getDocs(query(collection(this.firestoreDefault, 'deliverables'), where('profileid', '==', this.profileId)));
-    const mapDeliveryDoc = {};
-    deliverables.docs.forEach(d => mapDeliveryDoc[d.ref.path] = d.data());
+    deliverables.docs.forEach(d => this.mapDeliveryDoc[d.ref.path] = d.data());
 
     const sources = [
       ['appointmenttype', 'appointmenttype'],
@@ -382,15 +391,33 @@ export class UserprofileComponent {
       ['delivery queue', 'queuename'],
       ['delivery fieldwork', 'fieldworkname']
     ];
-    const mapDeliveryName = {};
     for (const [col, field] of sources) {
       const snap = await getDocs(collection(this.firestoreDefault, col));
-      snap.docs.forEach(d => mapDeliveryName[d.ref.path] = d.data()[field]);
+      snap.docs.forEach(d => this.mapDeliveryName[d.ref.path] = d.data()[field]);
     }
+    this.deliveryLookupLoaded = true;
+  }
 
-    for (const p of products) {
-      const steps = (p['delivery'] ?? []).map(d => {
-        const deliverable = mapDeliveryDoc[d.sequenceref.path] ?? {};
+  private async loadProductDeliverySequence(participantProductId: string) {
+    this.productProgressLoading[participantProductId] = true;
+
+    try {
+      if (!this.seqProductsMap) {
+        const seqDoc = await getDoc(doc(this.firestoreDefault, 'participantdeliverysequence', this.profileId));
+        const products = seqDoc.exists() ? seqDoc.data()['products'] ?? [] : [];
+        this.seqProductsMap = {};
+        for (const p of products) {
+          this.seqProductsMap[p['participantproductid']] = p;
+        }
+      }
+
+      await this.loadDeliveryLookups();
+      console.log("inside loadProdutDeliverySequence")
+      const productSeq = this.seqProductsMap[participantProductId];
+      const deliveryItems = productSeq ? (productSeq['delivery'] ?? []) : [];
+
+      const steps = deliveryItems.map(d => {
+        const deliverable = this.mapDeliveryDoc[d.sequenceref.path] ?? {};
         const status = deliverable.status;
 
         let stepClass = 'step-pending';
@@ -399,13 +426,15 @@ export class UserprofileComponent {
         else if (status === 'ready') { stepClass = 'step-ready'; statusLabel = 'Ready'; }
 
         return {
-          name: mapDeliveryName[deliverable.deliveryref?.path] || 'Unknown',
+          name: this.mapDeliveryName[deliverable.deliveryref?.path] || 'Unknown',
           stepClass,
           status: statusLabel
         };
       });
 
-      this.mapProductSteps[p['participantproductid']] = steps;
+      this.mapProductSteps[participantProductId] = steps;
+    } finally {
+      this.productProgressLoading[participantProductId] = false;
     }
   }
 
