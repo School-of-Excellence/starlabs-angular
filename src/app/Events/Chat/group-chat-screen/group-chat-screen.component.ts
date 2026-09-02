@@ -20,6 +20,7 @@ import { NavDrawerService } from '../../../nav-drawer.service';
 import { AddIssueComponent } from '../../../Customer Support/add-issue/add-issue.component';
 import { ChannelCommunicationComponent } from '../../../Channel Communication/channel-communication/channel-communication.component';
 import { ChatAudioComponent } from './audio-player.component';
+import * as XLSX from 'xlsx';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -45,8 +46,9 @@ export interface Attachment {
 
 export interface Receipt { name: string; at: string; }
 
-export interface Seg { kind: 'text' | 'bold' | 'link' | 'mention'; text: string; href?: string; }
-export interface Block { type: 'p' | 'ul' | 'ol'; segs?: Seg[]; items?: Seg[][]; }
+export interface Seg { kind: 'text' | 'bold' | 'italic' | 'link' | 'mention'; text: string; href?: string; }
+/** `gap` is a deliberately blank line — it is what keeps paragraph spacing in a sent message. */
+export interface Block { type: 'p' | 'ul' | 'ol' | 'gap'; segs?: Seg[]; items?: Seg[][]; }
 export interface Cta { label: string; href: string; }
 export interface Parsed { blocks: Block[]; ctas: Cta[]; }
 
@@ -1231,6 +1233,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private notify(msg: string): void { this.snackBar.open(msg, 'Close', { duration: 2000 }); }
 
+  /** Esc closes the preview — the tooltip promises it, and a video swallows backdrop clicks. */
+  @HostListener('document:keydown.escape')
+  onEscape(): void { if (this.lightbox) this.lightbox = null; }
+
   @HostListener('window:resize')
   onWindowResize(): void { this.fitToViewport(); }
 
@@ -1340,8 +1346,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return new RegExp(
       '\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)' +   // 1 label · 2 href
       '|\\*([^*\\n]+)\\*' +                                  // 3 bold — one star each side
-      '|(https?:\\/\\/[^\\s<>"\')]+)' +                     // 4 bare url
-      '|(' + this.mentionSource(names) + ')',                // 5 mention
+      '|(?<![A-Za-z0-9_])_([^_\\n]+)_(?![A-Za-z0-9_])' +      // 4 italic — one underscore each side
+      '|(https?:\\/\\/[^\\s<>"\')]+)' +                     // 5 bare url
+      '|(' + this.mentionSource(names) + ')',                // 6 mention
       'g');
   }
 
@@ -1353,9 +1360,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     for (const m of Array.from(src.matchAll(re))) {
       const idx = m.index ?? 0;
       if (idx > last) out.push({ kind: 'text', text: src.slice(last, idx) });
-      const [, label, href, bold, url, mention] = m;
+      const [, label, href, bold, italic, url, mention] = m;
       if (href) out.push({ kind: 'link', text: label, href });
       else if (bold) out.push({ kind: 'bold', text: bold });
+      else if (italic) out.push({ kind: 'italic', text: italic });
       else if (url) out.push({ kind: 'link', text: url, href: url });
       else if (mention) out.push({ kind: 'mention', text: mention });
       last = idx + m[0].length;
@@ -1366,8 +1374,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private splitCtas(text: string): { body: string; ctas: Cta[] } {
     const ctas: Cta[] = [];
+    // Trailing spaces go; blank lines STAY — they are the author's paragraph breaks. Runs of more
+    // than two are capped so a stray scroll of newlines cannot stretch a bubble indefinitely.
     const body = (text || '').replace(CTA_RE, (_m, label, href) => { ctas.push({ label, href }); return ''; })
-      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
     return { body, ctas };
   }
 
@@ -1387,7 +1397,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         list!.items.push(this.renderInline(number[1], names));
       } else {
         flush();
+        // A blank line is content, not noise: it becomes a spacer so the paragraph break survives.
         if (line.trim()) blocks.push({ type: 'p', segs: this.renderInline(line, names) });
+        else if (blocks.length) blocks.push({ type: 'gap' });
       }
     });
     flush();
@@ -1569,8 +1581,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * not grant it — a developer can appoint admins (see canManageAdmins) but cannot post unless they
    * are a member and an admin themselves. Platform chatxadmin/admin see every group via loadGroups(),
    * which is exactly why membership is checked here rather than assumed.
-   * NOTE: when `group_admin` is empty — every group created before the field existed — members may
-   * still post, rather than silently freezing every existing group. Flagged to the operator.
+   * There is NO exemption for a group with an empty `group_admin`. That allowance existed so groups
+   * created before the field would not freeze, but it meant any member could post in one — which is
+   * the opposite of the rule. Such a group is now read-only until someone is made an admin; a
+   * `developer` can always do that (see canManageAdmins), so no group is stuck.
    */
   get canMessage(): boolean {
     const a = this.active;
@@ -1580,7 +1594,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!this.isLive(a)) return true;
     const isMember = (a._memberUids || []).includes(this.currentUid);
     if (!isMember) return false;
-    if (!(a.adminUids || []).length) return true;   // legacy group: no admins recorded yet
     return this.isSelfGroupAdmin;
   }
 
@@ -1588,12 +1601,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * Broadcasting is gated on the channel's own `admins` array (profile doc ids), with the platform
    * chat admin roles as the fallback — a channel created before `admins` existed has nobody in it.
    */
-  /** Channel recipients, filtered by the same member-search box the group panel uses. */
+  /** Channel recipients — same search box, same admins-first ordering as a group's member list. */
   get channelRecipients(): Member[] {
     const q = this.memberSearch.trim().toLowerCase();
-    return (this.active?.members || [])
-      .filter(m => !q || m.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const list = (this.active?.members || [])
+      .filter(m => !q || m.name.toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q));
+    return this.adminsFirst(list, m => this.isChannelAdmin(m.id));
   }
 
   isChannelAdmin(profileDocId: string): boolean {
@@ -1774,14 +1787,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   openAvatar(name: string, event?: Event): void {
     event?.stopPropagation();
     const url = this.photoOf(name);
-    if (url) { this.lightboxIsPortrait = true; this.lightbox = url; }
+    if (url) { this.resetViewer(); this.lightboxKind = 'image'; this.lightboxIsPortrait = true; this.lightbox = url; }
     else this.openPerson(name);
   }
 
   /** The group picture, enlarged. */
   openGroupPhoto(item: ChatItem | null, event?: Event): void {
     event?.stopPropagation();
-    if (item?.photoUrl) { this.lightboxIsPortrait = true; this.lightbox = item.photoUrl; }
+    if (item?.photoUrl) { this.resetViewer(); this.lightboxKind = 'image'; this.lightboxIsPortrait = true; this.lightbox = item.photoUrl; }
   }
 
   /** Profile pictures open at portrait size; message attachments keep the full-bleed lightbox. */
@@ -1791,7 +1804,63 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   lightboxKind: 'image' | 'video' = 'image';
 
   /** Attachment images always open full-bleed — never inherit the portrait sizing. */
+  /* ── Image viewer: zoom, rotate, pan ────────────────────────────────
+     The image is always rendered at its own aspect ratio (`object-fit: contain`, no cropping) —
+     the old `cover` on the portrait variant was squaring off profile pictures. Zoom and rotation
+     are applied as a transform on top of that, so the source ratio is never altered. */
+
+  lbScale = 1;
+  lbRotate = 0;
+  lbX = 0;
+  lbY = 0;
+  private lbDrag: { x: number; y: number; ox: number; oy: number } | null = null;
+
+  private resetViewer(): void { this.lbScale = 1; this.lbRotate = 0; this.lbX = 0; this.lbY = 0; }
+
+  get lbTransform(): string {
+    return `translate(${this.lbX}px, ${this.lbY}px) scale(${this.lbScale}) rotate(${this.lbRotate}deg)`;
+  }
+
+  zoomBy(step: number, event?: Event): void {
+    event?.stopPropagation();
+    const next = Math.min(6, Math.max(0.25, +(this.lbScale + step).toFixed(2)));
+    this.lbScale = next;
+    // Back at fit size there is nothing to pan to, so recentre rather than stranding the image.
+    if (next <= 1) { this.lbX = 0; this.lbY = 0; }
+  }
+
+  rotateBy(deg: number, event?: Event): void {
+    event?.stopPropagation();
+    this.lbRotate = (this.lbRotate + deg + 360) % 360;
+  }
+
+  resetView(event?: Event): void { event?.stopPropagation(); this.resetViewer(); }
+
+  onViewerWheel(e: WheelEvent): void {
+    if (this.lightboxKind !== 'image') return;
+    e.preventDefault();
+    this.zoomBy(e.deltaY < 0 ? 0.2 : -0.2);
+  }
+
+  /** Panning only makes sense once the image is bigger than the frame. */
+  startPan(e: MouseEvent): void {
+    if (this.lbScale <= 1) return;
+    e.preventDefault(); e.stopPropagation();
+    this.lbDrag = { x: e.clientX, y: e.clientY, ox: this.lbX, oy: this.lbY };
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onPan(e: MouseEvent): void {
+    if (!this.lbDrag) return;
+    this.lbX = this.lbDrag.ox + (e.clientX - this.lbDrag.x);
+    this.lbY = this.lbDrag.oy + (e.clientY - this.lbDrag.y);
+  }
+
+  @HostListener('document:mouseup')
+  endPan(): void { this.lbDrag = null; }
+
   openImage(url: string): void {
+    this.resetViewer();
     this.lightboxIsPortrait = false; this.lightboxKind = 'image'; this.lightbox = url;
   }
 
@@ -1920,8 +1989,32 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       m._dayLabel = (!prev || day !== prevDay) ? this.dayLabel(m.at) : '';
     });
     this._visSrc = src; this._visKey = key; this._vis = list;
+    this._visDays = this.groupByDay(list);
     return list;
   }
+
+  /**
+   * The thread grouped into one wrapper per day. This exists for the sticky date separator:
+   * as flat siblings of the scroll container every separator sticks at top:0 and they pile up on
+   * top of each other. Nested one-per-day, each separator's sticky range is its own day, so they
+   * hand over cleanly as you scroll.
+   */
+  get visibleDays(): { label: string; messages: ChatMessage[] }[] {
+    this.visibleMessages;          // ensures the cache (and _dayLabel) is current
+    return this._visDays;
+  }
+  private _visDays: { label: string; messages: ChatMessage[] }[] = [];
+
+  private groupByDay(list: ChatMessage[]): { label: string; messages: ChatMessage[] }[] {
+    const out: { label: string; messages: ChatMessage[] }[] = [];
+    list.forEach(m => {
+      if (m._dayLabel || !out.length) out.push({ label: m._dayLabel || '', messages: [] });
+      out[out.length - 1].messages.push(m);
+    });
+    return out;
+  }
+
+  trackByDay = (_: number, d: { label: string }) => d.label;
 
   /** Ids of messages matching the in-thread query, oldest first. */
   searchHitIds: string[] = [];
@@ -2061,10 +2154,36 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Filters the participant list in the info panel; shown once a group is big enough to need it. */
   memberSearch = '';
 
+  /**
+   * Matches name or email, so an admin can find someone to remove from either — and lists the
+   * group's admins first, since they are who you look for when you need one.
+   */
   get filteredParticipants(): Member[] {
     const q = this.memberSearch.trim().toLowerCase();
-    if (!q) return this.participantMembers;
-    return this.participantMembers.filter(m => (m.name || '').toLowerCase().includes(q));
+    const list = q
+      ? this.participantMembers.filter(m =>
+          (m.name || '').toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q))
+      : this.participantMembers;
+    return this.adminsFirst(list, m => this.isGroupAdmin(m));
+  }
+
+  /** Admins to the top, everyone else after, each half alphabetical. */
+  private adminsFirst(list: Member[], isAdmin: (m: Member) => boolean): Member[] {
+    const byName = (a: Member, b: Member) => (a.name || '').localeCompare(b.name || '');
+    return [
+      ...list.filter(isAdmin).sort(byName),
+      ...list.filter(m => !isAdmin(m)).sort(byName),
+    ];
+  }
+
+  /** Team list under the same search box, so both halves of the panel filter together. */
+  get filteredTeam(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    const list = q
+      ? this.teamMembers.filter(m =>
+          (m.name || '').toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q))
+      : this.teamMembers;
+    return this.adminsFirst(list, m => this.isGroupAdmin(m));
   }
 
   /** Live groups have no team/participant split in `supportchat` — everyone is a participant. */
@@ -2193,6 +2312,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const text = this.draft.trim();
     const active = this.active;
     if (!active) return;
+    // The Send BUTTON is [disabled] while files upload, but Enter reaches this directly — without
+    // this guard, holding Enter during an upload queues the same message several times.
+    if (this.uploadingFiles) return;
 
     if (this.pendingFiles.length) {
       this.sendPendingFiles(active, text);
@@ -2254,10 +2376,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onComposerKeydown(e: KeyboardEvent): void {
+    // Ctrl/Cmd+B and Ctrl/Cmd+I wrap the selection, the way every other editor does.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault(); this.applyFormat('bold'); return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'i' || e.key === 'I')) {
+      e.preventDefault(); this.applyFormat('italic'); return;
+    }
     if (e.key === 'Enter') {
       if (this.mentionOptions.length) { e.preventDefault(); this.pickMention(this.mentionOptions[0]); return; }
       // Shift+Enter (and Alt/Ctrl/Cmd+Enter) insert a newline; plain Enter sends.
-      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
+        // …and inside a list, that newline should carry the list on rather than dropping out of it.
+        if (this.continueListOnNewline(e)) e.preventDefault();
+        return;
+      }
       e.preventDefault();
       this.editing ? this.saveEdit() : this.send();
       return;
@@ -2277,23 +2410,87 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* ── Composer formatting ────────────────────────────────────────────── */
 
-  applyFormat(kind: 'bold' | 'ul' | 'ol'): void {
+  /**
+   * Enter inside a list continues it: "- " for bullets, the NEXT number for an ordered list, and
+   * renumbering everything below so the run stays 1,2,3 after an insert. An empty marker ends the
+   * list instead of adding another blank item — the behaviour every editor has trained people on.
+   * Returns true when it handled the key.
+   */
+  private continueListOnNewline(e: KeyboardEvent): boolean {
+    const el = this.composerRef?.nativeElement;
+    if (!el || el.selectionStart !== el.selectionEnd) return false;
+    const pos = el.selectionStart ?? 0;
+    const lineStart = this.draft.lastIndexOf('\n', pos - 1) + 1;
+    const line = this.draft.slice(lineStart, pos);
+
+    const bullet = line.match(/^(\s*)([-•])\s+(.*)$/);
+    const number = line.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+    if (!bullet && !number) return false;
+
+    const content = bullet ? bullet[3] : number![4];
+    if (!content.trim()) {
+      // Empty item: drop the marker and leave the list.
+      const next = this.draft.slice(0, lineStart) + this.draft.slice(pos);
+      this.setDraftAndCaret(next, lineStart);
+      return true;
+    }
+
+    const indent = bullet ? bullet[1] : number![1];
+    const marker = bullet ? `${bullet[2]} ` : `${Number(number![2]) + 1}${number![3]} `;
+    const inserted = '\n' + indent + marker;
+    let next = this.draft.slice(0, pos) + inserted + this.draft.slice(pos);
+    if (number) next = this.renumberFrom(next, pos + inserted.length);
+    this.setDraftAndCaret(next, pos + inserted.length);
+    return true;
+  }
+
+  /** Rewrite the numbers of the ordered run the caret sits in, so inserts never leave 1,2,2,3. */
+  private renumberFrom(text: string, caret: number): string {
+    const lines = text.split('\n');
+    // Which line holds the caret?
+    let idx = 0, count = 0;
+    for (; idx < lines.length; idx++) {
+      count += lines[idx].length + 1;
+      if (count > caret) break;
+    }
+    const isNum = (l: string) => /^(\s*)(\d+)([.)])\s+/.test(l);
+    let first = idx;
+    while (first > 0 && isNum(lines[first - 1])) first--;
+    let n = 1;
+    for (let i = first; i < lines.length && isNum(lines[i]); i++, n++) {
+      lines[i] = lines[i].replace(/^(\s*)(\d+)([.)])/, (_m, sp, _d, dot) => `${sp}${n}${dot}`);
+    }
+    return lines.join('\n');
+  }
+
+  private setDraftAndCaret(next: string, caret: number): void {
+    const el = this.composerRef?.nativeElement;
+    this.draft = next;
+    if (!el) return;
+    // The value has to land before the caret can be placed in it.
+    el.value = next;
+    setTimeout(() => { el.selectionStart = el.selectionEnd = caret; el.focus(); this.autoGrowComposer(); }, 0);
+  }
+
+  applyFormat(kind: 'bold' | 'italic' | 'ul' | 'ol'): void {
     const el = this.composerRef?.nativeElement;
     if (!el) return;
     const start = el.selectionStart ?? this.draft.length;
     const end = el.selectionEnd ?? this.draft.length;
     const sel = this.draft.slice(start, end);
     let next: string;
-    if (kind === 'bold') {
-      next = this.draft.slice(0, start) + (sel ? `*${sel}*` : '**') + this.draft.slice(end);
-    } else {
-      const lines = (sel || 'item').split('\n');
-      const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `- ${l}`).join('\n');
-      const pre = start > 0 && this.draft[start - 1] !== '\n' ? '\n' : '';
-      next = this.draft.slice(0, start) + pre + marked + this.draft.slice(end);
+    if (kind === 'bold' || kind === 'italic') {
+      const mark = kind === 'bold' ? '*' : '_';
+      next = this.draft.slice(0, start) + (sel ? `${mark}${sel}${mark}` : `${mark}${mark}`) + this.draft.slice(end);
+      // Caret between the markers when there was nothing selected, so typing lands inside them.
+      this.setDraftAndCaret(next, sel ? end + 2 : start + 1);
+      return;
     }
-    this.draft = next;
-    setTimeout(() => el.focus(), 0);
+    const lines = (sel || 'item').split('\n');
+    const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `- ${l}`).join('\n');
+    const pre = start > 0 && this.draft[start - 1] !== '\n' ? '\n' : '';
+    next = this.draft.slice(0, start) + pre + marked + this.draft.slice(end);
+    this.setDraftAndCaret(next, start + pre.length + marked.length);
   }
 
   /** Buttons attached to the message being composed — written to the `buttons` field on send. */
@@ -2971,6 +3168,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.cName = ''; this.cEventId = '';
     this.cSearch = ''; this.cSelected = [];
     this.cAdminIds = []; this.cImageFile = null; this.cImagePreview = null;
+    this.importReport = null;
   }
 
   /** Team and participants merged, de-duplicated by id. */
@@ -3006,9 +3204,101 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   clearGroupImage(): void { this.cImageFile = null; this.cImagePreview = null; }
 
+  /** Search matches name OR email — an import list keys off email, so both have to be findable. */
   get createShown(): Person[] {
-    const q = this.cSearch.toLowerCase();
-    return this.createPool.filter(p => !q || p.name.toLowerCase().includes(q)).slice(0, 40);
+    const q = this.cSearch.trim().toLowerCase();
+    const pool = this.createPool.filter(p =>
+      !q || p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q));
+    // Picked people float to the top, so a long selection is never lost behind the cap below.
+    const picked = pool.filter(p => this.isPicked(p.id));
+    const rest = pool.filter(p => !this.isPicked(p.id));
+    return [...picked, ...rest].slice(0, 60);
+  }
+
+  get createMatchCount(): number {
+    const q = this.cSearch.trim().toLowerCase();
+    if (!q) return this.createPool.length;
+    return this.createPool.filter(p =>
+      p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q)).length;
+  }
+
+  /** profile_data email for a uid — the directory is keyed by uid, the email lives on the profile. */
+  emailOf(uid: string): string {
+    return this.profilesByUid[uid]?.['email'] || '';
+  }
+
+  clearCreateSearch(): void { this.cSearch = ''; }
+
+  selectAllCreateShown(): void {
+    const shown = this.createShown;
+    const allPicked = shown.length > 0 && shown.every(p => this.isPicked(p.id));
+    if (allPicked) {
+      const ids = new Set(shown.map(p => p.id));
+      this.cSelected = this.cSelected.filter(s => !ids.has(s.id));
+      this.cAdminIds = this.cAdminIds.filter(id => !ids.has(id));
+    } else {
+      shown.filter(p => !this.isPicked(p.id)).forEach(p => this.togglePerson(p));
+    }
+  }
+
+  /* ── Importing members from a spreadsheet ───────────────────────────
+     Ported from chat-screen's channel import: an .xlsx/.csv of name + email is matched against
+     profile_data and the matches are selected. Nothing is created from the file — a row that does
+     not match an existing profile is reported, not invented. */
+
+  importReport: { matched: number; skipped: string[] } | null = null;
+
+  downloadImportSample(): void {
+    const rows = [
+      { name: 'John Doe', email: 'john@example.com' },
+      { name: 'Jane Smith', email: 'jane@example.com' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Members');
+    XLSX.writeFile(wb, 'group_members_sample.xlsx');
+  }
+
+  onMembersImport(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(reader.result, { type: 'array' });
+        const rows: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]] || {});
+        const skipped: string[] = [];
+        let matched = 0;
+
+        rows.forEach(row => {
+          // Header names vary between exports, so accept the common spellings of each.
+          const email = String(row['email'] ?? row['Email'] ?? row['EMAIL'] ?? '').trim().toLowerCase();
+          const name = String(row['name'] ?? row['Name'] ?? row['NAME'] ?? '').trim().toLowerCase();
+          if (!email && !name) return;
+
+          const hit = this.createPool.find(p =>
+            (email && this.emailOf(p.id).toLowerCase() === email) ||
+            (!email && name && p.name.toLowerCase() === name));
+
+          if (!hit) { skipped.push(row['name'] || row['email'] || '(blank row)'); return; }
+          if (!this.isPicked(hit.id)) { this.togglePerson(hit); }
+          matched++;
+        });
+
+        this.importReport = { matched, skipped };
+        this.notify(matched
+          ? `Imported ${matched} member${matched === 1 ? '' : 's'}`
+          : 'No rows matched an existing profile');
+      } catch (e) {
+        console.error('member import', e);
+        this.notify('Could not read that file');
+      }
+    };
+    reader.onerror = () => this.notify('Could not read that file');
+    reader.readAsArrayBuffer(file);
   }
 
   isPicked(id: string): boolean { return this.cSelected.some(s => s.id === id); }

@@ -263,10 +263,12 @@
                    : 'No messages yet — say something' }}</span>
           </div>
 
-          <ng-container *ngFor="let m of visibleMessages; trackBy: trackById">
+          <!-- One wrapper per day, so each sticky separator's range is its own day and they hand
+               over as you scroll instead of stacking at the same offset. -->
+          <div class="wc-daygroup" *ngFor="let day of visibleDays; trackBy: trackByDay">
+            <div class="wc-day" *ngIf="day.label"><span>{{ day.label }}</span></div>
 
-            <!-- Sticky day separator -->
-            <div class="wc-day" *ngIf="m._dayLabel"><span>{{ m._dayLabel }}</span></div>
+          <ng-container *ngFor="let m of day.messages; trackBy: trackById">
 
             <!-- ── Channel broadcast card ─────────────────────────────
                  A broadcast is not a chat line: the send job writes an HTML body plus optional
@@ -480,6 +482,9 @@
                       <span class="wc-edited" *ngIf="m.edited">(edited)</span>
 
 
+                      <!-- Attached to the foot of the bubble, WhatsApp-style: full bubble width,
+                           stacked and divided. It stays INSIDE the bubble and cancels the bubble's
+                           padding, so it spans edge to edge instead of floating beside it. -->
                       <div class="wc-ctas" *ngIf="ctasOf(m).length" [class.light]="isLight(m)">
                         <a *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
                            rel="noreferrer" [title]="c.href" (click)="$event.stopPropagation()">
@@ -510,6 +515,7 @@
             </ng-template>
             </ng-template>
           </ng-container>
+          </div>
         </div>
 
         <!-- Reply preview -->
@@ -566,7 +572,8 @@
 
         <!-- Formatting toolbar -->
         <div class="wc-toolbar" *ngIf="!recording && !features.readOnly && canMessage">
-          <button matTooltip="Bold selection" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
+          <button matTooltip="Bold (Ctrl+B)" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
+          <button matTooltip="Italic (Ctrl+I)" (click)="applyFormat('italic')"><mat-icon>format_italic</mat-icon></button>
           <button matTooltip="Bullet list" (click)="applyFormat('ul')"><mat-icon>format_list_bulleted</mat-icon></button>
           <button matTooltip="Numbered list" (click)="applyFormat('ol')"><mat-icon>format_list_numbered</mat-icon></button>
           <div class="wc-toolbar-sep"></div>
@@ -582,7 +589,7 @@
           <button class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
             <mat-icon>link</mat-icon> link
           </button>
-          <span class="wc-toolbar-hint">*bold* · - bullet · 1. number</span>
+          <span class="wc-toolbar-hint">*bold* · _italic_ · - bullet · 1. number</span>
         </div>
 
         <!-- @mention autocomplete -->
@@ -798,12 +805,19 @@
               <mat-icon>group</mat-icon> <span class="grow">Team · {{ teamMembers.length + 1 }}</span>
               <button class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
+            <div class="wc-search plain membersearch">
+              <mat-icon>search</mat-icon>
+              <input [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
+              <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
             <div class="wc-member">
               <div class="wc-avatar team">AH</div>
               <span class="wc-member-name">{{ TEAM_NAME }}</span>
               <span class="wc-team-pill">ADMIN</span>
             </div>
-            <div class="wc-member" *ngFor="let mem of teamMembers; trackBy: trackByIndex">
+            <div class="wc-member" *ngFor="let mem of filteredTeam; trackBy: trackByIndex">
               <div class="wc-member-main" (click)="openPerson(mem.name)">
                 <div class="wc-avatar" [style.background]="avatarBg(mem.name)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
@@ -827,10 +841,9 @@
             </div>
             <div class="wc-note" *ngIf="participantMembers.length === 0">No participants yet</div>
 
-            <!-- Worth its space only once the list is long enough to scan -->
-            <div class="wc-search plain membersearch" *ngIf="participantMembers.length > 5">
+            <div class="wc-search plain membersearch" *ngIf="participantMembers.length">
               <mat-icon>search</mat-icon>
-              <input [(ngModel)]="memberSearch" placeholder="Search participants"/>
+              <input [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
               <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
@@ -1176,10 +1189,47 @@
   </div>
 
   <!-- ── Lightbox ───────────────────────────────────────────────────── -->
-  <div class="wc-lightbox" *ngIf="lightbox" (click)="lightbox = null">
-    <img *ngIf="lightboxKind === 'image'" [src]="lightbox" [class.portrait]="lightboxIsPortrait" alt="attachment"/>
+  <div class="wc-lightbox" *ngIf="lightbox" (click)="lightbox = null" (wheel)="onViewerWheel($event)">
+    <!-- The backdrop closes on click, but a video swallows its own clicks — so an explicit control
+         is the only way out of a video preview, and a visible one for images regardless. -->
+    <button class="wc-lightbox-close" (click)="lightbox = null; $event.stopPropagation()"
+            matTooltip="Close (Esc)" aria-label="Close preview">
+      <mat-icon>close</mat-icon>
+    </button>
+
+    <!-- The image keeps its own aspect ratio (contain, never cropped); zoom and rotation are a
+         transform layered on top, so the source proportions are never altered. -->
+    <img *ngIf="lightboxKind === 'image'" [src]="lightbox" alt="attachment"
+         [class.portrait]="lightboxIsPortrait" [class.zoomed]="lbScale > 1"
+         [style.transform]="lbTransform"
+         (mousedown)="startPan($event)" (click)="$event.stopPropagation()"/>
+
     <video *ngIf="lightboxKind === 'video'" [src]="lightbox" controls autoplay
            (click)="$event.stopPropagation()"></video>
+
+    <div class="wc-viewer-bar" *ngIf="lightboxKind === 'image'" (click)="$event.stopPropagation()">
+      <button (click)="zoomBy(-0.25, $event)" [disabled]="lbScale <= 0.25" matTooltip="Zoom out">
+        <mat-icon>zoom_out</mat-icon>
+      </button>
+      <span class="wc-viewer-zoom">{{ (lbScale * 100) | number: '1.0-0' }}%</span>
+      <button (click)="zoomBy(0.25, $event)" [disabled]="lbScale >= 6" matTooltip="Zoom in">
+        <mat-icon>zoom_in</mat-icon>
+      </button>
+      <span class="wc-viewer-sep"></span>
+      <button (click)="rotateBy(-90, $event)" matTooltip="Rotate left">
+        <mat-icon>rotate_left</mat-icon>
+      </button>
+      <button (click)="rotateBy(90, $event)" matTooltip="Rotate right">
+        <mat-icon>rotate_right</mat-icon>
+      </button>
+      <span class="wc-viewer-sep"></span>
+      <button (click)="resetView($event)" matTooltip="Reset">
+        <mat-icon>restart_alt</mat-icon>
+      </button>
+      <a [href]="lightbox" target="_blank" rel="noreferrer" matTooltip="Open original">
+        <mat-icon>open_in_new</mat-icon>
+      </a>
+    </div>
   </div>
 
   <!-- ── Delete confirmation ────────────────────────────────────────── -->
@@ -1243,12 +1293,49 @@
           <label>Members *
             <span class="wc-count">{{ cSelected.length }} selected<ng-container *ngIf="cAdminIds.length">, {{ cAdminIds.length }} admin</ng-container></span>
           </label>
-          <div class="wc-search plain">
-            <mat-icon>search</mat-icon>
-            <input [(ngModel)]="cSearch" placeholder="Search people…"/>
+          <!-- Search + import sit together: both are ways of getting people INTO the selection. -->
+          <div class="wc-pickbar">
+            <div class="wc-search plain grow">
+              <mat-icon>search</mat-icon>
+              <input [(ngModel)]="cSearch" placeholder="Search by name or email…"/>
+              <button class="wc-search-clear" *ngIf="cSearch" (click)="clearCreateSearch()" matTooltip="Clear">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <input #membersImport type="file" hidden accept=".xlsx,.xls,.csv"
+                   (change)="onMembersImport($event)"/>
+            <button class="wc-ghost-btn" (click)="membersImport.click()" matTooltip="Import members from a spreadsheet">
+              <mat-icon>upload_file</mat-icon> Import
+            </button>
+            <button class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
+              <mat-icon>download</mat-icon>
+            </button>
           </div>
+
+          <div class="wc-pickbar sub">
+            <button class="wc-link-btn" (click)="selectAllCreateShown()">Select all shown</button>
+            <span class="grow"></span>
+            <span class="wc-pickcount">
+              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es') : createPool.length + ' people' }}
+            </span>
+          </div>
+
+          <!-- What the import did, including rows that matched nothing — never invented as new people -->
+          <div class="wc-importnote" *ngIf="importReport">
+            <mat-icon>{{ importReport.matched ? 'check_circle' : 'error_outline' }}</mat-icon>
+            <span>
+              {{ importReport.matched }} matched and selected<ng-container *ngIf="importReport.skipped.length">,
+              {{ importReport.skipped.length }} not found: {{ importReport.skipped.slice(0, 4).join(', ') }}<ng-container
+              *ngIf="importReport.skipped.length > 4"> +{{ importReport.skipped.length - 4 }} more</ng-container></ng-container>
+            </span>
+            <button class="wc-plain-btn" (click)="importReport = null"><mat-icon>close</mat-icon></button>
+          </div>
+
           <div class="wc-picklist">
             <div class="wc-note center" *ngIf="createPool.length === 0">Loading people…</div>
+            <div class="wc-note center" *ngIf="createPool.length && !createShown.length">
+              Nobody matches “{{ cSearch }}”
+            </div>
             <div class="wc-pickrow" *ngFor="let p of createShown; trackBy: trackById"
                  [class.on]="isPicked(p.id)" (click)="togglePerson(p)">
               <div class="wc-check sm" [class.on]="isPicked(p.id)">
@@ -1258,7 +1345,10 @@
                 <img *ngIf="p.photoUrl" [src]="p.photoUrl" [alt]="p.name"/>
                 <ng-container *ngIf="!p.photoUrl">{{ initials(p.name) }}</ng-container>
               </div>
-              <span class="wc-pickname">{{ p.name }}</span>
+              <span class="wc-pickmain">
+                <span class="wc-pickname">{{ p.name }}</span>
+                <span class="wc-picksub" *ngIf="emailOf(p.id)">{{ emailOf(p.id) }}</span>
+              </span>
               <span class="wc-admin-pill" *ngIf="isCreateAdmin(p.id)">ADMIN</span>
               <span class="wc-journey" *ngIf="journeyMeta(p.journey) as jm"
                     [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
@@ -1431,6 +1521,8 @@
     <div *ngIf="b.type === 'p'">
       <ng-container *ngTemplateOutlet="segs; context: { $implicit: b.segs, light: light }"></ng-container>
     </div>
+    <!-- A blank line the author typed, preserved as spacing rather than collapsed away -->
+    <div class="wc-gap" *ngIf="b.type === 'gap'"></div>
     <ul *ngIf="b.type === 'ul'">
       <li *ngFor="let it of b.items; trackBy: trackByIndex">
         <ng-container *ngTemplateOutlet="segs; context: { $implicit: it, light: light }"></ng-container>
@@ -1448,6 +1540,7 @@
   <ng-container *ngFor="let s of list; trackBy: trackByIndex">
     <span *ngIf="s.kind === 'text'">{{ s.text }}</span>
     <strong *ngIf="s.kind === 'bold'">{{ s.text }}</strong>
+    <em *ngIf="s.kind === 'italic'">{{ s.text }}</em>
     <a *ngIf="s.kind === 'link'" class="wc-inline-link" [class.light]="light" [href]="s.href" target="_blank"
        rel="noreferrer" [title]="s.href" (click)="$event.stopPropagation()">{{ s.text }}</a>
     <span *ngIf="s.kind === 'mention'" class="wc-mention-tag" [class.light]="light">{{ s.text }}</span>

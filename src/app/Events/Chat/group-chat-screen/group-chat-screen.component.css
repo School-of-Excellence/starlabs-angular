@@ -360,13 +360,15 @@
 }
 
 /* Messages from one sender stack flush; the breathing room goes between senders. */
-.wc-messages > .wc-msg { margin-top: 2px; }
-.wc-messages > .wc-msg:not(.continues) { margin-top: 14px; }
-.wc-messages > .wc-msg:first-child { margin-top: 0; }
-.wc-messages > .wc-day + .wc-msg { margin-top: 4px; }
-.wc-messages > .wc-msg.continues .wc-bubble { border-radius: 12px; }
+/* Messages now sit inside a per-day wrapper (see .wc-daygroup), so these target that instead. */
+.wc-daygroup { display: flex; flex-direction: column; }
+.wc-daygroup > .wc-msg { margin-top: 2px; }
+.wc-daygroup > .wc-msg:not(.continues) { margin-top: 14px; }
+.wc-daygroup:first-child > .wc-msg:first-child { margin-top: 0; }
+.wc-daygroup > .wc-day + .wc-msg { margin-top: 4px; }
+.wc-daygroup > .wc-msg.continues .wc-bubble { border-radius: 12px; }
 /* Keep the pointed corner only on the first bubble of a run. */
-.wc-messages > .wc-msg.continues .wc-bubble.mine { border-bottom-right-radius: 12px; }
+.wc-daygroup > .wc-msg.continues .wc-bubble.mine { border-bottom-right-radius: 12px; }
 
 .wc-thread-state { align-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 12px; color: var(--t3); font-size: 12.5px; text-align: center; }
 .wc-thread-state mat-icon { font-size: 22px; width: 22px; height: 22px; }
@@ -638,25 +640,56 @@
 .wc-file-size { font-size: 12px; color: var(--ink4); font-variant-numeric: tabular-nums; }
 .wc-file mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
+/* Create-group people picker */
+.wc-pickbar { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+.wc-pickbar.sub { margin-bottom: 5px; }
+.wc-pickbar .grow { flex: 1; min-width: 0; }
+.wc-pickbar .wc-ghost-btn { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.wc-pickbar .wc-ghost-btn mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.wc-pickcount { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.wc-pickmain { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.wc-picksub { font-size: 11px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-importnote {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 7px; padding: 7px 10px;
+  border: 1px solid var(--blue-line); border-radius: 10px; background: var(--blue-tint2);
+  font-size: 11.5px; color: var(--ink2);
+}
+.wc-importnote > span { flex: 1; min-width: 0; }
+.wc-importnote mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--blue-text); flex-shrink: 0; }
+
+.wc-gap { height: .55em; }
 .wc-inline-link { color: var(--blue-text); text-decoration: underline; word-break: break-word; }
 .wc-inline-link.light { color: var(--blue-text); }
 .wc-mention-tag { font-weight: 800; color: var(--blue); background: var(--blue-tint); border-radius: 4px; padding: 0 3px; }
 .wc-mention-tag.light { color: var(--blue-tint2); background: rgba(255,255,255,0.20); }
 
-.wc-ctas { display: flex; flex-wrap: wrap; gap: 8px; }
-.wc-ctas a {
-  display: inline-flex; align-items: center; gap: 7px; margin-top: 7px; padding: 6px 11px;
-  text-decoration: none; font-size: 14.5px; font-weight: 600; border: 1px solid var(--blue-line);
-  border-radius: 12px; background: var(--blue-tint); color: var(--blue-text);
+/* Attached to the foot of the bubble the way WhatsApp renders reply buttons: each action is a
+   full-width row, divided from the one above. The negative margins cancel the bubble's own
+   padding (7px 11px) so the rows span edge to edge and meet its bottom corners. */
+.wc-ctas {
+  display: flex; flex-direction: column;
+  margin: 7px -11px -7px; border-top: 1px solid var(--line3);
+  border-radius: 0 0 9px 9px; overflow: hidden;
 }
-.wc-ctas.light a { border-color: var(--blue-line); background: var(--blue-tint); color: var(--blue-text); }
+.wc-ctas a {
+  display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px;
+  text-decoration: none; font-size: 14px; font-weight: 600; color: var(--blue-text);
+  border-top: 1px solid var(--line2);
+}
+.wc-ctas a:first-child { border-top: none; }
+.wc-ctas a:hover { background: var(--blue-tint); }
 .wc-ctas a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wc-ctas mat-icon { font-size: 14px; width: 14px; height: 14px; }
+.wc-ctas mat-icon { font-size: 15px; width: 15px; height: 15px; flex-shrink: 0; }
+/* A bubble carrying buttons needs a sensible minimum, or a two-word message makes them unreadable. */
+.wc-bubble:has(.wc-ctas) { min-width: 210px; }
 
 /* Hover actions · menu · picker */
 /* The action strip sits beside the message — vertically centred on its right edge, never over it. */
 .wc-hover {
-  position: absolute; top: -15px; right: 6px; left: auto; margin: 0;
+  /* Fully clear of the text: the pill sits above the card, intruding only ~5px into the bubble's
+     own top padding. Anchored right, not left — a wide pill on a short outgoing bubble used to
+     push past the pane and produce a horizontal scrollbar. */
+  position: absolute; bottom: calc(100% - 2px); top: auto; right: 6px; left: auto; margin: 0;
   display: flex; gap: 1px; background: var(--raised);
   border: 1px solid var(--line3); border-radius: 999px; padding: 3px;
   box-shadow: 0 8px 30px -8px rgba(0,0,0,.35); z-index: 5; white-space: nowrap;
@@ -862,10 +895,19 @@
 .wc-rec-cancel { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--red-line); background: var(--red-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--red-fill); }
 
 /* ── Slide-overs ───────────────────────────────────────────────────── */
+/* Wide screens: the panel is a flex sibling, so opening it SHRINKS the chat rather than covering
+   it. Below 1100px there is not enough width left to read a thread beside it, so it goes back to
+   an overlay (see the media query at the foot of this file). */
 .wc-slide {
-  position: absolute; top: 0; right: 0; bottom: 0; width: 340px; background: var(--panel);
-  border-left: 1px solid var(--line); box-shadow: -8px 0 30px -8px rgba(0,0,0,0.12);
+  position: relative; width: 340px; flex-shrink: 0; background: var(--panel);
+  border-left: 1px solid var(--line);
   display: flex; flex-direction: column; z-index: 10;
+}
+/* Only the group/channel info panel pushes. Message-info and the person profile are transient
+   detail views, often opened ON TOP of group info — tiling three panels would leave no thread. */
+.wc-slide.msginfo, .wc-slide.person {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  box-shadow: -8px 0 30px -8px rgba(0,0,0,0.12);
 }
 .wc-slide.msginfo { z-index: 11; }
 .wc-slide.person { z-index: 12; }
@@ -1090,10 +1132,46 @@
 
 /* ── Overlays · dialogs · toasts ───────────────────────────────────── */
 .wc-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 400; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
-.wc-lightbox img { max-width: 82%; max-height: 86%; border-radius: 10px; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }
+.wc-lightbox-close {
+  position: absolute; top: 18px; right: 22px; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.45); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
+  backdrop-filter: blur(6px);
+}
+.wc-lightbox-close:hover { background: rgba(0,0,0,.7); border-color: rgba(255,255,255,.55); }
+.wc-lightbox-close mat-icon { font-size: 20px; width: 20px; height: 20px; }
+.wc-lightbox img {
+  max-width: 82%; max-height: 86%; border-radius: 10px; box-shadow: 0 20px 80px rgba(0,0,0,0.5);
+  /* contain, never cover: the image is shown at its own ratio and is never cropped to fit. */
+  object-fit: contain; transition: transform .12s ease-out; will-change: transform;
+}
+.wc-lightbox img.zoomed { cursor: grab; }
+.wc-lightbox img.zoomed:active { cursor: grabbing; transition: none; }
 /* A profile picture is small at source — cap it so it enlarges without turning to mush. */
 .wc-lightbox video { max-width: 86%; max-height: 86%; border-radius: 10px; box-shadow: 0 20px 80px rgba(0,0,0,0.5); background: black; }
-.wc-lightbox img.portrait { max-width: min(70vw, 420px); max-height: min(70vh, 420px); border-radius: 14px; object-fit: cover; }
+/* Profile pictures get a smaller frame, but the SAME contain rule — `cover` was squaring off
+   non-square photos, which is exactly the ratio distortion being complained about. */
+.wc-lightbox img.portrait { max-width: min(70vw, 420px); max-height: min(70vh, 420px); border-radius: 14px; }
+
+/* Viewer controls */
+.wc-viewer-bar {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 999px;
+  background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.22); backdrop-filter: blur(8px);
+  z-index: 2;
+}
+.wc-viewer-bar button, .wc-viewer-bar a {
+  width: 34px; height: 34px; border: none; background: transparent; color: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.wc-viewer-bar button:hover:not(:disabled), .wc-viewer-bar a:hover { background: rgba(255,255,255,.16); }
+.wc-viewer-bar button:disabled { opacity: .35; cursor: default; }
+.wc-viewer-bar mat-icon { font-size: 19px; width: 19px; height: 19px; }
+.wc-viewer-zoom {
+  min-width: 48px; text-align: center; color: #fff; font-size: 12.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.wc-viewer-sep { width: 1px; height: 20px; background: rgba(255,255,255,.22); margin: 0 3px; }
 
 .wc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.28); z-index: 300; }
 .wc-dialog {
@@ -1186,6 +1264,14 @@
 /* ── Responsive ────────────────────────────────────────────────────── */
 .wc-back { display: none; }
 
+/* Below 1100px the chat cannot give up 340px and still be readable, so the panel goes back to
+   floating over the thread — which is what it did everywhere before. */
+@media (max-width: 1100px) {
+  .wc-slide {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    box-shadow: -8px 0 30px -8px rgba(0,0,0,0.12);
+  }
+}
 @media (max-width: 1024px) { .wc-left { width: 260px; } }
 
 /* Narrow: one pane at a time — list, or the open thread with a back button. */
