@@ -1589,7 +1589,18 @@ export class DeliveryDashboardCloneComponent {
                 productData.eiStarterPack.totalEligible.push(...totalEligible);
             }
             else if (this.selectedProductType === 'eiCustomSolutions') {
-                productData.eiCustomSolutions.totalEligible.push(...totalEligible);
+                for (let data of totalEligible) {
+                    const { tentativestart } = data;
+
+                    if (!tentativestart) {
+                        productData.eiCustomSolutions.totalEligible.push(data);
+                    } else {
+                        const date = tentativestart.toDate();
+                        const itemMonth = date.getMonth();
+                        const itemYear = date.getFullYear();
+                        this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiCustomSolutions');
+                    }
+                }
             }
 
             // Total Eligible
@@ -1619,7 +1630,14 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiStarterPack') {
                         productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
-                        productData.eiCustomSolutions.totalEligible.push(mergedData);
+                        if (!data.tentativestart) {
+                            productData.eiCustomSolutions.totalEligible.push(mergedData);
+                        } else {
+                            const date = data.tentativestart.toDate();
+                            const itemMonth = date.getMonth();
+                            const itemYear = date.getFullYear();
+                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiCustomSolutions');
+                        }
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1654,7 +1672,10 @@ export class DeliveryDashboardCloneComponent {
                                 ...diagnosticsAppointment
                             });
                         } else if (onboardedAppointment) {
-                            productData.eiCustomSolutions.onBoarding.push({ ...mergedData, ...onboardedAppointment });
+                            productData.eiCustomSolutions.onBoarded.push({
+                                ...mergedData,
+                                ...onboardedAppointment
+                            });
                         }
                     }
                     // ========================= EI STARTER PACK =========================
