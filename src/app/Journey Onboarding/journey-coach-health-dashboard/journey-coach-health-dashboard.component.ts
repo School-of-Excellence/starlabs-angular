@@ -103,6 +103,11 @@ interface CoachCard {
   coachId: string;
   coachName: string;
   caseload: number;     // distinct participants assigned to this coach (scoreboard baseSize)
+  activeCaseload: number;   // of those, customerstatus == active (doc item 9: "total active caseload")
+  jc: {                     // sessions RUN by this coach (appointments.hosts), not assignments
+    doneToday: number; doneWeek: number; doneMonth: number;
+    dueToday: number; dueWeek: number; pending: number; overdue: number;
+  };
   needToday: number;    // this coach's rows matching the needs-attention predicate
   goingQuiet: number;   // this coach's going-quiet rows
   flagged: number;      // this coach's flagged rows
@@ -112,13 +117,21 @@ interface CoachCard {
 
 type DashboardView = 'summary' | 'base' | 'scoreboard' | 'worklist';
 
+/** A clickable number on a coach card — each maps to a concrete list of people. */
+type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged'
+  | 'doneToday' | 'doneWeek' | 'doneMonth' | 'dueToday' | 'dueWeek' | 'pending' | 'overdue';
+
+/** One completed JC: an `appointments` doc with journeycoach == true AND attended == true.
+ *  `coachId` is the first entry of the doc's `hosts[]` — the coach who ran the session. */
+interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; }
+
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
 type ProductType = 'ecosystem' | 'dfu' | 'gifts' | 'other';
 
 /** Lightweight full-base index row: just the fields needed to search + filter the WHOLE base
  *  (every coach's / the admin's participants) without loading the heavy dependent collections.
- *  Built once from participantjourneyproduct + the already-loaded profile/meta/journey maps. */
+ *  Built once from `participant metadata` + the already-loaded profile/journey maps. */
 interface LiteIndexRow {
   profileid: string;
   name: string;
@@ -240,12 +253,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   coachFallback = false;
   coachFallbackDismissed = false;
 
-  scannedCount = 0;
   matchedCount = 0;
 
   // ---- server-side pagination (ALL / UNASSIGNED views only) ----
   // The per-coach view keeps the existing full-load + client paginator + global priority sort.
-  // ALL / UNASSIGNED page through participantjourneyproduct by documentId() (so no doc is ever
+  // ALL / UNASSIGNED page through the in-memory metadata roster (so no participant is ever
   // skipped — important for UNASSIGNED, whose docs may lack the coachedby field entirely).
   pagedMode = false;
   pageSize = 50;
@@ -254,10 +266,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   loadedRowCount = 0;            // distinct participants materialised across loaded pages
   pageLoading = false;          // per-page spinner (distinct from the initial `loading`)
   reachedEnd = false;           // last server page returned < pageSize
-  private lastDoc: QueryDocumentSnapshot | null = null;
-  private pageCache = new Map<number, QueryDocumentSnapshot[]>();
   // full dataset cached so switching back to a specific coach doesn't re-read 10k each time
-  private fullPjpData: any[] | null = null;
   // profileids whose heavy joins (tickets / touchpoints / contacts / event-requests / health) are
   // already loaded into the shared maps. Lets a later full-set build (export, or paging back over a
   // page) skip re-querying Firestore for rows it has already fetched — see loadJoinsFor().
@@ -269,7 +278,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // true only if BOTH the total and the inactive count queries resolved — guards active = total - inactive
   private serverActiveReady = false;
   // scoreboard runs over the full base; loaded on demand so the base view can page
-  private sbPjp: any[] = [];
   private scoreboardLoaded = false;
   // true once the FULL touchpoint + contact-event collections have been read (scoreboard needs
   // all coaches' raw data). Full-mode table loads are now scoped, so this stays false until the
@@ -290,7 +298,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // "Assigned to me" status-band segment filter (separate from the customerstatus `statusFilter`).
   lifecycleFilter: '' | 'active' | 'nonactive' | 'discontinued' | 'nostatus' = '';
   activeLever: Lever = 'all';
-  journeyOptions: string[] = [];
+  /** Journey dropdown on the Participants tab. Derived from journeyMix(), which seeds EVERY
+   *  journey in the `journey` collection — so the list is the same everywhere on the screen.
+   *  It used to be built from allRows(), i.e. only the 50 participants on the CURRENT PAGE, so
+   *  the dropdown changed contents as you paged and never offered a journey absent from the page. */
+  get journeyOptions(): string[] {
+    return this.journeyMix().map(j => j.name).sort((a, b) => a.localeCompare(b));
+  }
 
   // ---- Intelligent filter panel (client-side, applied over the FULL base) ----
   filtersExpanded = false;                         // collapsible panel state
@@ -343,7 +357,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // Flagged count + filter are correct in paged mode too (no page-local caveat needed).
   flaggedIds = signal<Set<string>>(new Set());
 
-  private pjpData: any[] = [];
   private profileMap: any = {};
   private metaMap: any = {};
   private journeyNameMap: any = {};
@@ -394,10 +407,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       return ['select', 'name', 'coach', 'journey', 'status', 'actions'];
     }
     // Participants table reproduces the mockup's #panel-participants columns IN ORDER:
-    // Participant · Coach · Priority · Journey · Status · Finance · Renewal · Tickets · Last touch.
+    // Participant · Coach · Priority · Journey · Status · Finance · Renewal · Tickets.
     // The dropped intel (health / reason / recent event / tier / inline actions) lives in the
     // slide-over, which opens on row tap. Coach is always shown (the mockup always has a Coach column).
-    const cols = ['name', 'coach', 'priority', 'journey', 'status', 'finance', 'renewal', 'tickets', 'lastcoach'];
+    // Last touch was REMOVED from the table (operator directive, 2026-08-26) — the slide-over shows
+    // it, alongside the separate Last JC / Next JC dates. The underlying lastcoachdate /
+    // daysSinceCoach are still computed: going-quiet and the priority score depend on them.
+    const cols = ['name', 'coach', 'priority', 'journey', 'status', 'finance', 'renewal', 'tickets'];
     // All-participants view also supports bulk select + assign/reassign (prepend the checkbox column).
     return this.selectedCoachId === this.ALL ? ['select', ...cols] : cols;
   }
@@ -480,7 +496,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.loadProgress = 0;
     this.setProgress(8, 'Loading profiles & coaches…');
     // ---- Phase 1: independent base reads run in PARALLEL (was a sequential await-chain) ----
-    const profileP = this.guard.getProfileMap().then(m => { this.profileMap = m; });
+    // profile_data is NO LONGER loaded in full (operator directive, 2026-08-26): name / email /
+    // phone all come from the participant's own metadata doc. The only profile_data reads left are
+    // (a) the tiny name-gap backfill below, (b) resolveCoach()'s single user_ref query, and
+    // (c) one doc fetched on demand when a participant's slide-over is opened.
     const metaP = this.guard.getParticipantMetaMap().then(m => { this.metaMap = m; });
     // single read of the 'journey' collection powers the name map + atc-model map + product type
     const journeyP = getDocs(collection(this.firestore, 'journey')).then(snap => {
@@ -500,10 +519,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const addressedP = this.loadAddressed();
     // Personal journey groups (owner == actorUid, resolved in resolveCoach before this runs).
     const groupsP = this.loadJourneyGroups();
-    // coach names are resolved from profileMap, so loadCoaches chains after it (still parallel
-    // with meta / journey / flags).
-    const coachesP = profileP.then(() => this.loadCoaches());
-    await Promise.all([profileP, metaP, journeyP, flagsP, addressedP, groupsP, coachesP]);
+    // coach names come from users_roles + the coach's own metadata doc, so this only needs meta.
+    const coachesP = metaP.then(() => this.loadCoaches());
+    await Promise.all([metaP, journeyP, flagsP, addressedP, groupsP, coachesP]);
+    // backfill names for the handful of participants whose metadata doc has no `name`
+    await this.backfillMissingNames();
     this.setProgress(35, 'Resolving your base…');
 
     const matchedCoach = !!(this.coachId && this.coaches.some(c => c.id === this.coachId));
@@ -514,7 +534,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyPaginatorBinding();
 
     if (this.pagedMode) {
-      // Paint page 1 ASAP. The heavy full-base index (full participantjourneyproduct + clientissue
+      // Paint page 1 ASAP. The roster index is in-memory (metadata), so it is ready immediately
       // scan) builds in the BACKGROUND and refreshes off-page filters + base-wide summary when it
       // lands — it no longer blocks first render. Server counts are cheap (2 parallel counts) so
       // they ride alongside the first page.
@@ -536,6 +556,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.accumulatePagedSummary();   // now uses fullIndexBuilt for base-wide totals
     this.applyFilters();             // recomputes fullBaseMatchIds + dataSource
     this.setProgress(85, 'Indexed full base · loading activity…');
+    void this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
     void this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
   }
 
@@ -575,7 +596,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const last = this.lastTouchMs(lite.profileid);
       const daysSince = last != null ? Math.floor((now - last) / 86400000) : null;
       const goingQuiet = daysSince != null && daysSince > this.QUIET_DAYS;
-      lite.goingQuiet = goingQuiet;   // so the Going-quiet / Needs-attention levers can scope the matched set
+      lite.goingQuiet = goingQuiet;   // flag stays base-wide so the levers can scope the matched set
+      // both COUNTS are scoped to the current view (All / Unassigned / one coach); the flag above
+      // is not, because the lever filters re-derive their own scope from it.
+      if (!this.liteInScope(lite)) continue;
       if (goingQuiet) gq++;
       if (goingQuiet || lite.lapsed || lite.notStarted || lite.renewalWindow || lite.openTickets > 0) na++;
     }
@@ -583,25 +607,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.fullBaseNeedsAttention.set(na);
   }
 
-  /** Per-coach path — used when a SPECIFIC coach is selected (and cached for re-use).
-   *  The pjp collection is still read in full (it powers the Unassigned count and is cached for
-   *  the scoreboard), but the dependent joins are now SCOPED to the coach's base via the same
-   *  batched `where(... 'in', chunk30)` loaders the paged path uses — no full-collection scans. */
+  /** Per-coach path — a SPECIFIC coach is selected. The roster comes from `participant metadata`
+   *  (coachedby lives there), so there is no collection scan: build the in-memory index, load the
+   *  dependent joins scoped to that coach's participants, and render. */
   private async loadFullPortfolio(): Promise<void> {
-    const pjpSnap = await getDocs(query(
-      collection(this.firestore, 'participantjourneyproduct'),
-      where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
-    ));
-    this.pjpData = this.stampCoachedBy(pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id })));
-    this.fullPjpData = this.pjpData;
-    this.scannedCount = this.pjpData.length;
+    await this.ensureFullIndex();
+    void this.loadExactOpenTickets();   // background; rows re-render when the exact counts land
     this.setProgress(55, 'Loaded base…');
-    // count distinct participants with no coach assigned (for the Unassigned view)
-    const unassignedProfiles = new Set<string>();
-    for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
-    }
-    this.unassignedCount = unassignedProfiles.size;
+    this.unassignedCount = this.countUnassignedInRoster();
 
     await this.loadFullDependentsForBase();
     this.setProgress(88, 'Loaded details…');
@@ -610,13 +623,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.setProgress(100, 'Ready');
   }
 
-  /** Distinct profileids assigned to the currently-selected coach (full-mode base). */
+  /** Distinct profileids in the selected coach's base — from the METADATA roster (coachedby lives
+   *  on the metadata doc), so the dependent joins cover every participant the table will render,
+   *  including any with no pjp record. */
   private currentBaseProfileIds(): string[] {
-    return Array.from(new Set(
-      this.pjpData
-        .filter(d => d['profileid'] && this.isMine(d['coachedby'], this.selectedCoachId))
-        .map(d => d['profileid']),
-    ));
+    return this.rosterIds();
   }
 
   /** Load every dependent join for the selected coach's base, SCOPED via batched 'in' queries.
@@ -633,131 +644,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Accurate KPI counts that can be derived purely from fields on the pjp doc.
    *  Each is best-effort: any that needs a missing composite index just stays 0 (the card
    *  then falls back to the accumulate-over-loaded value). */
+  /** Server-side counts that don't need the roster. The old `notStarted` count queried
+   *  participantjourneyproduct — removed with the rest of that collection's reads; open tickets
+   *  now come from each participant's metadata doc, so nothing here needs a server aggregate.
+   *  Kept as a no-op hook so the call sites and the *Ready flags stay intact. */
   private async loadServerCounts(): Promise<void> {
-    const pjp = collection(this.firestore, 'participantjourneyproduct');
-    // NOTE: total / active / inactive / renewals are now derived PARTICIPANT-LEVEL from the lite
-    // index (distinct profileid, subscription-based) in accumulatePagedSummary. The old pjp-RECORD
-    // total and the customerstatus inactive query were both wrong (records != people; customerstatus
-    // is empty on pjp) and have been removed. Only `notStarted` — a real pjp-field count — remains,
-    // as the pre-index fallback.
-    await Promise.all([
-      getCountFromServer(query(pjp, where('journeystatus', 'in', ['Initiated', 'initiated']), where('onboarded', '==', true)))
-        .then(s => { this.serverCounts.notStarted = s.data().count; }).catch(() => {}),
-      // Base-wide Open-tickets count straight from the server (counts OPEN clientissue docs) — shown
-      // immediately for the All view, independent of page loading / the lite-index full scan.
-      getCountFromServer(query(collection(this.firestore, 'clientissue'), where('status.status', 'in', ['Open', 'open'])))
-        .then(s => { this.serverCounts.openTickets = s.data().count; }).catch(() => {}),
-    ]);
     this.serverActiveReady = false;
     this.serverCountsReady = true;
-  }
-
-  private buildPjpPageQuery(startAfterDoc?: QueryDocumentSnapshot) {
-    const ref = collection(this.firestore, 'participantjourneyproduct');
-    // scope to the participant's current journey product (one doc per participant), then order by
-    // documentId() so paging is stable and NO matching doc is ever skipped.
-    const constraints: any[] = [
-      where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
-      orderBy(documentId()),
-    ];
-    if (startAfterDoc) constraints.push(startAfter(startAfterDoc));
-    constraints.push(limit(this.pageSize));
-    return query(ref, ...constraints);
-  }
-
-  private async fetchPjpPage(startAfterDoc?: QueryDocumentSnapshot): Promise<QueryDocumentSnapshot[]> {
-    const snap = await getDocs(this.buildPjpPageQuery(startAfterDoc));
-    const docs = snap.docs as QueryDocumentSnapshot[];
-    if (docs.length) this.lastDoc = docs[docs.length - 1];
-    this.reachedEnd = docs.length < this.pageSize;
-    this.pageCache.set(this.currentPage, docs);
-    // estimate paginator length (mirrors the house pattern in participant-form-tracker)
-    if (this.currentPage === 0) {
-      this.pageLength = this.reachedEnd ? docs.length : docs.length * 10;
-    } else if (this.reachedEnd) {
-      this.pageLength = this.currentPage * this.pageSize + docs.length;
-    } else {
-      this.pageLength = Math.max(this.pageLength, (this.currentPage + 2) * this.pageSize);
-    }
-    return docs;
-  }
-
-  private resetPagedAccumulators(): void {
-    this.countedProfiles.clear();
-    // Only zero the summary BEFORE the base-wide numbers exist. Once the lite index is built the
-    // counts are base-wide (not page-accumulated), so a page reload must not flash them to 0.
-    if (!this.fullIndexBuilt) {
-      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
-    }
-    this.loadedRowCount = 0;
-  }
-
-  private async loadFirstPage(): Promise<void> {
-    this.currentPage = 0;
-    this.lastDoc = null;
-    this.pageCache.clear();
-    this.resetPagedAccumulators();
-    if (this.paginator) this.paginator.firstPage();
-    const docs = await this.fetchPjpPage();
-    await this.renderPage(docs);
-  }
-
-  /** mat-paginator (page) handler — only active in paged mode (full mode lets the dataSource slice). */
-  onPageEvent(event: PageEvent): void {
-    // page changed — clear the keyboard highlight so it never points at a stale row
-    this.focusedRowIndex = -1;
-    if (this.pagedMode) void this.onPjpPageChange(event);
-  }
-
-  private async onPjpPageChange(event: PageEvent): Promise<void> {
-    // Once the index is built we page over the matched set client-side: page-size just RE-SLICES
-    // (no refetch, no summary reset), and any page index is a direct slice.
-    const indexed = this.pagedMode && this.fullIndexBuilt;
-    if (event.pageSize !== this.pageSize) {
-      this.pageSize = event.pageSize;
-      if (indexed) {
-        this.currentPage = 0;
-        if (this.paginator) this.paginator.firstPage();
-        await this.renderMatchedPage();
-      } else {
-        await this.loadFirstPage();
-      }
-      return;
-    }
-    if (indexed) {
-      this.currentPage = event.pageIndex;
-      await this.renderMatchedPage();
-      return;
-    }
-    // pre-index cursor mode (first paint, before the lite index lands)
-    if (event.pageIndex > this.currentPage) {
-      this.currentPage = event.pageIndex;
-      const cached = this.pageCache.get(this.currentPage);
-      await this.renderPage(cached ?? await this.fetchPjpPage(this.lastDoc ?? undefined));
-    } else if (event.pageIndex < this.currentPage) {
-      this.currentPage = event.pageIndex;
-      const cached = this.pageCache.get(this.currentPage)!;
-      this.lastDoc = cached.length ? cached[cached.length - 1] : null;
-      await this.renderPage(cached);
-    }
-  }
-
-  /** Build rows for ONE page: filter (UNASSIGNED), load page-scoped dependents, score, accumulate KPI. */
-  private async renderPage(pageDocs: QueryDocumentSnapshot[]): Promise<void> {
-    this.pageLoading = true;
-    try {
-      let pjpForPage = this.stampCoachedBy(pageDocs.map(d => ({ ...d.data(), __id: d.id })));
-      if (this.selectedCoachId === this.UNASSIGNED) {
-        pjpForPage = pjpForPage.filter(d => this.isUnassigned(d['coachedby']));
-      }
-      const profileIds = Array.from(new Set(pjpForPage.map(d => d['profileid']).filter(Boolean)));
-      await this.loadJoinsFor(profileIds);
-      this.pjpData = pjpForPage;       // computeRows reads this.pjpData (page-local matching + scoring)
-      this.computeRows();
-      this.accumulatePagedSummary();
-    } finally {
-      this.pageLoading = false;
-    }
   }
 
   /** KPI in paged mode: accurate server counts where available, else accumulate over loaded pages.
@@ -786,12 +679,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     this.loadedRowCount = this.countedProfiles.size;
     if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
-    // Open-tickets count: base-wide via getCountFromServer (counts OPEN clientissue docs), shown for
-    // the All view immediately — independent of page loading / the lite-index full scan. Other scopes
-    // (Unassigned) keep the distinct-participant count from the lite index once it builds.
-    if (this.selectedCoachId === this.ALL && this.serverCountsReady) {
-      this.summary.withOpenTickets = this.serverCounts.openTickets;
-    } else if (this.fullIndexBuilt) {
+    // Open-tickets count: distinct participants with at least one OPEN ticket, from the lite index
+    // (metadata's customersupporttickets / the clientissue open count). This used to prefer a
+    // getCountFromServer over `clientissue` for the ALL view — that query went with the rest of the
+    // pjp/server-count removal, so reading serverCounts here made the card show a permanent 0.
+    if (this.fullIndexBuilt) {
       this.summary.withOpenTickets = this.fullBaseWithOpenTickets;
     }
     // base-wide Going-quiet once the background touchpoint/appointment data has loaded (else it
@@ -806,7 +698,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // per-participant flag, so All-view filtering is exact. Band counts (total / lifecycle split)
       // reflect the JOURNEY filter only — so the segments stay visible and switchable — while the
       // lever counts reflect BOTH filters. journeyIdx ⊇ filteredIdx.
-      const journeyIdx = this.fullIndex.filter(l => this.matchesSummaryJourneyLite(l));
+      const journeyIdx = this.fullIndex.filter(l => this.liteInScope(l) && this.matchesSummaryJourneyLite(l));
       const filteredIdx = journeyIdx.filter(l => this.matchesSummaryLifecycleLite(l));
       this.summary.total = journeyIdx.length;                                       // distinct participants
       // Lifecycle split reads the participant-metadata customerstatus ONLY (lifecycleOf); the four
@@ -819,7 +711,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.noStatus = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'nostatus' ? 1 : 0), 0);
       this.summary.renewalsSoon = filteredIdx.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
       this.summary.paymentsLocked = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
-      this.summary.withOpenTickets = filteredIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
+      // journeyIdx, NOT filteredIdx: tickets are exempt from the lifecycle filter (see
+      // leverIgnoresLifecycle) so the card matches the list it opens.
+      this.summary.withOpenTickets = journeyIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
       this.summary.notStarted = filteredIdx.reduce((n, l) => n + (l.notStarted ? 1 : 0), 0);
       this.summary.lapsed = filteredIdx.reduce((n, l) => n + (l.lapsed ? 1 : 0), 0);
       // going-quiet flags land on the lite rows only once contact data loads (computeBaseWideAttention);
@@ -828,8 +722,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
       this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + ((l.goingQuiet || l.lapsed || l.notStarted || l.renewalWindow || l.openTickets > 0) ? 1 : 0), 0));
       this.pagedFilteredCount.set(filteredIdx.length);
-      const flags = this.flaggedIds();
-      this.pagedFlagged.set(filteredIdx.reduce((n, l) => n + (flags.has(l.profileid) ? 1 : 0), 0));
       const h = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
       for (const l of filteredIdx) {
         h.total++;
@@ -844,9 +736,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
       this.pagedHealth.set(h);
     } else if (this.serverCountsReady) {
-      // index not built yet — only notStarted is a reliable pjp-field server count; total/active/
-      // inactive/renewalsSoon stay on the page-accumulated values until the index lands.
-      this.summary.notStarted = this.serverCounts.notStarted;
+      // index not built yet — the counts stay on their page-accumulated values until it lands.
+      // (The old notStarted server count queried participantjourneyproduct and is gone with it.)
       this.summary.total = this.loadedRowCount;
     } else {
       this.summary.total = this.loadedRowCount;
@@ -857,6 +748,53 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const out: T[][] = [];
     for (let i = 0; i < arr.length; i += 30) out.push(arr.slice(i, i + 30));
     return out;
+  }
+
+  private resetPagedAccumulators(): void {
+    this.countedProfiles.clear();
+    // Only zero the summary BEFORE the base-wide numbers exist. Once the lite index is built the
+    // counts are base-wide (not page-accumulated), so a page reload must not flash them to 0.
+    if (!this.fullIndexBuilt) {
+      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+    }
+    this.loadedRowCount = 0;
+  }
+
+  private async loadFirstPage(): Promise<void> {
+    this.currentPage = 0;
+    this.resetPagedAccumulators();
+    if (this.paginator) this.paginator.firstPage();
+    // The roster index is built in memory from the meta map (no Firestore read), so it is ready
+    // before the first paint: page straight over the matched roster.
+    await this.ensureFullIndex();
+    this.applyFilters();          // -> sortedMatchedIds() -> renderMatchedPage()
+    this.accumulatePagedSummary();
+  }
+
+  /** mat-paginator (page) handler — only active in paged mode (full mode lets the dataSource slice). */
+  onPageEvent(event: PageEvent): void {
+    // page changed — clear the keyboard highlight so it never points at a stale row
+    this.focusedRowIndex = -1;
+    if (this.pagedMode) void this.onPjpPageChange(event);
+  }
+
+  private async onPjpPageChange(event: PageEvent): Promise<void> {
+    // Once the index is built we page over the matched set client-side: page-size just RE-SLICES
+    // (no refetch, no summary reset), and any page index is a direct slice.
+    const indexed = this.pagedMode && this.fullIndexBuilt;
+    if (event.pageSize !== this.pageSize) {
+      this.pageSize = event.pageSize;
+      if (indexed) {
+        this.currentPage = 0;
+        if (this.paginator) this.paginator.firstPage();
+        await this.renderMatchedPage();
+      } else {
+        await this.loadFirstPage();
+      }
+      return;
+    }
+    this.currentPage = event.pageIndex;
+    await this.renderMatchedPage();
   }
 
   /** Load the five heavy joins for exactly the ids not already loaded, then mark them loaded.
@@ -917,7 +855,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         const snap = await getDocs(query(collection(this.firestore, 'appointments'), where('bookedby', 'in', refBatch)));
         snap.forEach(d => {
           const data: any = d.data();
-          if (data['journeycoach'] !== true || data['attended'] !== true) return;
+          // cancelled JCs never count as contact, even when flagged attended (see loadContactEvents)
+          if (data['journeycoach'] !== true || data['attended'] !== true || data['cancelled'] === true) return;
           const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
           const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
           if (pid && dt) this.contactEventByProfile[pid] = Math.max(this.contactEventByProfile[pid] ?? 0, dt.getTime());
@@ -971,15 +910,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  full collections lazily (guarded by fullTouchAndContactLoaded) only when the scoreboard opens. */
   private async ensureScoreboardData(): Promise<void> {
     if (this.scoreboardLoaded) return;
-    if (this.fullPjpData) {
-      this.sbPjp = this.fullPjpData;     // pjp already cached from a prior full load
-    } else {
-      const pjpSnap = await getDocs(query(
-        collection(this.firestore, 'participantjourneyproduct'),
-        where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
-      ));
-      this.sbPjp = this.stampCoachedBy(pjpSnap.docs.map(d => ({ ...d.data(), __id: d.id })));
-    }
+    await this.ensureFullIndex();     // roster from metadata; no participantjourneyproduct read
     if (!this.fullTouchAndContactLoaded) {
       await this.loadTouchpoints();      // populates allTouchpoints + touchpointByProfile (full)
       await this.loadContactEvents();    // populates contactEventByProfile (full)
@@ -990,21 +921,29 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   // ===================================================================================
 
+  /** Coach list for the Coaches tab and the Viewing selector: STRICTLY `users_roles` docs with
+   *  `journeycoach == true` (operator directive, 2026-08-26). No other source, and the `tester`
+   *  flag is no longer used to exclude anyone — journeycoach is the only condition.
+   *
+   *  Consequence worth knowing: a participant whose `coachedby` points at someone who is NOT a
+   *  journeycoach has no card to appear under. In the test base all 54 coached participants point
+   *  at one id with no journeycoach role doc, so they are counted nowhere on this tab. That is a
+   *  DATA problem (role docs vs assignments), deliberately no longer papered over here. */
   private async loadCoaches(): Promise<void> {
     const list: { id: string; name: string }[] = [];
     try {
       const snap = await getDocs(query(collection(this.firestore, 'users_roles'), where('journeycoach', '==', true)));
       snap.forEach(d => {
         const data: any = d.data();
-        // drop test/junk accounts: the role doc carries a `tester` boolean (e.g. "Admin Test").
-        if (data['tester'] === true) return;
-        const ref: any = data['profile_ref'];
-        const id = ref?.id;
-        if (id) list.push({ id, name: this.profileMap.map?.[id] ?? data['name'] ?? id });
+        const id: string | undefined = data['profile_ref']?.id;
+        if (!id) return;
+        list.push({ id, name: data['name'] ?? this.metaMap?.docdata?.[id]?.['name'] ?? id });
       });
     } catch (e) {
       console.warn('could not load journey coaches', e);
     }
+    // the signed-in coach is always selectable in the Viewing dropdown, so they can see their own
+    // base even if their role doc is missing/mis-flagged.
     if (this.coachId && !list.some(c => c.id === this.coachId)) {
       list.push({ id: this.coachId, name: this.coachName || this.coachId });
     }
@@ -1065,24 +1004,156 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  More reliable than the drift-prone lastjourneycoachdate field (per research/audit). */
   private async loadContactEvents(): Promise<void> {
     const map: Record<string, number> = {};
+    const events: JcDoneEvent[] = [];
+    const pending: JcDoneEvent[] = [];
     try {
+      // ONE read of every journey-coach appointment (the `attended` filter used to be in the
+      // query). Splitting client-side gives, from the same snapshot: completed JCs (attended),
+      // and the pending / overdue ones the coach-wise view needs — without a second query.
       const snap = await getDocs(query(
         collection(this.firestore, 'appointments'),
         where('journeycoach', '==', true),
-        where('attended', '==', true),
       ));
       snap.forEach(d => {
         const data: any = d.data();
         const pid = data['bookedby']?.id ?? (typeof data['profileid'] === 'string' ? data['profileid'] : null);
         const dt = this.toDate(data['starttime']) ?? this.toDate(data['date']);
-        if (pid && dt) map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
+        if (!pid || !dt) return;
+        // CANCELLED JCs are excluded outright (operator directive, 2026-08-26). A doc can be
+        // attended AND cancelled — 5 of 54 attended JCs in the test base — and those must not
+        // count as a completed JC, nor as pending/overdue.
+        if (data['cancelled'] === true) return;
+        const hosts0: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
+        const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+        if (data['attended'] !== true) {
+          // booked and live: future = pending, past = overdue (the slot passed unattended).
+          pending.push({ profileid: pid, coachId: host, ms: dt.getTime() });
+          return;
+        }
+        map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
+        // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
+        // attended), and the JC pipeline metrics need the individual occurrences, not just the
+        // latest per participant. `hosts[]` carries the coach who ran it (129/129 populated in the
+        // test base, and they resolve to real journeycoach ids), so it attributes per coach.
+        const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
+        const coachId = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+        events.push({ profileid: pid, coachId, ms: dt.getTime() });
       });
     } catch (e) {
       if (this.isPermissionDenied(e)) this.scoreboardDataBlocked = true;
       console.warn('contact events load failed (non-fatal)', e);
     }
     this.contactEventByProfile = map;
+    this.jcDoneEvents.set(events);
+    this.jcPendingEvents.set(pending);
   }
+
+  // ---- JC pipeline metrics (doc item 8): JC Done Today / Last Week / Last Month ----
+  /** Every completed JC (attended journey-coach appointment), from loadContactEvents. Signal so
+   *  the cards fill in the moment the background contact load lands. */
+  private jcDoneEvents = signal<JcDoneEvent[]>([]);
+  /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
+  private jcPendingEvents = signal<JcDoneEvent[]>([]);
+
+  /** Per-coach JC metrics for the Coaches tab (doc item 9). Attribution is the appointment's
+   *  `hosts[0]` — the coach who actually ran (or is due to run) the session, which is NOT
+   *  necessarily the participant's `coachedby`. Both are real and they disagree in this data;
+   *  these numbers describe SESSIONS RUN, the caseload numbers describe ASSIGNMENTS. */
+  coachJcStats(coachId: string): {
+    doneToday: number; doneWeek: number; doneMonth: number;
+    dueToday: number; dueWeek: number; pending: number; overdue: number;
+  } {
+    const now = Date.now();
+    const dayMs = 86400000;
+    const startToday = this.startOfDay(new Date()).getTime();
+    const endToday = this.endOfDay(new Date()).getTime();
+    let doneToday = 0, doneWeek = 0, doneMonth = 0;
+    for (const e of this.jcDoneEvents()) {
+      if (e.coachId !== coachId || e.ms > now) continue;
+      if (e.ms >= startToday) doneToday++;
+      if (e.ms >= now - 7 * dayMs) doneWeek++;
+      if (e.ms >= now - 30 * dayMs) doneMonth++;
+    }
+    let dueToday = 0, dueWeek = 0, pending = 0, overdue = 0;
+    for (const e of this.jcPendingEvents()) {
+      if (e.coachId !== coachId) continue;
+      if (e.ms < now) { overdue++; continue; }
+      pending++;
+      if (e.ms <= endToday) dueToday++;
+      if (e.ms <= now + 7 * dayMs) dueWeek++;
+    }
+    return { doneToday, doneWeek, doneMonth, dueToday, dueWeek, pending, overdue };
+  }
+
+  /** Counts for the CURRENT scope (All / Unassigned / one coach): a JC counts when the
+   *  participant it was run for is in scope, so the numbers line up with every other card.
+   *  Windows are calendar-anchored: today = since midnight; week/month = the last 7 / 30 days. */
+  /** The actual span each JC window covers, so the tiles state their period rather than implying
+   *  a calendar week/month. "Last week" is the trailing 7 days, "last month" the trailing 30. */
+  jcRange(w: 'today' | 'week' | 'month'): { from: Date; to: Date } {
+    const now = new Date();
+    const dayMs = 86400000;
+    if (w === 'today') return { from: this.startOfDay(now), to: now };
+    const days = w === 'week' ? 7 : 30;
+    return { from: this.startOfDay(new Date(now.getTime() - (days - 1) * dayMs)), to: now };
+  }
+
+  /** Which window the JC list below the tiles is showing. */
+  jcWindow = signal<'today' | 'week' | 'month'>('month');
+  setJcWindow(w: 'today' | 'week' | 'month'): void { this.jcWindow.set(w); }
+
+  /** The individual completed JCs behind the selected tile — WHO it was with and WHEN.
+   *  participant + the coach who ran it (appointments.hosts[0]) + the session date, newest first. */
+  jcDoneList = computed<{ profileid: string; participant: string; coach: string; date: Date }[]>(() => {
+    const now = Date.now();
+    const dayMs = 86400000;
+    const w = this.jcWindow();
+    const from = w === 'today' ? this.startOfDay(new Date()).getTime()
+               : w === 'week' ? now - 7 * dayMs
+               : now - 30 * dayMs;
+    const inScope = new Set(this.rosterIds());
+    return this.jcDoneEvents()
+      .filter(e => inScope.has(e.profileid) && e.ms <= now && e.ms >= from)
+      .sort((a, b) => b.ms - a.ms)
+      .map(e => ({
+        profileid: e.profileid,
+        participant: this.nameOf(e.profileid),
+        coach: this.jcCoachName(e.coachId),
+        date: new Date(e.ms),
+      }));
+  });
+
+  /** Display name for the coach who ran a JC: the coach list, then their own metadata doc. */
+  private jcCoachName(coachId: string | null): string {
+    if (!coachId) return 'Unknown coach';
+    return this.coaches.find(c => c.id === coachId)?.name
+      ?? this.metaMap?.docdata?.[coachId]?.['name']
+      ?? coachId;
+  }
+
+  /** Open the participant's slide-over from the JC list (their row may not be on the page). */
+  openJcParticipant(profileid: string): void {
+    const existing = this.allRows().find(r => r.profileid === profileid);
+    this.openSlideover(existing ?? this.buildRow(profileid, Date.now()));
+  }
+
+  jcPipeline = computed<{ today: number; week: number; month: number; ready: boolean }>(() => {
+    const events = this.jcDoneEvents();
+    const ready = this.contactDataLoaded();
+    const now = Date.now();
+    const dayMs = 86400000;
+    const startToday = this.startOfDay(new Date()).getTime();
+    const inScope = new Set(this.rosterIds());
+    let today = 0, week = 0, month = 0;
+    for (const e of events) {
+      if (!inScope.has(e.profileid)) continue;
+      if (e.ms > now) continue;                       // a future booking is not a completed JC
+      if (e.ms >= startToday) today++;
+      if (e.ms >= now - 7 * dayMs) week++;
+      if (e.ms >= now - 30 * dayMs) month++;
+    }
+    return { today, week, month, ready };
+  });
 
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
@@ -1142,118 +1213,250 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } catch (e) { console.warn('coach health states (paged) failed', e); }
   }
 
-  computeRows(): void {
-    const now = Date.now();
-    const byProfile = new Map<string, PortfolioRow>();
-    let matched = 0;
+  // ===================== Participants roster (operator directive, 2026-08-26) =====================
+  // The Participants tab is built from `participant metadata` — ONE doc per participant, which
+  // already carries coach (coachedby), journey (activejourney), finance (financialstatus),
+  // status (customerstatus), subscription (subscriptionend) and tickets (customersupporttickets).
+  // participantjourneyproduct is NOT read by this dashboard at all (operator directive).
+  //
+  // Why: the roster used to come from pjp, one doc per journey-PRODUCT, gated on
+  // `journeystatus in [...]`. That made a participant's existence depend on their products'
+  // statuses — people with a real customerstatus vanished from the screen — and forced the
+  // merge-by-profileid dedup below. Metadata is 1:1 with participants, so neither problem exists.
+
+  /** Display name: the participant's own metadata doc, then anything the name backfill recovered
+   *  from profile_data, then the raw id as a last resort. */
+  private nameOf(profileid: string): string {
+    return this.metaMap?.docdata?.[profileid]?.['name']
+      ?? this.nameBackfill[profileid]
+      ?? profileid;
+  }
+
+  /** ~6% of `participant metadata` docs carry no `name`, but profile_data usually does. Rather
+   *  than read that whole collection, fetch ONLY the missing ids (batched documentId() 'in'
+   *  queries) so those rows show a person instead of a document id. */
+  private nameBackfill: Record<string, string> = {};
+  private async backfillMissingNames(): Promise<void> {
+    const docs = this.metaMap?.docdata ?? {};
+    const missing = Object.keys(docs).filter(id => docs[id]?.['name'] == null);
+    if (!missing.length) return;
+    try {
+      for (const batch of this.chunk30(missing)) {
+        const snap = await getDocs(query(
+          collection(this.firestore, 'profile_data'), where(documentId(), 'in', batch)));
+        snap.forEach(d => {
+          const n = (d.data() as any)?.['name'];
+          if (n != null) this.nameBackfill[d.id] = String(n);
+        });
+      }
+    } catch (e) {
+      console.warn('name backfill failed (rows fall back to the profileid)', e);
+    }
+  }
+
+  /** Customer-status filter options, DERIVED FROM THE DATA rather than hardcoded.
+   *
+   *  The dropdown used to offer only Active / Late / Discontinued — so 'non active' (20 people in
+   *  the test base), 'banned', 'none' and blank were unreachable, and the list silently disagreed
+   *  with the status band above it. Options are now every distinct `customerstatus` actually
+   *  present, in the exact stored wording (matching is an exact string compare), plus an explicit
+   *  entry for participants who have no status at all.
+   *
+   *  `value` is the raw stored token — never prettify it, the filter compares it verbatim.
+   *  BLANK_STATUS is a sentinel for "field missing / empty", which cannot be expressed as a value. */
+  readonly BLANK_STATUS = '__blank__';
+  statusOptions: { value: string; label: string; count: number }[] = [];
+
+  /** Exact-token compare, with BLANK_STATUS meaning "no customerstatus on the doc". */
+  private statusMatches(value: string | null | undefined): boolean {
+    const token = value == null ? '' : String(value).trim();
+    return this.statusFilter === this.BLANK_STATUS ? token === '' : token === this.statusFilter;
+  }
+
+  private rebuildStatusOptions(): void {
+    const counts = new Map<string, number>();
+    let blank = 0;
+    for (const id of Object.keys(this.metaMap?.docdata ?? {})) {
+      const raw = this.metaMap.docdata[id]?.['customerstatus'];
+      const token = raw == null ? '' : String(raw).trim();
+      if (!token) { blank++; continue; }
+      counts.set(token, (counts.get(token) ?? 0) + 1);
+    }
+    const out = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: this.titleCaseStatus(value), count }));
+    if (blank > 0) out.push({ value: this.BLANK_STATUS, label: 'No status', count: blank });
+    this.statusOptions = out;
+  }
+
+  /** Display-only prettifier: 'non active' -> 'Non active'. The stored token is never altered. */
+  private titleCaseStatus(v: string): string {
+    return v.charAt(0).toUpperCase() + v.slice(1);
+  }
+
+  /** Human label for a journey id. NEVER returns the raw document id: `journeyNameMap[id] ?? id`
+   *  used to fall through to the id itself, so a participant whose `activejourney` points at a
+   *  missing journey doc (or one whose `journey` name field is blank) rendered as a string of
+   *  random-looking characters in the table, the worklist and the By-journey chips. Those cases
+   *  now read "Unknown journey", which is honest and groups them together in the filter. */
+  private journeyLabelFor(journeyId: string | null | undefined): string {
+    if (!journeyId) return '-';
+    const name = this.journeyNameMap[journeyId];
+    return (name != null && String(name).trim() !== '') ? String(name) : 'Unknown journey';
+  }
+
+  /** Every participant in scope, from the metadata collection. One id per person, no dedup. */
+  private rosterIds(): string[] {
+    const docs = this.metaMap?.docdata ?? {};
     const showAll = this.selectedCoachId === this.ALL;
     const showUnassigned = this.selectedCoachId === this.UNASSIGNED;
+    const out: string[] = [];
+    for (const id of Object.keys(docs)) {
+      const cb = docs[id]?.['coachedby'];
+      if (showUnassigned) { if (!this.isUnassigned(cb)) continue; }
+      else if (!showAll && !this.isMine(cb, this.selectedCoachId)) continue;
+      out.push(id);
+    }
+    return out;
+  }
+
+  /** Participants in the whole metadata collection with no coach assigned. */
+  private countUnassignedInRoster(): number {
+    const docs = this.metaMap?.docdata ?? {};
+    let n = 0;
+    for (const id of Object.keys(docs)) if (this.isUnassigned(docs[id]?.['coachedby'])) n++;
+    return n;
+  }
+
+  /** When set, computeRows() builds ONLY these participants (one page of the roster). */
+  private rowIds: string[] | null = null;
+
+  /** Build one PortfolioRow from the participant's metadata doc, joining pjp for the rest. */
+  private buildRow(profileid: string, now: number): PortfolioRow {
+    const meta: any = this.metaMap?.docdata?.[profileid] ?? {};
+    // JOURNEY / SUBSCRIPTION — both straight off the metadata doc.
+    const journeyId: string | null =
+      (typeof meta['activejourney'] === 'string' && meta['activejourney']) || null;
+    const subEnd = this.toDate(meta['subscriptionend']);
+
+    // Last touch = attended coach appointments + logged touchpoints. The profile_data
+    // `lastjourneycoachdate` field is deliberately NOT used here: it is written from the most
+    // recent NON-CANCELLED appointment by starttime, including FUTURE ones, so it could push
+    // last-touch into the future and silently suppress going-quiet. It is now shown, unmixed,
+    // in the slide-over only (operator directive, 2026-08-26).
+    const lastCoach = this.maxDate(
+      this.contactEventByProfile[profileid] ? new Date(this.contactEventByProfile[profileid]) : null,
+      this.touchpointByProfile[profileid] ? new Date(this.touchpointByProfile[profileid]) : null,
+    );
+    const daysSinceCoach = lastCoach ? Math.floor((now - lastCoach.getTime()) / 86400000) : null;
+    const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
+    const subActive = daysToRenewal != null && daysToRenewal >= 0;
+
+    const row: PortfolioRow = {
+      profileid,
+      name: this.nameOf(profileid),
+      number: meta['phonenumber'] ?? meta['number'] ?? null,
+      email: meta['email'] ?? null,
+      coachname: this.coachNameFor(meta['coachedby']),
+      journeyname: this.journeyLabelFor(journeyId),
+      atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
+      productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
+      // journeystatus + onboarded lived ONLY on pjp, which this dashboard no longer reads.
+      journeystatus: '',
+      subscriptionend: subEnd,
+      purchasedate: this.toDate(meta['purchasedate']),
+      customerstatus: meta['customerstatus'] ?? null,
+      financialstatus: meta['financialstatus'] ?? null,
+      // opportunities were pjp fields; metadata's product arrays are the nearest equivalent.
+      opportunities: Array.isArray(meta['unconsumedproducts']) ? meta['unconsumedproducts'] : [],
+      opportunitiesConsumed: Array.isArray(meta['consumedproducts']) ? meta['consumedproducts'] : [],
+      totalpurchasevalue: this.num(meta['pp_totalpurchasevalue']),
+      balance: this.balanceFor(meta),
+      emi: this.num(meta['emi']),
+      lastcoachdate: lastCoach,
+      daysSinceCoach,
+      daysToRenewal,
+      // TICKETS — metadata's own open-ticket count (verified against clientippue: it tracks the
+      // OPEN count, not the total). Removes the need to scan clientissue for the row value.
+      openTickets: this.openTicketsFor(meta, profileid),
+      onboarded: false,          // pjp-only field; no longer read
+      goingQuiet: false,
+      flagged: this.flaggedIds().has(profileid),
+      renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
+      subActive,
+      lapsed: daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
+        && !this.isInactiveStatus(meta['customerstatus']),
+      // NOT-STARTED is permanently false: it needs pjp's journeystatus + onboarded, and this
+      // dashboard no longer reads that collection (operator directive, 2026-08-26). No metadata
+      // proxy is usable — the best candidate flagged 123 people to catch 8 (115 false positives).
+      // The flag, lever and scoring term are left in place so re-sourcing it is a one-function change.
+      notStarted: false,
+      priority: 0, priorityBand: 'Low', reason: '',
+      pjpIds: [],                // assignment writes go to the metadata doc, not pjp
+
+      recentEventRequest: this.recentEventByProfile[profileid] ?? null,
+      coachHealthState: this.freshHealth(this.coachHealthByProfile[profileid]),
+      healthState: null, healthCoverage: 0,
+    };
+    row.goingQuiet = row.subActive && daysSinceCoach != null && daysSinceCoach > this.QUIET_DAYS;
+    this.scoreRow(row);
+    if (this.SHOW_HEALTH) this.scoreHealth(row);
+    return row;
+  }
+
+  /** OPEN tickets for one participant — never a lifetime total.
+   *
+   *  ONE source at any given moment, so the summary card and the table can never disagree:
+   *
+   *   • before the base-wide clientissue read lands → metadata's `customersupporttickets`
+   *   • after it lands  → the exact count of `clientissue` docs whose status is 'open'
+   *
+   *  The gate is `openTicketsExact`, NOT `loadedJoinIds`. Gating on per-page joins was the bug:
+   *  the lite index (built before any joins) counted from metadata while the visible rows counted
+   *  from clientissue, so the "Open tickets" card and the list it opened reported different
+   *  numbers. In test data metadata said 21 people and clientissue said 28 — 7 participants have
+   *  open tickets but no `customersupporttickets` field at all, so metadata alone undercounts. */
+  private openTicketsExact = false;
+  private openTicketsFor(meta: any, profileid: string): number {
+    if (this.openTicketsExact) return this.openTicketCounts[profileid] ?? 0;
+    const n = meta?.['customersupporttickets'];
+    if (typeof n === 'number' && isFinite(n)) return Math.max(0, Math.round(n));
+    const parsed = this.num(n);
+    if (parsed != null && isFinite(parsed)) return Math.max(0, Math.round(parsed));
+    return this.openTicketCounts[profileid] ?? 0;
+  }
+
+  /** Background: one `clientissue` read, then re-count every lite row and re-render. Until this
+   *  completes the board runs on metadata's counts — consistently, in both places. */
+  private async loadExactOpenTickets(): Promise<void> {
+    if (this.openTicketsExact) return;
+    const counts = await this.ensureFullBaseOpenTickets();
+    Object.assign(this.openTicketCounts, counts);
+    this.openTicketsExact = true;
+    const metaDocs: any = this.metaMap?.docdata ?? {};
+    for (const lite of this.fullIndex) {
+      lite.openTickets = this.openTicketsFor(metaDocs[lite.profileid], lite.profileid);
+    }
+    this.fullBaseWithOpenTickets = this.fullIndex.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
+    this.recomputeSummary();
+    this.applyFilters();
+  }
+
+  computeRows(): void {
+    const now = Date.now();
     // NOTE: selection is NOT cleared here. Clearing on every computeRows() (which runs on search /
     // filter / page) was what wiped the user's picks. Selection is persistent and survives
     // search/filter/paging; it is cleared only after a successful assignSelected() (or pruned there).
+    const ids = this.rowIds ?? this.rosterIds();
+    const rows = ids.map(id => this.buildRow(id, now));
 
-    for (const d of this.pjpData) {
-      if (showUnassigned) { if (!this.isUnassigned(d['coachedby'])) continue; }
-      else if (!showAll && !this.isMine(d['coachedby'], this.selectedCoachId)) continue;
-      const profileid = d['profileid'];
-      if (!profileid) continue;
-      matched++;
-
-      const meta: any = this.metaMap.docdata?.[profileid] ?? {};
-      const journeyId = d['journeyref']?.id ?? null;
-      // subscriptionend comes ONLY from the participant's current PJP doc (no metadata fallback).
-      const subEnd = this.toDate(d['subscriptionend']);
-
-      // last touch = latest of: derived field, raw attended sessions, logged touchpoints
-      const lastCoach = this.maxDate(
-        this.maxDate(
-          this.toDate(this.profileMap.docdata?.[profileid]?.['lastjourneycoachdate']),
-          this.contactEventByProfile[profileid] ? new Date(this.contactEventByProfile[profileid]) : null,
-        ),
-        this.touchpointByProfile[profileid] ? new Date(this.touchpointByProfile[profileid]) : null,
-      );
-
-      const daysSinceCoach = lastCoach ? Math.floor((now - lastCoach.getTime()) / 86400000) : null;
-      const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
-      const onboarded = !!d['onboarded'];
-      const jstatus = d['journeystatus'];
-
-      const row: PortfolioRow = {
-        profileid,
-        name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
-        number: this.profileMap.phonenumber?.[profileid] ?? null,
-        email: this.profileMap.email?.[profileid] ?? meta['email'] ?? null,
-        coachname: this.coachNameFor(d['coachedby']),
-        journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
-        atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
-        productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
-        journeystatus: jstatus ?? 'Initiated',
-        subscriptionend: subEnd,
-        purchasedate: this.toDate(d['purchasedate']),
-        customerstatus: meta['customerstatus'] ?? null,
-        financialstatus: meta['financialstatus'] ?? null,
-        opportunities: Array.isArray(d['opportunities']) ? d['opportunities'] : [],
-        opportunitiesConsumed: Array.isArray(d['opportunities_consumed']) ? d['opportunities_consumed'] : [],
-        totalpurchasevalue: this.num(meta['pp_totalpurchasevalue']),
-        balance: this.balanceFor(meta),
-        emi: this.num(meta['emi']),
-        lastcoachdate: lastCoach,
-        daysSinceCoach,
-        daysToRenewal,
-        openTickets: this.openTicketCounts[profileid] ?? 0,
-        onboarded,
-        // going-quiet only counts ACTIVE participants (subActive); set after the row is built (below).
-        goingQuiet: false,
-        flagged: this.flaggedIds().has(profileid),
-        renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
-        // subscription-based active: this product's subscriptionend is in the future. The
-        // per-participant subActive is the OR across products, finalised at merge time below.
-        subActive: daysToRenewal != null && daysToRenewal >= 0,
-        lapsed: daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
-          && !this.isInactiveStatus(meta['customerstatus']),
-        notStarted: ['Initiated', 'initiated', null, undefined].includes(jstatus) && onboarded,
-        priority: 0, priorityBand: 'Low', reason: '',
-        pjpIds: [d['__id']],
-        recentEventRequest: this.recentEventByProfile[profileid] ?? null,
-        coachHealthState: this.freshHealth(this.coachHealthByProfile[profileid]),
-        healthState: null, healthCoverage: 0,
-      };
-      // going-quiet = ACTIVE participant with no coach contact in QUIET_DAYS+ days.
-      row.goingQuiet = row.subActive && daysSinceCoach != null && daysSinceCoach > this.QUIET_DAYS;
-      this.scoreRow(row);
-      if (this.SHOW_HEALTH) this.scoreHealth(row);
-
-      const existing = byProfile.get(profileid);
-      if (!existing) { byProfile.set(profileid, row); }
-      else {
-        const mergedIds = [...existing.pjpIds, d['__id']];
-        // a participant is subActive if ANY of their journey-products has a future subscriptionend.
-        const mergedSubActive = existing.subActive || row.subActive;
-        if (row.priority > existing.priority) {
-          row.pjpIds = mergedIds;
-          row.subActive = mergedSubActive;
-          // re-evaluate going-quiet against the merged active flag (a later product may flip it active)
-          row.goingQuiet = row.subActive && row.daysSinceCoach != null && row.daysSinceCoach > this.QUIET_DAYS;
-          byProfile.set(profileid, row);
-        } else {
-          existing.pjpIds = mergedIds;
-          existing.subActive = mergedSubActive;
-          existing.goingQuiet = existing.subActive && existing.daysSinceCoach != null && existing.daysSinceCoach > this.QUIET_DAYS;
-        }
-      }
-    }
-
-    this.matchedCount = matched;
-    this.allRows.set(Array.from(byProfile.values()).sort((a, b) => b.priority - a.priority));
-    this.journeyOptions = Array.from(new Set(this.allRows().map(r => r.journeyname))).sort();
-    // full mode: derive finance filter options from the (full) base; paged mode sources them from
-    // ensureFullIndex (the page-local allRows would otherwise miss off-page financial statuses).
+    this.matchedCount = rows.length;
+    this.allRows.set(rows.sort((a, b) => b.priority - a.priority));
     if (!this.pagedMode) {
       this.financeOptions = Array.from(
         new Set(this.allRows().map(r => r.financialstatus).filter((v): v is string => !!v)),
       ).sort();
     }
-    // paged mode builds the summary via accumulatePagedSummary() (server counts + loaded-so-far)
     if (!this.pagedMode) this.computeSummary();
     this.applyFilters();
   }
@@ -1728,6 +1931,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (r.openTickets > 0) out.push('tickets');
     return out;
   }
+  /** Does this row have at least one live Needs-Attention issue, i.e. is there anything to address?
+   *  Same predicate as needsAttentionRows() / the slideover's `needsAttention` flag. Public so the
+   *  table can render the Mark-addressed control disabled (rather than hidden) when it is false. */
+  hasAddressableIssue(r: PortfolioRow): boolean {
+    return r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0;
+  }
+
   /** True when the coach marked this participant addressed AND no NEW issue type has appeared since
    *  (current issues are a subset of the snapshot). A new issue re-surfaces them into Needs Attention. */
   isAddressed(r: PortfolioRow): boolean {
@@ -1809,11 +2019,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     });
     // reflect on the row + recompute the unassigned count from live data
     row.coachname = coachName;
-    const unassignedProfiles = new Set<string>();
-    for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
-    }
-    this.unassignedCount = unassignedProfiles.size;
+    this.unassignedCount = this.countUnassignedInRoster();
     // if we're viewing a single coach or the unassigned bucket, this row may no longer belong here
     if (this.selectedCoachId !== this.ALL) this.computeRows();
     this.guard.openSnackBar(`Assigned ${row.name} to ${coachName}`, 'Close');
@@ -1833,11 +2039,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       action: 'unassign', fromCoachId, fromCoachName, toCoachId: null, toCoachName: null, note: note.trim(),
     });
     row.coachname = '—';
-    const unassignedProfiles = new Set<string>();
-    for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
-    }
-    this.unassignedCount = unassignedProfiles.size;
+    this.unassignedCount = this.countUnassignedInRoster();
     if (this.selectedCoachId !== this.ALL) this.computeRows();
     this.guard.openSnackBar(`Removed coach from ${row.name}`, 'Close');
   }
@@ -1909,10 +2111,26 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Scope-aware flagged count: base-wide for the ALL view, but this coach's flagged participants
    *  for a specific coach (allRows is that coach's full base in non-paged mode). The global
    *  flaggedIds set is base-wide, so it must NOT be used as the count when a coach is selected.
-   *  (selectedCoachId is read as a plain field — it co-changes with an allRows rebuild on scope
-   *  switch, and flaggedIds is a signal, so the memoized count stays correct.) */
-  flaggedCount = computed<number>(() =>
-    this.pagedMode ? (this.fullIndexBuilt ? this.pagedFlagged() : this.flaggedIds().size) : this.flaggedRows().length);
+   *
+   *  Computed LIVE from the lite index rather than from a stored snapshot. It previously read
+   *  `pagedFlagged`, a number written only inside accumulatePagedSummary() — so if the flags
+   *  finished loading after the last summary pass (they load in parallel with everything else),
+   *  or a coach starred someone afterwards, the card stayed on 0 while the Flagged FILTER, which
+   *  reads the live flaggedIds signal, correctly listed those participants. Card and filter now
+   *  share one source, so they cannot disagree. Depends on indexReady() so it recomputes when the
+   *  index is (re)built, and on the two summary-filter signals so it honours the same scope. */
+  flaggedCount = computed<number>(() => {
+    if (!this.pagedMode) return this.flaggedRows().length;
+    const flags = this.flaggedIds();
+    if (!this.fullIndexBuilt) return flags.size;
+    this.indexReady();                     // recompute when the index is rebuilt
+    this.sumLifecycle(); this.sumJourneys();   // and when the summary filter changes
+    return this.fullIndex.reduce((n, l) =>
+      n + (flags.has(l.profileid)
+        && this.liteInScope(l)
+        && this.matchesSummaryJourneyLite(l)
+        && this.matchesSummaryLifecycleLite(l) ? 1 : 0), 0);
+  });
 
   /** Coach-set health distribution across the CURRENT scope's loaded rows (allRows). Honest: it
    *  reflects only KNOWN/loaded states — every row without a coach assessment is Not assessed (no
@@ -1947,14 +2165,26 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   journeyMix = computed<{ name: string; count: number }[]>(() => {
     const m = new Map<string, number>();
     this.indexReady();   // recompute when the lite index finishes building (paged mode)
+    // SHOW EVERY JOURNEY (operator directive, 2026-08-26): seed the map from the whole `journey`
+    // collection at zero first. Previously this list was derived only from the participants in
+    // scope, so a journey nobody is currently on simply vanished from the By-journey card and the
+    // filter dropdown — the list silently changed shape depending on who was loaded.
+    for (const id of Object.keys(this.journeyNameMap)) {
+      const label = this.journeyLabelFor(id);
+      if (label && label !== '-') m.set(label, 0);
+    }
     // Paged/All view: count the WHOLE base from the lite index (allRows is only the loaded page);
     // coach view: allRows is the full base. journeyname is carried on both.
-    const src: { journeyname?: string }[] = (this.pagedMode && this.fullIndexBuilt) ? this.fullIndex : this.allRows();
+    const src: { journeyname?: string }[] = (this.pagedMode && this.fullIndexBuilt)
+      ? this.fullIndex.filter(l => this.liteInScope(l))   // scope: All / Unassigned / one coach
+      : this.allRows();
     for (const r of src) {
       const j = (r.journeyname && r.journeyname !== '-') ? r.journeyname : 'Unknown';
       m.set(j, (m.get(j) ?? 0) + 1);
     }
-    return [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    // busiest first, then alphabetical so the zero-count journeys have a stable order
+    return [...m.entries()].map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   });
 
   // ---- personal journey groups (a named roll-up over chosen journeys, one journey per group) ----
@@ -1965,19 +2195,23 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   newGroupJourneys = new Set<string>();
   journeyGroupFilter: string[] = [];   // journeys of the tapped group (Participants filter)
 
-  /** The "By journey" split with groups rolled up + ungrouped journeys individual, desc by count. */
+  /** The "By journey" split: every journey listed, plus any personal groups as roll-ups. */
   journeyView = computed<{ name: string; count: number; group: boolean; journeys: string[] }[]>(() => {
     const mix = this.journeyMix();
     const countOf = new Map(mix.map(j => [j.name, j.count] as const));
-    const grouped = new Set<string>();
     const out: { name: string; count: number; group: boolean; journeys: string[] }[] = [];
     for (const g of this.journeyGroups()) {
       let c = 0;
-      for (const j of g.journeys) { c += countOf.get(j) ?? 0; grouped.add(j); }
+      for (const j of g.journeys) c += countOf.get(j) ?? 0;
       out.push({ name: g.name, count: c, group: true, journeys: g.journeys });
     }
-    for (const j of mix) if (!grouped.has(j.name)) out.push({ name: j.name, count: j.count, group: false, journeys: [j.name] });
-    return out.sort((a, b) => b.count - a.count);
+    // Every individual journey is listed as well, INCLUDING ones that belong to a group. Groups
+    // used to swallow their members (`if (!grouped.has(...))`), so creating a group removed those
+    // journeys from the list — the same journey could be visible or not depending on a personal,
+    // machine-local group definition. Groups are now roll-ups ON TOP of the full list, not
+    // replacements for it (operator directive, 2026-08-26).
+    for (const j of mix) out.push({ name: j.name, count: j.count, group: false, journeys: [j.name] });
+    return out.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   });
 
   // ---- global summary filter: lifecycle + journey/group, scopes EVERY summary metric ----
@@ -2012,11 +2246,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // and are read by the corresponding computeds — keeping the All view reactive to filter changes.
   private pagedHealth = signal<{ happy: number; neutral: number; unhappy: number; atRisk: number; critical: number; notAssessed: number; total: number }>(
     { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 });
-  private pagedFlagged = signal(0);
   private pagedFilteredCount = signal(0);
   // Bumped when the lite index finishes building, so journeyMix (which reads the plain fullIndex
   // array in paged mode) recomputes to the base-wide counts instead of the page-local ones.
   private indexReady = signal(0);
+  /** Is this lite row inside the CURRENTLY SELECTED scope (All / Unassigned / one coach)?
+   *
+   *  The lite index always holds the whole roster, so every base-wide computation over it has to
+   *  apply the scope itself. It didn't — so selecting "Unassigned" (or any paged view) left the
+   *  Summary tab reporting whole-base totals, lifecycle split, KPIs and journey mix while the
+   *  Participants list underneath was correctly scoped. */
+  private liteInScope(l: LiteIndexRow): boolean {
+    if (this.selectedCoachId === this.UNASSIGNED) return this.isUnassigned(l.coachedby);
+    if (this.selectedCoachId === this.ALL) return true;
+    return this.isMine(l.coachedby, this.selectedCoachId);
+  }
+
   /** Same journey predicate as matchesSummaryJourney, over a lite index row (base-wide). */
   private matchesSummaryJourneyLite(l: LiteIndexRow): boolean {
     const s = this.sumJourneys();
@@ -2042,7 +2287,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Base-wide count matching the applied filter — paged from the lite index, else the loaded rows. */
   get summaryShownCount(): number { return this.pagedMode ? this.pagedFilteredCount() : this.filteredRows().length; }
-  get summaryScopeTotal(): number { return this.pagedMode ? this.fullIndex.length : this.allRows().length; }
+  get summaryScopeTotal(): number {
+    return this.pagedMode ? this.fullIndex.filter(l => this.liteInScope(l)).length : this.allRows().length;
+  }
 
   /** Default is Active; a filter is "active" (Clear appears) only when it differs from that default. */
   get summaryFilterActive(): boolean { return this.sumLifecycle() !== 'active' || this.sumJourneys().size > 0; }
@@ -2189,17 +2436,36 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
-  /** Real top-of-queue participants for a coach (Coaches view), from the loaded base rows.
-   *  Matches a row to the coach via the row's own coachname (resolved in computeRows), so it
-   *  never fabricates — it only previews participants actually present in the loaded base. */
-  topQueueForCoach(coachId: string): PortfolioRow[] {
+  /** Every participant assigned to one coach, as full rows — built from the METADATA ROSTER, not
+   *  from the loaded page.
+   *
+   *  This is the fix for "clicking any caseload shows the same three participants". The old
+   *  implementation filtered `allRows()`, which in paged mode holds ONLY the current 50-row page,
+   *  so every coach card drew its queue from the same 50 people — coaches whose participants were
+   *  not on that page showed nothing, and the ones who were showed up under card after card.
+   *  The lite index covers the whole base, and buildRow() is pure in-memory (metadata + the
+   *  already-loaded join maps), so scoping by coach is exact and costs no Firestore read. */
+  private rowsForCoach(coachId: string): PortfolioRow[] {
+    const now = Date.now();
+    if (this.fullIndexBuilt) {
+      return this.fullIndex
+        .filter(l => this.isMine(l.coachedby, coachId))
+        .map(l => this.buildRow(l.profileid, now));
+    }
+    // pre-index fallback: the loaded rows, matched by resolved coach name
     const coachName = this.coaches.find(c => c.id === coachId)?.name ?? '';
-    if (!coachName) return [];
-    return this.allRows()
-      .filter(r => r.coachname === coachName)
+    return coachName ? this.allRows().filter(r => r.coachname === coachName) : [];
+  }
+
+  /** Top-of-queue preview for a coach card: their participants who need action, highest priority
+   *  first. Was hardcoded to 3 (`slice(0, 3)`) — the other half of the "only three participants"
+   *  report — now COACH_QUEUE_SIZE. */
+  readonly COACH_QUEUE_SIZE = 10;
+  topQueueForCoach(coachId: string): PortfolioRow[] {
+    return this.rowsForCoach(coachId)
       .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
       .sort((a, b) => b.priority - a.priority)
-      .slice(0, 3);
+      .slice(0, this.COACH_QUEUE_SIZE);
   }
 
   /** Jump to the Summary view (used by the compact strip when no matching lever applies). */
@@ -2222,6 +2488,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.statusFilter = '';
     this.financeFilters = [];
     this.carrySummaryFilterToBase();   // keep the current summary filter on the list
+    if (this.leverIgnoresLifecycle(lever)) this.lifecycleFilter = '';
     this.view = 'base';
     this.setLever(lever);
   }
@@ -2237,12 +2504,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
-  /** Summary "Unassigned" card → Participants tab scoped to the no-coach view, which renders the
-   *  bulk select + assign-coach bar so a coach can be tagged onto them. */
-  goToUnassigned(): void {
-    this.view = 'base';
-    void this.onCoachChange(this.UNASSIGNED);
-  }
 
   /** Summary "Payments locked" card → Participants tab filtered to the existing 'locked' finance
    *  filter (there is no payments-locked lever; the finance filter is the real, existing path). */
@@ -2263,13 +2524,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   coachCards = computed<CoachCard[]>(() => {
     const todayStart = this.startOfDay(new Date()).getTime();
     const todayEnd = this.endOfDay(new Date()).getTime();
-    // group the loaded base rows by coach name (computeRows resolves coachname from coachedby)
-    const rowsByCoach = new Map<string, PortfolioRow[]>();
-    for (const r of this.allRows()) {
-      const list = rowsByCoach.get(r.coachname) ?? [];
-      list.push(r);
-      rowsByCoach.set(r.coachname, list);
-    }
+    this.indexReady();   // rebuild when the roster index lands
     // touchpoints logged TODAY, counted per coach from the already-loaded raw touchpoints
     const handledByCoach: Record<string, number> = {};
     for (const tp of this.allTouchpoints) {
@@ -2284,8 +2539,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     const cards: CoachCard[] = [];
     for (const c of this.coaches) {
-      const rows = rowsByCoach.get(c.name) ?? [];
-      const caseload = baseByScoreboard[c.id] ?? rows.length;
+      // BASE-WIDE rows for this coach (see rowsForCoach) — these stats used to be computed from
+      // the loaded page only, so every card under-reported unless its coach happened to be on it.
+      const rows = this.rowsForCoach(c.id);
+      const caseload = baseByScoreboard[c.id] || rows.length;
       const needToday = rows.filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0).length;
       const goingQuiet = rows.filter(r => r.goingQuiet).length;
       const flagged = rows.filter(r => r.flagged).length;
@@ -2294,11 +2551,105 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (caseload === 0 && rows.length === 0) continue;
       cards.push({
         coachId: c.id, coachName: c.name, caseload, needToday, goingQuiet, flagged, handled,
-        queue: this.topQueueForCoach(c.id),
+        activeCaseload: rows.filter(r => this.lifecycleOf(r.customerstatus) === 'active').length,
+        jc: this.coachJcStats(c.id),
+        queue: rows
+          .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
+          .sort((a, b) => b.priority - a.priority)
+          .slice(0, this.COACH_QUEUE_SIZE),
       });
     }
     return cards;
   });
+
+  // ---- Coaches tab: click a stat, see exactly the people behind that number ----
+  /** Which coach + which metric is currently drilled into. */
+  coachDrill = signal<{ coachId: string; metric: CoachMetric } | null>(null);
+
+  /** Click a number on a coach card: expand the card and list THOSE people underneath.
+   *  Clicking the same number again collapses back to the default needs-action queue. */
+  drillCoach(coachId: string, metric: CoachMetric, ev?: Event): void {
+    ev?.stopPropagation();
+    const cur = this.coachDrill();
+    this.coachDrill.set(cur && cur.coachId === coachId && cur.metric === metric ? null : { coachId, metric });
+    this.expandedCoachIds.add(coachId);   // a drill always opens the card
+  }
+
+  isCoachDrill(coachId: string, metric: CoachMetric): boolean {
+    const cur = this.coachDrill();
+    return !!cur && cur.coachId === coachId && cur.metric === metric;
+  }
+
+  coachDrillTitle(metric: CoachMetric): string {
+    switch (metric) {
+      case 'caseload': return 'Caseload — all assigned participants';
+      case 'active': return 'Active caseload';
+      case 'needToday': return 'Need action today';
+      case 'goingQuiet': return 'Going quiet';
+      case 'flagged': return 'Flagged';
+      case 'doneToday': return 'JC done today';
+      case 'doneWeek': return 'JC done last week';
+      case 'doneMonth': return 'JC done last month';
+      case 'dueToday': return 'JC due today';
+      case 'dueWeek': return 'JC due this week';
+      case 'pending': return 'Pending JCs';
+      case 'overdue': return 'Overdue JCs';
+      default: return 'Needs action — top of queue';
+    }
+  }
+
+  /** The people behind one number on a coach card. Assignment-based metrics come from the coach's
+   *  roster rows; JC metrics come from the appointments they host, so `detail` shows the session
+   *  date rather than a priority reason. */
+  coachDrillPeople(coachId: string, metric: CoachMetric): { profileid: string; name: string; detail: string }[] {
+    const now = Date.now();
+    const dayMs = 86400000;
+    const startToday = this.startOfDay(new Date()).getTime();
+    const endToday = this.endOfDay(new Date()).getTime();
+
+    const fromRows = (rows: PortfolioRow[]) => rows
+      .sort((a, b) => b.priority - a.priority)
+      .map(r => ({ profileid: r.profileid, name: r.name, detail: r.reason || 'On track' }));
+
+    const fromEvents = (events: JcDoneEvent[], keep: (ms: number) => boolean) => events
+      .filter(e => e.coachId === coachId && keep(e.ms))
+      .sort((a, b) => b.ms - a.ms)
+      .map(e => ({
+        profileid: e.profileid,
+        name: this.nameOf(e.profileid),
+        detail: this.fmtDate(new Date(e.ms)),
+      }));
+
+    switch (metric) {
+      case 'caseload':   return fromRows(this.rowsForCoach(coachId));
+      case 'active':     return fromRows(this.rowsForCoach(coachId).filter(r => this.lifecycleOf(r.customerstatus) === 'active'));
+      case 'needToday':  return fromRows(this.rowsForCoach(coachId).filter(r => this.hasAddressableIssue(r)));
+      case 'goingQuiet': return fromRows(this.rowsForCoach(coachId).filter(r => r.goingQuiet));
+      case 'flagged':    return fromRows(this.rowsForCoach(coachId).filter(r => r.flagged));
+      case 'doneToday':  return fromEvents(this.jcDoneEvents(), ms => ms <= now && ms >= startToday);
+      case 'doneWeek':   return fromEvents(this.jcDoneEvents(), ms => ms <= now && ms >= now - 7 * dayMs);
+      case 'doneMonth':  return fromEvents(this.jcDoneEvents(), ms => ms <= now && ms >= now - 30 * dayMs);
+      case 'dueToday':   return fromEvents(this.jcPendingEvents(), ms => ms >= now && ms <= endToday);
+      case 'dueWeek':    return fromEvents(this.jcPendingEvents(), ms => ms >= now && ms <= now + 7 * dayMs);
+      case 'pending':    return fromEvents(this.jcPendingEvents(), ms => ms >= now);
+      case 'overdue':    return fromEvents(this.jcPendingEvents(), ms => ms < now);
+      default:           return [];
+    }
+  }
+
+  /** Doc item 9: clicking a coach's name opens the Participants tab scoped to that coach.
+   *  Resets the levers/filters first so the list is their WHOLE base, not a carried-over slice. */
+  openCoachBase(coachId: string): void {
+    this.activeLever = 'all';
+    this.statusFilter = '';
+    this.financeFilters = [];
+    this.lifecycleFilter = '';
+    this.journeyFilter = '';
+    this.journeyGroupFilter = [];
+    this.search = '';
+    this.view = 'base';
+    void this.onCoachChange(coachId);
+  }
 
   /** Progress-bar fill for a coach card: handled / needToday, clamped 0..100 (0 when nothing due). */
   handledPct(card: CoachCard): number {
@@ -2351,7 +2702,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Latest coach-contact timestamp for a participant (same signals as computeRows). */
   private lastTouchMs(profileid: string): number | null {
-    const derived = this.toDate(this.profileMap.docdata?.[profileid]?.['lastjourneycoachdate']);
+    const derived: Date | null = null;   // see buildRow(): lastjourneycoachdate is slide-over only
     const candidates = [
       derived ? derived.getTime() : null,
       this.contactEventByProfile[profileid] ?? null,
@@ -2374,11 +2725,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     // distinct participant -> coach (first matching assignment), so quiet is counted once per person
     const seen = new Set<string>();
-    for (const d of this.sbPjp) {
-      const pid = d['profileid'];
-      if (!pid) continue;
+    const metaDocs: any = this.metaMap?.docdata ?? {};
+    for (const pid of Object.keys(metaDocs)) {
+      const coachedby = metaDocs[pid]?.['coachedby'];
       for (const c of this.coaches) {
-        if (!this.isMine(d['coachedby'], c.id)) continue;
+        if (!this.isMine(coachedby, c.id)) continue;
         baseByCoach[c.id].add(pid);
         const key = c.id + '|' + pid;
         if (!seen.has(key)) {
@@ -2472,15 +2823,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // a specific coach needs its full base (global priority sort + accurate KPIs); the pjp
       // collection is cached, but the dependent joins must be (re)loaded SCOPED to this coach.
       if (this.paginator) this.paginator.firstPage();
-      if (this.fullPjpData) {
-        this.pjpData = this.fullPjpData;
-        this.setProgress(55, 'Loading details…');
-        await this.loadFullDependentsForBase();
-        this.computeRows();
-        this.setProgress(100, 'Ready');
-      } else {
-        await this.loadFullPortfolio();
-      }
+      await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
   }
 
@@ -2502,7 +2845,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.statusFilter = '';
     this.financeFilters = [];   // KPI cards are ONE mutually-exclusive group — clear the finance
                                 // (Payments-locked) filter so it can't stack with a lever card.
+    // Carry the summary filter onto the list, exactly as goToParticipantsWithLever() does.
+    // WITHOUT this the card and the list it opens disagree: every KPI number is counted through
+    // the summary filter (which DEFAULTS to Active), while the list was left unscoped — so
+    // "People with tickets" showed the active-only count and then listed every lifecycle
+    // (17 vs 28 in test data). The count and the rows now share one scope.
+    this.carrySummaryFilterToBase();
     const target = this.kpiLever(which);
+    if (this.leverIgnoresLifecycle(target)) this.lifecycleFilter = '';
     this.setLever(this.activeLever === target ? 'all' : target);
   }
 
@@ -2553,14 +2903,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (needsFetch) this.pageLoading = true;
     try {
       await this.loadJoinsFor(ids);
-      const idSet = new Set(ids);
-      const savedPjp = this.pjpData;
       this.suppressPagedRender = true;
-      this.pjpData = (this.fullPjpData ?? []).filter(d => idSet.has(d['profileid']));
-      this.computeRows();   // builds allRows for the ENTIRE matched set (applyFilters suppressed)
+      this.rowIds = ids;    // build the ENTIRE matched set from the roster (applyFilters suppressed)
+      this.computeRows();
+      this.rowIds = null;
       const rows = this.allRows().filter(r => this.rowMatches(r));
       this.suppressPagedRender = false;
-      this.pjpData = savedPjp;
       // restore the visible page (rebuilds allRows / dataSource for the current slice).
       await this.renderMatchedPage();
       return rows;
@@ -2579,7 +2927,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } else {
       id = coachedby?.id ?? null;
     }
-    return id ? (this.profileMap.map?.[id] ?? '—') : '—';
+    return id ? (this.coaches.find(c => c.id === id)?.name ?? this.metaMap?.docdata?.[id]?.['name'] ?? '—') : '—';
   }
 
   private isMine(coachedby: any, coachId: string): boolean {
@@ -2646,19 +2994,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Best-effort display name for a profileid from the loaded maps (for tray chips of off-page picks). */
   private nameForProfile(id: string): string | null {
-    return this.profileMap.map?.[id] ?? this.metaMap.docdata?.[id]?.['name'] ?? null;
+    return this.metaMap?.docdata?.[id]?.['name'] ?? this.coaches.find(c => c.id === id)?.name ?? null;
   }
 
   /** Bulk-assign the selected unassigned participants to a coach — writes real coachedby. */
   /** Coach assignment lives on the participant's SINGLE `participant metadata` doc (id == profileid),
    *  NOT on the per-journey-product docs. Stamp it onto each loaded pjp row from the meta map so every
    *  downstream read of d['coachedby'] (filters / computeRows / scoreboard) keeps working unchanged. */
-  private stampCoachedBy(rows: any[]): any[] {
-    for (const d of rows) {
-      d['coachedby'] = this.metaMap?.docdata?.[d['profileid']]?.['coachedby'] ?? null;
-    }
-    return rows;
-  }
 
   /** Write `value` (array) to coachedby on the participant's `participant metadata` doc (id ==
    *  profileid) — one write per participant, regardless of how many journey-products they have.
@@ -2673,12 +3015,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       console.error('assign: could not write coachedby for', profileid, e);
       return 1;
     }
-    // reflect locally: meta map first (read source), then any loaded pjp rows stamped from it.
+    // reflect locally on the meta map — the single read source for coach assignment.
     if (this.metaMap?.docdata?.[profileid]) this.metaMap.docdata[profileid]['coachedby'] = value;
-    for (const d of this.pjpData) { if (d['profileid'] === profileid) d['coachedby'] = value; }
-    if (this.fullPjpData && this.fullPjpData !== this.pjpData) {
-      for (const d of this.fullPjpData) { if (d['profileid'] === profileid) d['coachedby'] = value; }
-    }
+    for (const lite of this.fullIndex) { if (lite.profileid === profileid) lite.coachedby = value; }
     return 0;
   }
 
@@ -2713,11 +3052,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.guard.openSnackBar(
       `Assigned ${okCount} participant(s) to ${targetCoachName}${failed.size ? ` — ${failed.size} failed (permission denied?)` : ''}`,
       'Close', 5000);
-    const unassignedProfiles = new Set<string>();
-    for (const d of this.pjpData) {
-      if (d['profileid'] && this.isUnassigned(d['coachedby'])) unassignedProfiles.add(d['profileid']);
-    }
-    this.unassignedCount = unassignedProfiles.size;
+    this.unassignedCount = this.countUnassignedInRoster();
     this.assignTargetCoachId = '';
     // clear ONLY the participants we actually assigned; any that failed stay selected for retry.
     for (const pid of ids) { if (!failed.has(pid)) this.deselect(pid); }
@@ -2743,12 +3078,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         case 'discontinued': s.discontinued++; break;
         default: s.noStatus++; break;
       }
+      // tickets are exempt from the lifecycle filter, so they are tallied in the JOURNEY-scoped
+      // loop rather than the fully-filtered one below (see leverIgnoresLifecycle).
+      if (r.openTickets > 0) s.withOpenTickets++;
     }
     // Lever counts reflect BOTH filters (lifecycle + journey) — the fully-scoped subset.
     for (const r of this.filteredRows()) {
       if (r.renewalWindow) s.renewalsSoon++;
       if (r.lapsed) s.lapsed++;
-      if (r.openTickets > 0) s.withOpenTickets++;
       if (r.goingQuiet) s.goingQuiet++;
       if (r.notStarted) s.notStarted++;
       // Payments locked: rows whose financialstatus is the 'locked' token (same token the
@@ -2795,12 +3132,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     try {
       const start = this.currentPage * this.pageSize;
       const slice = this.matchedIds.slice(start, start + this.pageSize);
-      const sliceSet = new Set(slice);
       await this.loadJoinsFor(slice);
-      const pjpForPage = (this.fullPjpData ?? []).filter(d => sliceSet.has(d['profileid']));
+      // Roster page: computeRows builds exactly these participants from their metadata docs.
+      // (It used to slice pjp records here; the roster is now metadata, so we slice profileids.)
       this.suppressPagedRender = true;
-      this.pjpData = pjpForPage;
+      this.rowIds = slice;
       this.computeRows();   // builds allRows for this page; applyFilters (suppressed) sets dataSource.data
+      this.rowIds = null;
       this.suppressPagedRender = false;
       this.pageLength = this.matchedIds.length;
       this.loadedRowCount = this.matchedIds.length;
@@ -2835,7 +3173,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'tickets' && !(r.openTickets > 0)) return false;
     if (this.journeyFilter && r.journeyname !== this.journeyFilter) return false;
     if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(r.journeyname)) return false;
-    if (this.statusFilter && (r.customerstatus ?? '') !== this.statusFilter) return false;
+    if (this.statusFilter && !this.statusMatches(r.customerstatus)) return false;
     if (term && !(`${r.name} ${r.number ?? ''}`.toLowerCase().includes(term))) return false;
     // --- intelligent filter panel ---
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(r.productType)) return false;
@@ -2874,7 +3212,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'inactive' && lite.subActive) return false;
     if (this.journeyFilter && lite.journeyname !== this.journeyFilter) return false;
     if (this.journeyGroupFilter.length && !this.journeyGroupFilter.includes(lite.journeyname)) return false;
-    if (this.statusFilter && (lite.customerstatus ?? '') !== this.statusFilter) return false;
+    if (this.statusFilter && !this.statusMatches(lite.customerstatus)) return false;
     if (term && !(`${lite.name} ${lite.number ?? ''}`.toLowerCase().includes(term))) return false;
     if (this.productTypeFilters.length && !this.productTypeFilters.includes(lite.productType)) return false;
     if (this.tierFilters.length && !this.tierFilters.includes(lite.atcmodel ?? '')) return false;
@@ -2907,85 +3245,60 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.fullBaseMatchIds = ids;
   }
 
-  /** Build the lightweight full-base index once (paged mode), reducing the cached full pjp data to
-   *  just the searchable/filterable fields via the already-loaded profile / meta / journey maps.
-   *  Reuses fullPjpData when present (cached by a prior full load / scoreboard); otherwise reads the
-   *  pjp collection ONCE. Does NOT touch the heavy collections (touchpoints / appointments / events).*/
+  /** Build the lightweight full-base index from `participant metadata` — the SAME roster the
+   *  Participants table renders (operator directive, 2026-08-26). One lite row per participant,
+   *  carrying every field the base-wide filters and the status band need: coach, journey, product
+   *  type, tier, customerstatus, financialstatus, subscription state and open tickets.
+   *
+   *  This dashboard does not read participantjourneyproduct at all: metadata already holds
+   *  everything, so the index is built in memory the moment the meta map loads — no extra
+   *  Firestore round trip, and no `journeystatus` gate deciding who exists. */
   private async ensureFullIndex(): Promise<void> {
     if (this.fullIndexBuilt) return;
-    let pjp = this.fullPjpData;
-    if (!pjp) {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'participantjourneyproduct'),
-        where('journeystatus', 'in', this.CURRENT_JOURNEY_STATUSES),
-      ));
-      pjp = this.stampCoachedBy(snap.docs.map(d => ({ ...d.data(), __id: d.id })));
-      this.fullPjpData = pjp;
-    }
-    // base-wide open-ticket counts: ONE clientissue read (cached), so renewal/tickets can be
-    // evaluated across the whole base — not just the loaded page.
-    const openByProfile = await this.ensureFullBaseOpenTickets();
     const now = Date.now();
-    // one lite row per distinct participant (keep the highest-signal product type if a person has
-    // several journey-products: ecosystem ranks above dfu above gifts above other).
-    const rank: Record<ProductType, number> = { ecosystem: 3, dfu: 2, gifts: 1, other: 0 };
-    const byProfile = new Map<string, LiteIndexRow>();
+    const docs = this.metaMap?.docdata ?? {};
     const finance = new Set<string>();
-    for (const d of pjp) {
-      const profileid = d['profileid'];
-      if (!profileid) continue;
-      const meta: any = this.metaMap.docdata?.[profileid] ?? {};
-      const journeyId = d['journeyref']?.id ?? null;
-      const productType: ProductType = journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other';
+    const out: LiteIndexRow[] = [];
+
+    for (const profileid of Object.keys(docs)) {
+      const meta: any = docs[profileid] ?? {};
+      const journeyId: string | null =
+        (typeof meta['activejourney'] === 'string' && meta['activejourney']) || null;
       const fin = meta['financialstatus'] ?? null;
       if (fin) finance.add(fin);
-      // renewal window: SAME logic as computeRows — subscriptionend from the PJP doc ONLY (no meta fallback).
-      const subEnd = this.toDate(d['subscriptionend']);
+
+      const subEnd = this.toDate(meta['subscriptionend']);
       const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / 86400000) : null;
-      const renewalWindow = daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS;
-      // subscription-based active: this pjp record's subscriptionend is in the future.
-      const subActive = daysToRenewal != null && daysToRenewal >= 0;
-      // lifecycle flags — SAME logic as computeRows, so base-wide Needs-Attention matches per-row.
-      const lapsed = daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
-        && !this.isInactiveStatus(meta['customerstatus']);
-      const jstatus = d['journeystatus'];
-      const notStarted = ['Initiated', 'initiated', null, undefined].includes(jstatus) && !!d['onboarded'];
-      const lite: LiteIndexRow = {
+
+      out.push({
         profileid,
-        name: this.profileMap.map?.[profileid] ?? meta['name'] ?? profileid,
-        number: this.profileMap.phonenumber?.[profileid] ?? null,
-        coachedby: d['coachedby'] ?? null,
-        journeyname: journeyId ? (this.journeyNameMap[journeyId] ?? journeyId) : (meta['activejourney'] ?? '-'),
-        productType,
+        name: this.nameOf(profileid),
+        number: meta['phonenumber'] ?? meta['number'] ?? null,
+        coachedby: meta['coachedby'] ?? null,
+        journeyname: this.journeyLabelFor(journeyId),
+        productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
         atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
         customerstatus: meta['customerstatus'] ?? null,
         financialstatus: fin,
-        renewalWindow,
-        subActive,
-        openTickets: openByProfile[profileid] ?? 0,
-        lapsed,
-        notStarted,
-        goingQuiet: false,   // computed later, once touchpoints/appointments load (B-in-the-background)
-      };
-      const existing = byProfile.get(profileid);
-      if (!existing) { byProfile.set(profileid, lite); }
-      else {
-        // keep the strongest product type; a coachedby on either doc means assigned
-        if (rank[productType] > rank[existing.productType]) existing.productType = productType;
-        if (this.isUnassigned(existing.coachedby) && !this.isUnassigned(lite.coachedby)) existing.coachedby = lite.coachedby;
-        // a participant matches a flag if ANY of their journey-products does (union across records)
-        if (renewalWindow) existing.renewalWindow = true;
-        if (subActive) existing.subActive = true;
-        if (lapsed) existing.lapsed = true;
-        if (notStarted) existing.notStarted = true;
-      }
+        renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
+        subActive: daysToRenewal != null && daysToRenewal >= 0,
+        openTickets: this.openTicketsFor(meta, profileid),
+        lapsed: daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
+          && !this.isInactiveStatus(meta['customerstatus']),
+        notStarted: false,   // pjp-only signal; not available (see buildRow)
+        goingQuiet: false,   // needs touchpoints/appointments — see computeBaseWideAttention()
+      });
     }
-    this.fullIndex = Array.from(byProfile.values());
+
+    this.fullIndex = out;
     this.financeOptions = Array.from(finance).sort();
-    // base-wide Open-tickets KPI count: distinct profiles with at least one open ticket
+    this.rebuildStatusOptions();
     this.fullBaseWithOpenTickets = this.fullIndex.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
     this.fullIndexBuilt = true;
   }
+
+
+
 
   /** Full-base open-ticket counts via ONE read of the `clientissue` collection (cached for the
    *  session). A single collection scan is far cheaper than ~N/30 batched `in`-queries over a
@@ -3007,6 +3320,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } catch (e) { console.warn('full-base open tickets failed', e); }
     this.fullBaseOpenTickets = counts;
     return counts;
+  }
+
+  /** Levers that are NOT scoped by the status-band lifecycle filter (operator directive,
+   *  2026-08-26). An open support ticket needs handling whether or not the participant is still
+   *  'active' — scoping it to Active hid real tickets belonging to non-active, discontinued and
+   *  no-status people. Both the COUNT and the LIST it opens honour this, so they stay equal. */
+  private leverIgnoresLifecycle(lever: Lever): boolean {
+    return lever === 'tickets';
   }
 
   setLever(lever: Lever): void {
