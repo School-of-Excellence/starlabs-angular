@@ -98,6 +98,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private pipNameCardCache: { name: string; stream: MediaStream } | null = null;
   /** True while the user has Picture-in-Picture turned on for this call (persists across tab switches). */
   pipEnabled = false;
+  private pipAttachedTrack: RemoteTrack | LocalVideoTrack | null = null;
 
   // "Open Journey Plan" (bottom-center) — shown only for journey-coach/onboarding
   // appointments (twin of the appointment-studio button; opens /journeysupport/<client>).
@@ -418,8 +419,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.ScreenShare) {
           const cpu = this.adaptiveQuality.cpuPressure();
           const net = this.localNetworkQuality();
-          const screenQuality = 
-          cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW : 
+          const screenQuality =
+          cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW :
           cpu === 'serious' || net === ConnectionQuality.Poor ? VideoQuality.MEDIUM : VideoQuality.HIGH; // good conditions → full quality for spotlight view
           publication.setVideoQuality(screenQuality);
           console.log(`🖥️ Screen share sub quality: ${VideoQuality[screenQuality]} (cpu:${cpu} net:${ConnectionQuality[net]})`);
@@ -497,6 +498,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
         console.log('Audio muted:', participant.identity);
+      } else if (publication.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+        console.log('[pip] remote camera muted:', participant.identity);
+        this.resolvePipSource();
       }
     });
 
@@ -509,6 +513,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
         console.log('Audio unmuted:', participant.identity);
+      } else if (publication.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+        // Camera back on — PiP should switch from the name card back to live video.
+        console.log('[pip] remote camera unmuted:', participant.identity);
+        this.resolvePipSource();
       }
     });
 
@@ -523,9 +531,20 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     // Clean up state maps when a participant disconnects — prevents memory leak
     room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-      this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
-      this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
-      console.log('Participant disconnected, state cleaned:', participant.identity);
+      const identity = participant.identity;
+      this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
+      this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
+      this.remoteVideoTracks.delete(identity);
+      this.remoteParticipants.update(prev => {
+        const next = new Map(prev);
+        for (const [sid, info] of prev) {
+          if (info.participantIdentity === identity) next.delete(sid);
+        }
+        return next;
+      });
+      if (this.lastActiveSpeaker === identity) this.lastActiveSpeaker = null;
+      console.log('Participant disconnected, state cleaned:', identity);
+      this.resolvePipSource(); // pick a new target
     });
 
     // Handle unexpected server disconnection (network drop, server kick)
@@ -673,6 +692,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // (RoomEvent.Disconnected also calls leaveRoom — without this guard it loops)
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
+    this.clearPip();
 
     const currentRoom = this.room();
     // Remove all listeners BEFORE disconnect so RoomEvent.Disconnected doesn't re-trigger leaveRoom
@@ -684,7 +704,6 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.jitterStops.forEach(stop => stop());
     this.jitterStops.clear();
     this.remoteVideoTracks.clear();
-    this.clearPip();
     this.lastActiveSpeaker = null;
     if (this.pipVisibilityHandler) {
       document.removeEventListener('visibilitychange', this.pipVisibilityHandler);
@@ -1135,6 +1154,26 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     document.addEventListener('visibilitychange', this.pipVisibilityHandler);
   }
 
+  private async waitForPipMetadata(el: HTMLVideoElement, timeoutMs = 2000): Promise<boolean> {
+    if (el.readyState >= 1) return true;
+    return new Promise<boolean>(resolve => {
+      let done = false;
+      const onReady = () => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('loadedmetadata', onReady);
+        resolve(true);
+      };
+      el.addEventListener('loadedmetadata', onReady, { once: true });
+      setTimeout(() => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('loadedmetadata', onReady);
+        resolve(el.readyState >= 1);
+      }, timeoutMs);
+    });
+  }
+
   /** Attempt to enter PiP automatically (on tab hide). No-op if already in PiP or no source. */
   private async enterPipAuto(): Promise<void> {
     const el = this.pipVideo?.nativeElement;
@@ -1143,11 +1182,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (!el.srcObject) { console.log('[pip] auto skipped — no source to show'); return; }
     try {
       await el.play().catch(() => {});
-      // requestPictureInPicture() rejects if the video has no decoded frame yet — a freshly
-      // attached source (esp. the name-card canvas) needs one frame first. Wait briefly.
-      if (el.readyState < 2) {
-        await new Promise<void>(res => { const done = () => res(); el.addEventListener('loadeddata', done, { once: true }); setTimeout(done, 1000); });
-      }
+      const ready = await this.waitForPipMetadata(el);
+      if (!ready) { console.log('[pip] auto skipped — metadata never loaded'); return; }
       await (el as any).requestPictureInPicture();
       console.log('[pip] entered (auto)');
     } catch (e: any) {
@@ -1173,18 +1209,18 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       // Prefer the active remote; if alone, pop out your OWN video so PiP still works.
       this.resolvePipSource();
       if (!el.srcObject) {
-        const localTrack = this.localParticipant() as any;
-        if (localTrack?.mediaStreamTrack) {
-          this.setPipStream(new MediaStream([localTrack.mediaStreamTrack]));
-        }
+        const localTrack = this.localParticipant();
+        if (localTrack) this.setPipTrack(localTrack);
       }
       if (!el.srcObject) { alert('No video available to show in Picture-in-Picture. Turn your camera on or wait for a participant.'); return; }
       // Safari: transient user activation does NOT survive awaits — request PiP in the
       // same task as the click when frames are already there (the normal case, since the
       // pip video plays continuously). Only fall back to waiting when data isn't ready.
       el.play().catch(() => {});
-      if (el.readyState < 2) {
-        await new Promise<void>(res => { el.onloadeddata = () => res(); setTimeout(res, 1000); });
+      const ready = await this.waitForPipMetadata(el);
+      if (!ready) {
+        alert('Video is still loading — please try Picture-in-Picture again in a moment.');
+        return;
       }
       await (el as any).requestPictureInPicture();
       this.pipEnabled = true;
@@ -1195,6 +1231,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // True if the given remote participant's camera publication is currently muted (camera off).
+  private isRemoteCameraMuted(identity: string): boolean {
+    const pub = this.returnRemoteParticipantTrack().find(
+      t => t.participantIdentity === identity && t.trackPublication.source === Track.Source.Camera
+    );
+    return pub?.trackPublication.isMuted ?? true; // no publication at all = treat as not-live
+  }
+
   /** Choose what the PiP window shows and attach it. Safe to call on any relevant change. */
   private resolvePipSource(): void {
     const el = this.pipVideo?.nativeElement;
@@ -1202,8 +1246,8 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     // 1. A REMOTE screen share wins (scenario 4).
     const share = this.getActiveScreenShare();
-    if (share && !share.isLocal && share.track?.mediaStreamTrack) {
-      this.setPipStream(new MediaStream([share.track.mediaStreamTrack]));
+    if (share && !share.isLocal && share.track) {
+      this.setPipTrack(share.track);
       return;
     }
 
@@ -1217,36 +1261,56 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (!target) {
       // No remote yet — keep PiP meaningful (never clearPip() here: that would close a PiP the
       // user deliberately enabled). Priority: our own screen share → our own camera → a card.
-      const localShare = share && share.isLocal ? share.track?.mediaStreamTrack : null;
-      const localCam = (this.localParticipant() as any)?.mediaStreamTrack ?? null;
-      if (localShare) this.setPipStream(new MediaStream([localShare]));
-      else if (localCam && localCam.readyState === 'live') this.setPipStream(new MediaStream([localCam]));
+      const localShareTrack = share && share.isLocal ? share.track : null;
+      const localCam = this.localParticipant();
+      if (localShareTrack) this.setPipTrack(localShareTrack);
+      else if (localCam && (localCam as any).mediaStreamTrack?.readyState === 'live') this.setPipTrack(localCam);
       else this.setPipStream(this.nameCardStream('Waiting for others…'));
       return;
     }
 
     const camTrack = this.remoteVideoTracks.get(target);
-    if (camTrack?.mediaStreamTrack) {
-      this.setPipStream(new MediaStream([camTrack.mediaStreamTrack]));
+    const muted = this.isRemoteCameraMuted(target);
+    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack?.mediaStreamTrack, muted });
+    if (camTrack && !muted) {
+      this.setPipTrack(camTrack);
     } else {
       // Camera off → show a name card, same idea as the grid placeholder (scenario 5).
       this.setPipStream(this.nameCardStream(names.get(target) || target));
     }
   }
 
-  /** Attach a stream to the hidden PiP video (muted — audio plays via the normal elements). */
-  private setPipStream(stream: MediaStream): void {
+  private setPipTrack(track: RemoteTrack | LocalVideoTrack): void {
     const el = this.pipVideo?.nativeElement;
     if (!el) return;
+    if (this.pipAttachedTrack === track) return; // already showing this exact track
+
+    if (this.pipAttachedTrack) {
+      try { this.pipAttachedTrack.detach(el); } catch (_) {}
+    }
+    this.pipAttachedTrack = track;
+    track.attach(el); // sets srcObject internally + registers the element with LiveKit
+    el.muted = true;
+    (el as any).autoPictureInPicture = true;
+    el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
+  }
+
+  /** Attach a stream to the hidden PiP video (muted — audio plays via the normal elements). */
+    private setPipStream(stream: MediaStream): void {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+
+    if (this.pipAttachedTrack) {
+      try { this.pipAttachedTrack.detach(el); } catch (_) {}
+      this.pipAttachedTrack = null;
+    }
+
     const current = el.srcObject as MediaStream | null;
     const same = current && current.getVideoTracks()[0]?.id === stream.getVideoTracks()[0]?.id;
     if (!same) {
       el.srcObject = stream;
       el.muted = true;
       (el as any).autoPictureInPicture = true;
-      // A rapid source swap (active-speaker change) can abort an in-flight play() — harmless, so
-      // swallow AbortError and surface only real failures. Swapping srcObject while already in PiP
-      // updates the PiP window in place, so it follows the active speaker without flicker.
       el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
     }
   }
@@ -1273,9 +1337,18 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   private clearPip(): void {
+    try {
+      if ((document as any).pictureInPictureElement) {
+        (document as any).exitPictureInPicture?.();
+      }
+    } catch {}
+
     const el = this.pipVideo?.nativeElement;
-    try { if ((document as any).pictureInPictureElement === el) (document as any).exitPictureInPicture?.(); } catch {}
-    if (el) el.srcObject = null;
+    if (el) {
+      if (this.pipAttachedTrack) { try { this.pipAttachedTrack.detach(el); } catch (_) {} }
+      el.srcObject = null;
+    }
+    this.pipAttachedTrack = null;
     this.pipEnabled = false;
     this.pipNameCardCache = null;
   }
