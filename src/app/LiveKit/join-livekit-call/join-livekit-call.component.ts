@@ -1283,7 +1283,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private setPipTrack(track: RemoteTrack | LocalVideoTrack): void {
     const el = this.pipVideo?.nativeElement;
     if (!el) return;
-    if (this.pipAttachedTrack === track) return; // already showing this exact track
+    if (this.pipAttachedTrack === track && el.srcObject) return;
 
     if (this.pipAttachedTrack) {
       try { this.pipAttachedTrack.detach(el); } catch (_) {}
