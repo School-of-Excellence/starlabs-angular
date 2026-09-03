@@ -487,6 +487,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           next.set(participant.identity, quality);
           return next;
         });
+
+        if (quality === ConnectionQuality.Lost && participant.identity !== room.localParticipant.identity) {
+          this.resolvePipSource();
+        }
     });
 
     // Track Muted Participants
@@ -1231,6 +1235,12 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  // reported this participant's connection as Lost.
+  private isRemoteConnectionLost(identity: string): boolean {
+    return this.remoteParticipantsQuality().get(identity) === ConnectionQuality.Lost;
+  }
+
+
   // True if the given remote participant's camera publication is currently muted (camera off).
   private isRemoteCameraMuted(identity: string): boolean {
     const pub = this.returnRemoteParticipantTrack().find(
@@ -1257,7 +1267,14 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const names = this.remoteNames();
     let target = this.lastActiveSpeaker && names.has(this.lastActiveSpeaker) ? this.lastActiveSpeaker : null;
-    if (!target) target = names.keys().next().value ?? null; // any remote
+    if (target && this.isRemoteConnectionLost(target)) {
+      // Don't keep PiP pinned to a speaker whose connection just dropped — look for someone else.
+      target = null;
+    }
+    if (!target) {
+      // Prefer a remote whose connection isn't already reported Lost; fall back to any remote.
+      target = Array.from(names.keys()).find(id => !this.isRemoteConnectionLost(id)) ?? names.keys().next().value ?? null;
+    }
     if (!target) {
       // No remote yet — keep PiP meaningful (never clearPip() here: that would close a PiP the
       // user deliberately enabled). Priority: our own screen share → our own camera → a card.
@@ -1271,9 +1288,13 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const camTrack = this.remoteVideoTracks.get(target);
     const muted = this.isRemoteCameraMuted(target);
-    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack?.mediaStreamTrack, muted });
-    if (camTrack && !muted) {
+    const lost = this.isRemoteConnectionLost(target);
+    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack, muted, lost });
+    if (camTrack && !muted && !lost) {
       this.setPipTrack(camTrack);
+    } else if (lost) {
+      // Connection reported Lost — show a transitional card instead of freezing on the last
+      this.setPipStream(this.nameCardStream(`${names.get(target) || target} — reconnecting…`));
     } else {
       // Camera off → show a name card, same idea as the grid placeholder (scenario 5).
       this.setPipStream(this.nameCardStream(names.get(target) || target));
@@ -1289,7 +1310,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       try { this.pipAttachedTrack.detach(el); } catch (_) {}
     }
     this.pipAttachedTrack = track;
-    track.attach(el); // sets srcObject internally + registers the element with LiveKit
+    el.srcObject = null;
+
+    track.attach(el); // builds a fresh stream + registers the element with LiveKit
     el.muted = true;
     (el as any).autoPictureInPicture = true;
     el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
