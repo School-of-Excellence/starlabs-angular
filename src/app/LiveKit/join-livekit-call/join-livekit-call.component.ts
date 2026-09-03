@@ -1007,23 +1007,26 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   async toggleCamera(){
     const room = this.room();
-    if (!room) return;
+    if (!room || room.state !== 'connected') return;
+    try {
+      const isCurrentlyEnabled = room.localParticipant.isCameraEnabled;
 
-    const isCurrentlyEnabled = room.localParticipant.isCameraEnabled;
+      if (isCurrentlyEnabled) {
+        await room.localParticipant.setCameraEnabled(false);
+        console.log('📷 Camera disabled');
+      } else {
+        const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
+        const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
+        await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
 
-    if (isCurrentlyEnabled) {
-      await room.localParticipant.setCameraEnabled(false);
-      console.log('📷 Camera disabled');
-    } else {
-      const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
-      const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
-      await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
+        if (this.blurLevel !== 'none') {
+          await this.applyBlur(this.blurLevel);
+        }
 
-      if (this.blurLevel !== 'none') {
-        await this.applyBlur(this.blurLevel);
+        console.log('📷 Camera enabled');
       }
-
-      console.log('📷 Camera enabled');
+    } catch (e: any) {
+      console.warn('[toggleCamera] failed:', e?.name, e?.message);
     }
   }
 
@@ -1397,8 +1400,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async selectMic(deviceId: string): Promise<void> {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
     try {
-      await this.room()?.switchActiveDevice('audioinput', deviceId);
+      await room.switchActiveDevice('audioinput', deviceId);
       this.selectedMicId = deviceId;
       // switchActiveDevice creates a NEW mic track. dfnProc still references the OLD track's
       // processor, so applyDfnProcessor() would skip re-attaching → the new device (e.g. a
@@ -1439,6 +1444,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async startScreenShare() {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
+    try {
     // C2: Screen share resolution + encoding based on current network/CPU tier.
     // Publishing full-HD on a low-tier connection saturates uplink → camera freeze + audio loss.
     const tier = this.adaptiveQuality.currentTier();
@@ -1483,6 +1491,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     console.log("Screen sharing started");
     this.isLocalScreenSharing.set(true);
     this.resolvePipSource();
+    } catch (e: any) {
+      console.warn('[startScreenShare] failed:', e?.name, e?.message);
+    }
   }
 
   stopScreenShare() {
