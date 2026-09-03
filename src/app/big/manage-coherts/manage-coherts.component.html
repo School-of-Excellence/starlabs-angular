@@ -27,7 +27,7 @@
         <label class="form-label">Category <span class="required">*</span></label>
         <div class="radio-group">
           <label class="radio-option">
-            <input type="radio" formControlName="cohortCategory" value="studio" >
+            <input type="radio" formControlName="cohortCategory" value="studio" (click)="clearActivity()">
             <span class="radio-label">Studio Group</span>
           </label>
           <label class="radio-option">
@@ -397,15 +397,15 @@
               <button class="clear-participants" (click)="clearParticipants($event)">Clear All</button>
             </div>
 
-            <div class="select-all-option" *ngIf="filteredParticipantsList.length > 0" 
+            <div class="select-all-option" *ngIf="getFilteredParticipantList().length > 0" 
                 (click)="isAllParticipantsSelected() ? clearParticipants($event) : selectAllParticipants($event)">
               <mat-icon>{{isAllParticipantsSelected() ? 'check_box' : 'select_all'}}</mat-icon>
-              <span>{{isAllParticipantsSelected() ? 'Deselect All' : 'Select All'}} ({{filteredParticipantsList.length}})</span>
+              <span>{{isAllParticipantsSelected() ? 'Deselect All' : 'Select All'}} ({{getFilteredParticipantList().length}})</span>
             </div>
             
             <!-- Participants List -->
             <div class="participants-list">
-              <div class="participant-item" *ngFor="let participant of filteredParticipantsList" 
+              <div class="participant-item" *ngFor="let participant of getFilteredParticipantList()" 
                    [class.selected]="isParticipantSelected(participant.profileid)"
                    (click)="toggleParticipantSelection(participant.profileid, $event)">
                 <mat-icon>{{isParticipantSelected(participant.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -414,7 +414,7 @@
                   <span class="participant-email" *ngIf="participant.email">{{participant.email}}</span>
                 </div>
               </div>
-              <div class="participants-empty" *ngIf="filteredParticipantsList.length === 0">
+              <div class="participants-empty" *ngIf="getFilteredParticipantList().length === 0">
                 {{participantSearchQuery ? 'No participants found matching "' + participantSearchQuery + '"' : 'No participants available'}}
               </div>
             </div>

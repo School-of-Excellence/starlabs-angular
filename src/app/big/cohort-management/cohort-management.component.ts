@@ -642,7 +642,7 @@ export class CohortManagementComponent {
     this.unassignedParticipants = Array.from(participantMap.values());
     this.filterUnassignSearch();
   }
-
+  
   // Save queue selection to localStorage
   saveQueueSelection() {
     try {

@@ -89,9 +89,12 @@ export class ManageCohertsComponent {
   
   // Event participation tracking
   bigInvitationParticipants: any[] = [];
+  participantListForEvent : any[] = [];
   bigInvitationCount: number = 0;
   loadingInvitations: boolean = false;
   mapProfile = {};
+
+  assignedParticipantIds = new Set();
   
   // Track original participants for edit mode comparison
   originalParticipantIds: string[] = [];
@@ -283,7 +286,9 @@ export class ManageCohertsComponent {
 
   clearActivity(){
     console.log(this.cohortsForm.controls['bigactivity'].value);
-    this.cohortsForm.controls['bigactivity'].setValue(null)
+    this.cohortsForm.controls['bigactivity'].setValue(null);
+    this.cohortsForm.get('participantidlist').setValue(null);
+    this.selectedParticipants = [];
   }
 
   loadParticipantTags() {
@@ -596,13 +601,13 @@ export class ManageCohertsComponent {
     const activity = cohort['bigactivity'] ?? '';
     if(cohort.cohortCategory === 'studio' && ![null , undefined , ''].includes(eventId)){
       const queueId = [];
-      const queue = await getDocs(query(collection(this.firestore, 'queue generation') , where('eventid','array-contains',eventId)));
+      const queue = await getDocs(query(collection(this.firestore, 'queue generation') , where('eventid','array-contains', eventId)));
       queue.docs.forEach((q)=>{
         const qId = q.id;
         queueId.push(doc(this.firestore , 'queue generation' , qId));
       })
       console.log('queues list' , queueId)
-      if (queueId) {
+      if (queueId.length > 0) {
         const q = query(collection(this.firestore, 'queue studio pairing'), where('queueref', 'in' , queueId), where('studioin', '==', true), where('participants', 'array-contains', participantId));
         const studios = await getDocs(q);
         return studios.docs.filter((st) => Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
@@ -938,60 +943,172 @@ export class ManageCohertsComponent {
   }
 
   // Fetch participants from 'event participation request' when event is selected
+  // async onChangeEvent() {
+  //   const eventRef = this.cohortsForm.get("eventref")?.value;
+    
+  //   // DON'T reset participants when event changes - keep the selection
+  //   // this.selectedParticipants = [];
+  //   // this.cohortsForm.get('participantidlist')?.setValue([]);
+  //   this.participantSearchQuery = '';
+  //   this.participantImportResults = null;
+    
+  //   if (eventRef != null && eventRef != undefined) {
+  //     this.loadingInvitations = true;
+  //     // this.cohortsForm.get('cohortType').setValue(null);
+  //     // this.selectedParticipants = [];
+      
+  //     try {
+  //       const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
+  //       const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef) , where('cohortCategory' , '==' , 'studio'));
+  //       const approvedParticipant = new Set();
+  //       const assignedParticipantIds = new Set<string>(); 
+  //       const participantsList = [];
+        
+  //       const participationSnap = await getDocs(participationQuery);
+
+  //       if (this.cohortsForm?.get('cohortCategory')?.value === 'studio') {
+  //         const cohortsSnap = await getDocs(cohortQuery);
+          
+  //         cohortsSnap.docs.forEach((cohortDoc) => {
+  //           const cohort = cohortDoc.data();
+  //           (cohort['participantidlist'] || []).forEach((id: string) => {
+  //             assignedParticipantIds.add(id);
+  //           });
+  //         });
+
+  //       }
+        
+  //       // participationSnap.docs.forEach(docSnap => {
+  //       //   const data: any = docSnap.data();
+  //       //   if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
+  //       //     if(!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])){
+  //       //       participantsList.push({
+  //       //       id: docSnap.id,
+  //       //       name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //       //       profileid: data['profileid'],
+  //       //       ...data
+  //       //     })
+  //       //     }
+  //       //     approvedParticipant.add(data['profileid']);
+  //       //   }
+  //       // });
+
+  //       console.log('assigned size : ',assignedParticipantIds.size)
+  //       participationSnap.docs.forEach(docSnap => {
+  //         const data: any = docSnap.data();
+  //         if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
+
+  //           if (assignedParticipantIds.size > 0) {
+  //             if (!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])) {
+  //               participantsList.push({
+  //                 id: docSnap.id,
+  //                 name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //                 profileid: data['profileid'],
+  //                 ...data
+  //               })
+  //             }
+  //           } else {
+  //             participantsList.push({
+  //               id: docSnap.id,
+  //               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //               profileid: data['profileid'],
+  //               ...data
+  //             });
+  //           }
+  //          approvedParticipant.add(data['profileid']);
+            
+  //         }
+  //       });
+        
+  //       this.bigInvitationParticipants = [...participantsList];
+  //       this.participantListForEvent = [...participantsList];
+  //       // Extract participant IDs from event participation request
+  //       console.log('approved participant list : ' , approvedParticipant.size)
+  //       this.bigInvitationCount = participantsList.length;
+  //       this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
+        
+  //       this.filteredParticipants = participantsList;
+        
+  //       this.filteredParticipantsList = [...this.filteredParticipants];
+  //       console.log('Filtered participants with names:', this.filteredParticipants.length);
+        
+  //       // Update existing participants list - previously selected ones not in new event list
+  //       this.updateExistingParticipantsNotInList();
+        
+  //       console.log('Approved participants from event participation request not in any cohort:', participantsList);
+        
+  //     } catch (error) {
+  //       console.error('Error fetching event participation request:', error);
+  //       this.bigInvitationCount = 0;
+  //       this.bigInvitationParticipants = [];
+  //       this.participantListForEvent = [];
+  //       this.filteredParticipants = this.data.totalParticipants || [];
+  //       this.filteredParticipantsList = [...this.filteredParticipants];
+  //       this.updateExistingParticipantsNotInList();
+  //     } finally {
+  //       this.loadingInvitations = false;
+  //     }
+      
+  //   } else {
+  //     // Reset when no event selected - show all participants
+  //     this.bigInvitationCount = 0;
+  //     this.bigInvitationParticipants = [];
+  //     this.participantListForEvent = [];
+  //     this.filteredParticipants = this.data.totalParticipants || [];
+  //     this.filteredParticipantsList = [...this.filteredParticipants];
+  //     this.updateExistingParticipantsNotInList();
+  //   }
+  // }
+
   async onChangeEvent() {
     const eventRef = this.cohortsForm.get("eventref")?.value;
-    
-    // DON'T reset participants when event changes - keep the selection
-    // this.selectedParticipants = [];
-    // this.cohortsForm.get('participantidlist')?.setValue([]);
     this.participantSearchQuery = '';
     this.participantImportResults = null;
     
     if (eventRef != null && eventRef != undefined) {
       this.loadingInvitations = true;
-      // this.cohortsForm.get('cohortType').setValue(null);
-      // this.selectedParticipants = [];
-      
       try {
         const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
-        const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef));
-        const assignedParticipantIds = new Set<string>(); 
+        const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef) , where('cohortCategory' , '==' , 'studio'));
         const approvedParticipant = new Set();
-        const participantsNotInCohort = [];
+        const assignedParticipantIds = new Set<string>(); 
+        const participantsList = [];
         
-        const [participationSnap , cohortsSnap] = await Promise.all([getDocs(participationQuery) , getDocs(cohortQuery)]);
-        cohortsSnap.docs.forEach((cohortDoc)=>{
+        const [participationSnap , cohortsSnap] = await Promise.all([
+          getDocs(participationQuery),
+          getDocs(cohortQuery)
+        ])
+
+        cohortsSnap.docs.forEach((cohortDoc) => {
           const cohort = cohortDoc.data();
-          // console.log(cohort['participantidlist'])
           (cohort['participantidlist'] || []).forEach((id: string) => {
-          assignedParticipantIds.add(id);
+            assignedParticipantIds.add(id);
+          });
         });
-          
-        })
+
+        this.assignedParticipantIds = assignedParticipantIds;
 
         participationSnap.docs.forEach(docSnap => {
           const data: any = docSnap.data();
-          if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
-            if(!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])){
-              participantsNotInCohort.push({
+          if (data['profileid'] != null && !approvedParticipant.has(data['profileid'])) {
+            participantsList.push({
               id: docSnap.id,
               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
               profileid: data['profileid'],
               ...data
             })
-            }
             approvedParticipant.add(data['profileid']);
           }
         });
-
         
-        this.bigInvitationParticipants = [...participantsNotInCohort];
+        this.bigInvitationParticipants = [...participantsList];
+        this.participantListForEvent = [...participantsList];
         // Extract participant IDs from event participation request
-        
-        this.bigInvitationCount = participantsNotInCohort.length;
+        console.log('approved participant list : ' , approvedParticipant.size)
+        this.bigInvitationCount = participantsList.length;
         this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
         
-        this.filteredParticipants = participantsNotInCohort;
+        this.filteredParticipants = participantsList;
         
         this.filteredParticipantsList = [...this.filteredParticipants];
         console.log('Filtered participants with names:', this.filteredParticipants.length);
@@ -999,12 +1116,13 @@ export class ManageCohertsComponent {
         // Update existing participants list - previously selected ones not in new event list
         this.updateExistingParticipantsNotInList();
         
-        console.log('Approved participants from event participation request not in any cohort:', participantsNotInCohort);
+        console.log('Approved participants from event participation request not in any cohort:', participantsList);
         
       } catch (error) {
         console.error('Error fetching event participation request:', error);
         this.bigInvitationCount = 0;
         this.bigInvitationParticipants = [];
+        this.participantListForEvent = [];
         this.filteredParticipants = this.data.totalParticipants || [];
         this.filteredParticipantsList = [...this.filteredParticipants];
         this.updateExistingParticipantsNotInList();
@@ -1016,16 +1134,50 @@ export class ManageCohertsComponent {
       // Reset when no event selected - show all participants
       this.bigInvitationCount = 0;
       this.bigInvitationParticipants = [];
+      this.participantListForEvent = [];
       this.filteredParticipants = this.data.totalParticipants || [];
       this.filteredParticipantsList = [...this.filteredParticipants];
       this.updateExistingParticipantsNotInList();
     }
   }
 
+  getFilteredParticipantList() {
+    const profiles = [];
+    for (const participant of [...this.data.totalParticipants]) {
+      const participantId = participant['profileid'];
+      let event: boolean = true;
+      let search: boolean = true;
+      const searchQuery = this.participantSearchQuery.toLowerCase().trim();
+
+      if (this.isEventType()) {
+        const eventApprovedParticipant = [...this.participantsApprovedForEvent];
+        if (eventApprovedParticipant.includes(participantId)) {
+          if (this.cohortsForm.get('cohortCategory').value === 'studio' && ((this.assignedParticipantIds.has(participantId) && !this.selectedParticipants.includes(participantId)))) {
+            event = false
+          }
+        } else {
+          event = false
+        }
+      }
+
+      if (searchQuery) {
+        const searchCondition = !(participant['name']?.toLowerCase().includes(searchQuery) ||
+          participant['email']?.toLowerCase().includes(searchQuery) ||
+          participant['displayName']?.toLowerCase().includes(searchQuery))
+        if (!searchCondition) search = false;
+      }
+
+      if (event && search) profiles.push(participant)
+
+    }
+    return profiles;
+  }
+
+
   onEventSelectionChange(){
     this.cohortsForm.get('participantidlist').setValue(null);
     this.selectedParticipants = [];
-    this.onChangeEvent()
+    this.onChangeEvent();
   }
 
   // Fetch participant profiles directly if totalParticipants not available
