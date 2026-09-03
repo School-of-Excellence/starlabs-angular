@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -79,7 +79,7 @@ import { MatIconModule } from '@angular/material/icon';
     .ap-dl mat-icon { font-size: 15px; width: 15px; height: 15px; }
   `],
 })
-export class ChatAudioComponent {
+export class ChatAudioComponent implements AfterViewInit, OnDestroy {
   @Input() src = '';
   @Input() name?: string;
   /** Kept for compatibility; no bubble is dark in this design, so it no longer changes anything. */
@@ -94,12 +94,36 @@ export class ChatAudioComponent {
   rate = 1;
   private durationFixed = false;
 
+  ngAfterViewInit(): void {
+    const a = this.audioRef?.nativeElement;
+    if (a) ChatAudioComponent.players.add(a);
+  }
+
+  ngOnDestroy(): void {
+    const a = this.audioRef?.nativeElement;
+    // Leaving a destroyed element in the set would keep it alive and let it be paused later.
+    if (a) { ChatAudioComponent.players.delete(a); a.pause(); }
+  }
+
   toggle(): void {
     const a = this.audioRef?.nativeElement;
     if (!a) return;
-    if (this.playing) a.pause();
-    else a.play().catch(e => console.error('audio play failed', e));
+    if (this.playing) { a.pause(); return; }
+    // Only one voice note plays at a time — starting this one stops whatever else was going.
+    // Module-scoped rather than a service: every player on the screen is this component, and a
+    // DI service would add a provider to wire up for behaviour that is purely local to them.
+    ChatAudioComponent.stopOthers(a);
+    a.play().catch(e => console.error('audio play failed', e));
   }
+
+  /** Pause every other <audio> this component owns. */
+  private static stopOthers(keep: HTMLAudioElement): void {
+    ChatAudioComponent.players.forEach(el => {
+      if (el !== keep && !el.paused) el.pause();
+    });
+  }
+
+  private static players = new Set<HTMLAudioElement>();
 
   seek(value: string | number): void {
     const a = this.audioRef?.nativeElement;
