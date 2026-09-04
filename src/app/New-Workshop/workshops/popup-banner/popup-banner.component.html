@@ -1,0 +1,135 @@
+<div class="pb">
+  <!-- ───────── header ───────── -->
+  <div class="pb-head">
+    <div class="pb-head-text">
+      <div class="eyebrow">EiFlix</div>
+      <h2 class="pb-title">Popup banner</h2>
+      <p class="pb-sub">One banner for the whole app. Nothing here is required — fill in what you need.</p>
+    </div>
+    <span class="pb-state" *ngIf="!loading && !loadError" [class.on]="form?.get('enable')?.value">
+      {{ form?.get('enable')?.value ? 'Live' : 'Off' }}
+    </span>
+    <button type="button" class="pb-x" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- ───────── loading / error ───────── -->
+  <div class="pb-load" *ngIf="loading">
+    <mat-spinner diameter="28"></mat-spinner><span>Loading the banner…</span>
+  </div>
+
+  <div class="card placeholder" *ngIf="!loading && loadError">
+    <h2 class="sec-title">Could not load the banner</h2>
+    <p class="ph-text">The <code>classify / eiflixpopupbanner</code> document could not be read, so saving is disabled to avoid overwriting it with empty values.</p>
+  </div>
+
+  <!-- ───────── form ───────── -->
+  <form [formGroup]="form" *ngIf="!loading && !loadError" class="pb-body">
+
+    <!-- enable -->
+    <section class="card">
+      <div class="sec-body">
+        <div class="pb-toggle-row">
+          <div class="pb-toggle-text">
+            <div class="pb-toggle-title">Show this popup</div>
+            <div class="help">Stored as <strong>enable</strong>. Turn it off to hide the banner without clearing anything.</div>
+          </div>
+          <button type="button" class="toggle" [class.on]="form.get('enable')?.value"
+                  (click)="toggleEnable()" [attr.aria-pressed]="form.get('enable')?.value"
+                  aria-label="Show this popup"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- copy -->
+    <section class="card">
+      <div class="sec-head static">
+        <h2 class="sec-title">Content</h2>
+        <span class="grow"></span>
+        <span class="sec-hint">Rich text, except the button link</span>
+      </div>
+      <div class="sec-body">
+        <div class="field" *ngFor="let f of richFields">
+          <div class="label"><span>{{ f.label }}</span></div>
+          <div class="rt">
+            <ngx-editor-menu [editor]="editors[f.key]" [toolbar]="toolbar"></ngx-editor-menu>
+            <ngx-editor [ngClass]="f.size" [editor]="editors[f.key]" [formControlName]="f.key"
+                        [outputFormat]="'html'" [placeholder]="f.placeholder"></ngx-editor>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label"><span>Button 1 link</span><span class="counter">Plain text</span></div>
+          <div class="input">
+            <input class="txt" type="text" formControlName="button1link"
+                   placeholder="https://…" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="help">Where the first button goes. Button 2 has no link by design.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- artwork -->
+    <section class="card">
+      <div class="sec-head static">
+        <h2 class="sec-title">Artwork</h2>
+        <span class="grow"></span>
+        <span class="sec-hint">Uploaded to storage; the document keeps the URL</span>
+      </div>
+      <div class="sec-body">
+        <div class="pb-slots">
+          <div class="pb-slot" *ngFor="let s of slots">
+            <div class="label"><span>{{ s.label }}</span></div>
+
+            <div class="pb-drop" [class.busy]="uploading[s.key]"
+                 (dragover)="onDragOver($event)" (drop)="onDrop(s, $event)"
+                 (click)="pickImage(s)" role="button" tabindex="0"
+                 [attr.aria-label]="'Upload the ' + s.label + ' image'" [attr.aria-busy]="!!uploading[s.key]"
+                 (keydown.enter)="pickImage(s)" (keydown.space)="$event.preventDefault(); pickImage(s)">
+              <ng-container *ngIf="uploading[s.key]">
+                <mat-spinner diameter="22"></mat-spinner>
+                <span class="pb-drop-text">Uploading…</span>
+              </ng-container>
+              <ng-container *ngIf="!uploading[s.key] && form.get(s.key)?.value">
+                <img [src]="form.get(s.key)?.value" [alt]="s.label + ' banner image'"
+                     (error)="onImageError(s)" (load)="broken[s.key] = false">
+                <span class="pb-drop-text" *ngIf="broken[s.key]">This image URL no longer loads</span>
+              </ng-container>
+              <ng-container *ngIf="!uploading[s.key] && !form.get(s.key)?.value">
+                <mat-icon>add_photo_alternate</mat-icon>
+                <span class="pb-drop-text">Click or drop an image</span>
+              </ng-container>
+            </div>
+
+            <div class="help pb-hint">{{ s.hint }}</div>
+
+            <div class="pb-slot-actions" *ngIf="form.get(s.key)?.value && !uploading[s.key]">
+              <button type="button" class="btn btn-sm" (click)="pickImage(s)">Replace</button>
+              <button type="button" class="btn btn-sm btn-ghost" (click)="clearImage(s)">Remove</button>
+            </div>
+
+            <div class="pb-url" *ngIf="form.get(s.key)?.value" [title]="form.get(s.key)?.value">
+              {{ form.get(s.key)?.value }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </form>
+
+  <!-- ───────── save bar ───────── -->
+  <div class="pb-bar" *ngIf="!loading && !loadError">
+    <span class="pill pill-mute" *ngIf="!dirty && !justSaved && !saving">No changes</span>
+    <span class="pill pill-warn" *ngIf="dirty && !saving">Unsaved changes</span>
+    <span class="pill pill-warn" *ngIf="saving">Saving…</span>
+    <span class="pill pill-ok" *ngIf="justSaved && !dirty && !saving">Saved just now</span>
+    <span class="help" *ngIf="anyUploading">An image is still uploading.</span>
+    <span class="grow"></span>
+    <button type="button" class="btn" (click)="close()">Close</button>
+    <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving || anyUploading">
+      <span class="spin" *ngIf="saving"></span>
+      <span>{{ saving ? 'Saving' : 'Save banner' }}</span>
+    </button>
+  </div>
+</div>

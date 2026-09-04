@@ -67,13 +67,20 @@
               <mat-option *ngFor="let option of platformNameList" [value]="option">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
-          <mat-slide-toggle 
-            [(ngModel)]="showDuplicatesOnly" 
+          <mat-slide-toggle
+            [(ngModel)]="showDuplicatesOnly"
             (change)="onFilter(filterValue)"
             color="warn"
             class="ctrl-toggle-duplicates">
             Duplicates only
           </mat-slide-toggle>
+          <mat-checkbox
+            [(ngModel)]="showNewUsersOnly"
+            (change)="onFilter(filterValue)"
+            color="primary"
+            class="ctrl-check-newusers">
+            New users only
+          </mat-checkbox>
           <button mat-stroked-button type="button" (click)="onClearFilterValue()" class="btn-clear">
             <span class="btn-icon"><mat-icon>clear</mat-icon></span>Clear
         </button>

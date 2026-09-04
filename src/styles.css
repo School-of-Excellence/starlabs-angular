@@ -202,6 +202,19 @@ body {
   padding: 0 !important;
 }
 
+/* Workshops — EiFlix popup banner editor. The component paints its own header,
+   body and save bar edge to edge, so the Material surface padding is removed
+   (same treatment as .jchd-logcomposer-panel above). */
+.popup-banner-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0;
+}
+.popup-banner-dialog .mat-mdc-dialog-container,
+.popup-banner-dialog .mdc-dialog__content {
+  padding: 0 !important;
+}
+
 .fullscreen-dialog .mat-mdc-dialog-surface {
   border-radius: 10px !important;
   overflow: auto !important;
