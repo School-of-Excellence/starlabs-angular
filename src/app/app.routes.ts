@@ -87,8 +87,8 @@ export const routes: Routes = [
             .then(m => m.LearningMaterialComponent),canActivate:[authGuard]
       },
       {path: 'communitymanager', loadComponent: () => import('./AppEngagement/community-manager/community-manager.component').then(m => m.CommunityManagerComponent), canActivate:[authGuard]},
-      {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
-      {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent), canActivate:[authGuard]},
+      {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent),},
+      // {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent),},
       {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard]},
       // {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
       // {path: 'tieraccessconfig', loadComponent: () => import('./content/tier-access-config/view-tier-access/view-tier-access.component').then(m => m.ViewTierAccessComponent), canActivate: [authGuard]},
@@ -122,6 +122,7 @@ export const routes: Routes = [
     {path:'editseries', loadComponent: () => import('./content/series-dashboard/edit-series/edit-series.component').then(m => m.EditSeriesComponent), canActivate:[authGuard]},
   ]},
   {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
+  {path: 'assigncategory', loadComponent: () => import('./content/series-dashboard/categoryassign/categoryassign.component').then(m => m.CategoryassignComponent),},
   {path: 'zoomaccount', loadComponent: () => import('./queue system/zoom-account/zoom-account.component').then(m => m.ZoomAccountComponent), canActivate:[authGuard]},
   {path: 'arenastudioactivity', loadComponent: () => import('./queue system/arenastudioactivity/arenastudioactivity.component').then(m => m.ArenastudioactivityComponent), canActivate:[authGuard, roleGuard(['developer','admin','ah'])]},
   {path: 'queuetransfer', loadComponent: () => import('./queue system/queue-transfer/queue-transfer.component').then(m => m.QueueTransferComponent), canActivate:[authGuard]},
@@ -271,6 +272,7 @@ export const routes: Routes = [
 
   // Chat
   {path: 'group-chat', loadComponent: () => import('./Events/Chat/chat-screen/chat-screen.component').then(m => m.ChatScreenComponent), canActivate:[authGuard]},
+  {path: 'group-chat-screen', loadComponent: () => import('./Events/Chat/group-chat-screen/group-chat-screen.component').then(m => m.GroupChatScreenComponent), canActivate:[authGuard]},
 
   // Communication Center
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
@@ -285,7 +287,7 @@ export const routes: Routes = [
   {path: 'newusersprofile', loadComponent: () => import('./New-Workshop/newusersprofile/newusersprofile.component').then(m => m.NewusersprofileComponent)},
   {path: 'eiflixdiscoverpage', loadComponent: () => import('./New-Workshop/eiflixdiscoverpage/eiflixdiscoverpage.component').then(m => m.EiflixdiscoverpageComponent)},
   {path: 'workshop_dashboard/:id', loadComponent: () => import('./New-Workshop/workshop-dashboard/workshop-dashboard.component').then(m => m.WorkshopDashboardComponent), canActivate:[authGuard]},
-  {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent), canActivate:[authGuard]},
+  {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent)},
   {path: 'productpageworkshop', loadComponent: () => import('./New-Workshop/product-page/product-page.component').then(m => m.ProductPageComponent),canActivate:[authGuard]},
   {path: 'engagementdashboard', loadComponent: () => import('./New-Workshop/engagement-dashboard/engagement-dashboard.component').then(m => m.EngagementDashboardComponent),canActivate:[authGuard]},
   {path: 'bigengagementdashboard', loadComponent: () => import('./New-Workshop/capacity-dashboard/capacity-dashboard.component').then(m => m.CapacityDashboardComponent),canActivate:[authGuard]},

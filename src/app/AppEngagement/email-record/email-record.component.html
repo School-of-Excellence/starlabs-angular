@@ -613,6 +613,31 @@
             </div>
           </div>
 
+          <!-- ═══════ ON DELIVERY HOLD ═══════ -->
+          <ng-container *ngIf="heldParticipants.length > 0">
+            <div class="held-head">
+              <mat-icon>block</mat-icon>
+              <span>On delivery hold — excluded from this send</span>
+              <span class="held-count">{{ heldParticipants.length }}</span>
+            </div>
+            <div class="held-note">
+              These profiles had <strong>deliveryonhold</strong> set, so no email was sent to them and they
+              have no delivery status.
+            </div>
+            <div class="participants-list">
+              <div class="participant-item held-item" *ngFor="let p of heldParticipants">
+                <div class="participant-avatar"><mat-icon>block</mat-icon></div>
+                <div class="participant-info">
+                  <div class="participant-email">{{ p.email || p.profileid }}</div>
+                  <div class="participant-name" *ngIf="p.name && p.name !== 'Unknown'">{{ p.name }}</div>
+                </div>
+                <div class="participant-statuses">
+                  <span class="status-badge held"><mat-icon>block</mat-icon></span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
           <!-- No Participants Found -->
           <div class="no-participants" *ngIf="filteredParticipants.length === 0">
             <mat-icon>search_off</mat-icon>

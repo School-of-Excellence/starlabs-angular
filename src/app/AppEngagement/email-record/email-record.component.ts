@@ -177,6 +177,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
   allParticipants: Participant[] = [];
   filteredParticipants: Participant[] = [];
   participantSearchFilter = '';
+  heldParticipants: any[] = [];
   selectedStatusFilters: string[] = ['all']; // 'all', 'sent', 'delivery', 'open', 'click', 'bounce', 'subscriptionchange', 'failed', 'notSent'
   participantStatusCounts: StatusCounts = {
     sent: 0,
@@ -541,7 +542,10 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       const logs = this.emailLogsMap.get(archiveId) || [];
 
       // Get all recipients from the archive
-      const allRecipients = archive.emailid || archive.profileid || [];
+      const rawRecipients = archive.emailid || archive.profileid || [];
+      const allRecipients: string[] = (Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients])
+        .filter((r: any): r is string => typeof r === 'string' && r.trim() !== '')
+        .map((r: string) => r.trim().toLowerCase());
       const totalRecipients = allRecipients.length;
 
       // Calculate status counts from logs
@@ -612,7 +616,7 @@ export class EmailRecordComponent implements OnInit, AfterViewInit, OnDestroy {
       statusCounts.failed = failedEmails.size;
 
       // Calculate not sent (recipients who don't have a 'sent' log)
-      const allRecipientEmails = new Set<string>(allRecipients.map((r: string) => r.toLowerCase()));
+      const allRecipientEmails = new Set<string>(allRecipients);      
       const notSentCount = [...allRecipientEmails].filter((email: string) => !sentEmails.has(email)).length;
       statusCounts.notSent = notSentCount;
 
@@ -1148,14 +1152,15 @@ exportCategoryParticipants(): void {
   private buildParticipantsList(record: any): void {
     this.allParticipants = [];
     const logs: EmailLog[] = record.logs || [];
-    const allRecipients: string[] = record.emailid || [];
-    
+    const rawRecipients = record.emailid || [];
+    const allRecipients: string[] = (Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients])
+      .filter((r: any): r is string => typeof r === 'string' && r.trim() !== '');    
     // Create a map to track each participant's statuses
     const participantMap = new Map<string, Participant>();
     
     // Initialize all recipients
     allRecipients.forEach((emailOrProfileId: string) => {
-      const email = emailOrProfileId.toLowerCase();
+      const email = emailOrProfileId.trim().toLowerCase();      
       const profileId = record.emailmap?.[emailOrProfileId] || null;
       const profile = profileId ? this.mapProfile[profileId] : this.findProfileByEmail(email);
       
@@ -1258,7 +1263,16 @@ exportCategoryParticipants(): void {
     });
     
     this.allParticipants = Array.from(participantMap.values());
-    
+
+    // Profiles excluded by the delivery-hold filter. They are not in `emailid`, so they
+    // cannot appear in the list above — hence a separate section, not a badge.
+    const held: string[] = record.communicationhold || [];
+    this.heldParticipants = held.map((pid: string) => ({
+      profileid: pid,
+      name: this.mapProfile[pid]?.['name'] || 'Unknown',
+      email: this.mapProfile[pid]?.['email'] || ''
+    }));
+
     // Calculate status counts
     this.calculateParticipantStatusCounts();
   }
@@ -1371,6 +1385,7 @@ exportCategoryParticipants(): void {
     this.showParticipantsModal = false;
     this.selectedArchiveForPopup = null;
     this.allParticipants = [];
+    this.heldParticipants = [];
     this.filteredParticipants = [];
     this.participantSearchFilter = '';
     this.selectedStatusFilters = ['all'];

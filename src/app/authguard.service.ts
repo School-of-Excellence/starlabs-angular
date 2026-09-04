@@ -759,7 +759,12 @@ export class AuthguardService {
     var map = {}
     var list = []
 
-    const q = query(collection(this.firestore, 'participant metadata'), orderBy("name"))
+    // NO orderBy("name"): Firestore silently OMITS documents that lack the sort field, and
+    // ~6% of `participant metadata` docs have no `name`. Those participants were disappearing
+    // from every consumer of this map (and, since the JC dashboard now builds its Participants
+    // roster from this collection, would vanish from the screen entirely). Read unordered and
+    // sort in memory instead — same output order, nothing dropped.
+    const q = query(collection(this.firestore, 'participant metadata'))
     const profile = await getDocs(q);
     for (let i = 0; i < profile.docs.length; i++) {
       const doc = profile.docs[i];
@@ -770,6 +775,10 @@ export class AuthguardService {
         id: doc.id
       })
     }
+    // preserve the previous name-ascending order for existing consumers; unnamed docs sort last
+    // rather than being dropped.
+    list.sort((a: any, b: any) =>
+      (a.name ?? '').toString().toLowerCase().localeCompare((b.name ?? '').toString().toLowerCase()))
     return { docdata, map, list }
   }
   async getAppointmentMap() {
@@ -1224,6 +1233,30 @@ export class AuthguardService {
     }
   }
 
+  /** Splits a profileid list into who may be contacted and who is on delivery hold.
+   *  Reads `profile_data` fresh (not the IndexedDB-cached profile map) because a hold set
+   *  minutes ago must take effect immediately. On a read failure it fails OPEN — blocking
+   *  every notification app-wide on a transient error is worse than missing one hold. The
+   *  failure is logged to the console only: by operator decision (2026-08-26) nothing about
+   *  delivery holds is written onto the notification record. */
+  async filterDeliveryOnHold(profileid: any): Promise<{ sendable: string[], held: string[], checkfailed: boolean }> {
+    const ids: string[] = Array.isArray(profileid) ? profileid : (profileid ? [profileid] : [])
+    if (!ids.length) return { sendable: ids, held: [], checkfailed: false }
+    try {
+      const snap = await getDocs(query(this.profile_dataRef, where("deliveryonhold", "==", true)))
+      const heldSet = new Set<string>(snap.docs.map(d => d.id))
+      if (!heldSet.size) return { sendable: ids, held: [], checkfailed: false }
+      return {
+        sendable: ids.filter(id => !heldSet.has(id)),
+        held: ids.filter(id => heldSet.has(id)),
+        checkfailed: false,
+      }
+    } catch (err) {
+      console.error("deliveryonhold check failed — sending unfiltered", err)
+      return { sendable: ids, held: [], checkfailed: true }
+    }
+  }
+
   async saveNotificationRecord({
     title, // String
     message, // String
@@ -1240,6 +1273,12 @@ export class AuthguardService {
   }) {
     var docid = this.generateId(this.firestore, "notificationrecord")
     console.log(docid)
+
+    // Delivery hold — profiles with profile_data.deliveryonhold === true are never notified.
+    // Filtered here rather than at the ~22 call sites, so no sender can bypass it.
+    const holdResult = await this.filterDeliveryOnHold(profileid)
+    profileid = holdResult.sendable
+
     var notificationRecordData = {
       title: title,
       message: message,
@@ -1254,6 +1293,8 @@ export class AuthguardService {
       profileid: profileid,
       receivingapp: receivingapp,
       success: false,
+      // Held profiles, recorded alongside profilesuccess/profilefailed.
+      communicationhold: holdResult.held,
     }
     console.log("Record ID", docid)
     await setDoc(doc(this.firestore, "notificationrecord", docid), notificationRecordData).then(() => {
