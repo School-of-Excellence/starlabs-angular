@@ -5,6 +5,10 @@
       <p class="page-subtitle">Configure, monitor and manage all workshop sessions</p>
     </div>
     <div class="header-actions">
+      <button mat-stroked-button class="action-btn secondary-btn" (click)="openPopupBannerDialog()">
+        <mat-icon>web_asset</mat-icon>
+        <span>Popup Banner</span>
+      </button>
       <button mat-stroked-button class="action-btn secondary-btn" (click)="openNewUsersTab()">
         <span>New Users</span>
         <!-- <span>{{'New Users ( ' + objectKeys(mapProfileNew).length + ' )'}}</span> -->
@@ -120,8 +124,8 @@
           <ng-container matColumnDef="type">
             <th mat-header-cell *matHeaderCellDef>Type</th>
             <td mat-cell *matCellDef="let workshop">
-              <span class="type-badge" [class.type-evergreen]="workshop?.evergreenWorkshop" [class.type-cp]="!workshop?.evergreenWorkshop && workshop?.categorybased">
-                {{ workshop?.evergreenWorkshop ? 'Evergreen Workshop' : (workshop?.categorybased ? 'CP Workshop' : 'Workshop') }}
+              <span class="type-badge" [class.type-evergreen]="typeLabel(workshop) === 'Evergreen Workshop'" [class.type-cp]="typeLabel(workshop) === 'CP Workshop'">
+                {{ typeLabel(workshop) }}
               </span>
             </td>
           </ng-container>
