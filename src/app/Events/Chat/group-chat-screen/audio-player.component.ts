@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -18,7 +18,7 @@ import { MatIconModule } from '@angular/material/icon';
   standalone: true,
   imports: [CommonModule, MatIconModule],
   template: `
-    <div class="ap" [class.light]="light">
+    <div class="ap">
       <audio #audio [src]="src" preload="metadata"
              (loadedmetadata)="onMeta()"
              (durationchange)="onMeta()"
@@ -49,37 +49,40 @@ import { MatIconModule } from '@angular/material/icon';
     </div>
   `,
   styles: [`
+    /* Tokens come from the host screen and inherit through the DOM, so this follows the theme. */
     .ap {
       display: flex; align-items: center; gap: 9px; min-width: 230px; max-width: 320px;
-      padding: 7px 9px; border-radius: 10px; background: #F4F5F7; border: 1px solid #E5E7EB;
+      padding: 7px 9px; border-radius: 12px;
+      background: var(--sunken, #F4F6FA); border: 1px solid var(--line, rgba(60,60,67,.10));
+      color: var(--ink, #14161A);
     }
-    .ap.light { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.28); color: white; }
     .ap-play {
       width: 32px; height: 32px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
-      background: #7C3AED; color: white; display: flex; align-items: center; justify-content: center;
+      background: var(--blue, #007AFF); color: var(--on-accent, #fff);
+      display: flex; align-items: center; justify-content: center;
     }
-    .ap.light .ap-play { background: white; color: #7C3AED; }
     .ap-play mat-icon { font-size: 18px; width: 18px; height: 18px; }
     .ap-body { flex: 1; min-width: 0; }
     .ap-name {
-      font-size: 11px; font-weight: 600; margin-bottom: 2px;
+      font-size: 12px; font-weight: 600; margin-bottom: 2px; color: var(--ink, #14161A);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .ap-seek { width: 100%; height: 4px; accent-color: #7C3AED; cursor: pointer; margin: 3px 0 1px; }
-    .ap.light .ap-seek { accent-color: white; }
-    .ap-times { display: flex; justify-content: space-between; font-size: 9.5px; font-weight: 600; opacity: 0.7; }
+    .ap-seek { width: 100%; height: 4px; accent-color: var(--blue, #007AFF); cursor: pointer; margin: 3px 0 1px; }
+    .ap-times { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 600; color: var(--ink2, rgba(60,60,67,.62)); font-variant-numeric: tabular-nums; }
     .ap-rate {
-      border: none; background: none; font-size: 10.5px; font-weight: 800; color: inherit;
-      opacity: 0.75; cursor: pointer; flex-shrink: 0; padding: 0 2px;
+      border: none; background: none; font-size: 11px; font-weight: 800; color: var(--ink2, rgba(60,60,67,.62));
+      cursor: pointer; flex-shrink: 0; padding: 0 2px; min-width: 30px;
     }
-    .ap-dl { display: flex; color: inherit; opacity: 0.7; }
+    .ap-rate:hover { color: var(--blue-text, #0062CC); }
+    .ap-dl { display: flex; color: var(--ink3, rgba(60,60,67,.48)); }
+    .ap-dl:hover { color: var(--blue-text, #0062CC); }
     .ap-dl mat-icon { font-size: 15px; width: 15px; height: 15px; }
   `],
 })
-export class ChatAudioComponent {
+export class ChatAudioComponent implements AfterViewInit, OnDestroy {
   @Input() src = '';
   @Input() name?: string;
-  /** Renders for a dark (own-message) bubble. */
+  /** Kept for compatibility; no bubble is dark in this design, so it no longer changes anything. */
   @Input() light = false;
   @Input() download = true;
 
@@ -91,12 +94,36 @@ export class ChatAudioComponent {
   rate = 1;
   private durationFixed = false;
 
+  ngAfterViewInit(): void {
+    const a = this.audioRef?.nativeElement;
+    if (a) ChatAudioComponent.players.add(a);
+  }
+
+  ngOnDestroy(): void {
+    const a = this.audioRef?.nativeElement;
+    // Leaving a destroyed element in the set would keep it alive and let it be paused later.
+    if (a) { ChatAudioComponent.players.delete(a); a.pause(); }
+  }
+
   toggle(): void {
     const a = this.audioRef?.nativeElement;
     if (!a) return;
-    if (this.playing) a.pause();
-    else a.play().catch(e => console.error('audio play failed', e));
+    if (this.playing) { a.pause(); return; }
+    // Only one voice note plays at a time — starting this one stops whatever else was going.
+    // Module-scoped rather than a service: every player on the screen is this component, and a
+    // DI service would add a provider to wire up for behaviour that is purely local to them.
+    ChatAudioComponent.stopOthers(a);
+    a.play().catch(e => console.error('audio play failed', e));
   }
+
+  /** Pause every other <audio> this component owns. */
+  private static stopOthers(keep: HTMLAudioElement): void {
+    ChatAudioComponent.players.forEach(el => {
+      if (el !== keep && !el.paused) el.pause();
+    });
+  }
+
+  private static players = new Set<HTMLAudioElement>();
 
   seek(value: string | number): void {
     const a = this.audioRef?.nativeElement;
@@ -106,7 +133,7 @@ export class ChatAudioComponent {
   }
 
   cycleRate(): void {
-    const steps = [1, 1.5, 2];
+    const steps = [0.5, 1, 1.5, 2];
     this.rate = steps[(steps.indexOf(this.rate) + 1) % steps.length];
     const a = this.audioRef?.nativeElement;
     if (a) a.playbackRate = this.rate;
