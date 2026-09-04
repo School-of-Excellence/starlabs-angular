@@ -159,28 +159,50 @@
                             <span class="chip" [style.background]="catColors(member(j.pid).cat)[0]" [style.color]="catColors(member(j.pid).cat)[1]">{{ member(j.pid).cat }}</span>
                           </small>
                         </div>
-                      </div>
-                    </td>
-                    <td>{{ products[j.prod].name }}<small style="display:block;color:var(--muted);font-size:11px;margin-top:1px;">Focus: {{ j.focus }}</small></td>
-                    <td>
-                      <div style="font-size:12px;margin-bottom:4px;">{{ stageLabel(j) }}</div>
-                      <div class="prog"><span [style.width.%]="progress(j)"></span></div>
-                    </td>
-                    <td>
-                      <span *ngIf="j.started" class="sev" [style.--sv]="sevColor(j.days)">{{ j.days }}d</span>
-                      <span *ngIf="!j.started" style="color:var(--faint)">—</span>
-                    </td>
-                    <td>{{ member(j.owner).name.split(' ')[0] }}</td>
-                    <td>
-                      <span *ngIf="j.deliver">{{ member(j.deliver).name.split(' ')[0] }}</span>
-                      <span *ngIf="!j.deliver" style="color:var(--faint)">—</span>
-                    </td>
-                    <td>
-                      <span class="pill" [style.background]="'color-mix(in srgb, var(' + lifecycleConfig[lifecycle(j)].cssVar + ') 15%, transparent)'" [style.color]="'var(' + lifecycleConfig[lifecycle(j)].cssVar + ')'">
-                        <span class="pdot"></span>{{ lifecycleConfig[lifecycle(j)].label }}
-                      </span>
-                    </td>
-                  </tr>
+                      </td>
+                      <td>
+                        {{ row.activeDfuCount }} product{{ row.activeDfuCount > 1 ? 's' : '' }}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                            style="width:14px;height:14px;margin-left:6px;"
+                            [style.transform]="expandedOverviewRowId === row.id ? 'rotate(180deg)' : 'none'">
+                          <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                      </td>
+                    </tr>
+
+                    <tr *ngIf="expandedOverviewRowId === row.id">
+                      <td colspan="2">
+                        <div class="empty" *ngIf="overviewOngoingLoading[row.id]">Loading ongoing products…</div>
+
+                        <div class="product-accordion" *ngIf="!overviewOngoingLoading[row.id]">
+                          <div class="empty" *ngIf="!row.ongoingProducts?.length">No ongoing products.</div>
+
+                          <div class="product-item"
+                              *ngFor="let product of row.ongoingProducts"
+                              [class.open]="expandedOverviewProduct[product.participantproductid]">
+
+                            <button class="product-item-head" (click)="toggleOverviewProduct(row.id, product)">
+                              <span class="product-item-name">{{ product.productName }}</span>
+                              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 9l6 6 6-6"/>
+                              </svg>
+                            </button>
+
+                            <div class="product-item-body" *ngIf="expandedOverviewProduct[product.participantproductid]">
+                              <div class="empty" *ngIf="overviewProgressLoading[product.participantproductid]">Loading…</div>
+                              <div class="delivery-stepper" *ngIf="!overviewProgressLoading[product.participantproductid]">
+                                <div class="stepper-step" *ngFor="let step of overviewProductSteps[product.participantproductid]; let i = index">
+                                  <div class="stepper-circle" [ngClass]="step.stepClass">{{ i + 1 }}</div>
+                                  <div class="stepper-label">{{ step.name }}</div>
+                                  <div class="stepper-status" [ngClass]="step.stepClass">{{ step.status }}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </ng-container>
                 </tbody>
               </table>
             </div>
