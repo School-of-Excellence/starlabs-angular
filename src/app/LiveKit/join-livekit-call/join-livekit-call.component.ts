@@ -1270,13 +1270,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const names = this.remoteNames();
     let target = this.lastActiveSpeaker && names.has(this.lastActiveSpeaker) ? this.lastActiveSpeaker : null;
-    if (target && this.isRemoteConnectionLost(target)) {
-      // Don't keep PiP pinned to a speaker whose connection just dropped — look for someone else.
-      target = null;
-    }
     if (!target) {
-      // Prefer a remote whose connection isn't already reported Lost; fall back to any remote.
-      target = Array.from(names.keys()).find(id => !this.isRemoteConnectionLost(id)) ?? names.keys().next().value ?? null;
+      // Pick a genuinely random remaining participant instead of always the first one in map
+      const remoteIds = Array.from(names.keys());
+      target = remoteIds.length > 0 ? remoteIds[Math.floor(Math.random() * remoteIds.length)] : null;
     }
     if (!target) {
       // No remote yet — keep PiP meaningful (never clearPip() here: that would close a PiP the
@@ -1291,13 +1288,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     const camTrack = this.remoteVideoTracks.get(target);
     const muted = this.isRemoteCameraMuted(target);
-    const lost = this.isRemoteConnectionLost(target);
-    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack, muted, lost });
-    if (camTrack && !muted && !lost) {
+    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack?.mediaStreamTrack, muted });
+    if (camTrack && !muted) {
       this.setPipTrack(camTrack);
-    } else if (lost) {
-      // Connection reported Lost — show a transitional card instead of freezing on the last
-      this.setPipStream(this.nameCardStream(`${names.get(target) || target} — reconnecting…`));
     } else {
       // Camera off → show a name card, same idea as the grid placeholder (scenario 5).
       this.setPipStream(this.nameCardStream(names.get(target) || target));
@@ -1312,10 +1305,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (this.pipAttachedTrack) {
       try { this.pipAttachedTrack.detach(el); } catch (_) {}
     }
-    this.pipAttachedTrack = track;
     el.srcObject = null;
-
-    track.attach(el); // builds a fresh stream + registers the element with LiveKit
+    this.pipAttachedTrack = track;
+    track.attach(el); // sets srcObject internally + registers the element with LiveKit
     el.muted = true;
     (el as any).autoPictureInPicture = true;
     el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
