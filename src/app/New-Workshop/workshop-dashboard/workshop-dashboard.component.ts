@@ -2124,6 +2124,20 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Enrollment diagnostics — explains, gate by gate, why one profile can or
+   * cannot enroll in THIS workshop. Ports the EiFlix Flutter web enroll gates
+   * so support can answer "why can't this user enroll?" without the user's
+   * browser console.
+   */
+  async openDiagnoseDialog() {
+    const { EnrollDiagnosticsComponent } = await import('./enroll-diagnostics/enroll-diagnostics.component');
+    this.dialog.open(EnrollDiagnosticsComponent, {
+      data: { workshopId: this.workshopId, workshopTitle: this.workshopTitle },
+      width: '900px', maxWidth: '96vw', maxHeight: '92vh', autoFocus: false,
+    });
+  }
+
   async openClearDialog() {
     const { ClearWorkshopComponent } = await import('./clear-workshop/clear-workshop.component');
     this.dialog.open(ClearWorkshopComponent, {

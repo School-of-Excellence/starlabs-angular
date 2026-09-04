@@ -1,0 +1,96 @@
+<div class="ed">
+  <!-- ───────── header ───────── -->
+  <div class="ed-head">
+    <div class="ed-head-text">
+      <h2>Enrollment diagnostics</h2>
+      <p>Why a profile can or cannot enroll in <strong>{{ workshopTitle || 'this workshop' }}</strong>.</p>
+    </div>
+    <button mat-icon-button (click)="dialogRef.close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- ───────── form ───────── -->
+  <div class="ed-form">
+    <mat-form-field appearance="outline" class="ed-input">
+      <mat-label>Profile ID or email</mat-label>
+      <input matInput [(ngModel)]="profileId" placeholder="Paste the user's profileid or email id"
+             (keyup.enter)="check()" autocomplete="off" spellcheck="false">
+      <mat-icon matSuffix *ngIf="profileId.trim()">{{ inputIsEmail ? 'alternate_email' : 'badge' }}</mat-icon>
+    </mat-form-field>
+
+    <mat-radio-group [(ngModel)]="userKind" class="ed-radio">
+      <mat-radio-button value="exist">Existing user</mat-radio-button>
+      <mat-radio-button value="new">New user</mat-radio-button>
+    </mat-radio-group>
+
+    <button mat-flat-button color="primary" class="ed-check" (click)="check()" [disabled]="running">
+      <mat-icon *ngIf="!running">search</mat-icon>
+      <mat-spinner *ngIf="running" diameter="18" class="ed-spin"></mat-spinner>
+      {{ running ? 'Checking…' : 'Check' }}
+    </button>
+  </div>
+
+  <div class="ed-hint">
+    <span *ngIf="inputIsEmail">Reading this as an <strong>email</strong> — it is resolved to a profileid first.</span>
+    <span *ngIf="!inputIsEmail">Reading this as a <strong>profileid</strong>. Paste an email instead and it is looked up for you.</span>
+    Every lookup is a where query on this workshop only
+    (<code>workshopconfiguration/{{ workshopId }}</code>).
+  </div>
+
+  <div class="ed-error" *ngIf="error">
+    <mat-icon>error_outline</mat-icon><span>{{ error }}</span>
+  </div>
+
+  <div class="ed-cands" *ngIf="candidates.length">
+    <button type="button" class="ed-cand" *ngFor="let c of candidates" (click)="useCandidate(c.pid)">
+      <mat-icon>person_search</mat-icon>
+      <span class="ed-cand-main">
+        <span class="ed-cand-name">{{ c.name }}</span>
+        <span class="ed-cand-meta">{{ c.pid }} · found in {{ c.via }}</span>
+      </span>
+      <mat-icon class="ed-cand-go">chevron_right</mat-icon>
+    </button>
+  </div>
+
+  <!-- ───────── report ───────── -->
+  <div class="ed-report" *ngIf="ran">
+    <div class="ed-verdict" [class.ok]="verdict === 'allow'" [class.bad]="verdict === 'block'"
+         [class.warn]="verdict === 'card'">
+      <mat-icon>{{ verdict === 'allow' ? 'check_circle' : verdict === 'block' ? 'block' : 'payments' }}</mat-icon>
+      <div>
+        <div class="ed-verdict-text">{{ headline }}</div>
+        <div class="ed-verdict-sub" *ngIf="dialogSeen">What the user sees: <strong>{{ dialogSeen }}</strong></div>
+      </div>
+    </div>
+
+    <div class="ed-mismatch" *ngIf="kindMismatch">
+      <mat-icon>info</mat-icon><span>{{ kindMismatch }}</span>
+    </div>
+
+    <div class="ed-step" *ngFor="let s of steps" [ngClass]="'is-' + s.status">
+      <div class="ed-step-head">
+        <span class="ed-dot"></span>
+        <span class="ed-step-label">{{ s.label }}</span>
+        <span class="ed-tag">{{ s.status === 'pass' ? 'passed' : s.status === 'fail' ? 'refused here' : s.status === 'skip' ? 'not applied' : 'context' }}</span>
+      </div>
+      <p class="ed-step-text">{{ s.text }}</p>
+      <div class="ed-facts" *ngIf="s.facts?.length">
+        <span class="ed-fact" *ngFor="let f of s.facts"><b>{{ f.k }}</b>{{ f.v }}</span>
+      </div>
+      <div class="ed-q" *ngIf="s.q"><mat-icon>storage</mat-icon>{{ s.q }}</div>
+    </div>
+
+    <div class="ed-foot">
+      These are the app's client-side gates for the V2 web screen. They are not enforced by
+      Firestore rules, and the legacy <code>/workshopold</code> screen skips the access list
+      entirely, so a user refused here may still get in by another route.
+    </div>
+  </div>
+
+  <!-- ───────── empty state ───────── -->
+  <div class="ed-empty" *ngIf="!ran && !running && !error">
+    <mat-icon>troubleshoot</mat-icon>
+    <p>Enter a profileid and run the check to see every gate this workshop applies to that user.</p>
+  </div>
+</div>
