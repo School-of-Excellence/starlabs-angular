@@ -136,24 +136,24 @@ export class UpdateEventDetailComponent {
       bigmarathonref: [null,],
       ctaconfig : this.formbuilder.group({
         confirmparticipation : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], updateOn:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
+          button : ['', {validators: [Validators.required], updateOn:"change"}],
+          description : ['', {validators: [Validators.required], updateOn:"change"}],
         }),
         addon : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
+          button : ['', {validators: [Validators.required], updateOn:"change"}],
+          description : ['', {validators: [Validators.required], updateOn:"change"}],
         }),
         upgrade : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
+          button : ['', {validators: [Validators.required], updateOn:"change"}],
+          description : ['', {validators: [Validators.required], updateOn:"change"}],
         }),
         continuity : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
+          button : ['', {validators: [Validators.required], updateOn:"change"}],
+          description : ['', {validators: [Validators.required], updateOn:"change"}],
         }),
         nocta : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
+          button : ['', {validators: [Validators.required], updateOn:"change"}],
+          description : ['', {validators: [Validators.required], updateOn:"change"}],
         })
       })
     });
@@ -293,6 +293,7 @@ export class UpdateEventDetailComponent {
         });
       }
       console.log("Event Data", eventData);
+      const ctaconfig = eventData['ctaconfig'];
       this.eventimage.url = eventData["image"]
       this.eventform.controls["eventname"].setValue(eventData["name"])
       this.eventform.controls["atcmodel"].setValue(eventData["atcmodel"])
@@ -310,28 +311,29 @@ export class UpdateEventDetailComponent {
       this.eventform.controls["bigdescription"].setValue(eventData["bigdescription"])
       this.eventform.controls["bigmarathonref"].setValue(eventData["bigmarathonref"])
 
-      this.eventform.controls['ctaconfig'].patchValue( this.formbuilder.group({
-        confirmparticipation : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
-        }),
-        addon : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
-        }),
-        upgrade : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : ['', {validators: [Validators.required], update:"change"}],
-        }),
-        continuity : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : [' ', {validators: [Validators.required], update:"change"}],
-        }),
-        nocta : this.formbuilder.group({
-          button : [' ', {validators: [Validators.required], update:"change"}],
-          description : ['', {validators: [Validators.required], update:"change"}],
-        })
-      }))
+      console.log(ctaconfig)
+      this.eventform.get('ctaconfig')?.patchValue({
+        confirmparticipation: {
+          button: ctaconfig?.confirmparticipation?.button ?? '',
+          description: ctaconfig?.confirmparticipation?.description ?? '',
+        },
+        addon: {
+          button: ctaconfig?.addon?.button ?? '',
+          description: ctaconfig?.addon?.description ?? '',
+        },
+        upgrade: {
+          button: ctaconfig?.upgrade?.button ?? '',
+          description: ctaconfig?.upgrade?.description ?? '',
+        },
+        continuity: {
+          button: ctaconfig?.continuity?.button ?? '',
+          description: ctaconfig?.continuity?.description ?? '',
+        },
+        nocta: {
+          button: ctaconfig?.nocta?.button ?? '',
+          description: ctaconfig?.nocta?.description ?? '',
+        },
+      });
 
       // Get EVent Arena
       var arenaCollection = collection(this.firestore, "arena events")
@@ -557,10 +559,6 @@ export class UpdateEventDetailComponent {
   async saveEventDetail(value){
     console.log( this.eventimage.url);
 
-    Object.keys(this.eventform.controls).forEach((key)=>{
-      console.log(key)
-      console.log(this.eventform.controls[key].valid)
-    })
     if(this.eventform.valid){
       console.log(value)
       if(!this.validationFn()){
@@ -591,6 +589,7 @@ export class UpdateEventDetailComponent {
           bigmarathonref:value.bigmarathonref || null,
           arenaeventidlist:value.products.filter(e => e["delete"] != true).map(e => e['docid']),
           image: this.eventimage.url ?? null,
+          ctaconfig : value?.ctaconfig ?? {}
         }
         if(!this.capturedData['edit']){
           this.generateToken()
