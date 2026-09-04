@@ -7,8 +7,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Firestore, CollectionReference, collection, collectionData, collectionSnapshots, doc, getDocs,
-  query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion,
-  startAt, endAt, limit,
+  query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
+  startAt, endAt, startAfter, limit,
 } from '@angular/fire/firestore';
 import { writeBatch } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
@@ -16,8 +16,11 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { AuthguardService } from '../../../authguard.service';
+import { NavDrawerService } from '../../../nav-drawer.service';
 import { AddIssueComponent } from '../../../Customer Support/add-issue/add-issue.component';
+import { ChannelCommunicationComponent } from '../../../Channel Communication/channel-communication/channel-communication.component';
 import { ChatAudioComponent } from './audio-player.component';
+import * as XLSX from 'xlsx';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -43,8 +46,9 @@ export interface Attachment {
 
 export interface Receipt { name: string; at: string; }
 
-export interface Seg { kind: 'text' | 'bold' | 'link' | 'mention'; text: string; href?: string; }
-export interface Block { type: 'p' | 'ul' | 'ol'; segs?: Seg[]; items?: Seg[][]; }
+export interface Seg { kind: 'text' | 'bold' | 'italic' | 'link' | 'mention'; text: string; href?: string; }
+/** `gap` is a deliberately blank line — it is what keeps paragraph spacing in a sent message. */
+export interface Block { type: 'p' | 'ul' | 'ol' | 'gap'; segs?: Seg[]; items?: Seg[][]; }
 export interface Cta { label: string; href: string; }
 export interface Parsed { blocks: Block[]; ctas: Cta[]; }
 
@@ -85,6 +89,12 @@ export interface ChatMessage {
   /** Sender / reader uids, kept so names can be re-resolved when profile_data arrives late. */
   _senderUid?: string;
   _readerUids?: string[];
+  /**
+   * Channel broadcasts only. The broadcast job writes a rich card rather than a chat line:
+   * an optional header image/video, an HTML body, file cards, link chips, CTA buttons and a
+   * footer — plus the profile-doc-id audiences that drive the delivery panel.
+   */
+  _broadcast?: Broadcast;
   /** First message of a same-sender run — the only one that shows the avatar and the name. */
   _runStart?: boolean;
   /** Set on the first message of each day; renders the sticky date separator above it. */
@@ -92,6 +102,20 @@ export interface ChatMessage {
   // template-side parse cache
   _parsedFor?: string;
   _parsed?: Parsed;
+}
+
+/** The `supportchat/{channelId}/messages` shape written by the channel broadcast job. */
+export interface Broadcast {
+  html: string;
+  headerType: string | null;
+  headerValue: string | null;
+  footer: string | null;
+  files: { name: string; url: string }[];
+  links: { label: string; url: string }[];
+  /** All three are profile_data DOC IDS, not uids — channels address people by profile. */
+  sentTo: string[];
+  readBy: string[];
+  pending: string[];
 }
 
 export interface DeletedEntry {
@@ -130,6 +154,13 @@ export interface ChatItem {
   _ref?: any;
   /** Member uids exactly as stored on the doc — names are resolved through `profile_data`. */
   _memberUids?: string[];
+  /**
+   * Channels store `members` as profile_data doc ids, not uids (see ChannelCommunication's
+   * createChannel). Kept separately so nothing mistakes one identifier for the other.
+   */
+  _memberProfileIds?: string[];
+  /** `admins` on a channel doc — profile doc ids allowed to broadcast. */
+  _channelAdmins?: string[];
   _creatorUid?: string;
 }
 
@@ -194,13 +225,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   readonly AVATAR_EMOJIS = ['💬', '🎪', '🧠', '✨', '⚡', '📣', '🌟', '🔥', '🎯', '🤝'];
   readonly TABS: { k: TabKey; label: string }[] = [
     { k: 'groups', label: 'Groups' },
-    // Channels are parked for now — the tab is commented out rather than removed, and everything
-    // behind it (broadcast features, demo channel rows) is left in place.
-    // { k: 'channels', label: 'Channels' },
+    { k: 'channels', label: 'Channels' },
     { k: 'archived', label: 'Archived' },
   ];
 
-  /** Archived is split in two: deleted groups, and deleted channels (empty for now). */
+  /** Archived is split in two: deleted groups and deleted channels. */
   archivedSub: 'groups' | 'channels' = 'groups';
   readonly ARCHIVED_TABS: { k: 'groups' | 'channels'; label: string }[] = [
     { k: 'groups', label: 'Groups' },
@@ -217,6 +246,30 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /* ── Data ───────────────────────────────────────────────────────────── */
   groups: ChatItem[] = [];
   channels: ChatItem[] = [];
+
+  /* ── Channel paging ──────────────────────────────────────────────────
+     Groups stream live because a chat is conversational. Channels are broadcast archives —
+     the old screen paged them 10 at a time with getDocs and no listener, and this does the same:
+     a channel can hold years of sends, and none of them change after they land. */
+  private readonly CHANNEL_PAGE = 10;
+  private lastChannelDoc: { active: any; archived: any } = { active: null, archived: null };
+  hasMoreChannels = { active: false, archived: false };
+  loadingMoreChannels = false;
+
+  /** Broadcasts inside an open channel page the same way, newest first. */
+  private readonly BROADCAST_PAGE = 10;
+  private oldestBroadcastDoc: any = null;
+  hasMoreBroadcasts = false;
+  loadingMoreBroadcasts = false;
+
+  /** The delivery panel for one broadcast — sent to / read / pending. */
+  broadcastInfo: ChatMessage | null = null;
+  broadcastTab: 'sent' | 'read' | 'pending' = 'read';
+
+  /** Broadcast composer: pick the audience here, then hand off to ChannelCommunication. */
+  audienceOpen = false;
+  audienceSearch = '';
+  audiencePicked: string[] = [];
   directory: { [name: string]: Person } = {};
   participants: Person[] = [];
   team: Person[] = [];
@@ -285,7 +338,47 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* Ticket modal */
 
-  @ViewChild('composer') composerRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('composer') composerRef?: ElementRef<HTMLTextAreaElement>;
+
+  /** Grows the composer with its content up to COMPOSER_MAX_ROWS lines, then it scrolls. */
+  private static readonly COMPOSER_MAX_ROWS = 8;
+
+  /**
+   * Clearing `draft` in code does not fire (ngModelChange), so the textarea kept the inline height it
+   * had grown to and stayed tall after sending. Every programmatic clear goes through here.
+   */
+  private clearDraft(): void {
+    this.draft = '';
+    // The resize measures the DOM, and Angular has not pushed the empty value into the textarea yet at
+    // this point — measuring here would still see the old text and keep the grown height. Clear the
+    // element directly, then let a frame pass before re-measuring.
+    const el = this.composerRef?.nativeElement;
+    if (el) el.value = '';
+    requestAnimationFrame(() => this.autoGrowComposer());
+    setTimeout(() => this.autoGrowComposer(), 60);
+  }
+
+  autoGrowComposer(): void {
+    const el = this.composerRef?.nativeElement;
+    if (!el) return;
+
+    // An EMPTY textarea reports a nonsense scrollHeight here (543px against a 38px clientHeight —
+    // it is a flex item with `flex: 1` and `height: auto` at measure time), which is why the box
+    // stayed tall after sending. With no content there is nothing to measure: drop the inline height
+    // and let the CSS min-height define the resting size.
+    if (!el.value) { el.style.height = ''; return; }
+
+    const cs = getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight) || 22;
+    const chrome = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+                 + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    const max = line * GroupChatScreenComponent.COMPOSER_MAX_ROWS + chrome;
+    const wasAtBottom = this.isNearBottom();
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, max) + 'px';
+    // Growing the composer shortens the thread pane; hold the newest message in view.
+    if (wasAtBottom) this.scrollToBottomSoon();
+  }
   @ViewChild('messagePane') messagePane?: ElementRef<HTMLDivElement>;
   @ViewChild('imgInput') imgInput?: ElementRef<HTMLInputElement>;
   @ViewChild('vidInput') vidInput?: ElementRef<HTMLInputElement>;
@@ -294,6 +387,31 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private toastTimer: any = null;
   private flashTimer: any = null;
+
+  /* ── Appearance ─────────────────────────────────────────────────────
+     The design ships light and dark token sets. The attribute is set on THIS component's host, not on
+     <html>, so the rest of the app — which has no dark styling — is unaffected. */
+  theme: 'light' | 'dark' = 'light';
+  private static readonly THEME_KEY = 'groupChatTheme';
+
+  /** This screen hides the app toolbar, so it carries the app-navigation trigger itself. */
+  openAppNav(): void { this.navDrawer.toggle(); }
+
+  toggleTheme(): void {
+    this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');
+    try { localStorage.setItem(GroupChatScreenComponent.THEME_KEY, this.theme); } catch { /* private mode */ }
+  }
+
+  private applyTheme(theme: 'light' | 'dark'): void {
+    this.theme = theme;
+    this.hostEl.nativeElement.setAttribute('data-theme', theme);
+  }
+
+  private restoreTheme(): void {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(GroupChatScreenComponent.THEME_KEY); } catch { /* SSR / private mode */ }
+    this.applyTheme(saved === 'dark' ? 'dark' : 'light');
+  }
 
   /** Height of the screen in px — measured, so the whole UI fits with no page scroll. */
   screenHeight: number | null = null;
@@ -306,6 +424,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** uid of the signed-in user, i.e. their `user_data` doc id — the same key `members` holds. */
   currentUid = '';
   currentProfile: any = null;
+  /** profile_data doc id for the signed-in user — the identifier channels address people by. */
+  currentProfileDocId = '';
   chatAdmin = false;
   adminRole = false;
   /** `developer` on the roles doc — the escape hatch that can appoint the first admin. */
@@ -318,6 +438,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   private profilesByUid: { [uid: string]: any } = {};
   /** profileid → display name, for expanding stored `@profileid` mentions back to names. */
   private profileIdToName: { [profileId: string]: string } = {};
+  /** Keyed by profile_data DOC id — the identifier channel audiences are stored under. */
+  private profileByDocId: { [docId: string]: { name: string; photoUrl: string | null; uid: string } } = {};
   private nameToProfileId: { [name: string]: string } = {};
   private rolesByProfileId: { [profileId: string]: any } = {};
 
@@ -336,6 +458,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     private guard: AuthguardService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
+    private navDrawer: NavDrawerService,
   ) {
     this.supportchat = collection(this.firestore, 'supportchat');
   }
@@ -343,6 +466,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /* ── Lifecycle ──────────────────────────────────────────────────────── */
 
   ngOnInit(): void {
+    this.restoreTheme();
     // Static rows first so the screen is never blank; live groups replace them once auth resolves.
     this.seedDemoData();
     this.loading = false;
@@ -400,6 +524,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       if (profileSnap.empty) return;  // not a chat user — stay on the static demo rows
 
       this.currentProfile = profileSnap.docs[0].data();
+      this.currentProfileDocId = profileSnap.docs[0].id;
       this.currentUid = this.currentProfile['user_ref']?.id || '';
       if (!this.currentUid) return;
 
@@ -407,6 +532,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.watchRoles();
       this.loadTicketConfig();
       this.loadGroups();
+      this.loadChannels(false);
+      this.loadChannels(true);
       this.liveMode = true;
     } catch (e) {
       console.error('group-chat: live bootstrap failed, staying on demo data', e);
@@ -444,6 +571,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       .pipe(takeUntil(this.destroy$))
       .subscribe(docs => {
         this.profilesByUid = {};
+        this.profileByDocId = {};
         this.profileIdToName = {};
         this.nameToProfileId = {};
         const people: Person[] = [];
@@ -453,6 +581,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
           if (!uid || !data['name']) return;
           const profileId = data['profileid'] || data['profile_id'] || d.id;
           data['_profileId'] = profileId;
+          this.profileByDocId[d.id] = { name: data['name'], photoUrl: data['profile'] || null, uid };
           this.profilesByUid[uid] = data;
           this.profileIdToName[profileId] = data['name'];
           this.nameToProfileId[data['name']] = profileId;
@@ -558,8 +687,242 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     };
   }
 
+  /* ── Channels ───────────────────────────────────────────────────────
+     Same `supportchat` collection as groups, separated by `type`. Two things differ from the
+     group path and both are deliberate:
+
+     1. No listener. chat-screen fetched channels with getDocs in pages of 10 because a broadcast
+        archive only ever grows at one end, and re-reading the whole thing on every write is waste.
+     2. Membership is a profile_data DOC ID, not a uid. ChannelCommunication.createChannel() writes
+        `members: adminIds` where adminIds are profile ids, so the group filter
+        (members array-contains uid) matches nothing on a channel — which is why non-admins could
+        never see a channel on the old screen. Filtering by profile doc id fixes that here. */
+  private async loadChannels(archived: boolean, more = false): Promise<void> {
+    if (more && (this.loadingMoreChannels || !this.lastChannelDoc[archived ? 'archived' : 'active'])) return;
+    const key = archived ? 'archived' : 'active';
+    const baseFilter = (this.chatAdmin || this.adminRole)
+      ? []
+      : [where('members', 'array-contains', this.currentProfileDocId)];
+
+    const parts: any[] = [
+      ...baseFilter,
+      where('type', '==', 'channel'),
+      where('isdelete', '==', archived),
+      orderBy('last_modification', 'desc'),
+    ];
+    if (more) parts.push(startAfter(this.lastChannelDoc[key]));
+    parts.push(limit(this.CHANNEL_PAGE));
+
+    if (more) this.loadingMoreChannels = true;
+    try {
+      const snap = await getDocs(query(this.supportchat, ...parts));
+      const mapped = snap.docs.map(d => this.mapChannelDoc(d, archived));
+      const kept = more
+        ? this.channels
+        : this.channels.filter(c => c._live && !!c.archived !== archived);
+      this.channels = [...kept, ...mapped];
+      this.lastChannelDoc[key] = snap.docs[snap.docs.length - 1] ?? this.lastChannelDoc[key];
+      this.hasMoreChannels[key] = snap.docs.length === this.CHANNEL_PAGE;
+    } catch (e) {
+      console.error(archived ? 'archived channels' : 'active channels', e);
+    } finally {
+      this.loadingMoreChannels = false;
+    }
+  }
+
+  /** Channels run on the pink accent — including the archived sub-tab that lists deleted ones. */
+  get channelTheme(): boolean {
+    return this.tab === 'channels' || (this.tab === 'archived' && this.archivedSub === 'channels');
+  }
+
+  /** The paging control only belongs under a channel list that actually has another page. */
+  get showChannelPaging(): boolean {
+    if (this.tab === 'channels') return this.hasMoreChannels.active;
+    if (this.tab === 'archived' && this.archivedSub === 'channels') return this.hasMoreChannels.archived;
+    return false;
+  }
+
+  loadMoreChannels(): void {
+    this.loadChannels(this.tab === 'archived', true);
+  }
+
+  /** Re-read both channel buckets from page one — used after a restore/delete flips `isdelete`. */
+  private reloadChannels(): void {
+    this.lastChannelDoc = { active: null, archived: null };
+    this.loadChannels(false);
+    this.loadChannels(true);
+  }
+
+  private mapChannelDoc(d: any, archived: boolean): ChatItem {
+    const data: any = d.data();
+    const profileIds: string[] = data['members'] || [];
+    const existing = this.channels.find(c => c.id === d.id);
+    return {
+      id: d.id,
+      name: data['group_name'] || 'Untitled channel',
+      photoUrl: this.imageUrl(data['group_profile']),
+      emoji: '📣',
+      // Channels DO carry a description — ChannelCommunication writes one at create time.
+      description: data['description'] || '',
+      category: null,
+      eventId: null,
+      eventName: null,
+      createdBy: this.nameOfUid(data['creator_uid']),
+      members: profileIds.map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null })),
+      followers: profileIds.length,
+      messages: existing?.messages || [],
+      lastMessage: data['last_message'] || '',
+      lastAt: this.tsToIso(data['last_modification']),
+      unread: 0,
+      pinned: !!data['pinned'],
+      adminUids: [],
+      deletedLog: [],
+      archived,
+      _live: true,
+      _ref: d.ref,
+      _memberProfileIds: profileIds,
+      _channelAdmins: data['admins'] || [],
+      _creatorUid: data['creator_uid'],
+      _coll: 'supportchat',
+      _kind: 'channel',
+    };
+  }
+
+  /** Names for channel audiences, which are keyed by profile_data doc id. */
+  private nameOfProfileDoc(docId: string): string {
+    return this.profileByDocId[docId]?.name
+      || this.profileMapByDocId?.[docId]?.['name']
+      || 'Unknown User';
+  }
+
+  private photoOfProfileDoc(docId: string): string | null {
+    return this.profileByDocId[docId]?.photoUrl
+      || this.profileMapByDocId?.[docId]?.['profile']
+      || null;
+  }
+
+  /**
+   * Broadcasts, newest page first then reversed so the thread still reads oldest→newest.
+   * Deliberately a one-shot read, not a listener — see loadChannels().
+   */
+  private async loadBroadcasts(channel: ChatItem, more = false): Promise<void> {
+    if (more && (this.loadingMoreBroadcasts || !this.oldestBroadcastDoc)) return;
+    const col = collection(this.supportchat, channel.id, 'messages');
+    const parts: any[] = [orderBy('time', 'desc')];
+    if (more) parts.push(startAfter(this.oldestBroadcastDoc));
+    parts.push(limit(this.BROADCAST_PAGE));
+
+    if (more) this.loadingMoreBroadcasts = true;
+    else { this.messagesLoading = true; this.messagesError = ''; }
+    try {
+      let snap = await getDocs(query(col, ...parts));
+      let ordered = true;
+
+      /* Firestore drops any document that is MISSING the orderBy field. If the broadcast job stamps
+         its own timestamp under a different name, `orderBy('time')` returns an empty page while the
+         subcollection is full — indistinguishable from an empty channel. So: if the first page comes
+         back empty, re-read it unordered and sort on the client. Costs one extra read only in the
+         case that would otherwise show nothing. */
+      if (!more && snap.empty) {
+        // Wider page here: with no order there is no cursor to page from, so this read is the
+        // whole view, and it may also contain per-recipient duplicates to collapse.
+        snap = await getDocs(query(col, limit(60)));
+        ordered = false;
+        if (!snap.empty) {
+          console.warn('group-chat: channel messages have no usable `time` field; fell back to an '
+            + 'unordered read. Fields on the first doc:', Object.keys(snap.docs[0].data() || {}));
+        }
+      }
+
+      const target = this.channels.find(c => c.id === channel.id) || channel;
+      const docsOldestFirst = ordered ? [...snap.docs].reverse() : snap.docs;
+      const older = docsOldestFirst.map(d => {
+        try { return this.mapBroadcastDoc(d); }
+        catch (e) { console.error('group-chat: skipped a broadcast', d?.id, e); return null; }
+      }).filter(Boolean) as ChatMessage[];
+      if (!ordered) older.sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+      // channel-record queries these by `messageid` and iterates the result, so a broadcast is not
+      // guaranteed to be one document. Collapse by messageid — one card per send, either way.
+      const byId = new Map<string, ChatMessage>();
+      older.forEach(m => { if (!byId.has(m.id)) byId.set(m.id, m); });
+      const page = [...byId.values()];
+      target.messages = more ? [...page, ...target.messages] : page;
+      // docs came back newest-first, so the LAST one is the oldest — the cursor for the next page.
+      this.oldestBroadcastDoc = snap.docs[snap.docs.length - 1] ?? this.oldestBroadcastDoc;
+      // Paging needs the cursor to be meaningful; without an order there is nothing to page from.
+      this.hasMoreBroadcasts = ordered && snap.docs.length === this.BROADCAST_PAGE;
+      if (!more) this.scrollToBottomSoon();
+    } catch (e: any) {
+      console.error('channel broadcasts', e);
+      if (!more) {
+        this.messagesError = e?.code === 'permission-denied'
+          ? 'You do not have permission to read this channel.'
+          : `Could not load broadcasts${e?.code ? ' (' + e.code + ')' : ''}.`;
+      }
+    } finally {
+      this.messagesLoading = false;
+      this.loadingMoreBroadcasts = false;
+    }
+  }
+
+  loadMoreBroadcasts(): void {
+    if (this.active) this.loadBroadcasts(this.active, true);
+  }
+
+  /**
+   * A broadcast doc is a card, not a chat line: `htmlbody` holds the body, and header/footer/
+   * files/links/buttons hang off it. Everything lands on _broadcast so the normal bubble
+   * renderer is never asked to make sense of raw HTML.
+   */
+  private mapBroadcastDoc(d: any): ChatMessage {
+    const data: any = d.data();
+    const uid = data['sender_uid'] || '';
+    const files: any[] = data['files'] || [];
+    const links: any[] = data['links'] || [];
+    /* Field names are not guaranteed across the broadcast job's versions, and a card with no body is
+       worse than a plainly-rendered one. Fall through the known spellings rather than showing blank. */
+    const html: string = data['htmlbody'] || data['html_body'] || '';
+    const plain: string = data['textbody'] || data['text_body'] || data['message'] || '';
+    return {
+      id: data['messageid'] || d.id,
+      // Broadcasts have no "me" — chat-screen blanked isMyMessage on channels for the same reason.
+      from: 'member',
+      senderName: uid ? this.nameOfUid(uid) : this.TEAM_NAME,
+      text: plain,
+      at: this.tsToIso(data['time'] ?? data['createdat'] ?? data['created_on'] ?? data['senton']),
+      pinned: !!data['pinned'],
+      buttons: this.parseButtons(data['buttons']),
+      readBy: [],
+      deliveredTo: [],
+      _ref: d.ref,
+      _senderUid: uid,
+      _broadcast: {
+        html,
+        headerType: data['headertype'] ?? null,
+        headerValue: data['headervalue'] ?? null,
+        footer: data['footer'] ?? null,
+        files: files.map(f => ({ name: f?.['name'] || 'File', url: f?.['url'] || f?.['fileurl'] || '' }))
+                    .filter(f => !!f.url),
+        links: links.map(l => typeof l === 'string'
+          ? { label: l, url: l }
+          : { label: l?.['label'] || l?.['title'] || l?.['url'] || 'Link', url: l?.['url'] || '' })
+          .filter(l => !!l.url),
+        sentTo: data['members'] || [],
+        readBy: data['read_by'] || [],
+        pending: data['pending'] || [],
+      },
+    };
+  }
+
+  isBroadcast(m: ChatMessage): boolean { return !!m._broadcast; }
+
   /** Member and sender names come from profile_data, which can arrive after the groups do. */
   private refreshLiveNames(): void {
+    this.channels.filter(c => c._live).forEach(c => {
+      c.members = (c._memberProfileIds || []).map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null }));
+      c.createdBy = this.nameOfUid(c._creatorUid || '');
+      c.messages.forEach(m => { if (m._senderUid) m.senderName = this.nameOfUid(m._senderUid); });
+    });
     this.groups.filter(g => g._live).forEach(g => {
       g.members = (g._memberUids || []).map(uid => ({ id: uid, name: this.nameOfUid(uid), journey: null }));
       g.createdBy = this.nameOfUid(g._creatorUid || '');
@@ -587,6 +950,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Live thread: real-time messages, ordered oldest→newest, exactly as chat-screen reads them. */
   private subscribeMessages(group: ChatItem): void {
     this.messagesSub?.unsubscribe();
+    this.markedRead.clear();
     this.messagesLoading = true;
     this.messagesError = '';
     this.messagesSub = collectionSnapshots(
@@ -604,8 +968,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
           catch (e) { console.error('group-chat: skipped a message', d?.id, e); return null; }
         }).filter(Boolean) as ChatMessage[];
         this.messagesLoading = false;
+        // Anything that lands while this thread is open counts as read.
+        this.markArrivalsRead(docs);
         const isFirstLoad = before === 0;
-        if (isFirstLoad || (target.messages.length > before && wasAtBottom)) this.scrollToBottomSoon();
+        const grew = target.messages.length > before;
+        // Your own send always jumps to the bottom; someone else's message only if you were already there.
+        if (isFirstLoad || this.justSent || (grew && wasAtBottom)) {
+          this.scrollToBottomSoon();
+          if (grew) this.justSent = false;
+        }
       },
       error: e => {
         console.error('group messages', e);
@@ -753,10 +1124,64 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return (group._memberUids || []).filter(uid => uid !== this.currentUid);
   }
 
-  /** chat-screen semantics: drop me from last_pending when I open the thread. */
+  /**
+   * Opening a thread marks it read, the same way the Flutter participant app does:
+   *   group doc  → last_pending drops me, and my `pendingcount` entry is deleted
+   *   each message where `pending` contains me → read_by: arrayUnion(me), pending: arrayRemove(me)
+   *
+   * chat-screen only ever cleared the group-level flag, so a read on web was never recorded per
+   * message and the receipts under-reported the web side.
+   */
   private async markRead(group: ChatItem): Promise<void> {
-    try { await updateDoc(group._ref, { last_pending: arrayRemove(this.currentUid) }); }
-    catch (e) { console.error('mark read', e); }
+    try {
+      await updateDoc(group._ref, {
+        last_pending: arrayRemove(this.currentUid),
+        [`pendingcount.${this.currentUid}`]: deleteField(),
+      });
+    } catch (e) { console.error('mark read (group)', e); }
+
+    // Firestore batches cap at 500 writes; loop in case a thread has more unread than that.
+    try {
+      for (let round = 0; round < 5; round++) {
+        const snap = await getDocs(query(
+          collection(this.supportchat, group.id, 'messages'),
+          where('pending', 'array-contains', this.currentUid),
+          limit(400),
+        ));
+        if (snap.empty) return;
+        const batch = writeBatch(this.firestore);
+        snap.docs.forEach(d => {
+          batch.update(d.ref, {
+            read_by: arrayUnion(this.currentUid),
+            pending: arrayRemove(this.currentUid),
+          });
+          this.markedRead.add(d.id);
+        });
+        await batch.commit();
+        if (snap.size < 400) return;
+      }
+    } catch (e) { console.error('mark read (messages)', e); }
+  }
+
+  /** Message ids already receipted this session, so a live snapshot cannot re-write them in a loop. */
+  private markedRead = new Set<string>();
+
+  /**
+   * Messages that arrive while the thread is open are receipted too — the app keeps a listener doing
+   * the same. Guarded by `markedRead` so the write's own snapshot does not trigger another write.
+   */
+  private markArrivalsRead(docs: any[]): void {
+    const unread = docs.filter(d => {
+      const data = d.data();
+      return !this.markedRead.has(d.id) && (data['pending'] || []).includes(this.currentUid);
+    });
+    if (!unread.length) return;
+    const batch = writeBatch(this.firestore);
+    unread.slice(0, 400).forEach(d => {
+      batch.update(d.ref, { read_by: arrayUnion(this.currentUid), pending: arrayRemove(this.currentUid) });
+      this.markedRead.add(d.id);
+    });
+    batch.commit().catch(e => console.error('mark arrivals read', e));
   }
 
   private async writeMessage(group: ChatItem, body: string, files: any[], replyTarget?: ChatMessage | null,
@@ -808,6 +1233,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private notify(msg: string): void { this.snackBar.open(msg, 'Close', { duration: 2000 }); }
 
+  /** Esc closes the preview — the tooltip promises it, and a video swallows backdrop clicks. */
+  @HostListener('document:keydown.escape')
+  onEscape(): void { if (this.lightbox) this.lightbox = null; }
+
   @HostListener('window:resize')
   onWindowResize(): void { this.fitToViewport(); }
 
@@ -826,17 +1255,20 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
 
-  senderColor(name: string): string {
-    let h = 0;
-    for (let i = 0; i < (name || '').length; i++) h = (h + name.charCodeAt(i)) % SENDER_COLORS.length;
-    return SENDER_COLORS[h];
-  }
+  /**
+   * The console design drops the per-sender rainbow: names are plain ink, and identity is carried by
+   * the avatar (blue for team/admins, neutral for everyone else).
+   */
+  senderColor(_name: string): string { return 'var(--ink)'; }
 
   initials(name: string): string {
     return (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 
-  avatarBg(name: string): string { return this.senderColor(name) + '1F'; }
+  avatarBg(name: string): string {
+    // --chip-low is a mid grey in BOTH themes; --ink2 flips light/dark and white initials vanish on it.
+    return this.isAdminSender(name) || this.directory[name]?.source === 'team' ? 'var(--blue)' : 'var(--chip-low)';
+  }
 
   timeLabel(iso?: string): string {
     if (!iso) return '';
@@ -914,8 +1346,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return new RegExp(
       '\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)' +   // 1 label · 2 href
       '|\\*([^*\\n]+)\\*' +                                  // 3 bold — one star each side
-      '|(https?:\\/\\/[^\\s<>"\')]+)' +                     // 4 bare url
-      '|(' + this.mentionSource(names) + ')',                // 5 mention
+      '|(?<![A-Za-z0-9_])_([^_\\n]+)_(?![A-Za-z0-9_])' +      // 4 italic — one underscore each side
+      '|(https?:\\/\\/[^\\s<>"\')]+)' +                     // 5 bare url
+      '|(' + this.mentionSource(names) + ')',                // 6 mention
       'g');
   }
 
@@ -927,9 +1360,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     for (const m of Array.from(src.matchAll(re))) {
       const idx = m.index ?? 0;
       if (idx > last) out.push({ kind: 'text', text: src.slice(last, idx) });
-      const [, label, href, bold, url, mention] = m;
+      const [, label, href, bold, italic, url, mention] = m;
       if (href) out.push({ kind: 'link', text: label, href });
       else if (bold) out.push({ kind: 'bold', text: bold });
+      else if (italic) out.push({ kind: 'italic', text: italic });
       else if (url) out.push({ kind: 'link', text: url, href: url });
       else if (mention) out.push({ kind: 'mention', text: mention });
       last = idx + m[0].length;
@@ -940,8 +1374,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private splitCtas(text: string): { body: string; ctas: Cta[] } {
     const ctas: Cta[] = [];
+    // Trailing spaces go; blank lines STAY — they are the author's paragraph breaks. Runs of more
+    // than two are capped so a stray scroll of newlines cannot stretch a bubble indefinitely.
     const body = (text || '').replace(CTA_RE, (_m, label, href) => { ctas.push({ label, href }); return ''; })
-      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{4,}/g, '\n\n\n').trim();
     return { body, ctas };
   }
 
@@ -961,7 +1397,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         list!.items.push(this.renderInline(number[1], names));
       } else {
         flush();
+        // A blank line is content, not noise: it becomes a spacer so the paragraph break survives.
         if (line.trim()) blocks.push({ type: 'p', segs: this.renderInline(line, names) });
+        else if (blocks.length) blocks.push({ type: 'gap' });
       }
     });
     flush();
@@ -995,8 +1433,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       groups: this.groups.filter(g => !g.archived),
       channels: this.channels.filter(c => !c.archived),
       archived: (this.archivedSub === 'channels'
-        // Nothing to show under archived channels yet.
-        ? []
+        ? this.channels.filter(c => c.archived)
         : this.groups.filter(g => g.archived)
             .map(g => g._live ? g : { ...g, _coll: 'webchatGroups', _kind: 'group' as const })
       ).sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || '')),
@@ -1051,7 +1488,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * into the client is also matched mid-message, which is why both paths run.
    */
   private async runMessageSearch(q: string): Promise<void> {
-    const groups = this.list;
+    // Only groups: broadcasts have no `message_search` field, and their body is HTML.
+    const groups = this.list.filter(g => !this.isChannel(g));
     const hits: { group: ChatItem; msg: ChatMessage }[] = [];
 
     await Promise.all(groups.map(async g => {
@@ -1132,6 +1570,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get canManageAdmins(): boolean {
     const a = this.active;
     if (!a) return false;
+    // Channel membership and admins are owned by the broadcast flow, not edited from this panel.
+    if (this.isChannel(a)) return false;
     if (!this.isLive(a)) return true;               // demo rows stay fully editable
     return this.isSelfGroupAdmin || this.developerRole;
   }
@@ -1141,17 +1581,60 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * not grant it — a developer can appoint admins (see canManageAdmins) but cannot post unless they
    * are a member and an admin themselves. Platform chatxadmin/admin see every group via loadGroups(),
    * which is exactly why membership is checked here rather than assumed.
-   * NOTE: when `group_admin` is empty — every group created before the field existed — members may
-   * still post, rather than silently freezing every existing group. Flagged to the operator.
+   * There is NO exemption for a group with an empty `group_admin`. That allowance existed so groups
+   * created before the field would not freeze, but it meant any member could post in one — which is
+   * the opposite of the rule. Such a group is now read-only until someone is made an admin; a
+   * `developer` can always do that (see canManageAdmins), so no group is stuck.
    */
   get canMessage(): boolean {
     const a = this.active;
     if (!a) return false;
+    // A channel is one-way — the composer is replaced by the broadcast bar, not gated by access.
+    if (this.isChannel(a)) return false;
     if (!this.isLive(a)) return true;
     const isMember = (a._memberUids || []).includes(this.currentUid);
     if (!isMember) return false;
-    if (!(a.adminUids || []).length) return true;   // legacy group: no admins recorded yet
     return this.isSelfGroupAdmin;
+  }
+
+  /**
+   * Broadcasting is gated on the channel's own `admins` array (profile doc ids), with the platform
+   * chat admin roles as the fallback — a channel created before `admins` existed has nobody in it.
+   */
+  /** Channel recipients — same search box, same admins-first ordering as a group's member list. */
+  get channelRecipients(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    const list = (this.active?.members || [])
+      .filter(m => !q || m.name.toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q));
+    return this.adminsFirst(list, m => this.isChannelAdmin(m.id));
+  }
+
+  isChannelAdmin(profileDocId: string): boolean {
+    return (this.active?._channelAdmins || []).includes(profileDocId);
+  }
+
+  /** Channel members are profile doc ids, so their pictures resolve through profileByDocId. */
+  photoOfMemberDoc(profileDocId: string): string | null {
+    return this.photoOfProfileDoc(profileDocId);
+  }
+
+  get canManageChannel(): boolean {
+    const a = this.active;
+    if (!a || !this.isChannel(a) || a.archived) return false;
+    if (!this.isLive(a)) return true;               // demo rows stay fully exercisable
+    const admins = a._channelAdmins || [];
+    // An empty `admins` (a channel predating the field) would otherwise be frozen with nobody able
+    // to post or fix it — the platform chat admins are the escape hatch, as they are for groups.
+    if (!admins.length) return this.chatAdmin || this.adminRole;
+    return admins.includes(this.currentProfileDocId) || this.chatAdmin || this.adminRole;
+  }
+
+  /** Broadcasting and editing carry the same permission — both are "run this channel". */
+  get canBroadcast(): boolean { return this.canManageChannel; }
+
+  /** One gate for the info panel, whichever kind of chat is open. */
+  get canEditChat(): boolean {
+    return this.isChannel(this.active) ? this.canManageChannel : this.canManageAdmins;
   }
 
   toggleGroupAdmin(mem: Member, event?: Event): void {
@@ -1237,7 +1720,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get features(): Features {
     return {
       groups:   { sender: true,  reply: true,  react: true,  oneWay: false, info: true,  attach: true,  readOnly: false },
-      channels: { sender: false, reply: false, react: true,  oneWay: true,  info: false, attach: true,  readOnly: false },
+      // A broadcast has no reactions, replies or per-message read receipts to render — its
+      // delivery panel (sent / read / pending) replaces all of that.
+      channels: { sender: false, reply: false, react: false, oneWay: true,  info: true,  attach: false, readOnly: false },
       archived: { sender: true,  reply: false, react: false, oneWay: false, info: false, attach: false, readOnly: true  },
     }[this.tab];
   }
@@ -1261,9 +1746,18 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.person = null; this.attachError = ''; this.pinnedOpen = false;
     this.clearPendingFiles();
     this.messagesError = '';
+    this.memberSearch = ''; this.editingName = false;
+    this.broadcastInfo = null; this.audienceOpen = false;
+    this.oldestBroadcastDoc = null; this.hasMoreBroadcasts = false;
     if (this.isLive(c)) {
-      this.subscribeMessages(c);
-      if (c.unread) { this.sourceOf(c).unread = 0; this.markRead(c); }
+      if (this.isChannel(c)) {
+        // Broadcasts are read-only history: fetch a page, no listener, nothing to mark read.
+        this.messagesSub?.unsubscribe();
+        this.loadBroadcasts(c);
+      } else {
+        this.subscribeMessages(c);
+        if (c.unread) { this.sourceOf(c).unread = 0; this.markRead(c); }
+      }
     } else if (c.unread) {
       this.sourceOf(c).unread = 0;
     }
@@ -1293,14 +1787,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   openAvatar(name: string, event?: Event): void {
     event?.stopPropagation();
     const url = this.photoOf(name);
-    if (url) { this.lightboxIsPortrait = true; this.lightbox = url; }
+    if (url) { this.resetViewer(); this.lightboxKind = 'image'; this.lightboxIsPortrait = true; this.lightbox = url; }
     else this.openPerson(name);
   }
 
   /** The group picture, enlarged. */
   openGroupPhoto(item: ChatItem | null, event?: Event): void {
     event?.stopPropagation();
-    if (item?.photoUrl) { this.lightboxIsPortrait = true; this.lightbox = item.photoUrl; }
+    if (item?.photoUrl) { this.resetViewer(); this.lightboxKind = 'image'; this.lightboxIsPortrait = true; this.lightbox = item.photoUrl; }
   }
 
   /** Profile pictures open at portrait size; message attachments keep the full-bleed lightbox. */
@@ -1310,7 +1804,63 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   lightboxKind: 'image' | 'video' = 'image';
 
   /** Attachment images always open full-bleed — never inherit the portrait sizing. */
+  /* ── Image viewer: zoom, rotate, pan ────────────────────────────────
+     The image is always rendered at its own aspect ratio (`object-fit: contain`, no cropping) —
+     the old `cover` on the portrait variant was squaring off profile pictures. Zoom and rotation
+     are applied as a transform on top of that, so the source ratio is never altered. */
+
+  lbScale = 1;
+  lbRotate = 0;
+  lbX = 0;
+  lbY = 0;
+  private lbDrag: { x: number; y: number; ox: number; oy: number } | null = null;
+
+  private resetViewer(): void { this.lbScale = 1; this.lbRotate = 0; this.lbX = 0; this.lbY = 0; }
+
+  get lbTransform(): string {
+    return `translate(${this.lbX}px, ${this.lbY}px) scale(${this.lbScale}) rotate(${this.lbRotate}deg)`;
+  }
+
+  zoomBy(step: number, event?: Event): void {
+    event?.stopPropagation();
+    const next = Math.min(6, Math.max(0.25, +(this.lbScale + step).toFixed(2)));
+    this.lbScale = next;
+    // Back at fit size there is nothing to pan to, so recentre rather than stranding the image.
+    if (next <= 1) { this.lbX = 0; this.lbY = 0; }
+  }
+
+  rotateBy(deg: number, event?: Event): void {
+    event?.stopPropagation();
+    this.lbRotate = (this.lbRotate + deg + 360) % 360;
+  }
+
+  resetView(event?: Event): void { event?.stopPropagation(); this.resetViewer(); }
+
+  onViewerWheel(e: WheelEvent): void {
+    if (this.lightboxKind !== 'image') return;
+    e.preventDefault();
+    this.zoomBy(e.deltaY < 0 ? 0.2 : -0.2);
+  }
+
+  /** Panning only makes sense once the image is bigger than the frame. */
+  startPan(e: MouseEvent): void {
+    if (this.lbScale <= 1) return;
+    e.preventDefault(); e.stopPropagation();
+    this.lbDrag = { x: e.clientX, y: e.clientY, ox: this.lbX, oy: this.lbY };
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onPan(e: MouseEvent): void {
+    if (!this.lbDrag) return;
+    this.lbX = this.lbDrag.ox + (e.clientX - this.lbDrag.x);
+    this.lbY = this.lbDrag.oy + (e.clientY - this.lbDrag.y);
+  }
+
+  @HostListener('document:mouseup')
+  endPan(): void { this.lbDrag = null; }
+
   openImage(url: string): void {
+    this.resetViewer();
     this.lightboxIsPortrait = false; this.lightboxKind = 'image'; this.lightbox = url;
   }
 
@@ -1390,6 +1940,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   toggleGroupInfo(): void {
     this.showInfo = !this.showInfo; this.infoMsg = null; this.person = null;
+    this.memberSearch = ''; this.editingName = false;
   }
 
   /* ── Thread derived state ───────────────────────────────────────────── */
@@ -1438,8 +1989,32 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       m._dayLabel = (!prev || day !== prevDay) ? this.dayLabel(m.at) : '';
     });
     this._visSrc = src; this._visKey = key; this._vis = list;
+    this._visDays = this.groupByDay(list);
     return list;
   }
+
+  /**
+   * The thread grouped into one wrapper per day. This exists for the sticky date separator:
+   * as flat siblings of the scroll container every separator sticks at top:0 and they pile up on
+   * top of each other. Nested one-per-day, each separator's sticky range is its own day, so they
+   * hand over cleanly as you scroll.
+   */
+  get visibleDays(): { label: string; messages: ChatMessage[] }[] {
+    this.visibleMessages;          // ensures the cache (and _dayLabel) is current
+    return this._visDays;
+  }
+  private _visDays: { label: string; messages: ChatMessage[] }[] = [];
+
+  private groupByDay(list: ChatMessage[]): { label: string; messages: ChatMessage[] }[] {
+    const out: { label: string; messages: ChatMessage[] }[] = [];
+    list.forEach(m => {
+      if (m._dayLabel || !out.length) out.push({ label: m._dayLabel || '', messages: [] });
+      out[out.length - 1].messages.push(m);
+    });
+    return out;
+  }
+
+  trackByDay = (_: number, d: { label: string }) => d.label;
 
   /** Ids of messages matching the in-thread query, oldest first. */
   searchHitIds: string[] = [];
@@ -1506,10 +2081,25 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Newest first — ISO timestamps sort lexicographically, so no Date parsing needed. */
   get threadAttachments(): (Attachment & { mid: string; at: string; sender: string })[] {
     return (this.active?.messages || [])
-      .flatMap(m => this.attachmentsOf(m).map(att => ({
-        ...att, mid: m.id, at: m.at, sender: this.senderLabel(m),
-      })))
+      .flatMap(m => {
+        const own = this.attachmentsOf(m);
+        // A broadcast keeps its files under _broadcast, so surface those in the Docs list too.
+        const bc: Attachment[] = (m._broadcast?.files || [])
+          .map(f => ({ type: this.attachmentTypeForName(f.name || f.url), dataUrl: f.url, name: f.name }));
+        return [...own, ...bc].map(att => ({
+          ...att, mid: m.id, at: m.at, sender: this.senderLabel(m),
+        }));
+      })
       .sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  }
+
+  /** Broadcast files carry no mediatype, so the bucket comes off the filename. */
+  private attachmentTypeForName(nameOrUrl: string): Attachment['type'] {
+    const lower = (nameOrUrl || '').toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|avif)(\?|$)/.test(lower)) return 'image';
+    if (/\.(mp4|mov|webm|avi)(\?|$)/.test(lower)) return 'video';
+    if (/\.(mp3|wav|ogg|m4a|aac)(\?|$)/.test(lower)) return 'voice';
+    return 'file';
   }
 
   /** Photos and videos — the thumbnail grid. */
@@ -1522,6 +2112,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /** Which of the three lists the info panel is showing — Media / Docs / Links, as WhatsApp does. */
   infoTab: 'media' | 'docs' | 'links' = 'media';
+
+  /**
+   * Whether the Media/links/docs block is rendered — the same condition its own *ngIf uses.
+   * The member list is height-capped only when this is true: with something below it, a long list
+   * would bury it; with nothing below, capping just adds a second scrollbar for no reason.
+   */
+  get hasMediaBlock(): boolean {
+    return !!(this.threadAttachments.length || this.threadLinks.length);
+  }
 
   /**
    * Every link shared in the thread: stored `buttons` plus bare URLs and `[Label](url)` still in the
@@ -1541,6 +2140,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         out.push({ label, href, host: this.hostOf(href), sender, at: m.at, mid: m.id });
       };
       (m.buttons || []).forEach(b => push(b.label, b.href));
+      (m._broadcast?.links || []).forEach(l => push(l.label, l.url));
       this.parsedOf(m).ctas.forEach(c => push(c.label, c.href));
       ((m.text || '').match(urlRe) || []).forEach(u => push(this.hostOf(u), u));
     }
@@ -1549,6 +2149,41 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private hostOf(url: string): string {
     try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'link'; }
+  }
+
+  /** Filters the participant list in the info panel; shown once a group is big enough to need it. */
+  memberSearch = '';
+
+  /**
+   * Matches name or email, so an admin can find someone to remove from either — and lists the
+   * group's admins first, since they are who you look for when you need one.
+   */
+  get filteredParticipants(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    const list = q
+      ? this.participantMembers.filter(m =>
+          (m.name || '').toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q))
+      : this.participantMembers;
+    return this.adminsFirst(list, m => this.isGroupAdmin(m));
+  }
+
+  /** Admins to the top, everyone else after, each half alphabetical. */
+  private adminsFirst(list: Member[], isAdmin: (m: Member) => boolean): Member[] {
+    const byName = (a: Member, b: Member) => (a.name || '').localeCompare(b.name || '');
+    return [
+      ...list.filter(isAdmin).sort(byName),
+      ...list.filter(m => !isAdmin(m)).sort(byName),
+    ];
+  }
+
+  /** Team list under the same search box, so both halves of the panel filter together. */
+  get filteredTeam(): Member[] {
+    const q = this.memberSearch.trim().toLowerCase();
+    const list = q
+      ? this.teamMembers.filter(m =>
+          (m.name || '').toLowerCase().includes(q) || this.emailOf(m.id).toLowerCase().includes(q))
+      : this.teamMembers;
+    return this.adminsFirst(list, m => this.isGroupAdmin(m));
   }
 
   /** Live groups have no team/participant split in `supportchat` — everyone is a participant. */
@@ -1568,7 +2203,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   isTeamMsg(m: ChatMessage): boolean { return m.from === 'team'; }
 
   /** A team message in a two-way thread is drawn light-on-purple. */
-  isLight(m: ChatMessage): boolean { return m.from === 'team' && !this.features.oneWay; }
+  /**
+   * "Light" meant white-on-dark content inside a solid purple own-bubble. The console design has no
+   * dark bubble — own messages are a pale tinted card — so nothing renders light any more. Leaving this
+   * true made links, mentions, CTAs and the audio player white on near-white, i.e. invisible.
+   */
+  isLight(_m: ChatMessage): boolean { return false; }
 
   alignRight(m: ChatMessage): boolean { return !this.features.oneWay && m.from === 'team'; }
 
@@ -1593,6 +2233,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   actionsFor(m: ChatMessage) {
     const isTeam = m.from === 'team';
     const f = this.features;
+    if (m._broadcast) {
+      // Broadcasts are an archive written by the send job — nothing here edits or deletes one.
+      // No ticket here: a ticket is raised against something a participant said, and a broadcast is
+      // outbound. There is no participant on the other end of it to open a ticket about.
+      return [
+        { k: 'copy',      label: 'Copy text', icon: 'content_copy', show: !!m.text, danger: false },
+        { k: 'delivered', label: 'Delivery',  icon: 'fact_check',   show: true,     danger: false },
+      ].filter(o => o.show);
+    }
     return [
       { k: 'copy',   label: 'Copy',                     icon: 'content_copy',   show: !!m.text,                  danger: false },
       { k: 'react',  label: 'React',                    icon: 'add_reaction',   show: f.react,                   danger: false },
@@ -1606,6 +2255,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onBubbleDblClick(m: ChatMessage): void {
+    // Broadcasts are an archive — there is nothing here that bulk-deletes one.
+    if (m._broadcast) return;
     if (this.selectMode) return;
     this.selectMode = true;
     this.selectedIds = [m.id];
@@ -1661,13 +2312,16 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const text = this.draft.trim();
     const active = this.active;
     if (!active) return;
+    // The Send BUTTON is [disabled] while files upload, but Enter reaches this directly — without
+    // this guard, holding Enter during an upload queues the same message several times.
+    if (this.uploadingFiles) return;
 
     if (this.pendingFiles.length) {
       this.sendPendingFiles(active, text);
       return;
     }
     if (!text) return;
-    this.draft = '';
+    this.clearDraft();
 
     if (this.isLive(active)) {
       // Announcement framing still has no field behind it; the reply does — see reply_to above.
@@ -1676,6 +2330,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       const buttons = this.pendingButtons;
       this.replyTo = null;
       this.pendingButtons = [];
+      this.justSent = true;
       this.writeMessage(active, text, [], replyTarget, buttons)
         .catch(e => { console.error('send', e); this.notify('Error sending message'); });
       return;
@@ -1705,7 +2360,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (!active || !this.editing) return;
     const text = this.draft.trim();
     const editing = this.editing;
-    this.draft = ''; this.editing = null;
+    this.clearDraft(); this.editing = null;
     if (!text) return;
     if (this.isLive(active)) {
       // Only the `message` field is written — chat-screen has no edit marker to set.
@@ -1721,13 +2376,28 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onComposerKeydown(e: KeyboardEvent): void {
+    // Ctrl/Cmd+B and Ctrl/Cmd+I wrap the selection, the way every other editor does.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault(); this.applyFormat('bold'); return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'i' || e.key === 'I')) {
+      e.preventDefault(); this.applyFormat('italic'); return;
+    }
     if (e.key === 'Enter') {
       if (this.mentionOptions.length) { e.preventDefault(); this.pickMention(this.mentionOptions[0]); return; }
+      // Shift+Enter (and Alt/Ctrl/Cmd+Enter) insert a newline; plain Enter sends.
+      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
+        // …and inside a list, that newline should carry the list on rather than dropping out of it.
+        if (this.continueListOnNewline(e)) e.preventDefault();
+        return;
+      }
+      e.preventDefault();
       this.editing ? this.saveEdit() : this.send();
+      return;
     }
     if (e.key === 'Escape') {
       if (this.mentionQuery !== null) { this.mentionQuery = null; return; }
-      if (this.editing) { this.editing = null; this.draft = ''; }
+      if (this.editing) { this.editing = null; this.clearDraft(); }
     }
   }
 
@@ -1740,23 +2410,87 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* ── Composer formatting ────────────────────────────────────────────── */
 
-  applyFormat(kind: 'bold' | 'ul' | 'ol'): void {
+  /**
+   * Enter inside a list continues it: "- " for bullets, the NEXT number for an ordered list, and
+   * renumbering everything below so the run stays 1,2,3 after an insert. An empty marker ends the
+   * list instead of adding another blank item — the behaviour every editor has trained people on.
+   * Returns true when it handled the key.
+   */
+  private continueListOnNewline(e: KeyboardEvent): boolean {
+    const el = this.composerRef?.nativeElement;
+    if (!el || el.selectionStart !== el.selectionEnd) return false;
+    const pos = el.selectionStart ?? 0;
+    const lineStart = this.draft.lastIndexOf('\n', pos - 1) + 1;
+    const line = this.draft.slice(lineStart, pos);
+
+    const bullet = line.match(/^(\s*)([-•])\s+(.*)$/);
+    const number = line.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+    if (!bullet && !number) return false;
+
+    const content = bullet ? bullet[3] : number![4];
+    if (!content.trim()) {
+      // Empty item: drop the marker and leave the list.
+      const next = this.draft.slice(0, lineStart) + this.draft.slice(pos);
+      this.setDraftAndCaret(next, lineStart);
+      return true;
+    }
+
+    const indent = bullet ? bullet[1] : number![1];
+    const marker = bullet ? `${bullet[2]} ` : `${Number(number![2]) + 1}${number![3]} `;
+    const inserted = '\n' + indent + marker;
+    let next = this.draft.slice(0, pos) + inserted + this.draft.slice(pos);
+    if (number) next = this.renumberFrom(next, pos + inserted.length);
+    this.setDraftAndCaret(next, pos + inserted.length);
+    return true;
+  }
+
+  /** Rewrite the numbers of the ordered run the caret sits in, so inserts never leave 1,2,2,3. */
+  private renumberFrom(text: string, caret: number): string {
+    const lines = text.split('\n');
+    // Which line holds the caret?
+    let idx = 0, count = 0;
+    for (; idx < lines.length; idx++) {
+      count += lines[idx].length + 1;
+      if (count > caret) break;
+    }
+    const isNum = (l: string) => /^(\s*)(\d+)([.)])\s+/.test(l);
+    let first = idx;
+    while (first > 0 && isNum(lines[first - 1])) first--;
+    let n = 1;
+    for (let i = first; i < lines.length && isNum(lines[i]); i++, n++) {
+      lines[i] = lines[i].replace(/^(\s*)(\d+)([.)])/, (_m, sp, _d, dot) => `${sp}${n}${dot}`);
+    }
+    return lines.join('\n');
+  }
+
+  private setDraftAndCaret(next: string, caret: number): void {
+    const el = this.composerRef?.nativeElement;
+    this.draft = next;
+    if (!el) return;
+    // The value has to land before the caret can be placed in it.
+    el.value = next;
+    setTimeout(() => { el.selectionStart = el.selectionEnd = caret; el.focus(); this.autoGrowComposer(); }, 0);
+  }
+
+  applyFormat(kind: 'bold' | 'italic' | 'ul' | 'ol'): void {
     const el = this.composerRef?.nativeElement;
     if (!el) return;
     const start = el.selectionStart ?? this.draft.length;
     const end = el.selectionEnd ?? this.draft.length;
     const sel = this.draft.slice(start, end);
     let next: string;
-    if (kind === 'bold') {
-      next = this.draft.slice(0, start) + (sel ? `*${sel}*` : '**') + this.draft.slice(end);
-    } else {
-      const lines = (sel || 'item').split('\n');
-      const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `- ${l}`).join('\n');
-      const pre = start > 0 && this.draft[start - 1] !== '\n' ? '\n' : '';
-      next = this.draft.slice(0, start) + pre + marked + this.draft.slice(end);
+    if (kind === 'bold' || kind === 'italic') {
+      const mark = kind === 'bold' ? '*' : '_';
+      next = this.draft.slice(0, start) + (sel ? `${mark}${sel}${mark}` : `${mark}${mark}`) + this.draft.slice(end);
+      // Caret between the markers when there was nothing selected, so typing lands inside them.
+      this.setDraftAndCaret(next, sel ? end + 2 : start + 1);
+      return;
     }
-    this.draft = next;
-    setTimeout(() => el.focus(), 0);
+    const lines = (sel || 'item').split('\n');
+    const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `- ${l}`).join('\n');
+    const pre = start > 0 && this.draft[start - 1] !== '\n' ? '\n' : '';
+    next = this.draft.slice(0, start) + pre + marked + this.draft.slice(end);
+    this.setDraftAndCaret(next, start + pre.length + marked.length);
   }
 
   /** Buttons attached to the message being composed — written to the `buttons` field on send. */
@@ -1801,6 +2535,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const pos = this.composerRef?.nativeElement.selectionStart ?? val.length;
     const m = val.slice(0, pos).match(MENTION_TOKEN_RE);
     this.mentionQuery = m ? m[1] : null;
+    setTimeout(() => this.autoGrowComposer(), 0);
   }
 
   get mentionOptions(): MentionOption[] {
@@ -1911,7 +2646,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const staged = this.pendingFiles;
     const replyTarget = this.replyTo;
     const buttons = this.pendingButtons;
-    this.draft = ''; this.replyTo = null; this.pendingButtons = [];
+    this.justSent = true;
+    this.clearDraft(); this.replyTo = null; this.pendingButtons = [];
     this.uploadingFiles = true;
     try {
       if (this.isLive(active)) {
@@ -2002,6 +2738,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         const record = await this.uploadToStorage(target.id, blob, `voice-note-${secs}s.${ext}`, mime);
         const replyTarget = this.replyTo;
         this.replyTo = null;
+        this.justSent = true;
         await this.writeMessage(target, '', [record], replyTarget);
       } catch (err: any) {
         console.error('voice note', err);
@@ -2116,6 +2853,170 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (action === 'pin')    this.togglePin(m);
     if (action === 'react')  this.pickerId = m.id;
     if (action === 'ticket') this.raiseTicket(m);
+    if (action === 'delivered') this.openBroadcastInfo(m);
+  }
+
+  /* ── Broadcast delivery panel ───────────────────────────────────────
+     chat-screen's channel participants panel, re-cut for the console design. All three audiences
+     are profile_data doc ids, so they resolve through profileByDocId, not the uid directory. */
+
+  openBroadcastInfo(m: ChatMessage): void {
+    if (!m._broadcast) return;
+    this.broadcastInfo = m;
+    this.broadcastTab = 'read';
+    this.showInfo = false; this.infoMsg = null; this.person = null;
+  }
+
+  closeBroadcastInfo(): void { this.broadcastInfo = null; }
+
+  /** The audience list behind the panel's current tab, resolved to names and pictures. */
+  get broadcastAudience(): { id: string; name: string; photoUrl: string | null }[] {
+    const b = this.broadcastInfo?._broadcast;
+    if (!b) return [];
+    const ids = this.broadcastTab === 'sent' ? b.sentTo : this.broadcastTab === 'read' ? b.readBy : b.pending;
+    return ids
+      .map(id => ({ id, name: this.nameOfProfileDoc(id), photoUrl: this.photoOfProfileDoc(id) }))
+      .sort((a, b2) => a.name.localeCompare(b2.name));
+  }
+
+  broadcastCount(m: ChatMessage, which: 'sent' | 'read' | 'pending'): number {
+    const b = m._broadcast;
+    if (!b) return 0;
+    return (which === 'sent' ? b.sentTo : which === 'read' ? b.readBy : b.pending).length;
+  }
+
+  /** Header media on a broadcast card — the send job stores a type and a URL. */
+  broadcastHeaderIsVideo(m: ChatMessage): boolean {
+    const t = (m._broadcast?.headerType || '').toLowerCase();
+    return t.includes('video') || /\.(mp4|mov|webm)(\?|$)/i.test(m._broadcast?.headerValue || '');
+  }
+
+  broadcastHeaderIsImage(m: ChatMessage): boolean {
+    const b = m._broadcast;
+    if (!b?.headerValue) return false;
+    return !this.broadcastHeaderIsVideo(m);
+  }
+
+  /** Same extension mapping chat-screen used for channel file cards. */
+  fileIconFor(nameOrUrl: string): string {
+    const lower = (nameOrUrl || '').toLowerCase();
+    if (!lower) return 'attach_file';
+    if (lower.includes('.pdf')) return 'picture_as_pdf';
+    if (/\.(doc|docx)/.test(lower)) return 'description';
+    if (/\.(xls|xlsx|csv)/.test(lower)) return 'table_chart';
+    if (/\.(ppt|pptx)/.test(lower)) return 'slideshow';
+    if (/\.(mp4|mov|avi|webm)/.test(lower)) return 'videocam';
+    if (/\.(mp3|wav|ogg|m4a)/.test(lower)) return 'audiotrack';
+    if (/\.(jpg|jpeg|png|gif|webp)/.test(lower)) return 'image';
+    if (/\.(zip|rar|7z)/.test(lower)) return 'archive';
+    return 'attach_file';
+  }
+
+  fileExtFor(filename: string): string {
+    const parts = (filename || '').split('.');
+    return parts.length > 1 ? parts[parts.length - 1].toUpperCase().slice(0, 4) : 'FILE';
+  }
+
+  openExternal(url: string, event?: Event): void {
+    event?.stopPropagation();
+    if (url) window.open(url, '_blank', 'noopener');
+  }
+
+  /* ── Broadcasting ───────────────────────────────────────────────────
+     Two steps, exactly as chat-screen had them: choose the audience here, then hand the selection
+     to ChannelCommunicationComponent, which owns the template picker, the variable filling and the
+     write to `channelarchive`. Nothing about that contract changes — this screen only feeds it. */
+
+  openAudience(): void {
+    this.audienceOpen = true;
+    this.audienceSearch = '';
+    this.audiencePicked = [];
+  }
+
+  closeAudience(): void { this.audienceOpen = false; }
+
+  /** Every profile with a name, keyed by doc id — the identifier the broadcast expects. */
+  get audiencePool(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const source = Object.keys(this.profileByDocId).length ? this.profileByDocId : null;
+    if (!source) {
+      return Object.entries(this.profileMapByDocId || {})
+        .filter(([, p]: any) => !!p?.['name'])
+        .map(([id, p]: any) => ({ id, name: p['name'], email: p['email'] || '', photoUrl: p['profile'] || null }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return Object.entries(source)
+      .map(([id, p]) => ({
+        id, name: p.name, photoUrl: p.photoUrl,
+        email: this.profileMapByDocId?.[id]?.['email'] || '',
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  get audienceShown(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const q = this.audienceSearch.trim().toLowerCase();
+    return this.audiencePool
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+      .slice(0, 200);
+  }
+
+  isAudiencePicked(id: string): boolean { return this.audiencePicked.includes(id); }
+
+  toggleAudience(id: string): void {
+    this.audiencePicked = this.isAudiencePicked(id)
+      ? this.audiencePicked.filter(x => x !== id)
+      : [...this.audiencePicked, id];
+  }
+
+  /** Select-all applies to what the search is currently showing, not the whole directory. */
+  selectAllAudience(): void {
+    const shown = this.audienceShown.map(p => p.id);
+    const allPicked = shown.every(id => this.isAudiencePicked(id));
+    this.audiencePicked = allPicked
+      ? this.audiencePicked.filter(id => !shown.includes(id))
+      : [...new Set([...this.audiencePicked, ...shown])];
+  }
+
+  /** Pre-select everyone already on the channel. */
+  useChannelMembers(): void {
+    this.audiencePicked = [...(this.active?._memberProfileIds || [])];
+  }
+
+  proceedBroadcast(): void {
+    if (!this.audiencePicked.length) { this.notify('Pick at least one participant'); return; }
+    const byId = new Map(this.audiencePool.map(p => [p.id, p]));
+    const participants = this.audiencePicked.map(id => ({
+      profileid: id,
+      name: byId.get(id)?.name || '',
+      email: byId.get(id)?.email || '',
+    }));
+    this.audienceOpen = false;
+    this.dialog.open(ChannelCommunicationComponent, {
+      data: participants,
+      width: 'min(880px, 96vw)',
+      maxHeight: '92vh',
+      panelClass: 'ow-dialog-panel',
+    }).afterClosed().subscribe(result => {
+      if (!result?.success) return;
+      this.notify('Broadcast sent');
+      // The send job writes the message asynchronously, so re-read rather than guess.
+      if (this.active) { this.oldestBroadcastDoc = null; this.loadBroadcasts(this.active); }
+    });
+  }
+
+  /**
+   * "New channel" opens ChannelCommunication with no audience — its first step creates the channel.
+   * Creating one here would mean duplicating that form and its `admins` contract.
+   */
+  private openChannelCreate(): void {
+    this.dialog.open(ChannelCommunicationComponent, {
+      data: [],
+      width: 'min(880px, 96vw)',
+      maxHeight: '92vh',
+      panelClass: 'ow-dialog-panel',
+    }).afterClosed().subscribe(() => {
+      this.lastChannelDoc = { active: null, archived: null };
+      this.loadChannels(false);
+    });
   }
 
   togglePin(m: ChatMessage): void {
@@ -2218,9 +3119,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const active = this.active;
     if (!active) return;
     if (this.isLive(active)) {
+      const isChan = this.isChannel(active);
       updateDoc(active._ref, { isdelete: false })
-        .then(() => this.notify('Group restored to Active'))
-        .catch(e => { console.error('restore', e); this.notify('Error restoring group'); });
+        .then(() => {
+          this.notify(isChan ? 'Channel restored to Active' : 'Group restored to Active');
+          // Channels have no listener, so nothing would move between the lists on its own.
+          if (isChan) this.reloadChannels();
+        })
+        .catch(e => { console.error('restore', e); this.notify('Error restoring'); });
     } else {
       this.sourceOf(active).archived = false;
     }
@@ -2232,10 +3138,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const active = this.active;
     if (!active) return;
     if (this.isLive(active)) {
-      // chat-screen never hard-deletes a group — it sets isdelete, which lands it in Archived.
+      // chat-screen never hard-deletes a chat — it sets isdelete, which lands it in Archived.
+      const isChan = this.isChannel(active);
       updateDoc(active._ref, { isdelete: true })
-        .then(() => this.notify('Group moved to Archived'))
-        .catch(e => { console.error('delete group', e); this.notify('Error deleting group'); });
+        .then(() => {
+          this.notify(isChan ? 'Channel moved to Archived' : 'Group moved to Archived');
+          if (isChan) this.reloadChannels();
+        })
+        .catch(e => { console.error('delete chat', e); this.notify('Error deleting'); });
       this.activeIds = { ...this.activeIds, [this.tab]: null };
       this.showInfo = false;
       this.confirmDelete = null;
@@ -2253,10 +3163,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   get isGroupCreate(): boolean { return this.tab === 'groups'; }
 
   openCreate(): void {
+    if (this.tab === 'channels') { this.openChannelCreate(); return; }
     this.createOpen = true;
     this.cName = ''; this.cEventId = '';
     this.cSearch = ''; this.cSelected = [];
     this.cAdminIds = []; this.cImageFile = null; this.cImagePreview = null;
+    this.importReport = null;
   }
 
   /** Team and participants merged, de-duplicated by id. */
@@ -2292,9 +3204,101 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   clearGroupImage(): void { this.cImageFile = null; this.cImagePreview = null; }
 
+  /** Search matches name OR email — an import list keys off email, so both have to be findable. */
   get createShown(): Person[] {
-    const q = this.cSearch.toLowerCase();
-    return this.createPool.filter(p => !q || p.name.toLowerCase().includes(q)).slice(0, 40);
+    const q = this.cSearch.trim().toLowerCase();
+    const pool = this.createPool.filter(p =>
+      !q || p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q));
+    // Picked people float to the top, so a long selection is never lost behind the cap below.
+    const picked = pool.filter(p => this.isPicked(p.id));
+    const rest = pool.filter(p => !this.isPicked(p.id));
+    return [...picked, ...rest].slice(0, 60);
+  }
+
+  get createMatchCount(): number {
+    const q = this.cSearch.trim().toLowerCase();
+    if (!q) return this.createPool.length;
+    return this.createPool.filter(p =>
+      p.name.toLowerCase().includes(q) || (this.emailOf(p.id) || '').toLowerCase().includes(q)).length;
+  }
+
+  /** profile_data email for a uid — the directory is keyed by uid, the email lives on the profile. */
+  emailOf(uid: string): string {
+    return this.profilesByUid[uid]?.['email'] || '';
+  }
+
+  clearCreateSearch(): void { this.cSearch = ''; }
+
+  selectAllCreateShown(): void {
+    const shown = this.createShown;
+    const allPicked = shown.length > 0 && shown.every(p => this.isPicked(p.id));
+    if (allPicked) {
+      const ids = new Set(shown.map(p => p.id));
+      this.cSelected = this.cSelected.filter(s => !ids.has(s.id));
+      this.cAdminIds = this.cAdminIds.filter(id => !ids.has(id));
+    } else {
+      shown.filter(p => !this.isPicked(p.id)).forEach(p => this.togglePerson(p));
+    }
+  }
+
+  /* ── Importing members from a spreadsheet ───────────────────────────
+     Ported from chat-screen's channel import: an .xlsx/.csv of name + email is matched against
+     profile_data and the matches are selected. Nothing is created from the file — a row that does
+     not match an existing profile is reported, not invented. */
+
+  importReport: { matched: number; skipped: string[] } | null = null;
+
+  downloadImportSample(): void {
+    const rows = [
+      { name: 'John Doe', email: 'john@example.com' },
+      { name: 'Jane Smith', email: 'jane@example.com' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Members');
+    XLSX.writeFile(wb, 'group_members_sample.xlsx');
+  }
+
+  onMembersImport(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(reader.result, { type: 'array' });
+        const rows: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]] || {});
+        const skipped: string[] = [];
+        let matched = 0;
+
+        rows.forEach(row => {
+          // Header names vary between exports, so accept the common spellings of each.
+          const email = String(row['email'] ?? row['Email'] ?? row['EMAIL'] ?? '').trim().toLowerCase();
+          const name = String(row['name'] ?? row['Name'] ?? row['NAME'] ?? '').trim().toLowerCase();
+          if (!email && !name) return;
+
+          const hit = this.createPool.find(p =>
+            (email && this.emailOf(p.id).toLowerCase() === email) ||
+            (!email && name && p.name.toLowerCase() === name));
+
+          if (!hit) { skipped.push(row['name'] || row['email'] || '(blank row)'); return; }
+          if (!this.isPicked(hit.id)) { this.togglePerson(hit); }
+          matched++;
+        });
+
+        this.importReport = { matched, skipped };
+        this.notify(matched
+          ? `Imported ${matched} member${matched === 1 ? '' : 's'}`
+          : 'No rows matched an existing profile');
+      } catch (e) {
+        console.error('member import', e);
+        this.notify('Could not read that file');
+      }
+    };
+    reader.onerror = () => this.notify('Could not read that file');
+    reader.readAsArrayBuffer(file);
   }
 
   isPicked(id: string): boolean { return this.cSelected.some(s => s.id === id); }
@@ -2338,6 +3342,168 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     else { item.followers = 0; this.channels = [item, ...this.channels]; }
     this.createOpen = false;
     this.activeIds = { ...this.activeIds, [this.tab]: id };
+  }
+
+  /* ── Editing a live group's name and picture ────────────────────────
+     Both are existing fields on the supportchat doc (`group_name`, `group_profile`), and the picture
+     goes to the same Storage path buildGroup() uses, so the old screen shows the change too. */
+
+  editingName = false;
+  nameDraft = '';
+  savingGroupPhoto = false;
+
+  startEditName(): void {
+    if (!this.canEditChat) {
+      this.notify(this.isChannel(this.active)
+        ? 'Only a channel admin can rename this channel'
+        : 'Only a group admin can rename this group');
+      return;
+    }
+    this.nameDraft = this.active?.name || '';
+    this.editingName = true;
+  }
+
+  cancelEditName(): void { this.editingName = false; this.nameDraft = ''; }
+
+  saveGroupName(): void {
+    const active = this.active;
+    const name = this.nameDraft.trim();
+    if (!active || !name || name === active.name) { this.cancelEditName(); return; }
+    this.editingName = false;
+    const isChan = this.isChannel(active);
+    if (this.isLive(active)) {
+      // Channels have no listener, so the local copy is updated too or the change would not show.
+      updateDoc(active._ref, { group_name: name })
+        .then(() => { if (isChan) this.sourceOf(active).name = name;
+                      this.notify(isChan ? 'Channel renamed' : 'Group renamed'); })
+        .catch(e => { console.error('rename chat', e); this.notify('Error renaming'); });
+    } else {
+      this.sourceOf(active).name = name;
+    }
+  }
+
+  /* ── Editing a channel's description and admins ─────────────────────
+     `description` and `admins` are both fields ChannelCommunication already writes at create time,
+     so nothing new is introduced here — this is the same document, edited later. */
+
+  editingDesc = false;
+  descDraft = '';
+
+  startEditDesc(): void {
+    if (!this.canManageChannel) { this.notify('Only a channel admin can edit the description'); return; }
+    this.descDraft = this.active?.description || '';
+    this.editingDesc = true;
+  }
+
+  cancelEditDesc(): void { this.editingDesc = false; this.descDraft = ''; }
+
+  saveChannelDesc(): void {
+    const active = this.active;
+    const desc = this.descDraft.trim();
+    if (!active || desc === (active.description || '')) { this.cancelEditDesc(); return; }
+    this.editingDesc = false;
+    if (!this.isLive(active)) { this.sourceOf(active).description = desc; return; }
+    updateDoc(active._ref, { description: desc })
+      .then(() => { this.sourceOf(active).description = desc; this.notify('Description updated'); })
+      .catch(e => { console.error('channel description', e); this.notify('Error saving description'); });
+  }
+
+  /** Admin picker — the same directory the audience picker uses, keyed by profile doc id. */
+  adminsOpen = false;
+  adminSearch = '';
+  adminPicked: string[] = [];
+  savingAdmins = false;
+
+  openEditAdmins(): void {
+    if (!this.canManageChannel) { this.notify('Only a channel admin can change admins'); return; }
+    this.adminSearch = '';
+    this.adminPicked = [...(this.active?._channelAdmins || [])];
+    this.adminsOpen = true;
+  }
+
+  closeEditAdmins(): void { this.adminsOpen = false; }
+
+  get adminShown(): { id: string; name: string; email: string; photoUrl: string | null }[] {
+    const q = this.adminSearch.trim().toLowerCase();
+    return this.audiencePool
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+      .slice(0, 200);
+  }
+
+  isAdminPicked(id: string): boolean { return this.adminPicked.includes(id); }
+
+  toggleAdminPick(id: string): void {
+    this.adminPicked = this.isAdminPicked(id)
+      ? this.adminPicked.filter(x => x !== id)
+      : [...this.adminPicked, id];
+  }
+
+  async saveChannelAdmins(): Promise<void> {
+    const active = this.active;
+    if (!active || this.savingAdmins) return;
+    // ChannelCommunication refuses to create a channel with no admin; the same has to hold on edit,
+    // or a channel becomes unrunnable by anyone but a platform admin.
+    if (!this.adminPicked.length) { this.notify('A channel needs at least one admin'); return; }
+
+    const admins = [...this.adminPicked];
+    if (!this.isLive(active)) {
+      active._channelAdmins = admins;
+      this.adminsOpen = false;
+      return;
+    }
+
+    this.savingAdmins = true;
+    try {
+      // An admin must also be a recipient — createChannel seeds `members` with the admins, and the
+      // Recipients list (and so the ADMIN pill) is driven by `members`.
+      await updateDoc(active._ref, { admins, members: arrayUnion(...admins) });
+      const src = this.sourceOf(active);
+      src._channelAdmins = admins;
+      const merged = [...new Set([...(src._memberProfileIds || []), ...admins])];
+      src._memberProfileIds = merged;
+      src.members = merged.map(id => ({ id, name: this.nameOfProfileDoc(id), journey: null }));
+      src.followers = merged.length;
+      this.adminsOpen = false;
+      this.notify('Channel admins updated');
+    } catch (e) {
+      console.error('channel admins', e);
+      this.notify('Error updating admins');
+    } finally {
+      this.savingAdmins = false;
+    }
+  }
+
+  async onGroupPhotoPicked(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const active = this.active;
+    if (!file || !active) return;
+    if (!this.canEditChat) { this.notify('Only an admin can change the picture'); return; }
+    const isChan = this.isChannel(active);
+
+    this.savingGroupPhoto = true;
+    try {
+      if (this.isLive(active)) {
+        // Channels keep their pictures where ChannelCommunication puts them, groups where
+        // chat-screen's buildGroup puts them — so both screens read the same image either way.
+        const imgRef = ref(this.storage, isChan
+          ? `channel-images/${Date.now()}_${file.name}`
+          : `Chat/${file.name}${file.lastModified}${file.size}`);
+        const uploaded = await uploadBytes(imgRef, file);
+        const url = await getDownloadURL(uploaded.ref);
+        await updateDoc(active._ref, { group_profile: url });
+        if (isChan) this.sourceOf(active).photoUrl = url;
+        this.notify(isChan ? 'Channel picture updated' : 'Group picture updated');
+      } else {
+        this.sourceOf(active).photoUrl = URL.createObjectURL(file);
+      }
+    } catch (e) {
+      console.error('group picture', e);
+      this.notify('Could not update the picture');
+    } finally {
+      this.savingGroupPhoto = false;
+    }
   }
 
   /** buildGroup() from chat-screen: same doc shape, plus the emoji this UI picks. */
@@ -2493,18 +3659,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /* ── Message info panel ─────────────────────────────────────────────── */
 
+  /**
+   * Two tiers only — Read and Sent. `supportchat` messages carry `read_by` and `pending`; there is no
+   * delivery signal between them, so the old "Received" column was always empty by construction.
+   */
   get infoReadBy(): Receipt[] { return this.infoMsg?.readBy || []; }
 
-  get infoReceived(): Receipt[] {
-    const names = this.infoReadBy.map(r => r.name);
-    return (this.infoMsg?.deliveredTo || []).filter(d => !names.includes(d.name));
-  }
-
+  /** Everyone in the group who has not read it yet (the message's `pending` set, by name). */
   get infoSentOnly(): Receipt[] {
-    const reached = [...this.infoReadBy.map(r => r.name), ...this.infoReceived.map(d => d.name)];
+    const read = this.infoReadBy.map(r => r.name);
+    const senderName = this.infoMsg ? (this.infoMsg.from === 'team' ? this.selfName : this.infoMsg.senderName) : '';
     return (this.active?.members || [])
-      .filter(mem => !reached.includes(mem.name))
-      .map(mem => ({ name: mem.name, at: this.infoMsg?.at || '' }));
+      .filter(mem => mem.name !== senderName && !read.includes(mem.name))
+      .map(mem => ({ name: mem.name, at: '' }));
   }
 
   /* ── Scrolling ──────────────────────────────────────────────────────── */
@@ -2516,11 +3683,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
   }
 
+  /** Set when this user posts, so the incoming snapshot scrolls even if they had scrolled up. */
+  private justSent = false;
+
+  /**
+   * A single tick lands short: the row is in the DOM but reactions, stamps and media have not settled,
+   * so scrollHeight is still growing. Scroll on the next frame and again once layout has quiesced.
+   */
   private scrollToBottomSoon(): void {
-    setTimeout(() => {
+    const jump = () => {
       const el = this.messagePane?.nativeElement;
       if (el) el.scrollTop = el.scrollHeight;
-    }, 0);
+    };
+    requestAnimationFrame(() => { jump(); requestAnimationFrame(jump); });
+    setTimeout(jump, 120);
+    setTimeout(jump, 320);
   }
 
   trackById(_i: number, item: { id: string }): string { return item.id; }
@@ -2567,11 +3744,16 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         notes: 'Paid on 12 Aug, no email yet.', date: '2026-08-13', raisedBy: this.TEAM_NAME },
     ];
 
+    // Enough people that the participant search and the scrolling member list are exercised in the demo.
     const groupMembers: Member[] = [
       { id: 't1', name: 'Sanjeev R Jain', journey: null },
       { id: 'p1', name: 'Arjun Menon', journey: 'up' },
       { id: 'p2', name: 'Divya Rao', journey: 'lyl' },
       { id: 'p4', name: 'Nisha Verma', journey: 'up' },
+      { id: 'p5', name: 'Rahul Nair', journey: 'big' },
+      { id: 'p6', name: 'Aditi Sharma', journey: 'lyl' },
+      { id: 'p7', name: 'Vikram Rao', journey: 'up' },
+      { id: 'p8', name: 'Priya Menon', journey: 'up' },
     ];
 
     this.groups = [
@@ -2680,10 +3862,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         lastMessage: 'New journey dashboard is live',
         lastAt: iso(45),
         messages: [
+          // Shaped like a real broadcast so the demo path renders the same card as live data.
           {
-            id: 'cm1', from: 'team', senderName: this.TEAM_NAME,
-            text: '*New journey dashboard is live.*\nTrack marathons, sessions and payments in one place.\n[Open dashboard](https://example.com/dashboard)',
+            id: 'cm1', from: 'member', senderName: this.TEAM_NAME,
+            text: 'New journey dashboard is live. Track marathons, sessions and payments in one place.',
             at: iso(45), pinned: false,
+            buttons: [{ label: 'Open dashboard', href: 'https://example.com/dashboard' }],
+            _broadcast: {
+              html: '<p><strong>New journey dashboard is live.</strong></p>'
+                  + '<p>Track marathons, sessions and payments in one place.</p>',
+              headerType: null, headerValue: null,
+              footer: 'You are receiving this because you follow A&H Announcements.',
+              files: [{ name: 'release-notes.pdf', url: 'https://example.com/release-notes.pdf' }],
+              links: [{ label: 'What changed', url: 'https://example.com/changelog' }],
+              sentTo: [], readBy: [], pending: [],
+            },
           },
         ],
       },

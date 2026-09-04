@@ -89,6 +89,12 @@
   overflow: hidden;
 }
 
+/* With the toolbar hidden there is nothing to subtract: without this the shell stayed short, leaving a
+   white strip under the screen and an overall page scrollbar. */
+.mainscreen.no-toolbar{
+  height: 100vh;
+}
+
 .drawer-container{
   height: 100%;
   width: 100%;
