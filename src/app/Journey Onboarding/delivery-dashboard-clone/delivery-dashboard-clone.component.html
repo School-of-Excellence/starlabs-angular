@@ -988,9 +988,9 @@
                         <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
                           <div class="stage-tabs">
                             <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
-                              (click)="setStageTab(col, 'all')">All {{ stage.all.length + notScheduledCards.length }}</button>
-                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
-                              (click)="setStageTab(col, 'scheduled')">Scheduled {{ stage.all.length }}</button>
+                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length) + notScheduledCards.length }}</button>
+                          <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
+                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length }}</button>
                             <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
                               (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
                           </div>
@@ -1003,26 +1003,50 @@
                     <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage; else legacyBody">
 
                       <ng-container *ngIf="getStageTab(col) !== 'waiting'">
-                        <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
-                          <div class="card-top">
-                            <div class="card-info">
-                              <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
+                        <ng-container *ngIf="col.toLowerCase().trim() === 'onboarding'; else regularScheduledTpl">
+                          <div class="card" *ngFor="let card of getScheduledOnboardingCards(); trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info">
+                                <div class="card-name">{{ mapMetaData[card.profileid || card.clientid]?.name || (card.profileid || card.clientid) }}</div>
+                              </div>
+                            </div>
+                            <span class="card-status s-scheduled">SCHEDULED</span>
+                            <div class="detail-row">
+                              <span class="d-flex flex-column">
+                                <span>
+                                  <span class="detail-label">{{ col }}: </span>
+                                  <span class="detail-val">{{ formatDateTime(card.scheduledSlot) }}</span>
+                                </span>
+                                <span>
+                                  <span class="detail-label">Specialist: </span>
+                                  <span class="detail-val">{{ card.hostName }}</span>
+                                </span>
+                              </span>
                             </div>
                           </div>
-                          <span class="card-status s-scheduled">SCHEDULED</span>
-                          <div class="detail-row">
-                            <span class="d-flex flex-column">
-                              <span>
-                                <span class="detail-label">{{ col }}: </span>
-                                <span class="detail-val">{{ formatDateTime(app.starttime) }}</span>
+                        </ng-container>
+                        <ng-template #regularScheduledTpl>
+                          <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info">
+                                <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
+                              </div>
+                            </div>
+                            <span class="card-status s-scheduled">SCHEDULED</span>
+                            <div class="detail-row">
+                              <span class="d-flex flex-column">
+                                <span>
+                                  <span class="detail-label">{{ col }}: </span>
+                                  <span class="detail-val">{{ formatDateTime(app.starttime) }}</span>
+                                </span>
+                                <span *ngIf="app.hosts?.length">
+                                  <span class="detail-label">Specialist: </span>
+                                  <span class="detail-val">{{ mapMetaData[(app.hosts[0]?.path || app.hosts[0]).split('/').pop()]?.name }}</span>
+                                </span>
                               </span>
-                              <span *ngIf="app.hosts?.length">
-                                <span class="detail-label">Specialist: </span>
-                                <span class="detail-val">{{ mapMetaData[(app.hosts[0]?.path || app.hosts[0]).split('/').pop()]?.name }}</span>
-                              </span>
-                            </span>
+                            </div>
                           </div>
-                        </div>
+                        </ng-template>
                       </ng-container>
 
                       <ng-container *ngIf="getStageTab(col) !== 'scheduled' && col.toLowerCase().trim() === 'onboarding'">

@@ -1572,7 +1572,7 @@ export class DeliveryDashboardCloneComponent {
         this.selectedProductType = productType;
         const allAppointments = this.allAppointments;
         try {
-            const productItemsAll = this.getCardGroupedAll(productId);
+            const productItemsAll = this.getCardGroupedFiltered(productId);
 
             const totalEligible = productItemsAll.filter(data => {
                 const status = (data?.status || '').toString().toLowerCase().trim();
@@ -2006,20 +2006,42 @@ export class DeliveryDashboardCloneComponent {
         if (!populationSourceKey || !appointmentTypeName) return [];
 
         let populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+
         if (stageKey === 'onboarding') {
-            populationPool = populationPool.filter((card: any) => {
+            return populationPool.filter((card: any) => {
                 const status = (card?.status || '').toString().toLowerCase().trim();
-                return !status;
+                const isNotInitiated = !status;
+                const isNotScheduled = !card?.onboardingscheduled;
+                return isNotInitiated && isNotScheduled;
             });
         }
 
         const bookedProfileIds = this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
-
         return populationPool.filter((card: any) => {
             const profileId = card?.profileid || card?.clientid;
             const alreadyHasAppointment = profileId ? bookedProfileIds.has(profileId) : false;
             return !alreadyHasAppointment;
         });
+    }
+
+    getScheduledOnboardingCards(): any[] {
+        const productType = this.selectedProductType;
+        const populationSourceKey = this.stagePopulationSource[productType]?.['onboarding'];
+        if (!populationSourceKey) return [];
+
+        const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+        console.log("Population Pool for Scheduled Onboarding Cards:", populationPool);
+        return populationPool
+            .filter((card: any) => !!card?.onboardingscheduled)
+            .map((card: any) => {
+                const hostRef = card?.onboardedby?.[0];
+                const hostId = (hostRef?.id || hostRef?.path?.split('/')?.pop()) ?? null;
+                return {
+                    ...card,
+                    scheduledSlot: card.onboardingscheduled,
+                    hostName: hostId ? (this.mapprofile[hostId] || this.mapMetaData[hostId]?.['name'] || 'Unassigned') : 'Unassigned',
+                };
+            });
     }
 
     getStageCompletedCards(stageKey: string): any[] {
@@ -3818,8 +3840,7 @@ export class DeliveryDashboardCloneComponent {
             return;
         }
 
-
-        const profileId = card?.profileid || card?.clientid;
+        const profileId = card?.profileid;
         const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
         const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
 
@@ -3896,8 +3917,8 @@ export class DeliveryDashboardCloneComponent {
         card['calltype'] = 'onboarding';
         card['appointmentTypeId'] = dfuOnboardingType.id;
         card['appointmentTypeName'] = 'DFU Onboarding';
-        card['targetCollection'] = 'participantsproduct';
-        card['targetDocId'] = card.docid;
+        card['productid'] = card.productref?.id ?? null;
+        card['participantsproductid'] = card.docid;  
 
         const dialogRef = this.dialog.open(ScheduleDialogComponent, {
             data: card,
@@ -3908,13 +3929,13 @@ export class DeliveryDashboardCloneComponent {
         });
 
         dialogRef.afterClosed().subscribe(async (result: any) => {
-            if (!result?.appointmentid) return; 
+            if (!result?.appointmentid) return;
 
             await updateDoc(
                 doc(this.firestore, 'participantsproduct', card.docid),
                 {
-                    onboardingscheduled: result.starttime ?? serverTimestamp(),
-                    onboardingappointmentid: result.appointmentid
+                    onboardingscheduled: result.starttime,
+                    onboardedby: result.hostRef ?? [],
                 }
             );
 
