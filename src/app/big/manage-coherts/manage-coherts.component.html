@@ -389,7 +389,7 @@
           <div class="participants-dropdown-menu" *ngIf="participantDropdownOpen" (click)="$event.stopPropagation()">
             <div class="participants-search">
               <mat-icon>search</mat-icon>
-              <input type="text" placeholder="Search participants..." [(ngModel)]="participantSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onParticipantSearch()">
+              <input type="text" placeholder="Search participants..." [(ngModel)]="participantSearchQuery" [ngModelOptions]="{standalone: true}">
             </div>
             
             <div class="participants-header" *ngIf="getParticipantsInListCount() > 0">

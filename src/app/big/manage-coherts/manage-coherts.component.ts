@@ -1087,6 +1087,7 @@ export class ManageCohertsComponent {
         });
 
         this.assignedParticipantIds = assignedParticipantIds;
+        console.log(this.assignedParticipantIds)
 
         participationSnap.docs.forEach(docSnap => {
           const data: any = docSnap.data();
@@ -1163,8 +1164,9 @@ export class ManageCohertsComponent {
       if (searchQuery) {
         const searchCondition = !(participant['name']?.toLowerCase().includes(searchQuery) ||
           participant['email']?.toLowerCase().includes(searchQuery) ||
-          participant['displayName']?.toLowerCase().includes(searchQuery))
-        if (!searchCondition) search = false;
+          participant['displayName']?.toLowerCase().includes(searchQuery));
+        
+        if (searchCondition) search = false;
       }
 
       if (event && search) profiles.push(participant)

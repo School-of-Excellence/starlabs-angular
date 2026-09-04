@@ -134,6 +134,28 @@ export class UpdateEventDetailComponent {
       bigdescription: [, {validators: [Validators.required], updateOn:"change"}],
       products:this.formbuilder.array([]),
       bigmarathonref: [null,],
+      ctaconfig : this.formbuilder.group({
+        confirmparticipation : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], updateOn:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        addon : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        upgrade : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        continuity : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        nocta : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        })
+      })
     });
   }
 
@@ -142,7 +164,7 @@ export class UpdateEventDetailComponent {
   }
 
   getProductConsumption(productIndex){
-    return this.productsArray.controls[productIndex]?.get('productconsumption') as FormArray
+    return this.productsArray.controls[productIndex]?.get('eligibility.productconsumption') as FormArray
   }
 
   get loadingref (){
@@ -192,11 +214,28 @@ export class UpdateEventDetailComponent {
         delete:[false,],
         docid:[doc(collection(this.firestore,"arena events")).id,],
         image:[null,],
-        journeyid : [[]],
-        cohortid : [[]],
-        productconsumption : this.formbuilder.array([]),
+        eligibility: this.formbuilder.group({
+          journeyid: [[], { validators: [Validators.required], update: "change" }],
+          cohortid: [[]],
+          customerstatus: [['active'], { validators: [Validators.required], update: "change" }],
+          productconsumption: this.formbuilder.array([]),
+        })
       })
     )
+  }
+
+  onCustomerStatsChange(option, index: number, checked: boolean) {
+    console.log(index)
+    const control = this.productsArray.controls[index].get('eligibility.customerstatus');
+    const currentValue: string[] = control?.value || [];
+
+    if (checked) {
+      control?.setValue([...currentValue, option]);
+    } else {
+      control?.setValue(
+        currentValue.filter(value => value !== option)
+      );
+    }
   }
 
   removeproductsArray(index:number){
@@ -271,6 +310,29 @@ export class UpdateEventDetailComponent {
       this.eventform.controls["bigdescription"].setValue(eventData["bigdescription"])
       this.eventform.controls["bigmarathonref"].setValue(eventData["bigmarathonref"])
 
+      this.eventform.controls['ctaconfig'].patchValue( this.formbuilder.group({
+        confirmparticipation : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        addon : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        upgrade : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : ['', {validators: [Validators.required], update:"change"}],
+        }),
+        continuity : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : [' ', {validators: [Validators.required], update:"change"}],
+        }),
+        nocta : this.formbuilder.group({
+          button : [' ', {validators: [Validators.required], update:"change"}],
+          description : ['', {validators: [Validators.required], update:"change"}],
+        })
+      }))
+
       // Get EVent Arena
       var arenaCollection = collection(this.firestore, "arena events")
       await getDocs(query(arenaCollection, where("eventref", "==", eventDoc.ref))).then(arenaEvent =>{
@@ -278,7 +340,7 @@ export class UpdateEventDetailComponent {
         otherEventData.sort((a, b) => a["delete"] - b["delete"])
         for (let i = 0; i < otherEventData.length; i++) {
           const element = otherEventData[i];
-          const productConsumption = element['productconsumption'] ?? [];
+          const productConsumption = element['eligibility']?.['productconsumption'] ?? [];
           this.productsArray.push(
             this.formbuilder.group({
               heroevent: [element['heroevent'] ?? false, {validators: [Validators.required], update:"change"}],
@@ -290,15 +352,19 @@ export class UpdateEventDetailComponent {
               docid:[element['docid'],],
               delete:[element['delete'],],
               image:[element['image'] ?? null,],
-              journeyid : [element['journeyid'] ?? []],
-              cohortid : [element['cohortid'] ?? []],
-              productconsumption : this.formbuilder.array([])
+              eligibility: this.formbuilder.group({
+                journeyid: [element['eligibility']?.['journeyid'] ?? [], { validators: [Validators.required], update: "change" }],
+                cohortid: [element['eligibility']?.['cohortid'] ?? []],
+                customerstatus: [element['eligibility']?.['customerstatus'] ?? ['active'], { validators: [Validators.required], update: "change" }],
+                productconsumption: this.formbuilder.array([])
+              })
             })
           );
 
           // block to patch product consumption
           if (productConsumption.length > 0) {
             const productConsumptionArray = this.getProductConsumption(i);
+            console.log('product consum')
             productConsumption.forEach((productConsump)=>{
               productConsumptionArray.push(
                 this.formbuilder.group({
@@ -491,6 +557,10 @@ export class UpdateEventDetailComponent {
   async saveEventDetail(value){
     console.log( this.eventimage.url);
 
+    Object.keys(this.eventform.controls).forEach((key)=>{
+      console.log(key)
+      console.log(this.eventform.controls[key].valid)
+    })
     if(this.eventform.valid){
       console.log(value)
       if(!this.validationFn()){
@@ -563,9 +633,12 @@ export class UpdateEventDetailComponent {
                   eventname:value.eventname,
                   bigmarathonref:value.bigmarathonref || null,
                   image: value.products[i]['image'] ?? null,
-                  journeyid : value?.products[i]['journeyid'] ?? [],
-                  cohortid : value?.products[i]['cohortid'] ?? [],
-                  productconsumption : value?.products[i]['productconsumption'] ?? []
+                  eligibility: {
+                    journeyid: value?.products[i]?.eligibility['journeyid'] ?? [],
+                    cohortid: value?.products[i]?.eligibility['cohortid'] ?? [],
+                    customerstatus: value?.products[i]?.eligibility['customerstatus'] ?? [],
+                    productconsumption: value?.products[i]?.eligibility['productconsumption'] ?? []
+                  }
                 }
                 batch.set(arenaEventRef, arenaEventData, {merge:true})
               }
@@ -605,9 +678,12 @@ export class UpdateEventDetailComponent {
               eventname:value.eventname,
               bigmarathonref:value.bigmarathonref || null,
               image: value.products[i]['image'] ?? null,
-              journeyid : value?.products[i]['journeyid'] ?? [],
-              cohortid : value?.products[i]['cohortid'] ?? [],
-              productconsumption : value?.products[i]['productconsumption'] ?? []
+              eligibility: {
+                journeyid: value?.products[i]?.eligibility['journeyid'] ?? [],
+                cohortid: value?.products[i]?.eligibility['cohortid'] ?? [],
+                customerstatus: value?.products[i]?.eligibility['customerstatus'] ?? [],
+                productconsumption: value?.products[i]?.eligibility['productconsumption'] ?? []
+              }
             }
             batch.update(arenaEventRef, arenaEventData, {merge:true})
           }

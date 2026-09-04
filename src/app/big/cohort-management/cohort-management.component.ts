@@ -882,7 +882,12 @@ export class CohortManagementComponent {
     const cohortId = cohort['docid'];
     const eventId = cohort['eventref']?.id;
     const query = this.moveMenuSearchQuery.toLowerCase().trim();
-    let cohorts = this.cohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
+    let cohorts = this.cohortsList.filter(c =>{
+      if(c.docid !== cohortId && c['eventref']?.id === eventId){
+        console.log(c)
+      }
+      return c.docid !== cohortId && c['eventref']?.id === eventId
+    });
 
     if (query) {
       cohorts = cohorts.filter(c => c.name?.toLowerCase().includes(query));
@@ -925,15 +930,35 @@ export class CohortManagementComponent {
       this.isMovingParticipant = true;
       const batch = writeBatch(this.firestore);
       const checkForActiveStudio = [];
+      const checkForParticipantInCohort = [];
 
       for (let pid of participantId) {
         const check = await this.checkForActiveParticipantStuidosInCohort(sourceCohort, pid);
         if (check) checkForActiveStudio.push(this.mapProfile[pid]);
+
+        if(targetCohort?.cohortCategory === 'studio'){
+          const cohorts = this.cohortsList.filter((cohort)=>{
+            const eventId = cohort['eventref']?.id;
+             const cohortId = cohort['docid'];
+            if(eventId){
+              return eventId === sourceCohort['eventref']?.id && cohortId != sourceCohort['docid'] && cohort?.cohortCategory === 'studio';
+            }
+            return false;
+          })
+          const check = this.checkForParticipantPresentInCohort(pid , cohorts);
+          if(check) checkForParticipantInCohort.push(this.mapProfile[pid])
+        }
       }
 
       // check if any active studios present for the selected participants
       if (checkForActiveStudio.length > 0) {
         alert('There are active stuido for the selected participant please disbale it before moving to another cohorts');
+        return
+      }
+
+      // check if selected participant present in any other studio cohort
+      if (checkForParticipantInCohort.length > 0) {
+        alert('Selected participant already present in studio cohort');
         return
       }
 
@@ -1019,6 +1044,16 @@ export class CohortManagementComponent {
     } finally {
       this.isMovingParticipant = false;
     }
+  }
+
+  checkForParticipantPresentInCohort(participantId , cohorts = []){
+      const assignedParticipants = new Set();
+      cohorts.forEach((cohort)=>{
+        const cohortParticipants = cohort['participantidlist'] ?? []; 
+        cohortParticipants.forEach((pid)=>assignedParticipants.add(pid)); 
+      });
+
+      return assignedParticipants.has(participantId)
   }
 
   // function to create cohort movement log
@@ -2960,21 +2995,24 @@ export class CohortManagementComponent {
     const activity = cohort['bigactivity'] ?? '';
     if(eventId){
       const queueId = (this.mapEventQueue[eventId] ?? []).map( q =>doc(this.firestore , 'queue generation' , q));
-      const q = query(collection(this.firestore , 'queue studio pairing') , where('queueref' ,'in', queueId), where('participants' , 'array-contains' , participantId));
-      const studios = (await getDocs(q)).docs.map((doc)=>doc.data()).filter((st)=>Object.values(st['participantsactivity'] ?? {}).includes(activity));
+      
+      if (queueId.length > 0) {
+        const q = query(collection(this.firestore, 'queue studio pairing'), where('queueref', 'in', queueId), where('participants', 'array-contains', participantId));
+        const studios = (await getDocs(q)).docs.map((doc) => doc.data()).filter((st) => Object.values(st['participantsactivity'] ?? {}).includes(activity));
 
-      if(studios.length > 0){
-        const enabledStudios = studios.filter((studio)=>studio['studioin']);
+        if (studios.length > 0) {
+          const enabledStudios = studios.filter((studio) => studio['studioin']);
 
-      if(enabledStudios.length > 0){
-        return true;
-      }
-      const studioIds = studios.map((studio)=>studio['docid']);
-      const activeLiveAssignment = await getDocs(query(collection(this.firestore , 'live assignment') , where('status' , '==' , 'live') , where('studioid' , 'in' , studioIds)));
+          if (enabledStudios.length > 0) {
+            return true;
+          }
+          const studioIds = studios.map((studio) => studio['docid']);
+          const activeLiveAssignment = await getDocs(query(collection(this.firestore, 'live assignment'), where('status', '==', 'live'), where('studioid', 'in', studioIds)));
 
-      if(activeLiveAssignment.docs.length > 0){
-        return true;
-      }
+          if (activeLiveAssignment.docs.length > 0) {
+            return true;
+          }
+        }
       }
     }
     return false
