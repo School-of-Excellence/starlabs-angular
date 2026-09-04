@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, Inject, inject, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthguardService } from '../../authguard.service';
-import { collection, doc, Firestore, getDoc, getDocs, query, where } from '@angular/fire/firestore';
-import { SpecialistAppointmentSlotsComponent } from '../specialist-appointment-slot/specialist-appointment-slots.component';
+import { collection, Firestore, getDocs } from '@angular/fire/firestore';
 
 type ViewName = 'dashboard' | 'participants' | 'specialists' | 'planning';
 type LifecycleKey = 'notStarted' | 'onTrack' | 'needsAttention' | 'awaitingSignoff' | 'completed';
@@ -67,27 +65,14 @@ interface StageStep {
   label: string;
 }
 
-interface OverviewProduct {
-  participantproductid: string;
-  productId: string;
-  productName: string;
-}
-
-interface OverviewParticipantRow {
-  id: string;
-  name: string;
-  email: string;
-  products: OverviewProduct[];
-}
-
 @Component({
   selector: 'app-team-evolution-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SpecialistAppointmentSlotsComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './team-evolution-dashboard.component.html',
   styleUrl: './team-evolution-dashboard.component.css'
 })
-export class TeamEvolutionDashboardComponent implements OnInit {
+export class TeamEvolutionDashboardComponent {
 
   // ================= STATIC REFERENCE DATA =================
   readonly canon: { key: string; hos: string; by: 'owner' | 'participant' | 'specialist' }[] = [
@@ -168,7 +153,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   readonly lifecycleConfig: Record<LifecycleKey, { label: string; cssVar: string; desc: string }> = {
     notStarted: { label: 'Not started', cssVar: '--c-notstarted', desc: 'Directive not issued' },
-    onTrack: { label: 'Ongoing', cssVar: '--c-ontrack', desc: 'Within stipulated time' },   // ← renamed
+    onTrack: { label: 'On track', cssVar: '--c-ontrack', desc: 'Within stipulated time' },
     needsAttention: { label: 'Needs attention', cssVar: '--c-attention', desc: 'Overdue — act now' },
     awaitingSignoff: { label: 'Awaiting sign-off', cssVar: '--c-await', desc: 'At a validation gate' },
     completed: { label: 'Completed', cssVar: '--c-done', desc: 'Milestone signed off' }
@@ -189,12 +174,12 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     planning: ['Planning', 'Match waiting journeys to available specialists']
   };
 
-  private authguard = inject(AuthguardService);
   private firestore = inject(Firestore);
   private router = inject(Router);
 
   // ================= DYNAMIC PARTICIPANTS (Firestore) =================
-  participants: any[] = [];
+  participants: Member[] = [];
+  private participantsLoaded = false;
 
   // ================= UI STATE =================
   theme: 'light' | 'dark' = 'light';
@@ -221,30 +206,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   dateRangeStart = '2026-05-01';
   dateRangeEnd = '2026-06-30';
-
-  expandedSpecialistId: string | null = null;
-
-  // overview table state
-  dfuProductsMap: Record<string, string> = {};
-  overviewParticipants: OverviewParticipantRow[] = [];
-  expandedOverviewRowId: string | null = null;
-
-  expandedOverviewProduct: Record<string, boolean> = {};
-  overviewProductSteps: Record<string, any[]> = {};
-  overviewProgressLoading: Record<string, boolean> = {};
-
-  private overviewSeqMap: Record<string, any> = {};
-  private overviewDeliverableDoc: Record<string, any> = {};
-  private mapDeliveryName: Record<string, string> = {};
-  private deliveryLookupLoaded = false;
-  private deliverablesLoadedProfiles = new Set<string>();
-  ongoingCount: number | null = null;
-
-  ngOnInit(): void {
-    this.loadParticipants();
-    this.loadOverviewParticipants();
-    this.loadOngoingCount(); 
-  }
 
   // ================= HELPERS =================
   member(id: string): Member {
@@ -319,176 +280,33 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   // ================= NAVIGATION =================
   goToView(view: ViewName): void {
     this.currentView = view;
-  }
-
-  toggleSpecialistDetails(id: string): void {
-    this.expandedSpecialistId = this.expandedSpecialistId === id ? null : id;
-  }
-
-  toggleOverviewRow(participantId: string): void {
-    const isSameRow = this.expandedOverviewRowId === participantId;
-    this.expandedOverviewRowId = isSameRow ? null : participantId;
-  }
-
-  async toggleOverviewProduct(profileId: string, product: OverviewProduct): Promise<void> {
-    const id = product.participantproductid;
-    this.expandedOverviewProduct[id] = !this.expandedOverviewProduct[id];
-
-    const needsSteps = this.expandedOverviewProduct[id] && !this.overviewProductSteps[id];
-    if (needsSteps) {
-      await this.loadOverviewDeliverySequence(profileId, id);
-    }
-  }
-
-  private async loadOverviewDeliveryLookups(): Promise<void> {
-    if (this.deliveryLookupLoaded) { return; }
-
-    const sources: [string, string][] = [
-      ['appointmenttype', 'appointmenttype'],
-      ['delivery forms', 'formname'],
-      ['delivery report', 'reportname'],
-      ['delivery events', 'eventname'],
-      ['delivery queue', 'queuename'],
-      ['delivery fieldwork', 'fieldworkname']
-    ];
-    for (const [col, field] of sources) {
-      const snap = await getDocs(collection(this.firestore, col));
-      snap.docs.forEach(d => this.mapDeliveryName[d.ref.path] = d.data()[field]);
-    }
-    this.deliveryLookupLoaded = true;
-  }
-
-  private async loadOverviewProfileDeliverables(profileId: string): Promise<void> {
-    const alreadyLoaded = this.deliverablesLoadedProfiles.has(profileId);
-    if (alreadyLoaded) { return; }
-
-    const deliverables = await getDocs(query(collection(this.firestore, 'deliverables'), where('profileid', '==', profileId)));
-    deliverables.docs.forEach(d => this.overviewDeliverableDoc[d.ref.path] = d.data());
-    this.deliverablesLoadedProfiles.add(profileId);
-  }
-
-  private async loadOngoingCount(): Promise<void> {
-    const snap = await getDocs(collection(this.firestore, 'participantsproduct'));
-    this.ongoingCount = snap.docs.reduce((count, d) => {
-      const hasOngoingDate = !!d.data()?.['statusdate']?.['ongoing'];
-      return hasOngoingDate ? count + 1 : count;
-    }, 0);
-  }
-
-  async loadOverviewParticipants(): Promise<void> {
-    const dfuSnap = await getDocs(query(collection(this.firestore, 'products'), where('type', '==', 'DFU')));
-    const dfuProductsMap: Record<string, string> = {};
-    dfuSnap.docs.forEach(d => dfuProductsMap[d.id] = d.data()['product']);
-    this.dfuProductsMap = dfuProductsMap;
-
-    const participantMeta = await this.authguard.getParticipantMetaMap();
-    const domain = '@soexcellence.com';
-
-    const eligibleProfiles: { id: string; name: string; email: string }[] = [];
-    for (const id in participantMeta.docdata) {
-      const profile = participantMeta.docdata[id];
-      const email = (profile['email'] ?? '').toLowerCase();
-      const isSoExcellenceProfile = email.endsWith(domain);
-      if (!isSoExcellenceProfile) { continue; }
-      eligibleProfiles.push({ id, name: profile['name'] ?? 'Unnamed', email: profile['email'] ?? '' });
-    }
-
-    const profileIds = eligibleProfiles.map(p => p.id);
-    const productsByProfile: Record<string, OverviewProduct[]> = {};
-
-    for (let i = 0; i < profileIds.length; i += 30) {
-      const batch = profileIds.slice(i, i + 30);
-      const snap = await getDocs(query(collection(this.firestore, 'participantsproduct'), where('profileid', 'in', batch)));
-
-      snap.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        const productId = data['productref']?.id;
-        const isDfuProduct = !!dfuProductsMap[productId];
-        if (!isDfuProduct) { return; }
-
-        const profileId = data['profileid'];
-        const list = productsByProfile[profileId] ?? [];
-        list.push({ participantproductid: data['docid'], productId, productName: dfuProductsMap[productId] });
-        productsByProfile[profileId] = list;
-      });
-    }
-
-    this.overviewParticipants = eligibleProfiles
-      .filter(p => (productsByProfile[p.id] ?? []).length > 0)
-      .map(p => ({ ...p, products: productsByProfile[p.id] }));
-  }
-
-  private async loadOverviewDeliverySequence(profileId: string, participantProductId: string): Promise<void> {
-    this.overviewProgressLoading[participantProductId] = true;
-
-    try {
-      let seqProducts = this.overviewSeqMap[profileId];
-      if (!seqProducts) {
-        const seqDoc = await getDoc(doc(this.firestore, 'participantdeliverysequence', profileId));
-        const products = seqDoc.exists() ? seqDoc.data()['products'] ?? [] : [];
-        seqProducts = {};
-        products.forEach((p: any) => seqProducts[p['participantproductid']] = p);
-        this.overviewSeqMap[profileId] = seqProducts;
-      }
-
-      await this.loadOverviewProfileDeliverables(profileId);
-      await this.loadOverviewDeliveryLookups();
-
-      const productSeq = seqProducts[participantProductId];
-      const deliveryItems = productSeq ? (productSeq['delivery'] ?? []) : [];
-
-      this.overviewProductSteps[participantProductId] = deliveryItems.map((d: any) => {
-        const deliverable = this.overviewDeliverableDoc[d.sequenceref.path] ?? {};
-        const status = deliverable.status;
-
-        let stepClass = 'step-pending';
-        let statusLabel = 'Pending';
-        if (status === 'completed') { stepClass = 'step-completed'; statusLabel = 'Completed'; }
-        else if (status === 'ready') { stepClass = 'step-ready'; statusLabel = 'Ready'; }
-
-        return {
-          name: this.mapDeliveryName[deliverable.deliveryref?.path] || 'Unknown',
-          stepClass,
-          status: statusLabel
-        };
-      });
-    } finally {
-      this.overviewProgressLoading[participantProductId] = false;
+    if (view === 'participants') {
+      this.loadParticipants();
     }
   }
 
   async loadParticipants(): Promise<void> {
-    const getProfileData = await this.authguard.getProfileMap();
-    console.log("profile:",getProfileData)
-    const domain = '@soexcellence.com';
-
-    const result: any[] = [];
-    for (const id in getProfileData.docdata) {
-      const profile = getProfileData.docdata[id];
-      const email = (profile['email'] ?? '').toLowerCase();
-      const isSoExcellenceProfile = email.endsWith(domain);
-      if (!isSoExcellenceProfile) { 
-        continue; 
-      }
-      result.push({ id, ...profile });
-    }
-
-    this.participants = result;
+    if (this.participantsLoaded) { return; }
+    const profileDataCollection = collection(this.firestore, 'profile_data');
+    const profileDataSnap = await getDocs(profileDataCollection);
+    this.participants = profileDataSnap.docs
+      .map(e => e.data())
+      .filter(e => this.endsWithDomain(e['email'], '@soexcellence.com'))
+      .map(e => ({
+        id: e['profileid'],
+        name: e['name'],
+        email: e['email'],
+        ini: this.initials(e['name']),
+        age: e['age'] ?? '—',
+        cat: e['category'] ?? 'Operator',
+        spec: !!e['specialist']
+      }));
+    this.participantsLoaded = true;
   }
 
-  // async loadParticipants(): Promise<void> {
-  //   const snapshot = await getDocs(collection(this.firestore, 'profile_data'));
-
-  //   this.participants = snapshot.docs.map(docSnap => ({
-  //       id: docSnap.id,
-  //       ...docSnap.data()
-  //     }))
-  //     .filter((participant: any) =>
-  //       participant.email?.toLowerCase().endsWith('@soexcellence.com')
-  //     );
-
-  //   console.log('participantlist:', this.participants);
-  // }
+  private endsWithDomain(email: string, domain: string): boolean {
+    return (email ?? '').toLowerCase().endsWith(domain.toLowerCase());
+  }
 
   private initials(name: string): string {
     const parts = (name ?? '').split(' ').filter(Boolean);

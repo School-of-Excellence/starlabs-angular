@@ -112,6 +112,8 @@ export class UpdateDeliveryComponent {
         appointmentname: [, {validators: [Validators.required], updateOn : "change"}],
         duration: [, {validators: [Validators.required], updateOn:"change"}],
         ischangeworkrequired: [false, {validators: [], updateOn:"change"}],
+        showaddatc: [false, {validators: [], updateOn:"change"}],
+        showviewatc: [false, {validators: [], updateOn:"change"}],
         groupappointment: [false, {validators: [], updateOn:"change"}],
         maxbooking: [1, {validators: [], updateOn:"change"}],
         docid: [, {}]
@@ -155,10 +157,13 @@ export class UpdateDeliveryComponent {
       this.data = dialogdata
       this.selectedType = dialogdata.type
       if(this.selectedType == "Appointment"){
+        const widgets = dialogdata.widgets ?? []
         this.appointmentform.patchValue({
           appointmentname: dialogdata.deliveryname,
           duration: dialogdata.duration,
           ischangeworkrequired: dialogdata.ischangeworkrequired ?? false,
+          showaddatc: widgets.includes('addatc'),
+          showviewatc: widgets.includes('viewatc'),
           groupappointment: dialogdata.groupappointment ?? false,
           maxbooking: dialogdata.maxbooking ?? null,
           docid: dialogdata.docid
@@ -364,12 +369,20 @@ export class UpdateDeliveryComponent {
       this.loading = true
       var docid = value.docid ?? doc(collection(this.firestore,"appointmenttype")).id
       const docRef = doc(this.firestore,"appointmenttype",docid)
+      var widgets = []
+      if(value.ischangeworkrequired && value.showaddatc){
+        widgets.push('addatc')
+      }
+      if(value.ischangeworkrequired && value.showviewatc){
+        widgets.push('viewatc')
+      }
       setDoc(docRef,{
         appointmenttype: value.appointmentname,
         duration: value.duration,
         ischangeworkrequired: value.ischangeworkrequired,
         groupappointment: value.groupappointment,
         maxbooking: value.groupappointment ? value.maxbooking : null,
+        widgets: widgets,
         id: docid
       },{merge:true}).then(()=>{
         this.closeDialog()

@@ -36,6 +36,12 @@
         <mat-checkbox formControlName="ischangeworkrequired">Is Changework Required</mat-checkbox>
         <br>
 
+        <div *ngIf="appointmentform.get('ischangeworkrequired').value" class="widgetRow">
+          <mat-checkbox formControlName="showaddatc">Show Add ATC</mat-checkbox>
+          <mat-checkbox formControlName="showviewatc">Show View ATC</mat-checkbox>
+        </div>
+        <br>
+
         <mat-checkbox formControlName="groupappointment">Mark as Group Appointment</mat-checkbox>
         <div *ngIf="appointmentform.get('groupappointment').value">
           <mat-form-field class="textField" appearance="outline">
