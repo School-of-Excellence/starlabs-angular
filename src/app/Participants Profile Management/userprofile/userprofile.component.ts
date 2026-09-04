@@ -162,6 +162,15 @@ export class UserprofileComponent {
     touchpoint: 0
   };
 
+  // map delivery sequence
+  mapProductSteps: any = {};
+  expandedProduct: any = {};
+  private seqProductsMap: any = null;
+  private mapDeliveryDoc: any = {};
+  private mapDeliveryName: any = {};
+  private deliveryLookupLoaded = false;
+  productProgressLoading: any = {};
+
   // Paginated data getters
   get paginatedAllEvents() {
     const startIndex = this.currentPages.allEvents * this.pageSize;
@@ -333,7 +342,7 @@ export class UserprofileComponent {
     try {
       // Only load essential data and Journey tab (default) 
       await Promise.all([
-        this.loadTabData('Journey')
+        this.loadTabData('Journey'),
       ]);
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -353,6 +362,80 @@ export class UserprofileComponent {
   async seteventTab(tabName: string) {
     const previousTab = this.eventTab;
     this.eventTab = tabName;
+  }
+
+  // load delivery sequence data for all products
+  async toggleProgress(product) {
+    const id = product['participantproductid'];
+    this.expandedProduct[id] = !this.expandedProduct[id];
+
+    const needsSteps = this.expandedProduct[id] && !this.mapProductSteps[id];
+    if (needsSteps) {
+      await this.loadProductDeliverySequence(id);
+    }
+  }
+
+  private async loadDeliveryLookups() {
+    if (this.deliveryLookupLoaded) {
+      return;
+    }
+
+    const deliverables = await getDocs(query(collection(this.firestoreDefault, 'deliverables'), where('profileid', '==', this.profileId)));
+    deliverables.docs.forEach(d => this.mapDeliveryDoc[d.ref.path] = d.data());
+
+    const sources = [
+      ['appointmenttype', 'appointmenttype'],
+      ['delivery forms', 'formname'],
+      ['delivery report', 'reportname'],
+      ['delivery events', 'eventname'],
+      ['delivery queue', 'queuename'],
+      ['delivery fieldwork', 'fieldworkname']
+    ];
+    for (const [col, field] of sources) {
+      const snap = await getDocs(collection(this.firestoreDefault, col));
+      snap.docs.forEach(d => this.mapDeliveryName[d.ref.path] = d.data()[field]);
+    }
+    this.deliveryLookupLoaded = true;
+  }
+
+  private async loadProductDeliverySequence(participantProductId: string) {
+    this.productProgressLoading[participantProductId] = true;
+
+    try {
+      if (!this.seqProductsMap) {
+        const seqDoc = await getDoc(doc(this.firestoreDefault, 'participantdeliverysequence', this.profileId));
+        const products = seqDoc.exists() ? seqDoc.data()['products'] ?? [] : [];
+        this.seqProductsMap = {};
+        for (const p of products) {
+          this.seqProductsMap[p['participantproductid']] = p;
+        }
+      }
+
+      await this.loadDeliveryLookups();
+      console.log("inside loadProdutDeliverySequence")
+      const productSeq = this.seqProductsMap[participantProductId];
+      const deliveryItems = productSeq ? (productSeq['delivery'] ?? []) : [];
+
+      const steps = deliveryItems.map(d => {
+        const deliverable = this.mapDeliveryDoc[d.sequenceref.path] ?? {};
+        const status = deliverable.status;
+
+        let stepClass = 'step-pending';
+        let statusLabel = 'Pending';
+        if (status === 'completed') { stepClass = 'step-completed'; statusLabel = 'Completed'; }
+        else if (status === 'ready') { stepClass = 'step-ready'; statusLabel = 'Ready'; }
+
+        return {
+          name: this.mapDeliveryName[deliverable.deliveryref?.path] || 'Unknown',
+          stepClass,
+          status: statusLabel
+        };
+      });
+
+      this.mapProductSteps[participantProductId] = steps;
+    } finally {
+      this.productProgressLoading[participantProductId] = false;
+    }
   }
 
 

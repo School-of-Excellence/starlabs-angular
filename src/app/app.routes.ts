@@ -243,7 +243,7 @@ export const routes: Routes = [
   {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
   {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
-  { path: 'team-evolution', component: TeamEvolutionDashboardComponent },
+  {path: 'team-evolution-dashboard', loadComponent: () => import('./Journey Onboarding/team-evolution-dashboard/team-evolution-dashboard.component').then(m => m.TeamEvolutionDashboardComponent)},
 
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},

@@ -99,11 +99,11 @@ interface OverviewParticipantRow {
 @Component({
   selector: 'app-team-evolution-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SpecialistAppointmentSlotsComponent],
   templateUrl: './team-evolution-dashboard.component.html',
   styleUrl: './team-evolution-dashboard.component.css'
 })
-export class TeamEvolutionDashboardComponent {
+export class TeamEvolutionDashboardComponent implements OnInit {
 
   // ================= STATIC REFERENCE DATA =================
   readonly canon: { key: string; hos: string; by: 'owner' | 'participant' | 'specialist' }[] = [
@@ -184,7 +184,7 @@ export class TeamEvolutionDashboardComponent {
 
   readonly lifecycleConfig: Record<LifecycleKey, { label: string; cssVar: string; desc: string }> = {
     notStarted: { label: 'Not started', cssVar: '--c-notstarted', desc: 'Directive not issued' },
-    onTrack: { label: 'On track', cssVar: '--c-ontrack', desc: 'Within stipulated time' },
+    onTrack: { label: 'Ongoing', cssVar: '--c-ontrack', desc: 'Within stipulated time' },   // ← renamed
     needsAttention: { label: 'Needs attention', cssVar: '--c-attention', desc: 'Overdue — act now' },
     awaitingSignoff: { label: 'Awaiting sign-off', cssVar: '--c-await', desc: 'At a validation gate' },
     completed: { label: 'Completed', cssVar: '--c-done', desc: 'Milestone signed off' }
@@ -205,6 +205,7 @@ export class TeamEvolutionDashboardComponent {
     planning: ['Planning', 'Match waiting journeys to available specialists']
   };
 
+  private authguard = inject(AuthguardService);
   private firestore = inject(Firestore);
   private router = inject(Router);
 
