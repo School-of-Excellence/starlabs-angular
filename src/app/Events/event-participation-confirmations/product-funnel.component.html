@@ -289,6 +289,7 @@
             <th>Customer status</th>
             <th>Finance</th>
             <th>Paid</th>
+            <th *ngIf="showAfterApprovalChecks">Venue Fee</th>
             <th *ngIf="showApprovalChecks">Queue stage</th>
             <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
@@ -347,6 +348,9 @@
                 </ng-container>
                 <ng-template #dashPaid><span class="sx-mut">—</span></ng-template>
               </span>
+            </td>
+            <td *ngIf="showAfterApprovalChecks">
+              <span>{{getVenueFeeStatus(row)}}</span>
             </td>
             <td *ngIf="showApprovalChecks">
               <ng-container *ngIf="arena?.type === 'queue'; else noQueue">

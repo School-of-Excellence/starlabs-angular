@@ -1,5 +1,5 @@
 import { Component, Inject, ViewChild, ElementRef } from '@angular/core';
-import { collection, doc, DocumentReference, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where } from '@angular/fire/firestore';
+import { arrayRemove, collection, doc, DocumentReference, Firestore, getDoc, getDocs, or, orderBy, query, setDoc, updateDoc, where } from '@angular/fire/firestore';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatInputModule } from '@angular/material/input';
@@ -77,6 +77,7 @@ export class ManageCohertsComponent {
   participantSearchQuery: string = '';
   participantDropdownOpen: boolean = false;
   filteredParticipantsList: any[] = [];
+  participantsApprovedForEvent : any[] = [];
   
   // Existing participants (selected but not in current filtered list)
   existingParticipantsNotInList: any[] = [];
@@ -88,9 +89,12 @@ export class ManageCohertsComponent {
   
   // Event participation tracking
   bigInvitationParticipants: any[] = [];
+  participantListForEvent : any[] = [];
   bigInvitationCount: number = 0;
   loadingInvitations: boolean = false;
   mapProfile = {};
+
+  assignedParticipantIds = new Set();
   
   // Track original participants for edit mode comparison
   originalParticipantIds: string[] = [];
@@ -112,8 +116,12 @@ export class ManageCohertsComponent {
 
   bigActivityList: any[] = [];
 
-  supportchatref: DocumentReference | null
+  supportchatref: DocumentReference | null;
+  cohortSupportChat : any = null;
+  cohortChatMembers = [];
+  removedParticipantsInChat = [];
 
+  queueList : any = []
 
   constructor(
     private fb: FormBuilder,
@@ -123,6 +131,7 @@ export class ManageCohertsComponent {
     private snackBar: MatSnackBar
   ) {
 
+    this.queueList = this.data?.queueList ?? []
     for (let i = 0; i < this.data.totalParticipants.length; i++) {
       const profile = this.data.totalParticipants[i];
       this.mapProfile[profile.profileid] = profile;
@@ -143,13 +152,13 @@ export class ManageCohertsComponent {
       startDate: [null],
       endDate: [null],
       level: [],
-      enableGroupChat: [true],
+      enableGroupChat: [false],
       tags: [[]],
       mentors: [[]],
       team: [[]],
       bigactivity: [null],
       description: [''],
-
+      chatmembers : [[]]
     });
 
     // Load participant tags from data or fetch from collection
@@ -181,6 +190,10 @@ export class ManageCohertsComponent {
           createddate: new Date(),
           udpateddate: new Date(),
           marathonref: doc(collection(this.firestore, "big marathon"), this.data.selectedMarathon?.docid),
+          bigactivity : this.data?.bigactivity ?? null,
+          name : this.data?.cohortname ?? '',
+          cohortType : this.data?.cohortType || 'general',
+          eventref : this.data?.selectedEvent || null,
         });
       }
       if (this.data.type == "edit") {
@@ -211,7 +224,7 @@ export class ManageCohertsComponent {
           mentors: this.data.doc['mentors'] || [],
           team: this.data.doc['team'] || [],
           bigactivity: this.data.doc['bigactivity'] || null,
-          description: this.data.doc['description'] || null
+          description: this.data.doc['description'] || null,
         });
         
         this.selectedTags = this.data.doc['tags'] || [];
@@ -226,7 +239,7 @@ export class ManageCohertsComponent {
       if (this.data.doc && this.data.doc['eventref']) {
         this.onChangeEvent();
       }
-
+      this.loadCohortChat()
       // Update existing participants list after setting filtered participants
       this.updateExistingParticipantsNotInList();
     }
@@ -264,8 +277,18 @@ export class ManageCohertsComponent {
     })
   }
 
+  async loadCohortChat(){
+    if(this.isEditMode() && this.data.doc['enableGroupChat'] && this.data.doc['chatref']){
+      const chatDoc = await getDoc(doc(this.firestore , this.data.doc['chatref'].path));
+      this.cohortSupportChat = chatDoc.data();
+    }
+  }
+
   clearActivity(){
-    this.cohortsForm.controls['bigactivity'].setValue(null)
+    console.log(this.cohortsForm.controls['bigactivity'].value);
+    this.cohortsForm.controls['bigactivity'].setValue(null);
+    this.cohortsForm.get('participantidlist').setValue(null);
+    this.selectedParticipants = [];
   }
 
   loadParticipantTags() {
@@ -537,7 +560,7 @@ export class ManageCohertsComponent {
   }
 
   // Toggle participant selection
-  toggleParticipantSelection(profileId: string, event?: Event) {
+  async toggleParticipantSelection(profileId: string, event?: Event) {
     if (event) {
       event.stopPropagation();
     }
@@ -545,13 +568,52 @@ export class ManageCohertsComponent {
     const index = this.selectedParticipants.indexOf(profileId);
     if (index === -1) {
       this.selectedParticipants.push(profileId);
+      this.removedParticipantsInChat = this.removedParticipantsInChat.filter((pid)=>pid !== profileId)
     } else {
+      if(this.isEditMode()){
+        const check = await this.checkForActiveParticipantStuidosInCohort(this.data.doc , profileId);
+        if(check){
+          alert('Participant has active studio, Please Disable before delete');
+          return
+        }
+
+       const uid = (await this.getUidsFromProfileIds([profileId]))[0];
+        if(this.cohortSupportChat && this.cohortSupportChat['members']?.includes(uid)){
+          if(this.cohortsForm.get('enableGroupChat')?.value){
+            const msg = confirm('do you want to remove participant from chat also');
+            if(!msg){
+              this.removedParticipantsInChat.push(profileId);
+            }
+          }
+        }
+      }
+
       this.selectedParticipants.splice(index, 1);
     }
     this.cohortsForm.get('participantidlist')?.setValue([...this.selectedParticipants]);
     
     // Update existing participants list
     this.updateExistingParticipantsNotInList();
+  }
+
+   async checkForActiveParticipantStuidosInCohort(cohort : any , participantId : string){
+    const eventId = cohort.eventref?.id;
+    const activity = cohort['bigactivity'] ?? '';
+    if(cohort.cohortCategory === 'studio' && ![null , undefined , ''].includes(eventId)){
+      const queueId = [];
+      const queue = await getDocs(query(collection(this.firestore, 'queue generation') , where('eventid','array-contains', eventId)));
+      queue.docs.forEach((q)=>{
+        const qId = q.id;
+        queueId.push(doc(this.firestore , 'queue generation' , qId));
+      })
+      console.log('queues list' , queueId)
+      if (queueId.length > 0) {
+        const q = query(collection(this.firestore, 'queue studio pairing'), where('queueref', 'in' , queueId), where('studioin', '==', true), where('participants', 'array-contains', participantId));
+        const studios = await getDocs(q);
+        return studios.docs.filter((st) => Object.values(st.data()['participantsactivity'] ?? {}).includes(activity)).length > 0;
+      }
+    }
+    return false
   }
 
   // Get participant name by profile ID
@@ -598,7 +660,7 @@ export class ManageCohertsComponent {
   
   // Update the list of existing participants that are not in the current filtered list
   updateExistingParticipantsNotInList() {
-    const filteredProfileIds = this.filteredParticipants.map(p => p.profileid);
+    const filteredProfileIds = [...this.participantsApprovedForEvent];
     
     // Find selected participants that are NOT in the current filtered list
     const existingIds = this.selectedParticipants.filter(id => !filteredProfileIds.includes(id));
@@ -654,7 +716,7 @@ export class ManageCohertsComponent {
   
   // Get the count of participants in current list (not existing)
   getParticipantsInListCount(): number {
-    const filteredProfileIds = this.filteredParticipants.map(p => p.profileid);
+    const filteredProfileIds = [...this.participantsApprovedForEvent];
     return this.selectedParticipants.filter(id => filteredProfileIds.includes(id)).length;
   }
 
@@ -881,45 +943,173 @@ export class ManageCohertsComponent {
   }
 
   // Fetch participants from 'event participation request' when event is selected
+  // async onChangeEvent() {
+  //   const eventRef = this.cohortsForm.get("eventref")?.value;
+    
+  //   // DON'T reset participants when event changes - keep the selection
+  //   // this.selectedParticipants = [];
+  //   // this.cohortsForm.get('participantidlist')?.setValue([]);
+  //   this.participantSearchQuery = '';
+  //   this.participantImportResults = null;
+    
+  //   if (eventRef != null && eventRef != undefined) {
+  //     this.loadingInvitations = true;
+  //     // this.cohortsForm.get('cohortType').setValue(null);
+  //     // this.selectedParticipants = [];
+      
+  //     try {
+  //       const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
+  //       const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef) , where('cohortCategory' , '==' , 'studio'));
+  //       const approvedParticipant = new Set();
+  //       const assignedParticipantIds = new Set<string>(); 
+  //       const participantsList = [];
+        
+  //       const participationSnap = await getDocs(participationQuery);
+
+  //       if (this.cohortsForm?.get('cohortCategory')?.value === 'studio') {
+  //         const cohortsSnap = await getDocs(cohortQuery);
+          
+  //         cohortsSnap.docs.forEach((cohortDoc) => {
+  //           const cohort = cohortDoc.data();
+  //           (cohort['participantidlist'] || []).forEach((id: string) => {
+  //             assignedParticipantIds.add(id);
+  //           });
+  //         });
+
+  //       }
+        
+  //       // participationSnap.docs.forEach(docSnap => {
+  //       //   const data: any = docSnap.data();
+  //       //   if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
+  //       //     if(!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])){
+  //       //       participantsList.push({
+  //       //       id: docSnap.id,
+  //       //       name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //       //       profileid: data['profileid'],
+  //       //       ...data
+  //       //     })
+  //       //     }
+  //       //     approvedParticipant.add(data['profileid']);
+  //       //   }
+  //       // });
+
+  //       console.log('assigned size : ',assignedParticipantIds.size)
+  //       participationSnap.docs.forEach(docSnap => {
+  //         const data: any = docSnap.data();
+  //         if(data['profileid'] != null && !approvedParticipant.has(data['profileid'])){
+
+  //           if (assignedParticipantIds.size > 0) {
+  //             if (!assignedParticipantIds.has(data['profileid']) || this.selectedParticipants.includes(data['profileid'])) {
+  //               participantsList.push({
+  //                 id: docSnap.id,
+  //                 name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //                 profileid: data['profileid'],
+  //                 ...data
+  //               })
+  //             }
+  //           } else {
+  //             participantsList.push({
+  //               id: docSnap.id,
+  //               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
+  //               profileid: data['profileid'],
+  //               ...data
+  //             });
+  //           }
+  //          approvedParticipant.add(data['profileid']);
+            
+  //         }
+  //       });
+        
+  //       this.bigInvitationParticipants = [...participantsList];
+  //       this.participantListForEvent = [...participantsList];
+  //       // Extract participant IDs from event participation request
+  //       console.log('approved participant list : ' , approvedParticipant.size)
+  //       this.bigInvitationCount = participantsList.length;
+  //       this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
+        
+  //       this.filteredParticipants = participantsList;
+        
+  //       this.filteredParticipantsList = [...this.filteredParticipants];
+  //       console.log('Filtered participants with names:', this.filteredParticipants.length);
+        
+  //       // Update existing participants list - previously selected ones not in new event list
+  //       this.updateExistingParticipantsNotInList();
+        
+  //       console.log('Approved participants from event participation request not in any cohort:', participantsList);
+        
+  //     } catch (error) {
+  //       console.error('Error fetching event participation request:', error);
+  //       this.bigInvitationCount = 0;
+  //       this.bigInvitationParticipants = [];
+  //       this.participantListForEvent = [];
+  //       this.filteredParticipants = this.data.totalParticipants || [];
+  //       this.filteredParticipantsList = [...this.filteredParticipants];
+  //       this.updateExistingParticipantsNotInList();
+  //     } finally {
+  //       this.loadingInvitations = false;
+  //     }
+      
+  //   } else {
+  //     // Reset when no event selected - show all participants
+  //     this.bigInvitationCount = 0;
+  //     this.bigInvitationParticipants = [];
+  //     this.participantListForEvent = [];
+  //     this.filteredParticipants = this.data.totalParticipants || [];
+  //     this.filteredParticipantsList = [...this.filteredParticipants];
+  //     this.updateExistingParticipantsNotInList();
+  //   }
+  // }
+
   async onChangeEvent() {
     const eventRef = this.cohortsForm.get("eventref")?.value;
-    
-    // DON'T reset participants when event changes - keep the selection
-    // this.selectedParticipants = [];
-    // this.cohortsForm.get('participantidlist')?.setValue([]);
     this.participantSearchQuery = '';
     this.participantImportResults = null;
     
     if (eventRef != null && eventRef != undefined) {
       this.loadingInvitations = true;
-      
       try {
         const participationQuery = query(collection(this.firestore, "event participation request"),where("eventref", "==", eventRef),where("status", "in", ['attended','approved']));
+        const cohortQuery = query(collection(this.firestore , "big cohorts"), where("eventref", "==", eventRef) , where('cohortCategory' , '==' , 'studio'));
+        const approvedParticipant = new Set();
+        const assignedParticipantIds = new Set<string>(); 
+        const participantsList = [];
         
-        const participationSnap = await getDocs(participationQuery);
-        
-        this.bigInvitationParticipants = participationSnap.docs.map(docSnap => {
+        const [participationSnap , cohortsSnap] = await Promise.all([
+          getDocs(participationQuery),
+          getDocs(cohortQuery)
+        ])
+
+        cohortsSnap.docs.forEach((cohortDoc) => {
+          const cohort = cohortDoc.data();
+          (cohort['participantidlist'] || []).forEach((id: string) => {
+            assignedParticipantIds.add(id);
+          });
+        });
+
+        this.assignedParticipantIds = assignedParticipantIds;
+        console.log(this.assignedParticipantIds)
+
+        participationSnap.docs.forEach(docSnap => {
           const data: any = docSnap.data();
-          if(data['profileid'] != null){
-            return {
+          if (data['profileid'] != null && !approvedParticipant.has(data['profileid'])) {
+            participantsList.push({
               id: docSnap.id,
               name: this.mapProfile[data['profileid']]?.['name'] || 'unknown',
               profileid: data['profileid'],
               ...data
-            };
+            })
+            approvedParticipant.add(data['profileid']);
           }
-        }).filter(p => p != null);
+        });
         
+        this.bigInvitationParticipants = [...participantsList];
+        this.participantListForEvent = [...participantsList];
         // Extract participant IDs from event participation request
-        const approvedParticipantIds = this.bigInvitationParticipants
+        console.log('approved participant list : ' , approvedParticipant.size)
+        this.bigInvitationCount = participantsList.length;
+        this.participantsApprovedForEvent = Array.from(approvedParticipant.values())
         
-        this.bigInvitationCount = approvedParticipantIds.length;
-        
-        console.log(approvedParticipantIds);
-        console.log(this.data.totalParticipants);
-        
-        this.filteredParticipants = approvedParticipantIds;
-        console.log(this.filteredParticipants);
+        this.filteredParticipants = participantsList;
         
         this.filteredParticipantsList = [...this.filteredParticipants];
         console.log('Filtered participants with names:', this.filteredParticipants.length);
@@ -927,12 +1117,13 @@ export class ManageCohertsComponent {
         // Update existing participants list - previously selected ones not in new event list
         this.updateExistingParticipantsNotInList();
         
-        console.log('Approved participants from event participation request:', approvedParticipantIds);
+        console.log('Approved participants from event participation request not in any cohort:', participantsList);
         
       } catch (error) {
         console.error('Error fetching event participation request:', error);
         this.bigInvitationCount = 0;
         this.bigInvitationParticipants = [];
+        this.participantListForEvent = [];
         this.filteredParticipants = this.data.totalParticipants || [];
         this.filteredParticipantsList = [...this.filteredParticipants];
         this.updateExistingParticipantsNotInList();
@@ -944,10 +1135,51 @@ export class ManageCohertsComponent {
       // Reset when no event selected - show all participants
       this.bigInvitationCount = 0;
       this.bigInvitationParticipants = [];
+      this.participantListForEvent = [];
       this.filteredParticipants = this.data.totalParticipants || [];
       this.filteredParticipantsList = [...this.filteredParticipants];
       this.updateExistingParticipantsNotInList();
     }
+  }
+
+  getFilteredParticipantList() {
+    const profiles = [];
+    for (const participant of [...this.data.totalParticipants]) {
+      const participantId = participant['profileid'];
+      let event: boolean = true;
+      let search: boolean = true;
+      const searchQuery = this.participantSearchQuery.toLowerCase().trim();
+
+      if (this.isEventType()) {
+        const eventApprovedParticipant = [...this.participantsApprovedForEvent];
+        if (eventApprovedParticipant.includes(participantId)) {
+          if (this.cohortsForm.get('cohortCategory').value === 'studio' && ((this.assignedParticipantIds.has(participantId) && !this.selectedParticipants.includes(participantId)))) {
+            event = false
+          }
+        } else {
+          event = false
+        }
+      }
+
+      if (searchQuery) {
+        const searchCondition = !(participant['name']?.toLowerCase().includes(searchQuery) ||
+          participant['email']?.toLowerCase().includes(searchQuery) ||
+          participant['displayName']?.toLowerCase().includes(searchQuery));
+        
+        if (searchCondition) search = false;
+      }
+
+      if (event && search) profiles.push(participant)
+
+    }
+    return profiles;
+  }
+
+
+  onEventSelectionChange(){
+    this.cohortsForm.get('participantidlist').setValue(null);
+    this.selectedParticipants = [];
+    this.onChangeEvent();
   }
 
   // Fetch participant profiles directly if totalParticipants not available
@@ -1085,6 +1317,9 @@ export class ManageCohertsComponent {
   async updateSupportChatMembers(cohortData: any) {
     const supportChatDocId = cohortData['docid'];
     const supportChatRef = doc(this.firestore, "supportchat", supportChatDocId);
+    let { removed } = this.getParticipantChanges(cohortData['participantidlist'] || []);
+    const removedUids = await this.getUidsFromProfileIds(removed);
+    const exceptionUids = await this.getUidsFromProfileIds(this.removedParticipantsInChat);
     
     try {
       // Convert selected participant profile IDs to UIDs
@@ -1100,22 +1335,26 @@ export class ManageCohertsComponent {
       const teamUids = await this.getUidsFromProfileIds(selectedTeamProfileIds);
       
       // Combine participant, mentor, and team UIDs (remove duplicates)
-      const allMemberUids = Array.from(new Set([...participantUids, ...mentorUids, ...teamUids]));
+      // const allMemberUids = Array.from(new Set([...participantUids, ...mentorUids, ...teamUids]));
       
       // Get existing support chat document
       const supportChatRef = doc(this.firestore, "supportchat", supportChatDocId);
       const supportChatSnap = await getDoc(supportChatRef);
       
       if (supportChatSnap.exists()) {
-        // Update the support chat with new members list (replace, not merge)
+        const members = (supportChatSnap.data()['members'] ?? []).filter((pid)=> !removedUids.includes(pid) || exceptionUids.includes(pid))
+        
+        // Combine participant, mentor, and team UIDs (remove duplicates)
+        const overallMembers = Array.from(new Set([...participantUids, ...mentorUids, ...teamUids , ...members]));
+        
         await updateDoc(supportChatRef, {
-          members: allMemberUids,
+          members: overallMembers,
           group_name: cohortData['name'],
           last_modification: new Date(),
           type:'group'
         });
         
-        console.log('Support chat members replaced. Total members:', allMemberUids.length, '(Participants:', participantUids.length, ', Mentors:', mentorUids.length, ', Team:', teamUids.length, ')');
+        console.log('Support chat members replaced. Total members:', overallMembers.length, '(Participants:', participantUids.length, ', Mentors:', mentorUids.length, ', Team:', teamUids.length, ')');
         // return supportChatDocId;
         return supportChatRef;
       } else {
@@ -1231,7 +1470,7 @@ export class ManageCohertsComponent {
       if(check){
         // participantidlist already contains all selected participants (including existing ones)
         // The selectedParticipants array includes both dropdown selections and existing participants
-        
+        // formValue['queueref'] = ![null , undefined , ''].includes( formValue['queueref']) ? doc(this.firestore , 'queue generation'  , formValue['queueref']) : null;
         // Save cohort document
         await setDoc(doc(this.firestore, "big cohorts", formValue['docid']), formValue, { merge: true });
         
@@ -1272,7 +1511,6 @@ export class ManageCohertsComponent {
           // await this.updateSupportChatMembers(formValue);
         }
       }
-      
       
       this.dialogref.close(formValue);
     } catch (error) {
