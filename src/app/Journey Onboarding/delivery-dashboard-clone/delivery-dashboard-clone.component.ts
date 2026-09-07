@@ -3897,6 +3897,11 @@ export class DeliveryDashboardCloneComponent {
         return { overdue, upcoming, noDate };
     }
 
+    isBonusPackage(item: any): boolean {
+        const packageId = item?.packageref?.id;
+        return !!(packageId && this.bonusPackageLookup[packageId]);
+    }
+
     private openOnboardingScheduleDialog(card: any) {
         const profileId = card?.profileid || card?.clientid;
         if (!profileId || !card?.docid) {

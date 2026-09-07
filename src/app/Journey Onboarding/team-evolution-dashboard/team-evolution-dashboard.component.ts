@@ -7,6 +7,7 @@ import {collection, doc, Firestore, getDoc, collectionData, docData, query, wher
 import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { SpecialistAppointmentSlotsComponent } from '../specialist-appointment-slot/specialist-appointment-slot.component';
+import { getDocs } from 'firebase/firestore';
 
 type ViewName = 'dashboard' | 'participants' | 'specialists' | 'planning';
 type LifecycleKey = 'notStarted' | 'onTrack' | 'needsAttention' | 'awaitingSignoff' | 'completed';
@@ -393,8 +394,8 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         this.dfuProductRefs.push(doc(this.firestore, 'products', p.id));
       });
 
-      this.participantOverviewRows();
-      this.participantOverviewCount();
+      // this.participantOverviewRows();
+      // this.participantOverviewCount();
     });
   }
 
@@ -437,44 +438,59 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     this.overviewParticipants = rows;
   }
 
-  private ongoingParticipantsProduct(productRefs: any[], onData: (docs: any[]) => void): Subscription {
-    if (!productRefs.length) {
-      onData([]);
-      return new Subscription();
-    }
+  private ongoingParticipantsProduct(productRefs: any[],callback: (docs: any[]) => void): Subscription
+  { 
     const chunkSize = 30;
-    const combined = new Subscription();
-    const resultsByChunk: any[][] = [];
+    const allDocs: any[] = [];
+    const chunks: any[][] = [];
 
     for (let i = 0; i < productRefs.length; i += chunkSize) {
-      const chunk = productRefs.slice(i, i + chunkSize);
-      const chunkIndex = resultsByChunk.length;
-      resultsByChunk.push([]);
-
-      const q = query(
-        collection(this.firestore, 'participantsproduct'),
-        where('status', '==', 'ongoing'),
-        where('productref', 'in', chunk)
-      );
-
-      const chunkSub = collectionData(q, { idField: 'docid' }).subscribe(docs => {
-        resultsByChunk[chunkIndex] = docs;
-        onData(([] as any[]).concat(...resultsByChunk));
-      });
-
-      combined.add(chunkSub);
+      chunks.push(productRefs.slice(i, i + chunkSize));
     }
-
-    return combined;
+    if (chunks.length === 0) {
+      callback([]);
+      return new Subscription();
+    } 
+    let completedChunks = 0;
+    const subscriptions = chunks.map(chunk => {
+      const q = query(collection(this.firestore, 'participantsproduct'),where('status', 'in', ['ongoing', 'initiated']),where('productref', 'in', chunk));
+      return collectionData(q, { idField: 'docid' }).subscribe({next: docs => {allDocs.push(...docs);
+          completedChunks++;
+          if (completedChunks === chunks.length) {
+            callback(allDocs);
+          }
+        },
+        error: err => {
+          console.error('Error:', err);
+          completedChunks++;
+          if (completedChunks === chunks.length) {
+            callback(allDocs);
+          }
+        }
+      });
+    });
+    return new Subscription(() => {
+      subscriptions.forEach(sub => sub.unsubscribe());
+    });
   }
 
   private participantOverviewCount(): void {
-    this.ongoingCountSub?.unsubscribe();
+    const q = query(collection(this.firestore, 'participantsproduct'), where('status', 'in', ['ongoing', 'initiated']));
 
-    const soexcellenceIds = new Set(this.allSoexcellenceMeta.map(d => d.id));
-    this.ongoingCountSub = this.ongoingParticipantsProduct(this.dfuProductRefs, docs => {
-      this.ongoingCount = docs.filter(d => soexcellenceIds.has(d['profileid'])).length;
-    });
+    getDocs(q).then(snapshot => {
+      const soexcellenceIds = new Set(this.allSoexcellenceMeta.map((m: any) => m.id));
+      const matchingDocs = snapshot.docs.filter(d => {
+        const data = d.data();
+        const isSoexcellenceParticipant = soexcellenceIds.has(data['profileid']);
+        const isDfuProduct = !!this.dfuProductsMap[data['productref']?.id];
+        return isSoexcellenceParticipant && isDfuProduct;
+      });
+      this.ongoingCount = matchingDocs.length;
+    })
+    .catch(err => {
+      console.error('Error:', err);
+      this.ongoingCount = null;
+      });
   }
 
   toggleOverviewRow(participantId: string): void {

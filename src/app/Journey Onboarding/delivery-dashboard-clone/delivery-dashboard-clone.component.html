@@ -1158,8 +1158,31 @@
                       </div>
                     </ng-container>
                     <ng-template #legacyBody>
-                      <div class="no-data-card">No Data Yet</div>
-                    </ng-template>
+                      <div class="card" *ngFor="let c of filteredCardsMap[i]; trackBy: trackByCard">
+                          <div class="card-top">
+                              <div class="card-info">
+                                  <div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name || (c.profileid || c.clientid) }}</div>
+                              </div>
+                          </div>
+                          <div class="product-tag">
+                              <span class="status-tag" [ngClass]="c.status?.toLowerCase() || 'na'">{{ c.status || 'Initiated' }}</span>
+                              <span class="status-tag bonus" *ngIf="isBonusPackage(c)">Bonus</span>
+                          </div>
+                          <div class="detail-row" *ngIf="!c.status || c.status?.toLowerCase() === 'initiated'">
+                              <span class="d-flex flex-column">
+                                  <span>
+                                      <span class="detail-label">Tentative Start: </span>
+                                      <span class="detail-val">{{ formatDate(c.tentativestart) }}</span>
+                                  </span>
+                                  <span *ngIf="showDelayDate(c) as delay">
+                                      <span class="detail-label">Delayed By: </span>
+                                      <span class="detail-val">{{ delay }}</span>
+                                  </span>
+                              </span>
+                          </div>
+                      </div>
+                      <div class="no-data-card" *ngIf="!filteredCardsMap[i]?.length">No Data Yet</div>
+                  </ng-template>
                   </div>
                 </div>
               </ng-container>
