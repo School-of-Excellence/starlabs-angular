@@ -291,7 +291,8 @@
 
               <div class="wc-bc-media" *ngIf="b.headerValue">
                 <video *ngIf="broadcastHeaderIsVideo(m); else bcImage"
-                       [src]="b.headerValue" controls preload="metadata"></video>
+                       [src]="b.headerValue" controls preload="metadata"
+                       (play)="onMediaPlay($event)"></video>
                 <ng-template #bcImage>
                   <img [src]="b.headerValue" alt="" (click)="openImage(b.headerValue!)"/>
                 </ng-template>
@@ -461,7 +462,8 @@
                              [src]="att.dataUrl" [alt]="att.name || 'image'"
                              (click)="openImage(att.dataUrl)"/>
 
-                        <video class="wc-att-video" *ngIf="att.type === 'video'" [src]="att.dataUrl" controls></video>
+                        <video class="wc-att-video" *ngIf="att.type === 'video'" [src]="att.dataUrl" controls
+                               (play)="onMediaPlay($event)"></video>
 
                         <app-chat-audio *ngIf="att.type === 'voice'" class="wc-audio-block"
                                         [src]="att.dataUrl" [name]="att.name" [light]="isLight(m)">
@@ -1205,7 +1207,7 @@
          (mousedown)="startPan($event)" (click)="$event.stopPropagation()"/>
 
     <video *ngIf="lightboxKind === 'video'" [src]="lightbox" controls autoplay
-           (click)="$event.stopPropagation()"></video>
+           (play)="onMediaPlay($event)" (click)="$event.stopPropagation()"></video>
 
     <div class="wc-viewer-bar" *ngIf="lightboxKind === 'image'" (click)="$event.stopPropagation()">
       <button (click)="zoomBy(-0.25, $event)" [disabled]="lbScale <= 0.25" matTooltip="Zoom out">
@@ -1320,16 +1322,9 @@
             </span>
           </div>
 
-          <!-- What the import did, including rows that matched nothing — never invented as new people -->
-          <div class="wc-importnote" *ngIf="importReport">
-            <mat-icon>{{ importReport.matched ? 'check_circle' : 'error_outline' }}</mat-icon>
-            <span>
-              {{ importReport.matched }} matched and selected<ng-container *ngIf="importReport.skipped.length">,
-              {{ importReport.skipped.length }} not found: {{ importReport.skipped.slice(0, 4).join(', ') }}<ng-container
-              *ngIf="importReport.skipped.length > 4"> +{{ importReport.skipped.length - 4 }} more</ng-container></ng-container>
-            </span>
-            <button class="wc-plain-btn" (click)="importReport = null"><mat-icon>close</mat-icon></button>
-          </div>
+          <ng-container *ngIf="importReport?.target === 'create'">
+            <ng-container *ngTemplateOutlet="importReportPanel"></ng-container>
+          </ng-container>
 
           <div class="wc-picklist">
             <div class="wc-note center" *ngIf="createPool.length === 0">Loading people…</div>
@@ -1478,13 +1473,37 @@
         <button class="wc-close-btn" (click)="addingMembers = false"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-dialog-sub">
-        <div class="wc-search plain">
-          <mat-icon>search</mat-icon>
-          <input [(ngModel)]="aSearch" placeholder="Search people…"/>
+        <div class="wc-pickbar">
+          <div class="wc-search plain grow">
+            <mat-icon>search</mat-icon>
+            <input [(ngModel)]="aSearch" placeholder="Search by name or email…"/>
+            <button class="wc-search-clear" *ngIf="aSearch" (click)="aSearch = ''" matTooltip="Clear">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <!-- Same import as the create dialog, filling this picker instead -->
+          <input #addImport type="file" hidden accept=".xlsx,.xls,.csv"
+                 (change)="onMembersImport($event, 'add')"/>
+          <button class="wc-ghost-btn" (click)="addImport.click()" matTooltip="Import members from a spreadsheet">
+            <mat-icon>upload_file</mat-icon> Import
+          </button>
+          <button class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
+            <mat-icon>download</mat-icon>
+          </button>
+        </div>
+        <div class="wc-pickbar sub">
+          <span class="grow"></span>
+          <span class="wc-pickcount">{{ aPicked.length }} selected</span>
         </div>
       </div>
       <div class="wc-dialog-body flush">
+        <ng-container *ngIf="importReport?.target === 'add'">
+          <ng-container *ngTemplateOutlet="importReportPanel"></ng-container>
+        </ng-container>
         <div class="wc-note center" *ngIf="addPool.length === 0">Everyone here is already in the group</div>
+        <div class="wc-note center" *ngIf="addPool.length && !addShown.length">
+          Nobody matches “{{ aSearch }}”
+        </div>
         <div class="wc-pickrow rounded" *ngFor="let p of addShown; trackBy: trackById"
              [class.on]="isAddPicked(p.id)" (click)="toggleAddPerson(p)">
           <div class="wc-check sm" [class.on]="isAddPicked(p.id)">
@@ -1514,6 +1533,37 @@
     <mat-icon>group</mat-icon><span>{{ toastMsg }}</span>
   </div>
 </div>
+
+
+<!-- ── Import outcome, shared by the create and add-members pickers ─────── -->
+<ng-template #importReportPanel>
+        <!-- Everything the import did, including every row that matched nothing — never
+             invented as a new person, and downloadable so it can go back to whoever sent it. -->
+        <div class="wc-importnote" *ngIf="importReport as rep">
+          <div class="wc-importnote-head">
+            <mat-icon>{{ rep.matched ? 'check_circle' : 'error_outline' }}</mat-icon>
+            <span class="grow">
+              {{ rep.matched }} matched and selected<ng-container *ngIf="rep.skipped.length">,
+              {{ rep.skipped.length }} not found</ng-container>
+            </span>
+            <button class="wc-link-btn" *ngIf="rep.skipped.length" (click)="downloadSkipped()">
+              <mat-icon>download</mat-icon> Download
+            </button>
+            <button class="wc-plain-btn" (click)="importReport = null"><mat-icon>close</mat-icon></button>
+          </div>
+          <div class="wc-skiplist" *ngIf="rep.skipped.length">
+            <div class="wc-skiprow" *ngFor="let sk of skippedShown; trackBy: trackByIndex">
+              <span class="wc-skiprow-no">Row {{ sk.row }}</span>
+              <span class="wc-skiprow-who">{{ sk.name || sk.email || '(blank)' }}</span>
+              <span class="wc-skiprow-why">{{ sk.reason }}</span>
+            </div>
+          </div>
+          <button class="wc-link-btn" *ngIf="rep.skipped.length > 5"
+                  (click)="showAllSkipped = !showAllSkipped">
+            {{ showAllSkipped ? 'Show fewer' : 'Show all ' + rep.skipped.length }}
+          </button>
+        </div>
+</ng-template>
 
 <!-- ── Rich text renderer ───────────────────────────────────────────── -->
 <ng-template #richBody let-blocks let-light="light">
