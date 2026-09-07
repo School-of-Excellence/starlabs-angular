@@ -37,6 +37,10 @@
           <button type="button" class="whd-btn" (click)="openQADialog()">
             <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>
+          <button type="button" class="whd-btn" (click)="openDiagnoseDialog()"
+                  matTooltip="Check why a profile can or cannot enroll in this workshop">
+            <mat-icon>troubleshoot</mat-icon>Diagnose
+          </button>
           <button type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
             <mat-icon>delete</mat-icon>Clear
           </button>
