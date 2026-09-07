@@ -1,0 +1,80 @@
+<div class="campaign-dashboard">
+
+  <div class="sep">
+    <div class="sep-lbl">Active &amp; Scheduled Campaigns</div>
+    <div class="sep-line"></div>
+    <button type="button" class="btn-new-camp" (click)="openNewCampaignDialog()">+ New Campaign</button>
+  </div>
+
+  @if (loading) {
+    <div class="loading-row">Loading campaigns…</div>
+  }
+
+  <div class="camp-grid">
+    @for (c of cards; track c.id) {
+      <div class="cc">
+        <div class="cc-top">
+          <div>
+            <div class="cc-n">{{ c.name }}</div>
+            <div class="cc-d">{{ c.dateRange }}</div>
+            @if (c.segmentName) {
+              <div class="cc-seg">{{ c.segmentName }}</div>
+            }
+          </div>
+          <div class="schip"
+               [class.sl]="c.status === 'live'"
+               [class.ss]="c.status === 'sched'"
+               [class.se]="c.status === 'ended'">{{ c.statusLabel }}</div>
+        </div>
+
+        <div class="sc-sales">
+          <div><div class="csv">₹{{ c.expected }}</div><div class="csl">Expected</div></div>
+          <div><div class="csv" [style.color]="c.achievedColor">₹{{ c.achieved }}</div><div class="csl">Achieved</div></div>
+          <div><div class="csv">{{ c.sales }}</div><div class="csl">Sales</div></div>
+        </div>
+
+        <div class="cc-progress">
+          <div class="cc-prog-lbl"><span>Progress to target</span><span>{{ c.pct }}%</span></div>
+          <div class="cc-prog-bg">
+            <div class="cc-prog-fill" [style.width.%]="barsReady ? c.pct : 0" [style.background]="c.barColor"></div>
+          </div>
+        </div>
+
+        @if (c.notes) {
+          <div class="cc-manual">📋 {{ c.notes }}</div>
+        }
+
+        @if (c.assets.length) {
+          <div class="cc-assets">
+            <div class="cc-assets-lbl">Assets</div>
+            <div class="cc-asset-chips">
+              @for (a of c.assets; track $index) {
+                @if (a.url) {
+                  <a class="asset-chip" [href]="a.url" target="_blank" rel="noopener" [title]="a.name">
+                    <span>{{ a.icon }}</span><span class="asset-chip-type">{{ a.type }}</span><span class="asset-chip-name">{{ a.name }}</span>
+                  </a>
+                } @else {
+                  <span class="asset-chip" [title]="a.name">
+                    <span>{{ a.icon }}</span><span class="asset-chip-type">{{ a.type }}</span><span class="asset-chip-name">{{ a.name }}</span>
+                  </span>
+                }
+              }
+            </div>
+          </div>
+        }
+
+        <div class="cc-actions">
+          <button type="button" class="cbtn" (click)="openEditDialog(c.raw)">✎ Edit</button>
+          <button type="button" class="cbtn cbtn-sale">+ Add Sale</button>
+          <button type="button" class="cbtn">📊 Analytics</button>
+        </div>
+      </div>
+    }
+
+    <div class="empty-camp" (click)="openNewCampaignDialog()">
+      <span class="empty-plus">+</span>
+      <span>New Campaign</span>
+    </div>
+  </div>
+
+</div>

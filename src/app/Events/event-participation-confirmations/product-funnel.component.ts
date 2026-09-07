@@ -1,7 +1,8 @@
-import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, writeBatch, serverTimestamp, updateDoc, setDoc,
+  collectionData
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -29,6 +30,7 @@ import { BulkAddProductsComponent } from '../../Participants Profile Management/
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { Subscription } from 'rxjs';
 
 type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
 
@@ -93,7 +95,7 @@ interface PRow {
   templateUrl: './product-funnel.component.html',
   styleUrl: './product-funnel.component.css'
 })
-export class ProductFunnelComponent implements OnInit {
+export class ProductFunnelComponent implements OnInit , OnDestroy{
 
   @Input() arena: any;
   @Input() eventName = '';
@@ -121,7 +123,7 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
-    { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
+    { key: 'attended', label: 'Attended', cls: 'att', desc: 'marked attended', tip: 'Of the approved, how many have request status “attended”' },
     { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event. Product is kept.' },
     { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' },
     { key: 'revoked', label: 'Revoked', cls: 'rv', desc: 'cancelled — product pulled', tip: 'Manually revoked — the product is cancelled and the event profile removed (status “revoked”).' }
@@ -445,6 +447,8 @@ export class ProductFunnelComponent implements OnInit {
 
   // progress dialog state
   progress = { msg: '', value: 0, total: 0, eta: '' };
+  mapEligibility = {};
+  eticketEligibilitySubscription : Subscription | null = null
 
   constructor(
     public firestore: Firestore,
@@ -462,6 +466,13 @@ export class ProductFunnelComponent implements OnInit {
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
     await this.loadData();
+    this.loadETicketEligibilty();
+  }
+
+  ngOnDestroy(): void {
+    if (this.eticketEligibilitySubscription) {
+      this.eticketEligibilitySubscription.unsubscribe();
+    }
   }
 
   get productName() { return this.mapProduct[this.arena?.['productref']?.id] ?? 'Product'; }
@@ -522,7 +533,7 @@ export class ProductFunnelComponent implements OnInit {
         else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
       // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
-      // live bucket they still qualify for (owner / scanned→approved / requested), in ADDITION to their own
+      // live bucket they still qualify for (owner / requested), in ADDITION to their own
       // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
 
       // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
@@ -542,15 +553,19 @@ export class ProductFunnelComponent implements OnInit {
       const scanned = new Set<string>();
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
 
-      // Approved cohort = EPR approved/attended OR physically scanned (a scan means they were ticketed).
-      // Cohort members are not "requested", so attended is always a subset of approved.
-      const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
+      // Approved cohort = `event participation request` with status 'approved' or 'attended', ONLY.
+      // (operator directive) A physical e-ticket scan no longer confers membership of any bucket — it is
+      // kept solely as the `· scanned` badge on the row. Every 'attended' EPR doc also lands in
+      // approvedReq, so attended stays a subset of approved.
+      // Cohort members are not "requested" — they are removed from requestedData below.
+      const cohort = new Set<string>([...approvedReq.keys()]);
       cohort.forEach(p => requestedData.delete(p));
 
       // (removed) previously unattended/revoked were dropped from cohort/owner sets so they only showed in
       // their terminal segment. Per operator directive they now stay in every live bucket they qualify for.
-      // Consequence: a scanned-then-revoked person is in BOTH `approved` (cohort) and `revoked`; the counts
-      // and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid inflation.
+      // Consequence: a revoked person who still owns the product is in BOTH `potential` and `revoked`; the
+      // counts and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid
+      // inflation.
 
       const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
       const rows: PRow[] = [];
@@ -562,8 +577,12 @@ export class ProductFunnelComponent implements OnInit {
         // whatever live membership their source data still gives them AND retains their terminal flag.
         const isOwner = owners.has(pid);
         const isScanned = scanned.has(pid);
-        const isAttended = attendedIds.has(pid) || isScanned;
-        const inCohort = approvedReq.has(pid) || isScanned;
+        // Approval and attendance are both EPR-only (operator directive): a row is approved when its
+        // `event participation request` doc has status 'approved' or 'attended', and attended only when
+        // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
+        // `· scanned` badge and nothing else.
+        const isAttended = attendedIds.has(pid);
+        const inCohort = approvedReq.has(pid);
         const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
@@ -617,8 +636,9 @@ export class ProductFunnelComponent implements OnInit {
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
         unattended: rows.filter(r => r.isUnattended).length,
         revoked: rows.filter(r => r.isRevoked).length,
-        // De-duplicated union — a scanned-then-revoked person is in both `cohort` and `revokedIds`, so a raw
-        // sum would double-count. Count unique rows matching the same predicate as the segment filter.
+        // De-duplicated union — a revoked person who still owns the product / has a live request sits in
+        // more than one source set, so a raw sum would double-count. Count unique rows matching the same
+        // predicate as the segment filter.
         overallRequested: rows.filter(r => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked).length
       };
 
@@ -745,6 +765,34 @@ export class ProductFunnelComponent implements OnInit {
     if (this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
+  // functoin to load e-tickes eligibility 
+  async loadETicketEligibilty() {
+    const eventid = this.arena?.['eventref']?.id;
+    if(!eventid) return
+    const eligibilityCollRef = collection(this.firestore, "e-ticket eligibility");
+    const eligibilityQuery = query(eligibilityCollRef, where("eventid", "==", eventid));
+    this.eticketEligibilitySubscription = collectionData(eligibilityQuery).subscribe(eligibilitysnap => {
+      this.mapEligibility = {}
+      for (let i = 0; i < eligibilitysnap.length; i++) {
+        const element = eligibilitysnap[i];
+        this.mapEligibility[element['eventparticipationid']] = element
+      }
+    });
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(row: any): string {
+    const eventParticipationId = row['approvedRequestId'];
+    const eligibility = this.mapEligibility[eventParticipationId];
+    if ([null, undefined].includes(eligibility)) {
+      return 'Not paid'
+    }
+    if (eligibility['exempted'] === true) {
+      return 'Exempted'
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid'
+  }
+
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
@@ -761,6 +809,12 @@ export class ProductFunnelComponent implements OnInit {
   get showApprovalChecks(): boolean {
     return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
   }
+
+  // ---- Post-approval checks ----
+  get showAfterApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow' || this.segment === 'unattended' || this.segment === 'revoked' || this.segment === 'overallRequested';
+  }
+
   get colSpan(): number {
     return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
   }
@@ -1523,7 +1577,8 @@ export class ProductFunnelComponent implements OnInit {
           'Customer status': r.customerStatus || '',
           Eligibility: this.eligibilityLabel(r),
           Reason: r.reason || '',
-          Attended: r.attended ? 'Yes' : 'No'
+          Attended: r.attended ? 'Yes' : 'No',
+          'Venue Fee' : this.getVenueFeeStatus(r)
         };
       });
       const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });

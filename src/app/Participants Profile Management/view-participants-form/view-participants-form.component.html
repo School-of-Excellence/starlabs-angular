@@ -62,17 +62,20 @@
     </mat-form-field>
 
     <div style="display: flex; flex-direction: column; align-items: flex-start;">
-      <button mat-stroked-button color="accent" (click)="triggerFileInput()"  matTooltip="Column name of email should be 'Email' (Case-insensitive)">
+      <button mat-stroked-button color="accent" (click)="triggerFileInput()"
+        matTooltip="Column name of email should be 'Email' (Case-insensitive)">
         <mat-icon>upload_file</mat-icon> Import Emails
       </button>
     </div>
 
-    <button mat-stroked-button (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''" matTooltip="Filter liked forms">
+    <button mat-stroked-button (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''"
+      matTooltip="Filter liked forms">
       <mat-icon>{{ filterLiked ? 'favorite' : 'favorite_border' }}</mat-icon>
       Liked
     </button>
 
-    <button mat-stroked-button (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''" matTooltip="Filter flagged forms">
+    <button mat-stroked-button (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''"
+      matTooltip="Filter flagged forms">
       <mat-icon>{{ filterFlagged ? 'flag' : 'outlined_flag' }}</mat-icon>
       Flagged
     </button>
@@ -93,15 +96,17 @@
       <mat-icon class="my-forms-icon">bookmark</mat-icon>
       <span class="my-forms-label">My Forms</span>
       <div class="my-forms-chips">
-        <div class="my-form-chip" *ngFor="let form of myForms" [class.chip-active]="selectedMyForms.includes(form.formname)"
-          (click)="toggleMyFormChip(form.formname)">
+        <div class="my-form-chip" *ngFor="let form of myForms"
+          [class.chip-active]="selectedMyForms.includes(form.formname)" (click)="toggleMyFormChip(form.formname)">
           <span class="chip-text">{{ form.formname }}</span>
-          <mat-icon class="chip-remove" (click)="$event.stopPropagation(); removeFromMyForms(form.formname)">close</mat-icon>
+          <mat-icon class="chip-remove"
+            (click)="$event.stopPropagation(); removeFromMyForms(form.formname)">close</mat-icon>
         </div>
       </div>
     </div>
     <div class="my-forms-right">
-      <button mat-stroked-button class="compact-btn" *ngIf="selectedMyForms.length > 0" (click)="clearMyFormsSelection()">
+      <button mat-stroked-button class="compact-btn" *ngIf="selectedMyForms.length > 0"
+        (click)="clearMyFormsSelection()">
         Clear Filter
       </button>
     </div>
@@ -112,14 +117,13 @@
       <mat-icon class="my-forms-icon" style="color: #1976d2;">cloud_upload</mat-icon>
       <span class="my-forms-label" style="color: #1976d2;">Imported Emails Filter Active</span>
       <button mat-stroked-button (click)="openImportSummaryModal('matched')"
-              style="font-size: 12px; color: #2e7d32; border-color: #2e7d32; margin-left: 8px;">
-         Matched {{ matchedEmailsCount }}
+        style="font-size: 12px; color: #2e7d32; border-color: #2e7d32; margin-left: 8px;">
+        Matched {{ matchedEmailsCount }}
       </button>
 
-      <button mat-stroked-button *ngIf="unmatchedEmailsCount > 0" 
-              (click)="openImportSummaryModal('notfound')"
-              style="font-size: 12px; color: #c62828; border-color: #c62828; margin-left: 8px;">
-         Not Found {{ unmatchedEmailsCount }}
+      <button mat-stroked-button *ngIf="unmatchedEmailsCount > 0" (click)="openImportSummaryModal('notfound')"
+        style="font-size: 12px; color: #c62828; border-color: #c62828; margin-left: 8px;">
+        Not Found {{ unmatchedEmailsCount }}
       </button>
     </div>
     <div class="my-forms-right">
@@ -185,18 +189,13 @@
       <ng-container matColumnDef="profileid">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
         <td mat-cell *matCellDef="let row">
-          <span style="display:inline-flex;align-items:center;gap:8px;">
-            <app-profile-picture [profileId]="row.profileid" [name]="mapProfile[row.profileid] || mapProfileNew[row.profileid]" [size]="32"></app-profile-picture>
-            <span>
-              <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
-                {{ mapProfile[row.profileid] }}
-              </ng-container>
-              <ng-template #newUserBlock>
-                {{ mapProfileNew[row.profileid] }}
-                <span style="color: red;">(New User)</span>
-              </ng-template>
-            </span>
-          </span>
+          <ng-container *ngIf="mapProfile[row.profileid]; else newUserBlock">
+            {{ mapProfile[row.profileid] }}
+          </ng-container>
+          <ng-template #newUserBlock>
+            {{ mapProfileNew[row.profileid] }}
+            <span style="color: red;">(New User)</span>
+          </ng-template>
         </td>
       </ng-container>
 
@@ -210,7 +209,8 @@
       <ng-container matColumnDef="workshopref">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Workshop </th>
         <td mat-cell *matCellDef="let row">
-          {{ row.workshopref != undefined ? (mapWorkshop[row.workshopref.id] ?? mapWorkshopNew[row.workshopref.id]) : null }}
+          {{ row.workshopref != undefined ? (mapWorkshop[row.workshopref.id] ?? mapWorkshopNew[row.workshopref.id]) :
+          null }}
         </td>
       </ng-container>
 
@@ -223,13 +223,15 @@
       <!-- Submitted From Column -->
       <ng-container matColumnDef="submittedin">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Submitted From</th>
-        <td mat-cell *matCellDef="let row"> {{row.submittedin === 'starlabs' ? row.submittedin + "-link" : row.submittedin + "-app"}} </td>
+        <td mat-cell *matCellDef="let row"> {{row.submittedin === 'starlabs' ? row.submittedin + "-link" :
+          row.submittedin + "-app"}} </td>
       </ng-container>
 
       <!-- Date Column -->
       <ng-container matColumnDef="date">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
-        <td mat-cell *matCellDef="let row"> {{![null,undefined].includes(row.date) ? (row.date.toDate() | date: 'short') : ''}} </td>
+        <td mat-cell *matCellDef="let row"> {{![null,undefined].includes(row.date) ? (row.date.toDate() | date: 'short')
+          : ''}} </td>
       </ng-container>
 
       <!-- Notes Column -->
@@ -257,8 +259,10 @@
               <mat-icon>{{ row.liked ? 'favorite' : 'favorite_border' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.liked && row.likedetails">
-              <span class="meta-user">{{ mapProfile[row.likedetails.user] || mapProfileNew[row.likedetails.user] || '-' }}</span>
-              <span class="meta-time">{{ row.likedetails.time?.toDate ? (row.likedetails.time.toDate() | date: 'short') : '' }}</span>
+              <span class="meta-user">{{ mapProfile[row.likedetails.user] || mapProfileNew[row.likedetails.user] || '-'
+                }}</span>
+              <span class="meta-time">{{ row.likedetails.time?.toDate ? (row.likedetails.time.toDate() | date: 'short')
+                : '' }}</span>
             </div>
           </div>
         </td>
@@ -273,8 +277,10 @@
               <mat-icon>{{ row.tagged ? 'flag' : 'outlined_flag' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.tagged && row.tagdetails">
-              <span class="meta-user">{{ mapProfile[row.tagdetails.user] || mapProfileNew[row.tagdetails.user] || '-' }}</span>
-              <span class="meta-time">{{ row.tagdetails.time?.toDate ? (row.tagdetails.time.toDate() | date: 'short') : '' }}</span>
+              <span class="meta-user">{{ mapProfile[row.tagdetails.user] || mapProfileNew[row.tagdetails.user] || '-'
+                }}</span>
+              <span class="meta-time">{{ row.tagdetails.time?.toDate ? (row.tagdetails.time.toDate() | date: 'short') :
+                '' }}</span>
             </div>
           </div>
         </td>
@@ -288,9 +294,11 @@
               <mat-icon>{{ row.opportunity ? 'attach_money' : 'money_off' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.opportunity && row.opportunitydetails">
-              <span class="meta-user">{{ mapProfile[row.opportunitydetails.user] || mapProfileNew[row.opportunitydetails.user] || '-'
+              <span class="meta-user">{{ mapProfile[row.opportunitydetails.user] ||
+                mapProfileNew[row.opportunitydetails.user] || '-'
                 }}</span>
-              <span class="meta-time">{{ row.opportunitydetails.time?.toDate ? (row.opportunitydetails.time.toDate() | date: 'short') : ''
+              <span class="meta-time">{{ row.opportunitydetails.time?.toDate ? (row.opportunitydetails.time.toDate() |
+                date: 'short') : ''
                 }}</span>
             </div>
           </div>
@@ -302,7 +310,7 @@
         <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let row">
           <div class="action-buttons">
-            <button mat-stroked-button (click)="$event.stopPropagation(); viewFormOverlay(row)">View</button>
+            <button mat-stroked-button (click)="$event.stopPropagation(); openFormOverlay(row)">View</button>
             <button mat-icon-button (click)="$event.stopPropagation(); onFormPreview(row)" matTooltip="Open in New Tab">
               <mat-icon>open_in_new</mat-icon>
             </button>
@@ -322,7 +330,7 @@
           <ng-container *ngIf="isSelectedParticipantOutOfRange(); else noDataDefault">
             <div style="padding: 24px; text-align: center; color: #f57c00; font-size: 15px;">
               <mat-icon style="vertical-align: middle; margin-right: 6px;">person_search</mat-icon>
-              Participant not found in this date range. 
+              Participant not found in this date range.
             </div>
           </ng-container>
           <ng-template #noDataDefault>
@@ -336,6 +344,7 @@
   </div>
 </main>
 
+<app-form-overlay-view #formOverlay />
 <!-- ========== OVERLAY ========== -->
 <div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
   <div class="overlay-panel" (click)="$event.stopPropagation()">
@@ -356,47 +365,6 @@
       <div *ngIf="overlayLoading" class="loading-spinner">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
-
-      <!-- Individual View -->
-      <ng-container *ngIf="!overlayLoading && overlayMode === 'individual' && overlayFormData">
-        <div class="form-view">
-          <div class="form-banner"></div>
-          <div class="form-participant">{{ overlayFormData.participantName }}</div>
-          <div class="form-title">{{ overlayFormData.formTitle }}</div>
-          <div class="form-description" *ngIf="overlayFormData.formDescription">{{ overlayFormData.formDescription }}</div>
-          <div class="form-meta">
-            Queue: {{ overlayFormData.queue }} | Workshop: {{ overlayFormData.workshop }} | Submitted: {{ overlayFormData.date }}
-          </div>
-          <hr class="form-divider">
-          <div *ngFor="let field of overlayFormData.fields" class="form-field-item">
-            <div *ngIf="field.type === 'label'" class="form-section-label">
-              <div class="section-title">{{ field.fieldname }}</div>
-              <div class="section-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
-            </div>
-            <div *ngIf="field.type === 'field'" class="form-question">
-              <div class="question-title">
-                {{ field.number }}. {{ field.fieldname }}
-                <span class="required-star" *ngIf="field.required">*</span>
-              </div>
-              <div class="question-description" *ngIf="field.fielddescription">{{ field.fielddescription }}</div>
-              <div class="question-value" [class.empty-value]="field.isEmpty">
-                <ng-container *ngIf="field.fieldType === 'array'; else plainValue">
-                  <div *ngFor="let line of field.value.split('\n')" class="array-sub-item">
-                    <ng-container *ngIf="line.includes(':'); else noColon">
-                      <span class="sub-item-label">{{ line.split(':')[0] }}:</span>
-                      <div class="sub-item-answer">{{ line.split(':').slice(1).join(':') }}</div>
-                    </ng-container>
-                    <ng-template #noColon>{{ line }}</ng-template>
-                  </div>
-                </ng-container>
-                <ng-template #plainValue>{{ field.value }}</ng-template>
-              </div>
-              <div class="question-notes" *ngIf="field.fieldnotes">Note: {{ field.fieldnotes }}</div>
-            </div>
-          </div>
-        </div>
-      </ng-container>
-
       <!-- Merged View -->
       <ng-container *ngIf="!overlayLoading && overlayMode === 'merged'">
         <div *ngIf="overlayMergedForms.length === 0" class="no-data">No form data found.</div>
@@ -463,7 +431,8 @@
         <div *ngFor="let note of getReversedNotes()" class="note-item">
           <div class="note-meta">
             <span class="note-user">{{ mapProfile[note.user] || mapProfileNew[note.user] || note.user }}</span>
-            <span class="note-time">{{ note.time?.toDate ? (note.time.toDate() | date: 'medium') : (note.time | date: 'medium') }}</span>
+            <span class="note-time">{{ note.time?.toDate ? (note.time.toDate() | date: 'medium') : (note.time | date:
+              'medium') }}</span>
           </div>
           <div class="note-text">{{ note.notes }}</div>
         </div>
@@ -481,10 +450,10 @@
   <div class="notes-panel" (click)="$event.stopPropagation()" style="max-width: 400px;">
     <div class="overlay-header">
       <h2 *ngIf="importSummaryMode === 'matched'" style="color: #2e7d32;">
-         Matched Participants ({{ matchedEmailsCount }})
+        Matched Participants ({{ matchedEmailsCount }})
       </h2>
       <h2 *ngIf="importSummaryMode === 'notfound'" style="color: #c62828;">
-         Not Found ({{ unmatchedEmailsCount }})
+        Not Found ({{ unmatchedEmailsCount }})
       </h2>
       <button mat-icon-button (click)="closeImportSummaryModal()">
         <mat-icon>close</mat-icon>
@@ -493,8 +462,8 @@
     <div class="notes-content">
       <!-- Matched -->
       <ng-container *ngIf="importSummaryMode === 'matched'">
-        <div *ngFor="let name of matchedParticipantNames" 
-             style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">
+        <div *ngFor="let name of matchedParticipantNames"
+          style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px;">
           <mat-icon style="font-size: 16px; color: #2e7d32; vertical-align: middle;">person</mat-icon>
           {{ name }}
         </div>
@@ -502,7 +471,7 @@
       <!-- Not Found -->
       <ng-container *ngIf="importSummaryMode === 'notfound'">
         <div *ngFor="let name of notFoundEmails"
-             style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; color: #c62828;">
+          style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; color: #c62828;">
           <mat-icon style="font-size: 16px; vertical-align: middle;">person</mat-icon>
           {{ name }}
         </div>

@@ -324,10 +324,14 @@ export class UpcomingworkshopsComponent implements OnInit {
   }
 
   // --- Ads dialog (same component, different fields) ---
+  // Near-fullscreen (93% x 93%): the auto-notification and wati schedules
+  // render side by side per day and need the canvas.
   openAdsDialog(widget?: any): void {
     this.dialog.open(CreateupcomingworkshopsComponent, {
-      width: '720px',
-      maxWidth: '95vw',
+      width: '93vw',
+      maxWidth: '93vw',
+      height: '93vh',
+      maxHeight: '93vh',
       panelClass: 'upcoming-dialog-panel',
       autoFocus: false,
       data: {

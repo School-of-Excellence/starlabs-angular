@@ -104,6 +104,10 @@ export class QueueEventHealthComponent {
   productStatusOptions: any[] = [];
   integrationModeOptions: any[] = [];
   stageOptions: any[] = [];
+  showAttendedModal = false;
+  attendedModalRecordCount = 0;
+  attendedStatusSelection: 'completed' | 'shifted' = 'completed';
+  attendedStatusResolver: ((status: 'completed' | 'shifted' | null) => void) | null = null;
 
   activeFilter: 'status' | 'mode' | 'stage' | null = null;
 
@@ -1600,25 +1604,22 @@ export class QueueEventHealthComponent {
           record.tokenDocId
         );
         batch.update(tokenRef, {
-          tokenstatus: 'inactive'
+          tokenstatus: 'inActive'
         });
       }
-      if (record.participantproductid) {
+      if (
+        record.participantproductid &&
+        String(record.productStatus).toLowerCase() !== 'cancelled'
+      ) {
         const ppRef = doc(
           this.firestoreDefault,
           'participantsproduct',
           record.participantproductid
         );
-        if (String(record.productStatus).toLowerCase() !== 'cancelled') {
-          batch.update(ppRef, {
-            status: 'cancelled',
-            "statusdate.cancelled": serverTimestamp()
-          });
-        } else {
-          batch.update(ppRef, {
-            status: 'cancelled'
-          });
-        }
+        batch.update(ppRef, {
+          status: 'cancelled',
+          "statusdate.cancelled": serverTimestamp()
+        });
       }
       if (
         record.eventParticipationId &&
@@ -1650,34 +1651,42 @@ export class QueueEventHealthComponent {
       return;
     }
 
-    const confirmAction = confirm(
-      `Are you sure you want to mark ${selectedRecords.length} participant(s) as Attended?\n\n` +
-      `This will:\n` +
-      `• Set Event Participation → attended\n\n` +
-      `This action cannot be undone.`
-    );
+    // Show modal and wait for user to pick a status (or cancel)
+    this.attendedModalRecordCount = selectedRecords.length;
+    this.attendedStatusSelection = 'completed';
+    this.showAttendedModal = true;
 
-    if (!confirmAction) {
-      return;
+    const productStatus = await new Promise<'completed' | 'shifted' | null>(resolve => {
+      this.attendedStatusResolver = resolve;
+    });
+
+    this.showAttendedModal = false;
+    this.attendedStatusResolver = null;
+
+    if (!productStatus) {
+      return; // user cancelled
     }
 
     const batch = writeBatch(this.firestoreDefault);
     let updateCount = 0;
 
     for (const record of selectedRecords) {
-      if (!record.eventParticipationId) {
-        continue;
+      let recordTouched = false;
+      if (record.eventParticipationId && String(record.eventParticipationStatus).toLowerCase() !== 'attended') {
+        const epRef = doc(this.firestoreDefault,'event participation request',record.eventParticipationId);
+        batch.update(epRef, { status: 'attended' });
+        recordTouched = true;
       }
-      if (String(record.eventParticipationStatus).toLowerCase() === 'attended') {
-        continue;
+      if (record.participantproductid && String(record.productStatus).toLowerCase() !== productStatus) {
+        const ppRef = doc(this.firestoreDefault,'participantsproduct',record.participantproductid);
+        batch.update(ppRef, {status: productStatus,[`statusdate.${productStatus}`]: serverTimestamp()});
+        recordTouched = true;
       }
-      const epRef = doc(this.firestoreDefault, 'event participation request', record.eventParticipationId);
-      batch.update(epRef, { status: 'attended' });
-      updateCount++;
+      if (recordTouched) updateCount++;
     }
 
     if (updateCount === 0) {
-      alert('Nothing to update — selected records have no event participation record or are already attended.');
+      alert('Nothing to update — selected records already have this status.');
       return;
     }
 

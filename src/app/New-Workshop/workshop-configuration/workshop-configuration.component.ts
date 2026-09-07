@@ -975,10 +975,12 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
     const noterichTextControls = {};
     this.settingsForm = this.fb.group({
       active: [false],
+      webactive: [false],
       homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
       enableshare: [false],
+      enablesharemessage: [''],
       triggerFunction:[false],
       activeparticipants: [false],
       evergreenWorkshop:[false],
@@ -1006,6 +1008,8 @@ dropChallengeOuter(event: CdkDragDrop<AbstractControl[]>) {
         api: [''],
         id: [''],
         paymentfor: [''],
+        customerstatus: [[]],
+        financialstatus: [[]],
         hint: ['']
       }),
       referallowedusers: this.fb.group({
@@ -2362,10 +2366,12 @@ private rebuildActivityIds(): void {
     if (data && typeof data === 'object') {
       this.settingsForm.patchValue({
         active: data['active'] || false,
+        webactive: data['webactive'] || false,
         homescreenwidget: data['homescreenwidget'] || false,
         qanda: data['qanda'] || false,
         breakdown: data['breakdown'] || false,
         enableshare: data['enableshare'] || false,
+        enablesharemessage: data['enablesharemessage'] || '',
         triggerFunction: data['triggerFunction'] || false,
         activeparticipants: data['activeparticipants'] || false,
         evergreenWorkshop: data['evergreenWorkshop'] || false,
@@ -2387,6 +2393,8 @@ private rebuildActivityIds(): void {
           api: data['paymentmap']?.api ?? '',
           id: data['paymentmap']?.id ?? '',
           paymentfor: data['paymentmap']?.paymentfor ?? '',
+          customerstatus: Array.isArray(data['paymentmap']?.customerstatus) ? data['paymentmap'].customerstatus : [],
+          financialstatus: Array.isArray(data['paymentmap']?.financialstatus) ? data['paymentmap'].financialstatus : [],
           hint: data['paymentmap']?.hint ?? '',
         },
         referallowedusers: {
@@ -2586,10 +2594,12 @@ private rebuildActivityIds(): void {
       const ref = doc(this.firestore, `workshopconfiguration/${this.workshopId}`);
       await updateDoc(ref, {
         active: this.settingsForm.get('active')?.value || false,
+        webactive: this.settingsForm.get('webactive')?.value || false,
         homescreenwidget: this.settingsForm.get('homescreenwidget')?.value || false,
         qanda: this.settingsForm.get('qanda')?.value || false,
         breakdown: this.settingsForm.get('breakdown')?.value || false,
         enableshare: this.settingsForm.get('enableshare')?.value || false,
+        enablesharemessage: this.settingsForm.get('enablesharemessage')?.value || '',
         triggerFunction: this.settingsForm.get('triggerFunction')?.value || false,
         activeparticipants: this.settingsForm.get('activeparticipants')?.value || false,
         evergreenWorkshop: this.settingsForm.get('evergreenWorkshop')?.value || false,
@@ -2707,7 +2717,7 @@ private rebuildActivityIds(): void {
       input.value = '';
     }
   }
-  onToggleChange(field: 'active' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
+  onToggleChange(field: 'active' | 'webactive' | 'homescreenwidget' | 'qanda' | 'hero' | 'heromobile' | 'testmode' | 'breakdown' | 'enableshare' | 'activeparticipants' | 'newusersonly' | 'journeybased' | 'categorybased' | 'facilitator' | 'tierbased' |'triggerFunction' | 'evergreenWorkshop', event: any): void {
     const isChecked = event.checked;
     this.settingsForm.get(field)?.setValue(isChecked);
   }

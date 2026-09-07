@@ -179,7 +179,7 @@
           <button class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
             (click)="navToAttention('idle')">
             <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
-            <span class="dd-tile__label">Started, Not Engaging</span>
+            <span class="dd-tile__label">Initiated – Not Consuming</span>
             <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
             <span class="dd-tile__arr">&rarr;</span>
           </button>
@@ -244,13 +244,24 @@
               <span class="dd-products-title">Products Overview</span>
               <span class="dd-products-sub">{{ visibleCardIds.length }} active &nbsp;&middot;&nbsp; <span
                   class="dd-meta-pulse-inline"></span> Live</span>
+              <span class="up-confirmed">
+                <mat-form-field appearance="outline" class="event-select">
+                  <mat-label>Select Event</mat-label>
+                  <mat-select [(value)]="selectedEvent" (selectionChange)="onEventChange($event.value)"
+                    panelClass="event-dropdown">
+                    <mat-option *ngFor="let event of events" [value]="event">
+                      {{ event.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </span>
             </div>
           </div>
 
           <!-- Column header row -->
           <div class="dd-prow-colhead" aria-hidden="true">
             <div class="dd-prow-colhead__cell">Product</div>
-            <div class="dd-prow-colhead__cell">uP! Confirmed</div>
+            <div class="dd-prow-colhead__cell w-fit-content">{{ selectedEvent ? selectedEvent.name : 'Event Confirmation' }}</div>
             <div class="dd-prow-colhead__cell">Eligible</div>
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Participants</span>
@@ -261,7 +272,7 @@
             <div class="dd-prow-colhead__cell dd-prow-colhead__cell--group">
               <span class="dd-colhead__grp-lbl">Journey Funnel</span>
               <div class="dd-colhead__grp-tags">
-                <span>Init</span><span>Await</span><span>Started</span><span>Ongoing</span><span>Done</span>
+                <span>Yet to Start</span><span>Init</span><span>Started</span><span>Ongoing</span><span>Done</span>
               </div>
             </div>
             <div class="dd-prow-colhead__cell">Avg. Time</div>
@@ -276,8 +287,9 @@
               <div class="dd-prow__name-block"
                 [title]="getCardName(cardId) + (getCardSubNames(cardId).length > 0 ? '\n' + getCardSubNames(cardId).join(' · ') : '')">
                 <span class="dd-prow__name">{{ getCardName(cardId) }}</span>
-                <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">{{
-                  getCardSubNames(cardId).join(' · ') }}</span>
+                <span class="dd-prow__sub" *ngIf="getCardSubNames(cardId).length > 0">
+                  {{ getCardSubNames(cardId).join(' · ') }}
+                </span>
               </div>
             </div>
 
@@ -320,16 +332,17 @@
             </div>
 
             <!-- 5. Journey Funnel -->
+            <!-- 5. Journey Funnel -->
             <div class="dd-prow__funnel">
+              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
+                <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
+                  getCardFunnel(cardId).awaiting.length | number }}</span>
+                <span class="dd-fstep__lbl">Yet to Start</span>
+              </div>
               <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'initiated', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).initiated.length === 0">{{
                   getCardFunnel(cardId).initiated.length }}</span>
                 <span class="dd-fstep__lbl">Init</span>
-              </div>
-              <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'awaiting', $event)">
-                <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).awaiting.length === 0">{{
-                  getCardFunnel(cardId).awaiting.length | number }}</span>
-                <span class="dd-fstep__lbl">Await</span>
               </div>
               <div class="dd-fstep" (click)="openCardFunnelModal(cardId, 'started', $event)">
                 <span class="dd-fstep__pill" [class.empty]="getCardFunnel(cardId).started.length === 0">{{
@@ -434,16 +447,16 @@
                 <div class="section-label">Journey Funnel</div>
                 <div class="funnel-bars">
                   <div class="funnel-bar funnel-bar-1 clickable"
+                    [class.funnel-bar-empty]="getCardFunnel(productId).awaiting.length === 0"
+                    (click)="openCardFunnelModal(productId, 'awaiting', $event)">
+                    <span class="funnel-bar-num">{{ getCardFunnel(productId).awaiting.length | number }}</span>
+                    <span class="funnel-bar-label">Yet to Start</span>
+                  </div>
+                  <div class="funnel-bar funnel-bar-2 clickable"
                     [class.funnel-bar-empty]="getCardFunnel(productId).initiated.length === 0"
                     (click)="openCardFunnelModal(productId, 'initiated', $event)">
                     <span class="funnel-bar-num">{{ getCardFunnel(productId).initiated.length }}</span>
                     <span class="funnel-bar-label">Init</span>
-                  </div>
-                  <div class="funnel-bar funnel-bar-2 clickable"
-                    [class.funnel-bar-empty]="getCardFunnel(productId).awaiting.length === 0"
-                    (click)="openCardFunnelModal(productId, 'awaiting', $event)">
-                    <span class="funnel-bar-num">{{ getCardFunnel(productId).awaiting.length | number }}</span>
-                    <span class="funnel-bar-label">Await</span>
                   </div>
                   <div class="funnel-bar funnel-bar-3 clickable"
                     [class.funnel-bar-empty]="getCardFunnel(productId).started.length === 0"
@@ -538,7 +551,6 @@
                 <div class="profile-row" *ngFor="let pid of profileIds; let i = index">
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
-                    <app-profile-picture [profileId]="pid" [name]="mapMetaData[pid]?.['name'] || ''" [size]="28"></app-profile-picture>
                     <span class="participant-name">{{ mapMetaData[pid]?.['name'] || pid }}</span>
                     <span class="product-count">{{ currentGroupedByProfile[pid]?.length }} products</span>
                   </div>
@@ -644,13 +656,14 @@
                       <th>Initiated</th>
                       <th>Ongoing</th>
                       <th>Completed</th>
+                      <th>Product Cycle</th>
                     </tr>
                   </thead>
                   <tbody>
                     <ng-container *ngFor="let pid of funnelProfileIds; let i = index">
                       <tr *ngFor="let item of funnelModalProfiles[pid]; let j = index">
                         <td>{{ j === 0 ? (i + 1) : '' }}</td>
-                        <td><app-profile-picture *ngIf="j === 0" [profileId]="pid" [name]="mapMetaData[pid]?.['name'] || ''" [size]="24" style="vertical-align:middle;margin-right:6px;"></app-profile-picture>{{ j === 0 ? (mapMetaData[pid]?.['name'] || pid) : '' }}</td>
+                        <td>{{ j === 0 ? (mapMetaData[pid]?.['name'] || pid) : '' }}</td>
                         <td>{{ mapProductName[item['productref']?.id] || 'Unknown' }}</td>
                         <td>{{ item['statusdate']?.['initiated'] ?
                           (getDateFromFieldPublic(item['statusdate']['initiated']) |
@@ -661,6 +674,7 @@
                         <td>{{ item['statusdate']?.['completed'] ?
                           (getDateFromFieldPublic(item['statusdate']['completed']) |
                           date:'dd MMM yyyy') : '-' }}</td>
+                          <td>{{ item['cycle'] }}</td>
                       </tr>
                     </ng-container>
                   </tbody>
@@ -726,8 +740,7 @@
             <div class="modal-content" (click)="$event.stopPropagation()">
 
               <div class="modal-header">
-                <h3>{{ selectedUPConfirmedProduct }}</h3>
-
+              <h3>{{ selectedUPConfirmedProduct }} - {{ selectedEvent.name }}</h3>
                 <span class="modal-count">
                   {{ selectedUPConfirmedParticipants.length }}
                   Participants
@@ -750,8 +763,8 @@
                   <tbody>
                     <tr *ngFor="let p of selectedUPConfirmedParticipants; let i=index">
                       <td>{{ i + 1 }}</td>
-                      <td style="cursor: pointer;" (click)="openParticipant(p.profileid)">
-                        <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="p.profileid" [name]="mapMetaData[p.profileid]?.['name'] || ''" [size]="24"></app-profile-picture><span style="text-decoration: underline;">{{ mapMetaData[p.profileid]?.['name'] }}</span></span>
+                      <td style="cursor: pointer; text-decoration: underline;" (click)="openParticipant(p.profileid)">
+                        {{ mapMetaData[p.profileid]?.['name'] }}
                       </td>
                       <td>
                         <span *ngFor="let productId of p.matchedDFUProducts; let last = last">
@@ -803,7 +816,6 @@
                 <div class="profile-row" *ngFor="let app of groupedByStageProfileAll; let i = index">
                   <div class="profile-header">
                     <span class="participant-index">{{ i + 1 }}</span>
-                    <app-profile-picture [profileId]="app.bookedby?.id" [name]="mapMetaData[app.bookedby?.id]?.['name'] || ''" [size]="28"></app-profile-picture>
                     <a class="participant-name" [href]="'/participantdeliverysequence/' + app.bookedby?.id">
                       {{ mapMetaData[app.bookedby?.id]?.['name'] || app.bookedby?.id }}
                     </a>
@@ -947,8 +959,7 @@
 
                         <!-- Visible Card -->
                         <div class="card-top" (click)="c._expanded = !c._expanded" style="cursor:pointer;">
-                          <div class="card-info" style="display:flex;align-items:center;gap:8px;">
-                            <app-profile-picture [profileId]="c?.profileid || c?.clientid" [name]="(c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name) || ''" [size]="28"></app-profile-picture>
+                          <div class="card-info">
                             <div class="card-name">
                               {{ c?.profileid ? mapMetaData[c.profileid]?.name : mapMetaData[c.clientid]?.name }}
                             </div>
@@ -1007,7 +1018,8 @@
                           <span class="chevron" [class.open]="c._expanded">
                           </span>
                         </div>
-
+                        <!-- View Form Button -->
+                        <button *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
                         <!-- Expandable Section -->
                         <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
                           <hr class="divider">
@@ -1067,42 +1079,10 @@
                   </div>
                 </div>
               </ng-container>
-
-              <!-- Flow Table -->
-              <div class="flow-table-container" *ngIf="showTable">
-                <table class="flow-search-participant-table">
-                  <thead>
-                    <tr>
-                      <th *ngFor="let header of searchedParticipantHeaders">
-                        {{ header }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let row of filteredData">
-                      <td>{{ row.name }}</td>
-                      <td>{{ row.email }}</td>
-                      <td>{{ row.initiated }}</td>
-                      <td>{{ row.welcomeCall }}</td>
-                      <td>{{ row.clarityCall }}</td>
-                      <td>{{ row.diagnostics }}</td>
-                      <td>{{ row.implementation }}</td>
-                      <td>{{ row.midReviewDiagnostics }}</td>
-                      <td>{{ row.implementationPhase2 }}</td>
-                      <td>{{ row.finalReview }}</td>
-                      <td>{{ row.completed }}</td>
-                      <td>{{ row.needsValidation }}</td>
-                    </tr>
-                    <tr *ngIf="filteredData.length === 0">
-                      <td colspan="12" style="text-align:center;">
-                        No participant found
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
             </div>
           </div>
+
+          <app-form-overlay-view #formOverlay />
 
           <!-- ========== SPECIALIST APPOINTMENT SLOTS ========== -->
           <div class="specialist-section-container">
@@ -1132,7 +1112,8 @@
                         <select class="spec-input spec-select" [(ngModel)]="selectedActivity"
                           (ngModelChange)="onActivityChange($event)">
                           <option [ngValue]="null" disabled>Select activity</option>
-                          <option *ngFor="let activity of specialistSequences" [ngValue]="activity.appointmentTypeId">
+                          <option *ngFor="let activity of filteredSpecialistSequences"
+                            [ngValue]="activity.appointmentTypeId">
                             {{ activity.appointmentType }}
                           </option>
                         </select>
@@ -1475,8 +1456,6 @@
               </div>
             </div>
           </div>
-
-
         </ng-template>
       </mat-tab>
 
@@ -1635,7 +1614,8 @@
                     <select class="spec-input spec-select border" [(ngModel)]="selectedActivity"
                       (ngModelChange)="onActivityChange($event)">
                       <option [ngValue]="null" disabled>Select activity</option>
-                      <option *ngFor="let activity of specialistSequences" [ngValue]="activity.appointmentTypeId">
+                      <option *ngFor="let activity of filteredSpecialistSequences"
+                        [ngValue]="activity.appointmentTypeId">
                         {{ activity.appointmentType }}
                       </option>
                     </select>
@@ -1736,15 +1716,14 @@
                         journey}}</mat-option>
                     </mat-select>
                   </mat-form-field>
-                  <mat-form-field appearance="outline" class="pm-filter-field"
-                    *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
-                    <mat-label>Product</mat-label>
-                    <mat-select placeholder="Select Product" formControlName="product"
-                      (selectionChange)="filterTableData()" multiple>
-                      <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
-                        }}</mat-option>
-                    </mat-select>
-                  </mat-form-field>
+                <mat-form-field appearance="outline" class="pm-filter-field"
+                  [class.pm-filter-field--hidden]="!(currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity')">
+                  <mat-label>Product</mat-label>
+                  <mat-select placeholder="Select Product" [formControl]="productTableFilterControl"
+                    (selectionChange)="filterTableData()" multiple>
+                    <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
                 </form>
                 <button class="pm-btn-primary" (click)="exportTableData()">
                   Export &middot; <span class="pm-btn-filter">{{ participantsActiveTabName }}</span>
@@ -1878,8 +1857,6 @@
                     <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata']
                       ===
                       'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up' }}</span>
-                    <button *ngIf="header.key === 'action'" class="pm-initiate-btn"
-                      (click)="openParticipantPurchase(participant)">INITIATE NOW</button>
                   </td>
                 </tr>
                 <tr *ngIf="getCurrentTabData().length === 0">

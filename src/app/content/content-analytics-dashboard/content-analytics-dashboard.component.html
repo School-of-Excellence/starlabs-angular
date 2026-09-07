@@ -833,17 +833,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let p of dialogProfiles">
+                        <tr *ngFor="let p of dialogProfiles; trackBy: trackByProfileId">
                         <td>
                         <span class="dialog-value" style="text-decoration: underline; color: blue; cursor: pointer;"
-                            (click)="profiledetails(p.profileid)">
-                            {{ p.name }}
+                            (click)="profiledetails(p?.profileid)">
+                            {{ p?.name || 'Unknown participant' }}
                         </span>
-                        </td>                
-                         <td class="dialog-value">{{ getJourneyDetails(p.profileid).status }}</td>
-                         <td class="dialog-value">{{ getJourneyDetails(p.profileid).last }}</td>
-                         <td class="dialog-value">{{ getJourneyDetails(p.profileid).active }}</td>
-                         <td class="dialog-value">{{ getJourneyDetails(p.profileid).financeStatus }}</td>
+                        </td>
+                         <td class="dialog-value">{{ p?.journey?.status }}</td>
+                         <td class="dialog-value">{{ p?.journey?.last }}</td>
+                         <td class="dialog-value">{{ p?.journey?.active }}</td>
+                         <td class="dialog-value">{{ p?.journey?.financeStatus }}</td>
                         </tr>
                     </tbody>
                 </table>

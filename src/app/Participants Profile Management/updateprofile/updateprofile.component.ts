@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject, OnInit ,HostListener } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
-import { doc, Firestore, serverTimestamp, setDoc, writeBatch } from '@angular/fire/firestore';
+import { doc, getDoc, Firestore, serverTimestamp, setDoc, writeBatch } from '@angular/fire/firestore';
 import { FormGroup, Validators, FormBuilder, FormsModule, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -16,6 +16,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { CountryPhoneService, CountryPhone } from '../../Service/country-phone service/country-phone.service';
+import { AuthguardService } from '../../authguard.service';
 
 @Component({
   selector: 'app-updateprofile',
@@ -70,6 +71,31 @@ export class UpdateprofileComponent {
     input.value = val;
   }
 
+  // ── Delivery hold audit (deliveryonholdby) ──────────────────────────
+  // Reflects the SAVED state, not the live checkbox — toggling without saving
+  // must not change what this says.
+  holdByName: string | null = null;
+  holdByTime: Date | null = null;
+  holdWasOn = false;
+
+  private async loadHoldStamp(data: any): Promise<void> {
+    this.holdWasOn = data?.['deliveryonhold'] === true;
+    const stamp = data?.['deliveryonholdby'];
+    if (!stamp) { this.holdByName = null; this.holdByTime = null; return; }
+
+    const t = stamp['time'];
+    this.holdByTime = t?.toDate ? t.toDate() : (t ? new Date(t) : null);
+
+    const pid = stamp['user'];
+    if (!pid) { this.holdByName = 'Unknown'; return; }
+    try {
+      const snap = await getDoc(doc(this.firestore, 'profile_data', pid));
+      this.holdByName = snap.exists() ? (snap.data()?.['name'] ?? pid) : pid;
+    } catch {
+      this.holdByName = pid;   // fall back to the id rather than hiding the stamp
+    }
+  }
+
   private _syncCountry(code: string): void {
     const found = this.countryPhoneService.getByCode(code);
     this.selectedCountry = found ?? { name: 'Unknown', code, iso: '', digits: 10, flag: '' };
@@ -102,7 +128,7 @@ export class UpdateprofileComponent {
     return null;
   }
 
-  constructor(public auth: AngularFireAuth, public formbuilder: FormBuilder, public countryPhoneService: CountryPhoneService, public firestore : Firestore, public dialogRef : MatDialogRef<any>, @Inject(MAT_DIALOG_DATA) public dialogData : any, public http: HttpClient, private snackBar: MatSnackBar) {
+  constructor(public auth: AngularFireAuth, public formbuilder: FormBuilder, public countryPhoneService: CountryPhoneService, public firestore : Firestore, public dialogRef : MatDialogRef<any>, @Inject(MAT_DIALOG_DATA) public dialogData : any, public http: HttpClient, private snackBar: MatSnackBar, private authguard: AuthguardService) {
 
     this.profileForm =  this.formbuilder.group({
       // name: [, {validators: [Validators.required], updateOn: 'change'}],
@@ -153,6 +179,7 @@ export class UpdateprofileComponent {
         enableahcrm: data.enableahcrm ?? false,
         testuser: data.testuser ?? false
       })
+      this.loadHoldStamp(data)
       const code = data.countrycode ?? '+91';
       this._syncCountry(code);
       this.profileForm.get('number')!.setValidators([
@@ -396,6 +423,26 @@ export class UpdateprofileComponent {
           }
           profilevalue["name"] = profilevalue["firstname"].trim() + " " + profilevalue["lastname"].trim()
           profilevalue['lastmodifieddate'] = new Date()
+
+          // Audit the delivery hold: stamp who flipped it and when, but only when the
+          // value actually changes — otherwise every unrelated profile save would
+          // rewrite the timestamp and destroy the trail. Covers both directions
+          // (set and cleared) and a new profile created already on hold.
+          const prevHold = this.dialogData?.profile?.['deliveryonhold'] === true
+          const newHold  = profilevalue['deliveryonhold'] === true
+          if (newHold !== prevHold) {
+            let byProfileId: string | null = null
+            try {
+              const roles: any = await this.authguard.getRoles()
+              byProfileId = roles?.['profile_ref']?.id ?? null
+            } catch (err) {
+              console.error('Could not resolve the logged-in profile for deliveryonholdby', err)
+            }
+            profilevalue['deliveryonholdby'] = {
+              user: byProfileId,
+              time: serverTimestamp(),
+            }
+          }
           const profile_dataRef = doc(this.firestore, 'profile_data', profile_id)
           const users_rolesRef = doc(this.firestore, "users_roles", role_id)
           const metadataRef = doc(this.firestore, "participant metadata", profile_id)

@@ -1,0 +1,341 @@
+/* Light-theme port of the EiFlix "Active & Scheduled Campaigns" reference UI. */
+.campaign-dashboard {
+  /* accents (darkened where needed for contrast on white) */
+  --mag: #C2185B;
+  --pur: #7B2FBE;
+  --ora: #F26B22;
+  --gol: #A97F1C;
+  --grn: #17A34A;
+  --red: #E5484D;
+  --sky: #1E6BC8;
+  /* text-role variants: the base accents pass 3:1 for the bars but not 4.5:1 for text on white */
+  --ora-tx: #B84E18;
+  --grn-tx: #0C7A37;
+  --red-tx: #D53238;
+  /* neutrals */
+  --tx: #1A1D29;
+  --mu: rgba(26, 29, 41, .62);
+  --dm: rgba(26, 29, 41, .42);
+  --bd: rgba(26, 29, 41, .12);
+  --sf: #FFFFFF;
+  --sf2: #F4F5F9;
+
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: var(--tx);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Section separator header ── */
+.sep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 14px;
+}
+
+.sep-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--dm);
+  white-space: nowrap;
+}
+
+.sep-line {
+  flex: 1;
+  height: 1px;
+  background: var(--bd);
+}
+
+.btn-new-camp {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(90deg, var(--pur), var(--mag));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .2px;
+}
+
+.loading-row {
+  font-size: 12px;
+  color: var(--dm);
+  padding: 8px 0;
+}
+
+/* ── Card grid ── */
+.camp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.cc {
+  background: var(--sf);
+  border-radius: 12px;
+  border: 1px solid var(--bd);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .2s, box-shadow .2s;
+  box-shadow: 0 1px 3px rgba(26, 29, 41, .05);
+}
+
+.cc:hover {
+  border-color: rgba(194, 24, 91, .3);
+  box-shadow: 0 2px 8px rgba(26, 29, 41, .08);
+}
+
+.cc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-n {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+}
+
+.cc-d {
+  font-size: 11px;
+  color: var(--dm);
+  margin-top: 2px;
+}
+
+.cc-seg {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(59, 158, 255, .10);
+  border: 1px solid rgba(59, 158, 255, .30);
+  color: var(--sky);
+  font-weight: 700;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+/* status chips */
+.schip {
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sl {
+  background: rgba(37, 211, 102, .12);
+  border: 1px solid rgba(37, 211, 102, .35);
+  color: var(--grn-tx);
+}
+
+.ss {
+  background: rgba(212, 168, 67, .14);
+  border: 1px solid rgba(212, 168, 67, .40);
+  color: var(--gol);
+}
+
+.se {
+  background: rgba(26, 29, 41, .06);
+  border: 1px solid var(--bd);
+  color: var(--mu);
+}
+
+/* sales figures */
+.sc-sales {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.csv {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.csl {
+  font-size: 10px;
+  color: var(--dm);
+  margin-top: 2px;
+}
+
+/* progress */
+.cc-progress {
+  margin-top: 2px;
+}
+
+.cc-prog-lbl {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--mu);
+  margin-bottom: 4px;
+}
+
+.cc-prog-bg {
+  height: 5px;
+  background: rgba(26, 29, 41, .08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cc-prog-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--pur), var(--mag));
+  width: 0;
+  transition: width 1s .3s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* manual notes */
+.cc-manual {
+  font-size: 11px;
+  color: var(--mu);
+  border-top: 1px solid var(--bd);
+  padding-top: 8px;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+/* assets */
+.cc-assets {
+  margin-top: 2px;
+}
+
+.cc-assets-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--dm);
+  margin-bottom: 5px;
+}
+
+.cc-asset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.asset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--bd);
+  background: var(--sf2);
+  font-size: 11px;
+  color: var(--tx);
+  text-decoration: none;
+  transition: border-color .12s, background .12s;
+  max-width: 200px;
+  overflow: hidden;
+}
+
+a.asset-chip:hover {
+  border-color: rgba(59, 158, 255, .4);
+  background: rgba(59, 158, 255, .08);
+  color: var(--sky);
+}
+
+.asset-chip-type {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--sky);
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+
+.asset-chip-name {
+  font-size: 11px;
+  color: var(--mu);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* action buttons */
+.cc-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.cbtn {
+  flex: 1;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--bd);
+  background: transparent;
+  color: var(--mu);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cbtn:hover {
+  background: rgba(26, 29, 41, .04);
+}
+
+.cbtn-sale {
+  border-color: rgba(23, 163, 74, .30);
+  background: rgba(37, 211, 102, .08);
+  color: var(--grn-tx);
+}
+
+.cbtn-sale:hover {
+  background: rgba(37, 211, 102, .14);
+}
+
+/* dashed new-campaign card */
+.empty-camp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1.5px dashed rgba(26, 29, 41, .18);
+  padding: 40px 20px;
+  color: var(--dm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  min-height: 200px;
+  text-align: center;
+  gap: 10px;
+}
+
+.empty-camp:hover {
+  border-color: rgba(194, 24, 91, .4);
+  color: var(--mag);
+}
+
+.empty-plus {
+  font-size: 24px;
+}
+
+/* responsive */
+@media (max-width: 1100px) {
+  .camp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .camp-grid {
+    grid-template-columns: 1fr;
+  }
+}

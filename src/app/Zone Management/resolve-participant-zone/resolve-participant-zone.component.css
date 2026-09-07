@@ -80,6 +80,33 @@
   font-weight: 500;
 }
 
+/* Bulk apply buttons */
+.apply-zone-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.apply-zone-btn {
+  padding: 6px 14px;
+  border: 1px solid #2b6cb0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2b6cb0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.apply-zone-btn:hover {
+  background: #2b6cb0;
+  color: #ffffff;
+}
+
 /* Conflicts List */
 .conflicts-list {
   display: flex;

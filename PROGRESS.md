@@ -1,39 +1,49 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-20 (Form builder redesign)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-20-update-delivery-form-builder-redesign.md`.
+_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
+· **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
 
 ## Current state
-- **UpdateDeliveryComponent's `Form` type fully redesigned** (Product Designer ▸
-  delivery-set ▸ update-delivery). Sectioned layout, numbered field cards with
-  duplicate / expand-collapse / drag-drop reorder, sticky Save footer, a11y
-  fixes. **All reactive-form bindings and Firestore writes unchanged** (parity
-  audit: zero regressions; `ng build` green). Committed on `nanda-development`:
-  `55cf4da` (chip-input bug fixes) and `84d2591` (redesign + features). Local
-  only — push is operator-gated.
-- Other delivery types (Appointment/Report/Events/Queue/Fieldwork) untouched.
-- Operator's separate New-Workshop changes (workshop-configuration,
-  workshop-dashboard) are uncommitted in the working tree — not mine, left alone.
+- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
+  documentation added this session plus one pre-existing, unrelated
+  `group-chat-screen.component.css` edit. Nothing committed, nothing
+  pushed, nothing deployed — operator commits manually (standing directive).
+- **No queue code was changed.** The slot/capacity flow is documented and
+  frozen as a baseline so a planned logic change can be made and reverted
+  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
 
-## Last session changes (2026-07-20) — why
-- Fixed array sub-field option chips: input not cleared on Enter (wrong
-  `event.value=` instead of `chipInput.clear()`) and dead backspace after one
-  removal (Material focus hand-off race; fixed by refocusing the chip input
-  after removal — deliberate, see journal).
-- Rebuilt the Form UI per operator directive "premium clean classic UI/UX,
-  don't touch data structure": scoped `.fb-*` styles appended to component CSS,
-  existing classes preserved for other types.
-- Added duplicate (deep clone appended at end), collapse keyed by control
-  identity (survives reorder), CDK drag-drop persisting order via the existing
-  debounced autosave.
-- 15-agent adversarial review → 9 confirmed findings all applied (contrast,
-  aria-labels, inline required errors + invalid-save snackbar, media-URL
-  labels, flipping-options gating, spacing/mobile/hairline fixes).
+## Last session changes (2026-08-31)
+- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
+  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
+  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
+  paths** across Angular `queue-planner` / `queue-planner-review` and the
+  three Flutter cards, three mermaid flowcharts, a **divergence register
+  D-01…D-10**, six invariants, and the change/revert protocol.
+- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
+  four surprises, an append-only change log (CL-000) and the per-screen +
+  data-side revert playbook.
+- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
+  rendered reference artifact for the operator.
+- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
+  `usedslot = matching-token count` and every planner mutation auto-saves,
+  so it overwrites the counter that the four transactional booking paths
+  maintain — erasing Flutter self-service bookings and B!G pre-placements
+  that have no `queue_token` yet. Paired with D-01 (review offers slots
+  from a *derived* count while the transaction gates on the *stored* one),
+  this is the double-booking root cause.
 
-## Pending / next
-- Operator manual test of duplicate / collapse / drag-drop in the dev app
-  (localhost:4200 — NOTE: dev serves production Firebase `fir-sample-aae4a`;
-  valid forms autosave to live `delivery forms`. Test with Form Name empty to
-  stay write-safe).
-- Known-but-deferred: `{Validators:[...]}` capital-V typo makes the TS
-  "required" validators on type selects inert (template `required` attr is the
-  live one); display-name map for raw type tokens — both optional, unapproved.
+## Pending
+- **The logic change itself is unspecified** — awaiting the operator's
+  statement of the new rule. Recommended first target: D-02 + D-01
+  (one agreed source of truth for capacity). Follow §7 of the flow doc:
+  delta vs the register → check the six invariants → name the blast radius
+  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
+- Before any write-shape change: export the affected `queue planning`
+  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
+  fields have no history. First run against `starlabs-test` only.
+- Carried from 2026-08-27: operator visual pass of the redesigned
+  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
+  consumers to wire; newusertags backfill; `eiflixcampaign` rules
+  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
+  route guard; episode-delete gaps.

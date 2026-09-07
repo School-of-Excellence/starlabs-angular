@@ -38,11 +38,39 @@ export class ResolveParticipantZoneComponent {
 
   mapProfile = {}
 
+  // Zones in play across the conflicts - one "Apply <zone>" button each
+  zoneOptions: { zoneId: string, zoneName: string }[] = [];
+
   constructor(
     public dialogRef: MatDialogRef<any>,
     @Inject(MAT_DIALOG_DATA) public data: DialogData
   ) {
     this.mapProfile = data["mapProfile"]
+    this.buildZoneOptions();
+  }
+
+  // Collect every zone that at least one conflicted participant is eligible for
+  private buildZoneOptions(): void {
+    const zoneIds = new Set<string>();
+    (this.data.participants || []).forEach(p => {
+      (p.zones || []).forEach(zoneId => zoneIds.add(zoneId));
+    });
+
+    this.zoneOptions = Array.from(zoneIds)
+      .map(zoneId => ({
+        zoneId: zoneId,
+        zoneName: this.data.zoneMap[zoneId] || zoneId
+      }))
+      .sort((a, b) => a.zoneName.localeCompare(b.zoneName));
+  }
+
+  // Bulk select: tick this zone for everyone eligible for it
+  applyZoneToAll(zoneId: string): void {
+    (this.data.participants || []).forEach(p => {
+      if ((p.zones || []).includes(zoneId)) {
+        p.selectedZone = zoneId;
+      }
+    });
   }
 
   // Close dialog without action

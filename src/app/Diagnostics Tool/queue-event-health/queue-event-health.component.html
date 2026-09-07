@@ -152,6 +152,30 @@
     </div>
   </div>
 
+  <div class="modal-overlay" *ngIf="showAttendedModal">
+    <div class="attended-modal">
+      <h3>Mark {{ attendedModalRecordCount }} participant(s) as Attended?</h3>
+
+      <p class="modal-message">
+        This will:<br>
+        • Set Event Participation → attended<br>
+        • Set Product Status → <strong>{{ attendedStatusSelection }}</strong><br><br>
+        This action cannot be undone.
+      </p>
+
+      <label>Product status to update:</label>
+      <select [(ngModel)]="attendedStatusSelection">
+        <option value="completed">Completed</option>
+        <option value="shifted">Shifted</option>
+      </select>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="attendedStatusResolver && attendedStatusResolver(null)">Cancel</button>
+        <button class="btn-confirm" (click)="attendedStatusResolver && attendedStatusResolver(attendedStatusSelection)">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ACTION ROW -->
   <div class="action-bar">
     <div class="left-group">

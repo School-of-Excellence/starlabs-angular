@@ -193,7 +193,7 @@
         Showing newest {{rowCount}} — apply a filter to search all submissions
       </span>
       <span *ngIf="!bootstrapping && !fetching && !isDefaultView">Loaded {{rowCount}} videos</span>
-      <span *ngIf="!bootstrapping && !fetching && tagFilter !== 'all'" class="subtle">
+      <span *ngIf="!bootstrapping && !fetching && (tagFilter !== 'all' || selectedTags.length)" class="subtle">
         &nbsp;· showing {{visibleCount()}}
       </span>
       <span *ngIf="!bootstrapping && !fetching && rowCount > 1000" class="warn">
@@ -201,6 +201,7 @@
       </span>
     </div>
 
+    <!-- two independent table-level tag controls -->
     <div class="tagfilter">
       <span class="tagfilterlabel">Tags</span>
       <mat-button-toggle-group [value]="tagFilter" (change)="onTagFilterChange($event.value)" hideSingleSelectionIndicator>
@@ -208,6 +209,25 @@
         <mat-button-toggle value="tagged">Tagged ({{taggedCount}})</mat-button-toggle>
         <mat-button-toggle value="untagged">Untagged ({{untaggedCount}})</mat-button-toggle>
       </mat-button-toggle-group>
+    </div>
+
+    <div class="tagfilter">
+      <span class="tagfilterlabel">Filter by tags</span>
+      <mat-form-field appearance="outline" class="tagselect" subscriptSizing="dynamic">
+        <mat-select multiple panelClass="filterpanel" placeholder="Any tag"
+                    [ngModel]="selectedTags" [ngModelOptions]="{standalone: true}"
+                    (ngModelChange)="onSelectedTagsChange($event)">
+          <mat-select-trigger *ngIf="selectedTags.length">
+            {{tagName(selectedTags[0])}}
+            <span *ngIf="selectedTags.length > 1">&nbsp;+{{selectedTags.length - 1}}</span>
+          </mat-select-trigger>
+          <mat-option *ngFor="let tag of videoAskTags" [value]="tag.id">{{tag.name}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button type="button" *ngIf="selectedTags.length"
+              (click)="clearSelectedTags()" matTooltip="Clear tag filter">
+        <mat-icon>close</mat-icon>
+      </button>
     </div>
 
   </div>
