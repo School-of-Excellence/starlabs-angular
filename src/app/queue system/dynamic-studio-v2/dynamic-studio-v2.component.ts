@@ -1773,28 +1773,33 @@ export class DynamicStudioV2Component {
 
   /**
    * Build activitySpecialistMap (activityId -> specialist profileIds) from the
-   * cached cohorts, SCOPED to the event mapped to the current queue. A `big
+   * cached cohorts, SCOPED to the events mapped to the current queue. A `big
    * cohorts` doc's `eventref` points to an `event collection` doc (a "Live
-   * Event"), and the queue-generation doc carries that event's id in its
-   * `eventid` field — same mapping big-planner uses
-   * (`where('eventref','==', doc('event collection', selectedQueue.eventid))`).
-   * So we keep only cohorts whose eventref is the event-collection doc for this
-   * queue's `eventid` — the Enter-Studio / Invite-More chips then offer
-   * specialists from THIS event's cohorts only. Active cohorts'
+   * Event"), and the queue-generation doc carries those event ids in its
+   * `eventid` field — an ARRAY (a queue can be mapped to several Live Events);
+   * older docs still carry a bare string, so normalise before comparing.
+   * So we keep only cohorts whose eventref is an event-collection doc named in
+   * this queue's `eventid` — the Enter-Studio / Invite-More chips then offer
+   * specialists from THOSE events' cohorts only. Active cohorts'
    * `participantidlist`s are unioned per `bigactivity`. Safe to call before the
    * queue resolves (produces an empty map until getStudio() re-runs it).
    */
   private rebuildActivitySpecialistMap(){
-    const eventId = this.ongoingQueue?.["eventid"]
+    const rawEventId = this.ongoingQueue?.["eventid"]
+    const eventIds = new Set<string>(
+      Array.isArray(rawEventId)
+        ? rawEventId
+        : ([null, undefined, ""].includes(rawEventId) ? [] : [rawEventId])
+    )
     const map: { [activityId: string]: string[] } = {}
-    if(eventId){
+    if(eventIds.size){
       this.allCohortsCache.forEach(cohort=>{
         const activityId = cohort["bigactivity"]
         if(activityId == null) return
         if(cohort["status"] != null && cohort["status"] !== "active") return
         // Keep only cohorts of the event collection doc mapped to this queue.
         const ref = cohort["eventref"]
-        if(ref?.id !== eventId || ref?.parent?.id !== "event collection") return
+        if(!eventIds.has(ref?.id) || ref?.parent?.id !== "event collection") return
         const ids: string[] = Array.isArray(cohort["participantidlist"]) ? cohort["participantidlist"] : []
         const set = new Set<string>(map[activityId] ?? [])
         ids.forEach(id => set.add(id))

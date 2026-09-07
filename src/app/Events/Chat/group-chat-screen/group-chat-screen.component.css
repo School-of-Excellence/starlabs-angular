@@ -650,12 +650,30 @@
 .wc-pickmain { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .wc-picksub { font-size: 11px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wc-importnote {
-  display: flex; align-items: center; gap: 7px; margin-bottom: 7px; padding: 7px 10px;
+  margin-bottom: 7px; padding: 8px 10px;
   border: 1px solid var(--blue-line); border-radius: 10px; background: var(--blue-tint2);
   font-size: 11.5px; color: var(--ink2);
 }
-.wc-importnote > span { flex: 1; min-width: 0; }
+.wc-importnote-head { display: flex; align-items: center; gap: 7px; }
+.wc-importnote-head .grow { flex: 1; min-width: 0; }
 .wc-importnote mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--blue-text); flex-shrink: 0; }
+.wc-importnote .wc-link-btn { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.wc-importnote .wc-link-btn mat-icon { font-size: 13px; width: 13px; height: 13px; }
+
+/* The not-found rows. Capped and scrollable — a bad file can produce hundreds. */
+.wc-skiplist {
+  margin-top: 7px; max-height: 132px; overflow-y: auto;
+  border-top: 1px solid var(--blue-line); padding-top: 5px;
+  scrollbar-width: thin; scrollbar-color: var(--scroll) transparent;
+}
+.wc-skiplist::-webkit-scrollbar { width: 8px; }
+.wc-skiplist::-webkit-scrollbar-thumb {
+  background: var(--scroll); border: 2px solid transparent; background-clip: content-box; border-radius: 8px;
+}
+.wc-skiprow { display: flex; align-items: baseline; gap: 7px; padding: 3px 0; }
+.wc-skiprow-no { color: var(--ink4); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.wc-skiprow-who { flex: 1; min-width: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-skiprow-why { color: var(--ink3); flex-shrink: 0; }
 
 .wc-gap { height: .55em; }
 .wc-inline-link { color: var(--blue-text); text-decoration: underline; word-break: break-word; }
@@ -1197,13 +1215,21 @@
 
 .wc-field label { font-size: 13px; font-weight: 600; color: var(--ink2); letter-spacing: -0.01em; display: block; margin-bottom: 7px; }
 .wc-field .wc-count { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--blue); }
-.wc-field input, .wc-field select, .wc-field textarea {
+/* `:not(.wc-search) >` matters: without it this rule also hits the <input> INSIDE a .wc-search,
+   which already draws its own border, radius and background — a bordered pill inside a bordered
+   pill, i.e. the "double box". `.wc-search input` cannot win on its own: same specificity (0,1,1),
+   declared earlier, so source order hands it to this rule. */
+.wc-field :not(.wc-search) > input,
+.wc-field > input,
+.wc-field select,
+.wc-field textarea {
   width: 100%; height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line3);
   font-size: 15px; color: var(--ink); background: var(--field);
 }
 .wc-field textarea { height: auto; padding: 9px 12px; resize: vertical; line-height: 1.5; }
 .wc-field select { cursor: pointer; }
-.wc-field input:focus, .wc-field textarea:focus { border-color: var(--blue-text); }
+.wc-field > input:focus, .wc-field :not(.wc-search) > input:focus,
+.wc-field textarea:focus { border-color: var(--blue-text); }
 
 /* Group picture picker (replaces the emoji row) */
 .wc-imgpick { display: flex; align-items: center; gap: 10px; }
