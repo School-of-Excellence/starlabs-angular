@@ -7041,7 +7041,7 @@ export class DeliveryDashboardCloneComponent {
     // the PM table's column shape.
 
     private readonly IDLE_DAYS = 7;
-    private readonly STUCK_DAYS = 15;
+    private readonly STUCK_DAYS = 35;
 
     private daysSinceTs(ts: any): number {
         if (!ts) return 0;

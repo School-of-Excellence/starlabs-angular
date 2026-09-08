@@ -117,7 +117,7 @@
           [class.dd-kcell--empty]="kpiStuck === 0" (click)="navToAttention('stuck')">
           <span class="dd-kcell__label">Stuck Participants</span>
           <span class="dd-kcell__value">{{ kpiStuck | number }}</span>
-          <span class="dd-kcell__delta">no progress in 14+ days — needs follow-up</span>
+          <span class="dd-kcell__delta">no progress in 35+ days — needs follow-up</span>
           <div class="dd-kcell__spark">
             <div class="b" *ngFor="let v of sparkStuck" [style.height.%]="(v / sparkMax(sparkStuck)) * 100"
               [class.empty]="v === 0"></div>
@@ -160,7 +160,7 @@
             (click)="navToAttention('stuck')">
             <span class="dd-tile__num">{{ kpiStuck | number }}</span>
             <span class="dd-tile__label">Stuck</span>
-            <span class="dd-tile__hint">No updates for 14+ days — follow up now</span>
+            <span class="dd-tile__hint">No updates for 35+ days — follow up now</span>
             <span class="dd-tile__arr">&rarr;</span>
           </button>
           <button class="dd-tile" [class.dd-tile--empty]="kpiAwaitingTotal === 0" (click)="navToAttention('awaiting')">
