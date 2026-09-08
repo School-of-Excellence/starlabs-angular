@@ -197,15 +197,6 @@ export class ScheduleDialogComponent {
     //   data: { type: "spinner", msg: "Getting Appointments..." }
     // });
 
-    if (this.participantjourneyproduct['appointmentTypeId']) 
-    {
-      this.appointmenttypes = [
-        {id: this.participantjourneyproduct['appointmentTypeId'],
-        appointment: this.participantjourneyproduct['appointmentTypeName']}
-    ];
-      return;
-    }
-
     this.loading = true;
     let dataQuery = this.participantjourneyproduct.calltype == 'coach' ? 'journeycoach' : 'onboardingcall';
     await getDocs(query(collection(this.firestore, "appointmenttype"), where(dataQuery, '==', true))).then(res => {
@@ -609,32 +600,27 @@ export class ScheduleDialogComponent {
           hostRole[element1] = list
         }
 
-                var map = {
-                  starttime: selectedSlot.start,
-                  endtime: selectedSlot.end,
-                  appointment: doc(this.firestore, "appointmenttype", this.selectedAppointment.id),
-                  appointmentrole: requiredRoles,
-                  bookedby: doc(this.firestore, "profile_data", this.participantjourneyproduct.profileid),
-                  hosts: hostRef,
-                  hostRole,
-                  slotdata: selectedSlot.docdata,
-                  attended: false,
-                  cancelled: false,
-                  created: new Date(),
-                  loggedid: this.loggedinPID,
-                  journeyid: this.participantjourneyproduct.calltype == 'onboarding' ? (this.participantjourneyproduct['journeyref']?.id ?? null) : null,
-                  participantjourneyproductid: this.participantjourneyproduct.calltype == 'onboarding' ? this.participantjourneyproduct['docid'] : null,
-                  journeycoach: true,
-                  platform: this.selectedPlatform
-                }
+        var map = {
+          starttime: selectedSlot.start,
+          endtime: selectedSlot.end,
+          appointment: doc(this.firestore, "appointmenttype", this.selectedAppointment.id),
+          appointmentrole: requiredRoles,
+          bookedby: doc(this.firestore, "profile_data", this.participantjourneyproduct.profileid),
+          hosts: hostRef,
+          hostRole,
+          slotdata: selectedSlot.docdata,
+          attended: false,
+          cancelled: false,
+          created: new Date(),
+          loggedid: this.loggedinPID,
+          journeyid: this.participantjourneyproduct.calltype == 'onboarding' ? this.participantjourneyproduct['journeyref'].id : null,
+          participantjourneyproductid: this.participantjourneyproduct.calltype == 'onboarding' ? this.participantjourneyproduct['docid'] : null,
+          journeycoach: true,
+          platform: this.selectedPlatform
+        }
 
         if (this.participantjourneyproduct.calltype == 'onboarding') {
           map['onboarding'] = true;
-        }
-
-        if (this.participantjourneyproduct?.appointmentTypeName === 'DFU Onboarding') {
-          map['productonboarding'] = true;
-          map['participantsproductid'] = this.participantjourneyproduct['participantsproductid'] || null;
         }
 
         try {
@@ -642,7 +628,7 @@ export class ScheduleDialogComponent {
           map['docid'] = newDocRef.id;
           await setDoc(newDocRef, map);
 
-          if (this.participantjourneyproduct.calltype == 'onboarding' && !this.participantjourneyproduct['participantsproductid']) {
+          if (this.participantjourneyproduct.calltype == 'onboarding') {
             await updateDoc(doc(this.firestore, "participantjourneyproduct", this.participantjourneyproduct['docid']),
               {
                 onboardingscheduled: new Date(selectedSlot.start),
@@ -653,6 +639,7 @@ export class ScheduleDialogComponent {
             );
           }
 
+          this.dialog.closeAll();
           this.selectedAppointment = null;
           this.selectedDate = null;
           this.userAvailableSlots = [];
@@ -662,8 +649,6 @@ export class ScheduleDialogComponent {
           if (this.goback) {
             this.location.back();
           }
-
-          this.dialogRef.close({ appointmentid: newDocRef.id, starttime: selectedSlot.start, hostRef: hostRef });
 
         } catch (err) {
           alert('Failed to book appointment. Please try again.');

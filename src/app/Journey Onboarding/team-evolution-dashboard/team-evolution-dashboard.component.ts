@@ -408,7 +408,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       this.participants = this.allSoexcellenceMeta;
 
       this.participantOverviewRows();
-      this.participantOverviewCount();
+      // this.participantOverviewCount();
     });
   }
 

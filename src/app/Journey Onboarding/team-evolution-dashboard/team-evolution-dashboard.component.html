@@ -147,7 +147,7 @@
               <span class="sub">{{ kpiFilter ? lifecycleConfig[kpiFilter].label + ' · ' : '' }}{{ overviewRows.length }} of {{ totalJourneys }}</span>
             </div>
             <div class="body">
-              <table class="tbl">
+              <table class="tbl tbl-overview">
                 <thead><tr><th>Member</th><th>Products</th></tr></thead>
                 <tbody>
                   <tr *ngIf="!overviewParticipants.length"><td colspan="2" class="empty">No DFU participants found.</td></tr>

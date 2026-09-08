@@ -563,7 +563,9 @@
   /* ---------- Layout grid ---------- */
   .split {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    /* minmax(0,…) — an `auto` min-size lets the column grow to the table's
+       min-content width, which is what pushed the stepper off-screen. */
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 16px;
     margin-top: 16px;
     align-items: start;
@@ -609,6 +611,18 @@
   .tbl {
     width: 100%;
     border-collapse: collapse;
+  }
+
+  /* Member overview only — fixed layout so column widths come from the header
+     row, not from cell content: the wide stepper in the expanded row then
+     scrolls instead of stretching the whole table. Left off `.tbl` generally
+     so the 4-column product table keeps its auto sizing. */
+  .tbl-overview {
+    table-layout: fixed;
+  }
+
+  .tbl-overview th:last-child {
+    width: 130px;
   }
 
   .tbl th {
@@ -1371,13 +1385,18 @@
     display: flex;
     align-items: flex-start;
     overflow-x: auto;
-    padding: 10px 4px;
+    overscroll-behavior-x: contain;
+    max-width: 100%;
+    padding: 10px 4px 14px;
   }
 
   .stepper-step {
     position: relative;
-    flex: 1;
-    min-width: 90px;
+    /* grow to fill when there are few steps, never shrink below 110px — that
+       floor is what makes the row overflow (and therefore scroll) once a
+       product has enough steps, and keeps long labels from colliding. */
+    flex: 1 0 110px;
+    padding: 0 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
