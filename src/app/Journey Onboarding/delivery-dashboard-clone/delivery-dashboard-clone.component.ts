@@ -1772,7 +1772,123 @@ export class DeliveryDashboardCloneComponent {
 
         stageConfig.forEach(stage => {
             this.stageData[stage.key] = this.filterAppointmentsForStage(stage.appointmentType);
+            this.stageAppointmentTypeMap[stage.key] = stage.appointmentType; 
         });
+    }
+
+    getNotScheduledCards(stageKey: string): any[] {
+        const productType = this.selectedProductType;
+        const populationSourceKey = this.stagePopulationSource[productType]?.[stageKey];
+        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey];
+
+        if (!populationSourceKey || !appointmentTypeName) return [];
+
+        let populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+
+        if (stageKey === 'onboarding') {
+            return populationPool.filter((card: any) => {
+                const status = (card?.status || '').toString().toLowerCase().trim();
+                const isNotInitiated = !status;
+                const isNotScheduled = !card?.productonboarding && !card?.productonboardingscheduled;
+                return isNotInitiated && isNotScheduled;
+            });
+        }
+
+        const bookedProfileIds = this.getBookedProfileIdsForAppointmentType(appointmentTypeName);
+        return populationPool.filter((card: any) => {
+            const profileId = card?.profileid || card?.clientid;
+            const alreadyHasAppointment = profileId ? bookedProfileIds.has(profileId) : false;
+            return !alreadyHasAppointment;
+        });
+    }
+
+    getScheduledOnboardingCards(): any[] {
+        const productType = this.selectedProductType;
+        const populationSourceKey = this.stagePopulationSource[productType]?.['onboarding'];
+        if (!populationSourceKey) return [];
+
+        const populationPool = this.productData?.[productType]?.[populationSourceKey] || [];
+        return populationPool
+            .filter((card: any) => !!card?.productonboarding || !!card?.productonboardingscheduled)
+            .map((card: any) => {
+                const hostRef = card?.productonboardedby?.[0];
+                const hostId = (hostRef?.id || hostRef?.path?.split('/')?.pop()) ?? null;
+                return {
+                    ...card,
+                    scheduledSlot: card.productonboardingscheduled,
+                    hostName: hostId ? (this.mapprofile[hostId] || this.mapMetaData[hostId]?.['name'] || 'Unassigned') : 'Unassigned',
+                };
+            });
+    }
+
+    getStageCompletedCards(stageKey: string): any[] {
+        const productType = this.selectedProductType;
+        const appointmentCompleted = this.stageData?.[stageKey]?.completed || [];
+
+        const isTerminalStage = this.terminalStageKey[productType] === stageKey;
+        if (!isTerminalStage) {
+            return appointmentCompleted;
+        }
+
+        const productCompletedKey = productType === 'criticalSupport' ? 'completion' : 'celebrationCall';
+        const productCompleted = this.productData?.[productType]?.[productCompletedKey] || [];
+
+        const seen = new Set<string>();
+        const merged: any[] = [];
+
+        for (const c of productCompleted) {
+            const pid = c?.profileid || c?.clientid;
+            if (pid) {
+                if (seen.has(pid)) continue;
+                seen.add(pid);
+            }
+            merged.push(c);
+        }
+        for (const a of appointmentCompleted) {
+            const pid = a?.profileid || a?.clientid || a?.bookedby?.id;
+            if (pid) {
+                if (seen.has(pid)) continue;
+                seen.add(pid);
+            }
+            merged.push(a);
+        }
+        return merged;
+    }
+
+    private getBookedProfileIdsForAppointmentType(appointmentTypeName: string): Set<string> {
+        const bookedProfileIds = new Set<string>();
+        for (const appointment of this.allAppointments) {
+            const isMatchingType = appointment.appointmentTypeName === appointmentTypeName;
+            if (!isMatchingType) continue;
+            const profileId = appointment.profileid || appointment.clientid || appointment.bookedby?.id;
+            if (profileId) bookedProfileIds.add(profileId);
+        }
+        return bookedProfileIds;
+    }
+
+    getStageModalProfileId(app: any): string {
+        return app?.bookedby?.id || app?.profileid || app?.clientid || '';
+    }
+
+    stageModalBadgeClass(stageFilter: string): string {
+        const isPositiveState = stageFilter === 'Scheduled' || stageFilter === 'Completed';
+        return isPositiveState ? 'scheduled' : 'not-scheduled';
+    }
+
+    getAppointmentHistory(app: any): any[] {
+        if (app?.allappointments?.length) return app.allappointments;
+
+        const profileId = this.getStageModalProfileId(app);
+        if (!profileId) return [];
+
+        return this.allAppointments.filter((a: any) => {
+            const matchesProfile = a.profileid === profileId || a.clientid === profileId || a.bookedby?.id === profileId;
+            return matchesProfile && !!a.appointmentTypeName;
+        });
+    }
+
+    toggleStageCardExpand(app: any): void {
+        app._expanded = !app._expanded;
     }
 
     filterAppointmentsForStage(appointmentTypeName: string) {
@@ -3513,32 +3629,32 @@ export class DeliveryDashboardCloneComponent {
             return;
         }
 
-        const profileId = card?.profileid;
-        const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
-        const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
+        // const profileId = card?.profileid;
+        // const appointmentTypeId = this.resolveAppointmentTypeId(stageKey);
+        // const appointmentTypeName = this.stageAppointmentTypeMap[stageKey.toLowerCase().trim()];
 
-        if (!profileId || !appointmentTypeId) {
-            alert('Unable to resolve appointment type for booking.');
-            return;
-        }
+        // if (!profileId || !appointmentTypeId) {
+        //     alert('Unable to resolve appointment type for booking.');
+        //     return;
+        // }
 
-        const dialogRef = this.dialog.open(BookAppointmentDialogComponent, {
-            data: {
-                profileId,
-                profileName: this.mapMetaData[profileId]?.['name'] || profileId,
-                appointmentTypeId,
-                appointmentTypeName
-            },
-            width: '640px',
-            autoFocus: false,
-            panelClass: 'custom-dialog-container'
-        });
+        // const dialogRef = this.dialog.open(BookAppointmentDialogComponent, {
+        //     data: {
+        //         profileId,
+        //         profileName: this.mapMetaData[profileId]?.['name'] || profileId,
+        //         appointmentTypeId,
+        //         appointmentTypeName
+        //     },
+        //     width: '640px',
+        //     autoFocus: false,
+        //     panelClass: 'custom-dialog-container'
+        // });
 
-        dialogRef.afterClosed().subscribe((booked: boolean) => {
-            if (!booked) return;
-            this.closeStageModal();
-            if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
-        });
+        // dialogRef.afterClosed().subscribe((booked: boolean) => {
+        //     if (!booked) return;
+        //     this.closeStageModal();
+        //     if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
+        // });
     }
 
     getOnboardingWaitingGroups(): { overdue: any[]; upcoming: any[]; noDate: any[] } {
@@ -3574,7 +3690,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     private openOnboardingScheduleDialog(card: any) {
-        const profileId = card?.profileid || card?.clientid;
+        const profileId = card?.profileid;
         if (!profileId || !card?.docid) {
             alert('Unable to resolve participant/product for this card.');
             return;
@@ -3588,11 +3704,11 @@ export class DeliveryDashboardCloneComponent {
             return;
         }
 
-        card['isReschedule'] = !!card['onboardingscheduled'];
+        card['isReschedule'] = !!card['productonboardingscheduled'];
         card['appointmentid'] = card['onboardingappointmentid'] ?? null;
         card['mapProfile'] = this.mapprofile;
         card['mapJourney'] = this.mapjourneyname;
-        card['calltype'] = 'onboarding';
+        card['calltype'] = 'productonboarding';
         card['appointmentTypeId'] = dfuOnboardingType.id;
         card['appointmentTypeName'] = 'DFU Onboarding';
         card['productid'] = card.productref?.id ?? null;
@@ -3604,21 +3720,6 @@ export class DeliveryDashboardCloneComponent {
             disableClose: true,
             panelClass: 'custom-dialog-container',
             maxHeight: '90vh'
-        });
-
-        dialogRef.afterClosed().subscribe(async (result: any) => {
-            if (!result?.appointmentid) return;
-
-            await updateDoc(
-                doc(this.firestore, 'participantsproduct', card.docid),
-                {
-                    onboardingscheduled: result.starttime,
-                    onboardedby: result.hostRef ?? [],
-                }
-            );
-
-            this.closeStageModal();
-            if (this.selectedProductLabel) this.selectProduct(this.selectedProductLabel);
         });
     }
 
