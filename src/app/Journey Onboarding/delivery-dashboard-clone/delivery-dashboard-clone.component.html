@@ -794,7 +794,7 @@
                 </button>
               </div>
               <!-- Filter Tabs -->
-              <div class="diag-tabs">
+              <div class="diag-tabs" *ngIf="selectedStageFilter === 'Scheduled'">
                 <button class="diag-tab" [class.active]="selectedFilter === 'all'" (click)="onFilterChange('all')">
                   All
                 </button>
@@ -819,18 +819,14 @@
                     <a class="participant-name" [href]="'/participantdeliverysequence/' + getStageModalProfileId(app)">
                       {{ mapMetaData[getStageModalProfileId(app)]?.['name'] || getStageModalProfileId(app) }}
                     </a>
-                    <!-- <button *ngIf="selectedStageFilter === 'Waiting'" class="dd-initiate-btn"
+                    <button *ngIf="selectedStageFilter === 'Waiting'" class="dd-initiate-btn"
                       (click)="openBookAppointmentForCard(app, selectedStage)">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <polygon points="5 3 19 12 5 21 5 3" />
                       </svg>
                       Book Appointment
-                    </button> -->
-                    <span *ngIf="selectedStageFilter === 'Completed'" class="chevron-toggle" style="cursor:pointer"
-                      (click)="toggleStageCardExpand(app)">
-                      <span class="chevron" [class.open]="app._expanded"></span>
-                    </span>
+                    </button>
                     </div>
                     <div class="profile-products">
                       <div class="product-tag">
@@ -849,41 +845,31 @@
                         </span>
                       </div>
                     </div>
-                    <div class="expand-section" *ngIf="selectedStageFilter === 'Completed'"
-                      [class.expanded]="app._expanded" [class.collapsed]="!app._expanded">
-                      <hr class="divider">
-                      <ng-container *ngIf="getAppointmentHistory(app).length > 0; else noHistoryTpl">
-                        <div *ngFor="let appointment of getAppointmentHistory(app)"
-                          class="d-flex justify-content-between align-items-center mb-2">
-                          <div>
-                            <div class="detail-stage-label text-muted">
-                              {{ appointment?.appointmentTypeName || appointment?.formname || 'Appointment' }}
-                            </div>
-                            <div *ngIf="appointment?.starttime">
-                              <span class="detail-stage-label">Start: </span>
-                              <span class="detail-stage-label">{{ formatDateTime(appointment?.starttime) }}</span>
-                            </div>
-                            <div *ngIf="appointment?.endtime">
-                              <span class="detail-stage-label">End: </span>
-                              <span class="detail-stage-label">{{ formatDateTime(appointment?.endtime) }}</span>
-                            </div>
-                            <div *ngIf="appointment?.date">
-                              <span class="detail-stage-label">Submitted: </span>
-                              <span class="detail-stage-label">{{ formatDateTime(appointment?.date) }}</span>
-                            </div>
-                          </div>
-                          <div class="status-badge" [ngClass]="getStyleStatusClass(appointment)">
-                            {{ getAppointmentStatus(appointment?.appointmentTypeName || appointment?.formname || '', appointment) }}
-                          </div>
-                        </div>
-                      </ng-container>
-                      <ng-template #noHistoryTpl>
-                        <div class="expand-no-appts">No appointment history recorded</div>
-                      </ng-template>
-                    </div>
                 </div>
                 <div *ngIf="groupedByStageProfileAll.length === 0" class="no-data">
                   No data yet
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export modal -->
+          <div class="modal-overlay" *ngIf="stageExportModalOpen" (click)="closeStageExportModal()">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <h3>Export Stage Data — {{ selectedProductLabel }}</h3>
+                <button class="modal-close" (click)="closeStageExportModal()">✕</button>
+              </div>
+              <div class="modal-body">
+                <div class="dd-seg" style="flex-wrap: wrap; gap: 8px;">
+                  <button type="button" class="dd-seg__btn" *ngFor="let field of exportFieldOptions"
+                    [class.is-active]="field.selected" (click)="toggleExportField(field.key)">
+                    {{ field.label }}
+                  </button>
+                </div>
+                <div style="display:flex; gap:12px; margin-top:20px;">
+                  <button class="btn btn-success" (click)="exportStageData('excel')">Export as Excel</button>
+                  <button class="btn btn-success" (click)="exportStageData('jpg')">Export as JPG</button>
                 </div>
               </div>
             </div>
@@ -915,6 +901,12 @@
                 </div>
               </div>
               <div class="header-right">
+                <button class="dd-btn" (click)="openStageExportModal()">
+                  <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12">
+                    <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 12v1.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V12" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Export
+                </button>
                 <div class="search-container" *ngIf="selectedProductLabel">
                   <div class="search-field">
                     <mat-icon matSuffix>search</mat-icon>
@@ -977,25 +969,33 @@
                       </span>
                     </div>
                     <div>
-                      <div class="col-mini-stats">
-                        <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
-                          <div (click)="openStageModal(col, 'Scheduled', stage.all)"
-                            class="mini-stat mini-stat-clickable" title="View scheduled participants">
-                            <div class="mini-stat-val" style="color:var(--blue)">
-                              {{ stage.all.length || 0 }}
-                            </div>
-                            <div class="mini-stat-lbl">Scheduled</div>
+                      <ng-container *ngIf="stageData[col.toLowerCase().trim()] as stage">
+                        <div class="stage-stat-row">
+                          <button type="button" class="stage-stat-card"
+                            (click)="openStageModal(col, 'Completed', getStageCompletedCards(col.toLowerCase().trim()))">
+                            <span class="stage-stat-num stage-stat-num--completed">{{ getStageCompletedCards(col.toLowerCase().trim()).length || 0 }}</span>
+                            <span class="stage-stat-arrow">›</span>
+                            <span class="stage-stat-lbl">Completed</span>
+                          </button>
+                          <button type="button" class="stage-stat-card"
+                            (click)="openStageModal(col, 'Cancelled', stage.cancelled)">
+                            <span class="stage-stat-num stage-stat-num--cancelled">{{ stage.cancelled.length || 0 }}</span>
+                            <span class="stage-stat-arrow">›</span>
+                            <span class="stage-stat-lbl">Cancelled</span>
+                          </button>
+                        </div>
+
+                        <ng-container *ngIf="getNotScheduledCards(col.toLowerCase().trim()) as notScheduledCards">
+                          <div class="stage-tabs">
+                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'all'"
+                            (click)="setStageTab(col, 'all')">All {{ (col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length) + notScheduledCards.length }}</button>
+                          <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'scheduled'"
+                            (click)="setStageTab(col, 'scheduled')">Scheduled {{ col.toLowerCase().trim() === 'onboarding' ? getScheduledOnboardingCards().length : stage.all.length }}</button>
+                            <button type="button" class="stage-tab" [class.is-active]="getStageTab(col) === 'waiting'"
+                              (click)="setStageTab(col, 'waiting')">Waiting {{ notScheduledCards.length }}</button>
                           </div>
-                          <!-- Awaiting -->
-                          <!-- <div (click)="openStageModal(col, 'Awaiting', stage.awaiting)" class="mini-stat mini-stat-clickable"
-                    title="View awaiting participants">
-                    <div class="mini-stat-val" style="color:var(--coral)">
-                      {{ stage.awaiting?.length || 0 }}
-                    </div>
-                    <div class="mini-stat-lbl">Awaiting</div>
-                  </div> -->
                         </ng-container>
-                      </div>
+                      </ng-container>
                     </div>
                   </div>
 
@@ -1007,7 +1007,7 @@
                           <div class="card" *ngFor="let card of getScheduledOnboardingCards(); trackBy: trackByCard">
                             <div class="card-top">
                               <div class="card-info">
-                                <div class="card-name">{{ mapMetaData[card.profileid]?.name || (card.profileid) }}</div>
+                                <div class="card-name">{{ mapMetaData[card.profileid || card.clientid]?.name || (card.profileid || card.clientid) }}</div>
                               </div>
                             </div>
                             <span class="card-status s-scheduled">SCHEDULED</span>
@@ -1021,30 +1021,30 @@
                                   <span class="detail-label">Specialist: </span>
                                   <span class="detail-val">{{ card.hostName }}</span>
                                 </span>
-                              </ng-container>
-                            </span>
-                            <span>
-                              <ng-container *ngIf="showDelayDate(c) as delay">
-                                <span *ngIf="delay" class="detail-label">Delayed By: </span>
-                                <span *ngIf="delay" class="detail-val">{{ delay }}</span>
-                              </ng-container>
-                            </span>
-                          </span>
-                          <span class="chevron" [class.open]="c._expanded">
-                          </span>
-                        </div>
-                        <!-- View Form Button -->
-                        <button *ngIf="c?.status === 'submitted'" (click)="openFormOverlay(c)">View Form</button>
-                        <!-- Expandable Section -->
-                        <div class="expand-section" [class.expanded]="c._expanded" [class.collapsed]="!c._expanded">
-                          <hr class="divider">
-
-                          <!-- Specialist row (from participant product hosts) -->
-                          <div class="expand-specialist-row" *ngIf="c?.hosts?.length">
-                            <span class="expand-spec-label">Specialist</span>
-                            <span class="expand-spec-name">
-                              {{ mapMetaData[(c.hosts[0]?.path || c.hosts[0]).split('/').pop()]?.name || '—' }}
-                            </span>
+                              </span>
+                            </div>
+                          </div>
+                        </ng-container>
+                        <ng-template #regularScheduledTpl>
+                          <div class="card" *ngFor="let app of stage.all; trackBy: trackByCard">
+                            <div class="card-top">
+                              <div class="card-info">
+                                <div class="card-name">{{ mapMetaData[getStageModalProfileId(app)]?.name || getStageModalProfileId(app) }}</div>
+                              </div>
+                            </div>
+                            <span class="card-status s-scheduled">SCHEDULED</span>
+                            <div class="detail-row">
+                              <span class="d-flex flex-column">
+                                <span>
+                                  <span class="detail-label">{{ col }}: </span>
+                                  <span class="detail-val">{{ formatDateTime(app.starttime) }}</span>
+                                </span>
+                                <span *ngIf="app.hosts?.length">
+                                  <span class="detail-label">Specialist: </span>
+                                  <span class="detail-val">{{ mapMetaData[(app.hosts[0]?.path || app.hosts[0]).split('/').pop()]?.name }}</span>
+                                </span>
+                              </span>
+                            </div>
                           </div>
                         </ng-template>
                       </ng-container>
@@ -1057,7 +1057,7 @@
                           </div>
                           <div class="card card--overdue" *ngFor="let c of groups.overdue; trackBy: trackByCard">
                             <div class="card-top">
-                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid]?.name }}</div></div>
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
                             </div>
                             <span class="card-status s-waiting">WAITING</span>
                             <div class="detail-row">
@@ -1086,7 +1086,7 @@
                           </div>
                           <div class="card" *ngFor="let c of groups.upcoming; trackBy: trackByCard">
                             <div class="card-top">
-                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid]?.name }}</div></div>
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
                             </div>
                             <span class="card-status s-waiting">WAITING</span>
                             <div class="detail-row">
@@ -1106,25 +1106,12 @@
                             </button>
                           </div>
 
-                <!-- Specialist "cinema" cards -->
-                <div class="spec-grid" *ngIf="specialistData.length > 0">
-                  <div class="spec-card" *ngFor="let specialist of specialistData"
-                    [class.is-open]="expandedSpecialist === specialist.eisId">
-
-                    <!-- Card header: the specialist you book into -->
-                    <button type="button" class="spec-card-head"
-                      (click)="openSpecialistSlots(specialist.eisId); getSpecialistAvailability(specialist.eisId)">
-                      <div class="spec-card-top">
-                        <div class="spec-avatar">{{ (specialist.name || '?').charAt(0) | uppercase }}</div>
-
-                        <div class="spec-card-id">
-                          <div class="spec-card-name">{{ specialist.name }}</div>
-                          <div class="spec-card-activity" *ngIf="specialist.appointmentTypeName">
-                            {{ specialist.appointmentTypeName }}
+                          <div class="stage-subgroup-label" *ngIf="groups.noDate.length > 0">
+                            No Tentative Date ({{ groups.noDate.length }})
                           </div>
                           <div class="card" *ngFor="let c of groups.noDate; trackBy: trackByCard">
                             <div class="card-top">
-                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid]?.name }}</div></div>
+                              <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
                             </div>
                             <span class="card-status s-waiting">WAITING</span>
                             <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
@@ -1141,7 +1128,7 @@
                       <ng-container *ngIf="getStageTab(col) !== 'scheduled' && col.toLowerCase().trim() !== 'onboarding'">
                         <div class="card" *ngFor="let c of getNotScheduledCards(col.toLowerCase().trim()); trackBy: trackByCard">
                           <div class="card-top">
-                            <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid]?.name }}</div></div>
+                            <div class="card-info"><div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name }}</div></div>
                           </div>
                           <span class="card-status s-waiting">WAITING</span>
                           <div class="detail-row">
@@ -1156,13 +1143,13 @@
                               </span>
                             </span>
                           </div>
-                          <!-- <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
+                          <button class="dd-initiate-btn" (click)="openBookAppointmentForCard(c, col)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                               <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
                               <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                             </svg>
                             Book Appointment
-                          </button> -->
+                          </button>
                         </div>
                       </ng-container>
 
@@ -1174,7 +1161,7 @@
                       <div class="card" *ngFor="let c of filteredCardsMap[i]; trackBy: trackByCard">
                           <div class="card-top">
                               <div class="card-info">
-                                  <div class="card-name">{{ mapMetaData[c.profileid]?.name || (c.profileid) }}</div>
+                                  <div class="card-name">{{ mapMetaData[c.profileid || c.clientid]?.name || (c.profileid || c.clientid) }}</div>
                               </div>
                           </div>
                           <div class="product-tag">
@@ -1201,6 +1188,11 @@
               </ng-container>
             </div>
           </div>
+
+          <app-form-overlay-view #formOverlay />
+
+          <!-- ========== SPECIALIST APPOINTMENT SLOTS ========== -->
+          <app-specialist-appointment-slots></app-specialist-appointment-slots>
 
           <!-- ========== COMPLETION HISTORY BY DFU PRODUCT ========== -->
           <div class="completion-history-container">
@@ -1706,7 +1698,7 @@
                       </div>
                     </span>
                     <span *ngIf="header.key === 'financialdata'" class="pm-status-pill"
-                      [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Not Scheduled': participant[header.key] === 'Not Scheduled'}">{{
+                      [ngClass]="{'s-eligible': participant[header.key] === 'Cleared', 's-Waiting': participant[header.key] === 'Waiting'}">{{
                       participant[header.key] === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED' }}</span>
                     <span *ngIf="header.key === 'bottleneck'" class="pm-bottleneck-text">{{ participant['financialdata']
                       ===
