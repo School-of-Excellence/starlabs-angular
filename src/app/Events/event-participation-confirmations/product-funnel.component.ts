@@ -1,7 +1,8 @@
-import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, writeBatch, serverTimestamp, updateDoc, setDoc,
+  collectionData
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -29,6 +30,7 @@ import { BulkAddProductsComponent } from '../../Participants Profile Management/
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { Subscription } from 'rxjs';
 
 type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
 
@@ -93,7 +95,7 @@ interface PRow {
   templateUrl: './product-funnel.component.html',
   styleUrl: './product-funnel.component.css'
 })
-export class ProductFunnelComponent implements OnInit {
+export class ProductFunnelComponent implements OnInit , OnDestroy{
 
   @Input() arena: any;
   @Input() eventName = '';
@@ -445,6 +447,8 @@ export class ProductFunnelComponent implements OnInit {
 
   // progress dialog state
   progress = { msg: '', value: 0, total: 0, eta: '' };
+  mapEligibility = {};
+  eticketEligibilitySubscription : Subscription | null = null
 
   constructor(
     public firestore: Firestore,
@@ -462,6 +466,13 @@ export class ProductFunnelComponent implements OnInit {
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
     await this.loadData();
+    this.loadETicketEligibilty();
+  }
+
+  ngOnDestroy(): void {
+    if (this.eticketEligibilitySubscription) {
+      this.eticketEligibilitySubscription.unsubscribe();
+    }
   }
 
   get productName() { return this.mapProduct[this.arena?.['productref']?.id] ?? 'Product'; }
@@ -754,6 +765,34 @@ export class ProductFunnelComponent implements OnInit {
     if (this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
+  // functoin to load e-tickes eligibility 
+  async loadETicketEligibilty() {
+    const eventid = this.arena?.['eventref']?.id;
+    if(!eventid) return
+    const eligibilityCollRef = collection(this.firestore, "e-ticket eligibility");
+    const eligibilityQuery = query(eligibilityCollRef, where("eventid", "==", eventid));
+    this.eticketEligibilitySubscription = collectionData(eligibilityQuery).subscribe(eligibilitysnap => {
+      this.mapEligibility = {}
+      for (let i = 0; i < eligibilitysnap.length; i++) {
+        const element = eligibilitysnap[i];
+        this.mapEligibility[element['eventparticipationid']] = element
+      }
+    });
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(row: any): string {
+    const eventParticipationId = row['approvedRequestId'];
+    const eligibility = this.mapEligibility[eventParticipationId];
+    if ([null, undefined].includes(eligibility)) {
+      return 'Not paid'
+    }
+    if (eligibility['exempted'] === true) {
+      return 'Exempted'
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid'
+  }
+
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
@@ -770,6 +809,12 @@ export class ProductFunnelComponent implements OnInit {
   get showApprovalChecks(): boolean {
     return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
   }
+
+  // ---- Post-approval checks ----
+  get showAfterApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow' || this.segment === 'unattended' || this.segment === 'revoked' || this.segment === 'overallRequested';
+  }
+
   get colSpan(): number {
     return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
   }
@@ -1532,7 +1577,8 @@ export class ProductFunnelComponent implements OnInit {
           'Customer status': r.customerStatus || '',
           Eligibility: this.eligibilityLabel(r),
           Reason: r.reason || '',
-          Attended: r.attended ? 'Yes' : 'No'
+          Attended: r.attended ? 'Yes' : 'No',
+          'Venue Fee' : this.getVenueFeeStatus(r)
         };
       });
       const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });

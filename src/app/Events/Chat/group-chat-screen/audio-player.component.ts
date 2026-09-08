@@ -1,4 +1,5 @@
-import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild, inject } from '@angular/core';
+import { MediaPlaybackService } from './media-playback.service';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -24,7 +25,7 @@ import { MatIconModule } from '@angular/material/icon';
              (durationchange)="onMeta()"
              (timeupdate)="onTime()"
              (ended)="onEnded()"
-             (play)="playing = true"
+             (play)="playing = true; media.playing(audio)"
              (pause)="playing = false"></audio>
 
       <button class="ap-play" (click)="toggle()" [attr.aria-label]="playing ? 'Pause' : 'Play'">
@@ -94,36 +95,28 @@ export class ChatAudioComponent implements AfterViewInit, OnDestroy {
   rate = 1;
   private durationFixed = false;
 
+  /** Shared with the thread's <video> elements — see MediaPlaybackService. */
+  media = inject(MediaPlaybackService);
+
   ngAfterViewInit(): void {
     const a = this.audioRef?.nativeElement;
-    if (a) ChatAudioComponent.players.add(a);
+    if (a) this.media.register(a);
   }
 
   ngOnDestroy(): void {
     const a = this.audioRef?.nativeElement;
-    // Leaving a destroyed element in the set would keep it alive and let it be paused later.
-    if (a) { ChatAudioComponent.players.delete(a); a.pause(); }
+    // Leaving a destroyed element registered would keep it alive and let it be paused later.
+    if (a) this.media.release(a);
   }
 
   toggle(): void {
     const a = this.audioRef?.nativeElement;
     if (!a) return;
     if (this.playing) { a.pause(); return; }
-    // Only one voice note plays at a time — starting this one stops whatever else was going.
-    // Module-scoped rather than a service: every player on the screen is this component, and a
-    // DI service would add a provider to wire up for behaviour that is purely local to them.
-    ChatAudioComponent.stopOthers(a);
+    // One piece of media at a time, video included — the service owns that rule.
+    this.media.playing(a);
     a.play().catch(e => console.error('audio play failed', e));
   }
-
-  /** Pause every other <audio> this component owns. */
-  private static stopOthers(keep: HTMLAudioElement): void {
-    ChatAudioComponent.players.forEach(el => {
-      if (el !== keep && !el.paused) el.pause();
-    });
-  }
-
-  private static players = new Set<HTMLAudioElement>();
 
   seek(value: string | number): void {
     const a = this.audioRef?.nativeElement;

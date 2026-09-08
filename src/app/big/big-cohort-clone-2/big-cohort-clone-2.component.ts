@@ -1157,26 +1157,29 @@ export class BigCohortClone2Component {
       minWidth: "500px",
       disableClose: true
     })
-    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
-      if (result != null && result != undefined) {
-        let docid = doc(collection(this.firestore, "buffermix archive")).id
-        result['docid'] = docid
-        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
-          console.log("buffer document created");
-        }).catch(err => {
-          console.log(err);
-        })
-      }
-    });
+    // dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+    //   if (result != null && result != undefined) {
+    //     let docid = doc(collection(this.firestore, "buffermix archive")).id
+    //     result['docid'] = docid
+    //     setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+    //       console.log("buffer document created");
+    //     }).catch(err => {
+    //       console.log(err);
+    //     })
+    //   }
+    // });
   }
 
   moveMenuSearchQuery: string = '';
   moveMenuFilteredCohorts: any[] = [];
   isMovingParticipant: boolean = false;
 
-  filterMoveMenuCohorts(sourceCohortId: string) {
+  // function to filter cohorts in cohorts move menu
+  filterMoveMenuCohorts(cohort: string) {
+    const cohortId = cohort['docid'];
+    const eventId = cohort['eventref']?.id;
     const query = this.moveMenuSearchQuery.toLowerCase().trim();
-    let cohorts = this.filteredCohortsList.filter(c => c.docid !== sourceCohortId);
+    let cohorts = this.cohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
 
     if (query) {
       cohorts = cohorts.filter(c => c.name?.toLowerCase().includes(query));
@@ -1224,6 +1227,7 @@ export class BigCohortClone2Component {
         targetCohort.participantidlist.push(participantId);
       }
 
+      alert(`Moved participant ${this.mapProfile[participantId]} from ${sourceCohort.name} to ${targetCohort.name}`)
       console.log(`Moved participant ${participantId} from ${sourceCohort.name} to ${targetCohort.name}`);
 
     } catch (error) {

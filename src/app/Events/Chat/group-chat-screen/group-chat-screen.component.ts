@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -20,6 +20,7 @@ import { NavDrawerService } from '../../../nav-drawer.service';
 import { AddIssueComponent } from '../../../Customer Support/add-issue/add-issue.component';
 import { ChannelCommunicationComponent } from '../../../Channel Communication/channel-communication/channel-communication.component';
 import { ChatAudioComponent } from './audio-player.component';
+import { MediaPlaybackService } from './media-playback.service';
 import * as XLSX from 'xlsx';
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -485,6 +486,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
+    this.media.pauseAll();
     clearInterval(this.recTimer);
     clearTimeout(this.toastTimer);
     this.resizeObserver?.disconnect();
@@ -1748,6 +1750,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.messagesError = '';
     this.memberSearch = ''; this.editingName = false;
     this.broadcastInfo = null; this.audienceOpen = false;
+    // Switching threads should not leave a voice note from the old one still playing.
+    this.media.pauseAll();
     this.oldestBroadcastDoc = null; this.hasMoreBroadcasts = false;
     if (this.isLive(c)) {
       if (this.isChannel(c)) {
@@ -2110,6 +2114,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Docs are everything that is not playable or viewable. */
   get threadDocs()  { return this.threadAttachments.filter(a => a.type === 'file'); }
 
+  /* ── One piece of media at a time ────────────────────────────────────
+     Every <video> in the thread reports here on play, and the audio players share the same
+     registry, so starting either kind stops whatever else was running. */
+  media = inject(MediaPlaybackService);
+
+  onMediaPlay(event: Event): void {
+    this.media.playing(event.target as HTMLMediaElement);
+  }
+
   /** Which of the three lists the info panel is showing — Media / Docs / Links, as WhatsApp does. */
   infoTab: 'media' | 'docs' | 'links' = 'media';
 
@@ -2463,13 +2476,45 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return lines.join('\n');
   }
 
+  /**
+   * Replace a range of the composer through the BROWSER's edit pipeline rather than by assigning
+   * `el.value`. This is what keeps Ctrl+Z working: a programmatic `value =` wipes the native undo
+   * stack, so after any formatting action undo had nothing to go back to.
+   *
+   * `execCommand('insertText')` is deprecated but is still the only API that records an edit as
+   * undoable; `setRangeText` does not. Where it is unavailable we fall back to a direct assignment
+   * and accept the lost undo step rather than lose the edit itself.
+   */
+  private replaceRange(start: number, end: number, text: string, caret: number): void {
+    const el = this.composerRef?.nativeElement;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(start, end);
+
+    let inserted = false;
+    try {
+      inserted = document.execCommand('insertText', false, text);
+    } catch { inserted = false; }
+
+    if (!inserted) {
+      const next = el.value.slice(0, start) + text + el.value.slice(end);
+      el.value = next;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    // execCommand fires `input`, so ngModel has already seen it — mirror it locally either way.
+    this.draft = el.value;
+    setTimeout(() => {
+      el.selectionStart = el.selectionEnd = Math.min(caret, el.value.length);
+      el.focus();
+      this.autoGrowComposer();
+    }, 0);
+  }
+
+  /** Replace the WHOLE draft, still through the undoable path. */
   private setDraftAndCaret(next: string, caret: number): void {
     const el = this.composerRef?.nativeElement;
-    this.draft = next;
-    if (!el) return;
-    // The value has to land before the caret can be placed in it.
-    el.value = next;
-    setTimeout(() => { el.selectionStart = el.selectionEnd = caret; el.focus(); this.autoGrowComposer(); }, 0);
+    if (!el) { this.draft = next; return; }
+    this.replaceRange(0, el.value.length, next, caret);
   }
 
   applyFormat(kind: 'bold' | 'italic' | 'ul' | 'ol'): void {
@@ -2514,20 +2559,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (e.key === 'Escape') this.linkForm = null;
   }
 
+  /* These three all go through replaceRange() rather than assigning `draft`, so each stays a
+     single undoable step — see replaceRange() for why that matters. */
+
   insertMention(token: string): void {
-    const el = this.composerRef?.nativeElement;
-    const at = el?.selectionStart ?? this.draft.length;
-    this.draft = this.draft.slice(0, at) + token + ' ' + this.draft.slice(at);
+    const at = this.composerRef?.nativeElement?.selectionStart ?? this.draft.length;
+    this.replaceRange(at, at, token + ' ', at + token.length + 1);
     this.mentionQuery = null;
-    setTimeout(() => el?.focus(), 0);
   }
 
   startPersonMention(): void {
-    const el = this.composerRef?.nativeElement;
-    const at = el?.selectionStart ?? this.draft.length;
-    this.draft = this.draft.slice(0, at) + '@' + this.draft.slice(at);
+    const at = this.composerRef?.nativeElement?.selectionStart ?? this.draft.length;
+    this.replaceRange(at, at, '@', at + 1);
     this.mentionQuery = '';
-    setTimeout(() => { el?.focus(); el?.setSelectionRange(at + 1, at + 1); }, 0);
   }
 
   onDraftChange(val: string): void {
@@ -2557,10 +2601,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   pickMention(opt: MentionOption): void {
     const el = this.composerRef?.nativeElement;
     const pos = el?.selectionStart ?? this.draft.length;
-    const before = this.draft.slice(0, pos).replace(MENTION_TOKEN_RE, `@${opt.name} `);
-    this.draft = before + this.draft.slice(pos);
+    const head = this.draft.slice(0, pos);
+    const token = head.match(MENTION_TOKEN_RE);
+    // Replace only the half-typed "@na" token, not the whole line — a smaller, tidier undo step.
+    const start = token ? pos - token[0].length : pos;
+    const text = `@${opt.name} `;
+    this.replaceRange(start, pos, text, start + text.length);
     this.mentionQuery = null;
-    setTimeout(() => { el?.focus(); el?.setSelectionRange(before.length, before.length); }, 0);
   }
 
   /* ── Attachments ────────────────────────────────────────────────────── */
@@ -3246,7 +3293,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
      profile_data and the matches are selected. Nothing is created from the file — a row that does
      not match an existing profile is reported, not invented. */
 
-  importReport: { matched: number; skipped: string[] } | null = null;
+  /**
+   * The whole outcome of an import, not a summary string. Each unmatched entry keeps the ORIGINAL
+   * row — name, email and the sheet row number — because a "not found" list is only useful if it
+   * can be handed back to whoever produced the spreadsheet.
+   */
+  importReport: {
+    matched: number;
+    skipped: { row: number; name: string; email: string; reason: string }[];
+    /** Which picker the import filled, so the panel can say so. */
+    target: 'create' | 'add';
+  } | null = null;
+  /** The full not-found list is long; the panel shows a few until this is toggled. */
+  showAllSkipped = false;
 
   downloadImportSample(): void {
     const rows = [
@@ -3259,7 +3318,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     XLSX.writeFile(wb, 'group_members_sample.xlsx');
   }
 
-  onMembersImport(event: Event): void {
+  /**
+   * One import for both pickers. `target` decides which selection it fills and which pool it
+   * matches against — the Add-members dialog only offers people who are not already in the group,
+   * so importing there must not silently "match" someone who is already a member.
+   */
+  onMembersImport(event: Event, target: 'create' | 'add' = 'create'): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
@@ -3269,26 +3333,45 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     reader.onload = () => {
       try {
         const wb = XLSX.read(reader.result, { type: 'array' });
-        const rows: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]] || {});
-        const skipped: string[] = [];
+        // `raw:false` so a number-formatted cell still arrives as text; header row is row 1.
+        const rows: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]] || {}, { raw: false });
+        const pool = target === 'add' ? this.addPool : this.createPool;
+        const already = (id: string) => target === 'add' ? this.isAddPicked(id) : this.isPicked(id);
+        const pick = (p: Person) => target === 'add' ? this.toggleAddPerson(p) : this.togglePerson(p);
+
+        const skipped: { row: number; name: string; email: string; reason: string }[] = [];
         let matched = 0;
 
-        rows.forEach(row => {
-          // Header names vary between exports, so accept the common spellings of each.
-          const email = String(row['email'] ?? row['Email'] ?? row['EMAIL'] ?? '').trim().toLowerCase();
-          const name = String(row['name'] ?? row['Name'] ?? row['NAME'] ?? '').trim().toLowerCase();
-          if (!email && !name) return;
+        rows.forEach((row, i) => {
+          // Header spellings vary between exports, so accept the common ones.
+          const email = String(row['email'] ?? row['Email'] ?? row['EMAIL'] ?? '').trim();
+          const name = String(row['name'] ?? row['Name'] ?? row['NAME'] ?? '').trim();
+          const rowNo = i + 2;                       // +1 for the header, +1 for 1-based rows
+          if (!email && !name) return;               // a genuinely blank row is not a failure
 
-          const hit = this.createPool.find(p =>
-            (email && this.emailOf(p.id).toLowerCase() === email) ||
-            (!email && name && p.name.toLowerCase() === name));
+          const lowerEmail = email.toLowerCase();
+          const lowerName = name.toLowerCase();
+          const hit = pool.find(p =>
+            (lowerEmail && this.emailOf(p.id).toLowerCase() === lowerEmail) ||
+            (!lowerEmail && lowerName && p.name.toLowerCase() === lowerName));
 
-          if (!hit) { skipped.push(row['name'] || row['email'] || '(blank row)'); return; }
-          if (!this.isPicked(hit.id)) { this.togglePerson(hit); }
+          if (!hit) {
+            // Say WHY, so the operator can tell a typo from someone already in the group.
+            const inGroup = target === 'add' && this.createPool.some(p =>
+              (lowerEmail && this.emailOf(p.id).toLowerCase() === lowerEmail) ||
+              (!lowerEmail && lowerName && p.name.toLowerCase() === lowerName));
+            skipped.push({
+              row: rowNo, name, email,
+              reason: inGroup ? 'Already in this group' : 'No matching profile',
+            });
+            return;
+          }
+          if (!already(hit.id)) pick(hit);
           matched++;
         });
 
-        this.importReport = { matched, skipped };
+        this.importReport = { matched, skipped, target };
+        this.showAllSkipped = false;
         this.notify(matched
           ? `Imported ${matched} member${matched === 1 ? '' : 's'}`
           : 'No rows matched an existing profile');
@@ -3299,6 +3382,24 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     };
     reader.onerror = () => this.notify('Could not read that file');
     reader.readAsArrayBuffer(file);
+  }
+
+  /** The not-found rows, back out as a spreadsheet to hand to whoever produced the original. */
+  downloadSkipped(): void {
+    const skipped = this.importReport?.skipped || [];
+    if (!skipped.length) return;
+    const ws = XLSX.utils.json_to_sheet(skipped.map(s => ({
+      Row: s.row, Name: s.name, Email: s.email, Reason: s.reason,
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Not found');
+    XLSX.writeFile(wb, 'members_not_found.xlsx');
+  }
+
+  /** A few by default; the rest behind a toggle, since a bad file can produce hundreds. */
+  get skippedShown(): { row: number; name: string; email: string; reason: string }[] {
+    const all = this.importReport?.skipped || [];
+    return this.showAllSkipped ? all : all.slice(0, 5);
   }
 
   isPicked(id: string): boolean { return this.cSelected.some(s => s.id === id); }
@@ -3575,7 +3676,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   openAddMembers(): void {
     this.addingMembers = true;
-    this.aSearch = ''; this.aPicked = [];
+    this.aSearch = ''; this.aPicked = []; this.importReport = null; this.showAllSkipped = false;
   }
 
   /** One list, same as the create dialog — team and participants merged, current members excluded. */
@@ -3585,8 +3686,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   get addShown(): Person[] {
-    const q = this.aSearch.toLowerCase();
-    return this.addPool.filter(p => !q || p.name.toLowerCase().includes(q)).slice(0, 40);
+    const q = this.aSearch.trim().toLowerCase();
+    const pool = this.addPool.filter(p =>
+      !q || p.name.toLowerCase().includes(q) || this.emailOf(p.id).toLowerCase().includes(q));
+    // Picked people first, so an import's selection is not lost behind the cap.
+    return [...pool.filter(p => this.isAddPicked(p.id)), ...pool.filter(p => !this.isAddPicked(p.id))]
+      .slice(0, 60);
   }
 
   isAddPicked(id: string): boolean { return this.aPicked.some(x => x.id === id); }

@@ -1,31 +1,93 @@
-table {
-  width: 100%;
-}
+._mainContainer { margin: 32px 40px 60px; }
 
-th, td {
-  text-align: left;
-  padding: 8px;
+/* ── Toolbar ──────────────────────────────────────────────────────────
+   One card holding both filters and the create action, so the controls read as a set rather than
+   as three unrelated widgets floating above the table. */
+._toolbar {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: 12px;
+  padding: 14px 16px 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
 }
+._toolbarRow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.spacer { flex: 1 1 auto; }
 
-tr:nth-child(even){background-color: #f2f2f2}
-tr:hover{
+/* Search: a plain bordered field rather than a mat-form-field, which brought its own label,
+   underline and 20px of built-in padding and sat awkwardly beside the segmented control. */
+._searchBox {
+  display: flex; align-items: center; gap: 8px;
+  height: 40px; min-width: 300px; flex: 0 1 380px;
+  padding: 0 12px;
+  border: 1px solid rgba(0,0,0,.16); border-radius: 10px; background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+._searchBox:focus-within { border-color: #3f51b5; box-shadow: 0 0 0 3px rgba(63,81,181,.12); }
+._searchBox input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-size: 14px; color: rgba(0,0,0,.87);
+}
+._searchBox input::placeholder { color: rgba(0,0,0,.42); }
+._searchIcon { color: rgba(0,0,0,.42); font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+._clearBtn {
+  border: none; background: none; padding: 0; cursor: pointer; display: flex;
+  color: rgba(0,0,0,.42); flex-shrink: 0;
+}
+._clearBtn:hover { color: rgba(0,0,0,.72); }
+._clearBtn mat-icon { font-size: 17px; width: 17px; height: 17px; }
+
+/* Segmented view control — Active / Deleted / All, each carrying its own count. */
+._segmented {
+  display: inline-flex; height: 40px; padding: 3px;
+  background: #f1f2f5; border-radius: 10px; gap: 2px;
+}
+._segmented button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 14px; border: none; border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 600; color: rgba(0,0,0,.60); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+._segmented button:hover { color: rgba(0,0,0,.87); }
+._segmented button.on { background: #fff; color: #3f51b5; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+._count {
+  min-width: 20px; padding: 0 6px; height: 18px; border-radius: 9px;
+  background: rgba(0,0,0,.08); color: inherit;
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+._segmented button.on ._count { background: rgba(63,81,181,.12); }
+
+._addBtn { height: 40px; }
+._addBtn mat-icon { margin-right: 4px; font-size: 18px; width: 18px; height: 18px; }
+
+/* A one-line statement of what the table is showing — a filtered-down list should never be
+   mistaken for a loading failure. */
+._resultLine {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(0,0,0,.07);
+  font-size: 12.5px; color: rgba(0,0,0,.55);
+}
+._resultLine strong { color: rgba(0,0,0,.80); }
+._linkBtn {
+  margin-left: auto; border: none; background: none; padding: 0; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: #3f51b5;
+}
+._linkBtn:hover { text-decoration: underline; }
+
+/* ── Table ────────────────────────────────────────────────────────────── */
+table { width: 100%; }
+th, td { text-align: left; padding: 8px; }
+tr:nth-child(even) { background-color: #f2f2f2; }
+tr:hover {
   transform: scale(1);
--webkit-transform: scale(1);
--moz-transform: scale(1);
-box-shadow: 0px 0px 5px rgba(0,0,0,0.3);
--webkit-box-shadow: 0px 0px 5px rgba(0,0,0,0.3);
--moz-box-shadow: 0px 0px 5px rgba(0,0,0,0.3);
+  box-shadow: 0px 0px 5px rgba(0,0,0,0.3);
 }
-.ml10{
-    margin-left: 10px;
-}
-.spacer{ 
-    flex: 1 1 auto;
-}
-._container{
-    display: flex;
-    margin-bottom: 10px;
-}
-._mainContainer{
-  margin: 50px;
+/* A deleted row stays readable, just visibly out of service. */
+tr.mat-mdc-row._deleted td, tr.mat-row._deleted td { opacity: .55; }
+.ml10 { margin-left: 10px; }
+
+@media (max-width: 900px) {
+  ._mainContainer { margin: 20px 16px 40px; }
+  ._searchBox { flex: 1 1 100%; }
+  ._addBtn { width: 100%; }
 }
