@@ -65,6 +65,10 @@
           <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           <span>Workshops</span>
         </button>
+        <button type="button" class="btn btn-help" (click)="openHelp()" title="How to configure a workshop" aria-label="How to configure a workshop">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          <span>Guide</span>
+        </button>
         <button type="button" class="btn" (click)="openImageUpload()" *ngIf="!notFound">
           <ng-container [ngTemplateOutlet]="icImage"></ng-container>
           <span>Icons &amp; images</span>
@@ -136,6 +140,7 @@
               </button>
             </div>
             <div class="sec-body gap10" *ngIf="!isCollapsed(sec.key) && getFormArray(sec.key).length">
+              <div class="help sec-help" *ngIf="h(sec.key)">{{ h(sec.key) }}</div>
               <div class="list-row" *ngFor="let c of getFormArray(sec.key).controls; let i = index" [formGroupName]="i">
                 <ng-container [ngTemplateOutlet]="iconPicker" [ngTemplateOutletContext]="{ control: c.get('question'), pid: 'ic:' + sec.key + ':' + i, wide: true }"></ng-container>
                 <div class="input">
@@ -180,15 +185,18 @@
                 <div class="field">
                   <div class="label"><span>Workshop title</span><span class="counter">{{ len('title') }} / 100</span></div>
                   <div class="input"><input class="txt" formControlName="title" maxlength="100" placeholder="Enter workshop title"></div>
+                  <div class="help">{{ h('title') }}</div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Short description</span><span class="counter">{{ len('shortdescription') }} / 100</span></div>
                   <div class="input"><input class="txt" formControlName="shortdescription" maxlength="100" placeholder="Enter short description"></div>
+                  <div class="help">{{ h('shortdescription') }}</div>
                 </div>
               </div>
               <div class="field">
                 <div class="label"><span>Why this workshop?</span><span class="counter">{{ len('whyworkshop') }} / 100</span></div>
                 <div class="input"><input class="txt" formControlName="whyworkshop" maxlength="100" placeholder="Why Workshop?"></div>
+                <div class="help">{{ h('whyworkshop') }}</div>
               </div>
               <div class="grid2">
                 <div class="field">
@@ -211,7 +219,7 @@
                     <input class="txt mono" formControlName="titleVideo" placeholder="Paste a video URL or upload">
                     <button type="button" class="suffix" (click)="uploadVideo()" title="Upload video"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
                   </div>
-                  <div class="help">Uploads go to workshop/video/.</div>
+                  <div class="help">{{ h('titleVideo') }}</div>
                 </div>
               </div>
             </div>
@@ -230,20 +238,24 @@
                 <div class="field">
                   <div class="label"><span>Duration label</span><span class="counter">{{ len('day') }} / 100</span></div>
                   <div class="input"><input class="txt" formControlName="day" maxlength="100" placeholder="E.g., 14 Day Workshop"></div>
+                  <div class="help">{{ h('day') }}</div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Enroll button text</span><span class="counter">{{ len('enrollbuttonname') }} / 20</span></div>
                   <div class="input"><input class="txt" formControlName="enrollbuttonname" maxlength="20" placeholder="Button name"></div>
+                  <div class="help">{{ h('enrollbuttonname') }}</div>
                 </div>
               </div>
               <div class="grid2">
                 <div class="field">
                   <div class="label"><span>Price, struck through</span><span class="counter">{{ len('pricestriked') }} / 50</span></div>
                   <div class="input"><input class="txt" formControlName="pricestriked" maxlength="50" placeholder="Price striked"></div>
+                  <div class="help">{{ h('pricestriked') }}</div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Price, shown</span><span class="counter">{{ len('price') }} / 50</span></div>
                   <div class="input"><input class="txt" formControlName="price" maxlength="50" placeholder="Price"></div>
+                  <div class="help">{{ h('price') }}</div>
                 </div>
               </div>
             </div>
@@ -267,6 +279,7 @@
                       <input class="txt" [matDatepicker]="rsd" formControlName="registrationStartDate" placeholder="Start date">
                       <mat-datepicker #rsd></mat-datepicker>
                     </div>
+                    <div class="help">{{ h('registrationStartDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="rst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="rst" formControlName="registrationStartTime" placeholder="Time">
@@ -278,6 +291,7 @@
                       <input class="txt" [matDatepicker]="red" formControlName="registrationEndDate" placeholder="End date">
                       <mat-datepicker #red></mat-datepicker>
                     </div>
+                    <div class="help">{{ h('registrationEndDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="ret.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="ret" formControlName="registrationEndTime" placeholder="Time">
@@ -293,6 +307,7 @@
                       <input class="txt" [matDatepicker]="wsd" formControlName="workshopStartDate" placeholder="Start date">
                       <mat-datepicker #wsd></mat-datepicker>
                     </div>
+                    <div class="help">{{ h('workshopStartDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="wst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="wst" formControlName="workshopStartTime" placeholder="Time">
@@ -304,6 +319,7 @@
                       <input class="txt" [matDatepicker]="wed" formControlName="workshopEndDate" placeholder="End date">
                       <mat-datepicker #wed></mat-datepicker>
                     </div>
+                    <div class="help">{{ h('workshopEndDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="wet.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="wet" formControlName="workshopEndTime" placeholder="Time">
@@ -328,6 +344,7 @@
               </button>
             </div>
             <div class="sec-body gap10" *ngIf="!isCollapsed('blocks') && dynamicBlocks.length" cdkDropList (cdkDropListDropped)="drop($event, 'dynamicenrollment')">
+              <div class="help sec-help">{{ h('dynamicenrollment') }}</div>
               <div class="block" *ngFor="let block of dynamicBlocks.controls; let bi = index; trackBy: trackDynBlock" [formGroupName]="bi" cdkDrag
                 [class.open]="!isBlockCollapsed(block)">
                 <div class="drop-line" *cdkDragPlaceholder></div>
@@ -426,6 +443,7 @@
                   <ngx-editor-menu [editor]="editors['description']" [toolbar]="toolbarFull"></ngx-editor-menu>
                   <ngx-editor class="rt-lg" [editor]="editors['description']" formControlName="description" [outputFormat]="'html'" placeholder="Enter a detailed workshop description…"></ngx-editor>
                 </div>
+                <div class="help">{{ h('description') }}</div>
                 <div class="err" *ngIf="ctrl('description').invalid && (ctrl('description').touched || submitAttempted)">
                   <ng-container [ngTemplateOutlet]="icAlert"></ng-container>Workshop description is required
                 </div>
@@ -436,6 +454,7 @@
                   <ngx-editor-menu [editor]="editors['joinus']" [toolbar]="toolbarFull"></ngx-editor-menu>
                   <ngx-editor class="rt-md" [editor]="editors['joinus']" formControlName="joinus" [outputFormat]="'html'" placeholder="Enter join us content…"></ngx-editor>
                 </div>
+                <div class="help">{{ h('joinus') }}</div>
               </div>
             </div>
           </section>
@@ -457,6 +476,7 @@
               </button>
             </div>
             <div class="sec-body gap12" *ngIf="!isCollapsed('faq') && getFormArray('faq').length">
+              <div class="help sec-help">{{ h('faq') }}</div>
               <div class="faq-row" *ngFor="let c of getFormArray('faq').controls; let i = index" [formGroupName]="i">
                 <span class="faq-n">{{ i + 1 }}</span>
                 <div class="faq-fields">
@@ -487,6 +507,7 @@
                 </button>
               </div>
               <div class="sec-body gap8 tight" *ngIf="!isCollapsed(sec.key)" cdkDropList (cdkDropListDropped)="drop($event, sec.key)">
+                <div class="help sec-help" *ngIf="h(sec.key)">{{ h(sec.key) }}</div>
                 <div class="list-row" *ngFor="let c of getFormArray(sec.key).controls; let j = index" cdkDrag>
                   <div class="drop-line" *cdkDragPlaceholder></div>
                   <span class="drag" cdkDragHandle><ng-container [ngTemplateOutlet]="icGrip"></ng-container></span>
@@ -513,9 +534,11 @@
                 </button>
               </div>
               <div class="sec-body gap8 tight" *ngIf="!isCollapsed('outcome')">
+                <div class="help sec-help">{{ h('outcome') }}</div>
                 <div class="list-row" *ngFor="let g of outcomeArray.controls; let i = index" [formGroupName]="i">
                   <div class="input h36 w110"><input class="txt bold" formControlName="value" placeholder="Value"></div>
                   <div class="input h36"><input class="txt" formControlName="title" placeholder="Title"></div>
+                  <div class="help">{{ h('title') }}</div>
                   <button type="button" class="icon-btn" (click)="removeOutcome(i)" title="Remove"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
                 </div>
                 <div class="help" *ngIf="!outcomeArray.length">Empty. Add a value + title pair, e.g. 500+ / Participants.</div>
@@ -531,6 +554,7 @@
                 <span class="sec-hint">{{ headHint('primarylyTaught', 'Type a skill, press Enter') }}</span>
               </div>
               <div class="sec-body tight" *ngIf="!isCollapsed('primarylyTaught')">
+                <div class="help sec-help">{{ h('primarylyTaught') }}</div>
                 <div class="input chips">
                   <span class="chip soft in" *ngFor="let skill of primarylyTaughtArray.value; let i = index">
                     {{ skill }}
@@ -554,6 +578,7 @@
               <span class="sec-hint">{{ headHint('testimonials', 'Pick VideoAsk templates, then the answers to feature') }}</span>
             </div>
             <div class="sec-body" *ngIf="!isCollapsed('testimonials')">
+              <div class="help sec-help">{{ h('testimonialmap') }}</div>
               <div class="grid2">
                 <div class="field pop-anchor" data-pop>
                   <div class="label"><span>Templates</span><span class="counter">{{ selectedTemplatesForFilter.length }} / {{ templatesMax }}</span></div>

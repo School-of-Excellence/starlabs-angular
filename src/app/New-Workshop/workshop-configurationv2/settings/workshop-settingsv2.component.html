@@ -96,11 +96,14 @@
             <div class="s-text">
               <div class="s-title">Workshop Test Mode</div>
               <div class="s-desc" [class.on]="v('testmode')">{{ v('testmode') ? 'Workshop is currently in Test Mode' : 'Workshop is Not in Test Mode' }}</div>
+              <div class="help">{{ h('testmode') }}</div>
               <div class="s-expand" *ngIf="v('testmode')">
                 <div class="field">
                   <div class="label"><span>Test users</span><span class="counter">Selected {{ peopleCount('testusers') }} users</span></div>
                   <ng-container [ngTemplateOutlet]="peoplePicker" [ngTemplateOutletContext]="{ path: 'testusers', pid: 'pp:testusers', lockRegular: false }"></ng-container>
                   <div class="help">One picker, two directories: participants and new users. Both write into the same test-user list.</div>
+                
+                  <div class="help">{{ h('testusers') }}</div>
                 </div>
               </div>
             </div>
@@ -111,43 +114,54 @@
             <div class="s-text">
               <div class="s-title">Workshop Active</div>
               <div class="s-desc" [class.on]="v('active')">{{ v('active') ? 'Workshop is visible to participants' : 'Workshop is hidden from participants' }}</div>
+              <div class="help">{{ h('active') }}</div>
               <div class="help warn" *ngIf="v('active')" style="margin-top:4px;display:flex;gap:6px;align-items:center;"><ng-container [ngTemplateOutlet]="icLock"></ng-container>Active locks set order, activity order and Activity-set start dates on the Challenges tab.</div>
             </div>
             <button type="button" class="toggle" [class.on]="v('active')" (click)="toggleField('active')" aria-label="Workshop Active"></button>
           </div>
 
           <div class="setting">
-            <div class="s-text"><div class="s-title">Workshop Active Web</div><div class="s-desc" [class.on]="v('webactive')">{{ v('webactive') ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</div></div>
+            <div class="s-text"><div class="s-title">Workshop Active Web</div><div class="s-desc" [class.on]="v('webactive')">{{ v('webactive') ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</div>
+<div class="help">{{ h('webactive') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('webactive')" (click)="toggleField('webactive')" aria-label="Workshop Active Web"></button>
           </div>
           <div class="setting">
-            <div class="s-text"><div class="s-title">Enable Home Screen Widget</div><div class="s-desc" [class.on]="v('homescreenwidget')">{{ v('homescreenwidget') ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</div></div>
+            <div class="s-text"><div class="s-title">Enable Home Screen Widget</div><div class="s-desc" [class.on]="v('homescreenwidget')">{{ v('homescreenwidget') ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</div>
+<div class="help">{{ h('homescreenwidget') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('homescreenwidget')" (click)="toggleField('homescreenwidget')" aria-label="Enable Home Screen Widget"></button>
           </div>
           <div class="setting">
-            <div class="s-text"><div class="s-title">Enable Q&amp;A</div><div class="s-desc" [class.on]="v('qanda')">{{ v('qanda') ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</div></div>
+            <div class="s-text"><div class="s-title">Enable Q&amp;A</div><div class="s-desc" [class.on]="v('qanda')">{{ v('qanda') ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</div>
+<div class="help">{{ h('qanda') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('qanda')" (click)="toggleField('qanda')" aria-label="Enable Q&A"></button>
           </div>
           <div class="setting">
             <div class="s-text">
               <div class="s-title">Enable Share</div>
               <div class="s-desc" [class.on]="v('enableshare')">{{ v('enableshare') ? 'Workshop can be shared with others' : 'Sharing is disabled' }}</div>
+              <div class="help">{{ h('enableshare') }}</div>
               <div class="s-expand" *ngIf="v('enableshare')">
                 <div class="field">
                   <div class="label"><span>Share message</span></div>
                   <div class="input textarea"><textarea class="txt" formControlName="enablesharemessage" rows="3" placeholder="Enter the message shared along with the workshop"></textarea></div>
-                  <div class="help">Sent along with the workshop when a participant shares it.</div>
+                  <div class="help">{{ h('enablesharemessage') }}</div>
+                
+                  <div class="help">{{ h('selectedjourneys') }}</div>
+                
+                  <div class="help">{{ h('selectedtiers') }}</div>
                 </div>
               </div>
             </div>
             <button type="button" class="toggle" [class.on]="v('enableshare')" (click)="toggleField('enableshare')" aria-label="Enable Share"></button>
           </div>
           <div class="setting">
-            <div class="s-text"><div class="s-title">Workshop Breakdown</div><div class="s-desc" [class.on]="v('breakdown')">{{ v('breakdown') ? 'Breakdown is active and visible' : 'Breakdown is inactive and hidden' }}</div></div>
+            <div class="s-text"><div class="s-title">Workshop Breakdown</div><div class="s-desc" [class.on]="v('breakdown')">{{ v('breakdown') ? 'Breakdown is active and visible' : 'Breakdown is inactive and hidden' }}</div>
+<div class="help">{{ h('breakdown') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('breakdown')" (click)="toggleField('breakdown')" aria-label="Workshop Breakdown"></button>
           </div>
           <div class="setting">
-            <div class="s-text"><div class="s-title">Update Participant Workshop</div><div class="s-desc" [class.on]="v('triggerFunction')">{{ v('triggerFunction') ? 'Workshop updates in participant document' : 'Workshop will not update participant document' }}</div></div>
+            <div class="s-text"><div class="s-title">Update Participant Workshop</div><div class="s-desc" [class.on]="v('triggerFunction')">{{ v('triggerFunction') ? 'Workshop updates in participant document' : 'Workshop will not update participant document' }}</div>
+<div class="help">{{ h('triggerFunction') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('triggerFunction')" (click)="toggleField('triggerFunction')" aria-label="Update Participant Workshop"></button>
           </div>
         </div>
@@ -164,17 +178,20 @@
         </div>
         <div class="sec-body rows" *ngIf="!isCollapsed('audience')">
           <div class="setting">
-            <div class="s-text"><div class="s-title">Active Participants Only</div><div class="s-desc" [class.on]="v('activeparticipants')">{{ v('activeparticipants') ? 'Workshop is for Active participants' : 'Available to all participants' }}</div></div>
+            <div class="s-text"><div class="s-title">Active Participants Only</div><div class="s-desc" [class.on]="v('activeparticipants')">{{ v('activeparticipants') ? 'Workshop is for Active participants' : 'Available to all participants' }}</div>
+<div class="help">{{ h('activeparticipants') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('activeparticipants')" (click)="toggleField('activeparticipants')" aria-label="Active Participants Only"></button>
           </div>
           <div class="setting">
-            <div class="s-text"><div class="s-title">New Users Only</div><div class="s-desc" [class.on]="v('newusersonly')">{{ v('newusersonly') ? 'Workshop is for New participants' : 'Available to all users' }}</div></div>
+            <div class="s-text"><div class="s-title">New Users Only</div><div class="s-desc" [class.on]="v('newusersonly')">{{ v('newusersonly') ? 'Workshop is for New participants' : 'Available to all users' }}</div>
+<div class="help">{{ h('newusersonly') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('newusersonly')" (click)="toggleField('newusersonly')" aria-label="New Users Only"></button>
           </div>
           <div class="setting">
             <div class="s-text">
               <div class="s-title">Journey Based</div>
               <div class="s-desc" [class.on]="v('journeybased')">{{ v('journeybased') ? 'Workshop is restricted to selected journeys' : 'No journey restriction' }}</div>
+              <div class="help">{{ h('journeybased') }}</div>
               <div class="s-expand" *ngIf="v('journeybased')">
                 <div class="field pop-anchor" data-pop>
                   <div class="label"><span>Journeys</span><span class="counter">Selected {{ (v('selectedjourneys') || []).length }} journeys</span></div>
@@ -198,6 +215,7 @@
             <div class="s-text">
               <div class="s-title">Tier Based</div>
               <div class="s-desc" [class.on]="v('tierbased')">{{ v('tierbased') ? 'Workshop is restricted to selected tiers' : 'No tier restriction' }}</div>
+              <div class="help">{{ h('tierbased') }}</div>
               <div class="s-expand" *ngIf="v('tierbased')">
                 <div class="field pop-anchor" data-pop>
                   <div class="label"><span>Tiers</span><span class="counter">Selected {{ (v('selectedtiers') || []).length }} tiers</span></div>
@@ -222,6 +240,7 @@
             <div class="s-text">
               <div class="s-title">Workshop Facilitator</div>
               <div class="s-desc" [class.on]="v('facilitator')">{{ v('facilitator') ? 'Workshop Facilitator Enabled' : 'No facilitator assigned' }}</div>
+              <div class="help">{{ h('evergreenWorkshop') }}</div>
               <div class="s-expand" *ngIf="v('facilitator')">
                 <div class="field">
                   <div class="label"><span>Facilitators</span><span class="counter">Selected {{ peopleCount('facilitatorprofiles') }} facilitators</span></div>
@@ -253,6 +272,8 @@
               </div>
               <ng-template #noAvail><div class="help">No categories yet for this workshop.</div></ng-template>
               <div class="help">Click a category to edit it. Categories live in their own collection, scoped to this workshop.</div>
+            
+              <div class="help">{{ h('cohortsforthisworkshop') }}</div>
             </div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Cohorts</span><span class="counter">{{ (v('cohortsforthisworkshop') || []).length }} / 2</span></div>
@@ -307,6 +328,8 @@
             <div class="hrow wrap" style="gap:6px;">
               <span class="chip soft in" *ngFor="let id of v('cohortcategoriesforthisworkshop')">{{ catName(id) }}<button type="button" class="chip-x" [disabled]="isCategoryUsed(id)" (click)="removeCohortcategoriesforthisworkshop(id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
             </div>
+          
+            <div class="help">{{ h('cohortcategoriesforthisworkshop') }}</div>
           </div>
 
           <div class="grid2">
@@ -320,6 +343,8 @@
                 </div>
               </div>
               <div class="help">{{ uploading['categorythumbnail'] ? 'Uploading…' : 'Paste a URL or upload. Uploads go to workshop/thumbnail/.' }}</div>
+            
+              <div class="help">{{ h('categorythumbnail') }}</div>
             </div>
             <div class="field">
               <div class="label"><span>Category video</span></div>
@@ -328,6 +353,8 @@
                 <button type="button" class="suffix" (click)="pickFile('categoryVideo')" title="Upload video"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
               </div>
               <div class="help">{{ uploading['categoryVideo'] ? 'Uploading…' : 'Uploads go to workshop/video/.' }}</div>
+            
+              <div class="help">{{ h('categoryVideo') }}</div>
             </div>
           </div>
 
@@ -362,12 +389,12 @@
               <div class="field">
                 <div class="label"><span>Workshop days</span><span class="counter" style="color:#c0392b;font-weight:600;">Required · at least 1</span></div>
                 <div class="input num-input" [class.error]="settingsForm.get('evergreenWorkshopMeta.workshopDays')?.invalid"><input class="txt" type="number" min="1" formControlName="workshopDays" placeholder="Enter number of days"></div>
-                <div class="help">Number of days this evergreen workshop runs. The daily messages below follow this number.</div>
+                <div class="help">{{ h('evergreenWorkshopMeta.workshopDays') }}</div>
               </div>
               <div class="field">
                 <div class="label"><span>Last challenge message</span></div>
                 <div class="input textarea"><textarea class="txt" formControlName="lastChallengeMessage" rows="3" placeholder="Enter message to show after the last challenge..."></textarea></div>
-                <div class="help">Shown after the final challenge.</div>
+                <div class="help">{{ h('evergreenWorkshopMeta.lastChallengeMessage') }}</div>
               </div>
             </div>
 
@@ -395,13 +422,20 @@
             <div class="s-text">
               <div class="s-title">Referral Workshop</div>
               <div class="s-desc" [class.on]="v('referralworkshop')">{{ v('referralworkshop') ? 'Participants can refer this workshop' : 'Referral is disabled' }}</div>
+              <div class="help">{{ h('referralworkshop') }}</div>
               <div class="s-expand" *ngIf="v('referralworkshop')">
                 <div class="grid3">
-                  <div class="field"><div class="label"><span>Refer user count</span></div><div class="input num-input"><input class="txt" type="number" min="0" formControlName="refercount" placeholder="Enter number of users to refer"></div><div class="help">How many users each participant can refer.</div></div>
-                  <div class="field"><div class="label"><span>Referral code starts with</span><span class="counter">A–Z only</span></div><div class="input" [class.error]="settingsForm.get('referralcodestartswith')?.invalid"><input class="txt mono" type="text" formControlName="referralcodestartswith" (input)="onReferralCodeInput($event)" placeholder="Enter prefix (CAPS only)" style="text-transform:uppercase;color:#1a2535;" autocapitalize="characters"></div><div class="help" [class.err]="settingsForm.get('referralcodestartswith')?.invalid">{{ settingsForm.get('referralcodestartswith')?.invalid ? 'Only uppercase letters are allowed.' : 'Typed lower-case letters are uppercased as you type; other characters are dropped.' }}</div></div>
-                  <div class="field"><div class="label"><span>Referral message</span><span class="counter">Single line</span></div><div class="input"><input class="txt" formControlName="referralmessage" (input)="onReferralMessageInput($event)" (keydown.enter)="$event.preventDefault()" placeholder="Enter the referral message..."></div><div class="help">Line breaks become spaces.</div></div>
+                  <div class="field"><div class="label"><span>Refer user count</span></div><div class="input num-input"><input class="txt" type="number" min="0" formControlName="refercount" placeholder="Enter number of users to refer"></div>
+<div class="help">{{ h('refercount') }}</div></div>
+                  <div class="field"><div class="label"><span>Referral code starts with</span><span class="counter">A–Z only</span></div><div class="input" [class.error]="settingsForm.get('referralcodestartswith')?.invalid"><input class="txt mono" type="text" formControlName="referralcodestartswith" (input)="onReferralCodeInput($event)" placeholder="Enter prefix (CAPS only)" style="text-transform:uppercase;color:#1a2535;" autocapitalize="characters"></div><div class="help" [class.err]="settingsForm.get('referralcodestartswith')?.invalid">{{ settingsForm.get('referralcodestartswith')?.invalid ? 'Only uppercase letters are allowed.' : 'Typed lower-case letters are uppercased as you type; other characters are dropped.' }}</div>
+                    <div class="help">{{ h('referralcodestartswith') }}</div>
+                  </div>
+                  <div class="field"><div class="label"><span>Referral message</span><span class="counter">Single line</span></div><div class="input"><input class="txt" formControlName="referralmessage" (input)="onReferralMessageInput($event)" (keydown.enter)="$event.preventDefault()" placeholder="Enter the referral message..."></div>
+<div class="help">{{ h('referralmessage') }}</div></div>
                 </div>
-                <div class="field"><div class="label"><span>Referral dialog message</span></div><div class="input textarea"><textarea class="txt" formControlName="referraldialogmessage" rows="3" placeholder="Enter the referral dialog message..."></textarea></div></div>
+                <div class="field"><div class="label"><span>Referral dialog message</span></div><div class="input textarea"><textarea class="txt" formControlName="referraldialogmessage" rows="3" placeholder="Enter the referral dialog message..."></textarea></div>
+                  <div class="help">{{ h('referraldialogmessage') }}</div>
+                </div>
                 <div class="help">Enrollment-not-allowed messages are in Communication &rsaquo; Messages.</div>
               </div>
             </div>
@@ -412,10 +446,15 @@
             <div class="s-text">
               <div class="s-title">Payment</div>
               <div class="s-desc" [class.on]="v('payment')">{{ v('payment') ? 'Payment is enabled for this workshop' : 'Payment is disabled' }}</div>
+              <div class="help">{{ h('heromobile') }}</div>
               <div class="s-expand" *ngIf="v('payment')" formGroupName="paymentmap">
                 <div class="grid3">
-                  <div class="field"><div class="label"><span>Amount</span></div><div class="input"><input class="txt" type="number" min="0" formControlName="amount" placeholder="Enter amount"></div></div>
-                  <div class="field"><div class="label"><span>Amount striked</span></div><div class="input"><input class="txt" type="number" min="0" formControlName="amountstriked" placeholder="Enter striked amount"></div></div>
+                  <div class="field"><div class="label"><span>Amount</span></div><div class="input"><input class="txt" type="number" min="0" formControlName="amount" placeholder="Enter amount"></div>
+<div class="help">{{ h('amount') }}</div>
+                    <div class="help">{{ h('paymentmap.amount') }}</div>
+                  </div>
+                  <div class="field"><div class="label"><span>Amount striked</span></div><div class="input"><input class="txt" type="number" min="0" formControlName="amountstriked" placeholder="Enter striked amount"></div>
+<div class="help">{{ h('paymentmap.amountstriked') }}</div></div>
                   <div class="field pop-anchor" data-pop>
                     <div class="label"><span>Payment for</span></div>
                     <button type="button" class="input pick" (click)="togglePopover('paymentfor')"><span class="txt" [class.ph]="!v('paymentmap.paymentfor')">{{ v('paymentmap.paymentfor') === 'new' ? 'New' : v('paymentmap.paymentfor') === 'exist' ? 'Exist' : v('paymentmap.paymentfor') === 'both' ? 'Both' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
@@ -431,7 +470,8 @@
                 <div class="grid3">
                   <div class="field"><div class="label"><span>API</span></div><div class="input"><input class="txt mono" formControlName="api" placeholder="Enter API"></div></div>
                   <div class="field"><div class="label"><span>ID</span></div><div class="input"><input class="txt mono" formControlName="id" placeholder="Enter ID"></div></div>
-                  <div class="field"><div class="label"><span>Hint</span></div><div class="input"><input class="txt" formControlName="hint" placeholder="Enter hint"></div></div>
+                  <div class="field"><div class="label"><span>Hint</span></div><div class="input"><input class="txt" formControlName="hint" placeholder="Enter hint"></div>
+<div class="help">{{ h('paymentmap.hint') }}</div></div>
                 </div>
                 <div class="grid2">
                   <div class="field pop-anchor" data-pop>
@@ -510,6 +550,8 @@
               <div class="seg">
                 <button type="button" *ngFor="let ch of activityChannels" [class.on]="v('workshopactivitychannel') === ch" (click)="setField('workshopactivitychannel', ch)">{{ ch }}</button>
               </div>
+            
+              <div class="help">{{ h('selectedgroup') }}</div>
             </div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Chat group</span><span class="counter">from supportchat · newest first</span></div>
@@ -538,7 +580,8 @@
         <div class="sec-body" *ngIf="!isCollapsed('mail')" formGroupName="mailTemplate">
           <div class="field"><div class="label"><span>Subject</span></div><div class="input textarea" style="min-height:56px;"><textarea class="txt" formControlName="subject" rows="2"></textarea></div></div>
           <div class="grid2">
-            <div class="field"><div class="label"><span>Description</span></div><div class="input textarea"><textarea class="txt" formControlName="description" rows="3"></textarea></div></div>
+            <div class="field"><div class="label"><span>Description</span></div><div class="input textarea"><textarea class="txt" formControlName="description" rows="3"></textarea></div>
+<div class="help">{{ h('description') }}</div></div>
             <div class="field"><div class="label"><span>Live call text</span></div><div class="input textarea"><textarea class="txt" formControlName="liveCallText" rows="3"></textarea></div></div>
           </div>
         </div>
@@ -554,10 +597,14 @@
         </div>
         <div class="sec-body" *ngIf="!isCollapsed('messages')">
           <div class="grid2">
-            <div class="field"><div class="label"><span>WhatsApp enrol message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollwattimessage" rows="3" placeholder="Enter the message sent on enrolment…"></textarea></div></div>
-            <div class="field"><div class="label"><span>Congratulations message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrolledcongrats" rows="3" placeholder="Enter the congratulations message..."></textarea></div></div>
-            <div class="field"><div class="label"><span>Exist users enrollment not allowed message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollmentnotallowedmessage" rows="3" placeholder="Shown to existing users who cannot enrol…"></textarea></div></div>
-            <div class="field"><div class="label"><span>New users enrollment not allowed message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollmentnotallowedmessagenew" rows="3" placeholder="Shown to new users who cannot enrol…"></textarea></div></div>
+            <div class="field"><div class="label"><span>WhatsApp enrol message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollwattimessage" rows="3" placeholder="Enter the message sent on enrolment…"></textarea></div>
+<div class="help">{{ h('enrollwattimessage') }}</div></div>
+            <div class="field"><div class="label"><span>Congratulations message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrolledcongrats" rows="3" placeholder="Enter the congratulations message..."></textarea></div>
+<div class="help">{{ h('enrolledcongrats') }}</div></div>
+            <div class="field"><div class="label"><span>Exist users enrollment not allowed message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollmentnotallowedmessage" rows="3" placeholder="Shown to existing users who cannot enrol…"></textarea></div>
+<div class="help">{{ h('enrollmentnotallowedmessage') }}</div></div>
+            <div class="field"><div class="label"><span>New users enrollment not allowed message</span></div><div class="input textarea"><textarea class="txt" formControlName="enrollmentnotallowedmessagenew" rows="3" placeholder="Shown to new users who cannot enrol…"></textarea></div>
+<div class="help">{{ h('enrollmentnotallowedmessagenew') }}</div></div>
           </div>
         </div>
       </section>
@@ -577,8 +624,10 @@
             <div class="input tog"><span class="tog-label">Mobile hero active<span class="help">{{ v('heromobile') ? 'Workshop Mobile Hero is active and visible' : 'Workshop Mobile Hero is inactive and hidden' }}</span></span><button type="button" class="toggle" [class.on]="v('heromobile')" (click)="toggleField('heromobile')" aria-label="Mobile hero active"></button></div>
           </div>
           <div class="grid3">
-            <div class="field"><div class="label"><span>Hero heading</span></div><div class="input textarea" style="min-height:56px;"><textarea class="txt" formControlName="heroHeading" rows="2"></textarea></div></div>
-            <div class="field"><div class="label"><span>Hero description</span></div><div class="input textarea"><textarea class="txt" formControlName="heroDescription" rows="3"></textarea></div></div>
+            <div class="field"><div class="label"><span>Hero heading</span></div><div class="input textarea" style="min-height:56px;"><textarea class="txt" formControlName="heroHeading" rows="2"></textarea></div>
+<div class="help">{{ h('heroHeading') }}</div></div>
+            <div class="field"><div class="label"><span>Hero description</span></div><div class="input textarea"><textarea class="txt" formControlName="heroDescription" rows="3"></textarea></div>
+<div class="help">{{ h('heroDescription') }}</div></div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Hero type</span></div>
               <button type="button" class="input pick" (click)="togglePopover('herotype')"><span class="txt" [class.ph]="!v('heroshowtype')">{{ v('heroshowtype') === 'image' ? 'Image' : v('heroshowtype') === 'video' ? 'Video' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>

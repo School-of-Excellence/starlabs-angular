@@ -155,11 +155,13 @@
                     <input class="txt" [matDatepicker]="sdp" formControlName="startdate" placeholder="Date">
                     <mat-datepicker #sdp></mat-datepicker>
                   </div>
+                  <div class="help">{{ h('challenges[].startdate') }}</div>
                   <div class="input time">
                     <button type="button" class="prefix" (click)="stp.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                     <input class="txt" [matTimepicker]="stp" formControlName="starttime" placeholder="Time">
                     <mat-timepicker #stp></mat-timepicker>
                   </div>
+                  <div class="help">{{ h('challenges[].starttime') }}</div>
                 </div>
                 <!-- Workshop Active: the two controls stay in the form (still saved) but are not editable -->
                 <ng-template #lockedUnlock>
@@ -178,10 +180,12 @@
               <div class="field">
                 <div class="label"><span>Heading</span></div>
                 <div class="input"><input class="txt" formControlName="heading" placeholder="Enter heading"></div>
+                <div class="help">{{ h('challenges[].heading') }}</div>
               </div>
               <div class="field">
                 <div class="label"><span>Sub heading</span></div>
                 <div class="input"><input class="txt" formControlName="subheading" placeholder="Enter subheading"></div>
+                <div class="help">{{ h('challenges[].subheading') }}</div>
               </div>
             </div>
 
@@ -223,6 +227,7 @@
               <div class="field">
                 <div class="label"><span>Description</span></div>
                 <div class="input"><input class="txt" formControlName="description" placeholder="Enter description"></div>
+                <div class="help">{{ h('description') }}</div>
               </div>
               <div class="grid2">
                 <ng-container [ngTemplateOutlet]="categoriesField"></ng-container>
@@ -275,6 +280,7 @@
                         <div class="field">
                           <div class="label"><span>Activity name</span></div>
                           <div class="input"><input class="txt" formControlName="name" placeholder="Activity name"></div>
+                          <div class="help">{{ h('challenges[].challenges[].name') }}</div>
                         </div>
                         <div class="field pop-anchor" data-pop>
                           <div class="label"><span>Activity type</span></div>
@@ -290,12 +296,14 @@
                               </button>
                             </div>
                           </div>
+                          <div class="help" *ngIf="act.get('type')?.value && h('challenges[].challenges[].type=' + act.get('type')?.value)">{{ h('challenges[].challenges[].type=' + act.get('type')?.value) }}</div>
                           <div class="help warn" *ngIf="act.get('type')?.value">Changing the type clears this activity's type fields.</div>
                           <div class="err" *ngIf="!act.get('type')?.value"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Choose a type for this activity.</div>
                         </div>
                         <div class="field">
                           <div class="label"><span>Description</span></div>
                           <div class="input"><input class="txt" formControlName="description" placeholder="Activity description"></div>
+                          <div class="help">{{ h('description') }}</div>
                         </div>
                       </div>
 
@@ -426,10 +434,12 @@
                               <div class="field">
                                 <div class="label"><span>Topic</span></div>
                                 <div class="input"><input class="txt" formControlName="assignmenttopic" placeholder="Assignment topic"></div>
+                                <div class="help">{{ h('challenges[].challenges[].assignmenttopic') }}</div>
                               </div>
                               <div class="field">
                                 <div class="label"><span>Description</span></div>
                                 <div class="input"><input class="txt" formControlName="assignmentdescription" placeholder="Assignment description"></div>
+                                <div class="help">{{ h('challenges[].challenges[].assignmentdescription') }}</div>
                               </div>
                             </div>
                             <div class="grid2">
@@ -477,11 +487,12 @@
                             <div class="field">
                               <div class="label"><span>Resource title</span></div>
                               <div class="input"><input class="txt" formControlName="uploadedresourcetitle" placeholder="Resource title"></div>
+                              <div class="help">{{ h('challenges[].challenges[].uploadedresourcetitle') }}</div>
                             </div>
                             <div class="field">
                               <div class="label"><span>Resource URL</span><button type="button" class="link" *ngIf="act.get('uploadedresource')?.value" (click)="openResourceLink(act.get('uploadedresource')?.value)">Open ↗</button></div>
                               <div class="input ro"><input class="txt mono" formControlName="uploadedresource" readonly placeholder="Filled by the upload"></div>
-                              <div class="help">Read-only, filled by the upload.</div>
+                              <div class="help">{{ h('challenges[].challenges[].uploadedresource') }}</div>
                             </div>
                           </div>
                         </ng-container>
@@ -489,17 +500,22 @@
                         <!-- offer -->
                         <ng-container *ngSwitchCase="'offer'">
                           <div class="grid3">
-                            <div class="field"><div class="label"><span>Reward head</span></div><div class="input"><input class="txt" formControlName="rewardhead" placeholder="Reward head"></div></div>
-                            <div class="field"><div class="label"><span>Reward description</span></div><div class="input"><input class="txt" formControlName="rewarddescription" placeholder="Reward description"></div></div>
-                            <div class="field"><div class="label"><span>Reward link</span></div><div class="input"><input class="txt mono" formControlName="rewardlink" placeholder="https://…"></div></div>
+                            <div class="field"><div class="label"><span>Reward head</span></div><div class="input"><input class="txt" formControlName="rewardhead" placeholder="Reward head"></div>
+<div class="help">{{ h('challenges[].challenges[].rewardhead') }}</div></div>
+                            <div class="field"><div class="label"><span>Reward description</span></div><div class="input"><input class="txt" formControlName="rewarddescription" placeholder="Reward description"></div>
+<div class="help">{{ h('challenges[].challenges[].rewarddescription') }}</div></div>
+                            <div class="field"><div class="label"><span>Reward link</span></div><div class="input"><input class="txt mono" formControlName="rewardlink" placeholder="https://…"></div>
+<div class="help">{{ h('challenges[].challenges[].rewardlink') }}</div></div>
                           </div>
                         </ng-container>
 
                         <!-- note -->
                         <ng-container *ngSwitchCase="'note'">
                           <div class="grid2">
-                            <div class="field"><div class="label"><span>Note head</span></div><div class="input"><input class="txt" formControlName="notehead" placeholder="Note head"></div></div>
-                            <div class="field"><div class="label"><span>Note description</span></div><div class="input"><input class="txt" formControlName="notedescription" placeholder="Note description"></div></div>
+                            <div class="field"><div class="label"><span>Note head</span></div><div class="input"><input class="txt" formControlName="notehead" placeholder="Note head"></div>
+<div class="help">{{ h('challenges[].challenges[].notehead') }}</div></div>
+                            <div class="field"><div class="label"><span>Note description</span></div><div class="input"><input class="txt" formControlName="notedescription" placeholder="Note description"></div>
+<div class="help">{{ h('challenges[].challenges[].notedescription') }}</div></div>
                           </div>
                           <div class="field">
                             <div class="label"><span>Note (rich)</span></div>
@@ -507,14 +523,17 @@
                               <ngx-editor-menu [editor]="getEditor(act, 'notedescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
                               <ngx-editor class="rt-md" [editor]="getEditor(act, 'notedescriptionrich')" formControlName="notedescriptionrich" [outputFormat]="'html'" placeholder="Formatted note shown in the app…"></ngx-editor>
                             </div>
+                            <div class="help">{{ h('challenges[].challenges[].notedescriptionrich') }}</div>
                           </div>
                         </ng-container>
 
                         <!-- evolution mapping -->
                         <ng-container *ngSwitchCase="'evolutionmapping'">
                           <div class="grid2">
-                            <div class="field"><div class="label"><span>Title</span></div><div class="input"><input class="txt" formControlName="evolutionmappingtitle" placeholder="Evolution mapping title"></div></div>
-                            <div class="field"><div class="label"><span>Description</span></div><div class="input"><input class="txt" formControlName="evolutionmappingdescription" placeholder="Evolution mapping description"></div></div>
+                            <div class="field"><div class="label"><span>Title</span></div><div class="input"><input class="txt" formControlName="evolutionmappingtitle" placeholder="Evolution mapping title"></div>
+<div class="help">{{ h('challenges[].challenges[].evolutionmappingtitle') }}</div></div>
+                            <div class="field"><div class="label"><span>Description</span></div><div class="input"><input class="txt" formControlName="evolutionmappingdescription" placeholder="Evolution mapping description"></div>
+<div class="help">{{ h('challenges[].challenges[].evolutionmappingdescription') }}</div></div>
                           </div>
                           <div class="input tog"><span class="tog-label">Final before / after</span><button type="button" class="toggle" [class.on]="act.get('finalbeforeafter')?.value" [disabled]="!act.get('finalbeforeafter')?.value && !canEnableFinalBeforeAfter()" (click)="toggleFinalBeforeAfter(act)" aria-label="Final before / after"></button></div>
                           <div class="help" *ngIf="canEnableFinalBeforeAfter()">A "before" and an "after" VideoAsk activity exist, so this can be enabled.</div>
@@ -524,7 +543,8 @@
                         <!-- retired zoom-call activity: read-only legacy -->
                         <ng-container *ngSwitchCase="'zoomcall'">
                           <div class="grid2">
-                            <div class="field"><div class="label"><span>Zoom link</span></div><div class="input ro"><input class="txt mono" formControlName="zoomlinkchallenge" readonly></div></div>
+                            <div class="field"><div class="label"><span>Zoom link</span></div><div class="input ro"><input class="txt mono" formControlName="zoomlinkchallenge" readonly></div>
+<div class="help">{{ h('challenges[].challenges[].zoomlinkchallenge') }}</div></div>
                             <div class="field"><div class="label"><span>Meet date</span></div><div class="input ro"><span class="txt">{{ fmtDateTime(act.get('meetdate')?.value, act.get('meetdate')?.value) || '—' }}</span></div></div>
                           </div>
                           <div class="help warn">Retired type: not offered in the Type menu, but old data still renders so nothing is lost.</div>
@@ -548,6 +568,7 @@
                 <div class="field">
                   <div class="label"><span>Description</span></div>
                   <div class="input"><input class="txt" formControlName="description" placeholder="Enter description"></div>
+                  <div class="help">{{ h('description') }}</div>
                 </div>
                 <ng-container [ngTemplateOutlet]="categoriesField"></ng-container>
               </div>
@@ -561,20 +582,24 @@
                       <input class="txt" [matDatepicker]="ddp" formControlName="duedate" placeholder="Date">
                       <mat-datepicker #ddp></mat-datepicker>
                     </div>
+                    <div class="help">{{ h('challenges[].duedate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="dtp.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="dtp" formControlName="duetime" placeholder="Time">
                       <mat-timepicker #dtp></mat-timepicker>
                     </div>
+                    <div class="help">{{ h('challenges[].duetime') }}</div>
                   </div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Live call starts text</span></div>
                   <div class="input"><input class="txt" formControlName="startlivecall" placeholder="Shown before the call starts"></div>
+                  <div class="help">{{ h('challenges[].startlivecall') }}</div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Zoom link</span></div>
                   <div class="input"><input class="txt mono" formControlName="zoomlink" placeholder="Enter zoom meeting link"></div>
+                  <div class="help">{{ h('challenges[].zoomlink') }}</div>
                 </div>
               </div>
               <div class="grid3">
@@ -585,6 +610,7 @@
                 <div class="field">
                   <div class="label"><span>Completed Zoom URL</span></div>
                   <div class="input"><input class="txt mono" formControlName="completedzoomurl" placeholder="Paste the recording URL"></div>
+                  <div class="help">{{ h('challenges[].completedzoomurl') }}</div>
                 </div>
                 <div class="field">
                   <div class="label"><span>Status</span></div>

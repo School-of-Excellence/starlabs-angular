@@ -11,6 +11,7 @@ import { MatTimepickerModule } from '@angular/material/timepicker';
 import { DateAdapter } from '@angular/material/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { FIELD_HINTS } from '../wc2-help';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { EnrollmentDateAdapter, WC2_MONTHS as MONTHS } from '../wc2-date-adapter';
@@ -47,6 +48,9 @@ interface ConfirmDialog {
   styleUrl: './workshop-challengesv2.component.css'
 })
 export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnDestroy {
+  /** One-line hint under a field, keyed by its stored name (never displayed). */
+  h(key: string): string { return FIELD_HINTS[key] || ''; }
+
   @Input() workshopId: string | null = null;
   @Input() iconData: any[] = [];
   @Input() thumbnailData: any[] = [];

@@ -21,7 +21,7 @@
 
   <div class="card placeholder" *ngIf="!loading && loadError">
     <h2 class="sec-title">Could not load the banner</h2>
-    <p class="ph-text">The <code>classify / eiflixpopupbanner</code> document could not be read, so saving is disabled to avoid overwriting it with empty values.</p>
+    <p class="ph-text">The saved banner could not be read, so saving is disabled to avoid overwriting it with empty values. Close this and try again.</p>
   </div>
 
   <!-- ───────── form ───────── -->
@@ -33,7 +33,7 @@
         <div class="pb-toggle-row">
           <div class="pb-toggle-text">
             <div class="pb-toggle-title">Show this popup</div>
-            <div class="help">Stored as <strong>enable</strong>. Turn it off to hide the banner without clearing anything.</div>
+            <div class="help">Turn this off to hide the popup from the app without clearing anything you have written here.</div>
           </div>
           <button type="button" class="toggle" [class.on]="form.get('enable')?.value"
                   (click)="toggleEnable()" [attr.aria-pressed]="form.get('enable')?.value"

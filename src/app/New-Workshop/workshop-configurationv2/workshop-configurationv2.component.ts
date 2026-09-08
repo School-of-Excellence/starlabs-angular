@@ -15,8 +15,10 @@ import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import { DateAdapter } from '@angular/material/core';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { FIELD_HINTS } from './wc2-help';
 import { AuthguardService } from '../../authguard.service';
 
 import { EnrollmentDateAdapter, WC2_MONTHS as MONTHS } from './wc2-date-adapter';
@@ -48,8 +50,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'blocked' | 'saved' | 'error';
   imports: [
     CommonModule, ReactiveFormsModule, FormsModule, DragDropModule,
     MatDatepickerModule, MatTimepickerModule, MatSnackBarModule,
-    NgxEditorModule, WorkshopChallengesv2Component, WorkshopSettingsv2Component,
-  ],
+    NgxEditorModule, WorkshopChallengesv2Component, WorkshopSettingsv2Component, MatDialogModule,],
   providers: [{ provide: DateAdapter, useClass: EnrollmentDateAdapter }],
   templateUrl: './workshop-configurationv2.component.html',
   styleUrl: './workshop-configurationv2.component.css'
@@ -189,6 +190,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     private guard: AuthguardService,
     private zone: NgZone,
     private host: ElementRef<HTMLElement>,
+    private dialog: MatDialog,
   ) {}
 
   // ═══════════════════════════ lifecycle ═══════════════════════════
@@ -639,6 +641,19 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
 
   // ═══════════════════════════ navigation ═══════════════════════════
   backToWorkshops(): void { this.router.navigate(['/workshops']); }
+  /** The one-line hint shown under a field, keyed by its stored name (never displayed). */
+  h(key: string): string { return FIELD_HINTS[key] || ''; }
+
+  /** The configuration guide behind the "i" button. */
+  async openHelp(section?: number): Promise<void> {
+    const { Wc2HelpDialogComponent } = await import('./help/wc2-help-dialog.component');
+    this.dialog.open(Wc2HelpDialogComponent, {
+      width: '1040px', maxWidth: '96vw', maxHeight: '88vh',
+      autoFocus: false, panelClass: 'wc2-help-dialog',
+      data: { section },
+    });
+  }
+
   openLegacyEditor(): void { if (this.workshopId) this.router.navigate(['/workshopconfigold', this.workshopId]); }
   openImageUpload(): void {
     const url = this.router.serializeUrl(this.router.createUrlTree(['/workshop_image_upload']));

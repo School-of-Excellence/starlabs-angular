@@ -7,6 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { FIELD_HINTS } from '../wc2-help';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthguardService } from '../../../authguard.service';
@@ -33,6 +34,9 @@ interface SectionDef { id: string; title: string; group: 'General' | 'Access' | 
   styleUrl: './workshop-settingsv2.component.css'
 })
 export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDestroy {
+  /** One-line hint under a field, keyed by its stored name (never displayed). */
+  h(key: string): string { return FIELD_HINTS[key] || ''; }
+
   @Input() workshopId: string | null = null;
   @Input() documentsize = '';
   @Input() docPercent = 0;
