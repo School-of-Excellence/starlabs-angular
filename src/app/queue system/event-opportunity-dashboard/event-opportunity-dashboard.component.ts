@@ -1001,10 +1001,25 @@ export class EventOpportunityDashboardComponent {
       .sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
   }
 
+  /**
+   * Cohorts for a queue, resolved through the queue's `eventid`. That field is
+   * stored as an ARRAY of event-collection ids (a queue can be mapped to
+   * several Live Events); older docs still carry a bare string. `eventCohorts`
+   * is keyed by a single event id, so index it per id and union the results --
+   * indexing it with the raw array stringifies the key ("a,b") and silently
+   * misses every multi-event queue.
+   */
+  private cohortsForQueue(queueid: string): Array<{ bigactivity: string, participantidlist: string[] }> {
+    const raw = this.mapQueue[queueid]?.['eventid'];
+    const eventIds: string[] = Array.isArray(raw) ? raw : ([null, undefined, ''].includes(raw) ? [] : [raw]);
+    const out: Array<{ bigactivity: string, participantidlist: string[] }> = [];
+    eventIds.forEach(id => out.push(...(this.eventCohorts[id] ?? [])));
+    return out;
+  }
+
   getNoStudioShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
-    const cohorts = eventId ? this.eventCohorts[eventId] : null;
-    if (!cohorts?.length) return [];
+    const cohorts = this.cohortsForQueue(queueid);
+    if (!cohorts.length) return [];
 
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
     const mapBigActivity = this.mapData[queueid]?.['mapBigActivity'] ?? {};
@@ -1037,9 +1052,8 @@ export class EventOpportunityDashboardComponent {
   }
 
   getNoStudioShadowingCount(queueid: string, stage: string): number {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
-    const cohorts = eventId ? this.eventCohorts[eventId] : null;
-    if (!cohorts?.length) return 0;
+    const cohorts = this.cohortsForQueue(queueid);
+    if (!cohorts.length) return 0;
 
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
     const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
