@@ -907,7 +907,7 @@ export class UpdateEventDetailComponent {
 
             // Update Firestore to remove image URL
             const docid = this.productsArray.controls[index].value['docid'];
-            if (docid) {
+            if (docid && this.capturedData['edit']) {
               await updateDoc(doc(this.firestore, "arena events", docid), {
                 image: null
               });
