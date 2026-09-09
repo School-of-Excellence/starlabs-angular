@@ -132,33 +132,52 @@ jobs:
   #    recomputing it from N runs.
   report:
     name: report result
-    needs: [suite]
+    # `resolve` is in `needs` ON PURPOSE: without it a resolve failure skips `suite`, and
+    # `needs.suite.result` is then 'skipped' — which the old one-liner reported as FAILED, making a
+    # lane that NEVER RAN indistinguishable from tests that genuinely failed.
+    needs: [resolve, suite]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Report PASSED / FAILED
-        continue-on-error: true
+        continue-on-error: true # reporting must never fail the run
         env:
           INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
           REPO_NAME: ${{ github.event.repository.name }}
           BRANCH: ${{ inputs.ref || github.ref_name }}
           SUITES: ${{ inputs.suites }}
-          RESULT: ${{ needs.suite.result }}
+          RESOLVE_RESULT: ${{ needs.resolve.result }}
+          SUITE_RESULT: ${{ needs.suite.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          STATE=FAILED; [ "$RESULT" = "success" ] && STATE=PASSED
-          echo "matrix result: $RESULT → $STATE"
+          # PASSED only when every matrix leg passed. Everything else is FAILED, but the NOTE says
+          # which kind of failure it was — that distinction is the whole point of this job.
+          STATE=FAILED
+          case "$SUITE_RESULT" in
+            success)   STATE=PASSED; NOTE="all suites passed" ;;
+            failure)   NOTE="one or more suites failed — open the run and expand the failing matrix leg" ;;
+            cancelled) NOTE="the run was cancelled" ;;
+            skipped)
+              if [ "$RESOLVE_RESULT" != "success" ]; then
+                NOTE="the suites never ran: the resolve step failed ($RESOLVE_RESULT) — a suite name is unknown, not ciReady, or has no config in suites-manifest.json"
+              else
+                NOTE="the suites never ran: the matrix produced no jobs"
+              fi ;;
+            *)         NOTE="unexpected suite result: $SUITE_RESULT" ;;
+          esac
+          echo "resolve=$RESOLVE_RESULT suite=$SUITE_RESULT -> $STATE ($NOTE)"
           {
             echo "### branch suites"
             echo "- suites: \`$SUITES\`"
-            echo "- result: **$STATE**"
+            echo "- resolve: \`$RESOLVE_RESULT\` · suites: \`$SUITE_RESULT\`"
+            echo "- result: **$STATE** — $NOTE"
           } >> "$GITHUB_STEP_SUMMARY"
           if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping."; exit 0; fi
           curl -fsS -X POST "$INGEST_BASE/recordSuiteRun" \
             -H "Authorization: Bearer $INGEST_TOKEN" -H "Content-Type: application/json" \
             -d "$(jq -nc --arg repo "$REPO_NAME" --arg branch "$BRANCH" --arg state "$STATE" \
                         --arg sha "$GITHUB_SHA" --arg runId "$GITHUB_RUN_ID" --arg runUrl "$RUN_URL" \
-                        --argjson s "$SUITES" \
+                        --arg note "$NOTE" --argjson s "$SUITES" \
                   '{repo:$repo, branch:$branch, state:$state, sha:$sha,
-                    reportRunId:$runId, runUrl:$runUrl, suites:$s}')" \
+                    reportRunId:$runId, runUrl:$runUrl, suites:$s, note:$note}')" \
             && echo "Reported $STATE." || echo "console update failed (non-fatal)"
