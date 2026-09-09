@@ -248,6 +248,9 @@
 }
 .wc-row-badge mat-icon { font-size: 9px; width: 9px; height: 9px; }
 
+.wc-row-preview.draft { color: var(--ink2); }
+.wc-draft-tag { color: var(--red-fill); font-weight: 700; }
+
 .wc-row-body { flex: 1; min-width: 0; }
 .wc-row-top { display: flex; align-items: baseline; gap: 8px; }
 .wc-row-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -647,6 +650,12 @@
 .wc-pickbar .wc-ghost-btn { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .wc-pickbar .wc-ghost-btn mat-icon { font-size: 15px; width: 15px; height: 15px; }
 .wc-pickcount { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.wc-pickcount-muted { font-size: 11.5px; color: var(--ink4); font-variant-numeric: tabular-nums; }
+.wc-picknote {
+  display: flex; align-items: flex-start; gap: 6px; margin: -2px 0 8px;
+  font-size: 11.5px; line-height: 1.45; color: var(--ink3);
+}
+.wc-picknote mat-icon { font-size: 14px; width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
 .wc-pickmain { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .wc-picksub { font-size: 11px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wc-importnote {
@@ -869,7 +878,15 @@
 .wc-linkform-head mat-icon { color: var(--blue); font-size: 12px; width: 12px; height: 12px; }
 .wc-linkform-head span { font-size: 11px; font-weight: 800; color: var(--blue); flex: 1; }
 .wc-linkform-row { display: flex; gap: 6px; }
-.wc-linkform-row input { flex: 1; height: 32px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 12px; color: var(--t1); }
+/* `background` is not optional here: without it the field falls through to the app-wide input
+   style, which is dark — in the light theme that left dark boxes with near-invisible text. Same
+   reason the placeholder colour is stated rather than inherited. */
+.wc-linkform-row input {
+  flex: 1; height: 32px; padding: 0 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--field);
+  font-size: 12px; color: var(--ink);
+}
+.wc-linkform-row input::placeholder { color: var(--ink4); }
 .wc-linkform-row input.grow { flex: 1.4; }
 .wc-linkform-row input:focus { border-color: var(--blue); }
 
@@ -1022,7 +1039,9 @@
 .wc-cat-choice.on { border-color: var(--blue); background: var(--blue-tint); color: var(--blue); }
 .wc-cat-choice.remove { border-color: var(--red-line); background: var(--red-tint); color: var(--red-fill); }
 .wc-cat-new { display: flex; gap: 6px; }
-.wc-cat-new input { flex: 1; height: 30px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--line3); font-size: 12px; color: var(--t1); }
+/* Same missing-background defect as .wc-linkform-row; this markup is currently unused but the
+   rule is fixed so it cannot come back with the bug attached. */
+.wc-cat-new input { flex: 1; height: 30px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--line3); background: var(--field); font-size: 12px; color: var(--ink); }
 .wc-cat-new input:focus { border-color: var(--blue); }
 
 .wc-kv { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line2); }

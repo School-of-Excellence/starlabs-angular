@@ -348,7 +348,83 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * Clearing `draft` in code does not fire (ngModelChange), so the textarea kept the inline height it
    * had grown to and stayed tall after sending. Every programmatic clear goes through here.
    */
+  /* ── Drafts are per chat, and survive a reload ────────────────────────
+     `draft` is a single field on the component, so leaving a half-written message and opening
+     another group carried the text across — and the next Enter would have sent it to the wrong
+     people. Each chat now owns its draft, and the map is mirrored to localStorage so closing the
+     tab does not lose what was typed.
+
+     Scoped by uid: a shared machine must not show one person's unsent message to the next. Every
+     access is wrapped — localStorage throws outright in private mode and does not exist under SSR,
+     the same reasoning as restoreTheme(). */
+  private static readonly DRAFTS_KEY = 'groupChatDrafts';
+  /** A single draft is capped so a runaway paste cannot fill the origin's storage quota. */
+  private static readonly DRAFT_MAX = 8000;
+
+  private drafts: { [chatId: string]: string } = {};
+
+  private draftsKey(): string {
+    return `${GroupChatScreenComponent.DRAFTS_KEY}:${this.currentUid || 'anon'}`;
+  }
+
+  /** Read the stored map. Called on each access rather than cached — it is small, and the uid it is
+   *  keyed by is not known until the live bootstrap finishes. */
+  private loadDrafts(): void {
+    try {
+      const raw = localStorage.getItem(this.draftsKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      this.drafts = parsed && typeof parsed === 'object' ? parsed : {};
+    } catch { this.drafts = {}; }
+  }
+
+  private saveDrafts(): void {
+    try {
+      const keys = Object.keys(this.drafts);
+      if (!keys.length) localStorage.removeItem(this.draftsKey());
+      else localStorage.setItem(this.draftsKey(), JSON.stringify(this.drafts));
+    } catch { /* private mode, or quota — the in-memory copy still works for this session */ }
+  }
+
+  /** Park the open chat's draft before the active id changes. */
+  private stashDraft(): void {
+    clearTimeout(this.draftSaveTimer);
+    const id = this.activeIds[this.tab];
+    if (!id) return;
+    this.loadDrafts();
+    // An edit in progress is not a draft for the chat — it belongs to one specific message.
+    const text = this.editing ? '' : this.draft;
+    if (text.trim()) this.drafts[id] = text.slice(0, GroupChatScreenComponent.DRAFT_MAX);
+    else delete this.drafts[id];
+    this.saveDrafts();
+  }
+
+  /** Put the target chat's own draft into the composer (empty when it has none). */
+  private restoreDraft(id: string): void {
+    this.loadDrafts();
+    const text = this.drafts[id] || '';
+    this.draft = text;
+    // Angular has not written the new value into the textarea yet and autoGrow measures the DOM,
+    // so set the element directly and re-measure next frame — same reasoning as clearDraft().
+    const el = this.composerRef?.nativeElement;
+    if (el) el.value = text;
+    requestAnimationFrame(() => this.autoGrowComposer());
+  }
+
+  /** True when a chat other than the open one has unsent text — drives the sidebar hint. */
+  hasDraft(chatId: string): boolean {
+    return chatId !== this.activeIds[this.tab] && !!(this.drafts[chatId] || '').trim();
+  }
+
+  draftPreview(chatId: string): string {
+    return this.plainPreview(this.drafts[chatId] || '');
+  }
+
   private clearDraft(): void {
+    // Sent or discarded: drop the stored copy too, or reopening the chat resurrects it. The pending
+    // debounced save is cancelled first, or it would write the text back moments later.
+    clearTimeout(this.draftSaveTimer);
+    const id = this.activeIds[this.tab];
+    if (id) { this.loadDrafts(); delete this.drafts[id]; this.saveDrafts(); }
     this.draft = '';
     // The resize measures the DOM, and Angular has not pushed the empty value into the textarea yet at
     // this point — measuring here would still see the old text and keep the grown height. Clear the
@@ -357,6 +433,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (el) el.value = '';
     requestAnimationFrame(() => this.autoGrowComposer());
     setTimeout(() => this.autoGrowComposer(), 60);
+  }
+
+  /** Empty the composer without touching the stored drafts. */
+  private blankComposer(): void {
+    this.draft = '';
+    const el = this.composerRef?.nativeElement;
+    if (el) el.value = '';
+    requestAnimationFrame(() => this.autoGrowComposer());
   }
 
   autoGrowComposer(): void {
@@ -468,6 +552,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnInit(): void {
     this.restoreTheme();
+    this.loadDrafts();
     // Static rows first so the screen is never blank; live groups replace them once auth resolves.
     this.seedDemoData();
     this.loading = false;
@@ -486,6 +571,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
+    this.stashDraft();            // leaving the screen keeps what was typed
     this.media.pauseAll();
     this.discardRecording();          // revokes the preview object URL
     clearInterval(this.recTimer);
@@ -530,6 +616,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.currentProfileDocId = profileSnap.docs[0].id;
       this.currentUid = this.currentProfile['user_ref']?.id || '';
       if (!this.currentUid) return;
+      this.loadDrafts();          // the drafts key is scoped by uid, which is only known now
 
       this.watchDirectory();
       this.watchRoles();
@@ -627,6 +714,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   private livePeople: Person[] = [];
 
   private nameOfUid(uid: string): string { return this.profilesByUid[uid]?.['name'] || 'Unknown User'; }
+
+  /** Same query shape as chat-screen: admins see every group, everyone else only their own. */
+  /** The paging control only belongs under a channel list that actually has another page. */
+  get showChannelPaging(): boolean {
+    if (this.tab === 'channels') return this.hasMoreChannels.active;
+    if (this.tab === 'archived' && this.archivedSub === 'channels') return this.hasMoreChannels.archived;
+    return false;
+  }
 
   /** Same query shape as chat-screen: admins see every group, everyone else only their own. */
   private loadGroups(): void {
@@ -736,13 +831,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   /** Channels run on the pink accent — including the archived sub-tab that lists deleted ones. */
   get channelTheme(): boolean {
     return this.tab === 'channels' || (this.tab === 'archived' && this.archivedSub === 'channels');
-  }
-
-  /** The paging control only belongs under a channel list that actually has another page. */
-  get showChannelPaging(): boolean {
-    if (this.tab === 'channels') return this.hasMoreChannels.active;
-    if (this.tab === 'archived' && this.archivedSub === 'channels') return this.hasMoreChannels.archived;
-    return false;
   }
 
   loadMoreChannels(): void {
@@ -1480,6 +1568,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.search = value;
     clearTimeout(this.searchDebounce);
     const q = this.normalizeForSearch(value);
+    // Sidebar search filters what is loaded, so a paged window would hide groups the reader can see
+    // no other way. Searching therefore widens the window — the cost is paid only when they ask.
     if (!q) { this.messageHits = []; this.searchingMessages = false; return; }
     this.searchingMessages = true;
     this.searchDebounce = setTimeout(() => this.runMessageSearch(q), 300);
@@ -1744,7 +1834,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openItem(c: ChatItem): void {
+    if (this.activeIds[this.tab] === c.id) return;   // already open — nothing to stash or reload
+    this.stashDraft();
+    this.editing = null;                             // an edit belongs to the chat being left
     this.activeIds = { ...this.activeIds, [this.tab]: c.id };
+    this.restoreDraft(c.id);
     this.replyTo = null; this.showInfo = false; this.infoMsg = null;
     this.person = null; this.attachError = ''; this.pinnedOpen = false;
     this.clearPendingFiles();
@@ -1773,12 +1867,18 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /** Narrow layouts show one pane at a time — this returns to the list. */
   closeThread(): void {
+    this.stashDraft();
+    this.editing = null;
+    this.blankComposer();
     this.activeIds = { ...this.activeIds, [this.tab]: null };
     this.showInfo = false; this.infoMsg = null; this.person = null;
     this.exitSelect();
   }
 
   switchTab(t: TabKey): void {
+    this.stashDraft();                 // before `tab` moves — activeIds is keyed by it
+    this.editing = null;
+    this.blankComposer();
     this.tab = t;
     this.archivedSub = 'groups';
     this.search = ''; this.catFilter = 'all';
@@ -2585,7 +2685,12 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const m = val.slice(0, pos).match(MENTION_TOKEN_RE);
     this.mentionQuery = m ? m[1] : null;
     setTimeout(() => this.autoGrowComposer(), 0);
+    // Stashing only on a thread switch would still lose the message if the tab is closed while
+    // typing. Debounced so a fast typist is not writing to storage on every keystroke.
+    clearTimeout(this.draftSaveTimer);
+    this.draftSaveTimer = setTimeout(() => this.stashDraft(), 400);
   }
+  private draftSaveTimer: any;
 
   get mentionOptions(): MentionOption[] {
     const active = this.active;

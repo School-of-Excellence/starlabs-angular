@@ -74,7 +74,14 @@
               <span class="wc-row-time">{{ timeLabel(c.lastAt) }}</span>
             </div>
             <div class="wc-row-bottom">
-              <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              <!-- An unsent draft is the thing you most need to see from the list — it is the whole
+                   reason drafts are no longer shared between chats. -->
+              <span class="wc-row-preview draft" *ngIf="hasDraft(c.id); else lastMsg">
+                <span class="wc-draft-tag">Draft:</span> {{ draftPreview(c.id) }}
+              </span>
+              <ng-template #lastMsg>
+                <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              </ng-template>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
               <button class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
                       [matTooltip]="c.pinned ? 'Unpin chat' : 'Pin chat'">
@@ -1347,8 +1354,16 @@
             <button class="wc-link-btn" (click)="selectAllCreateShown()">Select all shown</button>
             <span class="grow"></span>
             <span class="wc-pickcount">
-              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es') : createPool.length + ' people' }}
+              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es')
+                         : createPool.length + ' with an app account' }}
             </span>
+          </div>
+          <!-- The count looks like a truncation otherwise. Group membership is stored as uids, so a
+               participant who has never signed in cannot be a member — and could not read the chat
+               or be notified if they were. -->
+          <div class="wc-picknote" *ngIf="!cSearch">
+            <mat-icon>info_outline</mat-icon>
+            <span>Only participants with an app account can be added — a chat member is identified by their login.</span>
           </div>
 
           <ng-container *ngIf="importReport?.target === 'create'">
@@ -1521,6 +1536,7 @@
           </button>
         </div>
         <div class="wc-pickbar sub">
+          <span class="wc-pickcount-muted">{{ addPool.length }} with an app account</span>
           <span class="grow"></span>
           <span class="wc-pickcount">{{ aPicked.length }} selected</span>
         </div>
