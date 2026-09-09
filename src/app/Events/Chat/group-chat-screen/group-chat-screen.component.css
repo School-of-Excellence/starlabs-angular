@@ -912,6 +912,23 @@
 .wc-rec-sub { font-size: 11px; color: var(--t3); }
 .wc-rec-cancel { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--red-line); background: var(--red-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--red-fill); }
 
+/* Pause / resume / re-record. Neutral next to the red discard and the accent Send, so the
+   destructive and the committing actions stay the two that stand out. */
+.wc-rec-btn {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  border: 1px solid var(--line3); background: var(--field); color: var(--ink2);
+  display: flex; align-items: center; justify-content: center;
+}
+.wc-rec-btn:hover { border-color: var(--blue-line); color: var(--blue-text); background: var(--blue-tint2); }
+.wc-rec-btn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
+/* Paused reads as held, not stopped: the dot stops pulsing and drops to the muted ink. */
+.wc-recording.paused .wc-rec-label { color: var(--ink2); }
+.wc-rec-dot.paused { background: var(--ink3); animation: none; }
+
+/* The clip under review sits where the text box would be, so it reads as the pending message. */
+.wc-rec-preview { flex: 1; min-width: 0; }
+
 /* ── Slide-overs ───────────────────────────────────────────────────── */
 /* Wide screens: the panel is a flex sibling, so opening it SHRINKS the chat rather than covering
    it. Below 1100px there is not enough width left to read a thread beside it, so it goes back to

@@ -573,7 +573,7 @@
         <!-- Only group admins may post -->
 
         <!-- Formatting toolbar -->
-        <div class="wc-toolbar" *ngIf="!recording && !features.readOnly && canMessage">
+        <div class="wc-toolbar" *ngIf="!recording && !recReview && !features.readOnly && canMessage">
           <button matTooltip="Bold (Ctrl+B)" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
           <button matTooltip="Italic (Ctrl+I)" (click)="applyFormat('italic')"><mat-icon>format_italic</mat-icon></button>
           <button matTooltip="Bullet list" (click)="applyFormat('ul')"><mat-icon>format_list_bulleted</mat-icon></button>
@@ -591,7 +591,7 @@
           <button class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
             <mat-icon>link</mat-icon> link
           </button>
-          <span class="wc-toolbar-hint">*bold* · _italic_ · - bullet · 1. number</span>
+          <span class="wc-toolbar-hint">*bold* · _italic_ · • bullet · 1. number</span>
         </div>
 
         <!-- @mention autocomplete -->
@@ -675,15 +675,44 @@
 
         <!-- Composer -->
         <div class="wc-composer">
-          <ng-container *ngIf="recording; else notRecording">
-            <div class="wc-recording">
-              <span class="wc-rec-dot"></span>
-              <span class="wc-rec-label">Recording… {{ fmtSecs(recSecs) }}</span>
+          <!-- Capturing: pause without losing what is already recorded, or stop to review it. -->
+          <ng-container *ngIf="recording; else maybeReview">
+            <div class="wc-recording" [class.paused]="recPaused">
+              <span class="wc-rec-dot" [class.paused]="recPaused"></span>
+              <span class="wc-rec-label">{{ recPaused ? 'Paused' : 'Recording…' }} {{ fmtSecs(recSecs) }}</span>
               <span class="wc-rec-sub">voice note</span>
             </div>
-            <button class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()"><mat-icon>close</mat-icon></button>
-            <button class="wc-send" matTooltip="Send voice note" (click)="finishRecording()"><mat-icon>send</mat-icon></button>
+            <button class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()">
+              <mat-icon>close</mat-icon>
+            </button>
+            <button class="wc-rec-btn" *ngIf="!recPaused" matTooltip="Pause" (click)="pauseRecording()">
+              <mat-icon>pause</mat-icon>
+            </button>
+            <button class="wc-rec-btn" *ngIf="recPaused" matTooltip="Resume" (click)="resumeRecording()">
+              <mat-icon>fiber_manual_record</mat-icon>
+            </button>
+            <button class="wc-send" matTooltip="Stop and review" (click)="stopForReview()">
+              <mat-icon>stop</mat-icon>
+            </button>
           </ng-container>
+
+          <!-- Recorded, not sent: play it back, record again, or send. -->
+          <ng-template #maybeReview>
+          <ng-container *ngIf="recReview as rev; else notRecording">
+            <app-chat-audio class="wc-rec-preview" [src]="rev.url" [name]="'Voice note · ' + fmtSecs(rev.secs)"
+                            [download]="false"></app-chat-audio>
+            <button class="wc-rec-cancel" matTooltip="Discard" (click)="discardRecording()">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+            <button class="wc-rec-btn" matTooltip="Record again" (click)="reRecord()">
+              <mat-icon>refresh</mat-icon>
+            </button>
+            <button class="wc-send" [disabled]="sendingRecording" matTooltip="Send voice note"
+                    (click)="finishRecording()">
+              <mat-icon>{{ sendingRecording ? 'hourglass_empty' : 'send' }}</mat-icon>
+            </button>
+          </ng-container>
+          </ng-template>
 
           <ng-template #notRecording>
             <div class="wc-attach" *ngIf="features.attach">

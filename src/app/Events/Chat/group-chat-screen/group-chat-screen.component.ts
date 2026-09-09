@@ -487,6 +487,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnDestroy(): void {
     this.media.pauseAll();
+    this.discardRecording();          // revokes the preview object URL
     clearInterval(this.recTimer);
     clearTimeout(this.toastTimer);
     this.resizeObserver?.disconnect();
@@ -1750,8 +1751,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.messagesError = '';
     this.memberSearch = ''; this.editingName = false;
     this.broadcastInfo = null; this.audienceOpen = false;
-    // Switching threads should not leave a voice note from the old one still playing.
+    // Switching threads should not leave a voice note from the old one still playing, nor an
+    // unsent clip recorded for a different group sitting in the composer.
     this.media.pauseAll();
+    if (this.recording) this.cancelRecording(); else this.discardRecording();
     this.oldestBroadcastDoc = null; this.hasMoreBroadcasts = false;
     if (this.isLive(c)) {
       if (this.isChannel(c)) {
@@ -2532,7 +2535,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
     const lines = (sel || 'item').split('\n');
-    const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `- ${l}`).join('\n');
+    // A real bullet, not a hyphen: the parser already accepts [-•], and "• item" still reads as a
+    // list in the Flutter app, which renders `message` as plain text and shows "- item" as-is.
+    const marked = lines.map((l, i) => kind === 'ol' ? `${i + 1}. ${l}` : `• ${l}`).join('\n');
     const pre = start > 0 && this.draft[start - 1] !== '\n' ? '\n' : '';
     next = this.draft.slice(0, start) + pre + marked + this.draft.slice(end);
     this.setDraftAndCaret(next, start + pre.length + marked.length);
@@ -2735,8 +2740,63 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
 
+  /* ── Voice notes ─────────────────────────────────────────────────────
+     Three states, not one: recording → (optionally paused) → review. Stopping no longer sends;
+     it produces a clip you can play back, re-record or discard first. Sending was previously
+     irreversible the instant you pressed stop, with no way to hear what you had said. */
+
+  /** True while the recorder is paused — still armed, not capturing. */
+  recPaused = false;
+  /** The finished clip awaiting review. Null while recording and after it is sent or discarded. */
+  recReview: { blob: Blob; url: string; secs: number } | null = null;
+  /** True while a reviewed clip is uploading, so Send cannot be pressed twice. */
+  sendingRecording = false;
+
+  pauseRecording(): void {
+    const rec = this.mediaRecorder;
+    if (!rec || rec.state !== 'recording') return;
+    rec.pause();
+    this.recPaused = true;
+    clearInterval(this.recTimer);          // the counter must not run while nothing is captured
+  }
+
+  resumeRecording(): void {
+    const rec = this.mediaRecorder;
+    if (!rec || rec.state !== 'paused') return;
+    rec.resume();
+    this.recPaused = false;
+    this.recTimer = setInterval(() => { this.recSecs += 1; }, 1000);
+  }
+
+  /** Stop capturing and hand the clip to the review bar. Does NOT send. */
+  async stopForReview(): Promise<void> {
+    const secs = this.recSecs;
+    const mime = this.mediaRecorder?.mimeType || 'audio/webm';
+    await this.stopRecorder();
+    const blob = new Blob(this.recChunks, { type: mime });
+    this.recChunks = [];
+    if (blob.size === 0) { this.discardRecording(); return; }
+    this.recReview = { blob, url: URL.createObjectURL(blob), secs };
+  }
+
+  /** Throw the clip away; an object URL left unrevoked holds the audio in memory. */
+  discardRecording(): void {
+    if (this.recReview) URL.revokeObjectURL(this.recReview.url);
+    this.recReview = null;
+    this.recPaused = false;
+    this.recSecs = 0;
+    this.recChunks = [];
+  }
+
+  /** Discard what was recorded and start again from zero. */
+  async reRecord(): Promise<void> {
+    this.discardRecording();
+    await this.startRecording();
+  }
+
   async startRecording(): Promise<void> {
     this.attachError = '';
+    this.discardRecording();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime = (window as any).MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
@@ -2747,6 +2807,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       rec.start();
       this.mediaRecorder = rec;
       this.recSecs = 0;
+      this.recPaused = false;
       this.recording = true;
       this.recTimer = setInterval(() => { this.recSecs += 1; }, 1000);
     } catch (err: any) {
@@ -2757,6 +2818,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   private stopRecorder(): Promise<void> {
     clearInterval(this.recTimer);
     this.recording = false;
+    this.recPaused = false;
     return new Promise(res => {
       const rec = this.mediaRecorder;
       if (!rec || rec.state === 'inactive') { res(); return; }
@@ -2767,19 +2829,26 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   async cancelRecording(): Promise<void> {
     await this.stopRecorder();
-    this.recChunks = [];
+    this.discardRecording();
   }
 
+  /** Send the clip currently under review. */
+  /** Send the clip currently under review. Nothing is sent until this is pressed. */
   async finishRecording(): Promise<void> {
     const target = this.active;
-    const secs = this.recSecs;
-    await this.stopRecorder();
-    const blob = new Blob(this.recChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
-    this.recChunks = [];
-    if (!target || blob.size === 0) return;
+    const review = this.recReview;
+    if (!target || !review || this.sendingRecording) return;
+    const { blob, secs } = review;
 
-    if (this.isLive(target)) {
-      try {
+    this.sendingRecording = true;
+    // Cleared up front: the composer returns to normal immediately, and a second Send during the
+    // upload finds nothing left to send.
+    URL.revokeObjectURL(review.url);
+    this.recReview = null;
+    this.recSecs = 0;
+
+    try {
+      if (this.isLive(target)) {
         const mime = blob.type || 'audio/webm';
         const ext = mime.includes('webm') ? 'webm' : mime.includes('mp4') ? 'm4a' : 'ogg';
         const record = await this.uploadToStorage(target.id, blob, `voice-note-${secs}s.${ext}`, mime);
@@ -2787,14 +2856,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         this.replyTo = null;
         this.justSent = true;
         await this.writeMessage(target, '', [record], replyTarget);
-      } catch (err: any) {
-        console.error('voice note', err);
-        this.attachError = err?.message || 'Could not send voice note.';
+        return;
       }
-      return;
-    }
 
-    try {
       const dataUrl: string = await new Promise((resolve, reject) => {
         const fr = new FileReader();
         fr.onload = () => resolve(fr.result as string);
@@ -2814,7 +2878,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.touch(target, '🎤 Voice note', at);
       this.scrollToBottomSoon();
     } catch (err: any) {
+      console.error('voice note', err);
       this.attachError = err?.message || 'Could not send voice note.';
+    } finally {
+      this.sendingRecording = false;
     }
   }
 
