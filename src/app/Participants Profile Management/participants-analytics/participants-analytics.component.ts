@@ -1,5 +1,5 @@
 import { SelectionModel } from '@angular/cdk/collections';
-import { Component, ElementRef, inject, ViewChild } from '@angular/core';
+import { Component, ElementRef, inject, Input, ViewChild } from '@angular/core';
 import { Firestore, collection, doc, getDocs, query, collectionData, orderBy, updateDoc, DocumentReference, deleteDoc, getDoc, where, writeBatch, serverTimestamp, setDoc, DocumentSnapshot, onSnapshot, limit, startAfter, Timestamp, getFirestore} from '@angular/fire/firestore';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -149,6 +149,8 @@ export class ParticipantsAnalyticsComponent {
   @ViewChild(MatPaginator) paginator: MatPaginator
   @ViewChild(MatSort) sort: MatSort
   @ViewChild('Table') table: ElementRef;
+
+  @Input() communication : any = null;
 
   dashboardEntireData: any[] = []
   cloneddashboarddata: any[] = [];
@@ -1472,6 +1474,7 @@ export class ParticipantsAnalyticsComponent {
     });
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
       if (result != null && result != undefined) {
+        result['communicationplannerid'] = this.communication?.docid ?? null;
         console.log(result);
 
         const docRef = doc(collection(this.firestore, "email archive"), result['docid']);
