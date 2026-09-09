@@ -10,6 +10,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { WC2_TOOLBAR_FULL, resetToParagraph, focusedEditor } from '../../workshop-configurationv2/wc2-editor';
 
 /** The three artwork slots, with the size each one is cut to. */
 interface Slot {
@@ -60,13 +61,7 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
   ];
 
   editors: { [key: string]: Editor } = {};
-  toolbar: Toolbar = [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ heading: ['h1', 'h2', 'h3'] }],
-    ['bullet_list', 'ordered_list'],
-    ['link', 'text_color'],
-    ['align_left', 'align_center', 'align_right', 'align_justify'],
-  ];
+  toolbar: Toolbar = WC2_TOOLBAR_FULL;
 
   // Sizes are the operator's, verbatim.
   readonly slots: Slot[] = [
@@ -115,6 +110,9 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
     this.richFields.forEach(f => { this.editors[f.key] = new Editor(); });
     this.load();
   }
+
+  /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
+  toNormal(): void { resetToParagraph(focusedEditor(this.editors)); }
 
   ngOnDestroy(): void {
     Object.values(this.editors).forEach(e => e?.destroy());
