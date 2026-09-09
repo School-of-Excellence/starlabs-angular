@@ -39,6 +39,14 @@ on:
       ref:
         description: 'Branch to build channels for'
         required: false
+      skip_channels:
+        description: >-
+          'true' = run ONLY the suite-status check and skip both channel builds.
+          Set by the console's Recheck button: re-running the ~1-minute check must not cost two
+          full AOT builds, and must not republish the PROD channel against the live project for
+          another 7 days. A plain push always leaves this empty, so the normal flow is unchanged.
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -117,6 +125,9 @@ jobs:
   # ── 2. Two hosting channels from the same commit ───────────────────────────────────────────────
   channels:
     name: channel (${{ matrix.env }})
+    # Skipped only for an explicit recheck dispatch. `inputs.skip_channels` is empty on a push
+    # event, so this condition is true for every normal run.
+    if: ${{ inputs.skip_channels != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: ${{ matrix.soft }}
