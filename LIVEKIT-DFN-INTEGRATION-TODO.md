@@ -17,15 +17,29 @@
 - **Reference implementation (gold standard, Next.js):** `/Users/m1/Documents/Angular Projects/Version 19/videoconference/fresh-livekit-dfn/meet`
   - DFN control: `lib/DfnControls.tsx` · headers: `next.config.js` · patched DFN source: `../mezon-noise-suppression/`
 
-## 1. Status snapshot (from audit, 2026-06-18)
-The DFN client port is **faithful and correct** — config, constraints, patched package, assets, jitter
-buffer all match the reference. The audio regression ("voice breaks / less clear") is **environmental**,
-not in the ported logic. Three suspected causes, in priority order:
-1. **Cross-origin isolation not guaranteed on `/joinlivekit`** (clarity) — see §2.
-2. **Different media server** (OpenVidu Pro Elastic vs self-hosted LiveKit) → network breakup — see §4.
-3. **`livekit-client` major version behind** (1.15.13 vs reference 2.19.1) — see §3.
+## 1. Status snapshot (UPDATED 2026-07-02 — byte-level parity proven; see Journal/2026-07-02-dfn-choppy-audio-package-parity-disproven.md)
+The DFN client port is **faithful and correct — now PROVEN byte-identical to the reference**, not just
+audited. The "reference patched a bug inside the DeepFilter package that we lack" lead is **DISPROVEN**:
+- `df_bg.wasm` md5 `9bdc1234…` === reference live CDN etag (cdn.mezon.ai). **Identical.**
+- `DeepFilterNet3_onnx.tar.gz` md5 `f37cd201…` === CDN etag. **Identical.**
+- `index.esm.js` glue === reference `dist`/node_modules build (`3ae35fe…`) + one benign Angular-only
+  `ensureGzippedModel` helper. Gate/makeupGain/frame/overlap-add logic **identical**.
+- `jitter-buffer.ts` === `meet/lib/jitterBuffer.ts` (identical logic). Processor config === `DfnControls.tsx`.
 
-Run §6 diagnostics FIRST to confirm which apply before changing anything.
+**Two suspects below are STALE/WRONG — do not chase:**
+1. ~~Cross-origin isolation not on `/joinlivekit`~~ — `firebase.json` **already** sets COOP same-origin +
+   COEP credentialless for `/joinlivekit/**` (matches reference). AND the DFN WASM is single-threaded
+   (Rust `no_threads` std; no SharedArrayBuffer/Atomics) so isolation is **irrelevant to DFN audio**. §2 void.
+3. ~~`livekit-client` behind (1.15.13)~~ — app is **already on 2.19.1** (package.json + node_modules), same
+   as the reference. `setAudioContext` present & used. §3 void.
+
+**Remaining real causes of choppiness (both runtime/environmental, need a live 2-participant call):**
+- **CPU starvation** of the single-threaded DFN AudioWorklet by video blur + VP8 simulcast + monitoring
+  (the bare reference has none). FIXED the one auto-force bug: leave/reset no longer sets `blurLevel='high'`.
+  `audioDiag()` now prints a `client` block (blur/cpu/cores/isolation) to A/B this.
+- **Media server / network** (OpenVidu-hosted LiveKit; possible TURN relay / loss) — see §4.
+
+Run §6 diagnostics on a LIVE 2-participant call to localize which of the two applies.
 
 ---
 
