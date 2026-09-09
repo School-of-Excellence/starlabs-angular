@@ -11,6 +11,7 @@ import { MatTimepickerModule } from '@angular/material/timepicker';
 import { DateAdapter } from '@angular/material/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { WC2_TOOLBAR_FULL, resetToParagraph, focusedEditor } from '../wc2-editor';
 import { FIELD_HINTS } from '../wc2-help';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -110,13 +111,7 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
 
   // rich text (keyed by activity challengeid so reorder/insert never re-indexes)
   editors: { [key: string]: Editor } = {};
-  toolbarFull: Toolbar = [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ heading: ['h1', 'h2', 'h3'] }],
-    ['bullet_list', 'ordered_list'],
-    ['link', 'text_color'],
-    ['align_left', 'align_center', 'align_right', 'align_justify'],
-  ];
+  toolbarFull: Toolbar = WC2_TOOLBAR_FULL;
 
   // ───────────────────────── UI state ─────────────────────────
   openSets = new Set<string>();
@@ -154,12 +149,16 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
     });
   }
 
+  /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
+  toNormal(): void { resetToParagraph(focusedEditor(this.editors)); }
+
   ngOnDestroy(): void {
     this.scrollEl?.removeEventListener('scroll', this.onScroll);
     this.destroy$.next();
     this.destroy$.complete();
     Object.values(this.editors).forEach(e => e?.destroy());
     if (this.savedTimer) clearTimeout(this.savedTimer);
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
   }
 
   @HostListener('document:click', ['$event'])
@@ -173,6 +172,9 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
   // scroll spy on the shell's scroll container (mat-drawer-content)
   private scrollEl: HTMLElement | Window | null = null;
   private scrollTicking = false;
+  /** Set while a Curriculum click is scrolling, so the scroll-spy does not fight the choice. */
+  private jumpingTo = '';
+  private jumpTimer: any = null;
   private readonly onScroll = () => {
     if (this.scrollTicking || this.host.nativeElement.hidden) return;
     this.scrollTicking = true;
@@ -187,6 +189,10 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
         if (el && el.getBoundingClientRect().top <= threshold) current = id;
         if (!current) current = id;
       }
+      // A smooth scroll started by a Curriculum click fires this handler all the way
+      // down. Recomputing from mid-flight positions would drag the highlight back off
+      // the set the operator just picked, so leave it alone until the scroll settles.
+      if (this.jumpingTo) return;
       if (current !== this.activeSetId) this.zone.run(() => { this.activeSetId = current; });
     });
   };
@@ -793,8 +799,20 @@ export class WorkshopChallengesv2Component implements OnInit, AfterViewInit, OnD
   toggleAct(act: AbstractControl): void { const id = this.actId(act); this.openActs.has(id) ? this.openActs.delete(id) : this.openActs.add(id); }
   jumpToSet(set: AbstractControl): void {
     const id = this.setId(set);
-    this.openSets.add(id); this.activeSetId = id;
-    document.getElementById('set-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this.openSets.add(id);
+    this.activeSetId = id;
+    // Clicking a rail item usually EXPANDS a collapsed set, which changes the height
+    // of everything below it. Scrolling in this same tick measures the pre-expansion
+    // layout and lands somewhere else — which is why it used to take two clicks, the
+    // second one working only because the set was already open. Wait for the expanded
+    // content to render, then scroll.
+    this.jumpingTo = id;
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
+    setTimeout(() => {
+      document.getElementById('set-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Release the spy once the smooth scroll has had time to settle.
+      this.jumpTimer = setTimeout(() => { this.jumpingTo = ''; this.jumpTimer = null; }, 800);
+    });
   }
   // Track by control identity: patchChallengeData rebuilds the groups, so their views (and every
   // formControlName binding inside) must be recreated; drag reorder moves the same instances.

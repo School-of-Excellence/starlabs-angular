@@ -18,6 +18,7 @@ import { DateAdapter } from '@angular/material/core';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { WC2_TOOLBAR_FULL, WC2_TOOLBAR_TITLE, WC2_TOOLBAR_ITEM, resetToParagraph, focusedEditor } from './wc2-editor';
 import { FIELD_HINTS } from './wc2-help';
 import { AuthguardService } from '../../authguard.service';
 
@@ -109,22 +110,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   ];
   editors: { [key: string]: Editor } = {};
   dynamicEditors: { [key: string]: Editor } = {};
-  toolbarFull: Toolbar = [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ heading: ['h1', 'h2', 'h3'] }],
-    ['bullet_list', 'ordered_list'],
-    ['link', 'text_color'],
-    ['align_left', 'align_center', 'align_right', 'align_justify'],
-  ];
-  toolbarTitle: Toolbar = [
-    ['bold', 'italic', 'underline'],
-    [{ heading: ['h1', 'h2'] }],
-    ['bullet_list', 'link'],
-  ];
-  toolbarItem: Toolbar = [
-    ['bold', 'italic', 'underline'],
-    ['bullet_list'],
-  ];
+  toolbarFull: Toolbar = WC2_TOOLBAR_FULL;
+  toolbarTitle: Toolbar = WC2_TOOLBAR_TITLE;
+  toolbarItem: Toolbar = WC2_TOOLBAR_ITEM;
 
   // ───────────────────────── section configs (same keys/limits as legacy) ─────────────────────────
   fieldSections = [
@@ -202,6 +190,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     this.loadWorkshopData();
   }
 
+  /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
+  toNormal(): void { resetToParagraph(focusedEditor(this.editors, this.dynamicEditors)); }
+
   ngOnDestroy(): void {
     this.scrollEl?.removeEventListener('scroll', this.onScroll);
     this.destroy$.next();
@@ -209,6 +200,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     Object.values(this.editors).forEach(e => e?.destroy());
     this.destroyAllDynEditors();
     if (this.savedTimer) clearTimeout(this.savedTimer);
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
   }
 
   @HostListener('window:beforeunload', ['$event'])
@@ -229,6 +221,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   // ───────── scroll spy: the app shell scrolls mat-drawer-content, not the window ─────────
   private scrollEl: HTMLElement | Window | null = null;
   private scrollTicking = false;
+  /** Set while a rail click is scrolling, so the scroll-spy does not fight the choice. */
+  private jumpingTo = '';
+  private jumpTimer: any = null;
   private readonly onScroll = () => {
     if (this.scrollTicking || this.activeTab !== 0) return;
     this.scrollTicking = true;
@@ -241,6 +236,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
         const el = document.getElementById('sec-' + s.id);
         if (el && el.getBoundingClientRect().top <= threshold) current = s.id;
       }
+      if (this.jumpingTo) return;   // a rail click owns the highlight until its scroll settles
       if (current !== this.activeSection) this.zone.run(() => { this.activeSection = current; });
     });
   };
@@ -679,8 +675,15 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   jumpTo(id: string): void {
     this.collapsed.delete(id);
     this.activeSection = id;
-    const el = document.getElementById('sec-' + id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Expanding a collapsed section changes the height of everything below it, so a
+    // scroll measured in this same tick lands in the wrong place — the reason a rail
+    // click used to need a second try. Scroll once the section has rendered.
+    this.jumpingTo = id;
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
+    setTimeout(() => {
+      document.getElementById('sec-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.jumpTimer = setTimeout(() => { this.jumpingTo = ''; this.jumpTimer = null; }, 800);
+    });
   }
 
   sectionCount(s: SectionDef): string {

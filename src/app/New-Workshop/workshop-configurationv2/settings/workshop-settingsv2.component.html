@@ -1,3 +1,10 @@
+<!-- Appended inside every editor's menu bar: the toolbar has no way back to a
+     plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
+     only strips marks), so a heading was otherwise permanent. -->
+<ng-template #wc2Normal>
+  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+          (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
+</ng-template>
 <!-- ═══════════════ shared inline icons ═══════════════ -->
 <ng-template #icChevDown><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></ng-template>
 <ng-template #icChevRight><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></ng-template>
@@ -124,6 +131,12 @@
             <div class="s-text"><div class="s-title">Workshop Active Web</div><div class="s-desc" [class.on]="v('webactive')">{{ v('webactive') ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</div>
 <div class="help">{{ h('webactive') }}</div></div>
             <button type="button" class="toggle" [class.on]="v('webactive')" (click)="toggleField('webactive')" aria-label="Workshop Active Web"></button>
+          </div>
+
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Workshop EiFlix Mobile</div><div class="s-desc" [class.on]="v('eiflixmobileactive')">{{ v('eiflixmobileactive') ? 'Workshop is visible in the mobile app' : 'Workshop is hidden in the mobile app' }}</div>
+<div class="help">{{ h('eiflixmobileactive') }}</div></div>
+            <button type="button" class="toggle" [class.on]="v('eiflixmobileactive')" (click)="toggleField('eiflixmobileactive')" aria-label="Workshop EiFlix Mobile"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">Enable Home Screen Widget</div><div class="s-desc" [class.on]="v('homescreenwidget')">{{ v('homescreenwidget') ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</div>
@@ -363,7 +376,7 @@
             <div class="field" *ngFor="let f of cpwelcomeFields">
               <div class="label"><span>{{ f.label }}</span></div>
               <div class="rt">
-                <ngx-editor-menu [editor]="cpwelcomeeditors[f.key]" [toolbar]="toolbarFull"></ngx-editor-menu>
+                <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="cpwelcomeeditors[f.key]" [toolbar]="toolbarFull"></ngx-editor-menu>
                 <ngx-editor class="rt-sm" [editor]="cpwelcomeeditors[f.key]" [formControlName]="f.key" [outputFormat]="'html'" [placeholder]="f.placeholder"></ngx-editor>
               </div>
               <div class="help">{{ f.hint }}</div>
@@ -619,10 +632,12 @@
           <span class="sec-hint">Communication · the banner on the web and in the app</span>
         </div>
         <div class="sec-body" *ngIf="!isCollapsed('hero')">
-          <div class="grid2">
+          <div class="grid3">
             <div class="input tog"><span class="tog-label">Web hero active<span class="help">{{ v('hero') ? 'Workshop Web Hero is active and visible' : 'Workshop Web Hero is inactive and hidden' }}</span></span><button type="button" class="toggle" [class.on]="v('hero')" (click)="toggleField('hero')" aria-label="Web hero active"></button></div>
             <div class="input tog"><span class="tog-label">Mobile hero active<span class="help">{{ v('heromobile') ? 'Workshop Mobile Hero is active and visible' : 'Workshop Mobile Hero is inactive and hidden' }}</span></span><button type="button" class="toggle" [class.on]="v('heromobile')" (click)="toggleField('heromobile')" aria-label="Mobile hero active"></button></div>
+            <div class="input tog"><span class="tog-label">EiFlix mobile hero active<span class="help">{{ v('heroeiflixmobile') ? 'Hero shows in the EiFlix mobile app' : 'Hero is hidden in the EiFlix mobile app' }}</span></span><button type="button" class="toggle" [class.on]="v('heroeiflixmobile')" (click)="toggleField('heroeiflixmobile')" aria-label="EiFlix mobile hero active"></button></div>
           </div>
+          <div class="help">{{ h('heroeiflixmobile') }}</div>
           <div class="grid3">
             <div class="field"><div class="label"><span>Hero heading</span></div><div class="input textarea" style="min-height:56px;"><textarea class="txt" formControlName="heroHeading" rows="2"></textarea></div>
 <div class="help">{{ h('heroHeading') }}</div></div>

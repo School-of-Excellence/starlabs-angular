@@ -1,3 +1,10 @@
+<!-- Appended inside every editor's menu bar: the toolbar has no way back to a
+     plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
+     only strips marks), so a heading was otherwise permanent. -->
+<ng-template #wc2Normal>
+  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+          (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
+</ng-template>
 <!-- ═══════════════ shared inline icons ═══════════════ -->
 <ng-template #icChevDown><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></ng-template>
 <ng-template #icChevRight><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></ng-template>
@@ -469,7 +476,7 @@
                             <div class="field">
                               <div class="label"><span>Rich description</span></div>
                               <div class="rt">
-                                <ngx-editor-menu [editor]="getEditor(act, 'assignmentdescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
+                                <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getEditor(act, 'assignmentdescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
                                 <ngx-editor class="rt-md" [editor]="getEditor(act, 'assignmentdescriptionrich')" formControlName="assignmentdescriptionrich" [outputFormat]="'html'" placeholder="Optional longer brief…"></ngx-editor>
                               </div>
                             </div>
@@ -520,7 +527,7 @@
                           <div class="field">
                             <div class="label"><span>Note (rich)</span></div>
                             <div class="rt">
-                              <ngx-editor-menu [editor]="getEditor(act, 'notedescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
+                              <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getEditor(act, 'notedescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
                               <ngx-editor class="rt-md" [editor]="getEditor(act, 'notedescriptionrich')" formControlName="notedescriptionrich" [outputFormat]="'html'" placeholder="Formatted note shown in the app…"></ngx-editor>
                             </div>
                             <div class="help">{{ h('challenges[].challenges[].notedescriptionrich') }}</div>
@@ -582,12 +589,14 @@
                       <input class="txt" [matDatepicker]="ddp" formControlName="duedate" placeholder="Date">
                       <mat-datepicker #ddp></mat-datepicker>
                     </div>
-                    <div class="help">{{ h('challenges[].duedate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="dtp.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="dtp" formControlName="duetime" placeholder="Time">
                       <mat-timepicker #dtp></mat-timepicker>
                     </div>
+                  </div>
+                  <div class="win-notes">
+                    <div class="help">{{ h('challenges[].duedate') }}</div>
                     <div class="help">{{ h('challenges[].duetime') }}</div>
                   </div>
                 </div>

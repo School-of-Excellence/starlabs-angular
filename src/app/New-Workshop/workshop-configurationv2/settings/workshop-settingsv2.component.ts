@@ -7,6 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { WC2_TOOLBAR_FULL, resetToParagraph, focusedEditor } from '../wc2-editor';
 import { FIELD_HINTS } from '../wc2-help';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -100,24 +101,18 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     { key: 'facilitatordescription', label: 'Facilitators · description', placeholder: 'Enter Description to show for Facilitators .', hint: 'Shown to Facilitators participants when they enrolled' },
   ];
   cpwelcomeeditors: { [key: string]: Editor } = {};
-  toolbarFull: Toolbar = [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ heading: ['h1', 'h2', 'h3'] }],
-    ['bullet_list', 'ordered_list'],
-    ['link', 'text_color'],
-    ['align_left', 'align_center', 'align_right', 'align_justify'],
-  ];
+  toolbarFull: Toolbar = WC2_TOOLBAR_FULL;
 
   // ───────────────────────── sections / rail ─────────────────────────
   sections: SectionDef[] = [
-    { id: 'mode', title: 'Mode & visibility', group: 'General', controls: ['testmode', 'testusers', 'active', 'webactive', 'homescreenwidget', 'qanda', 'enableshare', 'enablesharemessage', 'breakdown', 'triggerFunction'] },
+    { id: 'mode', title: 'Mode & visibility', group: 'General', controls: ['testmode', 'testusers', 'active', 'webactive', 'eiflixmobileactive', 'homescreenwidget', 'qanda', 'enableshare', 'enablesharemessage', 'breakdown', 'triggerFunction'] },
     { id: 'audience', title: 'Audience', group: 'Access', controls: ['activeparticipants', 'newusersonly', 'journeybased', 'selectedjourneys', 'tierbased', 'selectedtiers', 'facilitator', 'facilitatorprofiles'] },
     { id: 'category', title: 'Category based', group: 'Access', controls: ['categorybased', 'categoriesforthisworkshop', 'cohortcategoriesforthisworkshop', 'cohortsforthisworkshop', 'categorythumbnail', 'categoryVideo', 'cpwelcomemessage'] },
     { id: 'evergreen', title: 'Evergreen workshop', group: 'Access', controls: ['evergreenWorkshop', 'evergreenWorkshopMeta', 'referralworkshop', 'refercount', 'referralcodestartswith', 'referralmessage', 'referraldialogmessage', 'payment', 'paymentmap', 'referallowedusers', 'evergreenaccessto'] },
     { id: 'logs', title: 'Logs & chat', group: 'Communication', controls: ['workshopactivitychannel', 'selectedgroup'] },
     { id: 'mail', title: 'Mail template', group: 'Communication', controls: ['mailTemplate'] },
     { id: 'messages', title: 'Messages', group: 'Communication', controls: ['enrollwattimessage', 'enrolledcongrats', 'enrollmentnotallowedmessage', 'enrollmentnotallowedmessagenew'] },
-    { id: 'hero', title: 'Hero', group: 'Communication', controls: ['hero', 'heromobile', 'heroHeading', 'heroDescription', 'heroshowtype', 'heroImage', 'heroImageMobile', 'heroVideo', 'heroAccent'] },
+    { id: 'hero', title: 'Hero', group: 'Communication', controls: ['hero', 'heromobile', 'heroeiflixmobile', 'heroHeading', 'heroDescription', 'heroshowtype', 'heroImage', 'heroImageMobile', 'heroVideo', 'heroAccent'] },
   ];
   readonly groups: SectionDef['group'][] = ['General', 'Access', 'Communication'];
   collapsed = new Set<string>();
@@ -156,8 +151,12 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     });
   }
 
+  /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
+  toNormal(): void { resetToParagraph(focusedEditor(this.cpwelcomeeditors)); }
+
   ngOnDestroy(): void {
     this.scrollEl?.removeEventListener('scroll', this.onScroll);
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
     this.destroy$.next();
     this.destroy$.complete();
     Object.values(this.cpwelcomeeditors).forEach(e => e?.destroy());
@@ -175,6 +174,9 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   // scroll spy on the shell's scroll container
   private scrollEl: HTMLElement | Window | null = null;
   private scrollTicking = false;
+  /** Set while a rail click is scrolling, so the scroll-spy does not fight the choice. */
+  private jumpingTo = '';
+  private jumpTimer: any = null;
   private readonly onScroll = () => {
     if (this.scrollTicking || this.host.nativeElement.hidden) return;
     this.scrollTicking = true;
@@ -187,6 +189,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
         const el = document.getElementById('st-' + s.id);
         if (el && el.getBoundingClientRect().top <= threshold) current = s.id;
       }
+      if (this.jumpingTo) return;   // a rail click owns the highlight until its scroll settles
       if (current !== this.activeSection) this.zone.run(() => { this.activeSection = current; });
     });
   };
@@ -207,6 +210,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     this.settingsForm = this.fb.group({
       active: [false],
       webactive: [false],
+      eiflixmobileactive: [false],
       homescreenwidget: [false],
       qanda: [false],
       breakdown: [false],
@@ -243,6 +247,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       facilitator: [false],
       hero: [false],
       heromobile: [false],
+      heroeiflixmobile: [false],
       heroHeading: [''],
       heroDescription: [''],
       heroshowtype: [''],
@@ -345,6 +350,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     this.settingsForm.patchValue({
       active: data['active'] || false,
       webactive: data['webactive'] || false,
+      eiflixmobileactive: data['eiflixmobileactive'] || false,
       homescreenwidget: data['homescreenwidget'] || false,
       qanda: data['qanda'] || false,
       breakdown: data['breakdown'] || false,
@@ -414,6 +420,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       categoryVideo: data['categoryVideo'] || '',
       hero: data['hero'] || false,
       heromobile: data['heromobile'] || false,
+      heroeiflixmobile: data['heroeiflixmobile'] || false,
       heroHeading: data['heroHeading'] || '',
       heroDescription: data['heroDescription'] || '',
       heroshowtype: data['heroshowtype'] || '',
@@ -462,6 +469,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     return {
       active: g('active') || false,
       webactive: g('webactive') || false,
+      eiflixmobileactive: g('eiflixmobileactive') || false,
       homescreenwidget: g('homescreenwidget') || false,
       qanda: g('qanda') || false,
       breakdown: g('breakdown') || false,
@@ -506,6 +514,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       categoryVideo: g('categoryVideo') || '',
       hero: g('hero') || false,
       heromobile: g('heromobile') || false,
+      heroeiflixmobile: g('heroeiflixmobile') || false,
       heroHeading: g('heroHeading') || '',
       heroDescription: g('heroDescription') || '',
       heroshowtype: g('heroshowtype') || '',
@@ -650,16 +659,31 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   expandAll(): void { this.collapsed.clear(); }
   sectionsIn(group: string): SectionDef[] { return this.sections.filter(s => s.group === group); }
   jumpTo(id: string): void {
-    this.collapsed.delete(id); this.activeSection = id;
-    document.getElementById('st-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this.collapsed.delete(id);
+    this.activeSection = id;
+    // Expanding a collapsed section changes the height of everything below it, so a
+    // scroll measured in this same tick lands in the wrong place — the reason a rail
+    // click used to need a second try. Scroll once the section has rendered.
+    this.jumpingTo = id;
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
+    setTimeout(() => {
+      document.getElementById('st-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.jumpTimer = setTimeout(() => { this.jumpingTo = ''; this.jumpTimer = null; }, 800);
+    });
   }
   railHint(id: string): string {
     switch (id) {
-      case 'mode': return `${this.countOn(['testmode', 'active', 'webactive', 'homescreenwidget', 'qanda', 'enableshare', 'breakdown', 'triggerFunction'])} on`;
+      case 'mode': return `${this.countOn(['testmode', 'active', 'webactive', 'eiflixmobileactive', 'homescreenwidget', 'qanda', 'enableshare', 'breakdown', 'triggerFunction'])} on`;
       case 'audience': return `${this.countOn(['activeparticipants', 'newusersonly', 'journeybased', 'tierbased', 'facilitator'])} on`;
       case 'category': return this.v('categorybased') ? 'On' : 'Off';
       case 'evergreen': return this.v('evergreenWorkshop') ? 'On' : 'Off';
-      case 'hero': { const a = []; if (this.v('hero')) a.push('Web'); if (this.v('heromobile')) a.push('Mobile'); return a.join(' · ') || 'Off'; }
+      case 'hero': {
+        const a: string[] = [];
+        if (this.v('hero')) a.push('Web');
+        if (this.v('heromobile')) a.push('Mobile');
+        if (this.v('heroeiflixmobile')) a.push('EiFlix');
+        return a.join(' · ') || 'Off';
+      }
       default: return '';
     }
   }

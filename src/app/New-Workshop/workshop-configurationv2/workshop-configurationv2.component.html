@@ -1,3 +1,10 @@
+<!-- Appended inside every editor's menu bar: the toolbar has no way back to a
+     plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
+     only strips marks), so a heading was otherwise permanent. -->
+<ng-template #wc2Normal>
+  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+          (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
+</ng-template>
 <!-- ═══════════════ shared inline icons ═══════════════ -->
 <ng-template #icChevDown><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></ng-template>
 <ng-template #icChevRight><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></ng-template>
@@ -65,10 +72,15 @@
           <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
           <span>Workshops</span>
         </button>
+        <!-- Guide button — hidden for now at the operator's request (2026-09-09); to be
+             enabled later. Uncomment this block to switch it back on: everything behind it
+             is intact (openHelp() in the component, help/wc2-help-dialog.component.*, and
+             the content in wc2-help.ts). The inline field hints stay visible either way.
         <button type="button" class="btn btn-help" (click)="openHelp()" title="How to configure a workshop" aria-label="How to configure a workshop">
           <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
           <span>Guide</span>
         </button>
+        -->
         <button type="button" class="btn" (click)="openImageUpload()" *ngIf="!notFound">
           <ng-container [ngTemplateOutlet]="icImage"></ng-container>
           <span>Icons &amp; images</span>
@@ -279,7 +291,6 @@
                       <input class="txt" [matDatepicker]="rsd" formControlName="registrationStartDate" placeholder="Start date">
                       <mat-datepicker #rsd></mat-datepicker>
                     </div>
-                    <div class="help">{{ h('registrationStartDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="rst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="rst" formControlName="registrationStartTime" placeholder="Time">
@@ -291,12 +302,15 @@
                       <input class="txt" [matDatepicker]="red" formControlName="registrationEndDate" placeholder="End date">
                       <mat-datepicker #red></mat-datepicker>
                     </div>
-                    <div class="help">{{ h('registrationEndDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="ret.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="ret" formControlName="registrationEndTime" placeholder="Time">
                       <mat-timepicker #ret></mat-timepicker>
                     </div>
+                  </div>
+                  <div class="win-notes">
+                    <div class="help">{{ h('registrationStartDate') }}</div>
+                    <div class="help">{{ h('registrationEndDate') }}</div>
                   </div>
                 </div>
                 <div class="field">
@@ -307,7 +321,6 @@
                       <input class="txt" [matDatepicker]="wsd" formControlName="workshopStartDate" placeholder="Start date">
                       <mat-datepicker #wsd></mat-datepicker>
                     </div>
-                    <div class="help">{{ h('workshopStartDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="wst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="wst" formControlName="workshopStartTime" placeholder="Time">
@@ -319,12 +332,15 @@
                       <input class="txt" [matDatepicker]="wed" formControlName="workshopEndDate" placeholder="End date">
                       <mat-datepicker #wed></mat-datepicker>
                     </div>
-                    <div class="help">{{ h('workshopEndDate') }}</div>
                     <div class="input time">
                       <button type="button" class="prefix" (click)="wet.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
                       <input class="txt" [matTimepicker]="wet" formControlName="workshopEndTime" placeholder="Time">
                       <mat-timepicker #wet></mat-timepicker>
                     </div>
+                  </div>
+                  <div class="win-notes">
+                    <div class="help">{{ h('workshopStartDate') }}</div>
+                    <div class="help">{{ h('workshopEndDate') }}</div>
                   </div>
                 </div>
               </div>
@@ -375,14 +391,14 @@
                     <div class="field">
                       <div class="label"><span>Title 1</span></div>
                       <div class="rt">
-                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title1'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
+                        <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getDynEditor(deKey(block, 'title1'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
                         <ngx-editor class="rt-sm" [editor]="getDynEditor(deKey(block, 'title1'))" formControlName="title1" [outputFormat]="'html'" placeholder="Title 1"></ngx-editor>
                       </div>
                     </div>
                     <div class="field">
                       <div class="label"><span>Title 2</span></div>
                       <div class="rt">
-                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title2'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
+                        <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getDynEditor(deKey(block, 'title2'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
                         <ngx-editor class="rt-sm" [editor]="getDynEditor(deKey(block, 'title2'))" formControlName="title2" [outputFormat]="'html'" placeholder="Title 2"></ngx-editor>
                       </div>
                     </div>
@@ -392,7 +408,7 @@
                     <div class="field">
                       <div class="label"><span>Content</span></div>
                       <div class="rt">
-                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'content'))" [toolbar]="toolbarFull"></ngx-editor-menu>
+                        <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getDynEditor(deKey(block, 'content'))" [toolbar]="toolbarFull"></ngx-editor-menu>
                         <ngx-editor [editor]="getDynEditor(deKey(block, 'content'))" formControlName="content" [outputFormat]="'html'" placeholder="Content"></ngx-editor>
                       </div>
                     </div>
@@ -414,7 +430,7 @@
                           <div class="field">
                             <div class="label"><span>Text</span></div>
                             <div class="rt">
-                              <ngx-editor-menu [editor]="getDynEditor(deIconKey(block, item, 'value2'))" [toolbar]="toolbarItem"></ngx-editor-menu>
+                              <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="getDynEditor(deIconKey(block, item, 'value2'))" [toolbar]="toolbarItem"></ngx-editor-menu>
                               <ngx-editor class="rt-sm" [editor]="getDynEditor(deIconKey(block, item, 'value2'))" formControlName="value2" [outputFormat]="'html'" placeholder="Text"></ngx-editor>
                             </div>
                           </div>
@@ -440,7 +456,7 @@
               <div class="field">
                 <div class="label"><span class="hrow" style="gap:8px;">Workshop description <span class="tag-req">Required</span></span></div>
                 <div class="rt" [class.error]="ctrl('description').invalid && (ctrl('description').touched || submitAttempted)">
-                  <ngx-editor-menu [editor]="editors['description']" [toolbar]="toolbarFull"></ngx-editor-menu>
+                  <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="editors['description']" [toolbar]="toolbarFull"></ngx-editor-menu>
                   <ngx-editor class="rt-lg" [editor]="editors['description']" formControlName="description" [outputFormat]="'html'" placeholder="Enter a detailed workshop description…"></ngx-editor>
                 </div>
                 <div class="help">{{ h('description') }}</div>
@@ -451,7 +467,7 @@
               <div class="field">
                 <div class="label"><span>Join us section</span><span class="counter">Optional</span></div>
                 <div class="rt">
-                  <ngx-editor-menu [editor]="editors['joinus']" [toolbar]="toolbarFull"></ngx-editor-menu>
+                  <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="editors['joinus']" [toolbar]="toolbarFull"></ngx-editor-menu>
                   <ngx-editor class="rt-md" [editor]="editors['joinus']" formControlName="joinus" [outputFormat]="'html'" placeholder="Enter join us content…"></ngx-editor>
                 </div>
                 <div class="help">{{ h('joinus') }}</div>
