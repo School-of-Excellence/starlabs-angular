@@ -389,7 +389,7 @@ export class ProfilelistComponent {
       alert(JSON.stringify(profileStatus))
     }
     else{
-      if(confirm("Sure, Do you want to delete?")){
+      if(confirm("Sure, Do you want to delete ?")){
         const roleRef = doc(this.firestoreDefault, profile["role_ref"]["path"])
         const profilepathRef = doc(this.firestoreDefault, profilepath)
         const profileMetaRef = doc(this.firestoreDefault, "participant metadata", profileid)
