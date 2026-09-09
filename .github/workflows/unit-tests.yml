@@ -1,0 +1,127 @@
+# unit-tests — ROUTED pure-logic unit gate (Karma/Jasmine).
+#
+# TRIGGER: workflow_dispatch ONLY, matching the Playwright gates (operator decision 2026-07-06, PR #58 —
+# suites run from the console at https://cicdconsole.web.app/, never on PRs). No `pull_request` trigger.
+#
+# CONSOLE-DRIVEN, the same shape as the e2e gates: the console's Test Run dialog computes the suite list
+# from the suites-manifest mirror and dispatches with a JSON `suites` array (see console/functions/src
+# index.ts runTests → createWorkflowDispatch, and suites.ts: "The same globs drive CI's fallback
+# self-routing, so the dialog and CI can never disagree"). This workflow follows that contract:
+#   * `suites` supplied  -> run exactly those systems' unit specs (console / explicit dispatch)
+#   * `suites` empty     -> FALL BACK to self-routing: diff the branch against `development` and derive
+#                           the systems from the manifest globs (same behaviour as preview-e2e.yml)
+#   * `all: 1`           -> ignore routing, run every unit spec
+#
+# To wire the console button, add to console/functions/src/index.ts alongside the existing constants:
+#   const UNIT_WORKFLOW = 'unit-tests.yml';
+# and dispatch it with the SAME `suites` payload already sent to preview-e2e.yml. No other change needed —
+# the input name and JSON shape were chosen to match.
+#
+# ROUTING DATA IS GENERATED, never hand-edited: .github/unit-filters.yml and .github/unit-routing.json come
+# from the hub's suites-manifest.json via starlabs-e2e-tests/scripts/gen-unit-routing.mjs. Copying globs by
+# hand would create a second source of truth that drifts, and the gate would then pass while running none of
+# the changed system's specs.
+#   regenerate:  node scripts/gen-unit-routing.mjs          (in the hub repo)
+#   verify:      node scripts/gen-unit-routing.mjs --check
+#
+# SCOPE PIN: uses tsconfig.unit.json, which compiles only `*.unit.spec.ts` and what they import. The
+# repo-wide `ng test` cannot run today — four pre-existing files fail to compile (a Node `os` import in
+# schedule-dialog.component.ts, missing amazon-chime-sdk-js, a `console` import in
+# content-analytics.component.ts, and a wrong class name in assigncategorydialog.component.spec.ts).
+# Widen this gate to the full spec suite once those are fixed.
+name: unit-tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      suites:
+        description: 'JSON array of systems, e.g. ["journey","queue"]. Empty = self-route from the diff.'
+        type: string
+        default: ''
+      all:
+        description: '1 = ignore routing and run every unit spec'
+        type: string
+        default: '0'
+
+jobs:
+  # ---------------------------------------------------------------------------------------------------
+  # route — only needed when the dispatcher did not name the systems (fallback self-routing)
+  # ---------------------------------------------------------------------------------------------------
+  route:
+    if: inputs.suites == '' && inputs.all != '1'
+    runs-on: ubuntu-latest
+    outputs:
+      systems: ${{ steps.filter.outputs.changes }}   # JSON array, e.g. ["journey","profiles"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Diff the whole branch against the integration branch, as preview-e2e.yml does: a run covers the
+          # cumulative branch, so routing must see all of it and not just the last push.
+          base: development
+          filters: .github/unit-filters.yml
+
+  # ---------------------------------------------------------------------------------------------------
+  # unit — run the selected systems' specs
+  # ---------------------------------------------------------------------------------------------------
+  unit:
+    needs: route
+    # `always()` so an explicitly-dispatched run still executes when `route` was skipped.
+    if: always() && (inputs.all == '1' || inputs.suites != '' || needs.route.outputs.systems != '[]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Select the unit specs for the routed systems
+        id: sel
+        env:
+          EXPLICIT: ${{ inputs.suites }}
+          ROUTED: ${{ needs.route.outputs.systems }}
+          FORCE_ALL: ${{ inputs.all }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const parse = (s) => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; }
+                                   catch { return String(s).split(/[\s,]+/).filter(Boolean); } };
+            const explicit = parse(process.env.EXPLICIT);
+            const routed = explicit.length ? explicit : parse(process.env.ROUTED);
+            const source = explicit.length ? "dispatch input" : "self-routed from diff";
+            // "_all" is the manifest cross-cutting set: a match there can affect anything, so run everything.
+            const all = process.env.FORCE_ALL === "1" || routed.includes("_all");
+            const map = JSON.parse(fs.readFileSync(".github/unit-routing.json", "utf8")).systems;
+            const unknown = routed.filter((s) => s !== "_all" && !map[s]);
+            if (unknown.length) console.log("::warning::no unit routing for: " + unknown.join(", "));
+            const globs = all ? ["**/*.unit.spec.ts"]
+                              : [...new Set(routed.flatMap((s) => map[s] || []))];
+            console.log(`systems (${source}): ` + (all ? "ALL (cross-cutting)" : routed.join(", ") || "(none)"));
+            globs.forEach((g) => console.log("  include " + g));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,
+              "inc=" + globs.map((g) => `--include=${JSON.stringify(g)}`).join(" ") + "\n");
+          '
+
+      - name: Run unit tests
+        run: |
+          if [ -z '${{ steps.sel.outputs.inc }}' ]; then
+            echo "No unit specs routed for this run — nothing to do."
+            exit 0
+          fi
+          npx ng test --watch=false \
+            --karma-config=karma.ci.conf.js \
+            --ts-config=tsconfig.unit.json \
+            --code-coverage \
+            ${{ steps.sel.outputs.inc }}
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: coverage/
+          retention-days: 14

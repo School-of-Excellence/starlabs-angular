@@ -1,0 +1,114 @@
+{
+  "_generatedBy": "starlabs-e2e-tests/scripts/gen-unit-routing.mjs — do not edit by hand",
+  "_source": "suites-manifest.json",
+  "systems": {
+    "queue": [
+      "src/app/queue system/**/*.unit.spec.ts",
+      "src/app/big/**/*.unit.spec.ts",
+      "src/app/OpenVidu/**/*.unit.spec.ts",
+      "src/app/LiveKit/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/wati-input/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/email-input/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/ah-notification/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/manage-participantlist-dialog/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/tag-participants/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/add-queue-tag/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/bulk-add-products/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/**/*.unit.spec.ts",
+      "src/app/AppEngagement/app-action-pending/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/form-option/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/form-template-preview/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/formtemplate/**/*.unit.spec.ts",
+      "src/app/Channel Communication/channel-communication/**/*.unit.spec.ts",
+      "src/app/Events/events-stage-data/**/*.unit.spec.ts",
+      "src/app/EvolutionMapping/evolution-mapping/participant-evolution-mapping/**/*.unit.spec.ts",
+      "src/app/video-player/**/*.unit.spec.ts",
+      "src/app/instance-status.service.unit.spec.ts",
+      "src/app/web-studio-invitation/**/*.unit.spec.ts"
+    ],
+    "journey": [
+      "src/app/Journey Onboarding/**/*.unit.spec.ts",
+      "src/app/journey-onboarding-detail/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/journey-product-purchase/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participant-product/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participant-delivery-sequence/**/*.unit.spec.ts",
+      "src/app/Product Designer/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/new-profile/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/email-input/**/*.unit.spec.ts"
+    ],
+    "business": [
+      "src/app/Business Dashboard/**/*.unit.spec.ts",
+      "src/app/main-dashboard/**/*.unit.spec.ts",
+      "src/app/quiz/**/*.unit.spec.ts",
+      "src/app/hpc/**/*.unit.spec.ts",
+      "src/app/Zone Management/**/*.unit.spec.ts",
+      "src/app/New-Workshop/quiz/**/*.unit.spec.ts"
+    ],
+    "comms": [
+      "src/app/Communication Center/**/*.unit.spec.ts",
+      "src/app/Channel Communication/**/*.unit.spec.ts",
+      "src/app/in-app-message-input/**/*.unit.spec.ts",
+      "src/app/Customer Support/releaselogdialog/**/*.unit.spec.ts"
+    ],
+    "content": [
+      "src/app/content/**/*.unit.spec.ts",
+      "src/app/content-upload-version2/**/*.unit.spec.ts",
+      "src/app/video-player/**/*.unit.spec.ts"
+    ],
+    "evomap": [
+      "src/app/EvolutionMapping/**/*.unit.spec.ts"
+    ],
+    "modes": [
+      "src/app/participant-touchpoint/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/**/*.unit.spec.ts",
+      "src/app/quiz/**/*.unit.spec.ts",
+      "src/app/New-Workshop/quiz/**/*.unit.spec.ts",
+      "src/app/video-player/**/*.unit.spec.ts",
+      "src/app/Customer Support/add-issue/**/*.unit.spec.ts"
+    ],
+    "authroles": [
+      "src/app/login/**/*.unit.spec.ts",
+      "src/app/exceptionalrouting/**/*.unit.spec.ts",
+      "src/app/route-configuration/**/*.unit.spec.ts",
+      "src/app/icon-list.unit.spec.ts"
+    ],
+    "workshops": [
+      "src/app/Workshop/**/*.unit.spec.ts",
+      "src/app/New-Workshop/**/*.unit.spec.ts",
+      "src/app/tv-auth.component.unit.spec.ts",
+      "src/app/eiflix-telemetry/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/email-input/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/ah-notification/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/form-option/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/form-template-preview/**/*.unit.spec.ts",
+      "src/app/Product Designer/delivery-set/update-delivery/**/*.unit.spec.ts",
+      "src/app/content/episodes-dashboard/upload-episode-dialog/**/*.unit.spec.ts"
+    ],
+    "appointments": [
+      "src/app/appointment-dashboard/**/*.unit.spec.ts",
+      "src/app/Scheduling/**/*.unit.spec.ts",
+      "src/app/Offtime/**/*.unit.spec.ts"
+    ],
+    "events": [
+      "src/app/Events/**/*.unit.spec.ts",
+      "src/app/Diagnostics Tool/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/wati-input/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/email-input/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/ah-notification/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/bulk-add-products/**/*.unit.spec.ts",
+      "src/app/Participants Profile Management/participants-analytics/tag-participants/**/*.unit.spec.ts",
+      "src/app/Channel Communication/channel-communication/**/*.unit.spec.ts"
+    ],
+    "profiles": [
+      "src/app/Participants Profile Management/**/*.unit.spec.ts",
+      "src/app/ProfilePicture/**/*.unit.spec.ts",
+      "src/app/AppEngagement/app-action-pending/**/*.unit.spec.ts",
+      "src/app/loading-progress/**/*.unit.spec.ts",
+      "src/app/New-Workshop/workshop-dashboard/sendmessages/**/*.unit.spec.ts",
+      "src/app/New-Workshop/whatsapp-progress-dialog.component.unit.spec.ts",
+      "src/app/participant-videoask/**/*.unit.spec.ts",
+      "src/app/video-player/**/*.unit.spec.ts",
+      "src/app/Customer Support/add-issue/**/*.unit.spec.ts"
+    ]
+  }
+}
