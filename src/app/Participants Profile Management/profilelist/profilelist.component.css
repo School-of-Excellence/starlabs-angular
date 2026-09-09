@@ -112,3 +112,8 @@
     border: none;
   }
   
+/* ── Filter toggles ──────────────────────────────────────────────── */
+.filter-toggles { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding-bottom: 18px; }
+.toggle-count { display: inline-block; margin-left: 6px; border-radius: 9px; font-size: 11px; font-weight: 700; padding: 1px 7px; }
+.toggle-count.hold { background: #fdecea; color: #b3261e; }
+.toggle-count.ahcrm { background: #e8f0fe; color: #1a56c4; }

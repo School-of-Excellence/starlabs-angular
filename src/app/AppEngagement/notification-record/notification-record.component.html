@@ -294,6 +294,15 @@
                 <mat-icon>error</mat-icon>
                 Failed ({{filteredFailedRecipients.length}})
               </button>
+              <button mat-flat-button
+                      *ngIf="heldRecipients.length > 0"
+                      [class.active-tab]="selectedTab === 'held'"
+                      (click)="switchTab('held')"
+                      class="tab-btn tab-btn-held"
+                      matTooltip="Profiles on delivery hold — excluded before sending, never notified">
+                <mat-icon>block</mat-icon>
+                On hold ({{filteredHeldRecipients.length}})
+              </button>
             </div>
 
             <!-- Search input -->
@@ -306,6 +315,31 @@
             <div *ngIf="logsLoadingCount > 0" class="loading-indicator">
               <mat-icon class="spin">sync</mat-icon>
               Loading logs for {{logsLoadingCount}} recipient(s)...
+            </div>
+
+            <!-- ON-HOLD TAB -->
+            <div *ngIf="selectedTab === 'held'" class="recipients-table-container">
+              <div class="held-note">
+                <mat-icon>block</mat-icon>
+                <span><strong>deliveryonhold</strong> is set on these profiles, so they were excluded before
+                  this notification was sent — they were never delivered to and have no logs. Clear the flag
+                  in Update Profile to reach them again.</span>
+              </div>
+              <table class="recipients-table held-table">
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Profile ID</th>
+                </tr>
+                <tr *ngFor="let recipient of filteredHeldRecipients">
+                  <td>{{recipient.name}}</td>
+                  <td>{{recipient.email || '—'}}</td>
+                  <td class="held-pid">{{recipient.profileId}}</td>
+                </tr>
+              </table>
+              <div *ngIf="filteredHeldRecipients.length === 0" class="held-note">
+                No matching profiles on hold.
+              </div>
             </div>
 
             <!-- SUCCESS TAB -->

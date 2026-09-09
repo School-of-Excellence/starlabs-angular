@@ -19,9 +19,11 @@ import {
   collection,
   collectionData,
   doc,
+  query,
   setDoc,
   updateDoc,
-  serverTimestamp
+  serverTimestamp,
+  where
 } from '@angular/fire/firestore';
 import { firstValueFrom } from 'rxjs';
 
@@ -107,7 +109,10 @@ export class AssignTagsDialogComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const ref = collection(this.firestore, 'newusertags');
+      const ref = query(
+        collection(this.firestore, 'newusertags'),
+        where('type', '==', 'newusersegments')
+      );
       const rows = (await firstValueFrom(collectionData(ref, { idField: 'id' }))) as any[];
       this.tags = rows
         .map(r => ({ id: r.id, name: (r.name || '').toString() }))
@@ -166,7 +171,8 @@ export class AssignTagsDialogComponent implements OnInit {
     this.isCreating = true;
     try {
       const ref = doc(collection(this.firestore, 'newusertags'));
-      await setDoc(ref, { id: ref.id, name, created: serverTimestamp() });
+      // Stamped silently so this dialog's tags stay within the newusersegments type; not shown in the UI.
+      await setDoc(ref, { id: ref.id, name, type: 'newusersegments', created: serverTimestamp() });
       this.tags = [...this.tags, { id: ref.id, name }].sort((a, b) => a.name.localeCompare(b.name));
       this.selected.add(ref.id);   // auto-assign the freshly created tag
       this.search = '';
