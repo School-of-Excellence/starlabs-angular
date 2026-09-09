@@ -1,49 +1,57 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
-· **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
+_Last updated: 2026-09-09 (workshop configuration v2: hints, guide, new settings, editor fixes)_
+· **New session? Read `specs/ORIENTATION.md` first**, then the journals below.
+⚠️ `/specs` is gitignored (`.gitignore:8`) — the journals and HTML mockups exist only on this machine.
+
+Journals for this work, newest first:
+`specs/journals/2026-09-09-richtext-toolbar-and-headings.md` ·
+`2026-09-04-workshop-config-hints-and-guide.md` (also carries the 09-09 entries) ·
+`2026-09-04-eiflix-popup-banner.md` · `2026-09-04-workshop-enroll-diagnostics.md` ·
+`2026-09-02-workshopconfig-v2-enrollment-design.md` (the full v2 story).
 
 ## Current state
-- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
-  documentation added this session plus one pre-existing, unrelated
-  `group-chat-screen.component.css` edit. Nothing committed, nothing
-  pushed, nothing deployed — operator commits manually (standing directive).
-- **No queue code was changed.** The slot/capacity flow is documented and
-  frozen as a baseline so a planned logic change can be made and reverted
-  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
+- Branch `nanda-development`. **UNCOMMITTED**: 11 modified files (the three
+  `workshop-configurationv2` tabs, `wc2-help.ts`, `wc2-shared.css`, the popup banner,
+  `src/styles.css`) plus one new file, `workshop-configurationv2/wc2-editor.ts`.
+  Earlier work in this line was committed by the operator mid-session. NOT pushed.
+- `/workshopconfig/:id` (v2) is the live editor; the legacy screen stays at
+  `/workshopconfigold/:id`. Enrollment, Challenges and Settings all carry per-field
+  hints written from the EiFlix Flutter app.
+- Settings now writes **55** root fields (was 53): `eiflixmobileactive` and
+  `heroeiflixmobile` were added on request.
+- Dev + production builds green. **Nothing in this line has been verified at runtime** —
+  the screens are behind login.
 
-## Last session changes (2026-08-31)
-- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
-  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
-  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
-  paths** across Angular `queue-planner` / `queue-planner-review` and the
-  three Flutter cards, three mermaid flowcharts, a **divergence register
-  D-01…D-10**, six invariants, and the change/revert protocol.
-- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
-  four surprises, an append-only change log (CL-000) and the per-screen +
-  data-side revert playbook.
-- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
-  rendered reference artifact for the operator.
-- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
-  `usedslot = matching-token count` and every planner mutation auto-saves,
-  so it overwrites the counter that the four transactional booking paths
-  maintain — erasing Flutter self-service bookings and B!G pre-placements
-  that have no `queue_token` yet. Paired with D-01 (review offers slots
-  from a *derived* count while the transaction gates on the *stored* one),
-  this is the double-booking root cause.
+## Last session changes (2026-09-09 and the days before it)
+- **Field hints + configuration guide.** 160 fields traced read-only through
+  `/Users/nanda/Documents/Development/workshop`, each hint checked by a verifier (132
+  corrected). Headline finding: **29 settings are dead** — nothing in the user app reads
+  them. The guide has a narrative half and an "Every setting" reference with a
+  "does nothing today" filter. **The Guide button is currently commented out** at the
+  operator's request; uncommenting one block in the configuration header restores it.
+- **Two new settings**, both requested and both with the same caveat: *nothing in the
+  Flutter app reads them yet*. `eiflixmobileactive` (workshop in the EiFlix mobile app)
+  and `heroeiflixmobile` (hero banner in that app). The hero group now has three switches
+  of which only the web one demonstrably works — worth settling with the app team.
+- **Enrollment diagnostics** on `/workshop_dashboard/:id` — a Diagnose dialog that replays
+  every enroll gate for one profile (by profileid **or** email) and explains the outcome.
+- **EiFlix popup banner editor** on `/workshops`, editing `classify/eiflixpopupbanner`.
+- **Bugs fixed, each with the cause recorded in the journals:** a global Bootstrap `.row`
+  collision that stretched the header badge; an `*ngFor` identity churn that made the guide
+  nav unclickable; rail clicks needing two tries (expand-then-scroll in one tick, fixed on
+  all three rails); the Schedule row broken by my own hint rollout, plus a clipped time
+  dropdown; and the rich-text editors — h1–h6 everywhere, a **Normal** button to undo a
+  heading (the library had no way back), and the full toolbar.
 
 ## Pending
-- **The logic change itself is unspecified** — awaiting the operator's
-  statement of the new rule. Recommended first target: D-02 + D-01
-  (one agreed source of truth for capacity). Follow §7 of the flow doc:
-  delta vs the register → check the six invariants → name the blast radius
-  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
-- Before any write-shape change: export the affected `queue planning`
-  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
-  fields have no history. First run against `starlabs-test` only.
-- Carried from 2026-08-27: operator visual pass of the redesigned
-  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
-  consumers to wire; newusertags backfill; `eiflixcampaign` rules
-  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
-  route guard; episode-delete gaps.
+- **Operator runtime pass — nothing here has run.** Highest value first: save Settings and
+  confirm the two new toggles round-trip; open the Diagnose dialog on a known-refused
+  profile and one by email; save the popup banner and reopen it; apply a heading then press
+  Normal; click through each rail once.
+- **Decide the mobile flags** with the app team — three hero switches and two workshop-level
+  ones, most unread today.
+- **Decide whether to hide the 29 dead settings** from the screen instead of only labelling
+  them, and whether to re-enable the Guide button.
+- Carried: D1 (evergreen disabled-children quirk); retire `/workshopconfigold` after the
+  pass; `/eiflixhomeconfig` + `/videodashboard` visual pass; eiflix consumers/backfills.

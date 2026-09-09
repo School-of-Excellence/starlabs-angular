@@ -205,6 +205,47 @@ body {
 /* Workshops — EiFlix popup banner editor. The component paints its own header,
    body and save bar edge to edge, so the Material surface padding is removed
    (same treatment as .jchd-logcomposer-panel above). */
+/* Workshop configuration — the time pickers.
+   Material sizes the timepicker overlay to the input it is attached to
+   (`width: origin.offsetWidth`), and the time inputs in the schedule rows are only
+   ~84px wide, so every option rendered clipped ("00:" instead of "00:30"). The panel
+   is `width: 100%` of that pane, so a min-width on the panel is what fixes it. */
+.mat-timepicker-panel {
+  min-width: 148px;
+  border-radius: 8px;
+  border: 1px solid #dde3ec;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .10), 0 4px 8px rgba(0, 0, 0, .06);
+  padding: 6px;
+  background: #fff;
+}
+.mat-timepicker-panel .mat-mdc-option {
+  min-height: 34px;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.mat-timepicker-panel .mat-mdc-option:hover:not(.mdc-list-item--disabled) {
+  background: #eef3f9;
+}
+.mat-timepicker-panel .mat-mdc-option.mdc-list-item--selected {
+  background: #1a3c5e;
+}
+.mat-timepicker-panel .mat-mdc-option.mdc-list-item--selected .mdc-list-item__primary-text {
+  color: #fff;
+}
+
+/* Workshop configuration — the configuration guide behind the "i" button. */
+.wc2-help-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0;
+}
+.wc2-help-dialog .mat-mdc-dialog-container,
+.wc2-help-dialog .mdc-dialog__content {
+  padding: 0 !important;
+}
+
 .popup-banner-dialog .mat-mdc-dialog-surface {
   border-radius: 14px !important;
   overflow: hidden !important;

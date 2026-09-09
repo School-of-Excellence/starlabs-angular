@@ -1,3 +1,10 @@
+<!-- Appended inside every editor's menu bar: the toolbar has no way back to a
+     plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
+     only strips marks), so a heading was otherwise permanent. -->
+<ng-template #wc2Normal>
+  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+          (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
+</ng-template>
 <div class="pb">
   <!-- ───────── header ───────── -->
   <div class="pb-head">
@@ -21,7 +28,7 @@
 
   <div class="card placeholder" *ngIf="!loading && loadError">
     <h2 class="sec-title">Could not load the banner</h2>
-    <p class="ph-text">The <code>classify / eiflixpopupbanner</code> document could not be read, so saving is disabled to avoid overwriting it with empty values.</p>
+    <p class="ph-text">The saved banner could not be read, so saving is disabled to avoid overwriting it with empty values. Close this and try again.</p>
   </div>
 
   <!-- ───────── form ───────── -->
@@ -33,7 +40,7 @@
         <div class="pb-toggle-row">
           <div class="pb-toggle-text">
             <div class="pb-toggle-title">Show this popup</div>
-            <div class="help">Stored as <strong>enable</strong>. Turn it off to hide the banner without clearing anything.</div>
+            <div class="help">Turn this off to hide the popup from the app without clearing anything you have written here.</div>
           </div>
           <button type="button" class="toggle" [class.on]="form.get('enable')?.value"
                   (click)="toggleEnable()" [attr.aria-pressed]="form.get('enable')?.value"
@@ -53,7 +60,7 @@
         <div class="field" *ngFor="let f of richFields">
           <div class="label"><span>{{ f.label }}</span></div>
           <div class="rt">
-            <ngx-editor-menu [editor]="editors[f.key]" [toolbar]="toolbar"></ngx-editor-menu>
+            <ngx-editor-menu [customMenuRef]="wc2Normal" [editor]="editors[f.key]" [toolbar]="toolbar"></ngx-editor-menu>
             <ngx-editor [ngClass]="f.size" [editor]="editors[f.key]" [formControlName]="f.key"
                         [outputFormat]="'html'" [placeholder]="f.placeholder"></ngx-editor>
           </div>
