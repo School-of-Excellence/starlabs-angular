@@ -2,12 +2,10 @@ import { Component, OnInit, OnDestroy, Inject, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { AuthguardService } from '../../authguard.service';
 import {collection, doc, Firestore, getDoc, collectionData, docData, query, where} from '@angular/fire/firestore';
 import { firstValueFrom, Subject, Subscription } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
 import { SpecialistAppointmentSlotsComponent } from '../specialist-appointment-slot/specialist-appointment-slot.component';
-import { getDocs } from 'firebase/firestore';
+import { getDocs  } from 'firebase/firestore';
 
 type ViewName = 'dashboard' | 'participants' | 'specialists' | 'planning';
 type LifecycleKey = 'notStarted' | 'onTrack' | 'needsAttention' | 'awaitingSignoff' | 'completed';
@@ -206,108 +204,54 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     planning: ['Planning', 'Match waiting journeys to available specialists']
   };
 
-  private authguard = inject(AuthguardService);
-  private firestore = inject(Firestore);
-  private router = inject(Router);
-
-  // ================= UI STATE =================
+  // String declarations 
   theme: 'light' | 'dark' = 'light';
   currentView: ViewName = 'dashboard';
-  kpiFilter: LifecycleKey | null = null;
-
   fMember = 'All members';
   fAge = 'All ages';
   fCat = 'All categories';
   fProduct = 'All products';
-
   pplSearch = '';
   pplCat = 'All categories';
   pplRole: 'all' | 'spec' | 'ponly' = 'all';
-
   schedDate = '2026-06-03';
-
-  drawerOpen = false;
-  drawerPid: string | null = null;
-  drawerJid: string | null = null;
-
-  paletteOpen = false;
   paletteQuery = '';
-
   dateRangeStart = '2026-05-01';
   dateRangeEnd = '2026-06-30';
-
+  drawerPid: string | null = null;
+  drawerJid: string | null = null;
   expandedSpecialistId: string | null = null;
-
-  // // overview table state
-  // dfuProductsMap: Record<string, string> = {};
-  // overviewParticipants: OverviewParticipantRow[] = [];
-  // expandedOverviewRowId: string | null = null;
-
-  // expandedOverviewProduct: Record<string, boolean> = {};
-  // overviewProductSteps: Record<string, any[]> = {};
-  // overviewProgressLoading: Record<string, boolean> = {};
-
-  // private overviewSeqMap: Record<string, any> = {};
-  // private overviewDeliverableDoc: Record<string, any> = {};
-  // private mapDeliveryName: Record<string, string> = {};
-  // private deliveryLookupLoaded = false;
-  // private deliverablesLoadedProfiles = new Set<string>();
-  // ongoingCount: number | null = null;
-
- // unsubscribes every collection/doc listener tied to the component's own lifetime
-  // private destroy$ = new Subject<void>();
-
-  // ================= OVERVIEW: DFU PRODUCTS + PARTICIPANT METADATA =================
-  // private dfuProductsMap: Record<string, string> = {};   
-  // private dfuProductRefs: any[] = [];                     
-  // private allSoexcellenceMeta: any[] = [];              
-
-  // private participantActiveProductMap: Record<string, string[]> = {};
-
-  participants: any[] = [];                   
-  // overviewParticipants: OverviewParticipantRow[] = [];
-  // expandedOverviewRowId: string | null = null;
-  // overviewOngoingLoading: Record<string, boolean> = {};
-
-  // expandedOverviewProduct: Record<string, boolean> = {};
-  // overviewProductSteps: Record<string, any[]> = {};
-  // overviewProgressLoading: Record<string, boolean> = {};
-
-  // ongoingCount: number | null = null;
-
-  // private ongoingCountSub?: Subscription;
-  // private rowSubs: Record<string, Subscription> = {};
-  // private stepSubs: Record<string, Subscription> = {};
-  // private deliveryNameCache: Record<string, string> = {};
-
-  // private readonly deliveryNameFieldByType: Record<string, string> = {
-  //   event: 'eventname',
-  //   queue: 'queuename',
-  //   form: 'formname',
-  //   report: 'reportname',
-  //   fieldwork: 'fieldworkname',
-  //   appointment: 'appointmenttype'
-  // };
-
   expandedOverviewRowId: string | null = null;
-  expandedOverviewProduct: { [key: string]: boolean } = {};
+  kpiFilter: LifecycleKey | null = null;
+  
+  // Boolean declarations
+  drawerOpen = false;
+  paletteOpen = false;
 
+  // Array declarations
+  participants: any[] = [];                   
   participantMetadata: any[] = [];
+  dfuProductRefs: any[] = [];
 
+  // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
-  dfuProductRefs: string[] = [];
-
+  expandedOverviewProduct: { [key: string]: boolean } = {};
   dfuParticipantMap: {
-                      [profileId: string]: {
-                        name: string;
-                        email: string;
-                        activeproduct: string[];
-                        participantproducts?: any[];
-                        deliverysequence?: { step: number; deliveryname: string; status: string }[];
-                      };
-                    } = {};
+    [profileId: string]: {
+      name: string;
+      email: string;
+      activeproduct: string[];
+      participantproducts?: any[];
+      deliverysequence?: { step: number; deliveryname: string; status: string }[];
+    };
+  } = {};
+  
+  constructor(
+    private firestore : Firestore,
+    private router : Router
+  ) { }
 
-  async ngOnInit(): Promise<void> {
+  async ngOnInit() {
     await Promise.all([
       this.getDfuProducts(),
       this.getParticipantMetadata()
@@ -315,49 +259,26 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     this.mapDfuParticipants();
   }
 
-  // ngOnDestroy(): void {
-  //   this.destroy$.next();
-  //   this.destroy$.complete();
-  // }
+  // fetch the DFU products type from products collection
+  async getDfuProducts(){
+    try {
+      const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
+      const productsSnapshot = await getDocs(q);
 
-  toggleOverviewRow(profileid: string): void {
-    const isSameRow = this.expandedOverviewRowId === profileid;
-    this.expandedOverviewRowId = isSameRow ? null : profileid;
-  }
-
-  toggleOverviewProduct(profileid: string, product: any): void {
-    const key = product.participantproductid;
-    const isOpen = this.expandedOverviewProduct[key];
-    this.expandedOverviewProduct[key] = !isOpen;
-  }
-
-  // ====Data fetch==
-  async getDfuProducts(): Promise<void> 
-  {
-      try 
-      {
-        const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
-        const productsSnapshot = await getDocs(q);
-        this.dfuProductsMap = {};
-        this.dfuProductRefs = [];
-
-        productsSnapshot.docs.forEach(doc => {
-          const data = doc.data();
-
-          this.dfuProductsMap[doc.id] = data;
-          this.dfuProductRefs.push(doc.id);
-        });
-        console.log('DFU products fetched:', this.dfuProductsMap);
-
+      productsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        this.dfuProductsMap[doc.id] = data;
+        this.dfuProductRefs.push(doc.ref);
+      });
+      console.log('DFU products fetched:', this.dfuProductsMap);
     } catch (error) {
       console.error('Error fetching DFU products:', error);
     }
   }
 
-  async getParticipantMetadata(): Promise<void> 
-  {
-    try 
-    {
+  // fetch the participant metadata from participant metadata collection
+  async getParticipantMetadata(){
+    try {
       const participantsRef = collection(this.firestore,'participant metadata');
       const participants = await firstValueFrom(collectionData(query(participantsRef), { idField: 'id' }));
       this.participantMetadata = participants;
@@ -367,8 +288,8 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
   }
 
-  mapDfuParticipants(): void 
-  {
+  // map the participants who have active DFU products ongoing or initiated
+  mapDfuParticipants() {
     const localMap: {
       [profileId: string]: {
         name: string;
@@ -377,18 +298,14 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       };
     } = {};
 
-    const soExcellenceParticipants = this.participantMetadata.filter(participant =>
-      participant.email?.toLowerCase().endsWith('@soexcellence.com')
-    );
-
-    soExcellenceParticipants.forEach(participant => 
-    {
+    this.participantMetadata.forEach(participant => {
+      if (!(participant.email?.toLowerCase().endsWith('@soexcellence.com'))) {
+        return;
+      }
       const allActiveProducts: string[] = participant.activeproduct || [];
       const dfuActiveProducts = allActiveProducts.filter(productId => this.dfuProductsMap[productId]);
       const hasDfuProduct = dfuActiveProducts.length > 0;
-
-      if (hasDfuProduct) 
-      {
+      if (hasDfuProduct) {
         localMap[participant.profileid] = {
           name: participant.name,
           email: participant.email,
@@ -396,13 +313,13 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         };
       }
     });
-
     this.dfuParticipantMap = localMap;
-
     console.log('DFU Participant Map:', this.dfuParticipantMap);
   }
 
+  // fetch the participant products for a given participant profileid
   async toggleParticipant(profileid: string): Promise<void> {
+    this.toggleOverviewRow(profileid);
     const participant = this.dfuParticipantMap[profileid];
 
     if (!participant) {
@@ -415,8 +332,8 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       return;
     }
 
-    const productRefs = activeProductIds.map(productId =>
-      doc(this.firestore, 'products', productId)
+    const productRefs = this.dfuProductRefs.filter(ref =>
+      activeProductIds.includes(ref.id)
     );
     const chunkSize = 30;
     const participantProducts: any[] = [];
@@ -442,52 +359,62 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
 
     this.dfuParticipantMap[profileid].participantproducts = participantProducts;
-
     console.log('Participant products for', profileid, participantProducts);
   }
 
-  async deliverySequence(profileid: string, participantproductid: string): Promise<void> 
-  { 
+  // fetch the delivery sequence for a participant product
+  async deliverySequence(profileid: string, participantproductid: string): Promise<void> { 
+    this.toggleOverviewProduct(profileid, participantproductid);
     const deliverysequenceQuery = query(collection(this.firestore, 'participantdeliverysequence'), where('profileid', '==', profileid)); 
     const deliverySnapshot = await getDocs(deliverysequenceQuery); 
     let deliverySteps: any[] = []; 
-    deliverySnapshot.docs.forEach(docSnap => 
-    { 
-    const data = docSnap.data(); 
-    const products = data['products'] || []; 
-    const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid); 
-    if (matchedProduct) 
-    { 
-      deliverySteps = matchedProduct.delivery || []; 
-    } 
-    }); 
     const stepList: { step: number; deliveryname: string; status: string }[] = []; 
-    for (let i = 0; i < deliverySteps.length; i++) 
-    { 
+
+    deliverySnapshot.docs.forEach(docSnap => { 
+      const data = docSnap.data(); 
+      const products = data['products'] || []; 
+      const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid); 
+      if (matchedProduct) { 
+        deliverySteps = matchedProduct.delivery || []; 
+      } 
+    }); 
+
+    for (let i = 0; i < deliverySteps.length; i++) { 
       const seqStep = deliverySteps[i]; 
       const deliverableDoc = await getDoc(seqStep.sequenceref); 
       const deliverableData = deliverableDoc.data(); 
       const deliveryType = deliverableData?.['type']; 
       console.log('Delivery step', i, 'for', profileid, 'participantproductid', participantproductid, 'is', deliverableData); 
-      let deliveryName = ''; if (deliveryType === 'appointment') 
-      {
+      let deliveryName = ''; 
+
+      if (deliveryType === 'appointment') {
          const appointmentType = await getDoc(deliverableData['deliveryref']); 
          deliveryName = appointmentType.data()?.['appointmenttype'] || ''; 
-      } else if (deliveryType === 'form') 
-      { 
+      } else if (deliveryType === 'form') { 
         const form = await getDoc(deliverableData['deliveryref']); 
         deliveryName = form.data()?.['formname'] || ''; 
       } 
-        stepList.push
-        ({ 
-          step: i+1, 
-          deliveryname: deliveryName, 
-          status: deliverableData?.['status'] || '' 
-        }); 
-      } 
+      stepList.push({ 
+        step: i+1, 
+        deliveryname: deliveryName, 
+        status: deliverableData?.['status'] || '' 
+      }); 
+    } 
       this.dfuParticipantMap[profileid].deliverysequence = stepList; 
       console.log('deliverysequence for', profileid, stepList); 
-    }
+  }
+
+  // Helper functions
+  toggleOverviewRow(profileid: string): void {
+    const isSameRow = this.expandedOverviewRowId === profileid;
+    this.expandedOverviewRowId = isSameRow ? null : profileid;
+  }
+
+  toggleOverviewProduct(profileid: string, participantproductid: any): void {
+    const key = participantproductid;
+    const isOpen = this.expandedOverviewProduct[key];
+    this.expandedOverviewProduct[key] = !isOpen;
+  }
 
   // ================= HELPERS =================
   member(id: string): Member {
@@ -577,279 +504,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     return 'step-pending';
   }
 
-  // private getDfuProducts(): void {
-  //   const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
-
-  //   collectionData(q, { idField: 'id' }).pipe(takeUntil(this.destroy$)).subscribe(products => {
-  //     this.dfuProductsMap = {};
-  //     this.dfuProductRefs = [];
-
-  //     products.forEach((p: any) => {
-  //       this.dfuProductsMap[p.id] = p['product'];
-  //       this.dfuProductRefs.push(doc(this.firestore, 'products', p.id));
-  //     });
-
-  //     // this.participantOverviewRows();
-  //     // this.participantOverviewCount();
-  //   });
-  // }
-
-  // private getParticipantMetadata(): void {
-  //   const metaRef = collection(this.firestore, 'participant metadata');
-
-  //   collectionData(metaRef, { idField: 'id' }).pipe(takeUntil(this.destroy$)).subscribe(docs => {
-  //     const domain = '@soexcellence.com';
-  //     this.allSoexcellenceMeta = docs.filter((d: any) => (d['email'] ?? '').toLowerCase().endsWith(domain));
-  //     this.participants = this.allSoexcellenceMeta;
-
-  //     this.participantOverviewRows();
-  //     // this.participantOverviewCount();
-  //   });
-  // }
-
-  // private participantOverviewRows(): void {
-  //   const haveBothStreams = this.allSoexcellenceMeta.length && Object.keys(this.dfuProductsMap).length;
-  //   if (!haveBothStreams) { return; } 
-  //   const previousById = new Map(this.overviewParticipants.map(r => [r.id, r]));
-  //   const rows: OverviewParticipantRow[] = [];
-
-  //   this.allSoexcellenceMeta.forEach((profile: any) => {
-  //     const activeproduct: string[] = profile['activeproduct'] ?? [];
-  //     this.participantActiveProductMap[profile.id] = activeproduct;
-
-  //     const resultedProductArray = activeproduct.filter(pid => !!this.dfuProductsMap[pid]);
-  //     if (!resultedProductArray.length) { return; } 
-
-  //     const previous = previousById.get(profile.id);
-  //     rows.push({
-  //       id: profile.id,
-  //       name: profile['name'] ?? 'Unnamed',
-  //       email: profile['email'] ?? '',
-  //       activeDfuCount: resultedProductArray.length,
-  //       ongoingProducts: previous ? previous.ongoingProducts : null
-  //     });
-  //   });
-
-  //   this.overviewParticipants = rows;
-  // }
-
-  // private ongoingParticipantsProduct(productRefs: any[],callback: (docs: any[]) => void): Subscription
-  // { 
-  //   const chunkSize = 30;
-  //   const allDocs: any[] = [];
-  //   const chunks: any[][] = [];
-
-  //   for (let i = 0; i < productRefs.length; i += chunkSize) {
-  //     chunks.push(productRefs.slice(i, i + chunkSize));
-  //   }
-  //   if (chunks.length === 0) {
-  //     callback([]);
-  //     return new Subscription();
-  //   } 
-  //   let completedChunks = 0;
-  //   const subscriptions = chunks.map(chunk => {
-  //     const q = query(collection(this.firestore, 'participantsproduct'),where('status', 'in', ['ongoing', 'initiated']),where('productref', 'in', chunk));
-  //     return collectionData(q, { idField: 'docid' }).subscribe({next: docs => {allDocs.push(...docs);
-  //         completedChunks++;
-  //         if (completedChunks === chunks.length) {
-  //           callback(allDocs);
-  //         }
-  //       },
-  //       error: err => {
-  //         console.error('Error:', err);
-  //         completedChunks++;
-  //         if (completedChunks === chunks.length) {
-  //           callback(allDocs);
-  //         }
-  //       }
-  //     });
-  //   });
-  //   return new Subscription(() => {
-  //     subscriptions.forEach(sub => sub.unsubscribe());
-  //   });
-  // }
-
-  // private participantOverviewCount(): void {
-  //   const q = query(collection(this.firestore, 'participantsproduct'), where('status', 'in', ['ongoing', 'initiated']));
-
-  //   getDocs(q).then(snapshot => {
-  //     const soexcellenceIds = new Set(this.allSoexcellenceMeta.map((m: any) => m.id));
-  //     const matchingDocs = snapshot.docs.filter(d => {
-  //       const data = d.data();
-  //       const isSoexcellenceParticipant = soexcellenceIds.has(data['profileid']);
-  //       const isDfuProduct = !!this.dfuProductsMap[data['productref']?.id];
-  //       return isSoexcellenceParticipant && isDfuProduct;
-  //     });
-  //     this.ongoingCount = matchingDocs.length;
-  //   })
-  //   .catch(err => {
-  //     console.error('Error:', err);
-  //     this.ongoingCount = null;
-  //     });
-  // }
-
-  // toggleOverviewRow(participantId: string): void {
-  //   const isSameRow = this.expandedOverviewRowId === participantId;
-  //   this.expandedOverviewRowId = isSameRow ? null : participantId;
-
-  //   if (isSameRow) {
-  //     this.collapseRow(participantId);
-  //     return;
-  //   }
-
-  //   const row = this.overviewParticipants.find(r => r.id === participantId);
-  //   if (!row || this.rowSubs[participantId]) { return; }
-
-  //   this.overviewOngoingLoading[participantId] = true;
-
-  //   const activeproduct = this.participantActiveProductMap[participantId] ?? [];
-  //   const resultedProductArray = activeproduct.filter(pid => !!this.dfuProductsMap[pid]);
-  //   const resultedProductRefs = this.dfuProductRefs.filter(ref => resultedProductArray.includes(ref.id));
-
-  //   this.rowSubs[participantId] = this.ongoingParticipantsProduct(resultedProductRefs, docs => {
-  //     const mine = docs.filter(d => d['profileid'] === participantId);
-
-  //     row.ongoingProducts = mine.map(d => ({
-  //       participantproductid: d['docid'],
-  //       productId: d['productref']?.id,
-  //       productName: this.dfuProductsMap[d['productref']?.id] ?? 'Unknown product'
-  //     }));
-  //     this.overviewOngoingLoading[participantId] = false;
-  //   });
-  // }
-
-  // private collapseRow(participantId: string): void {
-  //   this.rowSubs[participantId]?.unsubscribe();
-  //   delete this.rowSubs[participantId];
-
-  //   const row = this.overviewParticipants.find(r => r.id === participantId);
-  //   (row?.ongoingProducts ?? []).forEach(p => this.collapseProduct(p.participantproductid));
-  // }
-
-  // toggleOverviewProduct(profileId: string, product: OverviewProduct): void {
-  //   const id = product.participantproductid;
-  //   const opening = !this.expandedOverviewProduct[id];
-  //   this.expandedOverviewProduct[id] = opening;
-
-  //   if (!opening) {
-  //     this.collapseProduct(id);
-  //     return;
-  //   }
-  //   if (this.stepSubs[id]) { return; } // already watching
-
-  //   this.overviewProgressLoading[id] = true;
-  //   this.stepSubs[id] = this.deliverySequence(profileId, id, steps => {
-  //     this.overviewProductSteps[id] = steps;
-  //     this.overviewProgressLoading[id] = false;
-  //   });
-  // }
-
-  // private collapseProduct(participantProductId: string): void {
-  //   this.stepSubs[participantProductId]?.unsubscribe();
-  //   delete this.stepSubs[participantProductId];
-  //   delete this.expandedOverviewProduct[participantProductId];
-  // }
-
-  // private deliverySequence(profileId: string,participantProductId: string,onData: (steps: any[]) => void): Subscription {
-  //   const seqRef = doc(this.firestore, 'participantdeliverysequence', profileId);
-  //   let itemSubs: Subscription[] = [];
-
-  //   const outerSub = docData(seqRef).subscribe((seqDoc: any) => {
-  //     itemSubs.forEach(s => s.unsubscribe());
-  //     itemSubs = [];
-
-  //     const products = seqDoc?.['products'] ?? [];
-  //     const productEntry = products.find((p: any) => p['participantproductid'] === participantProductId);
-  //     const deliveryItems = productEntry ? (productEntry['delivery'] ?? []) : [];
-
-  //     if (!deliveryItems.length) { onData([]); return; }
-
-  //     const steps: any[] = deliveryItems.map(() => ({ name: 'Loading…', stepClass: 'step-pending', status: 'Pending' }));
-  //     onData([...steps]);
-
-  //     deliveryItems.forEach((item: any, index: number) => {
-  //       const itemSub = docData(item.sequenceref).subscribe(async (deliverable: any) => {
-  //         if (!deliverable) {
-  //           steps[index] = { name: 'Unknown', stepClass: 'step-pending', status: 'Pending' };
-  //           onData([...steps]);
-  //           return;
-  //         }
-
-  //         const status = deliverable['status'];
-  //         let stepClass = 'step-pending';
-  //         let statusLabel = 'Pending';
-  //         if (status === 'completed') { stepClass = 'step-completed'; statusLabel = 'Completed'; }
-  //         else if (status === 'ongoing') { stepClass = 'step-ready'; statusLabel = 'Ongoing'; }
-  //         else if (status === 'ready') { stepClass = 'step-ready'; statusLabel = 'Ready'; }
-
-  //         steps[index] = { name: await this.resolveDeliveryName(deliverable), stepClass, status: statusLabel };
-  //         onData([...steps]);
-  //       });
-  //       itemSubs.push(itemSub);
-  //     });
-  //   });
-
-  //   const combined = new Subscription();
-  //   combined.add(outerSub);
-  //   combined.add(() => itemSubs.forEach(s => s.unsubscribe()));
-  //   return combined;
-  // }
-
-  // private async resolveDeliveryName(deliverable: any): Promise<string> {
-  //   if (!deliverable?.['deliveryref']) { return 'Unknown'; }
-
-  //   const key = deliverable['deliveryref'].path;
-  //   if (this.deliveryNameCache[key]) { return this.deliveryNameCache[key]; }
-
-  //   const snap = await getDoc(deliverable['deliveryref']);
-  //   if (!snap.exists()) { return 'Unknown'; }
-
-  //   const data: any = snap.data();
-  //   const field = this.deliveryNameFieldByType[deliverable['type']];
-  //   let name = field ? data[field] : undefined;
-
-  //   if (!name) {
-  //     const candidate = Object.keys(data).find(k => typeof data[k] === 'string' && k.toLowerCase().includes('name'));
-  //     name = candidate ? data[candidate] : 'Unknown';
-  //     console.warn(`[delivery name] unresolved for type="${deliverable['type']}" at ${key}. Fields on doc:`, Object.keys(data));
-  //   }
-
-  //   this.deliveryNameCache[key] = name;
-  //   return name;
-  // }
-
-  // async loadParticipants(): Promise<void> {
-  //   const getProfileData = await this.authguard.getProfileMap();
-  //   console.log("profile:",getProfileData)
-  //   const domain = '@soexcellence.com';
-
-  //   const result: any[] = [];
-  //   for (const id in getProfileData.docdata) {
-  //     const profile = getProfileData.docdata[id];
-  //     const email = (profile['email'] ?? '').toLowerCase();
-  //     const isSoExcellenceProfile = email.endsWith(domain);
-  //     if (!isSoExcellenceProfile) { 
-  //       continue; 
-  //     }
-  //     result.push({ id, ...profile });
-  //   }
-
-  //   this.participants = result;
-  // }
-
-  // async loadParticipants(): Promise<void> {
-  //   const snapshot = await getDocs(collection(this.firestore, 'profile_data'));
-
-  //   this.participants = snapshot.docs.map(docSnap => ({
-  //       id: docSnap.id,
-  //       ...docSnap.data()
-  //     }))
-  //     .filter((participant: any) =>
-  //       participant.email?.toLowerCase().endsWith('@soexcellence.com')
-  //     );
-
-  //   console.log('participantlist:', this.participants);
-  // }
 
   private initials(name: string): string {
     const parts = (name ?? '').split(' ').filter(Boolean);
