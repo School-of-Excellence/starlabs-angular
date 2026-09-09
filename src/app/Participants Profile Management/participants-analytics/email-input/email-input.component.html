@@ -20,6 +20,10 @@
         <button class="hdr-btn chip" (click)="onShowRecipients()" *ngIf="getRecipientCount() > 0">
           <mat-icon>group</mat-icon>
           {{getRecipientCount()}} recipient{{getRecipientCount() !== 1 ? 's' : ''}}
+          <span class="hold-count-badge" *ngIf="heldRecipients.length > 0"
+            [matTooltip]="heldRecipients.length + ' on delivery hold — will be skipped'">
+            <mat-icon>block</mat-icon>{{heldRecipients.length}}
+          </span>
           <mat-icon class="chevron">{{showRecipients ? 'expand_less' : 'expand_more'}}</mat-icon>
         </button>
 
@@ -37,8 +41,13 @@
           <mat-icon>people_outline</mat-icon>
           Campaign Recipients
         </div>
+        <div class="rc-group-head rc-group-send" *ngIf="heldRecipients.length > 0">
+          <mat-icon>send</mat-icon>
+          <span>Will be sent</span>
+          <span class="rc-group-count">{{sendableRecipients.length}}</span>
+        </div>
         <div class="recipients-grid">
-          <div class="recipient-pill" *ngFor="let r of getRecipientList()">
+          <div class="recipient-pill" *ngFor="let r of sendableRecipients; trackBy: trackRecipient">
             <div class="pill-avatar">
               <img *ngIf="r.photoURL || r.avatar" [src]="r.photoURL || r.avatar" [alt]="r.name">
               <mat-icon *ngIf="!r.photoURL && !r.avatar">account_circle</mat-icon>
@@ -48,7 +57,31 @@
               <span class="pill-email">{{r.email}}</span>
             </div>
           </div>
+          <div class="rc-empty-note" *ngIf="sendableRecipients.length === 0">
+            No sendable recipients — every selected profile is on delivery hold.
+          </div>
         </div>
+
+        <ng-container *ngIf="heldRecipients.length > 0">
+          <div class="rc-group-head rc-group-hold">
+            <mat-icon>block</mat-icon>
+            <span>On delivery hold — excluded from this send</span>
+            <span class="rc-group-count">{{heldRecipients.length}}</span>
+          </div>
+          <div class="recipients-grid">
+            <div class="recipient-pill on-hold" *ngFor="let r of heldRecipients; trackBy: trackRecipient"
+              matTooltip="deliveryonhold is set on this profile — clear it in Update Profile to send to them again">
+              <div class="pill-avatar">
+                <img *ngIf="r.photoURL || r.avatar" [src]="r.photoURL || r.avatar" [alt]="r.name">
+                <mat-icon *ngIf="!r.photoURL && !r.avatar">account_circle</mat-icon>
+              </div>
+              <div class="pill-info">
+                <span class="pill-name">{{r.name || r.displayName || 'Unknown'}}</span>
+                <span class="pill-email">{{r.email}}</span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
       </div>
     </div>
 

@@ -111,6 +111,11 @@
       </div>
       <br>
       <mat-checkbox formControlName="deliveryonhold">Delivery Onhold</mat-checkbox>
+      <div class="hold-stamp" *ngIf="holdByName" [class.on]="holdWasOn">
+        {{ holdWasOn ? 'On hold by' : 'Hold removed by' }}
+        <strong>{{ holdByName }}</strong>
+        <span *ngIf="holdByTime"> &middot; {{ holdByTime | date:'d MMM y, h:mm a' }}</span>
+      </div>
       <br>
       <mat-checkbox formControlName="enable">Enable Breakthroughs App</mat-checkbox>
       <br>

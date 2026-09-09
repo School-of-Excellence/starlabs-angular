@@ -18,9 +18,9 @@
 
   <form [formGroup]="addissue">
     <div class="main">
-      <div style="margin: 20px;">
+      <div class="col">
         <mat-card>
-        <div style="padding: 20px;">
+        <div class="col-inner">
           <mat-form-field class="formfield" appearance="outline">
             <mat-label>Reported Date</mat-label>
             <input matInput type="date" formControlName="reporteddate" placeholder="please Enter client name">
@@ -85,9 +85,9 @@
         </mat-card>
       </div>
 
-      <div style="margin: 20px;">
+      <div class="col">
         <mat-card>
-        <div style="padding: 20px;">
+        <div class="col-inner">
           <mat-form-field class="formfield" appearance="outline">
             <mat-label>Issue Reported By</mat-label>
             <mat-select formControlName="issueReportedBy">
@@ -167,9 +167,9 @@
         </mat-card>
       </div>
 
-      <div style="margin-left: 30px;margin-top: 20px;">
-        <mat-card style="height: 500px; overflow: auto;width: 750px; padding: 20px;">
-          <mat-form-field class="formfield1" appearance="outline" style="width: 700px;">
+      <div class="col col-issue">
+        <mat-card class="issue-card">
+          <mat-form-field class="formfield1" appearance="outline">
             <mat-label>Issue</mat-label>
             <textarea matInput id="myTextarea" formControlName="issue" (input)="adjustTextareaHeight()" [readonly]="dailogData['type'] == 'edit'"
               [ngClass]="{ 'status-action': addissue.controls['status'].value === 'open',

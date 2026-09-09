@@ -1,12 +1,49 @@
 <div class="_mainContainer">
-  <div class="_container">
-      <mat-form-field style="width:400px">
-          <mat-label>Filter By</mat-label>
-          <input matInput (keyup)="applyFilter($event)" placeholder="Enter product name" #input>
-        </mat-form-field>
-         <span class="spacer"></span>
-        <button  mat-stroked-button color="primary" (click)="addproductdialog()">Add New Product</button>
+  <!-- Toolbar: what you are looking at, and how to narrow it. Search and the view segments are
+       grouped together on the left because both filter; the create action sits apart on the right. -->
+  <div class="_toolbar">
+    <div class="_toolbarRow">
+      <div class="_searchBox">
+        <mat-icon class="_searchIcon">search</mat-icon>
+        <input #input type="text" placeholder="Search products, mode, ATC model…"
+               (keyup)="applyFilter($event)" aria-label="Search products"/>
+        <button type="button" class="_clearBtn" *ngIf="input.value"
+                (click)="clearSearch(input)" matTooltip="Clear search" aria-label="Clear search">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="_segmented" role="group" aria-label="Show products">
+        <button type="button" [class.on]="view === 'active'" (click)="setView('active')">
+          Active <span class="_count">{{ activeCount }}</span>
+        </button>
+        <button type="button" [class.on]="view === 'deleted'" (click)="setView('deleted')">
+          Deleted <span class="_count">{{ deletedCount }}</span>
+        </button>
+        <button type="button" [class.on]="view === 'all'" (click)="setView('all')">
+          All <span class="_count">{{ (listofproduct || []).length }}</span>
+        </button>
+      </div>
+
+      <span class="spacer"></span>
+      <button mat-flat-button color="primary" class="_addBtn" (click)="addproductdialog()">
+        <mat-icon>add</mat-icon> Add New Product
+      </button>
+    </div>
+
+    <!-- Says what the table is currently showing, so a short list never looks like a loading bug. -->
+    <div class="_resultLine">
+      <span>
+        Showing <strong>{{ dataSource?.filteredData?.length || 0 }}</strong>
+        of {{ (listofproduct || []).length }} products
+        <ng-container *ngIf="view === 'active'"> · deleted hidden</ng-container>
+        <ng-container *ngIf="view === 'deleted'"> · deleted only</ng-container>
+      </span>
+      <button type="button" class="_linkBtn" *ngIf="view !== 'active' || input.value"
+              (click)="resetFilters(input)">Reset filters</button>
+    </div>
   </div>
+
   <div class="mat-elevation-z8">
       <table mat-table [dataSource]="dataSource" matSort>
         <!-- Product  Column -->
@@ -89,18 +126,32 @@
           <td mat-cell *matCellDef="let row"><button mat-mini-fab color="primary" type="button" (click)="onrowedit(row)"><mat-icon> edit</mat-icon></button>  </td>
         </ng-container>
   
-        <!-- Delete Column -->
-        <!-- <ng-container matColumnDef="Delete">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
-          <td mat-cell *matCellDef="let row"><button mat-mini-fab color="accent" type="button" (click)="onrowdelete(row.id)"><mat-icon>delete</mat-icon></button> </td>
-        </ng-container> -->
+        <!-- Delete Column — a soft delete: the toggle writes `isdelete` on the document, it does
+             not remove it. Products are referenced elsewhere, so removing one would strand them. -->
+        <ng-container matColumnDef="Delete">
+          <th mat-header-cell *matHeaderCellDef> Delete </th>
+          <td mat-cell *matCellDef="let row">
+            <mat-slide-toggle color="warn"
+                              [checked]="row.isdelete === true"
+                              [disabled]="saving.has(row.id)"
+                              (change)="toggleDeleted(row, $event.checked)"
+                              [matTooltip]="row.isdelete === true ? 'Restore this product' : 'Mark this product deleted'">
+            </mat-slide-toggle>
+          </td>
+        </ng-container>
     
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            [class._deleted]="row.isdelete === true"></tr>
     
         <!-- Row shown when there is no matching data. -->
         <tr class="mat-row" *matNoDataRow>
-          <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <ng-container *ngIf="input.value">No data matching the filter "{{input.value}}"</ng-container>
+            <ng-container *ngIf="!input.value">
+              {{ view === 'deleted' ? 'No deleted products' : 'No products to show' }}
+            </ng-container>
+          </td>
         </tr>
       </table>
     
