@@ -24,10 +24,14 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'app-profilelist',
   imports: [
+    MatSlideToggleModule,
+    MatTooltipModule,
     MatFormFieldModule,
     MatInputModule,
     ReactiveFormsModule,
@@ -60,6 +64,13 @@ export class ProfilelistComponent {
   @ViewChild(MatPaginator) paginator:MatPaginator
   tableHeader = ["name", "email", "number", "more"];
   tableData:MatTableDataSource<any> = new MatTableDataSource();
+
+  // ── Filters ───────────────────────────────────────────────────────────
+  // Name search plus two toggles, combined into one predicate. The filter value
+  // is JSON so all three travel together through MatTableDataSource.
+  nameFilter = '';
+  holdOnly = false;
+  ahcrmOnly = false;
   profilerole = {}
   roleList = []
   atcmodelList = []
@@ -158,6 +169,41 @@ export class ProfilelistComponent {
   }
 
   ngOnInit(): void {
+    this.tableData.filterPredicate = (row: any, filter: string) => {
+      let f: any;
+      try { f = JSON.parse(filter); } catch { return true; }
+
+      if (f.hold && row['deliveryonhold'] !== true) return false;
+      if (f.ahcrm && row['enableahcrm'] !== true) return false;
+
+      if (f.name) {
+        // Same haystack MatTableDataSource builds by default, so the name box
+        // keeps matching every column exactly as it did before.
+        const hay = Object.keys(row)
+          .reduce((acc, k) => acc + row[k] + '◬', '')
+          .toLowerCase();
+        if (!hay.includes(f.name)) return false;
+      }
+      return true;
+    };
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    this.tableData.filter = JSON.stringify({
+      name: this.nameFilter.trim().toLowerCase(),
+      hold: this.holdOnly,
+      ahcrm: this.ahcrmOnly,
+    });
+    if (this.tableData.paginator) this.tableData.paginator.firstPage();
+  }
+
+  get holdCount(): number {
+    return (this.tableData.data || []).filter((r: any) => r['deliveryonhold'] === true).length;
+  }
+
+  get ahcrmCount(): number {
+    return (this.tableData.data || []).filter((r: any) => r['enableahcrm'] === true).length;
   }
 
   toggleRow(row: any): void {
@@ -194,7 +240,8 @@ export class ProfilelistComponent {
   }
 
   filterData(value){
-    this.tableData.filter = value
+    this.nameFilter = value || ''
+    this.applyFilters()
   }
 
   viewProfileSummary(pid){

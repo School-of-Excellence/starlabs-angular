@@ -380,3 +380,26 @@ tr.mat-mdc-row:nth-child(even) {
 .mat-mdc-slide-toggle {
   transform: scale(0.85);
 }
+/* ── Recipients / delivery hold ──────────────────────────────────── */
+.rc-bar { margin: 10px 0 4px; }
+.rc-toggle { display: inline-flex; align-items: center; gap: 6px; background: #f1f3f4; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #202124; cursor: pointer; }
+.rc-toggle mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.rc-panel { margin-top: 8px; background: #fafafa; border: 1px solid #eee; border-radius: 10px; padding: 10px 12px; }
+.rc-group-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.rc-group-head:first-child { margin-top: 0; }
+.rc-group-head mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.rc-group-count { border-radius: 9px; font-size: 11px; font-weight: 700; padding: 0 7px; letter-spacing: 0; }
+.rc-group-send { color: #1e8e3e; }
+.rc-group-send .rc-group-count { background: #e6f4ea; color: #1e8e3e; }
+.rc-group-hold { color: #b3261e; }
+.rc-group-hold .rc-group-count { background: #fdecea; color: #b3261e; }
+.rc-grid { display: flex; flex-wrap: wrap; gap: 8px; max-height: 140px; overflow-y: auto; }
+.rc-chip { display: flex; flex-direction: column; background: #f1f3f4; border: 1px solid #e0e0e0; border-radius: 12px; padding: 5px 12px; }
+.rc-chip .rc-name { font-size: 13px; font-weight: 600; color: #202124; line-height: 1.2; }
+.rc-chip .rc-email { font-size: 11px; color: #777; }
+.rc-chip.on-hold { background: #fdecea; border-color: #e57373; }
+.rc-chip.on-hold .rc-name { color: #b3261e; text-decoration: line-through; }
+.rc-chip.on-hold .rc-email { color: #a6635c; }
+.rc-empty-note { font-size: 12px; color: #b3261e; padding: 6px 2px; }
+.hold-count-badge { display: inline-flex; align-items: center; gap: 2px; background: #d93025; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 7px 1px 5px; }
+.hold-count-badge mat-icon { font-size: 13px !important; width: 13px !important; height: 13px !important; color: #fff !important; }
