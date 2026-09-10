@@ -125,7 +125,7 @@
               <span class="dot" [class.pulse]="k === 'needsAttention' && lifecycleCounts[k]"></span>
             </div>
             <div class="num">
-              {{ k === 'onTrack' ? overviewTabCount['ongoing'] ?? '…' : k === 'completed' ? overviewTabCount['completed'] ?? '…' : k === 'notStarted' ? overviewTabCount['initiated'] ?? '…' : lifecycleCounts[k] }}
+              {{ lifecycleCounts[k] }}
               <span class="den" *ngIf="k !== 'onTrack' && k !== 'completed' && k !== 'notStarted'"> / {{ totalJourneys }}</span>
             </div>
             <div class="desc">{{ lifecycleConfig[k].desc }}</div>
