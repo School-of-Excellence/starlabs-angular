@@ -19,6 +19,11 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTabsModule } from '@angular/material/tabs';
 import { UserAnalyticsDialogComponent } from './user-analytics-dialog/user-analytics-dialog.component';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import {
+  avgHoursPerActiveDay, completionPercent, daysSinceLastSeen, formatDaysHoursMins, formatHoursMins,
+  formatMinutesSeconds, journeyProfileVisible as journeyProfileVisibleRule, visibleProfileCount,
+  watchHours,
+} from './content-analytics.engine';
 
 @Component({
   selector: 'app-content-analytics',
@@ -228,50 +233,27 @@ export class ContentAnalyticsComponent {
   }
  
   journeyProfileVisible(profile: any): boolean {
-    const matchesFilter =
-      this.journeyFilter === 'all' ||
-      (this.journeyFilter === 'watching' && profile.watching) ||
-      (this.journeyFilter === 'notyet' && !profile.watching);
-    const matchesSearch = !this.journeySearchQuery ||
-      profile.name?.toLowerCase().includes(this.journeySearchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
+    return journeyProfileVisibleRule(profile, this.journeyFilter, this.journeySearchQuery);
   }
  
   getVisibleCount(profiles: any[]): number {
-    return (profiles || []).filter(p => this.journeyProfileVisible(p)).length;
+    return visibleProfileCount(profiles, this.journeyFilter, this.journeySearchQuery);
   }
  
   getWatchHrs(logs: any[]): number {
-    if (!logs?.length) return 0;
-    return logs.reduce((sum, l) => sum + (l.totaltimespend || 0), 0) / 3600;
+    return watchHours(logs);
   }
  
   getCompletion(logs: any[]): number {
-    if (!logs?.length) return 0;
-    const totalSpend   = logs.reduce((sum, l) => sum + (l.totaltimespend || 0), 0);
-    const totalRuntime = logs.reduce((sum, l) => sum + (l.totalruntime || 0), 0);
-    if (totalRuntime === 0) return 0;
-    return (totalSpend / totalRuntime) * 100;
+    return completionPercent(logs);
   }
  
   getAvgPerDay(logs: any[]): number {
-    if (!logs?.length) return 0;
-    const dateSet = new Set<string>();
-    logs.forEach(l => {
-      const d = l.logdate?.toDate ? l.logdate.toDate() : new Date(l.logdate);
-      dateSet.add(d.toISOString().substring(0, 10));
-    });
-    return dateSet.size > 0 ? this.getWatchHrs(logs) / dateSet.size : 0;
+    return avgHoursPerActiveDay(logs);
   }
  
   getLastSeenDays(logs: any[]): number {
-    if (!logs?.length) return 999;
-    let latest = 0;
-    logs.forEach(l => {
-      const d = l.logdate?.toDate ? l.logdate.toDate() : new Date(l.logdate);
-      if (d.getTime() > latest) latest = d.getTime();
-    });
-    return Math.floor((Date.now() - latest) / (1000 * 60 * 60 * 24));
+    return daysSinceLastSeen(logs);
   }
 
   // async journeyBasedanalytics(){
@@ -760,32 +742,15 @@ export class ContentAnalyticsComponent {
   }
 
   convertDecimal(value:number){
-    const minutes = Math.floor(value / 60);
-    const remainingSeconds = value % 60;
-    return `${minutes} mins ${remainingSeconds} sec (${value})`
+    return formatMinutesSeconds(value);
   }
 
   convertDaysHoursMins(seconds:number){
-    const days = Math.floor(seconds / (3600 * 24));
-    const remainingSecondsAfterDays = seconds % (3600 * 24);
-
-    const hours = Math.floor(remainingSecondsAfterDays / 3600);
-    const remainingSecondsAfterHours = remainingSecondsAfterDays % 3600;
-
-    const minutes = Math.floor(remainingSecondsAfterHours / 60);
-    const remainingSeconds = remainingSecondsAfterHours % 60;
-
-    return `${days} days ${hours} hours ${minutes} mins ${remainingSeconds} secs`
+    return formatDaysHoursMins(seconds);
   }
 
   convertHoursMins(seconds:number){
-    const hours = Math.floor(seconds / 3600);
-    const remainingSecondsAfterHours = seconds % 3600;
-
-    const minutes = Math.floor(remainingSecondsAfterHours / 60);
-    const remainingSeconds = remainingSecondsAfterHours % 60;
-
-    return `${hours} hours ${minutes} mins ${remainingSeconds} secs`
+    return formatHoursMins(seconds);
   }
 
   filterData(){

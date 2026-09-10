@@ -29,6 +29,8 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { CrossOverMetricsDialogComponent } from '../cross-over-metrics-dialog/cross-over-metrics-dialog.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+// Pure business rules, extracted 2026-09-10 — see journeycoach.engine.ts for what and why.
+import * as engine from './journeycoach.engine';
 
 interface ColumnConfig {
   key: string;
@@ -2667,17 +2669,7 @@ export class JourneycoachDashboardComponent {
 
   // Function to call column class based on schedule condition 
   getColumnClass(tentativeStart: Date): string {
-    const now = new Date();
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setMonth(now.getMonth() + 1);
-
-    if (tentativeStart < now) {
-      return 'overdue'; // red
-    } else if (tentativeStart <= oneMonthFromNow) {
-      return 'approaching'; // orange
-    } else {
-      return ''; // no color change
-    }
+    return engine.columnClassFor(tentativeStart);
   }
 
   // Function to naviagte to journey support screen 
@@ -3080,15 +3072,13 @@ export class JourneycoachDashboardComponent {
 
   // Function to view loading progress of the screen 
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
-    const total = Object.keys(this.loadingStates).length;
     this.cdr.markForCheck();
-    return (loaded / total) * 100;
+    return engine.loadingProgressPercent(this.loadingStates);
   }
 
   // Function to get total loaded count 
   getLoadedCount(): number {
-    return Object.values(this.loadingStates).filter(state => state === true).length;
+    return engine.loadedCount(this.loadingStates);
   }
 
   // Function to open schedule dialog 
@@ -3259,8 +3249,7 @@ export class JourneycoachDashboardComponent {
   };
 
   calculateDaysAgo(fromDate, toDate) {
-    const daysDiff = Math.floor((fromDate?.getTime() - toDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? 0 : daysDiff;
+    return engine.calculateDaysAgo(fromDate, toDate);
   }
 
   // Method to handle box clicks
@@ -3352,10 +3341,8 @@ export class JourneycoachDashboardComponent {
 
   // Calculate total pages
   calculatePagination() {
-    this.totalPages = Math.ceil(this.currentTableConfig.data.length / this.itemsPerPage);
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
-    }
+    this.totalPages = engine.totalPagesFor(this.currentTableConfig.data.length, this.itemsPerPage);
+    this.currentPage = engine.clampPage(this.currentPage, this.totalPages);
   }
 
   // Update paginated data for display
@@ -3415,31 +3402,7 @@ export class JourneycoachDashboardComponent {
 
   // Get page numbers for pagination display
   getPageNumbers(): number[] {
-    const pages: number[] = [];
-    const maxPagesToShow = 5;
-
-    if (this.totalPages <= maxPagesToShow) {
-      // Show all pages if total is less than max
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show limited pages with ellipsis
-      const halfRange = Math.floor(maxPagesToShow / 2);
-      let start = Math.max(1, this.currentPage - halfRange);
-      let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-      // Adjust start if we're near the end
-      if (end === this.totalPages) {
-        start = Math.max(1, end - maxPagesToShow + 1);
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-    }
-
-    return pages;
+    return engine.pageNumbers(this.currentPage, this.totalPages);
   }
 
   // Check if column is sortable
@@ -3449,10 +3412,7 @@ export class JourneycoachDashboardComponent {
 
   // Get sort icon for column
   getSortIcon(columnKey: string): string {
-    if (this.sortColumn !== columnKey) {
-      return '⇅'; // Both arrows
-    }
-    return this.sortDirection === 'asc' ? '↑' : '↓';
+    return engine.sortIconFor(this.sortColumn, this.sortDirection, columnKey);
   }
 
   // Export table data
@@ -3514,50 +3474,26 @@ export class JourneycoachDashboardComponent {
 
   // Sort table by column
   sortTable(columnKey: string) {
-    if (this.sortColumn === columnKey) {
-      if (this.sortDirection === 'asc') {
-        this.sortDirection = 'desc';
-      } else if (this.sortDirection === 'desc') {
-        this.sortDirection = null;
-        this.sortColumn = null;
+    // The asc -> desc -> unsorted cycle and the comparator live in journeycoach.engine.ts. Restoring the
+    // unfiltered order and repaginating stay here, because both mutate component state.
+    const next = engine.nextSortState(this.sortColumn, this.sortDirection, columnKey);
+    const cleared = next.sortDirection === null;
+    this.sortColumn = next.sortColumn;
+    this.sortDirection = next.sortDirection;
 
-        this.currentTableConfig.data = [...this.filteredTableData];
-        this.calculatePagination();
-        return;
-      }
-    } else {
-      this.sortColumn = columnKey;
-      this.sortDirection = 'asc';
+    if (cleared) {
+      this.currentTableConfig.data = [...this.filteredTableData];
+      this.calculatePagination();
+      return;
     }
 
-    if (this.sortDirection) {
-      this.currentTableConfig.data.sort((a, b) => {
-        const valueA: any = this.getCellValue(a, columnKey);
-        const valueB: any = this.getCellValue(b, columnKey);
-
-        if (valueA == null && valueB == null) return 0;
-        if (valueA == null) return this.sortDirection === 'asc' ? 1 : -1;
-        if (valueB == null) return this.sortDirection === 'asc' ? -1 : 1;
-
-        let comparison = 0;
-
-        if (!isNaN(valueA) && !isNaN(valueB)) {
-          comparison = Number(valueA) - Number(valueB);
-        } else if (this.isDate(valueA) && this.isDate(valueB)) {
-          comparison = new Date(valueA).getTime() - new Date(valueB).getTime();
-        } else {
-          comparison = valueA.toString().localeCompare(valueB.toString());
-        }
-
-        return this.sortDirection === 'asc' ? comparison : -comparison;
-      });
-    }
+    this.currentTableConfig.data.sort((a, b) =>
+      engine.compareCellValues(this.getCellValue(a, columnKey), this.getCellValue(b, columnKey), this.sortDirection));
   }
 
   // Helper function to check if value is a date
   isDate(value: any): boolean {
-    return value instanceof Date ||
-      (typeof value === 'string' && !isNaN(Date.parse(value)));
+    return engine.isDateLike(value);
   }
 
   // Close table view
@@ -3589,14 +3525,9 @@ export class JourneycoachDashboardComponent {
       date = new Date(inputDate);
     }
 
-    const today = new Date();
-    const diffTime = Math.abs(today.getTime() - date.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 30) return 1;        // 1 month or less
-    if (diffDays <= 90) return 2;        // 2-3 months
-    if (diffDays <= 180) return 3;       // 3-6 months
-    return 4;                            // Greater than 6 months
+    // The banding rule lives in journeycoach.engine.ts; only the Timestamp/string/Date normalisation
+    // above stays here, because it depends on the Firestore Timestamp class.
+    return engine.dateDifferenceCategoryCode(date);
   }
 
   // Function to format each cell value in table 
@@ -3667,56 +3598,17 @@ export class JourneycoachDashboardComponent {
 
   // Currency formatting
   private formatCurrency(value: number, prefix?: string, mapValue?: string): string {
-    if (!value && value !== 0) return '-';
-
-    if (mapValue) {
-      value = value[mapValue];
-    }
-
-    const symbol = prefix || '₹';
-    const formatted = value.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-
-    return `${symbol}${formatted}`;
+    return engine.formatCurrency(value, prefix, mapValue);
   }
 
   // Number formatting
   private formatNumber(value: number, prefix?: string, suffix?: string): string {
-    if (!value && value !== 0) return '-';
-
-    const formatted = value.toLocaleString('en-IN');
-    return `${prefix || ''}${formatted}${suffix || ''}`;
+    return engine.formatNumber(value, prefix, suffix);
   }
 
   // Map value using dictionary
   private mapValue(value: any, mapData?: { [key: string]: any }, mapKey?: string, mapValue?: string): string {
-    if (!mapData) return value.toString();
-    let tempMap = '';
-
-    if (mapKey) {
-      // Check if it's array access like "[0].id"
-      if (mapKey.startsWith('[')) {
-        const match = mapKey.match(/\[(\d+)\]\.?(.*)$/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-
-          tempMap = value?.[index];
-          if (property) {
-            tempMap = tempMap?.[property];
-          }
-        }
-      } else {
-        tempMap = value?.[mapKey];
-      }
-    } else {
-      tempMap = value;
-    }
-
-    tempMap = mapValue ? mapData[tempMap]?.[mapValue] : mapData[tempMap];
-    return tempMap || value.toString();
+    return engine.mapValue(value, mapData, mapKey, mapValue);
   }
 
   // Get value for a specific cell
@@ -3778,8 +3670,7 @@ export class JourneycoachDashboardComponent {
   }
 
   calculateDaysClosed(reportedDate: Date, closedDate: Date): string {
-    const daysDiff = Math.floor((closedDate?.getTime() - reportedDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? '0' : daysDiff.toString();
+    return engine.calculateDaysClosed(reportedDate, closedDate);
   }
 
   isRowSelected(row: any): boolean {
@@ -3965,41 +3856,35 @@ export class JourneycoachDashboardComponent {
 
   // Function to get count of pending sales 
   getPendingCount() {
-    return this.currentTableConfig.data.filter((e) => [null, undefined, "", "pending"].includes(e['status']?.toLowerCase())).length;
+    return engine.countPending(this.currentTableConfig.data);
   }
 
-  // Function to get count of assured 
+  // Function to get count of assured
   getAssuredCount() {
-    return this.currentTableConfig.data.filter((e) => ![null, undefined, ""].includes(e['paymentplan'])).length;
+    return engine.countAssured(this.currentTableConfig.data);
   }
 
-  // Function to get count of not assured 
+  // Function to get count of not assured
   getNotAssuredCount() {
-    return this.currentTableConfig.data.filter((e) => [null, undefined, ""].includes(e['paymentplan']) && e['status']?.toLowerCase() == 'approved').length;
+    return engine.countNotAssured(this.currentTableConfig.data);
   }
 
   // Function to get count of active participants
   getActiveCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      e['customerstatus']?.toLowerCase() === 'active'
-    ).length;
+    return engine.countActive(this.currentTableConfig.data);
   }
 
   // Function to get count of non-active participants
   getNonactiveCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      e['customerstatus']?.toLowerCase() === 'non active'
-    ).length;
+    return engine.countNonactive(this.currentTableConfig.data);
   }
 
   // Function to get count of discontinued participants
   getDiscontinuedCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      ['discontinued', 'banned', 'late'].includes(e['customerstatus']?.toLowerCase())
-    ).length;
+    return engine.countDiscontinued(this.currentTableConfig.data);
   }
 
   // shouldHighlightWaitingPeriod(row: any): boolean {
@@ -4008,32 +3893,17 @@ export class JourneycoachDashboardComponent {
 
   // Function to calculate gross waiting period 
   calculateGrossWaitingPeriod(purchaseDate: Date): number {
-    if (!purchaseDate) return 0;
-    let comparisonDate = new Date();
-
-    const timeDifference = comparisonDate.getTime() - purchaseDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
+    return engine.waitingPeriodDays(purchaseDate, new Date());
   }
 
   // Function to calculate assured waiting period 
   calculateAssuredWaitingPeriod(purchaseDate: Date, comparisonDate: Date): number {
-    if (!purchaseDate || !comparisonDate) return 0;
-
-    const timeDifference = comparisonDate.getTime() - purchaseDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
+    return engine.waitingPeriodDays(purchaseDate, comparisonDate);
   }
 
   // Add this method to your component
   calculateDelayedDays(enachDate: Date): number {
-    if (!enachDate) return 0;
-
-    const today = new Date();
-    const timeDifference = today.getTime() - enachDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-
-    return daysDifference;
+    return engine.waitingPeriodDays(enachDate, new Date());
   }
 
   addNotes(element) {
@@ -4343,85 +4213,21 @@ export class JourneycoachDashboardComponent {
 
   // Function to calculate evolution process percentage 
   processEvolutionProgressFromMap(keyProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]>): void {
-    const keys = Object.keys(keyProfileMap);
-
-    const bands = [
-      { label: '< 25%', range: [0, 25] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '25 – 50%', range: [25, 50] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '50 – 75%', range: [50, 75] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '75 – 100%', range: [75, 101] as [number, number], profiles: {} as Record<string, any[]> },
-    ];
-
-    const totals: Record<string, number> = {};
-
-    keys.forEach(key => {
-      const allEntries = keyProfileMap[key];
-      totals[key] = allEntries.reduce((a, b) => a + b.sum, 0);
-
-      allEntries.forEach(({ profileId, sum, docTotal }) => {
-        const pct = docTotal > 0 ? Math.round((sum / docTotal) * 100) : 0;
-        const profileName = this.mapprofile[profileId] ?? profileId;
-        const profile = { profileId, profileName, total: sum, pct };
-        const band = bands.find(b => pct >= b.range[0] && pct < b.range[1]);
-        if (band) {
-          if (!band.profiles[key]) band.profiles[key] = [];
-          band.profiles[key].push(profile);
-        }
-      });
-    });
-
-    this.evolutionProgressData = { keys, bands, totals };
+    // Percentage + banding rules live in journeycoach.engine.ts.
+    this.evolutionProgressData = engine.buildEvolutionProgress(keyProfileMap, this.mapprofile);
     this.cdr.markForCheck();
   }
 
   buildHealthOverview(): void {
-    const map = this.evolutionprogressMap as Record<string, number>;
-    const total = Object.values(map).reduce((a: number, b: number) => a + b, 0);
-    if (total === 0) return;
+    // Ranking, shares, bar widths, colours and risk tags all live in journeycoach.engine.ts. An empty
+    // result means the total was zero, which the original treated as "leave the overview alone".
+    const built = engine.buildHealthKeyData(
+      this.evolutionprogressMap as Record<string, number>,
+      this.evolutionProgressData,
+    );
+    if (!built.length) return;
 
-    const colors = ['#639922', '#1D9E75', '#378ADD', '#EF9F27', '#E24B4A'];
-    const tags = [
-      { t: 'Top key', bg: '#EAF3DE', c: '#27500A' },
-      { t: 'Strong', bg: '#E1F5EE', c: '#085041' },
-      { t: 'Moderate', bg: '#E6F1FB', c: '#0C447C' },
-      { t: 'Watch', bg: '#FAEEDA', c: '#633806' },
-      { t: 'At risk', bg: '#FCEBEB', c: '#791F1F' },
-    ];
-
-    const sorted: [string, number][] = (Object.entries(map) as [string, number][])
-      .sort((a, b) => b[1] - a[1]);
-
-    const maxCount: number = sorted[0]?.[1] ?? 1;
-
-    // Count unique profiles per dominant key from evolutionProgressData
-    const profileCountPerKey: Record<string, number> = {};
-    if (this.evolutionProgressData) {
-      const profileAllAreas: Record<string, Record<string, number>> = {};
-      this.evolutionProgressData.keys.forEach(k => {
-        this.evolutionProgressData!.bands.forEach(band => {
-          (band.profiles[k] ?? []).forEach(p => {
-            if (!profileAllAreas[p.profileId]) profileAllAreas[p.profileId] = {};
-            profileAllAreas[p.profileId][k] = (profileAllAreas[p.profileId][k] ?? 0) + p.total;
-          });
-        });
-      });
-      Object.entries(profileAllAreas).forEach(([, areas]) => {
-        const dominant = Object.entries(areas).sort((a, b) => b[1] - a[1])[0]?.[0];
-        if (dominant) profileCountPerKey[dominant] = (profileCountPerKey[dominant] ?? 0) + 1;
-      });
-    }
-
-    this.healthKeyData = sorted.map(([key, count], i) => ({
-      key,
-      count,
-      pct: Math.round((count / total) * 100),
-      barPct: Math.round((count / maxCount) * 100),
-      profileCount: profileCountPerKey[key] ?? 0,
-      color: colors[i] ?? '#888780',
-      tag: tags[i]?.t ?? '',
-      tagBg: tags[i]?.bg ?? '#F1EFE8',
-      tagColor: tags[i]?.c ?? '#444441',
-    }));
+    this.healthKeyData = built;
 
     // Clear insights — no longer used
     this.healthInsights = [];
@@ -4646,42 +4452,9 @@ export class JourneycoachDashboardComponent {
         let comparison: any = null;
 
         if (previousDoc) {
-          const allSame = CATEGORIES.every(cat => {
-            const curr = doc.metric[cat];
-            const prev = previousDoc.metric[cat];
-            return curr?.startpoint === prev?.startpoint && curr?.endpoint === prev?.endpoint;
-          });
-
-          if (allSame) {
-            comparison = { status: 'no change', progressedAreas: [], regressedAreas: [], changedCount: 0 };
-          } else {
-            const progressedAreas: string[] = [];
-            const regressedAreas: string[] = [];
-
-            CATEGORIES.forEach(cat => {
-              const currSeq = doc.metric[cat]?.sequence ?? null;
-              const prevSeq = previousDoc?.metric[cat]?.sequence ?? null;
-              if (currSeq != null && prevSeq != null) {
-                if (Number(currSeq) > Number(prevSeq)) progressedAreas.push(cat);
-                else if (Number(currSeq) < Number(prevSeq)) regressedAreas.push(cat);
-              }
-            });
-
-            const totalChanged = progressedAreas.length + regressedAreas.length;
-            const changedCount: number | 'all' = totalChanged === 5 ? 'all' : totalChanged;
-
-            // No longer single status — profile can be in BOTH progressed and regressed
-            const isProgressed = progressedAreas.length > 0;
-            const isRegressed = regressedAreas.length > 0;
-            const isNoChange = !isProgressed && !isRegressed;
-
-            comparison = {
-              status: isNoChange ? 'no change' : 'changed',
-              progressedAreas,
-              regressedAreas,
-              changedCount
-            };
-          }
+          // The progressed/regressed judgement lives in journeycoach.engine.ts; the Firestore reads and
+          // the AEL sequence enrichment above stay here.
+          comparison = engine.compareInterimMetrics(doc.metric, previousDoc.metric, CATEGORIES);
         }
 
         monthResultMap[yearMonth].interimDocs.push({
@@ -4753,8 +4526,7 @@ export class JourneycoachDashboardComponent {
         // Add to progressed if any areas progressed
         if ((doc.comparison.progressedAreas ?? []).length > 0) {
           progressedProfiles.push(interimProfile);
-          const progressedCount = doc.comparison.progressedAreas.length === 5
-            ? 'all' : doc.comparison.progressedAreas.length;
+          const progressedCount = engine.areaBucket(doc.comparison.progressedAreas.length);
           const areaKey: string | number = progressedCount === 'all' ? 'all' : progressedCount as number;
           progressedAreaBreakdown[areaKey] = (progressedAreaBreakdown[areaKey] ?? 0) + 1;
           doc.comparison.progressedAreas.forEach((cat: string) => {
@@ -4765,8 +4537,7 @@ export class JourneycoachDashboardComponent {
         // Add to regressed if any areas regressed — independent of progressed
         if ((doc.comparison.regressedAreas ?? []).length > 0) {
           regressedProfiles.push(interimProfile);
-          const regressedCount = doc.comparison.regressedAreas.length === 5
-            ? 'all' : doc.comparison.regressedAreas.length;
+          const regressedCount = engine.areaBucket(doc.comparison.regressedAreas.length);
           const areaKey: string | number = regressedCount === 'all' ? 'all' : regressedCount as number;
           regressedAreaBreakdown[areaKey] = (regressedAreaBreakdown[areaKey] ?? 0) + 1;
           doc.comparison.regressedAreas.forEach((cat: string) => {
@@ -4815,8 +4586,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getTabLabel(monthSummary: MonthSummary): string {
-    const parts = monthSummary.monthLabel.split(' ');
-    return `${parts[0].slice(0, 3)} ${parts[1].slice(2)}`;
+    return engine.tabLabelFor(monthSummary.monthLabel);
   }
 
   // ── Stat helpers ──────────────────────────────────────────────────────────
@@ -4830,15 +4600,15 @@ export class JourneycoachDashboardComponent {
   }
 
   getMaxValue(breakdownMap: Record<string | number, number>): number {
-    return Math.max(...Object.values(breakdownMap), 1);
+    return engine.maxBreakdownValue(breakdownMap);
   }
 
   getBarWidthPercent(value: number, maxValue: number): number {
-    return Math.round((value / Math.max(maxValue, 1)) * 100);
+    return engine.barWidthPercent(value, maxValue);
   }
 
   getAreaLabel(areaKey: number | 'all'): string {
-    return areaKey === 'all' ? 'All Areas' : `${areaKey} Area${areaKey > 1 ? 's' : ''}`;
+    return engine.areaLabel(areaKey);
   }
 
   getAreaValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', areaKey: number | 'all'): number {
@@ -4856,11 +4626,11 @@ export class JourneycoachDashboardComponent {
   }
 
   getInitials(name: string): string {
-    return (name || '?').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase();
+    return engine.initialsFor(name);
   }
 
   getCountBadgeClass(changedCount: number | 'all', statusType: 'up' | 'dn' | 'nc'): string {
-    return changedCount === 'all' ? 'all' : statusType;
+    return engine.countBadgeClass(changedCount, statusType);
   }
 
   // ── Dialog openers ────────────────────────────────────────────────────────
@@ -4965,25 +4735,23 @@ export class JourneycoachDashboardComponent {
   // ── Category detail helpers ────────────────────────────────────────────────
 
   getCategoryChangeType(profile: InterimProfile, category: string): 'up' | 'dn' | 'nc' {
-    if (profile.progressedAreas.includes(category)) return 'up';
-    if (profile.regressedAreas.includes(category)) return 'dn';
-    return 'nc';
+    return engine.categoryChangeType(profile, category);
   }
 
   getCategoryArrow(changeType: 'up' | 'dn' | 'nc'): string {
-    return changeType === 'up' ? '↑' : changeType === 'dn' ? '↓' : '→';
+    return engine.categoryArrow(changeType);
   }
 
   getCategoryStatusLabel(changeType: 'up' | 'dn' | 'nc'): string {
-    return changeType === 'up' ? 'Progressed' : changeType === 'dn' ? 'Regressed' : 'No change';
+    return engine.categoryStatusLabel(changeType);
   }
 
   isCategoryChanged(profile: InterimProfile, category: string): boolean {
-    return [...profile.progressedAreas, ...profile.regressedAreas].includes(category);
+    return engine.allChangedAreas(profile).includes(category);
   }
 
   getAllChangedAreas(profile: InterimProfile): string[] {
-    return [...profile.progressedAreas, ...profile.regressedAreas];
+    return engine.allChangedAreas(profile);
   }
 
   toggleFilterMode(mode: 'months' | 'daterange' | 'queue'): void {
@@ -5257,9 +5025,7 @@ export class JourneycoachDashboardComponent {
     return this.mapjourneyname?.[id] ?? id;
   }
   getSubStatusClass(status: string): string {
-    if (status === 'completed') return 'status-completed';
-    if (status === 'ongoing') return 'status-ongoing';
-    return '';
+    return engine.subStatusClass(status);
   }
   getGrandTotal(): number {
     if (!this.subscriptionMatrix) return 0;
@@ -5282,10 +5048,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getStatusClass(status: string): string {
-    if (status === 'active') return 'js-active';
-    if (status === 'non active') return 'js-nonactive';
-    if (status === 'discontinued') return 'js-discontinued';
-    return 'js-null';
+    return engine.journeyStatusClass(status);
   }
 
   getAllProfilesForJourney(journey: any): any[] {
@@ -5297,19 +5060,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getProfileAllKeyData(profileId: string): { key: string; count: number; pct: number; bandIdx: number }[] {
-    if (!this.evolutionProgressData) return [];
-    const result: { key: string; count: number; pct: number; bandIdx: number }[] = [];
-
-    this.evolutionProgressData.keys.forEach(key => {
-      this.evolutionProgressData!.bands.forEach((band, bandIdx) => {
-        const entry = band.profiles[key]?.find(p => p.profileId === profileId);
-        if (entry) {
-          result.push({ key, count: entry.total, pct: entry.pct, bandIdx });
-        }
-      });
-    });
-
-    return result.sort((a, b) => b.pct - a.pct);
+    return engine.profileAllKeyData(this.evolutionProgressData, profileId);
   }
 
   openHealthKeyDialog(key: string): void {
@@ -5573,20 +5324,6 @@ export class JourneycoachDashboardComponent {
   }
 
   getFilteredAskAHProfiles(): any[] {
-    let list = [...this.askAHDialogProfiles];
-
-    if (this.askAHSourceFilter === 'askAH') {
-      list = list.filter(p => p['source'] === 'ask AH');
-    } else if (this.askAHSourceFilter === 'loveLetter') {
-      list = list.filter(p => p['source'] !== 'ask AH');
-    }
-
-    if (this.askAHResolvedFilter === 'resolved') {
-      list = list.filter(p => p['resolved'] === true);
-    } else if (this.askAHResolvedFilter === 'unresolved') {
-      list = list.filter(p => !p['resolved']);
-    }
-
-    return list;
+    return engine.filterAskAHProfiles(this.askAHDialogProfiles, this.askAHSourceFilter, this.askAHResolvedFilter);
   }
 }
