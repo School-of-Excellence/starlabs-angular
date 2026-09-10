@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Configuration v2 — Enrollment Page (UI mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+    :root{--primary:#1a3c5e;--primary-light:#2a5a8e;--accent:#c8a96e;--success:#2e7d52;--success-bg:#e8f5ed;--danger:#c0392b;--danger-bg:#fdecea;--warn:#a8630f;--warn-bg:#fff4e0;--info:#1565c0;--info-bg:#e3f0ff;--bg:#f4f6f9;--surface:#ffffff;--border:#dde3ec;--border-light:#edf0f5;--t1:#1a2535;--t2:#5a6880;--t3:#8a98ac;--sh-sm:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);--sh-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);}
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:'DM Sans',system-ui,sans-serif;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased;}
+    a{color:var(--primary);text-decoration:none;} a:hover{color:var(--primary-light);}
+    .i{width:16px;height:16px;flex-shrink:0;} .i14{width:14px;height:14px;flex-shrink:0;} .i20{width:20px;height:20px;flex-shrink:0;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;line-height:1;border:1px solid var(--border);background:#fff;color:var(--t1);white-space:nowrap;cursor:pointer;}
+    .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 8px rgba(26,60,94,.25);}
+    .btn-ghost{border-color:transparent;background:transparent;color:var(--t2);}
+    .btn-sm{height:32px;padding:0 12px;font-size:12.5px;}
+    .btn.off{opacity:.45;cursor:not-allowed;box-shadow:none;}
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--t3);cursor:pointer;flex-shrink:0;}
+    .card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm);}
+    .sec-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border-light);}
+    .sec-head.closed{border-bottom:0;}
+    .sec-title{font-size:15px;font-weight:600;margin:0;color:var(--t1);}
+    .sec-hint{font-size:12px;color:var(--t3);}
+    .grow{flex:1;min-width:0;}
+    .count{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:#eef3f9;color:var(--primary);font-size:11.5px;font-weight:600;white-space:nowrap;}
+    .count.zero{background:#f1f3f7;color:var(--t3);}
+    .tag-req{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+    .sec-body{padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
+    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+    .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;font-weight:600;color:var(--t1);}
+    .counter{font-size:11.5px;font-weight:500;color:var(--t3);}
+    .input{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13.5px;color:var(--t1);min-width:0;}
+    .input .txt{flex:1 1 0;width:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .input.ph{color:var(--t3);}
+    .input.focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,60,94,.12);}
+    .textarea{min-height:84px;align-items:flex-start;padding:10px 12px;line-height:1.5;}
+    .textarea .txt{white-space:normal;overflow:visible;}
+    .help{font-size:12px;color:var(--t3);line-height:1.4;}
+    .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;border:1.5px solid var(--border);font-size:12.5px;font-weight:500;color:var(--t2);background:#fff;white-space:nowrap;}
+    .chip.soft{background:#eef3f9;border-color:#eef3f9;color:var(--primary);}
+    .chip.in{height:24px;font-size:12px;}
+    .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;height:40px;}
+    .seg > span{display:flex;align-items:center;padding:0 16px;font-size:13px;font-weight:500;color:var(--t2);}
+    .seg > span.on{background:var(--primary);color:#fff;}
+    .row{display:flex;align-items:center;gap:10px;}
+    .rt{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;}
+    .rt-bar{display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--border-light);background:#fafbfd;}
+    .rt-b{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;border-radius:4px;font-size:12.5px;font-weight:600;color:var(--t2);}
+    .rt-b.on{background:#eef3f9;color:var(--primary);}
+    .rt-sep{width:1px;height:18px;background:var(--border);margin:0 4px;}
+    .rt-body{padding:12px 14px;font-size:13.5px;line-height:1.55;color:var(--t1);min-height:56px;}
+    .rt-body p{margin:0 0 8px;} .rt-body ul{margin:0;padding-left:20px;}
+    .toggle{width:36px;height:20px;border-radius:10px;background:#c9d2df;position:relative;flex-shrink:0;}
+    .toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+    .toggle.on{background:var(--primary);} .toggle.on::after{left:18px;}
+    .thumb{width:40px;height:40px;border-radius:8px;background:#eef3f9;display:flex;align-items:center;justify-content:center;color:var(--primary);flex-shrink:0;}
+    .pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:12px;font-weight:600;white-space:nowrap;}
+    .pill-warn{background:var(--warn-bg);color:var(--warn);}
+    .drag{color:var(--t3);display:flex;flex-shrink:0;}
+    .list-row{display:flex;align-items:center;gap:8px;}
+    .list-row .input{flex:1;}
+    .badge{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap;}
+    .badge-rich{background:#e7f6ee;color:#1a8f5b;}
+    .badge-icon{background:#eef2ff;color:#4f46e5;}
+    .block{border:1px solid var(--border);border-radius:10px;background:#fff;overflow:hidden;}
+    .block-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fafbfd;}
+    .block-head .name{font-size:13.5px;font-weight:600;color:var(--t1);flex:1 1 0;width:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .block-body{padding:16px;display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--border-light);}
+    .item{border:1px solid var(--border-light);border-radius:8px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:10px;}
+    /* page */
+    .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding-bottom:20px;border-bottom:2px solid var(--border-light);}
+    .eyebrow{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+    .title{font-family:'Playfair Display',Georgia,serif;font-size:28px;font-weight:600;color:var(--primary);margin:0 0 6px;line-height:1.15;}
+    .sub{font-size:13px;color:var(--t2);display:flex;gap:8px;align-items:center;}
+    .mono{font-family:'DM Mono',ui-monospace,monospace;font-size:12px;color:var(--t3);}
+    .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 0 24px;}
+    .tab{padding:12px 14px;font-size:13.5px;font-weight:500;color:var(--t2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+    .tab.on{color:var(--primary);border-bottom-color:var(--primary);}
+    .layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:24px;align-items:start;}
+    .rail{position:sticky;top:16px;padding:14px 10px 14px;display:flex;flex-direction:column;gap:2px;}
+    .rail-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:0 10px 6px;}
+    .rail-group{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding:12px 10px 4px;}
+    .rail-item{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--t2);}
+    .rail-item .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .rail-item .c{font-size:11px;color:var(--t3);font-weight:500;}
+    .rail-item.on{background:#eef3f9;color:var(--primary);font-weight:600;}
+    .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;border:1.5px solid #c9d2df;background:#fff;}
+    .dot.ok{background:var(--success);border-color:var(--success);}
+    .meter{height:6px;border-radius:3px;background:#e7ebf2;overflow:hidden;}
+    .meter > div{height:100%;background:var(--primary);border-radius:3px;}
+    .main{display:flex;flex-direction:column;gap:16px;min-width:0;}
+    .savebar{position:sticky;bottom:12px;display:flex;align-items:center;gap:12px;padding:12px 20px;background:rgba(255,255,255,.97);border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh-md);}
+    .faq-n{width:24px;height:24px;border-radius:50%;background:#eef3f9;color:var(--primary);font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .cta-prev{border:1px dashed var(--border);border-radius:10px;padding:16px 18px;background:#fafbfd;display:flex;flex-direction:column;gap:10px;}
+    .prev-img{width:56px;height:36px;border-radius:6px;background:linear-gradient(135deg,#dfe7f2,#c9d6e6);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--primary);}
+  
+
+    /* ---- plain-page layout (replaces the fixed 1440px artboard) ---- */
+    .page{max-width:1440px;margin:0 auto;padding:32px 36px 40px;background:#f4f6f9;display:flex;flex-direction:column;}
+    /* ---- responsive: tablet & phone ---- */
+    @media (max-width: 1100px){
+      .layout{grid-template-columns:200px minmax(0,1fr);gap:16px;}
+      .grid3{grid-template-columns:repeat(2,minmax(0,1fr));}
+    }
+    @media (max-width: 900px){
+      .page{padding:16px 16px 24px;}
+      .hdr{flex-direction:column;align-items:stretch;}
+      .title{font-size:22px;}
+      .layout{display:flex;flex-direction:column;}
+      .rail{position:static;flex-direction:row;flex-wrap:wrap;gap:6px;padding:10px;}
+      .rail-label,.rail-group{display:none;}
+      .rail-item{height:34px;border:1px solid #dde3ec;border-radius:17px;}
+      .rail > div:last-child,.rail > div:nth-last-child(2){display:none !important;}
+      /* fixed-width rows (schedule) and 2-col inline grids wrap on phones */
+      .row{flex-wrap:wrap;}
+      .row > .input[style*="width:"]{flex:1 1 140px;width:auto !important;}
+      [style*="grid-template-columns:260px"]{grid-template-columns:minmax(0,1fr) !important;}
+      [style*="grid-template-columns:minmax(0,2fr)"]{grid-template-columns:minmax(0,1fr) !important;}
+      .sub{flex-wrap:wrap;}
+      .rt-bar{flex-wrap:wrap;row-gap:2px;}
+      .savebar .btn{flex:1 1 auto;}
+      .mono{word-break:break-all;}
+      .grid2,.grid3{grid-template-columns:minmax(0,1fr);}
+      .sec-body{padding:16px;}
+      .sec-head{flex-wrap:wrap;padding:12px 16px;}
+      .sec-hint{display:none;}
+      .input{height:44px;font-size:14px;}
+      .btn{height:44px;} .btn-sm{height:36px;} .icon-btn{width:40px;height:40px;}
+      .savebar{flex-wrap:wrap;gap:8px;padding:10px 12px;bottom:0;border-radius:12px 12px 0 0;}
+      .savebar .help{display:none;}
+      .cta-prev{order:-1;}
+      .list-row .input[style*="width:220px"]{width:100% !important;}
+      .list-row{flex-wrap:wrap;}
+    }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Page header -->
+  <div class="hdr">
+    <div style="display:flex;flex-direction:column;">
+      <div class="eyebrow">Workshop configuration</div>
+      <h1 class="title">14-Day Emotional Mastery Workshop</h1>
+      <div class="sub">
+        <span class="mono">workshopconfiguration / 8fK2mQ…qLp9</span>
+        <span style="color:#8a98ac;">·</span>
+        <span>Enrollment page</span>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;">
+      <span class="btn">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+        <span>Workshops</span>
+      </span>
+      <span class="btn">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg>
+        <span>Icons &amp; images</span>
+        <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M20 14v6H4V4h6"></path></svg>
+      </span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <span class="tab on">Enrollment Page</span>
+    <span class="tab">Challenges</span>
+    <span class="tab">Settings</span>
+  </div>
+
+  <div class="layout">
+
+    <!-- Section rail -->
+    <aside class="card rail">
+      <div class="rail-label">On this page</div>
+
+      <div class="rail-group">Basics</div>
+      <div class="rail-item on"><span class="dot ok"></span><span class="n">Workshop information</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Pricing &amp; CTA</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Schedule</span></div>
+
+      <div class="rail-group">Page content</div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Page blocks</span><span class="c">3</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Description &amp; Join us</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Sneak peak</span><span class="c">3/9</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Overview</span><span class="c">2/9</span></div>
+      <div class="rail-item"><span class="dot"></span><span class="n">Know info</span><span class="c">0/9</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">FAQ</span><span class="c">2/20</span></div>
+
+      <div class="rail-group">Lists</div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">What you'll learn</span><span class="c">4</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Requirements</span><span class="c">2</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Who is this for</span><span class="c">3</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Outcomes</span><span class="c">3</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Skills taught</span><span class="c">5</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Hometags</span><span class="c">3</span></div>
+
+      <div class="rail-group">Extras</div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Testimonials</span><span class="c">2</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Bonus</span></div>
+
+      <div style="display:flex;gap:4px;padding:12px 6px 4px;">
+        <span class="btn btn-ghost btn-sm" style="flex:1;">Collapse all</span>
+        <span class="btn btn-ghost btn-sm" style="flex:1;">Expand all</span>
+      </div>
+      <div style="padding:10px 10px 0;border-top:1px solid #edf0f5;display:flex;flex-direction:column;gap:6px;">
+        <div class="label"><span style="font-size:11.5px;color:#5a6880;">Document size</span><span class="counter">412 KB / 1 MB</span></div>
+        <div class="meter"><div style="width:40%;"></div></div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <main class="main">
+
+      <!-- 1. Workshop information -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Workshop information</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Identity, media and taxonomy</span>
+        </div>
+        <div class="sec-body">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Workshop title</span><span class="counter">33 / 100</span></div>
+              <div class="input focus"><span class="txt">14-Day Emotional Mastery Workshop</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Short description</span><span class="counter">81 / 100</span></div>
+              <div class="input"><span class="txt">Learn to name, understand and steady your emotions in two weeks of daily practice</span></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Product type</span></div>
+              <div class="seg"><span class="on">Workshop</span><span>EiFlix</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Why this workshop?</span><span class="counter">58 / 100</span></div>
+              <div class="input"><span class="txt">Because feelings run your decisions before you notice them</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label"><span>ATC taxonomy</span><span class="counter">2 selected</span></div>
+            <div class="input" style="height:auto;min-height:40px;padding:6px 12px;flex-wrap:wrap;">
+              <span class="chip soft in">Emotional regulation
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </span>
+              <span class="chip soft in">Relationships
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </span>
+              <span class="txt" style="color:#8a98ac;">Add a taxonomy…</span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Thumbnail image</span></div>
+              <div class="row">
+                <span class="prev-img">
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg>
+                </span>
+                <div class="input grow">
+                  <span class="txt mono" style="color:#5a6880;">https://firebasestorage.googleapis.com/…/workshop%2Fthumbnail%2Femotional-mastery.jpg</span>
+                  <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#1a3c5e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+                </div>
+              </div>
+              <div class="help">Paste a URL or upload. Uploads go to workshop/thumbnail/.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Title video</span></div>
+              <div class="input ph">
+                <span class="txt">Paste a video URL or upload</span>
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#1a3c5e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+              </div>
+              <div class="help">Uploads go to workshop/video/.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Pricing & CTA -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Pricing &amp; CTA</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">What the enroll button and price line say</span>
+        </div>
+        <div class="sec-body">
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:start;">
+            <div style="display:flex;flex-direction:column;gap:16px;">
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Duration label</span><span class="counter">15 / 100</span></div>
+                  <div class="input"><span class="txt">14 Day Workshop</span></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Enroll button text</span><span class="counter">10 / 20</span></div>
+                  <div class="input"><span class="txt">Enroll Now</span></div>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Price, struck through</span><span class="counter">7 / 50</span></div>
+                  <div class="input"><span class="txt">₹ 9,999</span></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Price, shown</span><span class="counter">7 / 50</span></div>
+                  <div class="input"><span class="txt">₹ 4,999</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="cta-prev">
+              <div class="help" style="font-weight:600;color:#5a6880;letter-spacing:.06em;text-transform:uppercase;font-size:10.5px;">Preview</div>
+              <div style="font-size:12.5px;color:#5a6880;">14 Day Workshop</div>
+              <div class="row" style="gap:8px;align-items:baseline;">
+                <span style="font-size:22px;font-weight:700;color:#1a2535;">₹ 4,999</span>
+                <span style="font-size:13px;color:#8a98ac;text-decoration:line-through;">₹ 9,999</span>
+              </div>
+              <span class="btn btn-primary" style="align-self:flex-start;">Enroll Now</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Schedule -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Schedule</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Each date + time pair is saved as one timestamp</span>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <div class="label"><span>Registration window</span></div>
+            <div class="row" style="gap:8px;">
+              <div class="input" style="width:170px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span class="txt">05 Sep 2026</span></div>
+              <div class="input" style="width:120px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="txt">10:00</span></div>
+              <span style="font-size:12.5px;color:#8a98ac;padding:0 4px;">to</span>
+              <div class="input" style="width:170px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span class="txt">18 Sep 2026</span></div>
+              <div class="input" style="width:120px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="txt">23:59</span></div>
+              <span class="help" style="margin-left:6px;">13 days</span>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label"><span>Workshop window</span></div>
+            <div class="row" style="gap:8px;">
+              <div class="input" style="width:170px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span class="txt">20 Sep 2026</span></div>
+              <div class="input" style="width:120px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="txt">07:00</span></div>
+              <span style="font-size:12.5px;color:#8a98ac;padding:0 4px;">to</span>
+              <div class="input" style="width:170px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span class="txt">04 Oct 2026</span></div>
+              <div class="input" style="width:120px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="txt">21:00</span></div>
+              <span class="help" style="margin-left:6px;">14 days</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Page blocks (dynamicenrollment) -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Page blocks</h2>
+          <span class="count">3 blocks</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Drag to set the order shown on the enrollment page</span>
+          <span class="btn btn-sm">
+            <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span>Add block</span>
+          </span>
+        </div>
+        <div class="sec-body" style="gap:10px;">
+
+          <div class="block">
+            <div class="block-head">
+              <span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+              <span class="badge badge-rich">Rich text</span>
+              <span class="name">Why this workshop works</span>
+              <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+            </div>
+          </div>
+
+          <div class="block" style="border-color:#1a3c5e;">
+            <div class="block-head">
+              <span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+              <span class="badge badge-icon">Icon text</span>
+              <span class="name">How the 14 days unfold</span>
+              <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+            </div>
+            <div class="block-body">
+              <div class="row" style="justify-content:space-between;">
+                <div class="field">
+                  <div class="label"><span>Block type</span></div>
+                  <div class="seg" style="height:34px;"><span style="padding:0 12px;font-size:12.5px;">Rich text</span><span class="on" style="padding:0 12px;font-size:12.5px;">Icon text</span></div>
+                </div>
+                <div class="row" style="gap:10px;">
+                  <span style="font-size:12.5px;font-weight:600;">Full border</span>
+                  <span class="toggle on"></span>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Title 1</span></div>
+                  <div class="rt">
+                    <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H1</span><span class="rt-b">H2</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"></path></svg></span></div>
+                    <div class="rt-body" style="min-height:44px;"><p style="margin:0;font-weight:600;">How the 14 days unfold</p></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Title 2</span></div>
+                  <div class="rt">
+                    <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H1</span><span class="rt-b">H2</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"></path></svg></span></div>
+                    <div class="rt-body" style="min-height:44px;"><p style="margin:0;color:#5a6880;">One skill a day, one circle a week</p></div>
+                  </div>
+                </div>
+              </div>
+              <div class="label"><span>Items</span><span class="counter">2 items · at least 1</span></div>
+              <div class="item">
+                <div class="row" style="justify-content:space-between;">
+                  <span style="font-size:12px;font-weight:600;color:#8a98ac;">Item 1</span>
+                  <span class="icon-btn" style="width:26px;height:26px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                </div>
+                <div style="display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start;">
+                  <div class="field">
+                    <div class="label"><span>Icon</span></div>
+                    <div class="input" style="padding-left:6px;">
+                      <span class="thumb" style="width:28px;height:28px;border-radius:6px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+                      <span class="txt">Daily practice</span>
+                      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <div class="label"><span>Text</span></div>
+                    <div class="rt">
+                      <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span></div>
+                      <div class="rt-body" style="min-height:40px;"><p style="margin:0;">Twenty minutes of guided practice, every morning.</p></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="item">
+                <div class="row" style="justify-content:space-between;">
+                  <span style="font-size:12px;font-weight:600;color:#8a98ac;">Item 2</span>
+                  <span class="icon-btn" style="width:26px;height:26px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                </div>
+                <div style="display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start;">
+                  <div class="field">
+                    <div class="label"><span>Icon</span></div>
+                    <div class="input" style="padding-left:6px;">
+                      <span class="thumb" style="width:28px;height:28px;border-radius:6px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 15c3 0 5 1.5 5 4"></path></svg></span>
+                      <span class="txt">Sunday circle</span>
+                      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <div class="label"><span>Text</span></div>
+                    <div class="rt">
+                      <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span></div>
+                      <div class="rt-body" style="min-height:40px;"><p style="margin:0;">A live Zoom circle with the lead coach to close each week.</p></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <span class="btn btn-sm" style="align-self:flex-start;">
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+                <span>Add item</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="block">
+            <div class="block-head">
+              <span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+              <span class="badge badge-rich">Rich text</span>
+              <span class="name">Who will guide you</span>
+              <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 5. Description & Join us -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Description &amp; Join us</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Rich text shown on the enrollment page</span>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <div class="label"><span class="row" style="gap:8px;">Workshop description <span class="tag-req">Required</span></span></div>
+            <div class="rt">
+              <div class="rt-bar"><span class="rt-b on">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-b" style="text-decoration:line-through;">S</span><span class="rt-sep"></span><span class="rt-b">H1</span><span class="rt-b">H2</span><span class="rt-b">H3</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span><span class="rt-b">1.</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"></path></svg></span><span class="rt-b">A</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h14"></path></svg></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M5 18h14"></path></svg></span></div>
+              <div class="rt-body" style="min-height:140px;">
+                <p><strong>A 14-day guided practice</strong> for people who feel their emotions run ahead of them. Each day you get one short lesson, one exercise and a check-in with your coach.</p>
+                <ul>
+                  <li>Daily 20-minute practice you can do anywhere</li>
+                  <li>Live Zoom circle every Sunday</li>
+                  <li>Private support group for the whole cohort</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label"><span>Join us section</span><span class="counter">Optional</span></div>
+            <div class="rt">
+              <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-b" style="text-decoration:line-through;">S</span><span class="rt-sep"></span><span class="rt-b">H1</span><span class="rt-b">H2</span><span class="rt-b">H3</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"></path><circle cx="4.5" cy="6" r="1" fill="currentColor"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor"></circle></svg></span><span class="rt-b">1.</span><span class="rt-sep"></span><span class="rt-b"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"></path></svg></span><span class="rt-b">A</span></div>
+              <div class="rt-body" style="min-height:72px;"><p style="margin:0;">Seats are limited to 40 per cohort so every participant gets coach time.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Sneak peak -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Sneak peak</h2>
+          <span class="count">3 / 9</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Icon + one line, up to 300 characters</span>
+          <span class="btn btn-sm">
+            <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span>Add item</span>
+          </span>
+        </div>
+        <div class="sec-body" style="gap:10px;">
+          <div class="list-row">
+            <div class="input" style="width:220px;padding-left:6px;">
+              <span class="thumb" style="width:28px;height:28px;border-radius:6px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg></span>
+              <span class="txt">Live circle</span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            </div>
+            <div class="input"><span class="txt">Two live Zoom circles with the lead coach</span><span class="counter">41 / 300</span></div>
+            <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+          <div class="list-row">
+            <div class="input" style="width:220px;padding-left:6px;">
+              <span class="thumb" style="width:28px;height:28px;border-radius:6px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-4a8 8 0 0116 0v4"></path><rect x="3" y="14" width="4" height="6" rx="1"></rect><rect x="17" y="14" width="4" height="6" rx="1"></rect></svg></span>
+              <span class="txt">Audio</span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            </div>
+            <div class="input"><span class="txt">A daily audio practice you can do on the commute</span><span class="counter">48 / 300</span></div>
+            <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+          <div class="list-row">
+            <div class="input" style="width:220px;padding-left:6px;">
+              <span class="thumb" style="width:28px;height:28px;border-radius:6px;"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l4-14 5 9 4-5 5 10z"></path></svg></span>
+              <span class="txt">Map</span>
+              <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            </div>
+            <div class="input"><span class="txt">Your own emotion map by day 14</span><span class="counter">30 / 300</span></div>
+            <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Overview (collapsed) -->
+      <section class="card">
+        <div class="sec-head closed">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          <h2 class="sec-title">Overview</h2>
+          <span class="count">2 / 9</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Live circle · Coach support</span>
+        </div>
+      </section>
+
+      <!-- 8. Know info (collapsed, empty) -->
+      <section class="card">
+        <div class="sec-head closed">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          <h2 class="sec-title">Know info</h2>
+          <span class="count zero">0 / 9</span>
+          <span class="grow"></span>
+          <span class="sec-hint">No items yet</span>
+          <span class="btn btn-sm">
+            <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span>Add item</span>
+          </span>
+        </div>
+      </section>
+
+      <!-- 9. FAQ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">FAQ</h2>
+          <span class="count">2 / 20</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Answers up to 600 characters</span>
+          <span class="btn btn-sm">
+            <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span>Add question</span>
+          </span>
+        </div>
+        <div class="sec-body" style="gap:12px;">
+          <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 32px;gap:10px;align-items:start;">
+            <span class="faq-n" style="margin-top:8px;">1</span>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="input"><span class="txt" style="font-weight:600;">Do I need any prior experience?</span></div>
+              <div class="input textarea" style="min-height:64px;"><span class="txt">No. The workshop starts from the basics and builds one skill a day.</span><span class="counter">67 / 600</span></div>
+            </div>
+            <span class="icon-btn" style="margin-top:4px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+          <div style="display:grid;grid-template-columns:24px minmax(0,1fr) 32px;gap:10px;align-items:start;">
+            <span class="faq-n" style="margin-top:8px;">2</span>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="input"><span class="txt" style="font-weight:600;">What if I miss a day?</span></div>
+              <div class="input textarea" style="min-height:64px;"><span class="txt">Every lesson stays open until the workshop ends, and the Sunday circle recaps the week.</span><span class="counter">86 / 600</span></div>
+            </div>
+            <span class="icon-btn" style="margin-top:4px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. Lists -->
+      <div class="grid2">
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">What you'll learn</h2>
+            <span class="count">4</span>
+            <span class="grow"></span>
+            <span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+          </div>
+          <div class="sec-body" style="gap:8px;padding:16px 20px;">
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Name what you feel within seconds</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Calm your body before you respond</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Say the hard thing without a fight</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Repair after a rupture</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">Requirements</h2>
+            <span class="count">2</span>
+            <span class="grow"></span>
+            <span class="btn btn-sm off"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+          </div>
+          <div class="sec-body" style="gap:8px;padding:16px 20px;">
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">20 minutes a day</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input focus ph" style="height:36px;"><span class="txt">Enter a requirement</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="help">Fill the empty row before adding another.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">Who is this workshop for?</h2>
+            <span class="count">3</span>
+            <span class="grow"></span>
+            <span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+          </div>
+          <div class="sec-body" style="gap:8px;padding:16px 20px;">
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Parents who lose their temper and regret it</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Managers who avoid difficult conversations</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Anyone starting therapy or coaching</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">Hometags</h2>
+            <span class="count">3</span>
+            <span class="grow"></span>
+            <span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+          </div>
+          <div class="sec-body" style="gap:8px;padding:16px 20px;">
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Emotions</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Relationships</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">Self-mastery</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 11. Outcomes + 12. Skills taught -->
+      <div class="grid2">
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">Outcomes</h2>
+            <span class="count">3</span>
+            <span class="grow"></span>
+            <span class="sec-hint">Value + title pairs</span>
+            <span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+          </div>
+          <div class="sec-body" style="gap:8px;padding:16px 20px;">
+            <div class="list-row"><div class="input" style="width:110px;height:36px;"><span class="txt" style="font-weight:700;">500+</span></div><div class="input" style="height:36px;"><span class="txt">Participants</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><div class="input" style="width:110px;height:36px;"><span class="txt" style="font-weight:700;">92%</span></div><div class="input" style="height:36px;"><span class="txt">Completed all 14 days</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+            <div class="list-row"><div class="input" style="width:110px;height:36px;"><span class="txt" style="font-weight:700;">4.8</span></div><div class="input" style="height:36px;"><span class="txt">Average rating</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="sec-head">
+            <h2 class="sec-title">Skills taught</h2>
+            <span class="count">5</span>
+            <span class="grow"></span>
+            <span class="sec-hint">Type a skill, press Enter</span>
+          </div>
+          <div class="sec-body" style="padding:16px 20px;">
+            <div class="input" style="height:auto;min-height:40px;padding:6px 10px;flex-wrap:wrap;gap:6px;">
+              <span class="chip soft in">Emotional regulation <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <span class="chip soft in">Active listening <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <span class="chip soft in">Boundary setting <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <span class="chip soft in">Conflict repair <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <span class="chip soft in">Self-compassion <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <span class="txt" style="color:#8a98ac;flex:1;min-width:120px;">Add a skill…</span>
+            </div>
+            <div class="help">Duplicates are ignored.</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 13. Testimonials -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Testimonials</h2>
+          <span class="count">2 selected</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Pick VideoAsk templates, then the answers to feature</span>
+        </div>
+        <div class="sec-body">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Templates</span><span class="counter">2 / 10</span></div>
+              <div class="input" style="height:auto;min-height:40px;padding:6px 12px;flex-wrap:wrap;">
+                <span class="chip soft in">Workshop feedback (Aug) <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                <span class="chip soft in">Day-14 reflection <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                <span class="txt" style="color:#8a98ac;">Add template…</span>
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+              </div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Testimonials from those templates</span><span class="counter">14 available</span></div>
+              <div class="input ph">
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+                <span class="txt">Search participants…</span>
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label"><span>Featured on the page</span></div>
+            <div class="row" style="flex-wrap:wrap;gap:8px;">
+              <span class="chip">
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg>
+                Priya S. · 12 Aug 2026
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </span>
+              <span class="chip">
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg>
+                Rahul M. · 14 Aug 2026
+                <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 14. Bonus -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Bonus</h2>
+          <span class="grow"></span>
+          <span style="font-size:12.5px;font-weight:600;">Show bonus section</span>
+          <span class="toggle on"></span>
+        </div>
+        <div class="sec-body">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Section name</span><span class="counter">15 / 50</span></div>
+              <div class="input"><span class="txt">Bonus resources</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Heading</span><span class="counter">34 / 100</span></div>
+              <div class="input"><span class="txt">Two extras when you enroll this week</span></div>
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="field">
+              <div class="label"><span>Bonus 1</span><span class="counter">23 / 100</span></div>
+              <div class="input"><span class="txt">Printable emotion wheel</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Bonus 2</span><span class="counter">28 / 100</span></div>
+              <div class="input"><span class="txt">Recording of the coach Q&amp;A</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Footer</span><span class="counter">37 / 100</span></div>
+              <div class="input"><span class="txt">Available inside the app after day 1</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sticky save bar -->
+      <div class="savebar">
+        <span class="pill pill-warn">
+          <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>
+          Unsaved changes
+        </span>
+        <span class="help">Workshop information · Requirements</span>
+        <span class="grow"></span>
+        <span class="help">Saves the Enrollment page only. Challenges and Settings save separately.</span>
+        <span class="btn btn-ghost">Discard</span>
+        <span class="btn btn-primary">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 3v5h7V3M8 21v-7h8v7"></path></svg>
+          <span>Save Enrollment</span>
+        </span>
+      </div>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>

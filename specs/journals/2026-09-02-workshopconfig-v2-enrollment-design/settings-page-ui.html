@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Configuration v2 — Settings tab (UI mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{--primary:#1a3c5e;--primary-light:#2a5a8e;--accent:#c8a96e;--success:#2e7d52;--success-bg:#e8f5ed;--danger:#c0392b;--danger-bg:#fdecea;--warn:#a8630f;--warn-bg:#fff4e0;--info:#1565c0;--info-bg:#e3f0ff;--bg:#f4f6f9;--border:#dde3ec;--border-light:#edf0f5;--t1:#1a2535;--t2:#5a6880;--t3:#8a98ac;--sh-sm:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);--sh-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);--sh-lg:0 8px 24px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.06);}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'DM Sans',system-ui,sans-serif;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased;}
+  .i{width:16px;height:16px;flex-shrink:0;} .i14{width:14px;height:14px;flex-shrink:0;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:6px;font-size:13px;font-weight:500;line-height:1;border:1px solid var(--border);background:#fff;color:var(--t1);white-space:nowrap;}
+  .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 8px rgba(26,60,94,.25);}
+  .btn-ghost{border-color:transparent;background:transparent;color:var(--t2);}
+  .btn-sm{height:32px;padding:0 12px;font-size:12.5px;}
+  .btn-danger-o{color:var(--danger);border-color:#f1c9c3;}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--t3);flex-shrink:0;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm);}
+  .sec-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border-light);}
+  .sec-head.closed{border-bottom:0;}
+  .sec-title{font-size:15px;font-weight:600;margin:0;}
+  .sec-hint{font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .grow{flex:1;min-width:0;}
+  .count{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:#eef3f9;color:var(--primary);font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .count.zero{background:#f1f3f7;color:var(--t3);}
+  .count.on{background:var(--success-bg);color:var(--success);}
+  .sec-body{padding:4px 24px 12px;display:flex;flex-direction:column;}
+  .sec-body.fields{padding:20px 24px;gap:16px;}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;font-weight:600;}
+  .counter{font-size:11.5px;font-weight:500;color:var(--t3);white-space:nowrap;}
+  .link{font-size:11.5px;font-weight:600;color:var(--primary);white-space:nowrap;}
+  .input{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13.5px;min-width:0;}
+  .input .txt{flex:1 1 0;width:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .input .ph{color:var(--t3);}
+  .input.focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,60,94,.12);}
+  .input.ro{background:#f8fafd;color:var(--t2);}
+  .input.err{border-color:var(--danger);}
+  .input.textarea{min-height:76px;align-items:flex-start;padding:10px 12px;height:auto;}
+  .input.textarea .txt{white-space:normal;overflow:visible;line-height:1.5;}
+  .input.chips{height:auto;min-height:40px;padding:6px 12px;flex-wrap:wrap;}
+  .mono{font-family:'DM Mono',ui-monospace,monospace;font-size:12.5px;color:var(--t2);}
+  .caret{color:var(--t3);display:inline-flex;}
+  .help{font-size:12px;color:var(--t3);line-height:1.4;}
+  .help.warn{color:var(--warn);} .help.err{color:var(--danger);font-weight:500;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;border:1.5px solid var(--border);font-size:12.5px;font-weight:500;color:var(--t2);background:#fff;white-space:nowrap;}
+  .chip.soft{background:#eef3f9;border-color:#eef3f9;color:var(--primary);}
+  .chip.in{height:24px;font-size:12px;}
+  .chip .tag{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:0 5px;height:14px;border-radius:7px;background:#fff;color:var(--info);border:1px solid #cfe0fb;display:inline-flex;align-items:center;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;height:40px;}
+  .seg>span{display:flex;align-items:center;padding:0 16px;font-size:13px;font-weight:500;color:var(--t2);}
+  .seg>span.on{background:var(--primary);color:#fff;}
+  .row{display:flex;align-items:center;gap:10px;} .row.wrap{flex-wrap:wrap;} .row.between{justify-content:space-between;}
+  .toggle{width:36px;height:20px;border-radius:10px;background:#c9d2df;position:relative;flex-shrink:0;}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .toggle.on{background:var(--primary);} .toggle.on::after{left:18px;}
+  .tog{display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff;}
+  .pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:12px;font-weight:600;white-space:nowrap;}
+  .pill-warn{background:var(--warn-bg);color:var(--warn);}
+  .drag{color:var(--t3);display:flex;flex-shrink:0;}
+  .rt{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;}
+  .rt-bar{display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--border-light);background:#fafbfd;flex-wrap:wrap;}
+  .rt-b{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;border-radius:4px;font-size:12.5px;font-weight:600;color:var(--t2);}
+  .rt-sep{width:1px;height:18px;background:var(--border);margin:0 4px;}
+  .rt-body{padding:12px 14px;font-size:13.5px;line-height:1.55;min-height:52px;}
+  /* page */
+  .page{max-width:1440px;margin:0 auto;padding:32px 36px 40px;display:flex;flex-direction:column;}
+  .hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding-bottom:20px;border-bottom:2px solid var(--border-light);}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
+  .title{font-family:'Playfair Display',Georgia,serif;font-size:28px;font-weight:600;color:var(--primary);margin:0 0 6px;line-height:1.15;}
+  .sub{font-size:13px;color:var(--t2);}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 0 24px;}
+  .tab{padding:12px 14px;font-size:13.5px;font-weight:500;color:var(--t2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.on{color:var(--primary);border-bottom-color:var(--primary);}
+  .layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:24px;align-items:start;}
+  .rail{position:sticky;top:16px;padding:14px 10px 14px;display:flex;flex-direction:column;gap:2px;}
+  .rail-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);padding:0 10px 6px;}
+  .rail-group{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding:12px 10px 4px;}
+  .rail-item{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--t2);}
+  .rail-item.on{background:#eef3f9;color:var(--primary);font-weight:600;}
+  .rail-item .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rail-item .c{font-size:11px;color:var(--t3);font-weight:500;}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;border:1.5px solid #c9d2df;background:#fff;}
+  .dot.ok{background:var(--success);border-color:var(--success);}
+  .dot.attn{background:var(--danger);border-color:var(--danger);}
+  .meter{height:6px;border-radius:3px;background:#e7ebf2;overflow:hidden;} .meter>div{height:100%;background:var(--primary);border-radius:3px;}
+  .main{display:flex;flex-direction:column;gap:16px;min-width:0;}
+  .savebar{position:sticky;bottom:12px;display:flex;align-items:center;gap:12px;padding:12px 20px;background:rgba(255,255,255,.97);border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh-md);}
+  /* settings rows */
+  .setting{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-top:1px solid var(--border-light);}
+  .setting:first-child{border-top:0;}
+  .s-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .s-title{font-size:13.5px;font-weight:600;}
+  .s-desc{font-size:12px;color:var(--t3);}
+  .s-desc.on{color:var(--success);}
+  .setting .toggle{margin-top:3px;}
+  .s-expand{margin-top:12px;padding:14px;border:1px dashed var(--border);border-radius:10px;background:#fafbfd;display:flex;flex-direction:column;gap:12px;}
+  .s-sub{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-top:4px;}
+  .reorder{display:flex;flex-direction:column;gap:6px;}
+  .r-item{display:flex;align-items:center;gap:8px;height:38px;padding:0 10px 0 6px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+  .r-item .num{width:20px;height:20px;border-radius:50%;background:#eef3f9;color:var(--primary);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .r-item .n{flex:1;font-size:13px;font-weight:500;}
+  .r-item.used .icon-btn{opacity:.35;}
+  .days{display:flex;flex-wrap:wrap;gap:6px;}
+  .day{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:28px;padding:0 8px;border-radius:14px;border:1.5px solid var(--border);font-size:12.5px;font-weight:600;color:var(--t2);background:#fff;}
+  .day.on{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .day.empty{color:var(--t3);border-style:dashed;}
+  .preview{width:100%;height:132px;border-radius:8px;background:linear-gradient(135deg,#dfe7f2,#c9d6e6);display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:12px;font-weight:600;}
+  .preview.mobile{width:110px;height:132px;}
+  .drop{border:1px dashed var(--border);border-radius:8px;padding:18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;background:#fff;}
+  .swatch{width:24px;height:24px;border-radius:6px;border:1px solid var(--border);flex-shrink:0;}
+  .cta-note{font-size:12px;color:var(--t3);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <div>
+      <div class="eyebrow">Workshop configuration</div>
+      <h1 class="title">14-Day Emotional Mastery Workshop</h1>
+      <div class="sub">Settings</div>
+    </div>
+    <div class="row" style="gap:8px;">
+      <span class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>Workshops</span>
+      <span class="btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg>Icons &amp; images <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M20 14v6H4V4h6"></path></svg></span>
+    </div>
+  </div>
+  <div class="tabs"><span class="tab">Enrollment Page</span><span class="tab">Challenges</span><span class="tab on">Settings</span></div>
+
+  <div class="layout">
+
+    <!-- rail -->
+    <aside class="card rail">
+      <div class="rail-label">On this page</div>
+      <div class="rail-group">General</div>
+      <div class="rail-item on"><span class="dot ok"></span><span class="n">Mode &amp; visibility</span><span class="c">5 on</span></div>
+      <div class="rail-group">Access</div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Audience</span><span class="c">3 on</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Category based</span><span class="c">On</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Evergreen workshop</span><span class="c">On</span></div>
+      <div class="rail-group">Communication</div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Logs &amp; chat</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Mail template</span></div>
+      <div class="rail-item"><span class="dot"></span><span class="n">Messages</span></div>
+      <div class="rail-item"><span class="dot ok"></span><span class="n">Hero</span><span class="c">Web</span></div>
+      <div style="display:flex;gap:4px;padding:12px 6px 4px;"><span class="btn btn-ghost btn-sm" style="flex:1;">Collapse all</span><span class="btn btn-ghost btn-sm" style="flex:1;">Expand all</span></div>
+      <div style="padding:10px 10px 0;border-top:1px solid #edf0f5;display:flex;flex-direction:column;gap:6px;">
+        <div class="label"><span style="font-size:11.5px;color:#5a6880;">Document size</span><span class="counter">412 KB / 1 MB</span></div>
+        <div class="meter"><div style="width:40%;"></div></div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ═══════ GENERAL · Mode & visibility ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Mode &amp; visibility</h2>
+          <span class="count on">5 of 8 on</span>
+          <span class="grow"></span>
+          <span class="sec-hint">General · who can see the workshop and what is switched on</span>
+        </div>
+        <div class="sec-body">
+
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Workshop Test Mode</div>
+              <div class="s-desc on">Workshop is currently in Test Mode</div>
+              <div class="s-expand">
+                <div class="field">
+                  <div class="label"><span>Test users</span><span class="counter">Selected 2 users</span></div>
+                  <div class="input chips">
+                    <span class="chip soft in">Priya S. <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="chip soft in">Arjun K. <span class="tag">new</span> <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="txt ph">Add a participant or new user…</span>
+                    <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+                  </div>
+                  <div class="help">One picker, two directories: participants and new users. Both write into the same test-user list.</div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Workshop Active</div><div class="s-desc">Workshop is hidden from participants</div></div>
+            <span class="toggle"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Workshop Active Web</div><div class="s-desc on">Workshop is visible on the web</div></div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Enable Home Screen Widget</div><div class="s-desc on">Home screen widget is enabled</div></div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Enable Q&amp;A</div><div class="s-desc on">Q&amp;A is active and visible to participants</div></div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Enable Share</div>
+              <div class="s-desc on">Workshop can be shared with others</div>
+              <div class="s-expand">
+                <div class="field">
+                  <div class="label"><span>Share message</span></div>
+                  <div class="input textarea"><span class="txt">Join me for 14 days of learning to steady your emotions. Enrol here: {link}</span></div>
+                  <div class="help">Sent along with the workshop when a participant shares it.</div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Workshop Breakdown</div><div class="s-desc">Breakdown is inactive and hidden</div></div>
+            <span class="toggle"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Update Participant Workshop</div><div class="s-desc">Workshop will not update participant document</div></div>
+            <span class="toggle"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ ACCESS · Audience ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Audience</h2>
+          <span class="count on">3 of 5 on</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Access · who is allowed in</span>
+        </div>
+        <div class="sec-body">
+          <div class="setting">
+            <div class="s-text"><div class="s-title">Active Participants Only</div><div class="s-desc">Available to all participants</div></div>
+            <span class="toggle"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text"><div class="s-title">New Users Only</div><div class="s-desc">Available to all users</div></div>
+            <span class="toggle"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Journey Based</div>
+              <div class="s-desc on">Workshop is restricted to selected journeys</div>
+              <div class="s-expand">
+                <div class="field">
+                  <div class="label"><span>Journeys</span><span class="counter">Selected 2 journeys</span></div>
+                  <div class="input chips">
+                    <span class="chip soft in">Emotional Intelligence <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="chip soft in">Relationships 101 <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="txt ph">Add journey…</span>
+                    <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Tier Based</div>
+              <div class="s-desc on">Workshop is restricted to selected tiers</div>
+              <div class="s-expand">
+                <div class="field">
+                  <div class="label"><span>Tiers</span><span class="counter">Selected 1 tier</span></div>
+                  <div class="input chips">
+                    <span class="chip soft in">Gold <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="txt ph">Add tier…</span>
+                    <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+                  </div>
+                  <div class="help">From the tier collection. Same picker as Journeys.</div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Workshop Facilitator</div>
+              <div class="s-desc on">Workshop Facilitator Enabled</div>
+              <div class="s-expand">
+                <div class="field">
+                  <div class="label"><span>Facilitators</span><span class="counter">Selected 2 facilitators</span></div>
+                  <div class="input chips">
+                    <span class="chip soft in">Meera N. <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="chip soft in">Dev R. <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                    <span class="txt ph">Add a participant or new user…</span>
+                    <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ ACCESS · Category based ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Category based</h2>
+          <span class="count on">On</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Workshop is restricted by categories</span>
+          <span class="toggle on"></span>
+        </div>
+        <div class="sec-body fields">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Available categories</span><span class="link">+ Create category</span></div>
+              <div class="row wrap" style="gap:6px;">
+                <span class="chip">Beginners (first-time participants) <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"></path></svg></span>
+                <span class="chip">Returning (did a workshop before) <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"></path></svg></span>
+                <span class="chip">Facilitators (coach team) <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"></path></svg></span>
+              </div>
+              <div class="help">Click a category to edit it. Categories live in their own collection, scoped to this workshop.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Cohorts</span><span class="counter">1 / 2</span></div>
+              <div class="input chips">
+                <span class="chip soft in">September 2026 cohort <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                <span class="txt ph">Add cohort…</span>
+                <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+              </div>
+              <div class="help">From big cohorts, newest first. Maximum 2.</div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="label"><span>Selected categories</span><span class="counter">Selected 2 · drag to reorder · after you save, this order feeds the Challenges "Categories" picker</span></div>
+            <div class="reorder">
+              <div class="r-item"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><span class="num">1</span><span class="n">Beginners</span><span class="help">used by Set 1 · Set 3</span><span class="icon-btn" style="opacity:.35;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span></div>
+              <div class="r-item"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><span class="num">2</span><span class="n">Returning</span><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span></div>
+            </div>
+            <div class="input chips" style="margin-top:2px;"><span class="txt ph">Add a category to this workshop…</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+            <div class="help">A category used by a challenge set cannot be removed here: its remove button is disabled and names the sets.</div>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Category thumbnail</span></div>
+              <div class="row">
+                <span class="swatch" style="width:56px;height:36px;border-radius:6px;background:linear-gradient(135deg,#dfe7f2,#c9d6e6);"></span>
+                <div class="input grow"><span class="txt mono">https://firebasestorage.googleapis.com/…/workshop%2Fthumbnail%2Fcategory.jpg</span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#1a3c5e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg></div>
+              </div>
+              <div class="help">Paste a URL or upload. Uploads go to workshop/thumbnail/.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Category video</span></div>
+              <div class="input ph"><span class="txt">Paste a video URL or upload</span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#1a3c5e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg></div>
+              <div class="help">Uploads go to workshop/video/.</div>
+            </div>
+          </div>
+          <div class="s-sub">Welcome messages <span class="help" style="text-transform:none;letter-spacing:0;font-weight:500;">· full rich-text toolbar in the build, as on Enrollment</span></div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Above Diagnostics · heading</span></div>
+              <div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body"><strong>Welcome, you are above the line</strong></div></div>
+              <div class="help">Shown to Above Diagnostics participants when they enrol.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Above Diagnostics · description</span></div>
+              <div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body">Your first circle is Sunday. Until then, start with Day 1.</div></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Facilitators · heading</span></div>
+              <div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body"><strong>Thank you for facilitating</strong></div></div>
+              <div class="help">Shown to facilitator participants when they enrol.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Facilitators · description</span></div>
+              <div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body" style="color:#8a98ac;">Enter description to show for facilitators…</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ ACCESS · Evergreen workshop ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Evergreen workshop</h2>
+          <span class="count on">On · 14 days</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Evergreen Workshop Enabled</span>
+          <span class="toggle on"></span>
+        </div>
+        <div class="sec-body fields">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Workshop days</span><span class="counter" style="color:#c0392b;font-weight:600;">Required · at least 1</span></div>
+              <div class="input" style="max-width:200px;"><span class="txt">14</span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg></div>
+              <div class="help">Number of days this evergreen workshop runs. The daily messages below follow this number.</div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Last challenge message</span></div>
+              <div class="input textarea"><span class="txt">You did it. Your emotion map is ready in your profile.</span></div>
+              <div class="help">Shown after the final challenge.</div>
+            </div>
+          </div>
+
+          <div class="s-sub">Daily communication</div>
+          <div class="days">
+            <span class="day on">Day 1</span><span class="day">2</span><span class="day">3</span><span class="day">4</span><span class="day">5</span><span class="day">6</span><span class="day">7</span><span class="day empty">8</span><span class="day empty">9</span><span class="day empty">10</span><span class="day empty">11</span><span class="day empty">12</span><span class="day empty">13</span><span class="day empty">14</span>
+          </div>
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Day 1 · Message 1</span></div>
+              <div class="input textarea focus"><span class="txt">Good morning. Today is about noticing. Open the app and start Day 1 when you have 20 quiet minutes.</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Day 1 · Message 2</span></div>
+              <div class="input textarea"><span class="txt">Reminder: your Day 1 practice is still open tonight.</span></div>
+            </div>
+          </div>
+          <div class="help">Pick a day above to edit its two messages. Dashed days have no message yet. Both messages of every day are stored, one list per message.</div>
+
+          <div class="setting" style="border-top:1px solid #edf0f5;margin-top:4px;">
+            <div class="s-text">
+              <div class="s-title">Referral Workshop</div>
+              <div class="s-desc on">Participants can refer this workshop</div>
+              <div class="s-expand">
+                <div class="grid3">
+                  <div class="field"><div class="label"><span>Refer user count</span></div><div class="input" style="max-width:160px;"><span class="txt">3</span></div><div class="help">How many users each participant can refer.</div></div>
+                  <div class="field"><div class="label"><span>Referral code starts with</span><span class="counter">A–Z only</span></div><div class="input"><span class="txt mono" style="color:#1a2535;text-transform:uppercase;">EM</span></div><div class="help">Typed lower-case letters are uppercased as you type; other characters are dropped.</div></div>
+                  <div class="field"><div class="label"><span>Referral message</span><span class="counter">Single line</span></div><div class="input"><span class="txt">Use my code {code} to join the workshop</span></div><div class="help">Line breaks become spaces.</div></div>
+                </div>
+                <div class="grid3">
+                  <div class="field"><div class="label"><span>Referral dialog message</span></div><div class="input textarea"><span class="txt">Share your code with up to 3 friends.</span></div></div>
+                  <div class="field"><div class="label"><span>Enrollment not allowed message</span></div><div class="input textarea"><span class="txt">This workshop is by referral only. Ask a participant for a code.</span></div></div>
+                  <div class="field"><div class="label"><span>Enrollment not allowed message (new users)</span></div><div class="input textarea"><span class="txt">New here? Ask a friend in the workshop for a referral code.</span></div></div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+
+          <div class="setting">
+            <div class="s-text">
+              <div class="s-title">Payment</div>
+              <div class="s-desc on">Payment is enabled for this workshop</div>
+              <div class="s-expand">
+                <div class="grid3">
+                  <div class="field"><div class="label"><span>Amount</span></div><div class="input"><span class="txt">4999</span></div></div>
+                  <div class="field"><div class="label"><span>Amount striked</span></div><div class="input"><span class="txt">9999</span></div></div>
+                  <div class="field"><div class="label"><span>Payment for</span></div><div class="input"><span class="txt">New</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div><div class="help">New · Exist · Both · or not set</div></div>
+                </div>
+                <div class="grid3">
+                  <div class="field"><div class="label"><span>API</span></div><div class="input"><span class="txt mono">razorpay_v2</span></div></div>
+                  <div class="field"><div class="label"><span>ID</span></div><div class="input"><span class="txt mono">plan_EM14</span></div></div>
+                  <div class="field"><div class="label"><span>Hint</span></div><div class="input"><span class="txt">One-time payment, no renewal</span></div></div>
+                </div>
+                <div class="grid2">
+                  <div class="field">
+                    <div class="label"><span>Payment based on customer status</span><span class="counter">2 selected</span></div>
+                    <div class="input chips"><span class="chip soft in">non active <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span><span class="chip soft in">discontinued <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span><span class="txt ph">Add status…</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+                    <div class="help">non active · active · discontinued · none · banned · late</div>
+                  </div>
+                  <div class="field">
+                    <div class="label"><span>Payment based on financial status</span><span class="counter">1 selected</span></div>
+                    <div class="input chips"><span class="chip soft in">defaulted <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span><span class="txt ph">Add status…</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+                    <div class="help">fully paid · regular · discontinued · locked · defaulted · banned · late</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="toggle on"></span>
+          </div>
+
+          <div class="s-sub">Who are all able to refer this workshop</div>
+          <div class="grid2">
+            <div class="field">
+              <div class="tog"><span>All users can refer</span><span class="toggle"></span></div>
+              <div class="label"><span>People who can refer</span><span class="counter">Selected 1 user</span></div>
+              <div class="input chips">
+                <span class="chip soft in">Priya S. <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                <span class="txt ph">Add a participant or new user…</span>
+                <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+              </div>
+            </div>
+            <div class="field">
+              <div class="tog"><span>New users are also allowed to refer</span><span class="toggle on"></span></div>
+            </div>
+          </div>
+
+          <div class="s-sub">Evergreen access to</div>
+          <div class="grid2">
+            <div class="field">
+              <div class="tog"><span>All users have access</span><span class="toggle"></span></div>
+              <div class="label"><span>People with access</span><span class="counter">Selected 1 user</span></div>
+              <div class="input chips">
+                <span class="chip soft in">Arjun K. <span class="tag">new</span> <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+                <span class="txt ph">Add a participant or new user…</span>
+                <span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span>
+              </div>
+              <div class="help">"All" on: every participant has access and the picker only offers new users. "All" off: only the people picked here.</div>
+            </div>
+            <div class="field">
+              <div class="tog"><span>New users have access</span><span class="toggle on"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ COMMUNICATION · Logs & chat ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Logs &amp; chat</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Communication · where activity is logged and where participants talk</span>
+        </div>
+        <div class="sec-body fields">
+          <div class="grid2">
+            <div class="field">
+              <div class="label"><span>Workshop activity log</span><span class="counter">Slack channel</span></div>
+              <div class="seg"><span class="on">workshop-logs</span><span>workshop-subscriber-activity</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Chat group</span><span class="counter">from supportchat · newest first</span></div>
+              <div class="input"><span class="txt">EM Workshop · September 2026</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ COMMUNICATION · Mail template ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Mail template</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Communication · the enrolment e-mail</span>
+        </div>
+        <div class="sec-body fields">
+          <div class="field"><div class="label"><span>Subject</span></div><div class="input"><span class="txt">You're in: 14-Day Emotional Mastery starts 20 Sep</span></div></div>
+          <div class="grid2">
+            <div class="field"><div class="label"><span>Description</span></div><div class="input textarea"><span class="txt">Welcome. Your first lesson unlocks on 20 September at 07:00. Until then, meet your coach in the Welcome video.</span></div></div>
+            <div class="field"><div class="label"><span>Live call text</span></div><div class="input textarea"><span class="txt">Live circles are every Sunday at 6 pm. The Zoom link appears in the app 15 minutes before.</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ COMMUNICATION · Messages ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Messages</h2>
+          <span class="grow"></span>
+          <span class="sec-hint">Communication · WhatsApp on enrolment, congratulations on completion</span>
+        </div>
+        <div class="sec-body fields">
+          <div class="grid2">
+            <div class="field"><div class="label"><span>WhatsApp enrol message</span></div><div class="input textarea ph"><span class="txt">Enter the message sent on enrolment…</span></div></div>
+            <div class="field"><div class="label"><span>Congratulations message</span></div><div class="input textarea ph"><span class="txt">Enter the congratulations message…</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ COMMUNICATION · Hero ═══════ -->
+      <section class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Hero</h2>
+          <span class="count on">Web on</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Communication · the banner on the web and in the app</span>
+        </div>
+        <div class="sec-body fields">
+          <div class="grid2">
+            <div class="tog"><span>Web hero active <span class="help" style="margin-left:6px;">Workshop Web Hero is active and visible</span></span><span class="toggle on"></span></div>
+            <div class="tog"><span>Mobile hero active <span class="help" style="margin-left:6px;">Workshop Mobile Hero is inactive and hidden</span></span><span class="toggle"></span></div>
+          </div>
+          <div class="grid3">
+            <div class="field"><div class="label"><span>Hero heading</span></div><div class="input textarea" style="min-height:56px;"><span class="txt">Steady your emotions in 14 days</span></div></div>
+            <div class="field"><div class="label"><span>Hero description</span></div><div class="input textarea"><span class="txt">A daily practice with a coach beside you.</span></div></div>
+            <div class="field">
+              <div class="label"><span>Hero type</span></div>
+              <div class="input"><span class="txt">Image</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+              <div class="help">Image · Video · or not set</div>
+              <div class="label" style="margin-top:8px;"><span>Hero accent colour</span></div>
+              <div class="input"><span class="swatch" style="background:#1a3c5e;"></span><span class="txt mono" style="color:#1a2535;">#1A3C5E</span></div>
+              <div class="help">Six-digit hex. Type it or pick from the swatch.</div>
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="field">
+              <div class="label"><span>Web hero image</span><span class="counter">Recommended 3840 × 1350</span></div>
+              <div class="preview">hero-web.jpg</div>
+              <div class="row" style="gap:8px;"><span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>Replace</span><span class="btn btn-sm btn-danger-o">Remove</span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Mobile hero image</span><span class="counter">EiFlix series image size</span></div>
+              <div class="drop"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg><span class="help">Drop an image or <span class="link">choose a file</span></span></div>
+            </div>
+            <div class="field">
+              <div class="label"><span>Hero video</span></div>
+              <div class="drop"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg><span class="help">Drop a video or <span class="link">choose a file</span></span></div>
+            </div>
+          </div>
+          <div class="help">Uploads go to workshops/&lt;workshop id&gt;/hero_&lt;timestamp&gt;. Remove clears the link only; the file stays in storage.</div>
+        </div>
+      </section>
+
+      <!-- save bar -->
+      <div class="savebar">
+        <span class="pill pill-warn"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>Unsaved changes</span>
+        <span class="help">Mode &amp; visibility · Evergreen workshop</span>
+        <span class="grow"></span>
+        <span class="help">Saves all Settings together. Enrollment and Challenges save separately.</span>
+        <span class="btn btn-ghost">Discard</span>
+        <span class="btn btn-primary"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 3v5h7V3M8 21v-7h8v7"></path></svg>Save Settings</span>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
