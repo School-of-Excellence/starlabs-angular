@@ -11,14 +11,7 @@
       <div class="card shadow-sm">
         <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
-            <h5 class="mb-0">
-              {{studio["title"]}}
-              <span class="provider-badge"
-                    [style.background]="getProvider(studio['roomid']) === 'livekit-cloud' ? '#1f9d55' : '#ff9800'"
-                    style="color:#fff; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-left:8px; vertical-align:middle;">
-                {{ getProviderLabel(studio['roomid']) }}
-              </span>
-            </h5>
+            <h5 class="mb-0">{{studio["title"]}}</h5>
             <small class="text-muted">Room ID: {{studio['roomid']}}</small>
           </div>
           <div class="d-flex align-items-center gap-2">
@@ -70,16 +63,13 @@
                         [participantIdentity]="remote.participantName">
                       </app-openvidu-video-element>
 
-                      <!-- Name badge: Name · Mute (only if muted) · NR · Network -->
+                      <!-- Name badge -->
                       <div class="name-badge">
-                        <span class="badge-name">{{ remote.participantName }}</span>
-                        <mat-icon class="badge-icon mute-icon"
-                          *ngIf="isParticipantMuted(studio['roomid'], remote.participantIdentity)">mic_off</mat-icon>
-                        <span class="nr-chip" *ngIf="getDfnInfo(studio['roomid'], remote.participantIdentity) as info" [class.nr-on]="info.dfn"
-                              [title]="info.dfn ? ('Noise reduction ON · ' + info.atten + ' dB attenuation') : 'Noise reduction OFF'">
-                          <mat-icon class="badge-icon">graphic_eq</mat-icon>
-                          <span class="nr-atten" *ngIf="info.dfn">{{ info.atten }}</span>
-                        </span>
+                        <mat-icon class="badge-mic-icon"
+                          [class.text-danger]="isParticipantMuted(studio['roomid'], remote.participantIdentity)">
+                          {{ isParticipantMuted(studio['roomid'], remote.participantIdentity) ? 'mic_off' : 'mic' }}
+                        </mat-icon>
+                        {{ remote.participantName }}
                         <span class="network-bars">
                           <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 1" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
                           <span class="bar" [class.active]="getNetworkBars(studio['roomid'], remote.participantIdentity).bars >= 2" [style.background]="getNetworkBars(studio['roomid'], remote.participantIdentity).color"></span>
@@ -114,7 +104,7 @@
     </div>
   </div>
 
-  <div class="infra-status-section" *ngIf="infraStatus || ociInfraStatus">
+  <div class="infra-status-section" *ngIf="infraStatus">
   
     <!-- Error/Success Messages -->
     <div *ngIf="infraError" class="infra-alert infra-error">
@@ -127,43 +117,10 @@
       <button (click)="infraSuccess = null" class="close-btn">✕</button>
     </div>
 
-    <!-- Active media provider selector (single source of truth: openvidu server/mediaprovider) -->
-    <div class="provider-selector">
-      <span class="provider-selector-label">Media Provider:</span>
-      <label>
-        <input type="radio" name="activeprovider" [checked]="activeProvider === 'aws'" (change)="switchProvider('aws')"> AWS
-      </label>
-      <label>
-        <input type="radio" name="activeprovider" [checked]="activeProvider === 'oci'" (change)="switchProvider('oci')"> OCI
-      </label>
-    </div>
-
-    <!-- Inactive-provider danger strips: silent when that cloud is off; red alert + Stop when running -->
-    <div class="provider-strip" *ngIf="activeProvider !== 'aws'" [class.danger]="isInactiveServerRunning('aws')">
-      <ng-container *ngIf="isInactiveServerRunning('aws'); else awsIdleStrip">
-        ⚠️ AWS server is running while OCI is the active provider
-        <button (click)="stopMasterNode()" [disabled]="infraActionInProgress" class="infra-btn btn-stop">
-          <span *ngIf="!infraActionInProgress">⏹️ Stop AWS</span>
-          <span *ngIf="infraActionInProgress">⏳</span>
-        </button>
-      </ng-container>
-      <ng-template #awsIdleStrip>AWS (inactive)</ng-template>
-    </div>
-    <div class="provider-strip" *ngIf="activeProvider !== 'oci'" [class.danger]="isInactiveServerRunning('oci')">
-      <ng-container *ngIf="isInactiveServerRunning('oci'); else ociIdleStrip">
-        ⚠️ OCI server is running while AWS is the active provider
-        <button (click)="stopOciMasterNode()" [disabled]="ociActionInProgress" class="infra-btn btn-stop">
-          <span *ngIf="!ociActionInProgress">⏹️ Stop OCI</span>
-          <span *ngIf="ociActionInProgress">⏳</span>
-        </button>
-      </ng-container>
-      <ng-template #ociIdleStrip>OCI (inactive)</ng-template>
-    </div>
-
     <div class="infra-cards">
-
+      
       <!-- Master Node Card -->
-      <div class="infra-card" *ngIf="activeProvider === 'aws' && infraStatus">
+      <div class="infra-card">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>Master Node</h3>
@@ -210,7 +167,7 @@
       </div>
 
       <!-- Media Nodes Card -->
-      <div class="infra-card" *ngIf="activeProvider === 'aws' && infraStatus">
+      <div class="infra-card">
         <div class="infra-card-header">
           <div class="header-content">
             <h3>Media Nodes</h3>
@@ -247,115 +204,19 @@
         </div>
 
         <div class="infra-card-actions">
-          <button
-            (click)="scaleMediaUp()"
+          <button 
+            (click)="scaleMediaUp()" 
             [disabled]="!canScaleUp()"
             class="infra-btn btn-scale">
             <span *ngIf="!infraActionInProgress">➕ Scale Up</span>
             <span *ngIf="infraActionInProgress">⏳</span>
           </button>
-          <button
-            (click)="scaleMediaDown()"
+          <button 
+            (click)="scaleMediaDown()" 
             [disabled]="!canScaleDown()"
             class="infra-btn btn-scale">
             <span *ngIf="!infraActionInProgress">➖ Scale Down</span>
             <span *ngIf="infraActionInProgress">⏳</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- OCI Master Node Card -->
-      <div class="infra-card" *ngIf="activeProvider === 'oci' && ociInfraStatus">
-        <div class="infra-card-header">
-          <div class="header-content">
-            <h3>OCI Master Node</h3>
-            <span class="status-badge" [ngClass]="getOciMasterStateClass()">
-              {{ getOciMasterState() }}
-            </span>
-          </div>
-        </div>
-
-        <div class="infra-card-body">
-          <div class="info-row">
-            <span class="label">Instance</span>
-            <code class="value">{{ ociInfraStatus['master']['instanceId'] | slice:-12 }}</code>
-          </div>
-          <div class="info-row" *ngIf="ociInfraStatus['master']['publicIp']">
-            <span class="label">Public IP</span>
-            <code class="value">{{ ociInfraStatus['master']['publicIp'] }}</code>
-          </div>
-          <div class="info-row" *ngIf="ociInfraStatus['master']['instanceType']">
-            <span class="label">Shape</span>
-            <span class="value">{{ ociInfraStatus['master']['instanceType'] }}</span>
-          </div>
-        </div>
-
-        <div class="infra-card-actions">
-          <button
-            (click)="startOciMasterNode()"
-            [disabled]="!canStartOciMaster()"
-            class="infra-btn btn-start">
-            <span *ngIf="!ociActionInProgress">▶️ Start</span>
-            <span *ngIf="ociActionInProgress">⏳</span>
-          </button>
-          <button
-            (click)="stopOciMasterNode()"
-            [disabled]="!canStopOciMaster()"
-            class="infra-btn btn-stop">
-            <span *ngIf="!ociActionInProgress">⏹️ Stop</span>
-            <span *ngIf="ociActionInProgress">⏳</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- OCI Media Nodes Card (instance pool) -->
-      <div class="infra-card" *ngIf="activeProvider === 'oci' && ociInfraStatus">
-        <div class="infra-card-header">
-          <div class="header-content">
-            <h3>OCI Media Nodes</h3>
-            <span class="status-badge" [ngClass]="getOciMediaStateClass()">
-              {{ ociInfraStatus['media']['instanceStates']['healthy'] }} / {{ ociInfraStatus['media']['desiredCapacity'] }}
-            </span>
-          </div>
-        </div>
-
-        <div class="infra-card-body">
-          <div class="info-row">
-            <span class="label">Pool Size</span>
-            <span class="value">{{ ociInfraStatus['media']['desiredCapacity'] }}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Healthy</span>
-            <span class="value healthy">{{ ociInfraStatus['media']['instanceStates']['healthy'] }}</span>
-          </div>
-          <div class="info-row" *ngIf="ociInfraStatus['media']['instanceStates']['pending'] > 0">
-            <span class="label">Starting</span>
-            <span class="value pending">{{ ociInfraStatus['media']['instanceStates']['pending'] }}</span>
-          </div>
-          <div class="info-row" *ngIf="ociInfraStatus['media']['instanceStates']['terminating'] > 0">
-            <span class="label">Terminating</span>
-            <span class="value terminating">{{ ociInfraStatus['media']['instanceStates']['terminating'] }}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Range</span>
-            <span class="value">{{ ociInfraStatus['media']['minSize'] }} - {{ ociInfraStatus['media']['maxSize'] }}</span>
-          </div>
-        </div>
-
-        <div class="infra-card-actions">
-          <button
-            (click)="scaleOciMediaUp()"
-            [disabled]="!canScaleOciUp()"
-            class="infra-btn btn-scale">
-            <span *ngIf="!ociActionInProgress">➕ Scale Up</span>
-            <span *ngIf="ociActionInProgress">⏳</span>
-          </button>
-          <button
-            (click)="scaleOciMediaDown()"
-            [disabled]="!canScaleOciDown()"
-            class="infra-btn btn-scale">
-            <span *ngIf="!ociActionInProgress">➖ Scale Down</span>
-            <span *ngIf="ociActionInProgress">⏳</span>
           </button>
         </div>
       </div>
