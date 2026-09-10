@@ -24,11 +24,18 @@
 #   regenerate:  node scripts/gen-unit-routing.mjs          (in the hub repo)
 #   verify:      node scripts/gen-unit-routing.mjs --check
 #
-# SCOPE PIN: uses tsconfig.unit.json, which compiles only `*.unit.spec.ts` and what they import. The
-# repo-wide `ng test` cannot run today — four pre-existing files fail to compile (a Node `os` import in
-# schedule-dialog.component.ts, missing amazon-chime-sdk-js, a `console` import in
-# content-analytics.component.ts, and a wrong class name in assigncategorydialog.component.spec.ts).
-# Widen this gate to the full spec suite once those are fixed.
+# SCOPE PIN: uses tsconfig.unit.json, which compiles only `*.unit.spec.ts` and what they import.
+#
+# HISTORY (corrected 2026-09-10): this pin originally existed because repo-wide `ng test` could not run at
+# all — SIX files failed to compile (not four, as this comment previously said), and `tsconfig.spec.json`
+# type-checks every spec BEFORE running any, so the whole run aborted. Those six are now fixed: three unused
+# Node built-in imports (`os`, `console` x2) were deleted from shipped components, and three CLI-scaffolded
+# spec stubs had their class names corrected. `tsc --noEmit -p tsconfig.spec.json` is clean.
+#
+# THE PIN STAYS ANYWAY, deliberately. Retiring it would make this gate compile all 400+ spec files instead of
+# the ~30 unit specs, which re-couples the unit gate to every unrelated spec in the repo: the next broken
+# scaffold breaks the unit gate again — exactly the failure we just spent a session escaping. The isolation
+# is the point, not the workaround. Retire it only if someone decides that coupling is acceptable.
 name: unit-tests
 
 on:
