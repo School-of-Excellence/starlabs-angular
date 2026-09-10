@@ -47,6 +47,7 @@
     "@ctrl/ngx-emoji-mart": "^9.2.0",
     "@fortawesome/fontawesome-free": "^7.0.0",
     "@kolkov/angular-editor": "^2.0.0",
+    "@livekit/krisp-noise-filter": "^0.4.3",
     "@livekit/track-processors": "^0.7.2",
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/face_mesh": "^0.4.1633559619",
