@@ -40,9 +40,12 @@ and the overlay only carries the still-new entries, so a moved person keeps thei
 
 ## 3. What changed
 
-- **New card, `existUsersEnrolled`**, inserted before New Users Enrolled in **all three**
-  layout blocks (the template repeats the metric grid for the category-based, evergreen and
-  plain variants — a single insertion would have covered only one of them).
+- **New card, `existUsersEnrolled`**, inserted before New Users Enrolled.
+
+  **Correction to my first pass:** I inserted it into three places believing the template
+  had three live layout blocks. Two of them sit inside `<!-- ... -->` — the second and third
+  `metrics-section` blocks are commented out, so only the first is live. The two dead copies
+  have been removed. A comment-aware scan is what caught it; a plain text search does not.
 - **Counts corrected.** New Users Enrolled and New Users Not Enrolled now exclude moved
   users, so Exist + New now equals Total Enrolled exactly.
 - **Two filters on the new panel**: journey and customer status. Options are derived from
@@ -83,3 +86,54 @@ and the overlay only carries the still-new entries, so a moved person keeps thei
 `mapProfileNew` is still passed whole to the new-users dialog (`manualenroll` / the New
 Users management screen). That is outside this card's scope and was left alone, but if that
 dialog should also stop showing moved users, it needs the same rule.
+
+
+## 6. The CI gate, testids, and the tests (2026-09-10, same day)
+
+The console blocked the branch: **"8 new interactive element(s) have no data-testid"**.
+
+The 8 were my 6 live new controls plus the 2 dead cards described above (the gate's diff is
+comment-blind, so it counted them). Removing the dead pair and adding ids to the rest clears
+it. This screen had **no** testids before, so the `wdash-` prefix is new here; the names
+follow the repo's existing `<screen>-<thing>-<kind>` convention:
+
+`wdash-exist-users-card` · `wdash-exist-users-count` (the number, for assertions) ·
+`wdash-exist-filter-btn` · `wdash-exist-journey-option` · `wdash-exist-status-option` ·
+`wdash-exist-clear-filters-btn` · `wdash-exist-status-chip`
+
+### The tests
+The e2e specs live in the hub repo (`starlabs-e2e-tests`), which is not checked out here, so
+the suite's own cases have to be added there. What *can* live in this repo is the logic, and
+that is where the risk actually is — so
+`workshop-dashboard.exist-users.spec.ts` covers it: **23 cases, all passing.** The rule,
+the four counts, the Exist+New partition, the moved user resolving through participant
+metadata, the derived filter options, and the filters (single, AND, OR, empty result,
+clearing, toggling, and *not* leaking into the Total Enrolled panel).
+
+They build the component from its prototype and set only the fields the logic reads, rather
+than booting Angular — the real component needs Firestore, routing and a live snapshot, none
+of which this behaviour depends on. So the suite runs offline and touches no data.
+
+**Two things worth knowing about running them:**
+- `ng test` is broken repo-wide, and not by this change:
+  `src/app/content/series-dashboard/assigncategorydialog/assigncategorydialog.component.spec.ts`
+  imports `AssigncategorydialogComponent` while the class is `AssignCategoryDialogComponent`,
+  and `tsconfig.spec.json` compiles every spec, so one stale stub fails the whole run. I
+  scoped the test tsconfig temporarily to run this suite and **reverted it** — that one-line
+  import fix would unblock `ng test` for everyone.
+- One test failed first time and it was **my fixture**, not the product: the options getter
+  sorts through `JourneyMap`, which the component always initialises but my fixture had not
+  set. Fixed in the fixture; no product change.
+
+### A dependency detour, and the mess it made
+The build broke mid-task on `@livekit/krisp-noise-filter` — declared in `package.json` but
+missing from `node_modules` after the operator's recent pull. My first fix,
+`npm install <pkg> --legacy-peer-deps`, **bumped the version spec to ^0.4.4 and stripped 847
+lines from the lockfile**. I reverted both manifests, but reverting the lock does not restore
+`node_modules`, and the prune had removed the `@zoom/meetingsdk` peers (react, redux,
+redux-thunk) that `--legacy-peer-deps` will not reinstall — so the build then failed on
+those instead. Restored with `npm ci --legacy-peer-deps` plus a `--no-save` install of the
+three peers. **`package.json` and `package-lock.json` are byte-identical to HEAD.**
+
+Lesson: in this repo install with `--no-save`, or expect npm to rewrite the manifests and
+prune peers that only exist because someone once installed without `--legacy-peer-deps`.

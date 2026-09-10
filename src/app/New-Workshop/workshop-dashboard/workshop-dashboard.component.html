@@ -284,12 +284,12 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
+            <mat-card class="metric-card clickable-metric" data-testid="wdash-exist-users-card" (click)="onMetricClick('existUsersEnrolled')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
                   <div class="metric-details">
-                    <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
+                    <h2 class="metric-value" data-testid="wdash-exist-users-count">{{ totalExistUsersEnrolled }}</h2>
                     <p class="metric-label">Exist Users Enrolled</p>
                   </div>
                 </div>
@@ -528,17 +528,6 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
-              <mat-card-content>
-                <div class="metric-content">
-                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
-                  <div class="metric-details">
-                    <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
-                    <p class="metric-label">Exist Users Enrolled</p>
-                  </div>
-                </div>
-              </mat-card-content>
-            </mat-card>
             <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
               <mat-card-content>
                 <div class="metric-content">
@@ -635,17 +624,6 @@
               </div>
             </mat-card-content>
           </mat-card>
-        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
-          <mat-card-content>
-            <div class="metric-content">
-              <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
-              <div class="metric-details">
-                <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
-                <p class="metric-label">Exist Users Enrolled</p>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
         <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
           <mat-card-content>
             <div class="metric-content">
@@ -1654,6 +1632,7 @@
                derived from the people actually in the list, so they are never empty. -->
           <ng-container *ngIf="selectedStatusInfo?.status === 'existUsersEnrolled'">
             <button mat-icon-button
+                    data-testid="wdash-exist-filter-btn"
                     [matMenuTriggerFor]="existFilterMenu"
                     [color]="(selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0) ? 'primary' : ''"
                     matTooltip="Filter by journey or customer status">
@@ -1667,6 +1646,7 @@
                 </div>
                 <div style="padding: 4px 0;" *ngIf="existJourneyOptions.length; else noExistJourneys">
                   <mat-checkbox
+                    data-testid="wdash-exist-journey-option"
                     *ngFor="let journey of existJourneyOptions"
                     [checked]="selectedJourneyFilters.includes(journey)"
                     (change)="toggleJourneyFilter(journey)"
@@ -1683,6 +1663,7 @@
                 </div>
                 <div style="padding: 4px 0;" *ngIf="customerStatusOptions.length; else noExistStatuses">
                   <mat-checkbox
+                    data-testid="wdash-exist-status-option"
                     *ngFor="let status of customerStatusOptions"
                     [checked]="selectedCustomerStatusFilters.includes(status)"
                     (change)="toggleCustomerStatusFilter(status)"
@@ -1697,6 +1678,7 @@
                 <div style="padding: 6px 16px 10px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2);"
                      *ngIf="selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0">
                   <button mat-button color="warn" style="font-size: 11px;"
+                          data-testid="wdash-exist-clear-filters-btn"
                           (click)="clearJourneyFilters(); $event.stopPropagation()">
                     <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
                     Clear All Filters
@@ -1803,6 +1785,7 @@
                 <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
               </mat-chip>
               <mat-chip
+                data-testid="wdash-exist-status-chip"
                 *ngFor="let status of selectedCustomerStatusFilters"
                 [removable]="true"
                 (removed)="toggleCustomerStatusFilter(status)"
