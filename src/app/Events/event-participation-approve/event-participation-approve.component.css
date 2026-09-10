@@ -20,6 +20,7 @@ table {
   display: inline-flex;
   justify-content: space-between;
   align-content: center;
+  position: relative;
 }
 
 .greenbtn{
@@ -41,4 +42,32 @@ td, th {
 
 button:focus{
   background-color: rgb(224, 218, 209);
+}
+
+.overall-profiles{
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.overall-profiles .op-pill{
+  padding: 6px 14px;
+  text-align: center;
+  font-weight: 600;
+  color: rgb(0, 41, 77);
+  background-color: rgb(232, 240, 248);
+  border-radius: 6px;
+}
+.overall-profiles span{
+  font-weight: 700;
+}
+.overall-profiles .product-counts{
+  margin-top: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.overall-profiles .product-counts div{
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }

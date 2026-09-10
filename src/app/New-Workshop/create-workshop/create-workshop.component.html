@@ -4,14 +4,6 @@
       <h2>Create New Workshop</h2>
       <form [formGroup]="form">
         <mat-form-field appearance="fill" class="full-width">
-        <mat-label>What are you creating?</mat-label>
-        <mat-select formControlName="type">
-            <mat-option value="workshop">Workshop</mat-option>
-            <mat-option value="eiflix">EiFlix</mat-option>
-        </mat-select>
-        <mat-error *ngIf="form.get('type')?.hasError('required')">Type is required.</mat-error>
-        </mat-form-field>
-        <mat-form-field appearance="fill" class="full-width">
         <mat-label>Title</mat-label>
         <input matInput formControlName="title">
         <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
@@ -66,15 +58,6 @@
     <mat-card-content>
       <h2>Create New Workshop</h2>
       <form [formGroup]="form">
-        <mat-form-field appearance="fill" class="full-width">
-          <mat-label>What are you creating?</mat-label>
-          <mat-select formControlName="type">
-            <mat-option value="workshop">Workshop</mat-option>
-            <mat-option value="eiflix">EiFlix</mat-option>
-          </mat-select>
-          <mat-error *ngIf="form.get('type')?.hasError('required')">Type is required.</mat-error>
-        </mat-form-field>
-
         <mat-form-field appearance="fill" class="full-width">
           <mat-label>Title</mat-label>
           <input matInput formControlName="title">

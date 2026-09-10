@@ -826,3 +826,13 @@ button[mat-raised-button][disabled] {
 .engagement-row {
   margin-top: 8px;
 }
+
+/* ── Delivery hold tab ───────────────────────────────────────────── */
+.tab-btn-held.active-tab { background: #d93025 !important; color: #fff !important; }
+.tab-btn-held mat-icon { color: inherit; }
+.held-note { display: flex; align-items: center; gap: 8px; background: #fdecea; border: 1px solid #e57373; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; color: #7a2e28; }
+.held-note mat-icon { color: #d93025; font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
+.held-table { width: 100%; border-collapse: collapse; }
+.held-table th { text-align: left; font-size: 12px; font-weight: 700; color: #555; padding: 8px 10px; border-bottom: 1px solid #e0e0e0; }
+.held-table td { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.held-pid { font-family: monospace; font-size: 11px; color: #888; }

@@ -6,6 +6,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { startWith, map } from 'rxjs/operators';
 import { Observable } from 'rxjs';
+import * as XLSX from 'xlsx';
 
 /* Angular Material */
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -21,8 +22,8 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
     CommonModule,
     ReactiveFormsModule,
     MatFormFieldModule,
-    MatInputModule,          
-    MatAutocompleteModule,  
+    MatInputModule,
+    MatAutocompleteModule,
     MatSelectModule,
     MatTableModule,
     MatPaginatorModule,
@@ -32,7 +33,7 @@ import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/pr
   styleUrl: './live-event-health.component.css'
 })
 export class LiveEventHealthComponent {
-  
+
   /* ---------------- EVENT STATE ---------------- */
 
   events: any[] = [];
@@ -72,6 +73,12 @@ export class LiveEventHealthComponent {
   eventStatusOptions: string[] = [];
   productStatusOptions: string[] = [];
   modeOptions: string[] = [];
+  productOptions: string[] = [];
+
+  productOptionCounts: { value: string; count: number }[] = [];
+  eventStatusOptionCounts: { value: string; count: number }[] = [];
+  productStatusOptionCounts: { value: string; count: number }[] = [];
+  modeOptionCounts: { value: string; count: number }[] = [];
 
   validationOptions = [
     { label: 'Valid', value: 'valid' },
@@ -84,12 +91,15 @@ export class LiveEventHealthComponent {
   productStatusFilter = new FormControl<string[]>([]);
   modeFilter = new FormControl<string[]>([]);
   validationFilter = new FormControl<string[]>([]);
+  productFilter = new FormControl<string[]>([]);
+  searchControl = new FormControl('');
 
   /* ---------------- KPI STATE ---------------- */
 
   kpiTotal = 0;
   kpiValid = 0;
   kpiInvalid = 0;
+  isLoading = false;
 
   eventStatusKpis: { status: string; count: number }[] = [];
   productStatusKpis: { status: string; count: number }[] = [];
@@ -140,7 +150,7 @@ export class LiveEventHealthComponent {
 
   toggleSelectAll(event: any) {
     if (event.target.checked) {
-      this.selectedRows = [...this.tableData]; 
+      this.selectedRows = [...this.tableData];
     } else {
       this.selectedRows = [];
     }
@@ -164,7 +174,14 @@ export class LiveEventHealthComponent {
 
     if (!this.selectedRows.length) return;
 
-    const ok = confirm(`Cancel ${this.selectedRows.length} participants?`);
+    const message =
+      `You're about to cancel ${this.selectedRows.length} participant(s).\n\n` +
+      `This will:\n` +
+      `- Set product status to "cancelled" \n` +
+      `- Set event status to "unattended"\n\n` +
+      `Do you want to proceed?`;
+
+    const ok = confirm(message);
     if (!ok) return;
 
     try {
@@ -240,6 +257,27 @@ export class LiveEventHealthComponent {
     this.loadProductsMaster();
   }
 
+  /* ---------------- Filters ---------------- */
+  filteredProductStatusOptions: Observable<string[]> = this.productStatusFilter.valueChanges.pipe(
+    startWith([]),
+    map(() => this.productStatusOptions)
+  );
+
+  filteredEventStatusOptions: Observable<string[]> = this.eventStatusFilter.valueChanges.pipe(
+    startWith([]),
+    map(() => this.eventStatusOptions)
+  );
+
+  filteredModeOptions: Observable<string[]> = this.modeFilter.valueChanges.pipe(
+    startWith([]),
+    map(() => this.modeOptions)
+  );
+
+  filteredproduct: Observable<string[]> = this.validationFilter.valueChanges.pipe(
+    startWith([]),
+    map(() => this.validationOptions.map(v => v.value))
+  );
+
   /* ---------------- FILTER LISTENERS ---------------- */
 
   setupFilterListeners() {
@@ -247,6 +285,8 @@ export class LiveEventHealthComponent {
     this.productStatusFilter.valueChanges.subscribe(() => this.applyFilters());
     this.modeFilter.valueChanges.subscribe(() => this.applyFilters());
     this.validationFilter.valueChanges.subscribe(() => this.applyFilters());
+    this.searchControl.valueChanges.subscribe(() => this.applyFilters());
+    this.productFilter.valueChanges.subscribe(() => this.applyFilters());
   }
 
   /* ---------------- LOAD EVENTS ---------------- */
@@ -278,6 +318,7 @@ export class LiveEventHealthComponent {
   selectEvent(event: any) {
     this.selectedEvent = event;
     this.pageIndex = 0;
+    this.isLoading = true;
 
     this.unsubParticipation?.();
     this.unsubProducts?.();
@@ -446,23 +487,28 @@ private upsertProduct(product: any) {
     const hasProductId = req.participantproductid ? true : false;
     let isValid = false;
 
-    // CASE 1 : REQUESTED / DENIED 
+    // CASE 1 : REQUESTED / DENIED
     if (['requested', 'denied'].includes(eventStatus)) {
       isValid = !hasProductId;
     }
 
-    // CASE 2 : APPROVED 
+    // CASE 2 : APPROVED
     else if (eventStatus === 'approved') {
       isValid = ['initiated', 'ongoing'].includes(productStatus);
     }
 
-    // CASE 3 : ATTENDED 
+    // CASE 3 : ATTENDED
     else if (eventStatus === 'attended') {
       isValid = productStatus === 'completed';
     }
 
     // CASE 4 : UNATTENDED
     else if (eventStatus === 'unattended') {
+      isValid = productStatus === 'cancelled' || !hasProductId;
+    }
+
+    // CASE 5 : REVOKED
+    else if (eventStatus === 'revoked') {
       isValid = productStatus === 'cancelled' || !hasProductId;
     }
 
@@ -474,13 +520,13 @@ private upsertProduct(product: any) {
     return {
       participationRequestId: req.id,
       profileid: profileId,
-      name: participantMeta?.name ?? profileId ?? '-',
-      event: this.selectedEvent?.name ?? '-',
-      product: productMaster?.product ?? productId ?? '-',
-      eventRequestStatus: req.status ?? '-',
-      participantProductStatus: product?.status ?? '-',
+      name: participantMeta?.name ?? profileId ?? 'N/A',
+      event: this.selectedEvent?.name ?? 'N/A',
+      product: productMaster?.product ?? productId ?? 'N/A',
+      eventRequestStatus: req.status ?? 'N/A',
+      participantProductStatus: product?.status ?? 'N/A',
       participantProductId: product?.id,
-      mode: mode ?? '-',
+      mode: mode ?? 'N/A',
       createdDate: req.doccreateddate?.toDate?.() ?? null,
       isValid
     };
@@ -494,6 +540,7 @@ private upsertProduct(product: any) {
 
   this.buildFilterOptions();
   this.applyFilters();
+  this.isLoading = false;
 }
 
 
@@ -502,17 +549,21 @@ private upsertProduct(product: any) {
   buildFilterOptions() {
     const uniq = <T>(arr: T[]) => Array.from(new Set(arr)).filter(Boolean);
 
-    this.eventStatusOptions = uniq(
-      this.fullTableData.map(r => r.eventRequestStatus)
-    );
+    this.eventStatusOptions = uniq(this.fullTableData.map(r => r.eventRequestStatus));
+    this.productStatusOptions = uniq(this.fullTableData.map(r => r.participantProductStatus));
+    this.modeOptions = uniq(this.fullTableData.map(r => r.mode));
+    this.productOptions = uniq(this.fullTableData.map(r => r.product));
 
-    this.productStatusOptions = uniq(
-      this.fullTableData.map(r => r.participantProductStatus)
-    );
+    const countBy = (field: string, options: string[]) =>
+      options.map(opt => ({
+        value: opt,
+        count: this.fullTableData.filter(r => r[field] === opt).length
+      }));
 
-    this.modeOptions = uniq(
-      this.fullTableData.map(r => r.mode)
-    );
+    this.productOptionCounts = countBy('product', this.productOptions);
+    this.eventStatusOptionCounts = countBy('eventRequestStatus', this.eventStatusOptions);
+    this.productStatusOptionCounts = countBy('participantProductStatus', this.productStatusOptions);
+    this.modeOptionCounts = countBy('mode', this.modeOptions);
   }
 
   /* ---------------- APPLY FILTERS ---------------- */
@@ -542,12 +593,27 @@ private upsertProduct(product: any) {
       );
     }
 
+    /* -------- SEARCH FILTER -------- */
+
+    const searchTerm = this.searchControl.value?.toLowerCase() || '';
+    if (searchTerm) {
+      data = data.filter(r =>
+        r.name.toLowerCase().includes(searchTerm) ||
+        r.event.toLowerCase().includes(searchTerm) ||
+        r.product.toLowerCase().includes(searchTerm) ||
+        r.eventRequestStatus.toLowerCase().includes(searchTerm) ||
+        r.participantProductStatus.toLowerCase().includes(searchTerm) ||
+        r.mode.toLowerCase().includes(searchTerm)
+      );
+    }
+
     /* -------- DROPDOWN FILTERS -------- */
 
     const eventStatuses = this.eventStatusFilter.value || [];
     const productStatuses = this.productStatusFilter.value || [];
     const modes = this.modeFilter.value || [];
     const validations = this.validationFilter.value || [];
+    const products = this.productFilter.value || [];
 
     if (eventStatuses.length) {
       data = data.filter(r =>
@@ -570,6 +636,12 @@ private upsertProduct(product: any) {
     if (validations.length) {
       data = data.filter(r =>
         validations.includes(r.isValid ? 'valid' : 'invalid')
+      );
+    }
+
+    if (products.length) {
+      data = data.filter(r =>
+        products.includes(r.product)
       );
     }
 
@@ -630,23 +702,73 @@ private upsertProduct(product: any) {
     this.tableData = this.filteredData.slice(start, end);
   }
 
+  exportToExcel() {
+    const exportData = this.filteredData.map(row => ({
+      Name: row.name,
+      Event: row.event,
+      Product: row.product,
+      'Event Status': row.eventRequestStatus,
+      'Participant Status': row.participantProductStatus,
+      Mode: row.mode,
+      'Created Date': row.createdDate ? row.createdDate.toISOString() : '',
+      Validation: row.isValid ? 'Valid' : 'Invalid'
+    }));
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(exportData);
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Live Event Health');
+    XLSX.writeFile(wb, `Live_Event_Health_${this.selectedEvent?.name ?? 'export'}.xlsx`);
+  }
+
   onPageChange(event: PageEvent) {
     this.pageIndex = event.pageIndex;
     this.pageSize = event.pageSize;
     this.applyPagination();
   }
 
+  onTotalKpiClick() {
+    if (this.kpiFilter.type === 'total') {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = 'total';
+    this.kpiFilter.value = null;
+    this.eventStatusFilter.setValue([]);
+    this.productStatusFilter.setValue([]);
+    this.modeFilter.setValue([]);
+    this.validationFilter.setValue([]);
+
+    this.applyFilters();
+  }
+
   onValidKpiClick(isValid: boolean) {
+    const type = isValid ? 'valid' : 'invalid';
+
+    if (this.kpiFilter.type === type) {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = type;
+    this.kpiFilter.value = null;
+
     this.eventStatusFilter.setValue([]);
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
 
-    this.validationFilter.setValue([isValid ? 'valid' : 'invalid']);
+    this.validationFilter.setValue([type]);
     this.applyFilters();
   }
 
-
   onEventStatusKpiClick(status: string) {
+    if (this.kpiFilter.type === 'eventStatus' && this.kpiFilter.value === status) {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = 'eventStatus';
+    this.kpiFilter.value = status;
+
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
     this.validationFilter.setValue([]);
@@ -655,8 +777,15 @@ private upsertProduct(product: any) {
     this.applyFilters();
   }
 
-
   onProductStatusKpiClick(status: string) {
+    if (this.kpiFilter.type === 'productStatus' && this.kpiFilter.value === status) {
+      this.resetKpiFilter();
+      return;
+    }
+
+    this.kpiFilter.type = 'productStatus';
+    this.kpiFilter.value = status;
+
     this.eventStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
     this.validationFilter.setValue([]);
@@ -665,7 +794,10 @@ private upsertProduct(product: any) {
     this.applyFilters();
   }
 
-  onTotalKpiClick() {
+  resetKpiFilter() {
+    this.kpiFilter.type = null;
+    this.kpiFilter.value = null;
+
     this.eventStatusFilter.setValue([]);
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
@@ -680,6 +812,7 @@ private upsertProduct(product: any) {
     this.productStatusFilter.setValue([]);
     this.modeFilter.setValue([]);
     this.validationFilter.setValue([]);
+    this.productFilter.setValue([]);
   }
 
 

@@ -350,7 +350,14 @@ export interface PdRow {
   journeyId: string;
   ft: boolean;
   atcBucket: number;        // 0 full · 1 partial · 2 unvalidated · 3 none · -1 unknown
-  atcPct: number | null;
+  atcPct: number | null;    // column "ADJ %" (renamed from "ATC %" on development, 2026-09)
+  /**
+   * Procedure completion %, procDone / (procDone + procPending), null when the total is 0.
+   * Added by development alongside the PROC % column and filter. Carried here so the row shape matches
+   * the component's, which keeps comparePdRows / nextPdSort delegating. NOTE the engine's pdMatches and
+   * buildPdCsvLines predate this field and DO NOT read it — they are no longer wired (see their headers).
+   */
+  procPct: number | null;
   adjDone: number;
   adjPending: number;
   procDone: number;
@@ -365,12 +372,21 @@ export interface PdFilter {
   atc: string;
   pctOp: '>=' | '<=' | '<';
   pctVal: number;
+  /** PROC % threshold — development's mirror of the ADJ % pair. See the note on PdRow.procPct. */
+  procOp: '>=' | '<=' | '<';
+  procVal: number;
   band: string;
 }
 
-/** The table's untouched state — every control at its "everything" position. */
+/**
+ * The table's untouched state — every control at its "everything" position.
+ *
+ * NOT WIRED as of the 2026-09-10 development merge. Development grew its own `defaultPdFilter()` on the
+ * component when it added the PROC % pair, and that is the live one. This copy is kept in step with it
+ * (procOp/procVal included) so the shape stays valid, but the component no longer calls it.
+ */
 export function defaultPdFilter(): PdFilter {
-  return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, band: '' };
+  return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, procOp: '>=', procVal: 0, band: '' };
 }
 
 /**
@@ -383,6 +399,12 @@ export function defaultPdFilter(): PdFilter {
  * percentage (nothing is < 0) while keeping every row whose percentage is unknown, because the
  * unknown branch only excludes once pctVal > 0. The table then shows exactly the participants it
  * has no data for.
+ */
+/**
+ * NOT WIRED as of the 2026-09-10 development merge — kept for its tests, not called by the component.
+ * Development added a PROC % threshold pair (procOp/procVal over PdRow.procPct) to its own inline copy
+ * of this filter. THIS FUNCTION IGNORES procPct ENTIRELY, so wiring it back would silently disable that
+ * filter. Re-extract from live-event-dashboard-v3.component.ts before using it again.
  */
 export function pdMatches(r: PdRow, f: PdFilter, bandIds?: ReadonlySet<string>): boolean {
   const q = f.q.toLowerCase().trim();
@@ -433,12 +455,21 @@ export function csvCell(s: any): string {
   return `"${String(s).replace(/"/g, '""')}"`;
 }
 
+/**
+ * NOT WIRED as of the 2026-09-10 development merge. Development's header is 12 columns: 'ATC %' was
+ * renamed 'ADJ %' and a 'Proc %' column was inserted before 'Proc Done'. This 11-column version would
+ * drop a column from the export.
+ */
 export const PD_CSV_HEADER = [
   'Name', 'Email', 'Journey', 'Type', 'ATC Status', 'ATC %',
   'Adj Done', 'Adj Pending', 'Proc Done', 'Proc Pending', 'Attended Days'
 ];
 
 /** The export's lines, header first. Name/email/journey are quoted; the numbers are not. */
+/**
+ * NOT WIRED as of the 2026-09-10 development merge — see PD_CSV_HEADER. Development's row emits procPct
+ * between adjPending and procDone; this one does not.
+ */
 export function buildPdCsvLines(
   rows: PdRow[],
   ctx: { journeyLabel: (id: string) => string; atcLabel: (b: number) => string; totalDays: number }

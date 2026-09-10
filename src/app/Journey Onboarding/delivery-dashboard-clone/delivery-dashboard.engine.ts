@@ -325,6 +325,14 @@ export interface CohortFlags {
  * NOTE: an ineligible row with no status falls through to step 3 and, having no status, matches
  * neither idle nor stuck — it is invisible on the board. That is the existing behaviour.
  */
+/**
+ * NOT WIRED as of the 2026-09-10 development merge — kept for its tests, not called by the component.
+ * Development SPLIT the awaiting bucket in two: `isEligible` dropped its payment test, a new
+ * readyForInitiation cohort took the payment-cleared rows, and `awaiting` inverted to mean NOT cleared
+ * with its bottleneck string changed to 'Awaiting for Initiation'. This function still returns the old
+ * single-bucket shape, so wiring it back would collapse development's new tab. Re-extract from
+ * delivery-dashboard-clone.component.ts (populateActionableCohorts) before using it again.
+ */
 export function classifyCohorts(input: CohortInput, thresholds: CohortThresholds = COHORT_DEFAULTS): CohortFlags {
   if (input.status === 'completed' || REJECTED_STATUSES.has(input.status)) {
     return { excluded: true, awaiting: false, idle: false, stuck: false };

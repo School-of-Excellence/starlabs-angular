@@ -1,0 +1,81 @@
+/* Popup banner editor.
+   Reuses the workshop-configuration v2 vocabulary so the rich-text fields look
+   and behave exactly like the ones there (that file also carries the guards
+   against the global Bootstrap / Material stylesheets). */
+@import '../../workshop-configurationv2/wc2-shared.css';
+
+:host { display: block; background: var(--bg); min-height: 0; }   /* wc2-shared's :host sets 100vh — wrong inside a 92vh dialog */
+
+.pb { display: flex; flex-direction: column; min-height: 0; max-height: 92vh; }
+
+/* header */
+.pb-head {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border-light); background: #fff;
+}
+.pb-head-text { flex: 1; min-width: 0; }
+.pb-title {
+  font-family: 'Playfair Display', Georgia, serif; font-size: 24px; font-weight: 600;
+  color: var(--primary); margin: 2px 0 4px; line-height: 1.15; letter-spacing: normal;
+}
+.pb-sub { margin: 0; font-size: 13px; color: var(--t2); }
+.pb-state {
+  flex-shrink: 0; margin-top: 6px; display: inline-flex; align-items: center; height: 24px;
+  padding: 0 11px; border-radius: 12px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  background: #eef1f6; color: var(--t2);   /* --t3 on --border-light is 2.6:1 — under AA */
+}
+.pb-state.on { background: var(--success-bg); color: var(--success); }
+.pb-x {
+  flex-shrink: 0; border: 0; background: none; cursor: pointer; color: var(--t3);
+  width: 32px; height: 32px; border-radius: 6px; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.pb-x:hover { background: var(--border-light); color: var(--t1); }
+
+/* body */
+.pb-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 18px 24px 22px; display: flex; flex-direction: column; gap: 16px;
+}
+.pb-load {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 56px 24px; color: var(--t2); font-size: 13.5px;
+}
+.sec-head.static { cursor: default; }
+.sec-body { display: flex; flex-direction: column; gap: 16px; padding: 16px 24px 20px; }
+
+/* enable row */
+.pb-toggle-row { display: flex; align-items: center; gap: 16px; }
+.pb-toggle-text { flex: 1; min-width: 0; }
+.pb-toggle-title { font-size: 14px; font-weight: 600; color: var(--t1); margin-bottom: 2px; }
+
+/* artwork */
+.pb-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.pb-slot { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pb-drop {
+  height: 150px; border: 1px dashed var(--border); border-radius: 10px; background: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; cursor: pointer; overflow: hidden; color: var(--t3); text-align: center;
+}
+.pb-drop:hover { border-color: var(--primary); color: var(--primary); background: #f9fbfd; }
+.pb-drop.busy { pointer-events: none; opacity: .75; }   /* no second upload into the same slot */
+.pb-drop img { width: 100%; height: 100%; object-fit: contain; background: #eef3f9; }
+.pb-drop-text { font-size: 12px; }
+.pb-hint { font-variant-numeric: tabular-nums; }
+.pb-slot-actions { display: flex; gap: 6px; }
+.pb-url {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10.5px; color: var(--t3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* save bar */
+.pb-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 24px; border-top: 1px solid var(--border); background: #fff;
+}
+
+@media (max-width: 900px) {
+  .pb-slots { grid-template-columns: minmax(0, 1fr); }
+  .pb-head, .pb-body, .pb-bar { padding-left: 16px; padding-right: 16px; }
+}

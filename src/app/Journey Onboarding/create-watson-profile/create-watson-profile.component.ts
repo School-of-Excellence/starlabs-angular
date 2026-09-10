@@ -179,6 +179,8 @@ export class CreateWatsonProfileComponent {
               this.selectedProfileEmail = newUser['email'];
               this.selectedProfileID = newUser['profileid'];
               console.log("new to profile_data", newUserDoc.id);
+              await updateDoc(newUserDoc.ref, { movedtoexist: true, movedon: serverTimestamp() });
+              console.log("new_user_data marked movedtoexist", newUserDoc.id);
               const userDataSnap = await getDoc(userDataRef);
               if (!userDataSnap.exists()) {
                 await setDoc(userDataRef, {

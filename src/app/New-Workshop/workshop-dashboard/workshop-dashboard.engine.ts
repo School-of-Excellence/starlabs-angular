@@ -444,6 +444,14 @@ export function evergreenWorkshopDays(meta: any): number {
  *
  * DEFECT (pinned): a future-dated enrolment is clamped to Day 1 rather than flagged.
  */
+/**
+ * NOT WIRED as of the 2026-09-10 development merge — kept for its tests, not called by either component.
+ * Development split the over-run branch: a participant past the final day who has any workshop extension
+ * (getExtendEntries / extenduntill) now goes to an EXTENDED bucket with an activeCount, instead of
+ * straight to Completed. This function has no extended bucket at all, so wiring it back would delete
+ * that feature. Re-extracting it needs an extendEntriesOf(profileid) accessor injected, and a check that
+ * workshop-dashboardv2 — which shares this engine and has no extension data — still works.
+ */
 export function evergreenDayDistribution(
   participants: { profileid: string; enrollmentdate?: any }[],
   days: number,

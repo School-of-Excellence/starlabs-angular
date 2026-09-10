@@ -180,12 +180,12 @@
               Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length :
               (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
             </h5>
-            <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
+            <!-- <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
               <div class="custom-checkbox" [class.checked]="areAllSelected()">
                 <i class="bi bi-check" *ngIf="areAllSelected()"></i>
               </div>
               <span class="select-all-text">Select All</span>
-            </div>
+            </div> -->
           </div>
           <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->
@@ -2109,10 +2109,14 @@
           diameter="16"
           class="btn-spinner">
         </mat-spinner>
-        <span *ngIf="!bulkMoveInProgress">
+        <span *ngIf="!bulkMoveInProgress && bulkMoveTargetStageKey !== 'Unattended Participants'">
           Move {{bulkMovableCount}} Participant(s)
         </span>
-        <span *ngIf="bulkMoveInProgress">Moving...</span>
+        <span *ngIf="bulkMoveInProgress && bulkMoveTargetStageKey !== 'Unattended Participants'">Moving...</span>
+        <span *ngIf="!bulkMoveInProgress && bulkMoveTargetStageKey === 'Unattended Participants'">
+          Mark {{bulkMoveResults.length}} Unattended
+        </span>
+        <span *ngIf="bulkMoveInProgress && bulkMoveTargetStageKey === 'Unattended Participants'">Marking...</span>
       </button>
     </div>
 
@@ -2122,7 +2126,7 @@
         [style.color]="bulkMoveFailed ? '#d32f2f' : '#388e3c'">
         {{bulkMoveFailed ? 'error' : 'check_circle'}}
       </mat-icon>
-      <p *ngIf="!bulkMoveFailed" class="done-ok">
+      <p *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey !== 'Unattended Participants'" class="done-ok">
         ✓ {{bulkMovableCount}} participant(s) moved successfully
         <span *ngIf="bulkMoveComputedResult.skippedDFU.length > 0">
           &nbsp;({{bulkMoveComputedResult.skippedDFU.length}} DFU skipped)
@@ -2130,6 +2134,10 @@
         <span *ngIf="bulkMoveComputedResult.skippedVariation.length > 0">
           &nbsp;({{bulkMoveComputedResult.skippedVariation.length}} variation skipped)
         </span>
+      </p>
+
+      <p *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey === 'Unattended Participants'" class="done-ok">
+        ✓ {{bulkMoveResults.length}} participant(s) marked unattended
       </p>
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.

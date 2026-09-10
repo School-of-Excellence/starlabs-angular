@@ -77,7 +77,7 @@ import {
 /** A registered participant row with nothing remarkable — each case switches on only what it is about. */
 const row = (over: Partial<PdRow> = {}): PdRow => ({
   profileId: 'p1', name: 'Ada Lovelace', email: 'ada@example.com', journeyId: 'j1', ft: false,
-  atcBucket: 0, atcPct: 50, adjDone: 1, adjPending: 1, procDone: 0, procPending: 0, attd: 2,
+  atcBucket: 0, atcPct: 50, procPct: null, adjDone: 1, adjPending: 1, procDone: 0, procPending: 0, attd: 2,
   ...over,
 });
 
@@ -480,7 +480,7 @@ describe('live-event-dashboard.engine', () => {
 
     it('lets everything through in its default state', () => {
       expect(pdMatches(row(), f())).toBe(true);
-      expect(defaultPdFilter()).toEqual({ q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, band: '' });
+      expect(defaultPdFilter()).toEqual({ q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, procOp: '>=', procVal: 0, band: '' });
     });
 
     it('searches name and email, case- and space-insensitively', () => {

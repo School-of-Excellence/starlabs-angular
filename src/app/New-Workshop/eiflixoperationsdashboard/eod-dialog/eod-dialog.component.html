@@ -1,0 +1,50 @@
+<div class="eodd" [class.eodd-rose]="config.accent === 'rose'" [class.eodd-indigo]="config.accent === 'indigo'"
+     [class.eodd-emerald]="config.accent === 'emerald'" [class.eodd-amber]="config.accent === 'amber'"
+     [class.eodd-violet]="config.accent === 'violet'">
+  <header class="eodd-head">
+    @if (config.icon) {
+      <span class="eodd-chip"><mat-icon>{{ config.icon }}</mat-icon></span>
+    }
+    <div class="eodd-titles">
+      <h2 class="eodd-title">{{ config.title }}</h2>
+      @if (config.subtitle) {
+        <span class="eodd-subtitle">{{ config.subtitle }}</span>
+      }
+    </div>
+    <button type="button" class="eodd-close" (click)="cancel()" aria-label="Close dialog">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <form class="eodd-body" (ngSubmit)="submit()">
+    @for (f of config.fields; track f.key) {
+      <label class="eodd-field">
+        <span class="eodd-label">{{ f.label }}</span>
+        <span class="eodd-input-wrap">
+          <input
+            [type]="f.type"
+            [name]="f.key"
+            [(ngModel)]="values[f.key]"
+            [attr.min]="f.min"
+            [attr.max]="f.max"
+            [attr.step]="f.step"
+            [required]="!!f.required" />
+          @if (f.suffix) {
+            <span class="eodd-suffix">{{ f.suffix }}</span>
+          }
+        </span>
+        @if (f.hint) {
+          <span class="eodd-hint">{{ f.hint }}</span>
+        }
+      </label>
+    }
+
+    @if (crossError) {
+      <span class="eodd-error" role="alert">{{ crossError }}</span>
+    }
+    <footer class="eodd-foot">
+      <button type="button" class="eodd-btn" (click)="cancel()">{{ config.cancelLabel || 'Cancel' }}</button>
+      <button type="submit" class="eodd-btn eodd-btn-primary" [disabled]="!valid">{{ config.submitLabel || 'Save' }}</button>
+    </footer>
+  </form>
+</div>

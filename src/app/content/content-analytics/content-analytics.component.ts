@@ -23,6 +23,7 @@ import {
   formatMinutesSeconds, journeyProfileVisible as journeyProfileVisibleRule, visibleProfileCount,
   watchHours,
 } from './content-analytics.engine';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
   selector: 'app-content-analytics',
@@ -41,7 +42,8 @@ import {
     MatSelectModule,
     MatTabsModule,
     MatDialogModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatCheckboxModule
   ],  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
@@ -96,6 +98,9 @@ export class ContentAnalyticsComponent {
   tierParticipantSummary: any = {};
   journeyWiseData: any = {};
   showDuplicatesOnly = false;
+  // Rows whose profileid is missing from 'participant metadata' — the same
+  // condition that renders the "(New User)" tag in the Name column.
+  showNewUsersOnly = false;
 
   allTierCompletionMap: any = {};
   allTierParticipantSummary: any = {};
@@ -731,6 +736,7 @@ export class ContentAnalyticsComponent {
       platform_name:null
     }
     this.showDuplicatesOnly = false;
+    this.showNewUsersOnly = false;
     this.onFilter(this.filterValue)
   }
 
@@ -1107,6 +1113,7 @@ export class ContentAnalyticsComponent {
       let e = data
       let value = JSON.parse(filter);
       return (this.showDuplicatesOnly ? e['isDuplicate'] === true : true) &&
+      (this.showNewUsersOnly ? !this.mapProfile[e['profileid']] : true) &&
       (![null,undefined].includes(value['name']) ? (
       (this.mapProfile[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0) ||
       (this.mapProfileNew[e['profileid']]?.toLowerCase().indexOf(value['name'].toLowerCase().trim()) === 0)): true)&& 
