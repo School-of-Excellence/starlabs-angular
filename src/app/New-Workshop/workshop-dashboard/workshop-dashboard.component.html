@@ -284,6 +284,17 @@
                 </div>
               </mat-card-content>
             </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
+                    <p class="metric-label">Exist Users Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
             <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
               <mat-card-content>
                 <div class="metric-content">
@@ -517,6 +528,17 @@
                 </div>
               </mat-card-content>
             </mat-card>
+            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
+                    <p class="metric-label">Exist Users Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
             <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
               <mat-card-content>
                 <div class="metric-content">
@@ -613,6 +635,17 @@
               </div>
             </mat-card-content>
           </mat-card>
+        <mat-card class="metric-card clickable-metric" (click)="onMetricClick('existUsersEnrolled')">
+          <mat-card-content>
+            <div class="metric-content">
+              <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
+              <div class="metric-details">
+                <h2 class="metric-value">{{ totalExistUsersEnrolled }}</h2>
+                <p class="metric-label">Exist Users Enrolled</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
         <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
           <mat-card-content>
             <div class="metric-content">
@@ -1617,6 +1650,61 @@
               </mat-radio-group>
             </mat-menu>
           </ng-container>
+          <!-- Exist Users Enrolled: its own journey + customer-status filters. Options are
+               derived from the people actually in the list, so they are never empty. -->
+          <ng-container *ngIf="selectedStatusInfo?.status === 'existUsersEnrolled'">
+            <button mat-icon-button
+                    [matMenuTriggerFor]="existFilterMenu"
+                    [color]="(selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0) ? 'primary' : ''"
+                    matTooltip="Filter by journey or customer status">
+              <mat-icon>sort</mat-icon>
+            </button>
+            <mat-menu #existFilterMenu="matMenu" class="filter-scroll-menu">
+              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+
+                <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Journey Filter
+                </div>
+                <div style="padding: 4px 0;" *ngIf="existJourneyOptions.length; else noExistJourneys">
+                  <mat-checkbox
+                    *ngFor="let journey of existJourneyOptions"
+                    [checked]="selectedJourneyFilters.includes(journey)"
+                    (change)="toggleJourneyFilter(journey)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ JourneyMap[journey] || journey }}
+                  </mat-checkbox>
+                </div>
+                <ng-template #noExistJourneys>
+                  <div style="padding: 4px 16px 8px; font-size: 12px; opacity: 0.6;">No journeys on these participants.</div>
+                </ng-template>
+
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Customer Status
+                </div>
+                <div style="padding: 4px 0;" *ngIf="customerStatusOptions.length; else noExistStatuses">
+                  <mat-checkbox
+                    *ngFor="let status of customerStatusOptions"
+                    [checked]="selectedCustomerStatusFilters.includes(status)"
+                    (change)="toggleCustomerStatusFilter(status)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ status }}
+                  </mat-checkbox>
+                </div>
+                <ng-template #noExistStatuses>
+                  <div style="padding: 4px 16px 8px; font-size: 12px; opacity: 0.6;">No customer status on these participants.</div>
+                </ng-template>
+
+                <div style="padding: 6px 16px 10px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2);"
+                     *ngIf="selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0">
+                  <button mat-button color="warn" style="font-size: 11px;"
+                          (click)="clearJourneyFilters(); $event.stopPropagation()">
+                    <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
+                    Clear All Filters
+                  </button>
+                </div>
+              </div>
+            </mat-menu>
+          </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button mat-icon-button
                     [matMenuTriggerFor]="journeyFilterMenu"
@@ -1704,7 +1792,7 @@
             </mat-menu>
 
             <!-- Selected filter chips shown below the button row -->
-            <div *ngIf="selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
+            <div *ngIf="selectedCustomerStatusFilters.length > 0 || selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
                 style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
               <mat-chip
                 *ngFor="let journey of selectedJourneyFilters"
@@ -1712,6 +1800,14 @@
                 (removed)="toggleJourneyFilter(journey)"
                 style="font-size: 11px; min-height: 24px; height: 24px;">
                 {{ JourneyMap[journey] || journey }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                *ngFor="let status of selectedCustomerStatusFilters"
+                [removable]="true"
+                (removed)="toggleCustomerStatusFilter(status)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ status }}
                 <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
               </mat-chip>
               <mat-chip

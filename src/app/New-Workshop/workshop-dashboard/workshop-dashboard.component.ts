@@ -149,6 +149,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   ];
 
   selectedJourneyFilters: string[] = [];
+  /** Customer status filter for the Exist Users Enrolled panel (participant metadata). */
+  selectedCustomerStatusFilters: string[] = [];
   selectedTierFilters: string[] = [];
   selectedCategoryFilters: string[] = [];
   selectedEnrollmentStatusFilters: string[] = [];
@@ -181,7 +183,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   private recalculateSubject$ = new Subject<void>();
   journeyData: any[] = [];
 
-  statusDisplayMap = new Map([
+  statusDisplayMap = new Map<string, string>([
+    ['existUsersEnrolled', 'Exist Users Enrolled'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -1201,7 +1204,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
       if (this.destroyed) return; // component torn down while awaiting
-      this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
+      // Overlay only the still-new users: a moved-to-existing person keeps their
+      // `participant metadata` (which carries activejourney / customerstatus).
+      this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1764,16 +1769,75 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return challenge.challenges[subChallengeIndex - 1]?.status === 'completed';
   }
 
+  /**
+   * Whether this profile still counts as a NEW user.
+   *
+   * `new_user_data` keeps the document after a person is migrated to a full
+   * profile and marks it `movedtoexist: true`. Those people are existing users:
+   * their live details (journey, customer status) are in `participant metadata`,
+   * and the stale new_user_data doc must not be used for them.
+   */
+  isNewUserProfile(profileId: string): boolean {
+    const nu = this.mapProfileNew[profileId];
+    return !!nu && nu['movedtoexist'] !== true;
+  }
+
+  /** Only the still-new entries, for overlaying onto the metadata map. */
+  private newUserOverlay(): { [id: string]: any } {
+    const out: { [id: string]: any } = {};
+    for (const id of Object.keys(this.mapProfileNew)) {
+      if (this.isNewUserProfile(id)) out[id] = this.mapProfileNew[id];
+    }
+    return out;
+  }
+
   get totalNewUsersEnrolled(): number {
     const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
     return Object.keys(this.mapProfileNew)
-      .filter(profileId => enrolledProfileIds.includes(profileId)).length;
+      .filter(profileId => this.isNewUserProfile(profileId) && enrolledProfileIds.includes(profileId)).length;
   }
 
   get totalNewUsersNotEnrolled(): number {
     const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
     return Object.keys(this.mapProfileNew)
-      .filter(profileId => !enrolledProfileIds.includes(profileId)).length;
+      .filter(profileId => this.isNewUserProfile(profileId) && !enrolledProfileIds.includes(profileId)).length;
+  }
+
+  /** Enrolled people who are NOT new users — including anyone moved to existing. */
+  get totalExistUsersEnrolled(): number {
+    return this.enrolledParticipants.filter(p => !this.isNewUserProfile(p.profileid)).length;
+  }
+
+  /** Customer statuses actually present among the enrolled existing users. */
+  get customerStatusOptions(): string[] {
+    const seen = new Set<string>();
+    for (const p of this.enrolledParticipants) {
+      if (this.isNewUserProfile(p.profileid)) continue;
+      const cs = (this.mapProfile[p.profileid]?.customerstatus || '').toString().trim();
+      if (cs) seen.add(cs);
+    }
+    return Array.from(seen).sort();
+  }
+
+  /** Journeys actually held by the enrolled existing users. */
+  get existJourneyOptions(): string[] {
+    const seen = new Set<string>();
+    for (const p of this.enrolledParticipants) {
+      if (this.isNewUserProfile(p.profileid)) continue;
+      const j = (this.mapProfile[p.profileid]?.activejourney || '').toString().trim();
+      if (j) seen.add(j);
+    }
+    return Array.from(seen).sort((a, b) => (this.JourneyMap[a] || a).localeCompare(this.JourneyMap[b] || b));
+  }
+
+  toggleCustomerStatusFilter(status: string) {
+    const i = this.selectedCustomerStatusFilters.indexOf(status);
+    if (i >= 0) { this.selectedCustomerStatusFilters.splice(i, 1); } else { this.selectedCustomerStatusFilters.push(status); }
+    this.applyFilterSide();
+  }
+  clearCustomerStatusFilters() {
+    this.selectedCustomerStatusFilters = [];
+    this.applyFilterSide();
   }
 
   get totalEnrolled() { return this.metrics.get('totalEnrolled')?.length || 0; }
@@ -1852,9 +1916,32 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onMetricClick(metricType: string) {
-    if (metricType === 'totalNewUsers') {
+    if (metricType === 'existUsersEnrolled') {
+      // Everyone enrolled who is not a new user — people moved out of new_user_data
+      // belong here, which is why the check goes through isNewUserProfile().
+      const existing = this.enrolledParticipants
+        .filter(p => !this.isNewUserProfile(p.profileid))
+        .map(p => this.buildParticipantEntry(p.profileid));
+      this.selectedParticipants = existing;
+      this.selectedStatusInfo = {
+        status: 'existUsersEnrolled',
+        challengeName: 'All Participants',
+        subChallengeName: 'Exist Users Enrolled',
+        count: existing.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
+      this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
+      this.applyFilterSide();
+
+    } else if (metricType === 'totalNewUsers') {
       const newUserParticipants = this.enrolledParticipants
-        .filter(p => this.mapProfileNew[p.profileid])
+        .filter(p => this.isNewUserProfile(p.profileid))
         .map(p => ({
           profileid: p.profileid,
           name: this.mapProfileNew[p.profileid]?.name || 'Unknown',
@@ -1877,7 +1964,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     } else if (metricType === 'totalNewUsersNotEnrolled') {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const notEnrolledNewUsers = Object.keys(this.mapProfileNew)
-        .filter(profileId => !enrolledProfileIds.includes(profileId))
+        .filter(profileId => this.isNewUserProfile(profileId) && !enrolledProfileIds.includes(profileId))
         .map(profileId => ({
           profileid: profileId,
           name: this.mapProfileNew[profileId]?.name || 'Unknown',
@@ -2507,6 +2594,23 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
     }
 
+    // Exist Users Enrolled carries its own journey + customer-status filters. They are
+    // not gated on categorybased: this card exists on every workshop, so gating them
+    // would hide the filters almost everywhere.
+    if (this.selectedStatusInfo?.status === 'existUsersEnrolled' && this.selectedJourneyFilters.length > 0) {
+      base = base.filter(p => {
+        const activeJourney: string = this.mapProfile[p.profileid]?.activejourney || '';
+        return this.selectedJourneyFilters.includes(activeJourney);
+      });
+    }
+
+    if (this.selectedStatusInfo?.status === 'existUsersEnrolled' && this.selectedCustomerStatusFilters.length > 0) {
+      base = base.filter(p => {
+        const cs: string = (this.mapProfile[p.profileid]?.customerstatus || '').toString().trim();
+        return this.selectedCustomerStatusFilters.includes(cs);
+      });
+    }
+
     if (this.workshopData?.categorybased === true &&
       this.selectedStatusInfo?.status === 'totalEnrolled' &&
       this.selectedJourneyFilters.length > 0) {
@@ -2584,6 +2688,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
         .filter(([profileId, p]: any) => {
+          if (!this.isNewUserProfile(profileId)) return false;   // moved to existing — not a new user
           if (!this.selectedSubscriberCode.includes(p?.refferedby)) return false;
           if (p?.subscriber !== true) return false;
           const isEnrolled = enrolledProfileIds.has(profileId);
@@ -2607,6 +2712,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
         .filter(([profileId, p]: any) => {
+          if (!this.isNewUserProfile(profileId)) return false;   // moved to existing — not a new user
           if (!p?.refferedby) return false;
           if (p?.subscriber === true) return false;
           const isEnrolled = enrolledProfileIds.has(profileId);
@@ -2630,6 +2736,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   clearJourneyFilters() {
     this.selectedJourneyFilters = [];
+    this.selectedCustomerStatusFilters = [];
     this.applyFilterSide();
   }
 

@@ -1,17 +1,21 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-09-09 (workshop configuration v2: hints, guide, new settings, editor fixes)_
+_Last updated: 2026-09-10 (workshop dashboard: Exist Users Enrolled card + movedtoexist rule)_
 · **New session? Read `specs/ORIENTATION.md` first**, then the journals below.
 ⚠️ `/specs` is gitignored (`.gitignore:8`) — the journals and HTML mockups exist only on this machine.
 
 Journals for this work, newest first:
+`specs/journals/2026-09-10-dashboard-exist-users-card.md` ·
 `specs/journals/2026-09-09-richtext-toolbar-and-headings.md` ·
 `2026-09-04-workshop-config-hints-and-guide.md` (also carries the 09-09 entries) ·
 `2026-09-04-eiflix-popup-banner.md` · `2026-09-04-workshop-enroll-diagnostics.md` ·
 `2026-09-02-workshopconfig-v2-enrollment-design.md` (the full v2 story).
 
 ## Current state
-- Branch `nanda-development`. **UNCOMMITTED**: 11 modified files (the three
+- Branch `nanda-development`. The v2 configuration work is **committed** (operator).
+  **UNCOMMITTED**: the workshop dashboard component (`.ts` + `.html`) — the new
+  Exist Users Enrolled card and the `movedtoexist` rule.
+- Previously uncommitted, now landed: 11 modified files (the three
   `workshop-configurationv2` tabs, `wc2-help.ts`, `wc2-shared.css`, the popup banner,
   `src/styles.css`) plus one new file, `workshop-configurationv2/wc2-editor.ts`.
   Earlier work in this line was committed by the operator mid-session. NOT pushed.
@@ -23,7 +27,14 @@ Journals for this work, newest first:
 - Dev + production builds green. **Nothing in this line has been verified at runtime** —
   the screens are behind login.
 
-## Last session changes (2026-09-09 and the days before it)
+## Last session changes (2026-09-10 and the days before it)
+- **Workshop dashboard: Exist Users Enrolled.** A new card before New Users Enrolled
+  counting everyone enrolled who is not a new user, with journey + customer-status
+  filters in its side panel. The screen reads **`participant metadata`** (not
+  `profile_data`). Root fix: `new_user_data` was spread over the metadata map, so a
+  person with `movedtoexist: true` kept resolving through their stale new-user doc —
+  no journey, no customer status, counted as new forever. One rule now governs it and
+  New/Exist finally partition Total Enrolled.
 - **Field hints + configuration guide.** 160 fields traced read-only through
   `/Users/nanda/Documents/Development/workshop`, each hint checked by a verifier (132
   corrected). Headline finding: **29 settings are dead** — nothing in the user app reads
