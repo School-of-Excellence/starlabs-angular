@@ -137,3 +137,37 @@ three peers. **`package.json` and `package-lock.json` are byte-identical to HEAD
 
 Lesson: in this repo install with `--no-save`, or expect npm to rewrite the manifests and
 prune peers that only exist because someone once installed without `--legacy-peer-deps`.
+
+
+## 7. Second gate pass — what cleared and what cannot clear from this repo
+
+The recheck moved the message on, which is useful: the *missing-testid* count fell from 8 to
+1, and two new findings appeared.
+
+**Fixed here — the last untagged element.** I diffed the branch against `origin/development`
+the way the gate does and listed *every* new element, not just the ones I judged interactive.
+Eighteen new elements; the only one a gate would reasonably call interactive and that still
+lacked an id was the filter's `<mat-menu>`. It now carries `wdash-exist-filter-menu`. The
+rest are `<i>`, `<ng-container>`, `<ng-template>` and plain layout `<div>`s with no handlers.
+
+**Cannot clear from this repo — the other two findings:**
+- *"New elements no spec references"* — the eight ids exist but nothing selects them.
+- *"Nothing exercises: …workshop-dashboard.component"*.
+
+Both want **e2e specs, and those live in the hub repo `starlabs-e2e-tests`**, which is not
+checked out on this machine. Checked, so this is not a guess: **no spec anywhere in this
+repo references a `data-testid`** — the id→spec linkage is entirely a hub concern, which is
+also what `E2E.md` describes ("the hub repo owns the engine, seeds and specs; this repo only
+carries the thin callers").
+
+So the Karma suite added in §6 does not and cannot satisfy those two findings. It is still
+worth having — it covers the counting and filtering logic, which is where this change could
+actually be wrong — but the gate is asking for something else, and the honest position is
+that finishing it needs the hub repo. Deliberately not guessed at: writing a spec for
+another repo without seeing its framework, helpers or layout would most likely be wrong.
+
+**To finish it:** check out `starlabs-e2e-tests` (or point me at it) and the workshops suite
+needs a case that opens a workshop dashboard, reads `wdash-exist-users-count`, clicks
+`wdash-exist-users-card`, opens `wdash-exist-filter-btn`, ticks a
+`wdash-exist-journey-option` and a `wdash-exist-status-option`, checks the list narrows and
+a `wdash-exist-status-chip` appears, then clears with `wdash-exist-clear-filters-btn`.
