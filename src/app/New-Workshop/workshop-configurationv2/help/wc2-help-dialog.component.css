@@ -1,0 +1,97 @@
+/* Configuration guide dialog. Shares the editor's vocabulary; every class is
+   prefixed `hlp-` so nothing collides with the global Bootstrap / Material CSS. */
+@import '../wc2-shared.css';
+
+:host { display: block; min-height: 0; }   /* wc2-shared's :host is a full page */
+
+.hlp { display: flex; min-height: 0; height: 82vh; background: #fff; }
+
+/* left rail */
+.hlp-nav {
+  width: 268px; flex-shrink: 0; border-right: 1px solid var(--border);
+  background: var(--bg); display: flex; flex-direction: column; min-height: 0;
+}
+.hlp-nav-head { padding: 18px 18px 10px; }
+.hlp-nav-title {
+  font-family: 'Playfair Display', Georgia, serif; font-size: 19px; font-weight: 600;
+  color: var(--primary); line-height: 1.2; letter-spacing: normal; margin-top: 2px;
+}
+.hlp-search { margin: 0 14px 10px; }
+.hlp-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.hlp-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 10px; border: 0; border-radius: 8px; background: transparent;
+  cursor: pointer; font: inherit; color: var(--t2); font-size: 13px;
+}
+.hlp-item:hover { background: #e9eef5; color: var(--t1); }
+.hlp-item.on { background: var(--primary); color: #fff; }
+.hlp-num {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; background: #dfe6ef; color: var(--t2);
+}
+.hlp-item.on .hlp-num { background: rgba(255,255,255,.22); color: #fff; }
+.hlp-item-t { flex: 1; min-width: 0; font-weight: 500; }
+.hlp-empty { padding: 10px; }
+
+/* right pane */
+.hlp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.hlp-top {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 24px 14px; border-bottom: 1px solid var(--border-light);
+}
+.hlp-title {
+  flex: 1; min-width: 0; margin: 0; font-family: 'Playfair Display', Georgia, serif;
+  font-size: 23px; font-weight: 600; color: var(--primary);
+  line-height: 1.2; letter-spacing: normal;
+}
+.hlp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 24px 8px; }
+.hlp-p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.65; color: var(--t1); max-width: 68ch; }
+
+.hlp-block {
+  margin: 16px 0 4px; padding: 14px 16px; border-radius: 10px;
+  background: #f4f7fb; border: 1px solid var(--border-light);
+}
+.hlp-block.warn { background: var(--warn-bg); border-color: #f0dcc0; }
+.hlp-block-t {
+  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--t3); margin-bottom: 8px;
+}
+.hlp-block.warn .hlp-block-t { color: var(--warn); }
+.hlp-steps, .hlp-warns { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; }
+.hlp-steps li, .hlp-warns li { font-size: 13px; line-height: 1.6; color: var(--t1); max-width: 66ch; }
+
+.hlp-foot {
+  padding: 11px 24px; border-top: 1px solid var(--border-light);
+  font-size: 11.5px; color: var(--t3); background: #fafbfd;
+}
+
+@media (max-width: 860px) {
+  .hlp { flex-direction: column; height: 86vh; }
+  .hlp-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--border); max-height: 40%; }
+}
+
+/* view switch + reference list */
+.hlp-seg { margin: 0 14px 10px; display: flex; width: calc(100% - 28px); }
+.hlp-seg > button { flex: 1; justify-content: center; height: 32px; font-size: 12.5px; }
+.hlp-count {
+  font-size: 11px; font-weight: 700; color: var(--t3);
+  background: #e4eaf2; border-radius: 9px; padding: 1px 7px;
+}
+.hlp-item.on .hlp-count { background: rgba(255,255,255,.22); color: #fff; }
+.hlp-note { padding: 10px 12px; line-height: 1.5; }
+.hlp-count-line { margin-bottom: 10px; }
+
+.hlp-group {
+  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--t3); margin: 18px 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+.hlp-group:first-child { margin-top: 0; }
+.hlp-field { padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+.hlp-field:last-child { border-bottom: 0; }
+.hlp-field-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.hlp-field-t { font-size: 13.5px; font-weight: 600; color: var(--t1); }
+.hlp-field-d { margin: 0; font-size: 13px; line-height: 1.6; color: var(--t2); max-width: 68ch; }
+.hlp-field.dead .hlp-field-t { color: var(--t3); }
+.badge.b-dead { background: var(--warn-bg); color: var(--warn); }

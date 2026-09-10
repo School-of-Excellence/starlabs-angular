@@ -15,8 +15,11 @@ import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import { DateAdapter } from '@angular/material/core';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
+import { WC2_TOOLBAR_FULL, WC2_TOOLBAR_TITLE, WC2_TOOLBAR_ITEM, resetToParagraph, focusedEditor } from './wc2-editor';
+import { FIELD_HINTS } from './wc2-help';
 import { AuthguardService } from '../../authguard.service';
 
 import { EnrollmentDateAdapter, WC2_MONTHS as MONTHS } from './wc2-date-adapter';
@@ -48,8 +51,7 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'blocked' | 'saved' | 'error';
   imports: [
     CommonModule, ReactiveFormsModule, FormsModule, DragDropModule,
     MatDatepickerModule, MatTimepickerModule, MatSnackBarModule,
-    NgxEditorModule, WorkshopChallengesv2Component, WorkshopSettingsv2Component,
-  ],
+    NgxEditorModule, WorkshopChallengesv2Component, WorkshopSettingsv2Component, MatDialogModule,],
   providers: [{ provide: DateAdapter, useClass: EnrollmentDateAdapter }],
   templateUrl: './workshop-configurationv2.component.html',
   styleUrl: './workshop-configurationv2.component.css'
@@ -108,22 +110,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   ];
   editors: { [key: string]: Editor } = {};
   dynamicEditors: { [key: string]: Editor } = {};
-  toolbarFull: Toolbar = [
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ heading: ['h1', 'h2', 'h3'] }],
-    ['bullet_list', 'ordered_list'],
-    ['link', 'text_color'],
-    ['align_left', 'align_center', 'align_right', 'align_justify'],
-  ];
-  toolbarTitle: Toolbar = [
-    ['bold', 'italic', 'underline'],
-    [{ heading: ['h1', 'h2'] }],
-    ['bullet_list', 'link'],
-  ];
-  toolbarItem: Toolbar = [
-    ['bold', 'italic', 'underline'],
-    ['bullet_list'],
-  ];
+  toolbarFull: Toolbar = WC2_TOOLBAR_FULL;
+  toolbarTitle: Toolbar = WC2_TOOLBAR_TITLE;
+  toolbarItem: Toolbar = WC2_TOOLBAR_ITEM;
 
   // ───────────────────────── section configs (same keys/limits as legacy) ─────────────────────────
   fieldSections = [
@@ -189,6 +178,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     private guard: AuthguardService,
     private zone: NgZone,
     private host: ElementRef<HTMLElement>,
+    private dialog: MatDialog,
   ) {}
 
   // ═══════════════════════════ lifecycle ═══════════════════════════
@@ -200,6 +190,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     this.loadWorkshopData();
   }
 
+  /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
+  toNormal(): void { resetToParagraph(focusedEditor(this.editors, this.dynamicEditors)); }
+
   ngOnDestroy(): void {
     this.scrollEl?.removeEventListener('scroll', this.onScroll);
     this.destroy$.next();
@@ -207,6 +200,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     Object.values(this.editors).forEach(e => e?.destroy());
     this.destroyAllDynEditors();
     if (this.savedTimer) clearTimeout(this.savedTimer);
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
   }
 
   @HostListener('window:beforeunload', ['$event'])
@@ -227,6 +221,9 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   // ───────── scroll spy: the app shell scrolls mat-drawer-content, not the window ─────────
   private scrollEl: HTMLElement | Window | null = null;
   private scrollTicking = false;
+  /** Set while a rail click is scrolling, so the scroll-spy does not fight the choice. */
+  private jumpingTo = '';
+  private jumpTimer: any = null;
   private readonly onScroll = () => {
     if (this.scrollTicking || this.activeTab !== 0) return;
     this.scrollTicking = true;
@@ -239,6 +236,7 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
         const el = document.getElementById('sec-' + s.id);
         if (el && el.getBoundingClientRect().top <= threshold) current = s.id;
       }
+      if (this.jumpingTo) return;   // a rail click owns the highlight until its scroll settles
       if (current !== this.activeSection) this.zone.run(() => { this.activeSection = current; });
     });
   };
@@ -639,6 +637,19 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
 
   // ═══════════════════════════ navigation ═══════════════════════════
   backToWorkshops(): void { this.router.navigate(['/workshops']); }
+  /** The one-line hint shown under a field, keyed by its stored name (never displayed). */
+  h(key: string): string { return FIELD_HINTS[key] || ''; }
+
+  /** The configuration guide behind the "i" button. */
+  async openHelp(section?: number): Promise<void> {
+    const { Wc2HelpDialogComponent } = await import('./help/wc2-help-dialog.component');
+    this.dialog.open(Wc2HelpDialogComponent, {
+      width: '1040px', maxWidth: '96vw', maxHeight: '88vh',
+      autoFocus: false, panelClass: 'wc2-help-dialog',
+      data: { section },
+    });
+  }
+
   openLegacyEditor(): void { if (this.workshopId) this.router.navigate(['/workshopconfigold', this.workshopId]); }
   openImageUpload(): void {
     const url = this.router.serializeUrl(this.router.createUrlTree(['/workshop_image_upload']));
@@ -664,8 +675,15 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   jumpTo(id: string): void {
     this.collapsed.delete(id);
     this.activeSection = id;
-    const el = document.getElementById('sec-' + id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Expanding a collapsed section changes the height of everything below it, so a
+    // scroll measured in this same tick lands in the wrong place — the reason a rail
+    // click used to need a second try. Scroll once the section has rendered.
+    this.jumpingTo = id;
+    if (this.jumpTimer) clearTimeout(this.jumpTimer);
+    setTimeout(() => {
+      document.getElementById('sec-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.jumpTimer = setTimeout(() => { this.jumpingTo = ''; this.jumpTimer = null; }, 800);
+    });
   }
 
   sectionCount(s: SectionDef): string {
