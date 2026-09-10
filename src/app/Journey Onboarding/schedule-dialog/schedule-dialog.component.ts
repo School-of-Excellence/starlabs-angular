@@ -197,13 +197,9 @@ export class ScheduleDialogComponent {
     //   data: { type: "spinner", msg: "Getting Appointments..." }
     // });
 
-    this.loading = true;
-    const isProductOnboarding = this.participantjourneyproduct.calltype == 'productonboarding';
-    const dataQuery = this.participantjourneyproduct.calltype == 'coach' ? 'journeycoach' : 'onboardingcall';
-
-    const appointmentTypeQuery = isProductOnboarding? query(collection(this.firestore, "appointmenttype"), where('appointmenttype', '==', 'DFU Onboarding')): query(collection(this.firestore, "appointmenttype"), where(dataQuery, '==', true));
-
-    await getDocs(appointmentTypeQuery).then(res => {
+      this.loading = true;
+      const dataQuery = this.participantjourneyproduct.calltype == 'coach' ? 'journeycoach' : this.participantjourneyproduct.calltype == 'productonboarding' ? 'productonboarding' : 'onboardingcall';
+      await getDocs(query(collection(this.firestore, "appointmenttype"), where(dataQuery, '==', true))).then(res => {
       for (let i = 0; i < res.docs.length; i++) {
         const element = res.docs[i].data();
         this.appointmenttypes.push({
