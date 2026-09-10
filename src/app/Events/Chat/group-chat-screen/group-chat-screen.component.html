@@ -74,7 +74,14 @@
               <span class="wc-row-time">{{ timeLabel(c.lastAt) }}</span>
             </div>
             <div class="wc-row-bottom">
-              <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              <!-- An unsent draft is the thing you most need to see from the list — it is the whole
+                   reason drafts are no longer shared between chats. -->
+              <span class="wc-row-preview draft" *ngIf="hasDraft(c.id); else lastMsg">
+                <span class="wc-draft-tag">Draft:</span> {{ draftPreview(c.id) }}
+              </span>
+              <ng-template #lastMsg>
+                <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              </ng-template>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
               <button class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
                       [matTooltip]="c.pinned ? 'Unpin chat' : 'Pin chat'">
@@ -573,7 +580,7 @@
         <!-- Only group admins may post -->
 
         <!-- Formatting toolbar -->
-        <div class="wc-toolbar" *ngIf="!recording && !features.readOnly && canMessage">
+        <div class="wc-toolbar" *ngIf="!recording && !recReview && !features.readOnly && canMessage">
           <button matTooltip="Bold (Ctrl+B)" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
           <button matTooltip="Italic (Ctrl+I)" (click)="applyFormat('italic')"><mat-icon>format_italic</mat-icon></button>
           <button matTooltip="Bullet list" (click)="applyFormat('ul')"><mat-icon>format_list_bulleted</mat-icon></button>
@@ -591,7 +598,7 @@
           <button class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
             <mat-icon>link</mat-icon> link
           </button>
-          <span class="wc-toolbar-hint">*bold* · _italic_ · - bullet · 1. number</span>
+          <span class="wc-toolbar-hint">*bold* · _italic_ · • bullet · 1. number</span>
         </div>
 
         <!-- @mention autocomplete -->
@@ -675,15 +682,44 @@
 
         <!-- Composer -->
         <div class="wc-composer">
-          <ng-container *ngIf="recording; else notRecording">
-            <div class="wc-recording">
-              <span class="wc-rec-dot"></span>
-              <span class="wc-rec-label">Recording… {{ fmtSecs(recSecs) }}</span>
+          <!-- Capturing: pause without losing what is already recorded, or stop to review it. -->
+          <ng-container *ngIf="recording; else maybeReview">
+            <div class="wc-recording" [class.paused]="recPaused">
+              <span class="wc-rec-dot" [class.paused]="recPaused"></span>
+              <span class="wc-rec-label">{{ recPaused ? 'Paused' : 'Recording…' }} {{ fmtSecs(recSecs) }}</span>
               <span class="wc-rec-sub">voice note</span>
             </div>
-            <button class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()"><mat-icon>close</mat-icon></button>
-            <button class="wc-send" matTooltip="Send voice note" (click)="finishRecording()"><mat-icon>send</mat-icon></button>
+            <button class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()">
+              <mat-icon>close</mat-icon>
+            </button>
+            <button class="wc-rec-btn" *ngIf="!recPaused" matTooltip="Pause" (click)="pauseRecording()">
+              <mat-icon>pause</mat-icon>
+            </button>
+            <button class="wc-rec-btn" *ngIf="recPaused" matTooltip="Resume" (click)="resumeRecording()">
+              <mat-icon>fiber_manual_record</mat-icon>
+            </button>
+            <button class="wc-send" matTooltip="Stop and review" (click)="stopForReview()">
+              <mat-icon>stop</mat-icon>
+            </button>
           </ng-container>
+
+          <!-- Recorded, not sent: play it back, record again, or send. -->
+          <ng-template #maybeReview>
+          <ng-container *ngIf="recReview as rev; else notRecording">
+            <app-chat-audio class="wc-rec-preview" [src]="rev.url" [name]="'Voice note · ' + fmtSecs(rev.secs)"
+                            [download]="false"></app-chat-audio>
+            <button class="wc-rec-cancel" matTooltip="Discard" (click)="discardRecording()">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+            <button class="wc-rec-btn" matTooltip="Record again" (click)="reRecord()">
+              <mat-icon>refresh</mat-icon>
+            </button>
+            <button class="wc-send" [disabled]="sendingRecording" matTooltip="Send voice note"
+                    (click)="finishRecording()">
+              <mat-icon>{{ sendingRecording ? 'hourglass_empty' : 'send' }}</mat-icon>
+            </button>
+          </ng-container>
+          </ng-template>
 
           <ng-template #notRecording>
             <div class="wc-attach" *ngIf="features.attach">
@@ -1318,8 +1354,16 @@
             <button class="wc-link-btn" (click)="selectAllCreateShown()">Select all shown</button>
             <span class="grow"></span>
             <span class="wc-pickcount">
-              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es') : createPool.length + ' people' }}
+              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es')
+                         : createPool.length + ' with an app account' }}
             </span>
+          </div>
+          <!-- The count looks like a truncation otherwise. Group membership is stored as uids, so a
+               participant who has never signed in cannot be a member — and could not read the chat
+               or be notified if they were. -->
+          <div class="wc-picknote" *ngIf="!cSearch">
+            <mat-icon>info_outline</mat-icon>
+            <span>Only participants with an app account can be added — a chat member is identified by their login.</span>
           </div>
 
           <ng-container *ngIf="importReport?.target === 'create'">
@@ -1492,6 +1536,7 @@
           </button>
         </div>
         <div class="wc-pickbar sub">
+          <span class="wc-pickcount-muted">{{ addPool.length }} with an app account</span>
           <span class="grow"></span>
           <span class="wc-pickcount">{{ aPicked.length }} selected</span>
         </div>
