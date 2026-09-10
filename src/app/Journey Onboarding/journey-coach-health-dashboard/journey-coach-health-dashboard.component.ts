@@ -31,6 +31,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 
 import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
+import { scorePriority } from './priority.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
@@ -1240,31 +1241,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // Priority weights: revenue-at-risk first — lapsed/renewal/financial outrank going-quiet;
   // going-quiet capped at 20 so it can't outrank an imminent renewal; bands High>=40 / Medium>=22
   // (all provisional, tune on data).
+  /**
+   * Priority scoring now lives in priority.engine.ts (extracted 2026-09-10) so the weights and bands can
+   * be unit-tested without standing up this component and its Firestore. Behaviour is unchanged; this
+   * method only adapts the row and writes the result back onto it.
+   */
   private scoreRow(r: PortfolioRow): void {
-    let p = 0;
-    const drivers: string[] = [];
-
-    if (r.daysSinceCoach != null && r.daysSinceCoach > this.QUIET_DAYS) {
-      p += Math.min(r.daysSinceCoach, 180) / 180 * 20;
-      drivers.push(`quiet ${r.daysSinceCoach}d`);
-    }
-    if (r.notStarted) { p += 24; drivers.push('journey not started'); }
-    if (r.lapsed) { p += 40; drivers.push(`lapsed ${Math.abs(r.daysToRenewal ?? 0)}d ago`); }
-    if (r.renewalWindow) {
-      p += (this.RENEWAL_DAYS - (r.daysToRenewal ?? this.RENEWAL_DAYS)) / this.RENEWAL_DAYS * 32;
-      if (this.continuityOpen(r)) p += 8;
-      drivers.push(`renewal ${r.daysToRenewal}d`);
-    }
-    const fin = (r.financialstatus ?? '').toLowerCase();
-    if (fin === 'defaulted' || fin === 'locked') { p += 26; drivers.push(`${fin} payments`); }
-    else if (fin === 'late') { p += 15; drivers.push('late payments'); }
-    // NOTE: customerstatus 'late' means the participant is gone (unactionable) — it does NOT add
-    // priority and such rows are excluded from the active board (see isInactiveStatus / applyFilters).
-    if (r.openTickets > 0) { p += Math.min(r.openTickets, 3) * 4; drivers.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`); }
-
-    r.priority = Math.max(0, Math.min(100, Math.round(p)));
-    r.priorityBand = r.priority >= 40 ? 'High' : r.priority >= 22 ? 'Medium' : 'Low';
-    r.reason = drivers.length ? `${drivers.slice(0, 2).join(' + ')} → ${this.actionFor(r)}` : 'On track';
+    const res = scorePriority(r, { quietDays: this.QUIET_DAYS, renewalDays: this.RENEWAL_DAYS });
+    r.priority = res.priority;
+    r.priorityBand = res.priorityBand;
+    r.reason = res.reason;
   }
 
   /** Phase-2 (gated): compute the Health state from whatever signals exist today. Sparse until
@@ -1291,23 +1277,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     r.healthCoverage = res.coverage;
   }
 
-  private continuityOpen(r: PortfolioRow): boolean {
-    return r.opportunities.some(o => /continuity/i.test(o)) && !r.opportunitiesConsumed.some(o => /continuity/i.test(o));
-  }
+
   private referralGiven(r: PortfolioRow): boolean {
     return r.opportunitiesConsumed.some(o => /referral/i.test(o));
   }
 
-  private actionFor(r: PortfolioRow): string {
-    if (r.lapsed) return 'win-back';
-    if (r.renewalWindow) return 'continuity call';
-    if (r.notStarted) return 'kickstart journey';
-    const fin = (r.financialstatus ?? '').toLowerCase();
-    if (fin === 'defaulted' || fin === 'locked' || fin === 'late') return 'finance follow-up';
-    if (r.openTickets > 0) return 'resolve support';
-    if (r.goingQuiet) return 're-engage';
-    return 'check in';
-  }
+
 
   isInactiveStatus(s: string | null | undefined): boolean {
     return ['late', 'discontinued', 'banned'].includes((s ?? '').toLowerCase());
