@@ -19,6 +19,18 @@ import { WatiInputComponent } from '../../Participants Profile Management/partic
 import {
   AtcBuckets, DayAttendance, EventData, JourneyCount, LiveEventDataService, PanelParticipant, QueueData
 } from './live-event-data.service';
+// Pure rules — extracted 2026-09-10; see live-event-dashboard.engine.ts for what moved and why.
+// The component still does its own Firestore gathering and only asks the engine the questions.
+import {
+  CallStatus, PdFilter, PdRow, QuartileRow,
+  attendanceRangeLabel, attendedAtLeastOnceIds, buildPdCsvLines, callStatusClass, comparePdRows,
+  completionQuartiles, completionRatio, coveragePct, dayLabel, defaultPdFilter, exportFileStem,
+  feedStatusClass, groupByName, groupCrmTags, groupVideoAskTags, idsWithoutCohort, initials,
+  isFirstTimer, journeyBadgeClass, journeyColumns, missingRecordingIds, nextPdSort, pairCountLabel,
+  paletteColor, participantCountLabel, pdAtcLabel, pdMatches, resolutionHours, resolveCallStatus,
+  reviewPercentage, scopeDates, staffNamesLabel, summariseCalls, tagDocsForDay, ticketStatusLabel,
+  timeLabel, todayBarPct, todayKey, triggerLabel, videoAskIdsForDay, weekdayLabel
+} from './live-event-dashboard.engine';
 
 // First-timer definition — lifted verbatim from first-timers-dashboard:
 // a participant is a first timer when their consumedproducts do NOT include the
@@ -30,19 +42,8 @@ function getExcludedProductId(): string {
 }
 const EXCLUDED_PRODUCT_ID = getExcludedProductId();
 
-/** One row of the Participant Data table — one per registered profileId. */
-interface PdRow {
-  profileId: string; name: string; email: string; journeyId: string; ft: boolean;
-  atcBucket: number;            // 0 full · 1 partial · 2 unvalidated · 3 none · -1 unknown
-  atcPct: number | null;        // SEAM 5
-  adjDone: number; adjPending: number; procDone: number; procPending: number;
-  attd: number;                 // distinct days present
-}
-interface PdFilter {
-  q: string; journey: string; type: string; atc: string;
-  pctOp: '>=' | '<=' | '<'; pctVal: number;
-  band: string;   // QuartileRow.cls of a clicked ATC-completion tier ('' = none)
-}
+// PdRow / PdFilter / QuartileRow now live in live-event-dashboard.engine.ts — the filter, sort and
+// export rules that read them are pure, so the shapes moved with them.
 
 // One column of the Video Ask Tags scroller. `isAddressed` marks the single synthetic
 // column, which is not a taxonomy tag — see computeTagGroups().
@@ -82,8 +83,6 @@ interface TicketFeedEntry {
  * Out of scope this phase: Attendance, Procedure Tracking, Participant Data,
  * Video Ask Tags, Arena Followup, Backend view, Zones view.
  */
-
-interface QuartileRow { cls: string; label: string; count: number; width: number; profileIds: string[]; }
 
 /** Option id for the journey filter's "No journey" entry. Not a real journey id —
  *  it stands for "in no journey bucket at all". */
@@ -235,8 +234,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // CONFIRMED (C-4): first-timers-dashboard logic — first timer = has NOT
     // consumed the excluded/hero product (participant metadata `consumedproducts`).
     const meta = this.data.participantMetadataMap[profileId];
-    const consumed: string[] = (meta && meta['consumedproducts']) || [];
-    return !consumed.includes(EXCLUDED_PRODUCT_ID);
+    return isFirstTimer((meta && meta['consumedproducts']) || [], EXCLUDED_PRODUCT_ID);
   }
 
   /**
@@ -264,8 +262,8 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     // (no ATC, adjTotal===0) are EXCLUDED (null) — they belong to the ATC "none"
     // bucket, not a completion tier — and show "—" in the ATC % column.
     const agg = this.data.participantAtc[p.profileid];
-    if (!agg || agg.adjTotal === 0) { return null; }
-    return agg.adjDone / agg.adjTotal;
+    if (!agg) { return null; }
+    return completionRatio(agg.adjDone, agg.adjTotal);
   }
 
   // ==========================================================================
@@ -376,21 +374,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private computeCompletionQuartiles(): QuartileRow[] {
     const parts = this.data.eventParticipantProfileIds.map(id => this.data.buildParticipantFromProfileId(id, false));
     const ratios = parts.map(p => ({ p, r: this.participantCompletionRatio(p) })).filter(x => x.r !== null) as { p: PanelParticipant; r: number }[];
-    const total = this.data.eventParticipantProfileIds.length;
-    // UNIQUE (non-cumulative) tiers — each participant falls in exactly one band.
-    // `cls` doubles as the band id the Participant Data table filters by; see
-    // applyPctFilter for why the band is not expressed as a % threshold.
-    const defs: { cls: string; label: string; test: (r: number) => boolean }[] = [
-      { cls: 'q100', label: '100%', test: r => r >= 1 },
-      { cls: 'q75', label: '75–99%', test: r => r >= 0.75 && r < 1 },
-      { cls: 'q50', label: '50–74%', test: r => r >= 0.5 && r < 0.75 },
-      { cls: 'q25', label: '25–49%', test: r => r >= 0.25 && r < 0.5 },
-      { cls: 'q0', label: 'Below 25%', test: r => r < 0.25 }
-    ];
-    return defs.map(d => {
-      const list = ratios.filter(x => d.test(x.r));
-      return { cls: d.cls, label: d.label, count: list.length, width: total ? Math.round((list.length / total) * 100) : 0, profileIds: list.map(x => x.p.profileid) };
-    });
+    // Tiers, widths and band ids are a rule — see live-event-dashboard.engine.ts (QUARTILE_DEFS).
+    return completionQuartiles(
+      ratios.map(x => ({ profileId: x.p.profileid, ratio: x.r })),
+      this.data.eventParticipantProfileIds.length
+    );
   }
 
   /** Task 1 — click an ATC-completion tier → apply it to the Participant Data
@@ -522,26 +510,10 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
    *  its header); ungrouped journeys stay journey-wise. In edit mode every journey
    *  shows individually so it can be ticked and grouped. */
   get journeyColumns(): { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] {
-    if (this.groupEditMode) {
-      return this.participantJourneys.map(j => ({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false }));
-    }
-    const countById: { [id: string]: number } = {};
-    this.participantJourneys.forEach(j => { countById[j.journeyId] = j.count; });
-    const groups = new Map<string, { key: string; label: string; journeyIds: string[]; isGroup: boolean }>();
-    const singles: { key: string; label: string; journeyIds: string[]; isGroup: boolean }[] = [];
-    this.participantJourneys.forEach(j => {
-      const g = (this.journeyGroups[j.journeyId] || '').trim();
-      if (g) {
-        const key = 'grp:' + g;
-        const e = groups.get(key) || { key, label: g, journeyIds: [], isGroup: true };
-        e.journeyIds.push(j.journeyId);
-        groups.set(key, e);
-      } else {
-        singles.push({ key: j.journeyId, label: this.journeyLabel(j.journeyId), journeyIds: [j.journeyId], isGroup: false });
-      }
-    });
-    const total = (col: { journeyIds: string[] }) => col.journeyIds.reduce((s, id) => s + (countById[id] || 0), 0);
-    return [...groups.values(), ...singles].sort((a, b) => total(b) - total(a));
+    // Grouping/collapse/ordering is a rule — see live-event-dashboard.engine.ts.
+    return journeyColumns(
+      this.participantJourneys, this.journeyGroups, id => this.journeyLabel(id), this.groupEditMode
+    );
   }
   private ptFilterIds(journeyIds: string[], ft: boolean | null): { profileId: string; journeyId: string }[] {
     return this.ptEntries().filter(e => journeyIds.includes(e.journeyId) && (ft === null || this.isFirstTimer(e.profileId) === ft));
@@ -564,8 +536,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return this.getVideoAskIdsByDay(day).length;
   }
   getVideoAskIdsByDay(day: DayAttendance): string[] {
-    const ids = this.data.videoAskByDay[day.date] || [];
-    return ids.filter(id => this.data.eventParticipantProfileIds.includes(id));
+    return videoAskIdsForDay(this.data.videoAskByDay[day.date] || [], this.data.eventParticipantProfileIds);
   }
 
   /** SEAM — day-over-day attendance change. null → delta chip hidden. */
@@ -574,8 +545,9 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** Present that day but did NOT submit a videoask (missing recording).
    *  present (registered, scoped to universe) − submitted that day. */
   getMissingRecordingByDay(day: DayAttendance): string[] {
-    const submitted = new Set(this.data.videoAskByDay[day.date] || []);
-    return day.presentProfileIds.filter(id => this.uni(id) && !submitted.has(id));
+    return missingRecordingIds(
+      day.presentProfileIds, this.data.videoAskByDay[day.date] || [], this.data.eventParticipantProfileIds
+    );
   }
 
   // ==========================================================================
@@ -584,11 +556,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get attDays(): DayAttendance[] { return this.data.dayWiseAttendance; }
   get attHasDays(): boolean { return this.data.dayWiseAttendance.length > 0; }
   get attRange(): string {
-    const days = this.data.dayWiseAttendance;
-    if (!days.length) { return ''; }
-    const fmt = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-    const currentDay = days.filter(d => !d.isFuture).length;
-    return `${fmt(days[0].date)} – ${fmt(days[days.length - 1].date)} · Day ${Math.max(1, currentDay)} of ${days.length}`;
+    return attendanceRangeLabel(this.data.dayWiseAttendance);
   }
   // Universe = arena e-ticket set (FT), so the grid's totals/absent all reconcile.
   get attTotalApproved(): number { return this.data.eventParticipantProfileIds.length; }
@@ -599,21 +567,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
    *  of eventParticipantProfileIds, so the two partition the universe. */
   get attUniqueParticipants(): number { return this.attTotalApproved - this.attNeverAttended; }
   private get attUniqueProfileIds(): string[] {
-    const never = new Set(this.data.allDayAbsentProfileIds);
-    return this.data.eventParticipantProfileIds.filter(id => !never.has(id));
+    return attendedAtLeastOnceIds(this.data.eventParticipantProfileIds, this.data.allDayAbsentProfileIds);
   }
   openAttUnique(): void { this.openPanel('Unique participants', 'Attended on at least one day', this.attUniqueProfileIds); }
 
-  attWeekday(day: DayAttendance): string {
-    const [y, m, d] = day.date.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
-  }
-  attDayLabel(day: DayAttendance): string { return day.isToday ? 'Today' : 'Day ' + day.day; }
-  attTodayBarPct(day: DayAttendance): number {
-    const va = this.getVideoAskByDay(day);
-    if (va === null || !day.count) { return 0; }
-    return Math.round((va / day.count) * 100);
-  }
+  attWeekday(day: DayAttendance): string { return weekdayLabel(day.date); }
+  attDayLabel(day: DayAttendance): string { return dayLabel(day); }
+  attTodayBarPct(day: DayAttendance): number { return todayBarPct(this.getVideoAskByDay(day), day.count); }
 
   // Shared day filter (CHANGED, operator 2026-07-29): Daily Attendance and Procedure
   // Tracking read/write the SAME service field, so the two stay in sync structurally —
@@ -720,16 +680,15 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   pdShown = 15;
   pdSortK: keyof PdRow = 'name';
   pdSortD = 1;
-  pdFilter: PdFilter = this.defaultPdFilter();
+  pdFilter: PdFilter = defaultPdFilter();
   readonly atcShort = ['Full', 'Partial', 'Unval', 'None'];
   readonly pdCols: { k: keyof PdRow; label: string }[] = [
     { k: 'name', label: 'Name' }, { k: 'atcBucket', label: 'ATC' }, { k: 'atcPct', label: 'ATC %' },
     { k: 'adjDone', label: 'Adj. Done' }, { k: 'adjPending', label: 'Adj. Pending' },
     { k: 'procDone', label: 'Proc. Done' }, { k: 'procPending', label: 'Proc. Pending' }, { k: 'attd', label: 'Attd' }
   ];
-  private defaultPdFilter(): PdFilter { return { q: '', journey: 'all', type: 'all', atc: 'all', pctOp: '>=', pctVal: 0, band: '' }; }
   togglePd(): void { this.pdOpen = !this.pdOpen; }
-  pdClear(): void { this.pdFilter = this.defaultPdFilter(); this.pdShown = 15; }
+  pdClear(): void { this.pdFilter = defaultPdFilter(); this.pdShown = 15; }
   pdMore(): void { this.pdShown += 25; }
   pdOnFilterChange(): void { this.pdShown = 15; }
 
@@ -761,35 +720,23 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
       new Set(this.completionQuartiles.find(q => q.cls === cls)?.profileIds || []));
   }
 
+  /** The filter + sort rules are pure — see live-event-dashboard.engine.ts (pdMatches/comparePdRows).
+   *  Only the band-membership lookup stays here, because it is memoised against live data. */
   private pdMatch(r: PdRow): boolean {
-    const f = this.pdFilter;
-    const q = f.q.toLowerCase().trim();
-    if (q && !(r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q))) { return false; }
-    if (f.journey !== 'all' && r.journeyId !== f.journey) { return false; }
-    if (f.type !== 'all' && r.ft !== (f.type === 'ft')) { return false; }
-    if (f.atc !== 'all' && r.atcBucket !== +f.atc) { return false; }
-    // a clicked ATC-completion tier — membership in that exact band, see applyPctFilter
-    if (f.band && !this.pdBandIds(f.band).has(r.profileId)) { return false; }
-    if (r.atcPct !== null) {
-      if (f.pctOp === '>=' && !(r.atcPct >= f.pctVal)) { return false; }
-      if (f.pctOp === '<=' && !(r.atcPct <= f.pctVal)) { return false; }
-      if (f.pctOp === '<' && !(r.atcPct < f.pctVal)) { return false; }
-    } else if (f.pctVal > 0) { return false; } // unknown % excluded once a threshold is set
-    return true;
+    return pdMatches(r, this.pdFilter, this.pdFilter.band ? this.pdBandIds(this.pdFilter.band) : undefined);
   }
   get pdFilteredRows(): PdRow[] {
     const rows = this.pdAllRows.filter(r => this.pdMatch(r));
     const k = this.pdSortK, d = this.pdSortD;
-    return rows.sort((a, b) => {
-      const va = a[k] as any, vb = b[k] as any;
-      if (typeof va === 'string' || typeof vb === 'string') { return String(va).localeCompare(String(vb)) * d; }
-      return (((va ?? -1) as number) - ((vb ?? -1) as number)) * d;
-    });
+    return rows.sort((a, b) => comparePdRows(a, b, k, d));
   }
   get pdVisibleRows(): PdRow[] { return this.pdFilteredRows.slice(0, this.pdShown); }
   get pdTotalDays(): number { return this.data.dayWiseAttendance.length; }
-  pdSort(k: keyof PdRow): void { if (this.pdSortK === k) { this.pdSortD *= -1; } else { this.pdSortK = k; this.pdSortD = k === 'name' ? 1 : -1; } }
-  pdAtcLabel(b: number): string { return b >= 0 ? this.atcShort[b] : '—'; }
+  pdSort(k: keyof PdRow): void {
+    const next = nextPdSort({ key: this.pdSortK, dir: this.pdSortD }, k);
+    this.pdSortK = next.key; this.pdSortD = next.dir;
+  }
+  pdAtcLabel(b: number): string { return pdAtcLabel(b, this.atcShort); }
   /** A row click opens the WHOLE table in the panel, not just that participant —
    *  in the table's current sort order (preserveOrder), and narrowed by whatever
    *  filters the table has applied. */
@@ -801,14 +748,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   }
 
   pdExport(): void {
-    const esc = (s: any) => `"${String(s).replace(/"/g, '""')}"`;
-    const header = ['Name', 'Email', 'Journey', 'Type', 'ATC Status', 'ATC %', 'Adj Done', 'Adj Pending', 'Proc Done', 'Proc Pending', 'Attended Days'];
-    const lines = [header.join(',')];
-    this.pdFilteredRows.forEach(r => {
-      lines.push([esc(r.name), esc(r.email), esc(this.journeyLabel(r.journeyId)), r.ft ? 'First timer' : 'Repeat',
-        this.pdAtcLabel(r.atcBucket), r.atcPct === null ? '' : r.atcPct, r.adjDone, r.adjPending, r.procDone, r.procPending, `${r.attd}/${this.pdTotalDays}`].join(','));
+    // The CSV's shape and quoting are a rule — see live-event-dashboard.engine.ts (buildPdCsvLines).
+    const lines = buildPdCsvLines(this.pdFilteredRows, {
+      journeyLabel: id => this.journeyLabel(id),
+      atcLabel: b => this.pdAtcLabel(b),
+      totalDays: this.pdTotalDays
     });
-    const name = (this.data.selectedEvent?.['name'] || 'event').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const name = exportFileStem(this.data.selectedEvent?.['name'] || '');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     a.download = name + '-participants.csv';
@@ -823,7 +769,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** CHANGED (operator) — taxonomy = V2 "participant tags" collection (docid→name),
    *  loaded in the service. Colors cycle a fixed palette. */
   getTagTaxonomy(): { id: string; label: string; color: string }[] {
-    return this.data.participantTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
+    return this.data.participantTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: paletteColor(i, this.tagPalette) }));
   }
 
   /** Synthetic column id — not a taxonomy tag, so it can never collide with a docid. */
@@ -849,32 +795,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private computeTagGroups(): TagGroup[] {
     const tax = this.getTagTaxonomy();
     if (!tax.length) { return []; }
-    const day = this.data.procDayFilter;
-    const docs = this.data.videoAskTagDocs.filter(d => d.day && (day === 'all' || d.day === day));
-
-    const tagsByParticipant: { [pid: string]: Set<string> } = {};
-    const allAddressed: { [pid: string]: boolean } = {};
-    docs.forEach(d => {
-      if (!d.tags.length) { return; }   // an untagged submission buckets nowhere and gets no Addressed vote
-      const set = tagsByParticipant[d.profileid] = tagsByParticipant[d.profileid] || new Set<string>();
-      d.tags.forEach(t => set.add(t));   // Set = one entry per participant per column, across their submissions
-      allAddressed[d.profileid] = (allAddressed[d.profileid] !== false) && d.addressed;
-    });
-
-    const byTag: { [id: string]: string[] } = {};
-    tax.forEach(t => { byTag[t.id] = []; });
-    const addressedIds: string[] = [];
-    const unknown = new Set<string>();
-    Object.keys(tagsByParticipant).forEach(pid => {
-      if (allAddressed[pid]) { addressedIds.push(pid); return; }   // Addressed replaces every tag column
-      tagsByParticipant[pid].forEach(tagId => {
-        if (byTag[tagId]) { byTag[tagId].push(pid); } else { unknown.add(tagId); }
-      });
-    });
-    if (unknown.size) {
+    // The three bucketing rules above are pure — see live-event-dashboard.engine.ts.
+    const docs = tagDocsForDay(this.data.videoAskTagDocs, this.data.procDayFilter);
+    const { byTag, addressedIds, unknownTagIds } = groupVideoAskTags(docs, tax.map(t => t.id));
+    if (unknownTagIds.length) {
       // A tag written onto a submission whose taxonomy doc was later deactivated (or is
       // not tagsfor 'video ask') has no column to live in — those people vanish silently.
-      console.warn('[v3][videoask-tags]', unknown.size, 'tag id(s) on submissions are not in the active video-ask taxonomy — not rendered:', [...unknown]);
+      console.warn('[v3][videoask-tags]', unknownTagIds.length, 'tag id(s) on submissions are not in the active video-ask taxonomy — not rendered:', unknownTagIds);
     }
 
     // Every active tag renders, empty ones included (operator). Addressed sits last.
@@ -902,19 +829,16 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // A participant appears under EVERY flag they carry (multi-tag, per first-timers).
   // ==========================================================================
   getCrmTaxonomy(): { id: string; label: string; color: string }[] {
-    return this.data.crmTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: this.tagPalette[i % this.tagPalette.length] }));
+    return this.data.crmTags.map((t, i) => ({ id: t['docid'], label: t['name'] || t['docid'], color: paletteColor(i, this.tagPalette) }));
   }
   get crmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] { return this.memo('crmGroups', () => this.computeCrmGroups()); }
   private computeCrmGroups(): { id: string; label: string; color: string; profileIds: string[] }[] {
     const tax = this.getCrmTaxonomy();
     if (!tax.length) { return []; }
-    const byTag: { [id: string]: string[] } = {};
-    tax.forEach(t => { byTag[t.id] = []; });
-    this.data.eventParticipantProfileIds.forEach(pid => {
-      const meta = this.data.participantMetadataMap[pid];
-      const tags: string[] = (meta && meta['profiletags']) || [];
-      tax.forEach(t => { if (tags.includes(t.id)) { byTag[t.id].push(pid); } });
-    });
+    // Multi-flag membership + keep-empty-columns is a rule — see live-event-dashboard.engine.ts.
+    const byTag = groupCrmTags(tax.map(t => t.id), this.data.eventParticipantProfileIds.map(pid => ({
+      profileId: pid, tags: (this.data.participantMetadataMap[pid] || {})['profiletags'] || []
+    })));
     return tax.map(t => ({ ...t, profileIds: byTag[t.id] }));   // include empty flags
   }
   openCrm(g: { label: string; profileIds: string[] }): void {
@@ -929,8 +853,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** Colour class per journey (cycles the prototype palette) so journey badges are
    *  colour-coded even though journeys are dynamic. */
   journeyBadgeClass(journeyId: string): string {
-    const idx = this.data.journeyCounts.findIndex(j => j.journeyId === journeyId);
-    return 'jc' + ((idx >= 0 ? idx : 0) % 6);
+    return journeyBadgeClass(journeyId, this.data.journeyCounts.map(j => j.journeyId));
   }
 
   // ==========================================================================
@@ -980,11 +903,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return chips;
   }
   setVaDay(v: string): void { this.vaDay = v; }
-  private vaScopeDates(): string[] {
-    if (this.vaDay === 'all') { return this.data.dayWiseAttendance.filter(d => !d.isFuture).map(d => d.date); }
-    if (this.vaDay === 'today') { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? [t.date] : []; }
-    return [this.vaDay];
-  }
+  private vaScopeDates(): string[] { return scopeDates(this.vaDay, this.data.dayWiseAttendance); }
   get vaReceivedIds(): string[] {
     const s = new Set<string>();
     this.vaScopeDates().forEach(dt => (this.data.videoAskByDay[dt] || []).forEach(id => { if (this.uni(id)) { s.add(id); } }));
@@ -1004,7 +923,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     this.vaScopeDates().forEach(dt => { const day = this.data.dayWiseAttendance.find(d => d.date === dt); if (day) { this.getMissingRecordingByDay(day).forEach(id => s.add(id)); } });
     return [...s];
   }
-  get vaPercentage(): number { const r = this.vaReceivedIds.length; return r ? Math.round((this.vaReviewedIds.length / r) * 100) : 0; }
+  get vaPercentage(): number { return reviewPercentage(this.vaReviewedIds.length, this.vaReceivedIds.length); }
   openVa(title: string, ids: string[]): void { this.openPanel(title, this.data.selectedEvent?.['name'] || '', ids); }
 
   // ---- Arena Calling (#callDayChips + rows) — outcomes via getCallLog stub ------
@@ -1015,11 +934,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return chips;
   }
   setCallDay(v: string): void { this.callDay = v; this.callShown = 20; this.rebuildCalls(); }
-  private callScopeDates(): string[] {
-    if (this.callDay === 'all') { return this.data.dayWiseAttendance.filter(d => !d.isFuture).map(d => d.date); }
-    if (this.callDay === 'today') { const t = this.data.dayWiseAttendance.find(d => d.isToday); return t ? [t.date] : []; }
-    return [this.callDay];
-  }
+  private callScopeDates(): string[] { return scopeDates(this.callDay, this.data.dayWiseAttendance); }
 
   callShown = 20;
   readonly callOptions: { value: CallLogEntry['status']; label: string }[] = [
@@ -1056,14 +971,13 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
         const meta = this.data.participantMetadataMap[pid];
         rows.push({
           profileId: pid, day: dt, name: this.participantName(pid), journeyId: meta?.['activejourney'] || '',
-          status: optimistic || e?.status || 'pending', calledAt: e?.calledAt || null, callerId: e?.callerId || null
+          status: resolveCallStatus(optimistic as CallStatus, e?.status as CallStatus),
+          calledAt: e?.calledAt || null, callerId: e?.callerId || null
         });
       });
     });
     this.callRowsCache = rows;
-    const s = { pending: 0, coming: 0, noAnswer: 0, notComing: 0 };
-    rows.forEach(r => { if (r.status === 'pending') { s.pending++; } else if (r.status === 'coming') { s.coming++; } else if (r.status === 'no-answer') { s.noAnswer++; } else if (r.status === 'not-coming') { s.notComing++; } });
-    this.callSummaryCache = s;
+    this.callSummaryCache = summariseCalls(rows);
   }
   get callRows(): CallRow[] { return this.callRowsCache; }
   get callVisibleRows(): CallRow[] { return this.callRowsCache.slice(0, this.callShown); }
@@ -1072,12 +986,11 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   get callComing(): number { return this.callSummaryCache.coming; }
   get callNoAnswer(): number { return this.callSummaryCache.noAnswer; }
   get callNotComing(): number { return this.callSummaryCache.notComing; }
-  callStatusClass(s: string): string { return ({ pending: 'pending', coming: 'coming', 'no-answer': 'noanswer', 'not-coming': 'notcoming' } as { [k: string]: string })[s] || ''; }
+  callStatusClass(s: string): string { return callStatusClass(s); }
   callerName(id: string | null | undefined): string { if (!id) { return ''; } return this.data.participantMetadataMap[id]?.['name'] || id; }
   fmtTime(t: Timestamp | null | undefined): string {
     if (!t) { return ''; }
-    const d = (t as any).toDate ? (t as any).toDate() : new Date(t as any);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return timeLabel((t as any).toDate ? (t as any).toDate() : new Date(t as any));
   }
 
   // Row detail helpers (real data, no new seam)
@@ -1123,19 +1036,19 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return this.data.clientIssues.map((t: any) => {
       const label = this.data.ticketLabel(t);
       const isClosed = label === 'resolved';
-      const status = isClosed ? 'Resolved' : (label === 'open' ? 'Open' : 'In Progress');
-      let resolutionHours: number | null = null;
+      const status = ticketStatusLabel(label);
+      let hours: number | null = null;
       if (isClosed) {
         const cd = t['status']?.['date']; const closeDate = cd?.toDate ? cd.toDate() : (cd ? new Date(cd) : null);
         const rd = t['reporteddate']; const openDate = rd?.toDate ? rd.toDate() : (rd ? new Date(rd) : null);
-        if (closeDate && openDate) { resolutionHours = Math.round(((closeDate.getTime() - openDate.getTime()) / 3600000) * 10) / 10; }
+        hours = resolutionHours(openDate ? openDate.getTime() : null, closeDate ? closeDate.getTime() : null);
       }
       const assign = t['assign'];
       const assigneeId = Array.isArray(assign) ? (assign[0] || null) : (assign || null);
-      return { profileId: t['clientid'], name: this.participantName(t['clientid']), category: t['category'] || '', status, time: t['reporteddate'] || null, assigneeId, resolutionHours };
+      return { profileId: t['clientid'], name: this.participantName(t['clientid']), category: t['category'] || '', status, time: t['reporteddate'] || null, assigneeId, resolutionHours: hours };
     });
   }
-  feedStatusClass(s: string): string { return s === 'In Progress' ? 'inprogress' : s.toLowerCase(); }
+  feedStatusClass(s: string): string { return feedStatusClass(s); }
   assigneeName(id: string | null | undefined): string { if (!id) { return ''; } return this.data.participantMetadataMap[id]?.['name'] || ''; }
   assigneeInitials(id: string | null | undefined): string { return this.initials(this.assigneeName(id)); }
 
@@ -1164,7 +1077,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   // when dayWiseAttendance has no calendar-today entry. 0 if nobody scanned today.
   private get zonePresentIds(): string[] {
     const uni = new Set(this.data.eventParticipantProfileIds);
-    const todayStr = new Date().toLocaleDateString('en-CA');
+    const todayStr = todayKey();
     return Object.keys(this.data.mapAttendence).filter(id => {
       if (!uni.has(id)) { return false; }
       return (this.data.mapAttendence[id] || []).some(r => {
@@ -1178,7 +1091,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   private get zoneUnassignedIds(): string[] { return this.zonePresentIds.filter(id => !this.data.zoneParticipantIds.has(id)); }
   get zoneAllocatedCount(): number { return this.zoneAllocatedIds.length; }
   get zoneUnassignedCount(): number { return this.zoneUnassignedIds.length; }
-  get zoneCoveragePct(): number { const p = this.zonePresentIds.length; return p ? Math.round((this.zoneAllocatedIds.length / p) * 100) : 0; }
+  get zoneCoveragePct(): number { return coveragePct(this.zoneAllocatedIds.length, this.zonePresentIds.length); }
 
   // No cohort (Zone Configuration basis) — registered participants who are in NO
   // "big cohorts" participantidlist. Scoped to the whole event universe (a roster
@@ -1192,8 +1105,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** Registered participants in NO "big cohorts" participantidlist (Zone Config
    *  basis). Reused by the Zones "No cohort" tile and the Arena Followup column. */
   get noCohortProfileIds(): string[] {
-    const members = this.cohortMemberSet;
-    return this.data.eventParticipantProfileIds.filter(id => !members.has(id));
+    return idsWithoutCohort(this.data.eventParticipantProfileIds, this.cohortMemberSet);
   }
   get zoneNoCohortCount(): number { return this.noCohortProfileIds.length; }
   openZoneNoCohort(): void { this.openZoneList('No cohort', this.data.selectedEvent?.['name'] || '', this.noCohortProfileIds, id => this.zoneNameOf(id) || 'no zone'); }
@@ -1202,9 +1114,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   zoneCoordinators(zone: any): string { return this.staffNames(zone['coordinators']); }
   zoneMentors(zone: any): string { return this.staffNames(zone['mentors']); }
   private staffNames(ids: any): string {
-    const list = Array.isArray(ids) ? ids : [];
-    const names = list.map((id: string) => this.data.staffNameMap[id] || id).filter(Boolean);
-    return names.length ? names.join(', ') : '—';
+    return staffNamesLabel(ids, id => this.data.staffNameMap[id]);
   }
 
   // occupants of a zone = present-today whose allocation selectedzone == this zone.
@@ -1223,9 +1133,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     return this.data.mapCohortsData[cohortId]?.['name'] || cohortId;
   }
   private groupByCohort(ids: string[]): { name: string; count: number; ids: string[] }[] {
-    const by: { [name: string]: string[] } = {};
-    ids.forEach(id => { const c = this.cohortNameOf(id); (by[c] = by[c] || []).push(id); });
-    return Object.keys(by).map(name => ({ name, count: by[name].length, ids: by[name] })).sort((a, b) => b.count - a.count);
+    return groupByName(ids, id => this.cohortNameOf(id));
   }
   zoneCohorts(zone: any): { name: string; count: number; ids: string[] }[] { return this.groupByCohort(this.zoneOccupantIds(zone)); }
 
@@ -1445,8 +1353,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
   /** Trigger text — one pick shows its name, several collapse to a count, because
    *  Material's default comma-joined list overflows a 440px panel. */
   private triggerLabel(picked: string[], opts: { id: string; name: string }[], noun: string): string {
-    if (picked.length === 1) { return opts.find(o => o.id === picked[0])?.name || `1 ${noun}`; }
-    return `${picked.length} ${noun}s`;
+    return triggerLabel(picked, opts, noun);
   }
   get panelProductTriggerLabel(): string { return this.triggerLabel(this.panelFilter.products, this.panelProductOptions, 'product'); }
   get panelCohortTriggerLabel(): string { return this.triggerLabel(this.panelFilter.cohorts, this.panelCohortOptions, 'cohort'); }
@@ -1562,20 +1469,14 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
    *  the filter dropdowns, whose counts are per person. Grouped lists state both. */
   get panelCountLabel(): string {
     const rows: any[] = this.panelParticipants as any[];
-    if (!rows.length || !rows[0]['_pair']) {
-      return `${rows.length.toLocaleString()} participant${rows.length === 1 ? '' : 's'}`;
-    }
+    if (!rows.length || !rows[0]['_pair']) { return participantCountLabel(rows.length); }
     const ids = new Set<string>();
     let role = 'doer';
     rows.forEach(p => {
       if (p['lead']) { ids.add(p['lead'].profileid); role = p['leadRole'] || role; }
       (p['others'] || []).forEach((o: any) => ids.add(o.profileid));
     });
-    const n = rows.length;
-    const lead = role === 'beneficiary'
-      ? `${n} ${n === 1 ? 'beneficiary' : 'beneficiaries'}`
-      : `${n} ${n === 1 ? 'doer' : 'doers'}`;
-    return `${lead} · ${ids.size} ${ids.size === 1 ? 'person' : 'people'}`;
+    return pairCountLabel(rows.length, ids.size, role);
   }
   closePanel(): void { this.panelOpen = false; }
 
@@ -1933,9 +1834,7 @@ export class LiveEventDashboardV3Component implements OnInit, OnDestroy {
     })
   }
 
-  initials(name: string): string {
-    return (name || '').split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-  }
+  initials(name: string): string { return initials(name); }
 
   private pathOf(ref: any): string { return ref && ref.path ? ref.path : String(ref); }
 }

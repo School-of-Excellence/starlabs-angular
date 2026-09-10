@@ -16,7 +16,6 @@ import { MatCalendar } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
-import { platform } from 'os';
 
 @Component({
   selector: 'app-schedule-dialog',

@@ -20,6 +20,43 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ViewParticipantAtcComponent } from '../../ATC/view-participant-atc/view-participant-atc.component';
+// Pure studio rules live in dynamic-studio-v2.engine.ts — no Angular / Firestore / rxjs there, so
+// presence, call state, stage resolution and the labels can be unit-tested without this component.
+import {
+  AdditionalSpecialist,
+  DEFAULT_INVITATION_TIMER_SECONDS,
+  StageNote,
+  TopBarStatus,
+  additionalSpecialists,
+  aelBandIndex,
+  aelBandLabel,
+  aelBandValue,
+  callEnded,
+  canRegenerate,
+  compareByDocId,
+  currentStageNotes,
+  evolutionWishlistContactsLabel,
+  formatEvolutionWishlistStatus,
+  formatEvolutionWishlistType,
+  formatFieldValueForOverlay,
+  formatOrdinal,
+  isMentor,
+  isStepCompleted,
+  isZoomLinkBroken,
+  linkExpired,
+  linkifyMessage,
+  mergeQueueStudioCounts,
+  participantHasJoinedCall,
+  participantInWaitingRoom,
+  participantProfileId,
+  presenceView,
+  previousStageName,
+  queuesWithStudios,
+  specialistInMeeting,
+  stepIndex,
+  topBarStatus,
+  widgetFetchSignature,
+} from './dynamic-studio-v2.engine';
 
 
 @Component({
@@ -315,8 +352,7 @@ export class DynamicStudioV2Component {
    * participant's name and photo in the sidebar.
    */
   get participantProfileId(): string {
-    const la: any = this.liveAssignment || {}
-    return la['token']?.['profile_id'] || la['participantid'] || ''
+    return participantProfileId(this.liveAssignment)
   }
 
   /**
@@ -331,11 +367,11 @@ export class DynamicStudioV2Component {
   private widgetFetchSignature = ''
   async loadAssignmentWidgetData() {
     const la: any = this.liveAssignment
-    if (!la?.['docid'] || !la?.['stagename']) return
     // Include the token identity so a freshly-hydrated token (auto-enter path
     // runs before the token settles) triggers exactly ONE refresh of the
     // token-dependent widgets (AEL, Forms), then same-token ticks are skipped.
-    const sig = la['docid'] + '|' + la['stagename'] + '|' + (la['token']?.['docid'] ?? 'pending')
+    const sig = widgetFetchSignature(this.liveAssignment)
+    if (sig == null) return
     if (sig === this.widgetFetchSignature) return  // already loaded this combination
     this.widgetFetchSignature = sig
     this.initChatThread()
@@ -430,9 +466,7 @@ export class DynamicStudioV2Component {
 
   /** Formats an Evolution Wishlist `type` for display. */
   formatEvolutionWishlistType(type: string): string {
-    if (type === 'familyandpeers') return 'Family & Peers'
-    if (type === 'self') return 'Self'
-    return type || '-'
+    return formatEvolutionWishlistType(type)
   }
 
   /**
@@ -441,10 +475,7 @@ export class DynamicStudioV2Component {
    * truthy on the entry.
    */
   formatEvolutionWishlistStatus(entry: any): string {
-    let status: string = entry?.['status'] || '-'
-    if (status === 'sended') status = 'Shared'
-    if (entry?.['mannualcompleted']) status = 'Partially ' + status
-    return status
+    return formatEvolutionWishlistStatus(entry)
   }
 
   /**
@@ -455,10 +486,7 @@ export class DynamicStudioV2Component {
    * accurate even when the doc doesn't carry a stored `submittedCount`.
    */
   evolutionWishlistContactsLabel(entry: any): string | null {
-    const contacts = entry?.['contacts']
-    if (!Array.isArray(contacts) || contacts.length === 0) return null
-    const submitted = contacts.filter((c: any) => c?.submitted === true).length
-    return `${submitted}/${contacts.length}`
+    return evolutionWishlistContactsLabel(entry)
   }
 
   /**
@@ -600,32 +628,7 @@ export class DynamicStudioV2Component {
   // NEVER overridden — it is a pre-Zoom "arrived at wait screen" state the webhook
   // cannot see, and stays client-stamped.
   get presenceView(): any {
-    const la: any = this.liveAssignment || {}
-    const log: any = this.liveAssignmentLog
-    if (!log) return la
-    const specialists: any = log['specialists'] || {}
-    const specVals: any[] = Object.values(specialists)
-    const specialistPresent = specVals.some(s => s && s.joinedAt && !s.leftAt)
-    const specialistEverJoined = specVals.some(s => s && s.joinedAt)
-    const anyJoinedAt = (specVals.find(s => s && s.joinedAt) || {})['joinedAt']
-    const anyLeftAt = (specVals.filter(s => s && s.leftAt).pop() || {})['leftAt']
-    const overlay: any = {}
-    if (log['participantInCallAt']) overlay['participantInCallAt'] = log['participantInCallAt']
-    if (log['participantLeftAt']) overlay['participantLeftAt'] = log['participantLeftAt']
-    if (specialistEverJoined) {
-      // Collapse the per-specialist map into the single-field semantics the getters
-      // expect: joined = anyone ever joined; left = everyone who joined has left.
-      overlay['specialistJoinedAt'] = anyJoinedAt || true
-      overlay['specialistLeftAt'] = specialistPresent ? null : (anyLeftAt || log['meetingEndedAt'] || true)
-    }
-    // Only treat the session as ended if the ended event was for the CURRENT
-    // meeting — after a regenerate the OLD meeting's end must not end the new one.
-    const currentMeetingId = la?.['zoomdata']?.['id']
-    if (log['meetingEndedAt'] && log['endedMeetingId'] != null &&
-        String(log['endedMeetingId']) === String(currentMeetingId)) {
-      overlay['meetingEndedAt'] = log['meetingEndedAt']
-    }
-    return { ...la, ...overlay }
+    return presenceView(this.liveAssignment, this.liveAssignmentLog)
   }
 
   // ---- Regenerate availability ----------------------------------------------
@@ -633,12 +636,7 @@ export class DynamicStudioV2Component {
   // studioZoomLink/regenerate) has passed.
   get linkExpired(): boolean {
     void this.presenceTick
-    const exp: any = this.liveAssignment?.['linkExpiresAt']
-    if (!exp) return false
-    const ms = typeof exp?.toMillis === 'function' ? exp.toMillis()
-             : typeof exp?.seconds === 'number' ? exp.seconds * 1000
-             : new Date(exp).getTime()
-    return Number.isFinite(ms) && ms < Date.now()
+    return linkExpired(this.liveAssignment)
   }
   // Offer regenerate ONLY when the link is unusable — meeting ended (callEnded
   // already folds in the webhook meetingEndedAt), token expired, or link broken.
@@ -646,7 +644,7 @@ export class DynamicStudioV2Component {
   // With the backend ending the old meeting first, regenerating here can never hit
   // "other meeting in progress". (isZoomLinkBroken is defined below.)
   get canRegenerate(): boolean {
-    return this.callEnded || this.linkExpired || this.isZoomLinkBroken
+    return canRegenerate(this.callEnded, this.linkExpired, this.isZoomLinkBroken)
   }
 
   // True only when the participant is currently in the wait screen (which
@@ -654,34 +652,27 @@ export class DynamicStudioV2Component {
   // Used to gate the topbar "Jump to Meeting" CTA.
   get participantInWaitingRoom(): boolean {
     void this.presenceTick
-    const la: any = this.presenceView
-    const ready = la['participantReadyAt']
-    const inCall = la['participantInCallAt']
-    const left = la['participantLeftAt']
     // Heartbeat removed — derive purely from the one-shots (see plan).
-    return !!ready && !inCall && !left
+    return participantInWaitingRoom(this.presenceView)
   }
 
   // True when the participant is actually live in the Zoom call.
   get participantHasJoinedCall(): boolean {
     void this.presenceTick
-    const la: any = this.presenceView
-    if (!la['participantInCallAt']) return false
-    if (la['participantLeftAt']) return false
-    return true
+    return participantHasJoinedCall(this.presenceView)
   }
 
   // True when the current specialist has the mentor role. Used to gate the
   // Edit ATC button on previous-cycle ATCs (only mentors can edit them).
   get isMentor(): boolean {
-    return !!this.profileRoles?.['mentor']
+    return isMentor(this.profileRoles)
   }
 
   // Body scroll lock is done purely via CSS (:has() selector in styles.css
   // targeting .dyn-studio-v2-app) — no JS needed.
 
   // Studio invitation countdown (configurable via classify/studiotimer.timerinseconds)
-  invitationTimerSeconds: number = 120
+  invitationTimerSeconds: number = DEFAULT_INVITATION_TIMER_SECONDS
 
   // Participant's active journey name (from metadata/<profileid>.activejourney → journey/<id>)
   participantJourneyName: string | null = null
@@ -722,26 +713,14 @@ export class DynamicStudioV2Component {
   // (stored on the live assignment as bonusactivity = { profileId: activityId }).
   // Resolved to display name + activity name for the sidebar roster shown next
   // to the participant profile.
-  get additionalSpecialists(): { profileId: string; name: string; activity: string }[] {
-    const bonus = this.liveAssignment?.['bonusactivity'] ?? {}
-    return Object.keys(bonus).map(profileId => ({
-      profileId,
-      name: this.mapProfile?.[profileId] ?? '—',
-      activity: this.mapActivity?.[bonus[profileId]] ?? ''
-    }))
+  get additionalSpecialists(): AdditionalSpecialist[] {
+    return additionalSpecialists(this.liveAssignment, this.mapProfile, this.mapActivity)
   }
 
   // Returns the stage name immediately before the current one in the participant's
   // stage list. Used by the "Send Back" button next to Invite More.
   get previousStageName(): string | null {
-    if (!this.liveAssignment) return null
-    const variationId = this.liveAssignment['token']?.['variationid']
-    const stageList: string[] = variationId != null
-      ? (this.queueVariation[variationId] ?? [])
-      : (this.ongoingQueue?.['stages'] ?? [])
-    if (!stageList.length) return null
-    const idx = stageList.findIndex(s => s === this.liveAssignment['stagename'])
-    return idx > 0 ? stageList[idx - 1] : null
+    return previousStageName(this.liveAssignment, this.queueVariation, this.ongoingQueue)
   }
 
   /**
@@ -755,41 +734,8 @@ export class DynamicStudioV2Component {
    * that map has no entry we are conservative and show nothing. When there's
    * no variationid we fall back to the queue's full stage list.
    */
-  get currentStageNotes(): { stage: string; note: string }[] {
-    if (!this.liveAssignment || !this.ongoingQueue) return []
-    const stagename = this.liveAssignment['stagename']
-    if (!stagename) return []
-    const raw = this.ongoingQueue?.['stageproperty']?.[stagename]?.['stagenote']
-    if (raw == null) return []
-
-    // Normalize both shapes into [{ stage, note }]:
-    //  - new ARRAY format: [{ stage, note }]
-    //  - legacy MAP format: { [stage]: note }
-    const entries: { stage: string; note: any }[] = Array.isArray(raw)
-      ? raw.map((r: any) => ({ stage: r?.['stage'], note: r?.['note'] }))
-      : (typeof raw === 'object'
-          ? Object.keys(raw).map(k => ({ stage: k, note: raw[k] }))
-          : [])
-
-    // Resolve the participant's variation stage list.
-    const variationId = this.liveAssignment['token']?.['variationid']
-    let stageList: string[]
-    if (variationId != null) {
-      if (!(variationId in this.queueVariation)) return [] // conservative
-      stageList = this.queueVariation[variationId] ?? []
-    } else {
-      stageList = this.ongoingQueue?.['stages'] ?? []
-    }
-
-    const out: { stage: string; note: string }[] = []
-    for (const e of entries) {
-      if (!e.stage) continue
-      if (e.note == null || String(e.note).trim().length === 0) continue
-      if (stageList.includes(e.stage)) {
-        out.push({ stage: e.stage, note: String(e.note) })
-      }
-    }
-    return out
+  get currentStageNotes(): StageNote[] {
+    return currentStageNotes(this.liveAssignment, this.ongoingQueue, this.queueVariation)
   }
 
   sendBack() {
@@ -826,40 +772,9 @@ export class DynamicStudioV2Component {
 
   // Top-bar live status pill — pure derivation from liveAssignment one-shots.
   // tones: primary | green | amber | slate. icons are Material icon names.
-  get topBarStatus(): { tone: string; icon: string; title: string; sub: string } {
+  get topBarStatus(): TopBarStatus {
     void this.presenceTick // re-run on tick
-    const la: any = this.presenceView
-    const readyAt = la['participantReadyAt']
-    const inCallAt = la['participantInCallAt']
-    const leftAt = la['participantLeftAt']
-    const specialistJoinedAt = la['specialistJoinedAt']
-    const specialistLeftAt = la['specialistLeftAt']
-
-    // call ended — the webhook `meeting.ended` (via callEnded) OR the legacy
-    // both-parties-left signal. Must be checked before the participant-left branch,
-    // otherwise an ended call reads as "participant left · waiting for rejoin".
-    if (this.callEnded || (leftAt && specialistLeftAt && specialistJoinedAt)) {
-      return { tone: 'slate', icon: 'check_circle', title: 'Call ended', sub: 'Complete the activity to finish this session.' }
-    }
-    // participant in call (joined live) — readyAt/leftAt are nulled on join
-    if (inCallAt && !leftAt) {
-      return {
-        tone: 'primary',
-        icon: 'login',
-        title: 'Participant has joined',
-        sub: (this.mapProfile?.[la?.['token']?.profile_id] || 'Participant') + ' is now live in the meeting'
-      }
-    }
-    // participant ready (on meeting screen) — show review hint
-    if (readyAt && !leftAt) {
-      return { tone: 'green', icon: 'videocam', title: 'Participant is waiting', sub: 'Take a moment to review the forms and ATC before starting the call.' }
-    }
-    // participant left mid-call while the specialist is still in the meeting
-    if (leftAt && specialistJoinedAt) {
-      return { tone: 'amber', icon: 'logout', title: 'Participant left the meeting', sub: 'Connection dropped — waiting for them to rejoin' }
-    }
-    // default — silent (no scary "no signal" copy)
-    return { tone: 'slate', icon: 'schedule', title: 'Awaiting participant', sub: 'Use this time to review the forms and ATC.' }
+    return topBarStatus(this.presenceView, this.mapProfile)
   }
 
   // ----- Studio-screen presence -----------------
@@ -1079,14 +994,11 @@ export class DynamicStudioV2Component {
   }
 
   getStepIndex(id: string): number {
-    return this.visibleSteps.findIndex(s => s.id === id)
+    return stepIndex(this.visibleSteps, id)
   }
 
   isStepCompleted(id: string): boolean {
-    const steps = this.visibleSteps
-    const activeIdx = steps.findIndex(s => s.id === this.activeStepId)
-    const idx = steps.findIndex(s => s.id === id)
-    return idx >= 0 && idx < activeIdx
+    return isStepCompleted(this.visibleSteps, id, this.activeStepId)
   }
 
   // If `mapProfile` doesn't yet have the participant (they were created/added
@@ -1414,9 +1326,7 @@ export class DynamicStudioV2Component {
 
   processMessage(message: string, linkColor: string = '#1a56db'): SafeHtml {
     if (!message) return '';
-    let processed = message.replace(/\n/g, '<br>');
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    processed = processed.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener" style="color:${linkColor};word-break:break-word;overflow-wrap:anywhere;">$1</a>`);    return this.sanitizer.bypassSecurityTrustHtml(processed);
+    return this.sanitizer.bypassSecurityTrustHtml(linkifyMessage(message, linkColor));
   }
 
   resetSubscription(){
@@ -1521,7 +1431,7 @@ export class DynamicStudioV2Component {
   }
 
   compareFn(c1:any, c2:any): boolean {
-    return c1 && c2 ? c1.docid === c2.docid : c1 === c2;
+    return compareByDocId(c1, c2);
   }
 
 
@@ -1608,15 +1518,9 @@ export class DynamicStudioV2Component {
   }
 
   private recomputeQueueStudioCounts(chunkResults: { [qid: string]: number }[]){
-    const merged: { [qid: string]: number } = {}
-    chunkResults.forEach(chunk => {
-      Object.keys(chunk).forEach(qid => {
-        if (qid === '__seeded') return
-        merged[qid] = (merged[qid] || 0) + chunk[qid]
-      })
-    })
+    const merged = mergeQueueStudioCounts(chunkResults)
     this.queueStudioCounts = merged
-    this.queuesWithStudios = this.ongoingQueueList.filter(q => (merged[q['docid']] || 0) > 0)
+    this.queuesWithStudios = queuesWithStudios(this.ongoingQueueList, merged)
     this.noStudioInAnyQueue = this.queuesWithStudios.length === 0
     // If currently selected queue lost all studios, pick another (but don't interrupt a live session)
     const currentId = this.ongoingQueue?.['docid']
@@ -3764,52 +3668,7 @@ export class DynamicStudioV2Component {
   // FORMAT FIELD VALUE FOR OVERLAY DISPLAY (ported)
   // ==========================================
   private formatFieldValueForOverlay(field: any, value: any): string {
-    if (!value && value !== 0) return 'Not answered'
-
-    switch (field.type) {
-      case 'date':
-        if (value?.toDate) return value.toDate().toLocaleDateString()
-        try { return new Date(value).toLocaleDateString() } catch { return String(value) }
-      case 'Checkbox':
-        return value ? 'Yes' : 'No'
-      case 'MultiSelect':
-      case 'multicheckbox':
-        return Array.isArray(value) ? value.join(', ') : String(value)
-      case 'slider': {
-        let result = String(value)
-        if (field.options?.length > 0) result += ` (Range: ${field.options[0]}-${field.options[field.options.length - 1]})`
-        return result
-      }
-      case 'array':
-        if (Array.isArray(value) && value.length > 0) {
-          return value.map((item: any) => {
-            if (typeof item === 'object' && item !== null) {
-              if (field.array && Array.isArray(field.array)) {
-                const parts = field.array.map((af: any) => {
-                  const v = item[af.fieldname]
-                  return v != null && v !== '' ? `${af.fieldname}: ${v}` : null
-                }).filter(Boolean)
-                return parts.join('\n')
-              }
-              const parts = Object.entries(item)
-                .filter(([, v]) => v != null && v !== '')
-                .map(([k, v]) => `${k}: ${v}`)
-              return parts.join('\n')
-            }
-            return String(item)
-          }).join('\n')
-        }
-        return 'No items'
-      default:
-        if (Array.isArray(value)) return value.join(', ')
-        if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-        if (typeof value === 'object') {
-          try {
-            return Object.entries(value).filter(([, v]) => v != null).map(([k, v]) => `${k}: ${v}`).join(', ')
-          } catch { return JSON.stringify(value) }
-        }
-        return String(value)
-    }
+    return formatFieldValueForOverlay(field, value)
   }
   
   // Manual prescribe: blank prescribe-ATC form for this participant (opens in a new tab).
@@ -4275,9 +4134,7 @@ export class DynamicStudioV2Component {
   }
 
   private formatOrdinal(n: number): string {
-    const s = ['th', 'st', 'nd', 'rd']
-    const v = n % 100
-    return n + (s[(v - 20) % 10] || s[v] || s[0])
+    return formatOrdinal(n)
   }
 
   async getLoveLetters(){
@@ -4698,20 +4555,18 @@ export class DynamicStudioV2Component {
   closeAelModal(){ this.aelModalOpen = false }
   /** index of the current band ("start---end") within aelLevelList (0 if none). */
   aelBandIndex(value: any): number {
-    const idx = this.aelLevelList.findIndex(o => (o['startpoint'] + '---' + o['endpoint']) === value)
-    return idx < 0 ? 0 : idx
+    return aelBandIndex(this.aelLevelList, value)
   }
   /** set the band from a slider index; keeps the exact stored value string. */
   setAelBand(crossover: any, idx: any){
     const o = this.aelLevelList[+idx]
     if(!o) return
-    crossover.value['value'] = o['startpoint'] + '---' + o['endpoint']
+    crossover.value['value'] = aelBandValue(o)
     this.participantAEL['aelStatus'] = 'edited'
   }
   /** human label for the current band, e.g. "0 – 10". */
   aelBandLabel(value: any): string {
-    const o = this.aelLevelList[this.aelBandIndex(value)]
-    return o ? (o['startpoint'] + ' – ' + o['endpoint']) : '—'
+    return aelBandLabel(this.aelLevelList, value)
   }
   async validateAelFromModal(){
     await this.updateCurrentAEL()
@@ -4773,8 +4628,7 @@ export class DynamicStudioV2Component {
   // as broken by the cloud function. Used by the template to show an inline
   // amber warning and to swap the Start Meeting button copy.
   get isZoomLinkBroken(): boolean {
-    const url = this.liveAssignment?.['zoomdata']?.['start_url']
-    return !url || url === 'Link Broken'
+    return isZoomLinkBroken(this.liveAssignment)
   }
 
   // True once the meeting has ENDED — both parties left after the call had
@@ -4784,10 +4638,7 @@ export class DynamicStudioV2Component {
   // page — they MUST generate a fresh link instead.
   get callEnded(): boolean {
     void this.presenceTick // re-run this getter on the presence tick
-    const la: any = this.presenceView
-    // Webhook says the meeting ended → definitively ended (cleanest signal).
-    if (la['meetingEndedAt']) return true
-    return !!(la['participantLeftAt'] && la['specialistLeftAt'] && la['specialistJoinedAt'])
+    return callEnded(this.presenceView)
   }
 
   // True while the specialist is currently inside the meeting (joined and not
@@ -4795,8 +4646,7 @@ export class DynamicStudioV2Component {
   // Meeting" so they know they're already in.
   get specialistInMeeting(): boolean {
     void this.presenceTick
-    const la: any = this.presenceView
-    return !!la['specialistJoinedAt'] && !la['specialistLeftAt'] && !this.callEnded
+    return specialistInMeeting(this.presenceView)
   }
 
   navigateMeeting(doc:any){

@@ -58,6 +58,32 @@ import { AddPendingActionComponent } from '../../AppEngagement/app-action-pendin
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../../New-Workshop/whatsapp-progress-dialog.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { getApp } from '@angular/fire/app';
+// The pure rules behind this screen (age, computed columns, journey resolution, product filters, the
+// filter-text banner and the dropdown typeaheads) live in a dependency-free sibling engine so they can be
+// unit-tested without this component's Firestore stack. Extracted 2026-09-10; see
+// participants-analytics.engine.ts for what moved and why.
+import {
+  CPM_PRODUCT_IDS,
+  UP_LIVE_PRODUCT_IDS,
+  buildFilterText,
+  calculateAge as calculateAgeRule,
+  checkboxLabel as checkboxLabelRule,
+  countMatchingProducts,
+  filterColumns,
+  filterOptions,
+  filterSavedFilters,
+  filterTierOptions,
+  isAllSelected as isAllSelectedRule,
+  journeyForParticipant,
+  lastAttendedEventId,
+  participantsMatchingProductFilters,
+  productConsumedTotal,
+  productFilterLabel,
+  productSearchValidation,
+  stripBlankFilters,
+  tagsAdded,
+  tagsRemoved,
+} from './participants-analytics.engine';
 
 export class formelement {
   activejourney: Array<string[]> | null;
@@ -788,9 +814,8 @@ export class ParticipantsAnalyticsComponent {
 
   /** Whether the number of selected elements matches the total number of rows. */
   isAllSelected() {
-    const numSelected = this.selection.selected.length;
-    const numRows = this.dataSource.data.length;
-    return numSelected === numRows;
+    // Rule in participants-analytics.engine.ts
+    return isAllSelectedRule(this.selection.selected.length, this.dataSource.data.length);
   }
 
   /** Selects all rows if they are not all selected; otherwise clear selection. */
@@ -804,10 +829,8 @@ export class ParticipantsAnalyticsComponent {
 
   /** The label for the checkbox on the passed row */
   checkboxLabel(row?: any): string {
-    if (!row) {
-      return `${this.isAllSelected() ? 'deselect' : 'select'} all`;
-    }
-    return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${row.position + 1}`;
+    // Rule in participants-analytics.engine.ts
+    return checkboxLabelRule(row, this.isAllSelected(), (r) => this.selection.isSelected(r));
   }
 
   applyFilter(event: Event) {
@@ -820,74 +843,51 @@ export class ParticipantsAnalyticsComponent {
 
   //saved filter search
   savedfiltersearch() {
-    var filtered = ![null, undefined, ''].includes(this.searchsavedfilters) ? this.savedfilterquery.filter((e: any) => e.label?.toLowerCase().trim().includes(this.searchsavedfilters?.toLowerCase().trim())) : this.savedfilterquery;
-    return filtered;
+    // Rule in participants-analytics.engine.ts
+    return filterSavedFilters(this.savedfilterquery, this.searchsavedfilters);
   }
 
-  onfilterjourneylist() {
+  // Each dropdown below shares one typeahead rule (filterOptions) and differs only in the label it reads.
+  // The null guards stay here because two of them return `undefined` and the rest return `[]`.
+  onfilterjourneylist(): any {
+    // Unlike its siblings this one returns `undefined` (not []) when the list has not loaded. Kept.
     if (this.journeylist != null) {
-      const filterValue = (this.filterjourneylist != null && this.filterjourneylist != '') ? this.filterjourneylist.trim().toLowerCase() : ''
-      return this.journeylist.filter(e => e.journey.trim().toLowerCase().includes(filterValue))
+      return filterOptions<any>(this.journeylist, this.filterjourneylist, (e) => e.journey);
     }
   }
 
   onParticipantMode() {
-    if (this.modesList != null) {
-      const filterValue = (this.filterparticipantmode != null && this.filterparticipantmode != '') ? this.filterparticipantmode.trim().toLowerCase() : ''
-      return this.modesList.filter(e => e.mode.trim().toLowerCase().includes(filterValue))
-    }
-    return []
+    return filterOptions<any>(this.modesList, this.filterparticipantmode, (e) => e.mode);
   }
 
   onEventSearch() {
-    if (this.productEventList != null) {
-      const filterValue = (this.filterevent != null && this.filterevent != '') ? this.filterevent.trim().toLowerCase() : ''
-      return this.productEventList.filter(e => e.name.trim().toLowerCase().includes(filterValue))
-    }
-    return []
+    return filterOptions<any>(this.productEventList, this.filterevent, (e) => e.name);
   }
 
   onQueueSearch() {
-    if (this.queueventList != null) {
-      const filterValue = (this.filterqueue != null && this.filterqueue != '') ? this.filterqueue.trim().toLowerCase() : ''
-      return this.queueventList.filter(e => e.queuename.trim().toLowerCase().includes(filterValue))
-    }
-    return []
+    return filterOptions<any>(this.queueventList, this.filterqueue, (e) => e.queuename);
   }
 
   onQueueStageSearch() {
-    if (this.queueTokens != null) {
-      const filterValue = (this.filterqueuestage != null && this.filterqueuestage != '') ? this.filterqueuestage.trim().toLowerCase() : ''
-      return this.queueTokens.filter(e => e.trim().toLowerCase().includes(filterValue))
-    }
-    return []
+    return filterOptions<any>(this.queueTokens, this.filterqueuestage, (e) => e);
   }
 
   onCategorySearch() {
-    if (this.customerSupportCategorys != null) {
-      const filterValue = (this.filtercategorys != null && this.filtercategorys != '') ? this.filtercategorys.trim().toLowerCase() : ''
-      return this.customerSupportCategorys.filter(e => e.trim().toLowerCase().includes(filterValue))
-    }
-    return []
+    return filterOptions<any>(this.customerSupportCategorys, this.filtercategorys, (e) => e);
   }
 
   onfilterproducts() {
-    if (this.productlist != null) {
-      const filterValue = (this.filterproductlist != null && this.filterproductlist != '') ? this.filterproductlist.trim().toLowerCase() : ''
-      return this.productlist.filter(e => e.product.trim().toLowerCase().includes(filterValue))
-    } else return []
+    return filterOptions<any>(this.productlist, this.filterproductlist, (e) => e.product);
   }
 
   // Function to filter tags on search
   onfiltertags() {
-    if (this.tagList != null) {
-      const filterValue = (this.filterTagList != null && this.filterTagList != '') ? this.filterTagList.trim().toLowerCase() : ''
-      return this.tagList.filter(e => this.mapfiltervalues[e].trim().toLowerCase().includes(filterValue))
-    } else return []
+    return filterOptions<any>(this.tagList, this.filterTagList, (e) => this.mapfiltervalues[e]);
   }
 
   filterproducts(productarray: Array<any>, productvalue: string) {
-    return productarray.filter(e => e === productvalue).length
+    // Rule in participants-analytics.engine.ts
+    return countMatchingProducts(productarray, productvalue);
   }
 
   filterAtcModel(atcmodelarray: Array<any>) {
@@ -895,10 +895,8 @@ export class ParticipantsAnalyticsComponent {
   }
 
   onfiltertier() {
-    if (this.tierlist != null) {
-      const filterValue = (this.filtertier != null && this.filtertier != '') ? this.filtertier.trim().toLowerCase() : ''
-      return this.tierlist.filter(e => e.tier.toLowerCase().indexOf(filterValue) === 0)
-    } else return []
+    // Tier is a PREFIX match, unlike every sibling dropdown — rule in participants-analytics.engine.ts
+    return filterTierOptions<any>(this.tierlist, this.filtertier);
   }
 
   handleQueueSelection() {
@@ -912,68 +910,27 @@ export class ParticipantsAnalyticsComponent {
   }
 
   returnFilterText(): void {
+    // The banner text is a pure rule — see participants-analytics.engine.ts. The DatePipe is passed in
+    // rather than imported there, so the engine stays free of Angular.
+    this.filterText = buildFilterText(
+      this.filterdata,
+      this.filterKeyGroups,
+      this.mapfiltervalues,
+      (value) => this.datepipe.transform(value, 'MMM d, y'),
+    );
+  }
 
-    let data = Object.assign({}, this.filterdata)
-
-    for (const key in data) {
-      if (data[key] === null || data[key] === undefined) delete data[key]
-      else if (this.range.includes(key)) {
-        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
-      }
-      else if ([...this.arraystring, ...this.arrayarray].includes(key)) {
-        if (data[key].length === 0) delete data[key]
-      }
-      else if (this.numberrange.includes(key)) {
-        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
-      }
-    }
-    // console.log(data);
-    this.filterText = null
-    let filterdata = Object.assign({}, data)
-    for (const key in filterdata) {
-      const element = filterdata[key];
-
-      // console.log(key, filterdata[key], typeof element)
-      // if(this.arraystring.includes(key) || this.arrayarray.includes(key)){
-      //   var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${this.mapfiltervalues[filterdata[key]] ? this.mapfiltervalues[filterdata[key]] : this.mapfiltervalues[filterdata[key]] .join(" (OR) ")}`
-      //   this.filterText = (this.filterText ?? "") + text
-      // }
-      if (this.arraystring.includes(key) || this.arrayarray.includes(key)) {
-        const filterValues = filterdata[key]; // Get the filter data for the key
-        let text = "";
-        // Check if the key belongs to arrayarray
-        if (this.arrayarray.includes(key) && Array.isArray(filterValues)) {
-          const mappedValues = filterValues
-            .map(value => this.mapfiltervalues[value] || value)
-            .join(" (OR) "); // Map and join values
-          text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValues}`;
-        }
-        // Check if the key belongs to arraystring
-        else if (this.arraystring.includes(key) && Array.isArray(filterValues)) {
-          const mappedValues = filterValues
-            .map(value => this.mapfiltervalues[value] || value)
-            .join(" (OR) "); // Map and join values
-          text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValues}`;
-          // text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${mappedValue}`;
-        }
-
-        // Append the constructed text to the filterText
-        this.filterText = (this.filterText ?? "") + text;
-      }
-
-      else if (this.string.includes(key) || this.number.includes(key) || this.stringarray.includes(key)) {
-        var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" is equal to ${this.mapfiltervalues[filterdata[key]] ? this.mapfiltervalues[filterdata[key]] : filterdata[key]}`
-        this.filterText = (this.filterText ?? "") + text
-      }
-      else if (this.range.includes(key)) {
-        var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" From ${this.datepipe.transform(filterdata[key]["start"], 'MMM d, y')} To ${this.datepipe.transform(filterdata[key]["end"], 'MMM d, y')}`
-        this.filterText = (this.filterText ?? "") + text
-      }
-      else if (this.numberrange.includes(key)) {
-        var text = `${this.filterText == null ? '' : ' (AND) \n'}"${key}" From ${filterdata[key]["start"]} To ${filterdata[key]["end"]}`
-        this.filterText = (this.filterText ?? "") + text
-      }
-    }
+  /** The key buckets the engine sorts a filter criterion into. Assembled from the lists declared above. */
+  private get filterKeyGroups() {
+    return {
+      range: this.range,
+      numberrange: this.numberrange,
+      arraystring: this.arraystring,
+      arrayarray: this.arrayarray,
+      string: this.string,
+      number: this.number,
+      stringarray: this.stringarray,
+    };
   }
 
   loadtabledata(value: any) {
@@ -1242,19 +1199,11 @@ export class ParticipantsAnalyticsComponent {
   }
 
   searchValidation() {
-    let validation = []
-    if (this.filterdata['productcount'] != null && this.filterdata['productcount'] != undefined) {
-      let productarray = Object.keys(this.filterdata).filter(e => ['unconsumedproducts', 'consumedproducts', 'activeproduct'].includes(e))
-      for (let i = 0; i < productarray.length; i++) {
-        const element = productarray[i];
-        if (this.filterdata[element].length != 0) validation.push(true)
-        else {
-          delete this.filterdata[element]
-          validation.push(false)
-        }
-      }
-    }
-    return validation.filter(e => e).length > 1
+    // The decision is a rule (participants-analytics.engine.ts); the deletions stay here because they
+    // mutate the live form state.
+    const { removeKeys, tooManyProductFilters } = productSearchValidation(this.filterdata);
+    removeKeys.forEach((key) => delete this.filterdata[key]);
+    return tooManyProductFilters;
   }
 
 
@@ -1262,30 +1211,22 @@ export class ParticipantsAnalyticsComponent {
     this.closeModal()
 
     let loadingref = this.loading
-    let data = Object.assign({}, this.filterdata)
-    for (const key in data) {
-      if (data[key] instanceof numberElement) {
-        data[key] = data[key].toObject();
+    let serialised = Object.assign({}, this.filterdata)
+    for (const key in serialised) {
+      if (serialised[key] instanceof numberElement) {
+        serialised[key] = serialised[key].toObject();
       }
-      if (data[key] instanceof dateElement) {
-        data[key] = {
+      if (serialised[key] instanceof dateElement) {
+        serialised[key] = {
           // start:data[key].start ,
           // end:data[key].end
-          start: data[key].start ? this.datepipe.transform(data[key].start, 'yyyy-MM-dd') : null,
-          end: data[key].end ? this.datepipe.transform(data[key].end, 'yyyy-MM-dd') : null,
+          start: serialised[key].start ? this.datepipe.transform(serialised[key].start, 'yyyy-MM-dd') : null,
+          end: serialised[key].end ? this.datepipe.transform(serialised[key].end, 'yyyy-MM-dd') : null,
         };
       }
-      if (data[key] === null || data[key] === undefined) delete data[key]
-      else if (this.range.includes(key)) {
-        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
-      }
-      else if ([...this.arraystring, ...this.arrayarray].includes(key)) {
-        if (data[key].length === 0) delete data[key]
-      }
-      else if (this.numberrange.includes(key)) {
-        if (data[key]['start'] === null || data[key]['start'] === undefined || data[key]['end'] === null || data[key]['end'] === undefined) delete data[key]
-      }
     }
+    // Blank-criterion cleanup is the same rule the banner uses — participants-analytics.engine.ts
+    let data = stripBlankFilters(serialised, this.filterKeyGroups)
     if (Object.keys(data).length >= 2) {
       if (confirm("are you sure you want to submit")) {
         data['docid'] = data['docid'] ?? doc(collection(this.firestore, "searchquery")).id
@@ -1349,8 +1290,8 @@ export class ParticipantsAnalyticsComponent {
   // }
 
   returnTableColumns() {
-    var columns = this.columnsDisplayed
-    return columns.filter(e => e.toLowerCase().trim().includes(this.searchColumn.toLowerCase().trim()))
+    // Rule in participants-analytics.engine.ts — note columnsDisplayed carries a hole (stray `, ,`).
+    return filterColumns(this.columnsDisplayed, this.searchColumn);
   }
 
   //remarks
@@ -2658,15 +2599,12 @@ export class ParticipantsAnalyticsComponent {
   }
 
   getTagsAdded(current: any, previous: any): string[] {
-    const curr = current.profiletags || [];
-    const prev = previous.profiletags || [];
-    return curr.filter((t: string) => !prev.includes(t));
+    // Rules in participants-analytics.engine.ts
+    return tagsAdded(current, previous);
   }
 
   getTagsRemoved(current: any, previous: any): string[] {
-    const curr = current.profiletags || [];
-    const prev = previous.profiletags || [];
-    return prev.filter((t: string) => !curr.includes(t));
+    return tagsRemoved(current, previous);
   }
 
   openTagHistory(event: MouseEvent, element: any) {
@@ -3031,19 +2969,9 @@ export class ParticipantsAnalyticsComponent {
   }
 
   getProductString(product: any) {
-    if (!product) return '';
-
-    let comparison = product?.comparison;
-
-    if (comparison == 'equalto') {
-      comparison = 'Equal To';
-    } else if (comparison == 'gtoreqto') {
-      comparison = 'Greater than or Equal To';
-    } else if (comparison == 'lsoreqto') {
-      comparison = 'Less than or Equal To';
-    }
-
-    return `${this.productMap[product?.productId]?.product} ${comparison} ${product?.count}`;
+    // Label rule in participants-analytics.engine.ts (see DEFECT 3 there: the label understands
+    // 'gtoreqto' while the matcher below tests for 'groreqto').
+    return productFilterLabel(product, this.productMap);
   }
 
   unSelectConsumedProduct(productId: string) {
@@ -3061,55 +2989,10 @@ export class ParticipantsAnalyticsComponent {
   }
 
   filterProductsFromFilters(data: any) {
-    const consumed = data.consumed;
-    const unconsumed = data.unconsumed;
-    const participants = {};
-    if (data?.rawProductsData) {
-      data?.rawProductsData.forEach((p) => {
-        let matchesConsumed = consumed.length === 0;
-        let matchesUnconsumed = unconsumed.length === 0;
-
-        if (consumed.length > 0) {
-          matchesConsumed = consumed.every(filter => {
-            const productData = p.products[filter.productId];
-
-            if (!productData) return false;
-
-            if (filter.comparison === 'equalto') {
-              return productData.consumedCount == filter.count;
-            } else if (filter.comparison === 'groreqto') {
-              return productData.consumedCount >= filter.count;
-            } else if (filter.comparison === 'lsoreqto') {
-              return productData.consumedCount <= filter.count;
-            }
-            return productData.consumedCount == filter.count;
-          });
-        }
-
-        // Check unconsumed filters (only if unconsumed filters exist)
-        if (unconsumed.length > 0) {
-          matchesUnconsumed = unconsumed.every(filter => {
-            const productData = p.products[filter.productId];
-            if (!productData) return false;
-
-            if (filter.comparison === 'equalto') {
-              return productData.unConsumedCount == filter.count;
-            } else if (filter.comparison === 'groreqto') {
-              return productData.unConsumedCount >= filter.count;
-            } else if (filter.comparison === 'lsoreqto') {
-              return productData.unConsumedCount <= filter.count;
-            }
-
-            return productData.unConsumedCount == filter.count;
-          });
-        }
-
-        if (matchesConsumed && matchesUnconsumed) {
-          participants[p['profileId']] = p;
-        }
-      })
-    }
-    data.participants = participants;
+    // Matching rule in participants-analytics.engine.ts
+    data.participants = participantsMatchingProductFilters(
+      data?.rawProductsData, data.consumed, data.unconsumed,
+    );
     this.filterByProducts = data;
   }
 
@@ -3132,76 +3015,33 @@ export class ParticipantsAnalyticsComponent {
   }
 
   calculateAge(d: any) {
-    const date = d?.toDate ? d.toDate() : d;
-    const currentDate: Date = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-    if (!date?.toDateString) {
-      return ''
-    }
-    const age = (currentDate.getFullYear() - date.getFullYear()) - 1;
-    date.setFullYear(currentDate.getFullYear());
-    console.log(date, currentDate)
-    return date <= currentDate ? age + 1 : age;
+    // Rule in participants-analytics.engine.ts (it mutates the Date it is handed — DEFECT 1 there).
+    return calculateAgeRule(d);
   }
 
-  getUpLiveCount(profileId : string) : number | string{
-    if([null , undefined , ''].includes(profileId) || !this.participantProductMap[profileId]){
+  getUpLiveCount(profileId: string): number | string {
+    // Both computed columns are the same reduce over a different id list — engine constants.
+    if ([null, undefined, ''].includes(profileId) || !this.participantProductMap[profileId]) {
       return 0;
     }
-
-    return ['0ayiNALL1HDVvCXDHcZ4' , 'N0MhGQnxP9S8TdavuRJR' , 'Rq9cu2Z3FSuILXdwYtca'].reduce((total , productId)=>{
-      const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
-      return total + count;
-    } , 0);
+    return productConsumedTotal(this.participantProductMap[profileId], UP_LIVE_PRODUCT_IDS);
   }
 
-  getCPMCount(profileId : string) : number | string{
-    if([null , undefined , ''].includes(profileId) || !this.participantProductMap[profileId]){
+  getCPMCount(profileId: string): number | string {
+    if ([null, undefined, ''].includes(profileId) || !this.participantProductMap[profileId]) {
       return 0;
     }
-
-    return ['AED3TRIhKpyCtIWQvQMc' , 'TnlqL6gUvDSx105YIPC5' , 'TxnrP4kevFZCPHFtxj7Z' , 'ZvANGjeQnKeIbGXiY0un'].reduce((total , productId)=>{
-      const count =  this.participantProductMap[profileId][productId]?.consumedCount || 0;
-      return total + count;
-    } , 0);
+    return productConsumedTotal(this.participantProductMap[profileId], CPM_PRODUCT_IDS);
   }
 
-  getJourneyForParticipant(metadata){
-    const customerStatus = metadata['customerstatus'] ?? null;
-    
-    if (customerStatus === 'active') {
-      return this.mapfiltervalues[metadata['activejourney']];
-    } else if (customerStatus === 'non active') {
-      return this.mapfiltervalues[metadata['lastcompletedjourney']];
-    } else if (customerStatus === 'discontinued') {
-      return this.mapfiltervalues[metadata['lastsubscribedjourney']];
-    } 
-    return ''
+  getJourneyForParticipant(metadata) {
+    // Rule in participants-analytics.engine.ts
+    return journeyForParticipant(metadata, this.mapfiltervalues);
   }
 
-  getLastAttendedEventForParticipant(metadata){
-    const productEvent = metadata?.productevent ?? {};
-    const attendedEventIds : any[]= Object.values(productEvent).flat()
-    let lastAttendedEvent = null;
-
-    for(let eventId of attendedEventIds){
-      const endDate = this.eventCollectionMap[eventId]?.end_date?.toDate() ?? null;
-      if([null , undefined , ''].includes(endDate)){
-        console.log('there is no end date for event id : ' , eventId);
-        continue
-      }
-
-      if ([null , undefined , ''].includes(lastAttendedEvent) || lastAttendedEvent?.endDate?.getTime() <= endDate?.getTime()) {
-        
-        lastAttendedEvent = {
-          eventId,
-          endDate
-        };
-      }
-    }
-
-    return lastAttendedEvent?.eventId;
-    
+  getLastAttendedEventForParticipant(metadata) {
+    // Rule in participants-analytics.engine.ts
+    return lastAttendedEventId(metadata, this.eventCollectionMap);
   }
 
   async openCheckListForProductEvent(){

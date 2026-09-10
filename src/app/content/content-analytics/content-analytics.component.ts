@@ -5,7 +5,6 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { async, Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { collection, collectionSnapshots, Firestore, getDocs, onSnapshot, orderBy, query, where } from '@angular/fire/firestore';
-import { log } from 'console';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';

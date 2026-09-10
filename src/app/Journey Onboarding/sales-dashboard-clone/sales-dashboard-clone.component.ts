@@ -23,6 +23,64 @@ import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule }
 import { ChangeDetectorRef, Component, ViewChild, TemplateRef } from '@angular/core';
 import { MatMenuModule } from '@angular/material/menu';
 import * as XLSX from 'xlsx';
+
+// Pure business rules for this dashboard. Extracted 2026-09-10; see sales-dashboard.engine.ts for what
+// moved and why. The component keeps the Firestore gathering and asks the engine the questions.
+import {
+  allLoaded,
+  isCountingType,
+  isMovementType,
+  assuredFilterCutoff,
+  barColors,
+  cancellationBalance,
+  cellValueOrDash,
+  chunk,
+  clampPage,
+  clampSliderPage,
+  compareCellValues,
+  customerStatusBucket,
+  dayBounds,
+  downgradeType,
+  formatCurrencyCell,
+  formatIndianCurrency,
+  formatNumberCell,
+  formatTextCell,
+  hasAnyPositiveMetric,
+  initSlider,
+  isAssuredSale,
+  isBadgeColumn,
+  isDateLike,
+  isExcludedSale,
+  isNotAssuredSale,
+  isPendingSale,
+  isPendingStatus,
+  isSortable,
+  isTestDataSale,
+  isWithinRange,
+  lastNoteText,
+  loadedCount,
+  loadingProgressPct,
+  mapCellValue,
+  matchesSaleFilters,
+  matchesSaleTypeFilter,
+  monthBounds,
+  nextSortState,
+  pageNumbers,
+  pairAvatar,
+  percentageOf,
+  personNameOrUnknown,
+  rowHighlightClass,
+  saleValueKey,
+  settleSliderPage,
+  shouldHighlightCell,
+  sliderGoToPage,
+  sliderTransform,
+  sortIcon,
+  topPairs,
+  topPerformers,
+  totalPagesFor,
+  trendsStartMonth,
+} from './sales-dashboard.engine';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
@@ -966,11 +1024,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // helper function to return color based on the sales for person
   private getBarColors(values: number[]): string[] {
-    return values.map(value => {
-      if (value >= 70) return "#22C55E";   // Green
-      if (value >= 55) return "#B45309";   // Orange
-      return "#EF4444";                    // Red
-    });
+    return barColors(values);
   }
 
   // function to update performance chart
@@ -1639,8 +1693,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // function to check loading status of the screen
   private checkLoadingComplete(): void {
-    const allLoaded = Object.values(this.loadingStates).every(state => state === true);
-    if (allLoaded) {
+    if (allLoaded(this.loadingStates)) {
       this.isLoading = false;
       this.cdr.detectChanges();
     }
@@ -1648,21 +1701,19 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // function to get loading progress
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
-    const total = Object.keys(this.loadingStates).length;
-    return (loaded / total) * 100;
+    return loadingProgressPct(this.loadingStates);
   }
 
   // function to get loaded count
   getLoadedCount(): number {
-    return Object.values(this.loadingStates).filter(state => state === true).length;
+    return loadedCount(this.loadingStates);
   }
 
   // function to set current month
   setMonthDates(): void {
-    const now = this.currentMonth;
-    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const bounds = monthBounds(this.currentMonth);
+    this.startDate = bounds.start;
+    this.endDate = bounds.end;
   }
 
   // functoin to handle customer dates range seletion
@@ -1786,10 +1837,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     this.loadingStates.downgradeSales = false;
 
     const now = new Date();
-    const daysAgo = filterType === 'last7days' ? 7 : 30;
-    const filterDate = new Date(now);
-    filterDate.setDate(filterDate.getDate() - daysAgo);
-    filterDate.setHours(0, 0, 0, 0);
+    const filterDate = assuredFilterCutoff(filterType, now);
 
     this.assuredFilterStartDate = this.datePipe.transform(filterDate, 'dd-MMM-yyyy') || '';
     this.assuredFilterEndDate = this.datePipe.transform(now, 'dd-MMM-yyyy') || '';
@@ -2314,7 +2362,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           // const isInSelectedRange = start <= sale['purchasedate']?.toDate() && end >= sale['purchasedate']?.toDate()
           return (isPreSalesTable ?
             sale['presalespersonname'] === row.person :
-            sale['salespersonname'] === row.person) && !['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']);
+            sale['salespersonname'] === row.person) && !isMovementType(sale['type']);
         }
         );
         break;
@@ -2325,7 +2373,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           // const isInSelectedRange = start <= sale['purchasedate']?.toDate() && end >= sale['purchasedate']?.toDate()
           return (isPreSalesTable ?
             sale['presalespersonname'] === row.person :
-            sale['salespersonname'] === row.person) && !['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])
+            sale['salespersonname'] === row.person) && !isMovementType(sale['type'])
         }
         );
         break;
@@ -2469,31 +2517,18 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // function to check whether the sale data is passed the filters or not
   matchesFilterCriteria(sale: any): boolean {
-    const saleJourney = sale['journey'];
-    const preSalesPerson = sale['presalespersonname'] || 'Unknown';
-    const salesPerson = sale['salespersonname'] || 'Unknown';
-
-    const journeyCondition = (![null, undefined, ''].includes(this.selectedFilter) || this.selectedJourney.length > 0) && !this.selectedJourney.includes(saleJourney)
-
-    const preSalesPersonCondition = this.selectedPreSalesPerson.length > 0 && !this.selectedPreSalesPerson.includes(preSalesPerson)
-    const salesPersonCondition = this.selectedSalesPerson.length > 0 && !this.selectedSalesPerson.includes(salesPerson)
-
-    if (journeyCondition || preSalesPersonCondition || salesPersonCondition) {
-      return false;
-    }
-
-    return true;
+    return matchesSaleFilters(sale, {
+      selectedFilter: this.selectedFilter,
+      selectedJourney: this.selectedJourney,
+      selectedPreSalesPerson: this.selectedPreSalesPerson,
+      selectedSalesPerson: this.selectedSalesPerson,
+    });
   }
 
 
   // function to format normal number to indian currency
   formatIndianCurrency(value: number): string {
-    if (!value && value !== 0) return '-';
-
-    return value.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
+    return formatIndianCurrency(value);
   }
 
 
@@ -2768,21 +2803,11 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     }
 
     if (column.key === 'generalnotes') {
-      if (Array.isArray(value) && value.length > 0) {
-        const lastNote = value[value.length - 1];
-        if (lastNote && typeof lastNote === 'object' && lastNote.note) {
-          return lastNote.note;
-        }
-      }
-      return '-';
+      return lastNoteText(value);
     }
 
     if (column.type === 'text') {
-      const stringValue = value.toString();
-
-      return column.substringEnd
-        ? stringValue.substring(column.substringStart, column.substringEnd)
-        : stringValue;
+      return formatTextCell(value, column.substringStart, column.substringEnd);
     }
 
     switch (column.type) {
@@ -2827,63 +2852,23 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // Currency formatting
   private formatCurrency(value: number, prefix?: string, mapValue?: string): string {
-    if (!value && value !== 0) return '-';
-
-    if (mapValue) {
-      value = value[mapValue];
-    }
-
-    const symbol = prefix || '₹';
-    const formatted = value.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-
-    return `${symbol}${formatted}`;
+    return formatCurrencyCell(value, prefix, mapValue);
   }
 
   // Number formatting
   private formatNumber(value: number, prefix?: string, suffix?: string): string {
-    if (!value && value !== 0) return '-';
-
-    const formatted = value.toLocaleString('en-IN');
-    return `${prefix || ''}${formatted}${suffix || ''}`;
+    return formatNumberCell(value, prefix, suffix);
   }
 
   // Map value using dictionary
   private mapValue(value: any, mapData?: { [key: string]: any }, mapKey?: string, mapValue?: string): string {
-    if (!mapData) return value.toString();
-    let tempMap = '';
-
-    if (mapKey) {
-      if (mapKey.startsWith('[')) {
-        const match = mapKey.match(/\[(\d+)\]\.?(.*)$/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-
-          tempMap = value?.[index];
-          if (property) {
-            tempMap = tempMap?.[property];
-          }
-        }
-      } else {
-        tempMap = value?.[mapKey];
-      }
-    } else {
-      tempMap = value;
-    }
-
-    tempMap = mapValue ? mapData[tempMap]?.[mapValue] : mapData[tempMap];
-    return tempMap || value.toString();
+    return mapCellValue(value, mapData, mapKey, mapValue);
   }
 
   // Calculate total pages
   calculatePagination() {
-    this.totalPages = Math.ceil(this.currentTableConfig.data.length / this.itemsPerPage);
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
-    }
+    this.totalPages = totalPagesFor(this.currentTableConfig.data.length, this.itemsPerPage);
+    this.currentPage = clampPage(this.currentPage, this.totalPages);
   }
 
   // Update paginated data for display
@@ -2943,44 +2928,17 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // Get page numbers for pagination display
   getPageNumbers(): number[] {
-    const pages: number[] = [];
-    const maxPagesToShow = 5;
-
-    if (this.totalPages <= maxPagesToShow) {
-      // Show all pages if total is less than max
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show limited pages with ellipsis
-      const halfRange = Math.floor(maxPagesToShow / 2);
-      let start = Math.max(1, this.currentPage - halfRange);
-      let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-      // Adjust start if we're near the end
-      if (end === this.totalPages) {
-        start = Math.max(1, end - maxPagesToShow + 1);
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-    }
-
-    return pages;
+    return pageNumbers(this.currentPage, this.totalPages);
   }
 
   // Check if column is sortable
   isSortable(column: any): boolean {
-    return column.sortable !== false;
+    return isSortable(column);
   }
 
   // Get sort icon for column
   getSortIcon(columnKey: string): string {
-    if (this.sortColumn !== columnKey) {
-      return '⇅'; // Both arrows
-    }
-    return this.sortDirection === 'asc' ? '↑' : '↓';
+    return sortIcon({ sortColumn: this.sortColumn, sortDirection: this.sortDirection }, columnKey);
   }
 
   // function to export table data
@@ -3103,103 +3061,58 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // function to check whether it is date or not
   isDate(value: any): boolean {
-    return value instanceof Date ||
-      (typeof value === 'string' && !isNaN(Date.parse(value)));
+    return isDateLike(value);
   }
 
   // function to get an cell value
   getCellValue(row: any, key: string): string {
-    return row[key] || '-';
+    return cellValueOrDash(row, key);
   }
 
   // Sort table by column
   sortTable(columnKey: string) {
     const salesLeadsMap = this.salesLeadsMap()
-    if (this.sortColumn === columnKey) {
-      if (this.sortDirection === 'asc') {
-        this.sortDirection = 'desc';
-      } else if (this.sortDirection === 'desc') {
-        this.sortDirection = null;
-        this.sortColumn = null;
+    const next = nextSortState({ sortColumn: this.sortColumn, sortDirection: this.sortDirection }, columnKey);
+    const wasCycledOff = this.sortColumn === columnKey && this.sortDirection === 'desc';
+    this.sortColumn = next.sortColumn;
+    this.sortDirection = next.sortDirection;
 
-        this.currentTableConfig.data = [...this.filteredTableData];
-        this.calculatePagination();
-        return;
-      }
-    } else {
-      this.sortColumn = columnKey;
-      this.sortDirection = 'asc';
+    if (wasCycledOff) {
+      this.currentTableConfig.data = [...this.filteredTableData];
+      this.calculatePagination();
+      return;
     }
 
     if (this.sortDirection) {
-      this.currentTableConfig.data.sort((a, b) => {
-        const valueA: any = this.getCellValue(salesLeadsMap[a], columnKey);
-        const valueB: any = this.getCellValue(salesLeadsMap[b], columnKey);
-
-        if (valueA == null && valueB == null) return 0;
-        if (valueA == null) return this.sortDirection === 'asc' ? 1 : -1;
-        if (valueB == null) return this.sortDirection === 'asc' ? -1 : 1;
-
-        let comparison = 0;
-
-        if (!isNaN(valueA) && !isNaN(valueB)) {
-          comparison = Number(valueA) - Number(valueB);
-        } else if (this.isDate(valueA) && this.isDate(valueB)) {
-          comparison = new Date(valueA).getTime() - new Date(valueB).getTime();
-        } else {
-          comparison = valueA.toString().localeCompare(valueB.toString());
-        }
-
-        return this.sortDirection === 'asc' ? comparison : -comparison;
-      });
+      this.currentTableConfig.data.sort((a, b) => compareCellValues(
+        this.getCellValue(salesLeadsMap[a], columnKey),
+        this.getCellValue(salesLeadsMap[b], columnKey),
+        this.sortDirection,
+      ));
     }
   }
 
   // Function to highlight row based on status 
   highlightRow(row: any) {
-    if (this.tableType === 'grossSales' || this.tableType === 'grossDowngradeSales' || this.tableType === 'grossCancelledSales') {
-      if ([null, undefined, "", "pending"].includes(row['status']?.toLowerCase())) {
-        return 'pending-highlight'
-      } else if (row['status']?.toLowerCase() == 'approved' && ![null, undefined, ""].includes(row['paymentplan'])) {
-        return 'assured-highlight'
-      } else {
-        return ''
-      }
-    } if (this.tableType === 'overallParticipants') {
-      const customerStatus = row['customerstatus']?.toLowerCase();
-
-      if (customerStatus === 'active') {
-        return 'active-highlight';
-      } else if (customerStatus === 'non active') {
-        return 'non-active-highlight';
-      } else if (['discontinued', 'banned', 'late'].includes(customerStatus)) {
-        return 'discontinued-highlight';
-      }
-    }
-    return ''
+    return rowHighlightClass(this.tableType, row);
   }
 
   // Function to get count of pending sales 
   getPendingCount() {
     const sales = this.salesLeadsMap();
-    return this.currentTableConfig.data.filter((e) => {
-      if (!sales[e]) {
-      }
-
-      return [null, undefined, "", "pending"].includes(sales[e]['status']?.toLowerCase());
-    }).length;
+    return this.currentTableConfig.data.filter((e) => isPendingSale(sales[e])).length;
   }
 
   // Function to get count of assured 
   getAssuredCount() {
     const sales = this.salesLeadsMap()
-    return this.currentTableConfig.data.filter((e) => ![null, undefined, ""].includes(sales[e]['paymentplan'])).length;
+    return this.currentTableConfig.data.filter((e) => isAssuredSale(sales[e]['paymentplan'])).length;
   }
 
   // Function to get count of not assured 
   getNotAssuredCount() {
     const sales = this.salesLeadsMap()
-    return this.currentTableConfig.data.filter((e) => [null, undefined, ""].includes(sales[e]['paymentplan']) && sales[e]['status']?.toLowerCase() == 'approved').length;
+    return this.currentTableConfig.data.filter((e) => isNotAssuredSale(sales[e])).length;
   }
 
   // Function to get count of active participants
@@ -3207,7 +3120,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     const sales = this.salesLeadsMap()
     if (!this.currentTableConfig?.data) return 0;
     return this.currentTableConfig.data.filter((e) =>
-      sales[e]['customerstatus']?.toLowerCase() === 'active'
+      customerStatusBucket(sales[e]['customerstatus']) === 'active'
     ).length;
   }
 
@@ -3216,7 +3129,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     const sales = this.salesLeadsMap()
     if (!this.currentTableConfig?.data) return 0;
     return this.currentTableConfig.data.filter((e) =>
-      sales[e]['customerstatus']?.toLowerCase() === 'non active'
+      customerStatusBucket(sales[e]['customerstatus']) === 'non active'
     ).length;
   }
 
@@ -3225,20 +3138,18 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     const sales = this.salesLeadsMap()
     if (!this.currentTableConfig?.data) return 0;
     return this.currentTableConfig.data.filter((e) =>
-      ['discontinued', 'banned', 'late'].includes(sales[e]['customerstatus']?.toLowerCase())
+      customerStatusBucket(sales[e]['customerstatus']) === 'discontinued'
     ).length;
   }
 
   // Check if column should be highlighted
   shouldHighlightCell(columnKey: string): boolean {
-    const highlightColumns = ['name', 'contractId', 'category'];
-    return highlightColumns.includes(columnKey);
+    return shouldHighlightCell(columnKey);
   }
 
   // function to check whether the column is badge column or not
   isBadgeColumn(columnKey: string): boolean {
-    const badgeColumns = ['journey', 'paymentStatus'];
-    return badgeColumns.includes(columnKey);
+    return isBadgeColumn(columnKey);
   }
 
   // function to navigate to use profile
@@ -3532,17 +3443,17 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     const cancelledData = [];
     const downgradeData = [];
 
-    let salesData = salesleads.filter((e)=> !(e['journey'] === 'RXvsMYoK0g4SstvDDURZ' && e['email']?.toLowerCase().includes('soexcellence.com')));
+    let salesData = salesleads.filter((e) => !isTestDataSale(e));
 
     // Process each sale
     for (let i = 0; i < salesData.length; i++) {
       const salesLeadsData = salesData[i];
 
-      if (salesLeadsData['journey'] == 'InLXMl7OBAqlDTZcXwK0' || salesLeadsData['status']?.toLowerCase() == 'rejected') {
+      if (isExcludedSale(salesLeadsData)) {
         continue;
       }
 
-      if ((salesLeadsData['purchasedate']?.toDate() >= startdate && salesLeadsData['purchasedate']?.toDate() <= enddate)) {
+      if (isWithinRange(salesLeadsData['purchasedate']?.toDate(), startdate, enddate)) {
         salesLeadsData['type'] = salesLeadsData['journeytype']
         saleLeadsMap[salesLeadsData['docid']] = salesLeadsData
       }
@@ -3566,7 +3477,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
         if (cancelSnap.exists()) {
           const originalSale = cancelSnap.data();
-          const balanceAmount = (originalSale['totalpurchasevalue'] ?? 0) - (sale['totalpurchasevalue'] ?? 0);
+          const balanceAmount = cancellationBalance(originalSale['totalpurchasevalue'], sale['totalpurchasevalue']);
           const cancelData = { ...originalSale, balanceamount: balanceAmount, type: 'cancelled' };
           saleLeadsMap[cancelData['docid']] = cancelData
         }
@@ -3584,14 +3495,8 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           const originalSale = downgradeSnap.data();
           const downgradeValue = originalSale['totalpurchasevalue'] || 0;
 
-          if (sale['downgradetonewpurchase']
-            && sale['purchasedate']?.toDate() >= startdate
-            && sale['purchasedate']?.toDate() <= enddate
-          ) {
-            originalSale['type'] = 'downgradetonew'
-          } else {
-            originalSale['type'] = 'downgradetoold'
-          }
+          originalSale['type'] = downgradeType(
+            sale['downgradetonewpurchase'], sale['purchasedate']?.toDate(), startdate, enddate);
 
           saleLeadsMap[originalSale['docid']] = originalSale
         }
@@ -3824,7 +3729,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
       const [start, end] = this.getDateRange
       const isInSelectedRange = start <= sale['purchasedate']?.toDate() && end >= sale['purchasedate']?.toDate()
 
-      if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) || (isInSelectedRange)) {
+      if (!isMovementType(sale['type']) || (isInSelectedRange)) {
 
         metric.gross.totalValue += sale[valueKey] || 0;
         metric.gross.totalEMI += sale['installmentamount'] || 0;
@@ -3836,7 +3741,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
             metric[`gross${sale['journeytype']}`].totalValue += sale[valueKey] || 0
           }
 
-          if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
+          if (!isMovementType(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
             metric.actualgross.data.push(docId);
             metric.actualgross.totalValue += sale[valueKey] || 0
             metric.actualgross.totalEMI += sale['installmentamount'] || 0
@@ -3844,7 +3749,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
             metric[`actualgross${sale['journeytype']}`].totalValue += sale[valueKey] || 0
           }
 
-        } else if ([null, undefined, '', 'pending'].includes(status)) {
+        } else if (isPendingStatus(status)) {
           metric.grosspending.push(docId)
         }
 
@@ -3858,7 +3763,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
             metric[`assured${sale['journeytype']}`].totalValue += sale[valueKey] || 0;
           }
 
-          if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
+          if (!isMovementType(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
             metric.actualassured.data.push(docId)
             metric.actualassured.totalValue += sale[valueKey] || 0;
             metric.actualassured.totalEMI += sale['installmentamount'] || 0;
@@ -3866,7 +3771,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
             metric[`actualassured${sale['journeytype']}`]?.data.push(docId)
             metric[`actualassured${sale['journeytype']}`].totalValue += sale[valueKey] || 0
           }
-          // if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+          // if (!isMovementType(sale['type'])) {
           //   metric.actualassured.data.push(docId)
           //   metric.actualassured.totalValue += sale[valueKey] || 0;
           //   metric.actualassured.totalEMI += sale['installmentamount'] || 0;
@@ -3874,7 +3779,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
         }
 
       }
-      if (['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
+      if (isMovementType(sale['type']) && !['cancelled', 'downgrade'].includes(sale['journeytype'])) {
         metric[`gross${sale['type']}`].data.push(docId)
         metric[`gross${sale['type']}`].totalValue += sale[valueKey] || 0
 
@@ -3986,7 +3891,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           })
         }
 
-        if (['new', 'addons', 'upgrade'].includes(sale['type']) || isInSelectedRange) {
+        if (isCountingType(sale['type']) || isInSelectedRange) {
           preSalesMap.get(preSalesPerson).grossCount++
           salesPersonMap.get(salesPerson).grossCount++
 
@@ -4002,7 +3907,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
             topSalesPersonPairMap.get(personPair).grossupgrades++
           }
-          if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+          if (!isMovementType(sale['type'])) {
             preSalesMap.get(preSalesPerson).actualGrossNumber++
             salesPersonMap.get(salesPerson).actualGrossNumber++
 
@@ -4020,7 +3925,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
               newPreSalesPerson.get(preSalesPerson).assuredCount++
               newSalesPerson.get(salesPerson).assuredCount++
 
-              if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+              if (!isMovementType(sale['type'])) {
 
                 topPreSalesPersonMap.get(preSalesPerson).assurednew++
                 topSalesPersonMap.get(salesPerson).assurednew++
@@ -4033,7 +3938,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
               upgradePreSalesPerson.get(preSalesPerson).assuredCount++
               upgradeSalesPerson.get(salesPerson).assuredCount++
 
-              if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+              if (!isMovementType(sale['type'])) {
 
                 topPreSalesPersonMap.get(preSalesPerson).assuredupgrades++
                 topSalesPersonMap.get(salesPerson).assuredupgrades++
@@ -4041,13 +3946,13 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
                 topSalesPersonPairMap.get(personPair).assuredupgrades++
               }
             } else if (sale['type'] === 'addons') {
-              if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+              if (!isMovementType(sale['type'])) {
 
                 topPreSalesPersonMap.get(preSalesPerson).assuredaddons++
                 topSalesPersonMap.get(salesPerson).assuredaddons++
               }
             }
-            if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+            if (!isMovementType(sale['type'])) {
               preSalesMap.get(preSalesPerson).actualAssuredNumber++
               salesPersonMap.get(salesPerson).actualAssuredNumber++
 
@@ -4119,14 +4024,14 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     }
     const status = sale['status']?.toLowerCase() || ''
     const docId = sale['docid']
-    const valueKey = sale['type'] === 'cancelled' ? 'balanceamount' : 'totalpurchasevalue';
-    const isAssured = ![null, undefined, ''].includes(sale['paymentplan'])
-    const preSalesPerson = sale['presalespersonname'] || 'Unknown';
-    const salesPerson = sale['salespersonname'] || 'Unknown';
+    const valueKey = saleValueKey(sale['type']);
+    const isAssured = isAssuredSale(sale['paymentplan'])
+    const preSalesPerson = personNameOrUnknown(sale['presalespersonname']);
+    const salesPerson = personNameOrUnknown(sale['salespersonname']);
     const [start, end] = this.getDateRange
-    const isInSelectedRange = start <= sale['purchasedate']?.toDate() && end >= sale['purchasedate']?.toDate()
+    const isInSelectedRange = isWithinRange(sale['purchasedate']?.toDate(), start, end)
 
-    if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) || (isInSelectedRange)) {
+    if (!isMovementType(sale['type']) || (isInSelectedRange)) {
 
       metric.gross.totalValue += sale[valueKey] || 0
       metric.gross.totalEMI += sale['installmentamount'] || 0
@@ -4137,7 +4042,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           metric[`gross${sale['journeytype']}`]?.data.push(docId)
           metric[`gross${sale['journeytype']}`].totalValue += sale[valueKey] || 0
         }
-      } else if ([null, undefined, '', 'pending'].includes(status)) {
+      } else if (isPendingStatus(status)) {
         metric.grosspending.push(docId)
       }
 
@@ -4155,7 +4060,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
 
     }
-    if (['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) && sale['journeytype'] !== 'cancelled') {
+    if (isMovementType(sale['type']) && sale['journeytype'] !== 'cancelled') {
       metric[`gross${sale['type']}`].data.push(docId)
       metric[`gross${sale['type']}`].totalValue += sale[valueKey] || 0
 
@@ -4215,7 +4120,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
         })
       }
 
-      if (['new', 'addons', 'upgrade'].includes(sale['type']) || isInSelectedRange) {
+      if (isCountingType(sale['type']) || isInSelectedRange) {
         preSalesMap.get(preSalesPerson).grossCount++
         salesPersonMap.get(salesPerson).grossCount++
 
@@ -4271,14 +4176,14 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
     const status = sale['status']?.toLowerCase() || ''
     const docId = sale['docid']
-    const valueKey = sale['type'] === 'cancelled' ? 'balanceamount' : 'totalpurchasevalue';
-    const isAssured = ![null, undefined, ''].includes(sale['paymentplan'])
-    const preSalesPerson = sale['presalespersonname'] || 'Unknown';
-    const salesPerson = sale['salespersonname'] || 'Unknown';
+    const valueKey = saleValueKey(sale['type']);
+    const isAssured = isAssuredSale(sale['paymentplan'])
+    const preSalesPerson = personNameOrUnknown(sale['presalespersonname']);
+    const salesPerson = personNameOrUnknown(sale['salespersonname']);
     const [start, end] = this.getDateRange
-    const isInSelectedRange = start <= sale['purchasedate']?.toDate() && end >= sale['purchasedate']?.toDate()
+    const isInSelectedRange = isWithinRange(sale['purchasedate']?.toDate(), start, end)
 
-    if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) || (isInSelectedRange)) {
+    if (!isMovementType(sale['type']) || (isInSelectedRange)) {
 
       metric.gross.totalValue -= sale[valueKey] || 0
       metric.gross.totalEMI -= sale['installmentamount'] || 0
@@ -4291,7 +4196,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
           metric[`gross${sale['journeytype']}`]?.data.splice(findId, 1);
           metric[`gross${sale['journeytype']}`].totalValue -= sale[valueKey] || 0
         }
-      } else if ([null, undefined, '', 'pending'].includes(status)) {
+      } else if (isPendingStatus(status)) {
         const findId = metric.grosspending.find((id) => docId)
         metric.grosspending.splice(findId, 1);
       }
@@ -4314,7 +4219,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
 
     }
-    if (['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+    if (isMovementType(sale['type'])) {
       const findId = metric[`gross${sale['type']}`].data.find((id) => docId)
       metric[`gross${sale['type']}`].data.splice(findId, 1);
 
@@ -4331,7 +4236,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
     if (status === 'approved') {
 
-      if (['new', 'addons', 'upgrade'].includes(sale['type']) || isInSelectedRange) {
+      if (isCountingType(sale['type']) || isInSelectedRange) {
 
         preSalesMap.get(preSalesPerson).grossCount--
         salesPersonMap.get(salesPerson).grossCount--
@@ -4384,13 +4289,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // filter predicate for sale type
   filterPredicateForSaleType(person, selectedSaleTypeFilter: string) {
-    const saleTypes = selectedSaleTypeFilter.split(',')
-    if (saleTypes.length > 0) {
-      return saleTypes.some((key) => {
-        return person[key] > 0
-      })
-    }
-    return true
+    return matchesSaleTypeFilter(person, selectedSaleTypeFilter);
   }
 
   // function to filter sales by sale type
@@ -4408,36 +4307,17 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // function to filter pre and sales person
   filterPreAndSalesPerson(person): boolean {
-    const values: any = Object.values(person);
-    if (person?.person !== 'Unknown') {
-      for (let i = 1; i < values.length; i++) {
-        if (values[i] > 0) {
-          return true
-        }
-      }
-    }
-    return false
+    return hasAnyPositiveMetric(person);
   }
 
   // helper function to get selected date range
   get getDateRange() {
-    const start = new Date(this.startDate);
-    const end = new Date(this.endDate);
-
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999)
-
-    return [start, end]
+    return dayBounds(this.startDate, this.endDate);
   }
 
   // functoin to calculate top five pre sales person
   calculateTopFivePreSalesPerson() {
-    const allPreSalesPerson = Array.from(this.topPreSalesPersonMap.values()).filter((p) => p.person !== 'Team');
-    allPreSalesPerson.sort((person_1, person_2) => {
-      return person_2.assured - person_1.assured;
-    });
-
-    this.topPreSalesPerson = allPreSalesPerson.slice(0, 5);
+    this.topPreSalesPerson = topPerformers(Array.from(this.topPreSalesPersonMap.values()));
 
     this.slider['pre'].currentPage = 0;
     this.slider['pre'].totalCount = this.topPreSalesPerson.length
@@ -4446,25 +4326,14 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // functoin to calculate top five sales person
   calculateTopFiveSalesPerson() {
-    const allSalesPerson = Array.from(this.topSalesPersonMap.values()).filter((p) => p.person !== 'Team');
-    allSalesPerson.sort((person_1, person_2) => {
-      return person_2.assured - person_1.assured;
-    });
-
-    this.topSalesPerson = allSalesPerson.slice(0, 5);
+    this.topSalesPerson = topPerformers(Array.from(this.topSalesPersonMap.values()));
     this.slider['sal'].currentPage = 0;
     this.slider['sal'].totalCount = this.topSalesPerson.length;
   }
 
   // functoin to calculate top five sales perons pair
   calculateTopFiveSalesPersonPair() {
-    const topSalesPersonPairMap = Array.from(this.topSalesPersonPairMap.values()).filter((p) => ![p.preSalesPerson, p.salesPerson].includes('Team'));
-
-    topSalesPersonPairMap.sort((pair_1, pair_2) => {
-      return pair_2.assured - pair_1.assured;
-    });
-
-    this.topSalesPersonPair = topSalesPersonPairMap.slice(0, 5);
+    this.topSalesPersonPair = topPairs(Array.from(this.topSalesPersonPairMap.values()));
     this.slider['presalepair'].currentPage = 0;
     this.slider['presalepair'].totalCount = this.topSalesPersonPair.length
   }
@@ -4493,18 +4362,14 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
     });
 
     data.sort((a, b) => b.assured - a.assured);
-    for (let i = 0; i < data.length; i += 8) {
-      chunks.push(data.slice(i, i + 8));
-    }
+    chunks.push(...chunk(data));
     this.slider['pairs'].totalCount = chunks.length
     return chunks;
   }
 
   // function to set monthly trends range
   setMonthlyTrendsRange(duration: number) {
-    const currentDate = new Date();
-    currentDate.setMonth(currentDate.getMonth() - duration);
-    this.selectedMonth = { month: currentDate.getMonth(), year: currentDate.getFullYear() };
+    this.selectedMonth = trendsStartMonth(duration);
     this.chosenDuration = duration;
     this.fetchMonthTrendsData();
   }
@@ -4575,17 +4440,17 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
         continue
       }
       if (monthlyMap.has(month)) {
-        if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type']) || (isInSelectedRange)) {
+        if (!isMovementType(sale['type']) || (isInSelectedRange)) {
 
           if (status === 'approved') {
             monthlyMap.get(month).gross++
           }
-          if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+          if (!isMovementType(sale['type'])) {
             monthlyMap.get(month).actualgross++
           }
           if (isAssured) {
             monthlyMap.get(month).assured++
-            if (!['cancelled', 'downgradetoold', 'downgradetonew'].includes(sale['type'])) {
+            if (!isMovementType(sale['type'])) {
               monthlyMap.get(month).actualassured++
             }
           }
@@ -4652,7 +4517,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
         if (cancelSnap.exists()) {
           const originalSale = cancelSnap.data();
-          const balanceAmount = (originalSale['totalpurchasevalue'] ?? 0) - (sale['totalpurchasevalue'] ?? 0);
+          const balanceAmount = cancellationBalance(originalSale['totalpurchasevalue'], sale['totalpurchasevalue']);
           const cancelData = { ...originalSale, balanceamount: balanceAmount, type: 'cancelled', 'cancelleddate': sale['date'] };
           saleLeadsMap[cancelData['docid']] = cancelData
         }
@@ -4685,36 +4550,28 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
 
   // helper function to get percentage
   getPercentage(value1: any = 0, value2: any = 0) {
-    return value2 > 0 ? this.Math.floor((value1 * 100) / value2) : 0;
+    return percentageOf(value1, value2);
   }
 
   // function to init slider
   private initSlider() {
-    return { currentPage: 0, isDragging: false, dragStartX: 0, dragDelta: 0, outerWidth: 300, totalCount: 0 };
+    return initSlider();
   }
 
   // function to get pair avatar
   getPairAvatar(pair: TopPerformer) {
-    return `${pair.preSalesPerson.at(0)} x ${pair.salesPerson.at(0)}`;
+    return pairAvatar(pair);
   }
 
   // function to handel slider
   getTransform(key: string): string {
-    const s = this.slider[key];
-    if (s.isDragging) {
-      const dragPct = s.outerWidth ? (s.dragDelta / s.outerWidth) * 100 : 0;
-      const rawPct = s.currentPage * 100 - dragPct;
-      const clampedPct = Math.min((Math.min(this.MAX_SLIDES - 1, s.totalCount - 1)) * 100, Math.max(0, rawPct)); // ← clamp added
-      return `translateX(-${clampedPct}%)`;
-    }
-    return `translateX(-${s.currentPage * 100}%)`;
+    return sliderTransform(this.slider[key], this.MAX_SLIDES);
   }
 
   // function to move sliding card
   goTo(key: string, page: number, total?: number): void {
     const s = this.slider[key];
-    const max = total ?? 999;
-    s.currentPage = Math.max(0, Math.min(max - 1, page));
+    s.currentPage = sliderGoToPage(page, total);
     s.dragDelta = 0;
   }
 
@@ -4773,13 +4630,7 @@ export class SalesDashboardCloneComponent implements OnInit, OnDestroy {
   // function to move sliding
   private settle(key: string): void {
     const s = this.slider[key];
-    const THRESHOLD = 60;
-    if (s.dragDelta < -THRESHOLD) {
-      s.currentPage = s.currentPage + 1;
-    } else if (s.dragDelta > THRESHOLD) {
-      s.currentPage = s.currentPage - 1;
-    }
-    s.currentPage = Math.max(0, Math.min(this.MAX_SLIDES - 1, s.currentPage, s.totalCount - 1)); // ← clamp added
+    s.currentPage = settleSliderPage(s, this.MAX_SLIDES);
     s.dragDelta = 0;
   }
 

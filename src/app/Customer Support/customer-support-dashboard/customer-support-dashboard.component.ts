@@ -28,6 +28,37 @@ import { CustomerChatScreenComponent } from "../customer-chat-screen/customer-ch
 import { ChatConfigComponent } from '../chat-config/chat-config.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import html2canvas from 'html2canvas';
+// The pure rules behind this dashboard (the filter form, the status/negligence bands, the header sort,
+// the category report, the day counters and the week number) live in a dependency-free sibling engine so
+// they can be unit-tested without this component's Firestore stack. Extracted 2026-09-10; see
+// customer-support-dashboard.engine.ts for what moved, and for the unguarded toLowerCase/localeCompare
+// calls that are pinned there as DEFECT tests rather than fixed.
+import {
+  buildCategoryReport,
+  calculateDaysAgo as calculateDaysAgoRule,
+  calculateDaysClosed as calculateDaysClosedRule,
+  filterAdminUserOptions,
+  filterCategoryOptions,
+  filterJourneyOptions,
+  filterTickets,
+  hasReview,
+  isOpenStatus,
+  isClosedStatus,
+  isReopened,
+  mostRecentTimestampKey,
+  negligenceBand,
+  nextSortState,
+  openChatBand,
+  paginate,
+  reportTotal,
+  sortTickets,
+  statusRowClass,
+  totalPages,
+  toggleCategorySelection,
+  uniqueCategories,
+  weekNumberFor,
+  weekYearKey,
+} from './customer-support-dashboard.engine';
 
 @Component({
   selector: 'app-customer-support-dashboard',
@@ -212,6 +243,8 @@ export class CustomerSupportDashboardComponent {
           }
           this.journeyList.push(map);
         }
+        // Unguarded .localeCompare on a journey name Firestore does not guarantee — see DEFECT 13
+        // in customer-support-dashboard.engine.ts. Left as-is deliberately.
         this.journeyList.sort((a, b) => a['journey'].localeCompare(b['journey']));
       });
       const chatconfigRef = collection(this.firestore, 'chat config');
@@ -290,41 +323,9 @@ export class CustomerSupportDashboardComponent {
 
   // function to filter form 
   formfilter(value, refreshpage) {
-
-    let weekyear = `${this.weekNumber}${"-"}${this.weekYear}`;
-
-    this.clientIssues = this.tempIssues.filter((e) => {
-      const ticketDateArray = e.reporteddate;
-      const endDate = new Date(value.ticketend);
-      endDate.setHours(23, 59, 59, 999);
-
-      const closedTicketDate = e.status?.date;
-      const closedEndDate = new Date(value.closedend);
-      closedEndDate.setHours(23, 59, 59, 999);
-
-      if (((e.issue?.toLowerCase().trim().replace(/\s/g, "").indexOf(value.search != '' ? value.search?.toLowerCase().trim().replace(/\s/g, "") : '') > -1)
-        || (e.name?.toLowerCase().trim().replace(/\s/g, "").indexOf(value.search != '' ? value.search?.toLowerCase().trim().replace(/\s/g, "") : '') > -1)
-        || (e.email?.toLowerCase().trim().replace(/\s/g, "").indexOf(value.search != '' ? value.search?.toLowerCase().trim().replace(/\s/g, "") : '') > -1)
-        || (e.issueno?.toString().trim().replace(/\s/g, "").indexOf(value.search != '' ? value.search.toString().toLowerCase().trim().replace(/\s/g, "") : '') > -1))
-        && (value.status.length != 0 ? value.status?.toLowerCase().includes(e.status.status?.toLowerCase()) : true)
-        && (value.category.length != 0 ? value.category.includes(e.category) : true)
-        && (value.journey.length != 0 ? value.journey.includes(e.journey?.id) : true)
-        && (value.assign.length != 0 ? value.assign.some(item => e.assign.includes(item)) : true)
-        && (value.reviewedby.length != 0 ? value.reviewedby.some(item => ![null, undefined].includes(e.review) && Object.keys(e.review).includes(item)) : true)
-        && (value.peopleinvolved.length != 0 ? value.peopleinvolved.some(item => e.peopleinvolved?.includes(item)) : true)
-        && (value.chatstatus != '' ? value.chatstatus == e.chatstatus && ![null, undefined].includes(e.chatstatus) : true)
-        && (value.flag ? value.flag == e.flag && ![null, undefined].includes(e.flag) : true)
-        && (value.review != '' ? ![null, undefined].includes(e.review) && value.review == 'true' ? e.review && typeof e.review === 'object' && Object.keys(e.review).length != 0 : e.review && typeof e.review === 'object' && Object.keys(e.review).length == 0 : true)
-        // && (value.mandatereview != '' ? ![null, undefined].includes(e.mandatereview) && value.mandatereview == 'true' ? e.mandatereview && typeof e.mandatereview === 'object' && e.mandatereview.hasOwnProperty(this.profile_id) : e.mandatereview && typeof e.mandatereview === 'object' && !(e.mandatereview.hasOwnProperty(this.profile_id)) : true)
-        && (value.metrics != '' ? value.metrics == 'gross' ? ![null, undefined, ""].includes(e.negligencemetrics) && e.negligencemetrics.hasOwnProperty(weekyear) && e.negligencemetrics[weekyear] > 8 : value.metrics == 'high' ? ![null, undefined, ""].includes(e.negligencemetrics) && e.negligencemetrics.hasOwnProperty(weekyear) && e.negligencemetrics[weekyear] < 9 && e.negligencemetrics[weekyear] > 5 : ![null, undefined, ""].includes(e.negligencemetrics) && e.negligencemetrics.hasOwnProperty(weekyear) && [4, 5].includes(e.negligencemetrics[weekyear]) : true)
-        && (value.priority.length != 0 ? value.priority.includes(e.priority) : true)
-        && ((![null, undefined, ""].includes(value.ticketstart) ? (ticketDateArray?.toDate() >= new Date(value.ticketstart)) : true)
-          && (![null, undefined, ""].includes(value.ticketend) ? (ticketDateArray?.toDate() <= endDate) : true))
-        && ((![null, undefined, ""].includes(value.closedstart) ? (closedTicketDate?.toDate() >= new Date(value.closedstart)) : true)
-          && (![null, undefined, ""].includes(value.closedend) ? (closedTicketDate?.toDate() <= closedEndDate) : true))) {
-        return e;
-      }
-    });
+    // The whole predicate is a rule — see customer-support-dashboard.engine.ts
+    const weekyear = weekYearKey(this.weekNumber, this.weekYear);
+    this.clientIssues = filterTickets(this.tempIssues, value, weekyear);
     if (refreshpage) {
       this.currentPage = 1;
       this.itemsPerPage = 10;
@@ -375,16 +376,13 @@ export class CustomerSupportDashboardComponent {
           let weekyear = `${this.weekNumber}${"-"}${this.weekYear}`;
 
           if (![null, undefined, ""].includes(element['negligencemetrics']) && element['negligencemetrics'].hasOwnProperty(weekyear)) {
-            if (element['negligencemetrics'][weekyear] > 8) {
-              this.grosstickets = this.grosstickets + 1;
-            } else if (element['negligencemetrics'][weekyear] < 9 && element['negligencemetrics'][weekyear] > 5) {
-              this.hightickets = this.hightickets + 1;
-            } else if ([4, 5].includes(element['negligencemetrics'][weekyear])) {
-              this.moderatetickets = this.moderatetickets + 1;
-            } else if ([1, 2, 3].includes(element['negligencemetrics'][weekyear])) {
-              this.lowtickets = this.lowtickets + 1;
-            } else if (element['negligencemetrics'][weekyear] == 0) {
-              this.notickets = this.notickets + 1;
+            // Band rule in customer-support-dashboard.engine.ts
+            switch (negligenceBand(element['negligencemetrics'][weekyear])) {
+              case 'gross': this.grosstickets = this.grosstickets + 1; break;
+              case 'high': this.hightickets = this.hightickets + 1; break;
+              case 'moderate': this.moderatetickets = this.moderatetickets + 1; break;
+              case 'low': this.lowtickets = this.lowtickets + 1; break;
+              case 'none': this.notickets = this.notickets + 1; break;
             }
           }
 
@@ -406,7 +404,8 @@ export class CustomerSupportDashboardComponent {
           }
 
           // if the ticket is open 
-          if (element['status']['status']?.toLowerCase().includes('open')) {
+          // Status rules in customer-support-dashboard.engine.ts
+          if (isOpenStatus(element['status'])) {
             this.opentickets = this.opentickets + 1;
 
             // increment open count based on category 
@@ -414,27 +413,25 @@ export class CustomerSupportDashboardComponent {
 
             // check chatstatus 
             if (![null, undefined, ""].includes(element['chatstatus'])) {
-              if (element['chatstatus'] == 'New') {
-                this.newtickets = this.newtickets + 1;
-              } else if (element['chatstatus']?.toLowerCase() == 'responded') {
-                this.respondedtickets = this.respondedtickets + 1;
-              } else if (['decision making', 'pending'].includes(element['chatstatus']?.toLowerCase())) {
-                this.pendingtickets = this.pendingtickets + 1;
+              switch (openChatBand(element['chatstatus'])) {
+                case 'new': this.newtickets = this.newtickets + 1; break;
+                case 'responded': this.respondedtickets = this.respondedtickets + 1; break;
+                case 'pending': this.pendingtickets = this.pendingtickets + 1; break;
               }
             }
 
-          } else if (element['status']['status']?.toLowerCase().includes('close')) {
+          } else if (isClosedStatus(element['status'])) {
             // increment close count based on category 
             ![null, undefined, ''].includes(this.categoryCountMap[element['category']]) ? this.categoryCountMap[element['category']].close++ : '';
             this.closetickets = this.closetickets + 1;
           }
 
           // condition to check reopen ticket 
-          if (element['status']['status']?.toLowerCase().includes('open')) {
-            if (![null, undefined, ''].includes(element['status']?.editedBy)) {
-              if (!this.chatadminUsers.includes(element['status']?.editedBy)) {
-                element['reopen'] = true;
-              }
+          // Rule in customer-support-dashboard.engine.ts. NOTE the original never set reopen=false
+          // inside the open branch; that asymmetry is preserved.
+          if (isOpenStatus(element['status'])) {
+            if (isReopened(element['status'], this.chatadminUsers)) {
+              element['reopen'] = true;
             }
           } else {
             element['reopen'] = false;
@@ -533,16 +530,13 @@ export class CustomerSupportDashboardComponent {
             let weekyear = `${this.weekNumber}${"-"}${this.weekYear}`;
 
             if (![null, undefined, ""].includes(element['negligencemetrics']) && element['negligencemetrics'].hasOwnProperty(weekyear)) {
-              if (element['negligencemetrics'][weekyear] > 8) {
-                this.grosstickets = this.grosstickets + 1;
-              } else if (element['negligencemetrics'][weekyear] < 9 && element['negligencemetrics'][weekyear] > 5) {
-                this.hightickets = this.hightickets + 1;
-              } else if ([4, 5].includes(element['negligencemetrics'][weekyear])) {
-                this.moderatetickets = this.moderatetickets + 1;
-              } else if ([1, 2, 3].includes(element['negligencemetrics'][weekyear])) {
-                this.lowtickets = this.lowtickets + 1;
-              } else if (element['negligencemetrics'][weekyear] == 0) {
-                this.notickets = this.notickets + 1;
+              // Band rule in customer-support-dashboard.engine.ts
+              switch (negligenceBand(element['negligencemetrics'][weekyear])) {
+                case 'gross': this.grosstickets = this.grosstickets + 1; break;
+                case 'high': this.hightickets = this.hightickets + 1; break;
+                case 'moderate': this.moderatetickets = this.moderatetickets + 1; break;
+                case 'low': this.lowtickets = this.lowtickets + 1; break;
+                case 'none': this.notickets = this.notickets + 1; break;
               }
             }
 
@@ -564,7 +558,8 @@ export class CustomerSupportDashboardComponent {
             }
 
             // if the ticket is open 
-            if (element['status']['status']?.toLowerCase().includes('open')) {
+            // Status rules in customer-support-dashboard.engine.ts
+            if (isOpenStatus(element['status'])) {
               this.opentickets = this.opentickets + 1;
 
               // increment open count based on category 
@@ -576,23 +571,27 @@ export class CustomerSupportDashboardComponent {
                   this.newtickets = this.newtickets + 1;
                 } else if (element['chatstatus']?.toLowerCase() == 'responded') {
                   this.respondedtickets = this.respondedtickets + 1;
+                  // NOTE: this branch deliberately NOT delegated to openChatBand(). My-tickets counts
+                  // ONLY 'decision making' as pending, while all-tickets also counts 'pending'. The two
+                  // views genuinely disagree; unifying them here would be a behaviour change, not a
+                  // refactor. See DEFECT 2b in customer-support-dashboard.engine.ts.
                 } else if (element['chatstatus']?.toLowerCase() == 'decision making') {
                   this.pendingtickets = this.pendingtickets + 1;
                 }
               }
 
-            } else if (element['status']['status']?.toLowerCase().includes('close')) {
+            } else if (isClosedStatus(element['status'])) {
               // increment close count based on category 
               ![null, undefined, ''].includes(this.categoryCountMap[element['category']]) ? this.categoryCountMap[element['category']].close++ : '';
               this.closetickets = this.closetickets + 1;
             }
 
             // condition to check reopen ticket 
-            if (element['status']['status']?.toLowerCase().includes('open')) {
-              if (![null, undefined, ''].includes(element['status']?.editedBy)) {
-                if (!this.chatadminUsers.includes(element['status']?.editedBy)) {
-                  element['reopen'] = true;
-                }
+            // Rule in customer-support-dashboard.engine.ts. NOTE the original never set reopen=false
+            // inside the open branch; that asymmetry is preserved.
+            if (isOpenStatus(element['status'])) {
+              if (isReopened(element['status'], this.chatadminUsers)) {
+                element['reopen'] = true;
               }
             } else {
               element['reopen'] = false;
@@ -968,44 +967,32 @@ export class CustomerSupportDashboardComponent {
 
   // function to sort column when clicked on header 
   sortcolumn(column: string) {
-    // if the column is already clicked 
-    if (this.sortColumn == column) {
-      if (this.sortOrder == "desc") {
-        this.sortColumn = "";
-        this.formfilter(this.filterform.value, false);
-      } else if (this.sortOrder == 'asc') {
-        this.sortOrder = "desc";
-        this.sortColumn = column;
-        this.descSorting(column);
-      } else {
-        this.sortOrder = "asc";
-        this.sortColumn = column;
-        this.ascSorting(column);
-      }
-    } else {
-      // if the column is not clicked 
-      this.sortOrder = "asc";
-      this.sortColumn = column;
-      this.ascSorting(column);
+    // The three-state header cycle is a rule — customer-support-dashboard.engine.ts
+    const next = nextSortState(this.sortColumn, this.sortOrder as any, column);
+    this.sortColumn = next.column;
+    if (next.column === '') {
+      this.formfilter(this.filterform.value, false);
+      return;
     }
+    this.sortOrder = next.order;
+    this.clientIssues = sortTickets(
+      this.clientIssues, next.column, next.order as 'asc' | 'desc',
+      { mapProfileData: this.mapProfileData, mapJourney: this.mapJourney },
+    );
   }
 
   // Opens category selection dialog with unique categories from open tickets
   openCategorySelector() {
-    const openTickets = this.tempIssues;
-    this.allCategories = [...new Set(openTickets.map(t => t.category).filter(c => c))].sort();
+    // Rule in customer-support-dashboard.engine.ts
+    this.allCategories = uniqueCategories(this.tempIssues);
     this.selectedCategories = [...this.allCategories];
     this.showCategoryDialog = true;
   }
 
   // Toggles a category's selection state in the checkbox list
   toggleCategory(category: string) {
-    const index = this.selectedCategories.indexOf(category);
-    if (index > -1) {
-      this.selectedCategories.splice(index, 1);
-    } else {
-      this.selectedCategories.push(category);
-    }
+    // Rule in customer-support-dashboard.engine.ts
+    this.selectedCategories = toggleCategorySelection(this.selectedCategories, category);
   }
 
   // Selects all categories in the dialog
@@ -1025,106 +1012,13 @@ export class CustomerSupportDashboardComponent {
 
   // Generates report data by grouping open tickets into time-based buckets per category
   generateReport() {
-    const now = new Date();
-
-    const openTickets = this.tempIssues.filter(
-      t => t.status?.status?.toLowerCase() === 'open'
-    );
-
-    const closedTickets = this.tempIssues.filter(
-      t => t.status?.status?.toLowerCase() === 'closed'
-    );
-
-    this.reportData = this.selectedCategories.sort().map(category => {
-      const categoryTickets = openTickets.filter(t => t.category === category);
-      const closedTicketsCategory = closedTickets.filter(t => t.category === category);
-
-      let closedLast24 = 0;
-
-      let last24 = 0, hrs48 = 0, hrs72 = 0, days7 = 0, month1 = 0, moreThan1Month = 0;
-      let last24Unresponded = 0, hrs48Unresponded = 0, hrs72Unresponded = 0;
-      let days7Unresponded = 0, month1Unresponded = 0, moreThan1MonthUnresponded = 0;
-
-      categoryTickets.forEach(ticket => {
-        let reportedDate: Date;
-
-        if (ticket.reporteddate?.toDate) {
-          reportedDate = ticket.reporteddate.toDate();
-        } else if (ticket.reporteddate?.seconds) {
-          reportedDate = new Date(ticket.reporteddate.seconds * 1000);
-        } else {
-          reportedDate = new Date(ticket.reporteddate);
-        }
-
-        const diffMs = now.getTime() - reportedDate.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        const diffDays = diffHours / 24;
-
-        const chatStatus = ticket.chatstatus;
-        const isUnresponded = [null, undefined, 'new'].includes(
-          chatStatus != null ? chatStatus.toLowerCase() : chatStatus
-        );
-
-        if (diffHours <= 24) {
-          last24++;
-          if (isUnresponded) last24Unresponded++;
-        } else if (diffHours <= 48) {
-          hrs48++;
-          if (isUnresponded) hrs48Unresponded++;
-        } else if (diffHours <= 72) {
-          hrs72++;
-          if (isUnresponded) hrs72Unresponded++;
-        } else if (diffDays <= 7) {
-          days7++;
-          if (isUnresponded) days7Unresponded++;
-        } else if (diffDays <= 30) {
-          month1++;
-          if (isUnresponded) month1Unresponded++;
-        } else {
-          moreThan1Month++;
-          if (isUnresponded) moreThan1MonthUnresponded++;
-        }
-      });
-
-      closedTicketsCategory.forEach((ticket) => {
-        let date: Date;
-
-        if (ticket?.status?.date?.toDate) {
-          date = ticket.status.date.toDate();
-        } else if (ticket.status?.date?.seconds) {
-          date = new Date(ticket.status?.date?.seconds * 1000);
-        } else {
-          date = new Date(ticket.date);
-        }
-
-        const diffMs = now.getTime() - date.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-
-        if (diffHours <= 24) {
-          closedLast24++;
-        }
-      });
-
-      return {
-        category,
-        total: categoryTickets.length,
-        totalUnresponded: last24Unresponded + hrs48Unresponded + hrs72Unresponded
-          + days7Unresponded + month1Unresponded + moreThan1MonthUnresponded,
-        closedLast24,
-        last24, last24Unresponded,
-        hrs48, hrs48Unresponded,
-        hrs72, hrs72Unresponded,
-        days7, days7Unresponded,
-        month01: month1,
-        month01Unresponded: month1Unresponded,
-        moreThan01: moreThan1Month,
-        moreThan01Unresponded: moreThan1MonthUnresponded,
-      };
-    });
+    // The whole report — bucketing, unresponded counts and the closed-in-24h tally — is a rule.
+    // See customer-support-dashboard.engine.ts.
+    this.reportData = buildCategoryReport(this.tempIssues, this.selectedCategories);
   }
 
   getTotal(field: string): number {
-    return this.reportData.reduce((sum, row) => sum + row[field], 0);
+    return reportTotal(this.reportData, field);
   }
 
   async downloadReport() {
@@ -1418,74 +1312,8 @@ export class CustomerSupportDashboardComponent {
     link.click();
   }
 
-  // function to sort columns in ascending order 
-  ascSorting(column) {
-    if (['category', 'name', 'chatstatus', 'priority'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => a[column]?.toLowerCase().localeCompare(b[column]?.toLowerCase()));
-    }
-
-    if (column == "severity") {
-      this.clientIssues = this.clientIssues.sort((a, b) => a['flagdata']?.severity?.toLowerCase().localeCompare(b['flagdata']?.severity?.toLowerCase()));
-    }
-
-    if (['active', 'issueno', 'closed'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => a[column] - b[column]);
-    }
-
-    if (['happinessindex'].includes(column)) {
-      this.clientIssues = this.clientIssues.filter((e) => ![null, undefined, ''].includes(e[column])).sort((a, b) => a[column] - b[column]);
-      this.clientIssues.push(...this.clientIssues.filter((e) => [null, undefined, ''].includes(e[column])));
-    }
-
-    if (['reportedBy'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => this.mapProfileData[a[column]]?.name?.toLowerCase().localeCompare(this.mapProfileData[b[column]]?.name?.toLowerCase()));
-    }
-    if (['journey'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => this.mapJourney[a[column]?.id]?.toLowerCase().localeCompare(this.mapProfileData[b[column]?.id]?.toLowerCase()));
-    }
-
-    if (['reporteddate'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => a[column]?.toDate() - b[column]?.toDate());
-    }
-
-    if (['closeddate'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => a.status.date?.toDate() - b.status.date?.toDate());
-    }
-  }
-
-  // function to sort columns in descending order 
-  descSorting(column) {
-    if (['category', 'name', 'chatstatus', 'priority'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => b[column]?.toLowerCase().localeCompare(a[column]?.toLowerCase()));
-    }
-    if (['active', 'issueno', 'closed'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => b[column] - a[column]);
-    }
-
-    if (column == "severity") {
-      this.clientIssues = this.clientIssues.sort((a, b) => b['flagdata']?.severity?.toLowerCase().localeCompare(a['flagdata']?.severity?.toLowerCase()));
-    }
-
-    if (['happinessindex'].includes(column)) {
-      this.clientIssues = this.clientIssues.filter((e) => ![null, undefined, ''].includes(e[column])).sort((a, b) => b[column] - a[column]);
-      this.clientIssues.push(...this.clientIssues.filter((e) => [null, undefined, ''].includes(e[column])));
-    }
-
-    if (['reportedBy'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => this.mapProfileData[b[column]]?.name?.toLowerCase().localeCompare(this.mapProfileData[a[column]]?.name?.toLowerCase()));
-    }
-    if (['journey'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => this.mapJourney[b[column]?.id]?.toLowerCase().localeCompare(this.mapProfileData[a[column]?.id]?.toLowerCase()));
-    }
-
-    if (['reporteddate'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => b[column]?.toDate() - a[column]?.toDate());
-    }
-
-    if (['closeddate'].includes(column)) {
-      this.clientIssues = this.clientIssues.sort((a, b) => b.status.date?.toDate() - a.status.date?.toDate());
-    }
-  }
+  // ascSorting()/descSorting() were deleted on 2026-09-10 — both directions are now one rule,
+  // sortTickets(), in customer-support-dashboard.engine.ts.
 
   // function to refresh all the values to actual value 
   refresh() {
@@ -1531,19 +1359,15 @@ export class CustomerSupportDashboardComponent {
 
   // function to slice tickets count based on items per page 
   get paginatedData() {
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    // if(this.tableView == "open") {
-    //   this.clientIssues.sort((a,b)=>b.unread - a.unread)
-    // }  
-    return this.clientIssues.slice(startIndex, startIndex + this.itemsPerPage);
+    // Rule in customer-support-dashboard.engine.ts
+    return paginate(this.clientIssues, this.currentPage, this.itemsPerPage);
   }
 
   // function to get total no of pages 
   get totalPages() {
-    return Math.ceil(this.clientIssues.length / this.itemsPerPage);
+    return totalPages(this.clientIssues.length, this.itemsPerPage);
   }
 
-  // function to go to next page in table 
   nextPage() {
     if (this.currentPage < this.totalPages) {
       this.currentPage++;
@@ -1739,24 +1563,12 @@ export class CustomerSupportDashboardComponent {
 
   // function to get week number of the date selected 
   getWeekNumber(date: Date): number {
-    const tempDate = new Date(date);
-    tempDate.setHours(0, 0, 0, 0);
-
-    this.weekYear = tempDate.getFullYear();
-
-    const dayOffset = (tempDate.getDay() - 2 + 7) % 7;
-    tempDate.setDate(tempDate.getDate() - dayOffset);
-
-    const yearStart = new Date(tempDate.getFullYear(), 0, 1);
-    const yearStartDay = (yearStart.getDay() - 2 + 7) % 7;
-    yearStart.setDate(yearStart.getDate() + (yearStartDay === 0 ? 0 : 7 - yearStartDay));
-
-    const daysSinceYearStart = Math.floor((tempDate.getTime() - yearStart.getTime()) / 86400000);
-    const weekNumber = Math.floor(daysSinceYearStart / 7) + 1;
-
+    // Rule in customer-support-dashboard.engine.ts. It returns the year alongside the number; the
+    // component still stores the year on itself, exactly as before.
+    const { weekNumber, weekYear } = weekNumberFor(date);
+    this.weekYear = weekYear;
     return weekNumber;
   }
-
 
   // function to open category configuring screen 
   openCategory() {
@@ -1780,35 +1592,36 @@ export class CustomerSupportDashboardComponent {
 
   // function to calculate time taken to close ticket 
   calculateDaysClosed(reportedDate: Date, closedDate: Date): string {
-    const daysDiff = Math.floor((closedDate?.getTime() - reportedDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? '0' : daysDiff.toString();
+    // Rule in customer-support-dashboard.engine.ts
+    return calculateDaysClosedRule(reportedDate, closedDate);
   }
 
   // function to calculate active time for ticket that is opened 
   calculateDaysAgo(reportedDate: Date): string {
-    const currentDate = new Date();
-    const daysDiff = Math.floor((currentDate?.getTime() - reportedDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? '0' : daysDiff.toString();
+    // Rule in customer-support-dashboard.engine.ts
+    return calculateDaysAgoRule(reportedDate);
   }
 
   // function to return category 
   returnFilterCategory() {
-    return this.categories.filter(e => e.category?.toLowerCase().includes(this.filteredCategory?.toLowerCase()))
+    // Rules in customer-support-dashboard.engine.ts — see the DEFECT notes there: the journey and
+    // member filters call .toLowerCase()/.localeCompare() on values Firestore does not guarantee.
+    return filterCategoryOptions(this.categories, this.filteredCategory);
   }
 
-  // function to return journey 
+  // function to return journey
   returnFilterJourney() {
-    return this.journeyList.filter(e => e.journey.toLowerCase().includes(this.filteredJourney?.toLowerCase())).sort((a, b) => a['journey'].localeCompare(b['journey']));
+    return filterJourneyOptions(this.journeyList, this.filteredJourney);
   }
 
-  // function to return user 
+  // function to return user
   returnFilterMember() {
-    return this.chatadminUsers.filter(e => this.mapProfileData[e]['name']?.toLowerCase().includes(this.filteredMember?.toLowerCase())).sort((a, b) => this.mapProfileData[a]['name']?.toLowerCase().localeCompare(this.mapProfileData[b]['name']?.toLowerCase()))
+    return filterAdminUserOptions(this.chatadminUsers, this.mapProfileData, this.filteredMember);
   }
 
-  // function to return user 
+  // function to return user
   returnReviewedUser() {
-    return this.chatadminUsers.filter(e => this.mapProfileData[e]['name']?.toLowerCase().includes(this.filteredReviewed?.toLowerCase())).sort((a, b) => this.mapProfileData[a]['name']?.toLowerCase().localeCompare(this.mapProfileData[b]['name']?.toLowerCase()))
+    return filterAdminUserOptions(this.chatadminUsers, this.mapProfileData, this.filteredReviewed);
   }
 
   // function to open snack bar 
@@ -1818,12 +1631,8 @@ export class CustomerSupportDashboardComponent {
 
   // function to get color of table based on the ticket status 
   getStatusColor(status: string): string {
-    if (status['status'].toLowerCase() === "open") {
-      return 'row-open';
-    } else if (status['status'].toLowerCase() === "closed") {
-      return 'row-closed';
-    }
-    return '';
+    // Rule in customer-support-dashboard.engine.ts — UNGUARDED there, exactly as it was here.
+    return statusRowClass(status);
   }
 
   // function to get scroll location 
@@ -1845,15 +1654,9 @@ export class CustomerSupportDashboardComponent {
 
   // function to check whether my profileid present in review 
   isIdPresent(myObject): boolean {
-    if (![null, undefined, ""].includes(myObject['review'])) {
-      if (Object.keys(myObject['review']).length != 0) {
-        return true;
-      } else {
-        return false;
-      }
-    } else {
-      return false;
-    }
+    // Rule in customer-support-dashboard.engine.ts (named hasReview there — the id it once checked
+    // for is long gone from the condition).
+    return hasReview(myObject);
   }
 
   // function to open dialog of release log of this screen 
@@ -1869,40 +1672,8 @@ export class CustomerSupportDashboardComponent {
   }
 
   getMostRecentTimestampKey(obj: Record<string, any>): string | null {
-    if (!obj || typeof obj !== 'object' || Object.keys(obj).length === 0) {
-      return null;
-    }
-
-    let mostRecentKey: string = null;
-    let mostRecentDate: Date = new Date(0); // Start with oldest possible date
-
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const timestamp = obj[key];
-        let currentDate: Date = null;
-
-        // Handle different timestamp formats
-        if (timestamp instanceof Date) {
-          currentDate = timestamp;
-        } else if (timestamp && typeof timestamp.toDate === 'function') {
-          currentDate = timestamp.toDate(); // Firestore Timestamp object
-        } else if (timestamp && timestamp._seconds !== undefined) {
-          currentDate = new Date(timestamp._seconds * 1000); // Firestore seconds/nanoseconds format
-        } else if (typeof timestamp === 'number') {
-          currentDate = new Date(timestamp); // Numeric timestamp (in milliseconds)
-        } else if (typeof timestamp === 'string' && !isNaN(Date.parse(timestamp))) {
-          currentDate = new Date(timestamp); // ISO string date
-        }
-
-        // If we got a valid date and it's more recent than our current most recent
-        if (currentDate && currentDate > mostRecentDate) {
-          mostRecentDate = currentDate;
-          mostRecentKey = key;
-        }
-      }
-    }
-
-    return mostRecentKey;
+    // Rule in customer-support-dashboard.engine.ts
+    return mostRecentTimestampKey(obj);
   }
 
   chatConfig() {

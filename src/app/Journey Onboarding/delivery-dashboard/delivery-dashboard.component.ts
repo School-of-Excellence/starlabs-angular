@@ -17,6 +17,46 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import * as XLSX from 'xlsx';
 
+// Pure business rules for this dashboard. Extracted 2026-09-10; see delivery-dashboard.engine.ts for
+// what moved and why. The component keeps the Firestore gathering and asks the engine the questions.
+import {
+  allLoaded,
+  clampPage,
+  appointmentCategory,
+  appointmentStatusLabel,
+  clearedAgeBucket,
+  displayMonthLabel,
+  escalationLevel,
+  exportBottleneckLabel,
+  exportFinancialLabel,
+  exportWaitingPeriodLabel,
+  filterDisplayText,
+  financialLabel,
+  hasActiveTableFilter,
+  hasAnyClearedProduct,
+  isAwaitingInitiationCandidate,
+  isStuckCase,
+  istShiftedMonthWindow,
+  lastNoteText,
+  loadedCount,
+  loadingProgressPct,
+  matchesProductSelection,
+  matchesRowFilters,
+  monthBounds,
+  monthYearKey,
+  pageNumbers,
+  pageSlice,
+  priorityLabel,
+  resolveMinimumPayment,
+  shiftMonth,
+  stuckIssueType,
+  stuckResolution,
+  totalPagesFor,
+  waitingDaysSince,
+  waitingPeriodFor,
+  wholeDaysBetweenMidnights,
+} from './delivery-dashboard.engine';
+
 interface TableHeader {
   key: string;
   label: string;
@@ -403,7 +443,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
             if (initiatedDate.toDateString() === todayString) {
               tempArray1.push(productdata);
             }
-            productdata['waitingperiod'] = this.calculateWaitingPeriod(statusDateInitiated.toDate());
+            productdata['waitingperiod'] = waitingDaysSince(statusDateInitiated.toDate());
             const journeyId = this.mapMetaData[productdata['profileid']]?.['activejourney'];
             const journeyname = this.mapjourneyname[journeyId] || 'N/A';
             productdata['journey'] = journeyname;
@@ -454,9 +494,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
             const consumedProduct = this.mapMetaData[profileId]?.['consumedproducts'];
             const journeyStatus = participant['journeystatus'];
 
-            if ((journeyStatus === 'initiated' || journeyStatus === 'ongoing') &&
-              (!activeProduct || activeProduct.length === 0) &&
-              (!consumedProduct || consumedProduct.length === 0)) {
+            if (isAwaitingInitiationCandidate(journeyStatus, activeProduct, consumedProduct)) {
 
               participantsToProcess.push(participant);
               productQueryPromises.push(
@@ -474,36 +512,25 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
             const productQuery = productQueryResults[i];
 
             const onboardedDate = participant['onboardedtime']?.toDate();
-            participant['waitingperiod'] = this.calculateWaitingPeriod(onboardedDate);
+            participant['waitingperiod'] = waitingDaysSince(onboardedDate);
             const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || 0;
             const paymentdate = this.mapMetaData[profileId]?.['lastpaymentdate'];
             participant['lastpaymentdate'] = paymentdate;
-            let hasAtLeastOneCleared = false;
+            const minimums = productQuery.docs.map(d => resolveMinimumPayment(
+              d.data()['minimumpayment'],
+              this.mapProduct[d.data()['productref']?.id]?.minimumrequiredamount,
+            ));
+            const hasAtLeastOneCleared = hasAnyClearedProduct(minimums, totalpaid);
 
-            for (let j = 0; j < productQuery.docs.length; j++) {
-              const productData = productQuery.docs[j].data();
-              let minimumpayment = productData['minimumpayment'];
-              if ([null, undefined].includes(minimumpayment)) {
-                minimumpayment = this.mapProduct[productData['productref']?.id]?.minimumrequiredamount || 0;
-              }
-
-              if (minimumpayment <= totalpaid) {
-                hasAtLeastOneCleared = true;
-                break;
-              }
-            }
-
-            participant['financialdata'] = hasAtLeastOneCleared ? 'Cleared' : 'Pending';
+            participant['financialdata'] = financialLabel(hasAtLeastOneCleared);
             if (participant['financialdata'] === 'Cleared') {
               readyForInitiationArray.push(participant);
               if (paymentdate) {
-                const lastPaymentDate = paymentdate.toDate();
-                lastPaymentDate.setHours(0, 0, 0, 0);
-                const daysDifference = Math.floor((today.getTime() - lastPaymentDate.getTime()) / (1000 * 3600 * 24));
-
-                if (daysDifference > 30) {
+                const daysDifference = wholeDaysBetweenMidnights(paymentdate.toDate(), today);
+                const bucket = clearedAgeBucket(daysDifference);
+                if (bucket === 'over30') {
                   tempArray1.push(participant);
-                } else if (daysDifference > 7) {
+                } else if (bucket === 'over7') {
                   tempArray2.push(participant);
                 }
               }
@@ -563,26 +590,10 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
         return;
       }
 
-      const monthStart = new Date(
-        this.selectedMonth.getFullYear(),
-        this.selectedMonth.getMonth(),
-        1
-      );
-      monthStart.setHours(0, 0, 0, 0);
-
-      const monthEnd = new Date(
-        this.selectedMonth.getFullYear(),
-        this.selectedMonth.getMonth() + 1,
-        0
-      );
-      monthEnd.setHours(23, 59, 59, 999);
-
-      // Add timezone offset (IST = +5:30)
-      monthStart.setTime(monthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
-      monthEnd.setTime(monthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
-
-      const startTimestamp = Timestamp.fromDate(monthStart);
-      const endTimestamp = Timestamp.fromDate(monthEnd);
+      // The IST shift is a known defect, pinned in the engine - see istShiftedMonthWindow().
+      const monthWindow = istShiftedMonthWindow(this.selectedMonth);
+      const startTimestamp = Timestamp.fromDate(monthWindow.start);
+      const endTimestamp = Timestamp.fromDate(monthWindow.end);
 
       const appointmentsSnap = await getDocs(query(
         collection(this.firestore, "appointments"),
@@ -672,46 +683,8 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
         if (doc?.exists()) typeNameMap.set(path, doc.data()["appointmenttype"] || "");
       });
 
-      const categoryMap = {
-        "Welcome To WiSH": "welcomeCall",
-
-        "EI Starter Pack Clarity Call": "clarityCall",
-
-        "A&H Light Diagnostics": "diagnostics",
-        "EI Starter Pack Diagnostics": "diagnostics",
-        "WiSH Diagnostics": "diagnostics",
-        "Critical Support Diagnostics": "diagnostics",
-        "EI Diagnostics": "diagnostics",
-
-        "EI Implementation": "implementation",
-        "WiSH Implementation": "implementation",
-        "Critical Support Implementation": "implementation",
-        "A&H Light Implementation": "implementation",
-        "EI Starter Pack Implementation": "implementation",
-
-        "Critical Support Mid Review": "midReviewDiagnostics",
-        "A&H Light Mid Review": "midReviewDiagnostics",
-
-
-        "A&H Light Review": "finalReview",
-        "EI Review": "finalReview",
-        "WiSH Review": "finalReview",
-        "EI Starter Pack Review": "finalReview",
-        "Critical Support Review": "finalReview",
-        "WiSH Final Review Call": "finalReview",
-
-        "EI Celebration Call": "completed",
-        "WiSH Celebration Call": "completed",
-        "WiSH Experience Call": "completed",
-      };
-
-      const productKeywordsMap: any = {
-        "WISH": ["WiSH"],
-        "A&H LIGHT": ["A&H Light"],
-        "EI Solution": ["EI Solution", "EI Celebration", "EI Implementation", "EI Diagnostics", "EI Review"],
-        "EI Starter Pack": ["EI Starter Pack"],
-        "Critical Support": ["Critical Support"]
-      };
+      // categoryMap and productKeywordsMap moved to the engine - see APPOINTMENT_CATEGORY_MAP /
+      // PRODUCT_KEYWORDS_MAP in delivery-dashboard.engine.ts.
 
       // Add appointment type names and categories for both current and previous appointments
       allAppointments.forEach(appointmentData => {
@@ -720,7 +693,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
           const appointmentTypeName = typeNameMap.get(appointmentTypeRef.path);
           if (appointmentTypeName) {
             appointmentData["appointmentTypeName"] = appointmentTypeName;
-            appointmentData["category"] = categoryMap[appointmentTypeName] || null;
+            appointmentData["category"] = appointmentCategory(appointmentTypeName);
           }
         }
 
@@ -734,14 +707,8 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
       });
 
       // Filter by selected product
-      let filteredLatestAppointments = allAppointments;
-      if (this.selectedProduct !== "All Products Overview") {
-        const selectedKeywords = productKeywordsMap[this.selectedProduct] || [];
-        filteredLatestAppointments = allAppointments.filter(appointment => {
-          const appointmentTypeName = appointment["appointmentTypeName"] || "";
-          return selectedKeywords.some(keyword => appointmentTypeName.includes(keyword));
-        });
-      }
+      const filteredLatestAppointments = allAppointments.filter(appointment =>
+        matchesProductSelection(appointment["appointmentTypeName"], this.selectedProduct));
 
       // Calculate stuck cases and days stuck
       const stuckCasesArray = [];
@@ -750,7 +717,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
       filteredLatestAppointments.forEach(latestAppointment => {
         const appointmentEnd = latestAppointment["endtime"] || latestAppointment["starttime"];
         const appointmentEndDate = appointmentEnd?.toDate ? appointmentEnd.toDate() : appointmentEnd;
-        const daysSinceAppointment = this.calculateWaitingPeriod(appointmentEndDate);
+        const daysSinceAppointment = waitingDaysSince(appointmentEndDate);
 
         const participantId = latestAppointment["bookedby"]?.id;
         let assignedToName = 'Unassigned';
@@ -763,21 +730,21 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
 
         const productId = latestAppointment["productid"];
         const actualProductName = this.mapProductName[productId] || 'N/A';
-        latestAppointment["waitingperiod"] = this.calculateWaitingPeriod(appointmentEndDate);
+        latestAppointment["waitingperiod"] = waitingDaysSince(appointmentEndDate);
         latestAppointment["profileid"] = participantId;
-        latestAppointment["appointmentstatus"] = latestAppointment["attended"] ? 'Completed' : 'Scheduled'
+        latestAppointment["appointmentstatus"] = appointmentStatusLabel(latestAppointment["attended"])
         latestAppointment["appointment"] = latestAppointment["appointmentTypeName"] || 'N/A';
         latestAppointment["product"] = actualProductName;
         latestAppointment["date"] = appointmentEnd;
         latestAppointment["assignedto"] = assignedToName;
         const journeyId = this.mapMetaData[participantId]?.['activejourney'];
         latestAppointment["activejourney"] = this.mapjourneyname[journeyId] || 'N/A';
-        latestAppointment["escalationlevel"] = daysSinceAppointment > 30 ? 'HIGH' : daysSinceAppointment > 15 ? 'MEDIUM' : 'LOW';
-        latestAppointment["issuetype"] = daysSinceAppointment > 15 ? 'Stuck in Phase' : 'In Progress';
+        latestAppointment["escalationlevel"] = escalationLevel(daysSinceAppointment);
+        latestAppointment["issuetype"] = stuckIssueType(daysSinceAppointment);
         latestAppointment["lastaction"] = latestAppointment.previousAppointment?.appointmentTypeName || 'N/A';
-        latestAppointment["resolution"] = daysSinceAppointment > 15 ? 'Pending' : 'N/A';
+        latestAppointment["resolution"] = stuckResolution(daysSinceAppointment);
 
-        if (daysSinceAppointment > 15) {
+        if (isStuckCase(daysSinceAppointment)) {
           stuckCasesArray.push(latestAppointment);
         }
       });
@@ -967,46 +934,29 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   updateDisplayMonth() {
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'];
-    this.displayMonth = `${monthNames[this.selectedMonth.getMonth()]} ${this.selectedMonth.getFullYear()}`;
+    this.displayMonth = displayMonthLabel(this.selectedMonth);
   }
 
   goToPreviousMonth() {
-    this.selectedMonth = new Date(
-      this.selectedMonth.getFullYear(),
-      this.selectedMonth.getMonth() - 1,
-      1
-    );
+    this.selectedMonth = shiftMonth(this.selectedMonth, -1);
     this.updateDisplayMonth();
     this.applyMonthFilter();
   }
 
   goToNextMonth() {
-    this.selectedMonth = new Date(
-      this.selectedMonth.getFullYear(),
-      this.selectedMonth.getMonth() + 1,
-      1
-    );
+    this.selectedMonth = shiftMonth(this.selectedMonth, 1);
     this.updateDisplayMonth();
     this.applyMonthFilter();
   }
 
   applyMonthFilter() {
     // Set start and end dates based on selected month
-    this.startDate = new Date(
-      this.selectedMonth.getFullYear(),
-      this.selectedMonth.getMonth(),
-      1
-    );
-    this.endDate = new Date(
-      this.selectedMonth.getFullYear(),
-      this.selectedMonth.getMonth() + 1,
-      0
-    );
+    const bounds = monthBounds(this.selectedMonth);
+    this.startDate = bounds.start;
+    this.endDate = bounds.end;
 
     // Update monthyear format for existing logic
-    this.monthyear = `${this.selectedMonth.getFullYear()}-${String(this.selectedMonth.getMonth() + 1).padStart(2, '0')}`;
+    this.monthyear = monthYearKey(this.selectedMonth);
 
     // Refresh data
     this.fetchData();
@@ -1029,38 +979,22 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
 
   // Function to view loading progress of the screen 
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
-    const total = Object.keys(this.loadingStates).length;
-    return (loaded / total) * 100;
+    return loadingProgressPct(this.loadingStates);
   }
 
   // Function to get total loaded count 
   getLoadedCount(): number {
-    return Object.values(this.loadingStates).filter(state => state === true).length;
+    return loadedCount(this.loadingStates);
   }
 
-  calculateWaitingPeriod(onboardedtime: Date): number {
-    if (!onboardedtime) return 0;
-    let comparisonDate = new Date();
-    const timeDifference = comparisonDate.getTime() - onboardedtime.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
-  }
-
+  // calculateWaitingPeriod() moved to the engine as waitingDaysSince(); this one delegates.
   getWaitingPeriod(participant: any): number {
-    if (participant.waitingperiod !== undefined) {
-      return participant.waitingperiod;
-    }
-    if (participant.initiatedtime) {
-      return this.calculateWaitingPeriod(participant.initiatedtime?.toDate());
-    }
-    return 0;
+    return waitingPeriodFor(participant);
   }
 
   checkAllDataLoaded() {
     console.log('All data loaded:', this.loadingStates);
-    const allLoaded = Object.values(this.loadingStates).every(state => state === true);
-    if (allLoaded) {
+    if (allLoaded(this.loadingStates)) {
       this.processTodayActivity();
       this.processLast7DaysActivity();
       this.processLast30DaysActivity();
@@ -1071,18 +1005,16 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   getPriorityLabel(waitingPeriod: number): string {
-    if (waitingPeriod >= 14) return 'URGENT';
-    if (waitingPeriod >= 10) return 'HIGH';
-    if (waitingPeriod >= 5) return 'MEDIUM';
-    return 'LOW';
+    return priorityLabel(waitingPeriod);
   }
 
   // Function to set current month date 
   setCurrentMonth() {
     const now = new Date();
-    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    this.monthyear = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, '0');
+    const bounds = monthBounds(now);
+    this.startDate = bounds.start;
+    this.endDate = bounds.end;
+    this.monthyear = monthYearKey(now);
   }
 
   getCurrentTabHeaders(): TableHeader[] {
@@ -1148,23 +1080,18 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
 
   calculatePagination() {
     const allData = this.getCurrentTabData();
-    this.totalPages = Math.ceil(allData.length / this.itemsPerPage);
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
-    }
+    this.totalPages = totalPagesFor(allData.length, this.itemsPerPage);
+    this.currentPage = clampPage(this.currentPage, this.totalPages);
   }
 
   // Get paginated data for display
   updatePaginatedData(): void {
-    if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.product?.length > 0) {
+    if (hasActiveTableFilter(this.filterForm.value)) {
       this.updatePaginatedDataWithSearch();
     } else {
       const allData = this.getCurrentTabData();
-      this.totalPages = Math.ceil(allData.length / this.itemsPerPage);
-
-      const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-      const endIndex = startIndex + this.itemsPerPage;
-      this.paginatedData = allData.slice(startIndex, endIndex);
+      this.totalPages = totalPagesFor(allData.length, this.itemsPerPage);
+      this.paginatedData = pageSlice(allData, this.currentPage, this.itemsPerPage);
     }
   }
 
@@ -1183,35 +1110,17 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
       this.filteredData = allData;
     } else {
       this.filteredData = allData.filter(participant => {
-        let matchesSearch = true;
-        let matchesJourney = true;
-        let matchesProduct = true;
-
-        // Search filter
-        if (searchTerm) {
-          const name = this.mapMetaData[participant['profileid']]?.['name'] || '';
-          matchesSearch = name.toLowerCase().includes(searchTerm);
-        }
-
-        // Journey filter
-        if (selectedJourneys.length > 0) {
-          const journeyId = this.mapMetaData[participant['profileid']]?.['activejourney'];
-          const journeyname = this.mapjourneyname[journeyId] || participant['journey'] || participant['activejourney'] || '';
-          matchesJourney = selectedJourneys.includes(journeyname);
-        }
-
-        // Product filter (for stuck cases and activity tabs)
-        if (selectedProducts.length > 0) {
-          const productName = participant['product'] || '';
-          matchesProduct = selectedProducts.some(prod => productName.includes(prod));
-        }
-
-        return matchesSearch && matchesJourney && matchesProduct;
+        const journeyId = this.mapMetaData[participant['profileid']]?.['activejourney'];
+        return matchesRowFilters({
+          name: this.mapMetaData[participant['profileid']]?.['name'] || '',
+          journeyName: this.mapjourneyname[journeyId] || participant['journey'] || participant['activejourney'] || '',
+          productName: participant['product'] || '',
+        }, { searchTerm, selectedJourneys, selectedProducts });
       });
     }
 
     this.currentPage = 1;
-    this.totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
+    this.totalPages = totalPagesFor(this.filteredData.length, this.itemsPerPage);
     this.updatePaginatedDataWithSearch();
   }
 
@@ -1272,12 +1181,9 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   updatePaginatedDataWithSearch(): void {
-    const dataToDisplay = (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.product?.length > 0) ? this.filteredData : this.getCurrentTabData();
-    this.totalPages = Math.ceil(dataToDisplay.length / this.itemsPerPage);
-
-    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    const endIndex = startIndex + this.itemsPerPage;
-    this.paginatedData = dataToDisplay.slice(startIndex, endIndex);
+    const dataToDisplay = hasActiveTableFilter(this.filterForm.value) ? this.filteredData : this.getCurrentTabData();
+    this.totalPages = totalPagesFor(dataToDisplay.length, this.itemsPerPage);
+    this.paginatedData = pageSlice(dataToDisplay, this.currentPage, this.itemsPerPage);
   }
 
   clearSearch(): void {
@@ -1530,25 +1436,22 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
 
     // Handle waiting period with DAYS label
     if (header.key === 'waitingperiod') {
-      return `${value || 0} DAYS`;
+      return exportWaitingPeriodLabel(value);
     }
 
     // Handle general notes
     if (header.key === 'generalnotes') {
-      if (participant[header.key] && participant[header.key].length > 0) {
-        return participant[header.key][participant[header.key].length - 1].note || 'N/A';
-      }
-      return 'N/A';
+      return lastNoteText(participant[header.key]);
     }
 
     // Handle financial data
     if (header.key === 'financialdata') {
-      return value === 'Cleared' ? 'ELIGIBLE' : 'NOT CLEARED';
+      return exportFinancialLabel(value);
     }
 
     // Handle bottleneck
     if (header.key === 'bottleneck') {
-      return participant['financialdata'] === 'Cleared' ? 'Ready for Initiation' : 'Payment Follow-up';
+      return exportBottleneckLabel(participant['financialdata']);
     }
 
     // Handle text fields
@@ -1561,7 +1464,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   getCurrentTabDataLength(): number {
-    if (this.filterForm.value.search || this.filterForm.value.journey?.length > 0 || this.filterForm.value.product?.length > 0) {
+    if (hasActiveTableFilter(this.filterForm.value)) {
       return this.filteredData.length;
     }
     return this.getCurrentTabData().length;
@@ -1606,26 +1509,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   getPageNumbers(): number[] {
-    const pages: number[] = [];
-    const maxPagesToShow = 5;
-    if (this.totalPages <= maxPagesToShow) {
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      const halfRange = Math.floor(maxPagesToShow / 2);
-      let start = Math.max(1, this.currentPage - halfRange);
-      let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-      if (end === this.totalPages) {
-        start = Math.max(1, end - maxPagesToShow + 1);
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-    }
-    return pages;
+    return pageNumbers(this.currentPage, this.totalPages);
   }
 
   onItemsPerPageChange() {
@@ -1761,42 +1645,7 @@ export class DeliveryDashboardComponent implements OnInit, OnDestroy {
   }
 
   getFilterDisplayText(): string {
-    switch (this.activeFilter) {
-      case 'readyForInitiation':
-        return 'Showing only participants with cleared payment';
-      case 'clearedMoreThan7Days':
-        return 'Showing only participants waiting 7+ days with cleared payment';
-      case 'clearedMoreThan30Days':
-        return 'Showing only participants waiting 30+ days with cleared payment';
-      case 'initiatedToday':
-        return 'Showing only participants initiated today';
-      case 'todayActivity':
-        return 'Showing today\'s activity (initiated and appointments)';
-      case 'last7DaysActivity':
-        return 'Showing last 7 days activity';
-      case 'last30DaysActivity':
-        return 'Showing last 30 days activity';
-      case 'thisMonthActivity':
-        return 'Showing this month\'s activity';
-      case 'welcomeCall':
-        return 'Showing participants in Welcome Call stage';
-      case 'clarityCall':
-        return 'Showing participants in Clarity Call stage';
-      case 'diagnostics':
-        return 'Showing participants in Diagnostics stage';
-      case 'implementation':
-        return 'Showing participants in Implementation stage';
-      case 'midReviewDiagnostics':
-        return 'Showing participants in Mid Review - Diagnostics stage';
-      case 'implementationPhase2':
-        return 'Showing participants in Implementation Phase 2 stage';
-      case 'finalReview':
-        return 'Showing participants in Final Review stage';
-      case 'completed':
-        return 'Showing completed participants';
-      default:
-        return '';
-    }
+    return filterDisplayText(this.activeFilter);
   }
 
   getActiveFilterCount(): number {

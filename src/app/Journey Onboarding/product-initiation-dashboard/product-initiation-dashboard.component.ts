@@ -14,10 +14,58 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { count } from 'console';
 import { OnboardingRemarkComponent } from '../onboarding-remark/onboarding-remark.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import * as XLSX from 'xlsx';
+
+// Pure business rules for this dashboard. Extracted 2026-09-10; see product-initiation-dashboard.engine.ts
+// for what moved and why. The component keeps the Firestore gathering and asks the engine the questions.
+import {
+  allLoaded,
+  isAfterSalesEpoch,
+  stepMonthYearKey,
+  boundsFromMonthYearKey,
+  boxForTabIndex,
+  cellValueOrDash,
+  clampPage,
+  compareCellValues,
+  daysAgo,
+  financialLabel,
+  formatCurrencyCell,
+  formatNumberCell,
+  formatTextCell,
+  hasAnyClearedProduct,
+  hasInFlightJourney,
+  isAwaitingInitiationCandidate,
+  isBadgeColumn,
+  isDateLike,
+  isDeadJourney,
+  isEngagementCleared,
+  isEngagementOpportunity,
+  isPerformanceMode,
+  isReportableJourney,
+  isSortable,
+  isStatusEmpty,
+  isTestParticipantEmail,
+  isWithinRange,
+  istShiftedWindow,
+  lastNoteText,
+  loadedCount,
+  loadingProgressPct,
+  mapCellValue,
+  matchesRowFilters,
+  monthBounds,
+  monthYearKey,
+  nextSortState,
+  pageNumbers,
+  purchaseAgeBucket,
+  resolveMinimumPayment,
+  salesEpoch,
+  shouldHighlightCell,
+  sortIcon,
+  totalPagesFor,
+  waitingDaysSince,
+} from './product-initiation-dashboard.engine';
 
 interface ColumnConfig {
   key: string;
@@ -236,68 +284,54 @@ export class ProductInitiationDashboardComponent {
   // Function to set current month date 
   setCurrentMonth() {
     const now = new Date();
-    this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    this.monthyear = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, '0');
+    const bounds = monthBounds(now);
+    this.startDate = bounds.start;
+    this.endDate = bounds.end;
+    this.monthyear = monthYearKey(now);
   }
 
   // Update date based on month selection 
   updateDate() {
-    let year = parseInt(this.monthyear.split('-')[0]);
-    let month = parseInt(this.monthyear.split('-')[1]);
-
-    this.startDate = new Date(year, month - 1, 1);
-    this.endDate = new Date(year, month, 0);
+    const bounds = boundsFromMonthYearKey(this.monthyear);
+    this.startDate = bounds.start;
+    this.endDate = bounds.end;
 
     this.fetchData();
   }
 
   // move to next month 
   forwardMonth() {
-    let year = parseInt(this.monthyear.split('-')[0]);
-    let month = parseInt(this.monthyear.split('-')[1]);
-    month = month != 12 ? month + 1 : 1;
-    year = month == 1 ? year + 1 : year;
-    this.startDate = new Date(year, month - 1, 1);
-    this.endDate = new Date(year, month, 0);
-    this.monthyear = year + "-" + String(month).padStart(2, '0');
+    const next = stepMonthYearKey(this.monthyear, 1);
+    this.startDate = next.start;
+    this.endDate = next.end;
+    this.monthyear = next.monthyear;
 
     this.fetchData();
   }
 
   // move to previous month 
   backwardMonth() {
-    let year = parseInt(this.monthyear.split('-')[0]);
-    let month = parseInt(this.monthyear.split('-')[1]);
-    month = month != 1 ? month - 1 : 12;
-    year = month == 12 ? year - 1 : year;
-    this.startDate = new Date(year, month - 1, 1);
-    this.endDate = new Date(year, month, 0);
-    this.monthyear = year + "-" + String(month).padStart(2, '0');
+    const prev = stepMonthYearKey(this.monthyear, -1);
+    this.startDate = prev.start;
+    this.endDate = prev.end;
+    this.monthyear = prev.monthyear;
 
     this.fetchData();
   }
 
   onTabChange(event: any) {
     console.log('Tab changed to index:', event.index);
-    switch (event.index) {
-      case 0:
-        this.onBoxClick('awaitingInitiation');
-        break;
-      case 1:
-        this.onBoxClick('initiatedPending');
-        break;
-      case 2:
-        this.onBoxClick('engagementOpportunity');
-        break;
+    const box = boxForTabIndex(event.index);
+    if (box) {
+      this.onBoxClick(box);
     }
   }
 
   // Calculate total pages
   calculatePagination() {
-    this.totalPages = Math.ceil(this.currentTableConfig.data.length / this.itemsPerPage);
+    this.totalPages = totalPagesFor(this.currentTableConfig.data.length, this.itemsPerPage);
     if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
+      this.currentPage = clampPage(this.currentPage, this.totalPages);
     }
   }
 
@@ -325,55 +359,20 @@ export class ProductInitiationDashboardComponent {
     const selectedJourney = value.journey || [];
     const selectedStatus = value.status || [];
 
-    this.currentTableConfig.data = this.filteredTableData.filter(row => {
-      let matchesSearch = true;
-      let matchesJourney = true;
-      let matchesStatus = true;
-      if (searchTerm.trim()) {
-        matchesSearch = this.currentTableConfig.columns.some(col => {
-          const headerLower = col.header.toLowerCase();
+    const columnFor = (header: string) => this.currentTableConfig.columns.find(col =>
+      col.header.toLowerCase() === header) || null;
+    const nameColumn = columnFor('name');
+    const mobileColumn = columnFor('mobile');
+    const emailColumn = columnFor('email');
+    const journeyColumn = columnFor('journey');
 
-          if (headerLower === 'name') {
-            const cellValue = this.formatCellValue(row, col).toLowerCase().trim();
-            return cellValue.includes(searchTerm.toLowerCase());
-          }
-
-          if (headerLower === 'mobile') {
-            const cellValue = this.formatCellValue(row, col);
-            return cellValue.includes(searchTerm);
-          }
-
-          if (headerLower === 'email') {
-            const cellValue = this.formatCellValue(row, col);
-            return cellValue.includes(searchTerm);
-          }
-
-          return false;
-        });
-      }
-
-      if (selectedJourney.length > 0) {
-
-        const journeyColumn = this.currentTableConfig.columns.find(col =>
-          col.header.toLowerCase() === 'journey'
-        );
-
-        if (journeyColumn) {
-          const cellValue = this.formatCellValue(row, journeyColumn);
-          matchesJourney = selectedJourney.includes(cellValue);
-        }
-      }
-
-      if (selectedStatus && selectedStatus !== '') {
-        if (selectedStatus === 'Cleared') {
-          matchesStatus = row['financialdata'] === 'Cleared';
-        } else if (selectedStatus === 'Pending') {
-          matchesStatus = row['financialdata'] === 'Pending';
-        }
-      }
-
-      return matchesSearch && matchesJourney && matchesStatus;
-    });
+    this.currentTableConfig.data = this.filteredTableData.filter(row => matchesRowFilters({
+      name: nameColumn ? this.formatCellValue(row, nameColumn) : null,
+      mobile: mobileColumn ? this.formatCellValue(row, mobileColumn) : null,
+      email: emailColumn ? this.formatCellValue(row, emailColumn) : null,
+      journey: journeyColumn ? this.formatCellValue(row, journeyColumn) : null,
+      financialdata: row['financialdata'],
+    }, { search: searchTerm, selectedJourney, selectedStatus }));
 
     this.currentPage = 1;
     this.calculatePagination();
@@ -389,8 +388,7 @@ export class ProductInitiationDashboardComponent {
 
   // Function to check if all data is loaded 
   private checkAllDataLoaded(): void {
-    const allLoaded = Object.values(this.loadingStates).every(state => state === true);
-    if (allLoaded) {
+    if (allLoaded(this.loadingStates)) {
       this.isLoading = false;
       this.cdr.detectChanges();
     }
@@ -692,56 +690,27 @@ export class ProductInitiationDashboardComponent {
 
   // Get page numbers for pagination display
   getPageNumbers(): number[] {
-    const pages: number[] = [];
-    const maxPagesToShow = 5;
-
-    if (this.totalPages <= maxPagesToShow) {
-      // Show all pages if total is less than max
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show limited pages with ellipsis
-      const halfRange = Math.floor(maxPagesToShow / 2);
-      let start = Math.max(1, this.currentPage - halfRange);
-      let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-      // Adjust start if we're near the end
-      if (end === this.totalPages) {
-        start = Math.max(1, end - maxPagesToShow + 1);
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-    }
-
-    return pages;
+    return pageNumbers(this.currentPage, this.totalPages);
   }
 
   // Check if column is sortable
   isSortable(column: any): boolean {
-    return column.sortable !== false;
+    return isSortable(column);
   }
 
   // Get sort icon for column
   getSortIcon(columnKey: string): string {
-    if (this.sortColumn !== columnKey) {
-      return '⇅'; // Both arrows
-    }
-    return this.sortDirection === 'asc' ? '↑' : '↓';
+    return sortIcon({ sortColumn: this.sortColumn, sortDirection: this.sortDirection }, columnKey);
   }
 
   // Check if column should be highlighted
   shouldHighlightCell(columnKey: string): boolean {
-    const highlightColumns = ['name', 'contractId', 'category'];
-    return highlightColumns.includes(columnKey);
+    return shouldHighlightCell(columnKey);
   }
 
   // Check if column should show as badge
   isBadgeColumn(columnKey: string): boolean {
-    const badgeColumns = ['journey', 'paymentStatus'];
-    return badgeColumns.includes(columnKey);
+    return isBadgeColumn(columnKey);
   }
 
   addNotes(element) {
@@ -880,14 +849,7 @@ export class ProductInitiationDashboardComponent {
     }, 200);
   }
 
-  calculateWaitingPeriod(onboardedtime: Date): number {
-    if (!onboardedtime) return 0;
-    let comparisonDate = new Date();
-
-    const timeDifference = comparisonDate.getTime() - onboardedtime.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
-  }
+  // calculateWaitingPeriod() moved to the engine as waitingDaysSince(); call sites use it directly.
 
   loadProductsForMenu(profileId: string) {
     const participantMetadata = this.mapMetaData[profileId];
@@ -984,55 +946,34 @@ export class ProductInitiationDashboardComponent {
 
   // Sort table by column
   sortTable(columnKey: string) {
-    if (this.sortColumn === columnKey) {
-      if (this.sortDirection === 'asc') {
-        this.sortDirection = 'desc';
-      } else if (this.sortDirection === 'desc') {
-        this.sortDirection = null;
-        this.sortColumn = null;
+    const wasCycledOff = this.sortColumn === columnKey && this.sortDirection === 'desc';
+    const next = nextSortState({ sortColumn: this.sortColumn, sortDirection: this.sortDirection }, columnKey);
+    this.sortColumn = next.sortColumn;
+    this.sortDirection = next.sortDirection;
 
-        this.currentTableConfig.data = [...this.filteredTableData];
-        this.calculatePagination();
-        return;
-      }
-    } else {
-      this.sortColumn = columnKey;
-      this.sortDirection = 'asc';
+    if (wasCycledOff) {
+      this.currentTableConfig.data = [...this.filteredTableData];
+      this.calculatePagination();
+      return;
     }
 
     if (this.sortDirection) {
-      this.currentTableConfig.data.sort((a, b) => {
-        const valueA: any = this.getCellValue(a, columnKey);
-        const valueB: any = this.getCellValue(b, columnKey);
-
-        if (valueA == null && valueB == null) return 0;
-        if (valueA == null) return this.sortDirection === 'asc' ? 1 : -1;
-        if (valueB == null) return this.sortDirection === 'asc' ? -1 : 1;
-
-        let comparison = 0;
-
-        if (!isNaN(valueA) && !isNaN(valueB)) {
-          comparison = Number(valueA) - Number(valueB);
-        } else if (this.isDate(valueA) && this.isDate(valueB)) {
-          comparison = new Date(valueA).getTime() - new Date(valueB).getTime();
-        } else {
-          comparison = valueA.toString().localeCompare(valueB.toString());
-        }
-
-        return this.sortDirection === 'asc' ? comparison : -comparison;
-      });
+      this.currentTableConfig.data.sort((a, b) => compareCellValues(
+        this.getCellValue(a, columnKey),
+        this.getCellValue(b, columnKey),
+        this.sortDirection,
+      ));
     }
   }
 
   // Get value for a specific cell
   getCellValue(row: any, key: string): string {
-    return row[key] || '-';
+    return cellValueOrDash(row, key);
   }
 
   // Helper function to check if value is a date
   isDate(value: any): boolean {
-    return value instanceof Date ||
-      (typeof value === 'string' && !isNaN(Date.parse(value)));
+    return isDateLike(value);
   }
 
   closeTable() {
@@ -1180,22 +1121,14 @@ export class ProductInitiationDashboardComponent {
   // Function to fetch data from Participant Journey Product 
   loadParticipantJourneyProduct() {
     const now = new Date();
-    const currentMonthStart = new Date(this.startDate);
-    currentMonthStart.setHours(0, 0, 0, 0);
-
-    const currentMonthEnd = new Date(this.endDate);
-    currentMonthEnd.setHours(23, 59, 59, 999);
-
-    currentMonthStart.setTime(currentMonthStart.getTime() + (5 * 60 + 30) * 60 * 1000);
-    currentMonthEnd.setTime(currentMonthEnd.getTime() + (5 * 60 + 30) * 60 * 1000);
-
-    let startdate = Timestamp.fromDate(currentMonthStart).toDate();
-    let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
+    // The IST shift is a known defect, pinned in the engine - see istShiftedWindow().
+    const monthWindow = istShiftedWindow(this.startDate, this.endDate);
+    let startdate = Timestamp.fromDate(monthWindow.start).toDate();
+    let enddate = Timestamp.fromDate(monthWindow.end).toDate();
 
     const currentDate = new Date();
     // last 7 days
-    let last7days = new Date();
-    last7days.setDate(currentDate.getDate() - 7);
+    let last7days = daysAgo(7, currentDate);
 
     try {
       this.subscriptions['journeyproduct1'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "==", null))).subscribe((notassured) => {
@@ -1204,9 +1137,11 @@ export class ProductInitiationDashboardComponent {
           for (let i = 0; i < notassured.length; i++) {
             const notAssuredData = notassured[i];
             // notAssuredData['generalnotes'] = [null, undefined, ''].includes(this.mapMetaData[notAssuredData['profileid']]) ? [] : (this.mapMetaData[notAssuredData['profileid']]['generalnotes'] ?? [])
-            if (notAssuredData['purchasedate']?.toDate() >= new Date('2025-01-01') && ![null, undefined, ""].includes(notAssuredData['profileid'])) {
-              if (!['cancelled', 'downgraded'].includes(notAssuredData['journeystatus'])) {
-                if (!this.mapMetaData[notAssuredData['profileid']]?.['email'].includes('soexcellence')) {
+            if (isAfterSalesEpoch(notAssuredData['purchasedate']?.toDate()) && ![null, undefined, ""].includes(notAssuredData['profileid'])) {
+              if (!isDeadJourney(notAssuredData['journeystatus'])) {
+                // NOTE: the '.email' deref below is deliberately left unguarded — see the engine's
+                // isTestParticipantEmail() header for why this throws on a record with no email.
+                if (!isTestParticipantEmail(this.mapMetaData[notAssuredData['profileid']]?.['email'])) {
                   tempArray1.push(notAssuredData);
                 }
               }
@@ -1217,8 +1152,7 @@ export class ProductInitiationDashboardComponent {
       this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
         if (onboarded.length != 0) {
           // last 30days 
-          let last30days = new Date();
-          last30days.setDate(currentDate.getDate() - 30);
+          let last30days = daysAgo(30, currentDate);
 
           let tempArray2 = [];
           let tempArray3 = [];
@@ -1230,20 +1164,23 @@ export class ProductInitiationDashboardComponent {
             const onboardedData = onboarded[i];
             onboardedData['generalnotes'] = [null, undefined, ''].includes(this.mapMetaData[onboardedData['profileid']]) ? [] : (this.mapMetaData[onboardedData['profileid']]['generalnotes'] ?? [])
 
-            if (onboardedData['purchasedate']?.toDate() >= new Date('2025-01-01') && ([null, undefined, ""].includes(onboardedData['journeyref']) || onboardedData['journeyref'].id != 'InLXMl7OBAqlDTZcXwK0') && [null, 'ongoing', 'initiated'].includes(onboardedData['journeystatus'])) {
+            if (isAfterSalesEpoch(onboardedData['purchasedate']?.toDate())
+              && isReportableJourney(
+                [null, undefined, ""].includes(onboardedData['journeyref']) ? null : onboardedData['journeyref'].id,
+                onboardedData['journeystatus'])) {
               if ([null, undefined, "", false].includes(onboardedData['onboarded'])) {
-                if (onboardedData['purchasedate']?.toDate() >= last7days) {
+                if (purchaseAgeBucket(onboardedData['purchasedate']?.toDate(), last7days) === 'recent') {
                   tempArray2.push(onboardedData);
                 } else if (onboardedData['purchasedate']?.toDate() < last7days) {
                   tempArray3.push(onboardedData)
                 }
               } else if (onboardedData['onboarded'] == true) {
-                if (onboardedData['onboardedtime']?.toDate() >= startdate && onboardedData['onboardedtime']?.toDate() <= enddate) {
+                if (isWithinRange(onboardedData['onboardedtime']?.toDate(), startdate, enddate)) {
                   tempArray4.push(onboardedData);
                 }
 
                 if (this.mapMetaData[onboardedData['profileid']]?.['activeproduct']?.length == 0) {
-                  if (onboardedData['purchasedate']?.toDate() >= last30days) {
+                  if (purchaseAgeBucket(onboardedData['purchasedate']?.toDate(), last30days) === 'recent') {
                     tempArray5.push(onboardedData);
                   } else {
                     tempArray6.push(onboardedData);
@@ -1288,31 +1225,24 @@ export class ProductInitiationDashboardComponent {
             const consumedProduct = this.mapMetaData[profileId]?.['consumedproducts'];
             const journeyStatus = participant['journeystatus'];
 
-            if ((journeyStatus === 'initiated' || journeyStatus === 'ongoing') && (!activeProduct || activeProduct.length === 0) && (!consumedProduct || consumedProduct.length === 0)) {
+            if (isAwaitingInitiationCandidate(journeyStatus, activeProduct, consumedProduct)) {
               const productQuery = await getDocs(
                 query(collection(this.firestore, "participantsproduct"),
                   where("profileid", "==", profileId))
               );
               const onboardedDate = participant['onboardedtime']?.toDate();
-              participant['waitingperiod'] = this.calculateWaitingPeriod(onboardedDate);
+              participant['waitingperiod'] = waitingDaysSince(onboardedDate);
 
               const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || 0;
-              let hasAtLeastOneCleared = false;
+              const hasAtLeastOneCleared = hasAnyClearedProduct(
+                productQuery.docs.map(d => resolveMinimumPayment(
+                  d.data()['minimumpayment'],
+                  this.mapProduct[d.data()['productref']?.id]?.minimumrequiredamount,
+                )),
+                totalpaid,
+              );
 
-              for (let j = 0; j < productQuery.docs.length; j++) {
-                const productData = productQuery.docs[j].data();
-                let minimumpayment = productData['minimumpayment'];
-                if ([null, undefined].includes(minimumpayment)) {
-                  minimumpayment = this.mapProduct[productData['productref']?.id]?.minimumrequiredamount || 0;
-                }
-
-                if (minimumpayment <= totalpaid) {
-                  hasAtLeastOneCleared = true;
-                  break;
-                }
-              }
-
-              participant['financialdata'] = hasAtLeastOneCleared ? 'Cleared' : 'Pending';
+              participant['financialdata'] = financialLabel(hasAtLeastOneCleared);
               if (participant['financialdata'] === 'Cleared') {
                 awaitingClearedCount++;
                 readyForInitiationArray.push(participant);
@@ -1355,21 +1285,13 @@ export class ProductInitiationDashboardComponent {
                 where("profileid", "==", profileId))
             );
 
-            let hasInitiatedOrOngoingJourney = false;
-            if (!journeyQuery.empty) {
-              for (const journeyDoc of journeyQuery.docs) {
-                const journeyStatus = journeyDoc.data()['journeystatus'];
-                if (journeyStatus === 'initiated' || journeyStatus === 'ongoing') {
-                  hasInitiatedOrOngoingJourney = true;
-                  break;
-                }
-              }
-            }
+            const hasInitiatedOrOngoingJourney = hasInFlightJourney(
+              journeyQuery.docs.map(d => d.data()['journeystatus']));
             if (hasInitiatedOrOngoingJourney) {
               const participantObj: any = {
                 profileid: profileId,
                 initiatedtime: statusDateInitiated,
-                waitingperiod: statusDateInitiated ? this.calculateWaitingPeriod(statusDateInitiated.toDate()) : 0
+                waitingperiod: statusDateInitiated ? waitingDaysSince(statusDateInitiated.toDate()) : 0
               };
               const journeyData = this.journeyProductMap[profileId];
               participantObj['journeyref'] = journeyData ? journeyData['journeyref'] || null : null;
@@ -1377,31 +1299,25 @@ export class ProductInitiationDashboardComponent {
 
               const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || '0';
               const minimumpayment = participant['minimumpayment'] || 'NA';
-              let hasAtLeastOneCleared = false;
 
               const allProductsQuery = await getDocs(
                 query(collection(this.firestore, "participantsproduct"),
                   where("profileid", "==", profileId))
               );
 
-              for (const doc of allProductsQuery.docs) {
-                const productData = doc.data();
-                let productMinimumPayment = productData['minimumpayment'];
-
-                if ([null, undefined].includes(productMinimumPayment)) {
-                  productMinimumPayment = this.mapProduct[productData['productref']?.id]?.minimumrequiredamount || 0;
-                }
-
-                // If at least one product has minimum payment met
-                if (productMinimumPayment <= totalpaid) {
-                  hasAtLeastOneCleared = true;
-                  break;
-                }
-              }
+              // NOTE: totalpaid defaults to the STRING '0' here, so this comparison can be
+              // lexicographic — pinned as a defect in the engine's hasAnyClearedProduct().
+              const hasAtLeastOneCleared = hasAnyClearedProduct(
+                allProductsQuery.docs.map(d => resolveMinimumPayment(
+                  d.data()['minimumpayment'],
+                  this.mapProduct[d.data()['productref']?.id]?.minimumrequiredamount,
+                )),
+                totalpaid,
+              );
 
               participantObj['totalpaid'] = totalpaid;
               participantObj['minimumamount'] = minimumpayment;
-              participantObj['financialdata'] = hasAtLeastOneCleared ? 'Cleared' : 'Pending';
+              participantObj['financialdata'] = financialLabel(hasAtLeastOneCleared);
               if (participantObj['financialdata'] === 'Cleared') {
                 initiatedClearedCount++;
               } else {
@@ -1411,48 +1327,41 @@ export class ProductInitiationDashboardComponent {
             }
           }
 
-          const isStatusEmpty = [null, undefined, ''].includes(modeStatus);
+          const statusEmpty = isStatusEmpty(modeStatus);
           const participantMode = participant['mode'];
-          const isValidMode = ['Performance Mode', 'Extended Performance Mode', 'After Extended Performance Mode'].includes(participantMode);
+          // NOTE: isValidMode is computed and never read — pinned as a defect in the engine
+          // (see PERFORMANCE_MODES). Left in place so behaviour is unchanged.
+          const isValidMode = isPerformanceMode(participantMode);
 
           let completedDate: Date | null = null;
           if (statusDateCompleted && typeof statusDateCompleted.toDate === 'function') {
             completedDate = statusDateCompleted.toDate();
           }
 
-          if (isStatusEmpty) {
+          if (statusEmpty) {
             const journeyQuery = await getDocs(
               query(collection(this.firestore, "participantjourneyproduct"),
                 where("profileid", "==", profileId))
             );
 
-            let hasInitiatedOrOngoingJourney = false;
-            if (!journeyQuery.empty) {
-              for (const journeyDoc of journeyQuery.docs) {
-                const journeyStatus = journeyDoc.data()['journeystatus'];
-                if (journeyStatus === 'initiated' || journeyStatus === 'ongoing') {
-                  hasInitiatedOrOngoingJourney = true;
-                  break;
-                }
-              }
-            }
+            const hasInitiatedOrOngoingJourney = hasInFlightJourney(
+              journeyQuery.docs.map(d => d.data()['journeystatus']));
             const consumedProduct = this.mapMetaData[profileId]?.['consumedproducts'];
-            const hasConsumedProducts = consumedProduct && consumedProduct.length > 0;
             const activeProduct = this.mapMetaData[profileId]?.['activeproduct'];
 
-            if (hasInitiatedOrOngoingJourney && hasConsumedProducts && (!activeProduct || activeProduct.length === 0)) {
+            if (isEngagementOpportunity(hasInitiatedOrOngoingJourney, consumedProduct, activeProduct)) {
               const journeyData = this.journeyProductMap[profileId];
               participant['journeyref'] = journeyData ? journeyData['journeyref'] || null : null;
               participant['lastConsumedDate'] = statusDateCompleted;
-              participant['waitingperiod'] = completedDate ? this.calculateWaitingPeriod(completedDate) : 0;
+              participant['waitingperiod'] = completedDate ? waitingDaysSince(completedDate) : 0;
 
               const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || 'NA';
               const minimumpayment = participant['minimumpayment'] || 'NA';
-              const remainingamount = minimumpayment - totalpaid;
 
               participant['totalpaid'] = totalpaid;
               participant['minimumamount'] = minimumpayment;
-              participant['financialdata'] = remainingamount <= 0 ? 'Cleared' : 'Pending';
+              // 'NA' - 'NA' is NaN and NaN <= 0 is false — pinned in the engine as isEngagementCleared().
+              participant['financialdata'] = financialLabel(isEngagementCleared(minimumpayment, totalpaid));
               tempArray9.push(participant);
             }
           }
@@ -1587,7 +1496,7 @@ export class ProductInitiationDashboardComponent {
 //         const participantObj: any = {
 //           profileid: profileId,
 //           initiatedtime: statusDateInitiated,
-//           waitingperiod: statusDateInitiated ? this.calculateWaitingPeriod(statusDateInitiated.toDate()) : 0
+//           waitingperiod: statusDateInitiated ? waitingDaysSince(statusDateInitiated.toDate()) : 0
 //         };
         
 //         const journeyData = this.journeyProductMap[profileId];
@@ -1657,7 +1566,7 @@ export class ProductInitiationDashboardComponent {
 //         const journeyData = this.journeyProductMap[profileId];
 //         participant['journeyref'] = journeyData ? journeyData['journeyref'] || null : null;
 //         participant['lastConsumedDate'] = statusDateCompleted;
-//         participant['waitingperiod'] = completedDate ? this.calculateWaitingPeriod(completedDate) : 0;
+//         participant['waitingperiod'] = completedDate ? waitingDaysSince(completedDate) : 0;
 
 //         const totalpaid = this.mapMetaData[profileId]?.['pp_totalpaid'] || 'NA';
 //         const minimumpayment = participant['minimumpayment'] || 'NA';
@@ -1691,14 +1600,12 @@ export class ProductInitiationDashboardComponent {
 
   // Function to view loading progress of the screen 
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
-    const total = Object.keys(this.loadingStates).length;
-    return (loaded / total) * 100;
+    return loadingProgressPct(this.loadingStates);
   }
 
   // Function to get total loaded count 
   getLoadedCount(): number {
-    return Object.values(this.loadingStates).filter(state => state === true).length;
+    return loadedCount(this.loadingStates);
   }
 
   // Function to format each cell value in table 
@@ -1709,21 +1616,11 @@ export class ProductInitiationDashboardComponent {
     }
 
     if (column.key === 'generalnotes') {
-      if (Array.isArray(value) && value.length > 0) {
-        const lastNote = value[value.length - 1];
-        if (lastNote && typeof lastNote === 'object' && lastNote.note) {
-          return lastNote.note;
-        }
-      }
-      return '-';
+      return lastNoteText(value);
     }
 
     if (column.type === 'text') {
-      const stringValue = value.toString();
-
-      return column.substringEnd
-        ? stringValue.substring(column.substringStart, column.substringEnd)
-        : stringValue;
+      return formatTextCell(value, column.substringStart, column.substringEnd);
     }
     switch (column.type) {
       case 'date':
@@ -1767,55 +1664,17 @@ export class ProductInitiationDashboardComponent {
 
   // Currency formatting
   private formatCurrency(value: number, prefix?: string, mapValue?: string): string {
-    if (!value && value !== 0) return '-';
-
-    if (mapValue) {
-      value = value[mapValue];
-    }
-
-    const symbol = prefix || '₹';
-    const formatted = value.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-
-    return `${symbol}${formatted}`;
+    return formatCurrencyCell(value, prefix, mapValue);
   }
 
   // Number formatting
   private formatNumber(value: number, prefix?: string, suffix?: string): string {
-    if (!value && value !== 0) return '-';
-
-    const formatted = value.toLocaleString('en-IN');
-    return `${prefix || ''}${formatted}${suffix || ''}`;
+    return formatNumberCell(value, prefix, suffix);
   }
 
   // Map value using dictionary
   private mapValue(value: any, mapData?: { [key: string]: any }, mapKey?: string, mapValue?: string): string {
-    if (!mapData) return value.toString();
-    let tempMap = '';
-
-    if (mapKey) {
-      if (mapKey.startsWith('[')) {
-        const match = mapKey.match(/\[(\d+)\]\.?(.*)$/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-
-          tempMap = value?.[index];
-          if (property) {
-            tempMap = tempMap?.[property];
-          }
-        }
-      } else {
-        tempMap = value?.[mapKey];
-      }
-    } else {
-      tempMap = value;
-    }
-
-    tempMap = mapValue ? mapData[tempMap]?.[mapValue] : mapData[tempMap];
-    return tempMap || '-';
+    return mapCellValue(value, mapData, mapKey, mapValue);
   }
 
 }
