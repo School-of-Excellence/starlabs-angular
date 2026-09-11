@@ -1468,7 +1468,10 @@ export class ParticipantsAnalyticsComponent {
 
   sendEmailToSelectedParicipant() {
     let dialogRef = this.dialog.open(EmailInputComponent, {
-      data: this.selection.selected,
+      data: {
+        selectedParticipants : this.selection.selected,
+        communicationDoc :  this.communication ?? null
+      },
       minWidth: "600px",
       disableClose: true
     });
@@ -1535,7 +1538,10 @@ export class ParticipantsAnalyticsComponent {
 
   sendWatiMessage() {
     let dialogRef = this.dialog.open(WatiInputComponent, {
-      data: this.selection.selected,
+      data: {
+        selectedParticipants : this.selection.selected,
+        communicationDoc : this.communication ?? null
+      },
       width: "70vw",
       height: "80vh",
       disableClose: true
