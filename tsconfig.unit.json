@@ -1,0 +1,31 @@
+// Compile scope for the PURE-LOGIC unit gate.
+//
+// Why this file exists: tsconfig.spec.json seeds the compiler with every src/**/*.spec.ts — all 422
+// legacy Angular CLI stubs — and each stub imports its component, transitively type-checking the
+// whole app. Several of those files do not compile (stray Node imports, a missing dependency, a
+// class-name typo), so `ng test` fails before a single test runs.
+//
+// Narrowing `include` to *.unit.spec.ts means TypeScript only checks what the unit specs actually
+// import. That is the entire routing mechanism: name a file <thing>.unit.spec.ts beside its source
+// and it joins the gate — no edit here, ever.
+//
+// NOTE: use // comments in this file, never /* */. A glob like src/**/*.spec.ts contains the
+// sequence that closes a block comment, which silently truncates it and breaks the config.
+//
+// Usage (BOTH flags are mandatory; --ts-config narrows what compiles, --include what runs):
+//   npx ng test --watch=false --browsers=ChromeHeadless \
+//     --ts-config=tsconfig.unit.json --include="**/*.unit.spec.ts"
+//
+// This file is a workaround. Once the compile blockers are fixed repo-wide, tsconfig.spec.json can
+// do this job and this file can be retired. See TECHNICALDEBTS.md.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/unit",
+    "types": ["jasmine"]
+  },
+  "include": [
+    "src/**/*.unit.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}
