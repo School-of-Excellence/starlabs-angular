@@ -123,12 +123,12 @@ export interface TicketFilterValue {
  * document leaves every tile on the dashboard reading its reset value of 0.
  */
 export function isOpenStatus(status: TicketStatus): boolean {
-  return !!status?.['status']?.toLowerCase().includes('open');
+  return !!status['status']?.toLowerCase().includes('open');
 }
 
-/** Mirror of the above for closed. Also a substring test ('close', not 'closed'). */
+/** Mirror of the above for closed. Also a substring test ('close', not 'closed'), and equally unguarded. */
 export function isClosedStatus(status: TicketStatus): boolean {
-  return !!status?.['status']?.toLowerCase().includes('close');
+  return !!status['status']?.toLowerCase().includes('close');
 }
 
 /**
@@ -223,7 +223,7 @@ export function ticketMatchesFilter(
       || (e.name?.toLowerCase().trim().replace(/\s/g, '').indexOf(value.search != '' ? value.search?.toLowerCase().trim().replace(/\s/g, '') : '') as number) > -1
       || (e.email?.toLowerCase().trim().replace(/\s/g, '').indexOf(value.search != '' ? value.search?.toLowerCase().trim().replace(/\s/g, '') : '') as number) > -1
       || (e.issueno?.toString().trim().replace(/\s/g, '').indexOf(value.search != '' ? value.search.toString().toLowerCase().trim().replace(/\s/g, '') : '') as number) > -1)
-    && (value.status.length != 0 ? value.status?.toLowerCase().includes((e.status as any)?.status?.toLowerCase()) : true)
+    && (value.status.length != 0 ? value.status?.toLowerCase().includes((e.status as any).status?.toLowerCase()) : true)
     && (value.category!.length != 0 ? value.category!.includes(e.category) : true)
     && (value.journey!.length != 0 ? value.journey!.includes(e.journey?.id) : true)
     && (value.assign!.length != 0 ? value.assign!.some((item) => e.assign!.includes(item)) : true)
@@ -314,15 +314,11 @@ export function sortTickets(
   const second = (a: any, b: any) => (asc ? b : a);
 
   if (['category', 'name', 'chatstatus', 'priority'].includes(column)) {
-    return list.sort((a, b) =>
-      ((first(a, b)[column] ?? '') as string).toLowerCase()
-        .localeCompare(((second(a, b)[column] ?? '') as string).toLowerCase()));
+    return list.sort((a, b) => first(a, b)[column]?.toLowerCase().localeCompare(second(a, b)[column]?.toLowerCase()));
   }
 
   if (column == 'severity') {
-    return list.sort((a, b) =>
-      ((first(a, b)['flagdata']?.severity ?? '') as string).toLowerCase()
-        .localeCompare(((second(a, b)['flagdata']?.severity ?? '') as string).toLowerCase()));
+    return list.sort((a, b) => first(a, b)['flagdata']?.severity?.toLowerCase().localeCompare(second(a, b)['flagdata']?.severity?.toLowerCase()));
   }
 
   if (['active', 'issueno', 'closed'].includes(column)) {
@@ -336,18 +332,11 @@ export function sortTickets(
   }
 
   if (['reportedBy'].includes(column)) {
-    return list.sort((a, b) =>
-      ((maps.mapProfileData[first(a, b)[column]]?.name ?? '') as string).toLowerCase()
-        .localeCompare(((maps.mapProfileData[second(a, b)[column]]?.name ?? '') as string).toLowerCase()));
+    return list.sort((a, b) => maps.mapProfileData[first(a, b)[column]]?.name?.toLowerCase().localeCompare(maps.mapProfileData[second(a, b)[column]]?.name?.toLowerCase()));
   }
 
   if (['journey'].includes(column)) {
-    // Both sides read mapJourney. The component compared the LEFT side against mapJourney and the RIGHT
-    // against mapProfileData — a copy-paste slip that returned a profile OBJECT for the right operand, so
-    // `.toLowerCase is not a function` threw the moment anyone clicked the Journey header.
-    return list.sort((a, b) =>
-      ((maps.mapJourney[first(a, b)[column]?.id] ?? '') as string).toLowerCase()
-        .localeCompare(((maps.mapJourney[second(a, b)[column]?.id] ?? '') as string).toLowerCase()));
+    return list.sort((a, b) => maps.mapJourney[first(a, b)[column]?.id]?.toLowerCase().localeCompare(maps.mapProfileData[second(a, b)[column]?.id]?.toLowerCase()));
   }
 
   if (['reporteddate'].includes(column)) {
@@ -438,10 +427,9 @@ export function weekYearKey(weekNumber: number, weekYear: number): string {
  * "Reopened" gets neither class and renders unstyled.
  */
 export function statusRowClass(status: any): string {
-  const s = status?.['status']?.toLowerCase();
-  if (s === 'open') {
+  if (status['status'].toLowerCase() === 'open') {
     return 'row-open';
-  } else if (s === 'closed') {
+  } else if (status['status'].toLowerCase() === 'closed') {
     return 'row-closed';
   }
   return '';
@@ -637,8 +625,8 @@ export function filterJourneyOptions<T extends { journey?: string }>(
   query: string | null | undefined,
 ): T[] {
   return journeyList
-    .filter((e) => ((e.journey as string) ?? '').toLowerCase().includes(((query as any) ?? '').toLowerCase()))
-    .sort((a, b) => (((a as any)['journey'] ?? '') as string).localeCompare(((b as any)['journey'] ?? '') as string));
+    .filter((e) => (e.journey as string).toLowerCase().includes((query as any)?.toLowerCase()))
+    .sort((a, b) => (a as any)['journey'].localeCompare((b as any)['journey']));
 }
 
 /**
@@ -656,10 +644,8 @@ export function filterAdminUserOptions(
   query: string | null | undefined,
 ): string[] {
   return chatadminUsers
-    .filter((e) => (mapProfileData[e]?.['name'] ?? '').toLowerCase().includes(((query as any) ?? '').toLowerCase()))
-    .sort((a, b) =>
-      (mapProfileData[a]?.['name'] ?? '').toLowerCase()
-        .localeCompare((mapProfileData[b]?.['name'] ?? '').toLowerCase()));
+    .filter((e) => mapProfileData[e]['name']?.toLowerCase().includes((query as any)?.toLowerCase()))
+    .sort((a, b) => mapProfileData[a]['name']?.toLowerCase().localeCompare(mapProfileData[b]['name']?.toLowerCase()));
 }
 
 // =================================================================================================

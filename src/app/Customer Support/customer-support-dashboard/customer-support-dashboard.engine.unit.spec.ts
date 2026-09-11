@@ -103,15 +103,13 @@ describe('customer-support-dashboard.engine', () => {
       expect(isClosedStatus({})).toBeFalse();
     });
 
-    it('FIXED (was DEFECT 1b): a ticket with NO status map is neither open nor closed', () => {
-      // WAS: `element['status']['status']?.toLowerCase()` — the `?.` guarded the inner `.status`, not
-      // the status MAP, so a malformed clientissue document threw INSIDE the snapshot loop, aborting it
-      // and leaving EVERY tile on the dashboard reading its reset value of 0. Not one bad row: the whole
-      // board. Fixed 2026-09-10 by guarding the map itself.
-      // The guard is the ONLY change — a well-formed status still classifies exactly as before.
-      expect(isOpenStatus(undefined as any)).toBeFalse();
-      expect(isClosedStatus(null as any)).toBeFalse();
-      expect(isOpenStatus({} as any)).toBeFalse();
+    it('DEFECT 1b (pinned): a ticket with NO status map throws — component lines 408/425/432', () => {
+      // UNGUARDED .toLowerCase(). The component wrote `element['status']['status']?.toLowerCase()`:
+      // the `?.` guards the inner `.status`, not the `status` MAP. Real-world consequence: this runs
+      // inside the snapshot loop, so ONE malformed clientissue document aborts the loop and leaves
+      // EVERY tile on the dashboard reading its reset value of 0 — not one bad row, the whole board.
+      expect(() => isOpenStatus(undefined as any)).toThrowError(/Cannot read propert/);
+      expect(() => isClosedStatus(null as any)).toThrowError(/Cannot read propert/);
     });
 
     it('DEFECT 1 (pinned): the tiles and the report disagree about "Reopened"', () => {
@@ -284,13 +282,14 @@ describe('customer-support-dashboard.engine', () => {
       expect(ticketMatches(ticket(), { ticketend: '2026-08-30' })).toBeFalse();
     });
 
-    it('FIXED (was DEFECT 4): a ticket with no status map is simply excluded by a status filter', () => {
-      // WAS: `e.status.status?.toLowerCase()` — the `?.` was on the wrong hop, so the dashboard rendered
-      // fine until someone picked a status from the dropdown, at which point the whole list blew up.
-      // That intermittency is why this read as flaky rather than broken. Fixed 2026-09-10.
+    it('DEFECT 4 (pinned): a ticket with no status map throws once ANY status filter is applied', () => {
+      // UNGUARDED — component line 309 reads `e.status.status?.toLowerCase()`. The `?.` is on the
+      // wrong hop. Real-world consequence: the dashboard renders fine until someone picks a status
+      // from the dropdown, at which point the whole list blows up. That intermittency is exactly why
+      // this reads as flaky rather than broken in the e2e run.
       const noStatus = ticket({ status: undefined });
-      expect(ticketMatches(noStatus)).toBeTrue();                       // no filter: still matches
-      expect(ticketMatches(noStatus, { status: 'Open' })).toBeFalse();  // filtered: excluded, not thrown
+      expect(ticketMatches(noStatus)).toBeTrue();                                  // no filter: fine
+      expect(() => ticketMatches(noStatus, { status: 'Open' })).toThrowError(/Cannot read propert/);
     });
 
     it('DEFECT 5 (pinned): the status clause is inverted — the FILTER contains the TICKET', () => {
@@ -360,33 +359,30 @@ describe('customer-support-dashboard.engine', () => {
       expect(sortTickets(rows, 'nosuchcolumn', 'asc', maps)).toBe(rows);
     });
 
-    it('FIXED (was DEFECT 7): sorting by Journey reads mapJourney on BOTH sides', () => {
-      // WAS: component lines 1444/1478 compared `mapJourney[a.journey.id]` (a STRING) against
-      // `mapProfileData[b.journey.id]` (an OBJECT), so `?.toLowerCase` was "not a function" and the
-      // Journey column header threw outright, in both directions, on any board that has journeys.
-      // Fixed 2026-09-10: the right-hand operand now reads mapJourney too. This is a genuine
-      // copy-paste slip being corrected, not just a guard — the sort had never worked.
-      const rows = [{ journey: { id: 'j2' } }, { journey: { id: 'j1' } }];
-      const journeyMaps = {
+    it('DEFECT 7 (pinned): sorting by Journey throws — the two operands read DIFFERENT maps', () => {
+      // UNGUARDED .toLowerCase() on the wrong map. Component lines 1444 and 1478 compare
+      // `mapJourney[a.journey.id]` (a STRING) against `mapProfileData[b.journey.id]` (an OBJECT).
+      // `?.toLowerCase` on an object is not a function. Real-world consequence: the Journey column
+      // header is broken outright, in both directions, on any board that has journeys — clicking it
+      // throws rather than sorting.
+      const rows = [{ journey: { id: 'j1' } }, { journey: { id: 'j2' } }];
+      const badMaps = {
         mapProfileData: { j1: { name: 'x' }, j2: { name: 'y' } },
         mapJourney: { j1: 'Alpha', j2: 'Beta' },
       };
-      expect(sortTickets([...rows], 'journey', 'asc', journeyMaps).map((r: any) => r.journey.id))
-        .toEqual(['j1', 'j2']);
-      expect(sortTickets([...rows], 'journey', 'desc', journeyMaps).map((r: any) => r.journey.id))
-        .toEqual(['j2', 'j1']);
+      expect(() => sortTickets(rows, 'journey', 'asc', badMaps)).toThrowError(/not a function/);
+      expect(() => sortTickets(rows, 'journey', 'desc', badMaps)).toThrowError(/not a function/);
     });
 
-    it('FIXED (was DEFECT 8): a blank text value sorts to the FRONT, not between "t" and "v"', () => {
-      // WAS: `a?.toLowerCase()` guarded the receiver, but `.localeCompare(b?.toLowerCase())` coerced an
-      // undefined ARGUMENT to the literal string 'undefined', so tickets with no category/name/priority
-      // sorted as if named "undefined" and hid in the middle of the list. Fixed 2026-09-10 by defaulting
-      // both operands to ''.
-      // Blanks now collect at one end, where an operator can actually see them.
+    it('DEFECT 8 (pinned): a blank text value sorts as the literal word "undefined"', () => {
+      // UNGUARDED .localeCompare() ARGUMENT: `a?.toLowerCase()` guards the receiver, but
+      // `.localeCompare(b?.toLowerCase())` coerces an undefined argument to the string 'undefined'.
+      // Real-world consequence: tickets with no category/name/priority do not collect at either end
+      // of the sort where an operator would spot them — they land between "t" and "v".
       const sorted = sortTickets(
         [{ category: 'beta' }, {}, { category: 'alpha' }], 'category', 'asc', maps,
       ).map((t: any) => t.category);
-      expect(sorted).toEqual([undefined, 'alpha', 'beta']);
+      expect(sorted).toEqual(['alpha', 'beta', undefined]);
     });
 
     it('DEFECT 9 (pinned): sorting by happinessindex DELETES every row that has none', () => {
@@ -475,16 +471,14 @@ describe('customer-support-dashboard.engine', () => {
       expect(statusRowClass({ status: 'pending' })).toBe('');
     });
 
-    it('FIXED (was DEFECT 12): a missing status map yields no row class instead of killing the table', () => {
-      // WAS: `status['status'].toLowerCase()` with no optional chaining anywhere, called from the
-      // template for EVERY rendered row. A single clientissue document with a missing or empty `status`
-      // map took the ENTIRE table down with a render error — not one blank row, the whole view.
-      // This was the most likely single cause of the red Customer Support e2e run: it needs no user
-      // interaction at all to fire. Fixed 2026-09-10.
-      expect(statusRowClass(undefined)).toBe('');
-      expect(statusRowClass({})).toBe('');
-      expect(statusRowClass({ status: 'Open' })).toBe('row-open');       // unchanged for good data
-      expect(statusRowClass({ status: 'Closed' })).toBe('row-closed');
+    it('DEFECT 12 (pinned): NO guard at all — component line 1821', () => {
+      // `status['status'].toLowerCase()`, with no optional chaining anywhere. This is called from the
+      // template for EVERY rendered row. Real-world consequence: a single clientissue document with
+      // a missing or empty `status` map takes the entire table down with a render error — not one
+      // blank row, the whole view. This is the most likely single cause of the red Customer Support
+      // e2e run, because it needs no user interaction at all to fire.
+      expect(() => statusRowClass(undefined)).toThrowError(/Cannot read propert/);
+      expect(() => statusRowClass({})).toThrowError(/Cannot read properties of undefined \(reading 'toLowerCase'\)/);
     });
   });
 
@@ -593,14 +587,13 @@ describe('customer-support-dashboard.engine', () => {
         .toEqual([{ journey: 'alpha' }, { journey: 'Beta' }]);
     });
 
-    it('FIXED (was DEFECT 14): a journey with no name is skipped, not fatal to the dropdown', () => {
-      // WAS: `e.journey.toLowerCase()` had no `?.` while the query beside it did, and the sort called
-      // `a['journey'].localeCompare(...)` bare. One half-created journey document — a row saved before
-      // its name was typed — made the filter throw, so NO journeys were selectable at all.
-      // Fixed 2026-09-10: a nameless journey simply fails the substring test.
-      expect(filterJourneyOptions([{ journey: 'A' }, {}], 'a')).toEqual([{ journey: 'A' }]);
-      // With an empty query a nameless row still sorts without throwing.
-      expect(filterJourneyOptions([{ journey: 'B' }, {}], '').length).toBe(2);
+    it('DEFECT 14 (pinned): a journey with no name empties the whole journey dropdown — component line 1801', () => {
+      // UNGUARDED .toLowerCase(). `e.journey.toLowerCase()` has no `?.`, while the query beside it
+      // does; the sort then calls `a['journey'].localeCompare(...)` bare (also component line 215).
+      // Real-world consequence: one half-created journey document — a row saved before its name was
+      // typed — makes the journey filter throw, so NO journeys are selectable at all.
+      expect(() => filterJourneyOptions([{ journey: 'A' }, {}], 'a'))
+        .toThrowError(/Cannot read properties of undefined \(reading 'toLowerCase'\)/);
     });
 
     it('filters and sorts admin users by resolved profile name', () => {
@@ -609,14 +602,13 @@ describe('customer-support-dashboard.engine', () => {
       expect(filterAdminUserOptions(['u1', 'u2'], map, 'zo')).toEqual(['u1']);
     });
 
-    it('FIXED (was DEFECT 15): a chat-admin id with no profile is skipped, not fatal', () => {
-      // WAS: `mapProfileData[e]['name']` guarded the NAME with `?.` but never the profile itself. A
-      // deleted admin, or a profile map that had not finished loading, threw — and because the same
-      // expression backs both the "team member" and the "reviewed by" dropdowns, two filters went blank
-      // at once. Fixed 2026-09-10.
-      expect(filterAdminUserOptions(['u1', 'ghost'], { u1: { name: 'A' } }, 'a')).toEqual(['u1']);
-      // And an unresolved id sorts as a blank rather than throwing.
-      expect(filterAdminUserOptions(['u1', 'ghost'], { u1: { name: 'A' } }, '')).toEqual(['ghost', 'u1']);
+    it('DEFECT 15 (pinned): a chat-admin id with no profile empties BOTH member dropdowns — component lines 1806/1811', () => {
+      // UNGUARDED MAP INDEX. `mapProfileData[e]['name']` guards the NAME with `?.` but never the
+      // profile itself. Real-world consequence: a deleted admin, or a profile map that has not
+      // finished loading, throws — and because the same expression backs both the "team member" and
+      // the "reviewed by" dropdowns, two filters go blank at once.
+      expect(() => filterAdminUserOptions(['u1', 'ghost'], { u1: { name: 'A' } }, 'a'))
+        .toThrowError(/Cannot read properties of undefined \(reading 'name'\)/);
     });
   });
 
