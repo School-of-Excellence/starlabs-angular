@@ -120,7 +120,9 @@ export class WorkshopsComponent implements OnInit {
 
   route(routeto: string, id?: any) {
     if (routeto === 'create') {
-      window.open('/create-workshop', '_blank');
+      // v2: open the editor on a fresh Firestore id; the document is created on the first save.
+      const newId = doc(collection(this.firestore, 'workshopconfiguration')).id;
+      window.open(`/workshopconfig/${newId}`, '_blank');
     } else if (routeto === 'edit') {
       window.open(`/workshopconfig/${id.docid}`, '_blank');
     }
@@ -131,6 +133,27 @@ export class WorkshopsComponent implements OnInit {
       window.open(`/workshop_dashboard/${workshop['id']}`, '_blank');
     } catch (error) {
       console.error('Error:', error);
+    }
+  }
+
+  private popupBannerOpening = false;
+  /** EiFlix popup banner — edits the single `classify/eiflixpopupbanner` document. */
+  async openPopupBannerDialog() {
+    // The dynamic import leaves a window in which a second click would open a
+    // second dialog; two editors on one document means the stale one can revert
+    // the other's save.
+    if (this.popupBannerOpening) return;
+    this.popupBannerOpening = true;
+    try {
+      const { PopupBannerComponent } = await import('./popup-banner/popup-banner.component');
+      const ref = this.dialog.open(PopupBannerComponent, {
+        width: '980px', maxWidth: '96vw', maxHeight: '92vh',
+        autoFocus: false, panelClass: 'popup-banner-dialog',
+      });
+      ref.afterClosed().subscribe(() => { this.popupBannerOpening = false; });
+    } catch (e) {
+      console.error('Could not open the popup banner editor:', e);
+      this.popupBannerOpening = false;
     }
   }
 
@@ -265,8 +288,19 @@ export class WorkshopsComponent implements OnInit {
     }
   }
 
+  /** Root `workshoptype` (v2) wins; legacy documents fall back to the Settings flags. */
+  typeLabel(w: any): string {
+    switch (w?.workshoptype) {
+      case 'evergreenworkshop': return 'Evergreen Workshop';
+      case 'cpworkshop': return 'CP Workshop';
+      case 'liveworkshop': return 'Workshop';
+    }
+    return w?.evergreenWorkshop ? 'Evergreen Workshop' : (w?.categorybased ? 'CP Workshop' : 'Workshop');
+  }
+
   async duplicateWorkshop(workshop: any): Promise<void> {
-    const confirmed = window.confirm('Are you sure you want to duplicate ' + workshop['detailpage']['title'] + ' workshop?');
+    const title = workshop?.detailpage?.title || 'this workshop';
+    const confirmed = window.confirm(`Are you sure you want to duplicate "${title}"?`);
     if (!confirmed) return;
     try {
       const workshopRef = doc(this.firestore, `workshopconfiguration/${workshop.docid}`);

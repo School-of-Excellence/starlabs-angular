@@ -1,4 +1,5 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Input, OnDestroy, ViewChild, inject } from '@angular/core';
+import { MediaPlaybackService } from './media-playback.service';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
@@ -24,7 +25,7 @@ import { MatIconModule } from '@angular/material/icon';
              (durationchange)="onMeta()"
              (timeupdate)="onTime()"
              (ended)="onEnded()"
-             (play)="playing = true"
+             (play)="playing = true; media.playing(audio)"
              (pause)="playing = false"></audio>
 
       <button class="ap-play" (click)="toggle()" [attr.aria-label]="playing ? 'Pause' : 'Play'">
@@ -79,7 +80,7 @@ import { MatIconModule } from '@angular/material/icon';
     .ap-dl mat-icon { font-size: 15px; width: 15px; height: 15px; }
   `],
 })
-export class ChatAudioComponent {
+export class ChatAudioComponent implements AfterViewInit, OnDestroy {
   @Input() src = '';
   @Input() name?: string;
   /** Kept for compatibility; no bubble is dark in this design, so it no longer changes anything. */
@@ -94,11 +95,27 @@ export class ChatAudioComponent {
   rate = 1;
   private durationFixed = false;
 
+  /** Shared with the thread's <video> elements — see MediaPlaybackService. */
+  media = inject(MediaPlaybackService);
+
+  ngAfterViewInit(): void {
+    const a = this.audioRef?.nativeElement;
+    if (a) this.media.register(a);
+  }
+
+  ngOnDestroy(): void {
+    const a = this.audioRef?.nativeElement;
+    // Leaving a destroyed element registered would keep it alive and let it be paused later.
+    if (a) this.media.release(a);
+  }
+
   toggle(): void {
     const a = this.audioRef?.nativeElement;
     if (!a) return;
-    if (this.playing) a.pause();
-    else a.play().catch(e => console.error('audio play failed', e));
+    if (this.playing) { a.pause(); return; }
+    // One piece of media at a time, video included — the service owns that rule.
+    this.media.playing(a);
+    a.play().catch(e => console.error('audio play failed', e));
   }
 
   seek(value: string | number): void {

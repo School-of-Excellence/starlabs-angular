@@ -759,7 +759,12 @@ export class AuthguardService {
     var map = {}
     var list = []
 
-    const q = query(collection(this.firestore, 'participant metadata'), orderBy("name"))
+    // NO orderBy("name"): Firestore silently OMITS documents that lack the sort field, and
+    // ~6% of `participant metadata` docs have no `name`. Those participants were disappearing
+    // from every consumer of this map (and, since the JC dashboard now builds its Participants
+    // roster from this collection, would vanish from the screen entirely). Read unordered and
+    // sort in memory instead — same output order, nothing dropped.
+    const q = query(collection(this.firestore, 'participant metadata'))
     const profile = await getDocs(q);
     for (let i = 0; i < profile.docs.length; i++) {
       const doc = profile.docs[i];
@@ -770,6 +775,10 @@ export class AuthguardService {
         id: doc.id
       })
     }
+    // preserve the previous name-ascending order for existing consumers; unnamed docs sort last
+    // rather than being dropped.
+    list.sort((a: any, b: any) =>
+      (a.name ?? '').toString().toLowerCase().localeCompare((b.name ?? '').toString().toLowerCase()))
     return { docdata, map, list }
   }
   async getAppointmentMap() {

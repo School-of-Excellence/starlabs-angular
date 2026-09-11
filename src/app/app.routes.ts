@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
 import { pendingUploadsGuard } from './content/episodes-dashboard/upload-studio/pending-uploads.guard';
+import { workshopConfigUnsavedGuard } from './New-Workshop/workshop-configurationv2/unsaved-changes.guard';
 
 export const routes: Routes = [
   {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
@@ -241,6 +242,7 @@ export const routes: Routes = [
   {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
   {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
+  {path: 'team-evolution-dashboard', loadComponent: () => import('./Journey Onboarding/team-evolution-dashboard/team-evolution-dashboard.component').then(m => m.TeamEvolutionDashboardComponent), canActivate: [authGuard]},
 
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},
@@ -254,7 +256,8 @@ export const routes: Routes = [
   {path: 'bigProfile', loadComponent: () => import('./big/big-profile/big-profile.component').then(m => m.BigProfileComponent), canActivate:[authGuard]},
   {path: 'particiant_assignment_board', loadComponent: () => import('./big/participant-assignment-board/participant-assignment-board.component').then(m => m.ParticipantAssignmentBoardComponent), canActivate: [authGuard]},
   {path: 'zoommeeting_bigparticipants', loadComponent: () => import('./big/zoom-meeting/zoom-meeting.component').then(m => m.ZoomMeetingComponent), canActivate: [authGuard]},
-  {path: 'bigcohorts', loadComponent: () => import('./big/big-cohort-clone-2/big-cohort-clone-2.component').then(m => m.BigCohortClone2Component), canActivate: [authGuard]},
+  {path: 'bigcohorts', loadComponent: () => import('./big/cohort-management/cohort-management.component').then(m => m.CohortManagementComponent), canActivate: [authGuard]},
+  {path: 'cohort-detail', loadComponent: () => import('./big/cohort-detail/cohort-detail.component').then(m => m.CohortDetailComponent), canActivate: [authGuard]},
   {path: 'manualassignment', loadComponent: () => import('./big/manual-assignments/manual-assignments.component').then(m => m.ManualAssignmentsComponent), canActivate: [authGuard]},
   {path: 'validateParticipantAssignments', loadComponent: () => import('./big/validate-participants-assignment/validate-participants-assignment.component').then(m => m.ValidateParticipantsAssignmentComponent), canActivate: [authGuard]},
   {path: 'biglevel', loadComponent: () => import('./big/big-level/big-level.component').then(m => m.BigLevelComponent), canActivate: [authGuard]},
@@ -280,12 +283,14 @@ export const routes: Routes = [
   {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
 
   // New Workshop
-  {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent)},
-  {path: 'workshopconfig/:id', loadComponent: () => import('./New-Workshop/workshop-configuration/workshop-configuration.component').then(m => m.WorkshopConfigurationComponent)},
+  {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent),canActivate:[authGuard]},
+  // v2 editor (in progress) owns the canonical URL; the legacy editor moved to /workshopconfigold/:id.
+  {path: 'workshopconfig/:id', loadComponent: () => import('./New-Workshop/workshop-configurationv2/workshop-configurationv2.component').then(m => m.WorkshopConfigurationv2Component),canActivate:[authGuard], canDeactivate:[workshopConfigUnsavedGuard]},
+  {path: 'workshopconfigold/:id', loadComponent: () => import('./New-Workshop/workshop-configuration/workshop-configuration.component').then(m => m.WorkshopConfigurationComponent),canActivate:[authGuard]},
   {path: 'workshops', loadComponent: () => import('./New-Workshop/workshops/workshops.component').then(m => m.WorkshopsComponent),canActivate:[authGuard]},
-  {path: 'eiflixhomeconfig', loadComponent: () => import('./New-Workshop/upcomingworkshops/upcomingworkshops.component').then(m => m.UpcomingworkshopsComponent)},
-  {path: 'newusersprofile', loadComponent: () => import('./New-Workshop/newusersprofile/newusersprofile.component').then(m => m.NewusersprofileComponent)},
-  {path: 'eiflixdiscoverpage', loadComponent: () => import('./New-Workshop/eiflixdiscoverpage/eiflixdiscoverpage.component').then(m => m.EiflixdiscoverpageComponent)},
+  {path: 'eiflixhomeconfig', loadComponent: () => import('./New-Workshop/upcomingworkshops/upcomingworkshops.component').then(m => m.UpcomingworkshopsComponent),canActivate:[authGuard]},
+  {path: 'newusersprofile', loadComponent: () => import('./New-Workshop/newusersprofile/newusersprofile.component').then(m => m.NewusersprofileComponent),canActivate:[authGuard]},
+  {path: 'eiflixdiscoverpage', loadComponent: () => import('./New-Workshop/eiflixdiscoverpage/eiflixdiscoverpage.component').then(m => m.EiflixdiscoverpageComponent),canActivate:[authGuard]},
   {path: 'workshop_dashboard/:id', loadComponent: () => import('./New-Workshop/workshop-dashboard/workshop-dashboard.component').then(m => m.WorkshopDashboardComponent), canActivate:[authGuard]},
   {path: 'formtemplateworkshop', loadComponent: () => import('./New-Workshop/form-assignment/form-assignment.component').then(m => m.FormAssignmentComponent)},
   {path: 'productpageworkshop', loadComponent: () => import('./New-Workshop/product-page/product-page.component').then(m => m.ProductPageComponent),canActivate:[authGuard]},

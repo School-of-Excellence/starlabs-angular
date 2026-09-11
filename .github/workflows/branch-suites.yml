@@ -1,0 +1,183 @@
+# branch suites — THE NEW FLOW's test lane. Dispatched by the console, never by a push.
+#
+# WHY A SEPARATE FILE, AND WHY THIS NAME
+#   The release console tracks workflows by file name and, when the webhook payload omits `path`,
+#   by display name containing `preview`, `deploy` or `e2e`
+#   (console/functions/src/index.ts — PREVIEW_WORKFLOW / DEPLOY_WORKFLOW / E2E_GATE_HINT).
+#   `preview-e2e.yml` IS tracked: its runs write `gateRun` and `testSummary` on the candidate — the
+#   OLD flow's tester-report fields. Dispatching that file from the new flow would hand the new
+#   flow control of the old flow's status.
+#
+#   So this is a different file with a display name containing none of those three words. Its runs
+#   are logged "not a tracked lane" and cannot touch `gateRun`, `testSummary` or `preview.*`.
+#
+#   ⚠️ Do NOT rename this workflow to anything containing preview / deploy / e2e.
+#
+# WHO DISPATCHES IT
+#   console/functions/src/readiness.ts → maybeDispatchSuites(), via the GitHub App, when the
+#   readiness check returns MATCHED with a non-empty suite list. `GITHUB_TOKEN` cannot do this —
+#   GitHub suppresses workflow runs it triggers — which is why the trigger lives in the backend and
+#   not in branch-channels.yml.
+#
+# THE ENGINE IS THE HUB'S. This file only resolves + fans out; the real work is
+# starlabs-e2e-tests/.github/workflows/web-e2e.yml, unchanged and shared with the old flow.
+name: branch suites
+
+on:
+  workflow_dispatch:
+    inputs:
+      suites:
+        description: 'JSON array of suite names from the readiness check, e.g. ["queue","modes"]'
+        type: string
+        required: true
+      ref:
+        description: 'Branch under test'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  INGEST_BASE: https://us-central1-starlabs-cicd.cloudfunctions.net
+
+jobs:
+  # ── 1. Tell the console the run has started ───────────────────────────────────────────────────
+  start:
+    name: mark running
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref_name }}
+
+      - name: Report RUNNING
+        continue-on-error: true # reporting must never fail the run
+        env:
+          INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ inputs.ref || github.ref_name }}
+          SUITES: ${{ inputs.suites }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping."; exit 0; fi
+          curl -fsS -X POST "$INGEST_BASE/recordSuiteRun" \
+            -H "Authorization: Bearer $INGEST_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg repo "$REPO_NAME" --arg branch "$BRANCH" --arg sha "$GITHUB_SHA" \
+                        --arg runId "$GITHUB_RUN_ID" --arg runUrl "$RUN_URL" --argjson s "$SUITES" \
+                  '{repo:$repo, branch:$branch, state:"RUNNING", sha:$sha,
+                    reportRunId:$runId, runUrl:$runUrl, suites:$s}')" \
+            && echo "Reported RUNNING." || echo "console update failed (non-fatal)"
+
+  # ── 2. suite names → {suite, config} matrix, from the hub manifest (git = routing truth) ───────
+  #    Deliberately the same mapping preview-e2e.yml uses, so the two lanes can never disagree
+  #    about which config a suite runs under.
+  resolve:
+    name: resolve suites
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.map.outputs.matrix }}
+    steps:
+      - name: Checkout the hub (suites-manifest.json)
+        uses: actions/checkout@v4
+        with:
+          repository: School-of-Excellence/starlabs-e2e-tests
+          ref: main
+          token: ${{ secrets.REPO_PAT }}
+
+      - name: Map suites → configs
+        id: map
+        env:
+          SUITES: ${{ inputs.suites }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const manifest = JSON.parse(fs.readFileSync("suites-manifest.json", "utf8"));
+            const names = JSON.parse(process.env.SUITES);
+            if (!Array.isArray(names) || names.length === 0) {
+              console.error("suites must be a non-empty JSON array"); process.exit(1);
+            }
+            const legs = names.map((n) => {
+              const def = manifest.suites[n];
+              if (!def) { console.error(`Unknown suite: ${n}`); process.exit(1); }
+              if (!def.ciReady) { console.error(`Suite not CI-ready: ${n}`); process.exit(1); }
+              return { suite: n, config: def.config };
+            });
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(legs)}\n`);
+            console.log("matrix:", JSON.stringify(legs, null, 2));
+          '
+
+  # ── 3. One parallel job per suite, on the hub's shared engine ─────────────────────────────────
+  #    `stage: branch-suite` keeps these runs OUT of the old flow's cicd-audit ledger, which uses
+  #    `gate` (PR-creation) and `preview-gate` (preview-time).
+  suite:
+    needs: resolve
+    strategy:
+      fail-fast: false # every suite reports; one failure must not cancel the others
+      matrix:
+        include: ${{ fromJson(needs.resolve.outputs.matrix) }}
+    uses: School-of-Excellence/starlabs-e2e-tests/.github/workflows/web-e2e.yml@main
+    with:
+      suite: ${{ matrix.suite }}
+      config: ${{ matrix.config }}
+      e2e_ref: main
+      firebase_project: starlabs-cicd
+      stage: branch-suite
+      evidence: '1' # report mode always on; the per-suite config decides capture level
+    secrets: inherit
+
+  # ── 4. Collapse the legs into ONE verdict ─────────────────────────────────────────────────────
+  #    PASSED means EVERY leg passed. `needs.suite.result` is 'success' only when no matrix leg
+  #    failed, which is exactly the rule we want — the console stores the verdict rather than
+  #    recomputing it from N runs.
+  report:
+    name: report result
+    # `resolve` is in `needs` ON PURPOSE: without it a resolve failure skips `suite`, and
+    # `needs.suite.result` is then 'skipped' — which the old one-liner reported as FAILED, making a
+    # lane that NEVER RAN indistinguishable from tests that genuinely failed.
+    needs: [resolve, suite]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report PASSED / FAILED
+        continue-on-error: true # reporting must never fail the run
+        env:
+          INGEST_TOKEN: ${{ secrets.CONSOLE_INGEST_TOKEN }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ inputs.ref || github.ref_name }}
+          SUITES: ${{ inputs.suites }}
+          RESOLVE_RESULT: ${{ needs.resolve.result }}
+          SUITE_RESULT: ${{ needs.suite.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # PASSED only when every matrix leg passed. Everything else is FAILED, but the NOTE says
+          # which kind of failure it was — that distinction is the whole point of this job.
+          STATE=FAILED
+          case "$SUITE_RESULT" in
+            success)   STATE=PASSED; NOTE="all suites passed" ;;
+            failure)   NOTE="one or more suites failed — open the run and expand the failing matrix leg" ;;
+            cancelled) NOTE="the run was cancelled" ;;
+            skipped)
+              if [ "$RESOLVE_RESULT" != "success" ]; then
+                NOTE="the suites never ran: the resolve step failed ($RESOLVE_RESULT) — a suite name is unknown, not ciReady, or has no config in suites-manifest.json"
+              else
+                NOTE="the suites never ran: the matrix produced no jobs"
+              fi ;;
+            *)         NOTE="unexpected suite result: $SUITE_RESULT" ;;
+          esac
+          echo "resolve=$RESOLVE_RESULT suite=$SUITE_RESULT -> $STATE ($NOTE)"
+          {
+            echo "### branch suites"
+            echo "- suites: \`$SUITES\`"
+            echo "- resolve: \`$RESOLVE_RESULT\` · suites: \`$SUITE_RESULT\`"
+            echo "- result: **$STATE** — $NOTE"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$INGEST_TOKEN" ]; then echo "CONSOLE_INGEST_TOKEN not set — skipping."; exit 0; fi
+          curl -fsS -X POST "$INGEST_BASE/recordSuiteRun" \
+            -H "Authorization: Bearer $INGEST_TOKEN" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg repo "$REPO_NAME" --arg branch "$BRANCH" --arg state "$STATE" \
+                        --arg sha "$GITHUB_SHA" --arg runId "$GITHUB_RUN_ID" --arg runUrl "$RUN_URL" \
+                        --arg note "$NOTE" --argjson s "$SUITES" \
+                  '{repo:$repo, branch:$branch, state:$state, sha:$sha,
+                    reportRunId:$runId, runUrl:$runUrl, suites:$s, note:$note}')" \
+            && echo "Reported $STATE." || echo "console update failed (non-fatal)"
