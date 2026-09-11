@@ -14,7 +14,8 @@
 
     <div>
       <mat-form-field appearance="outline" style="width: 350px;padding: 20px 20px 5px;">
-        <mat-select placeholder="Select Event" [(ngModel)]="selectedEventsList" (selectionChange)="eventSelected()" multiple>
+        <mat-select placeholder="Select Event" [(ngModel)]="selectedEventsList" (selectionChange)="eventSelected()" multiple
+                    data-testid="bp-event-select">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
           </mat-option>

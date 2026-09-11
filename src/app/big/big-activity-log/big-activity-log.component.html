@@ -37,7 +37,8 @@
   
           <mat-form-field class="ml-3" appearance="outline">
             <mat-label>Filter Participant</mat-label>
-            <mat-select [(ngModel)]="selectedProfile" (selectionChange)="filterTable($event.value); selectedBigActivity = null; selectedQueue = null">
+            <mat-select [(ngModel)]="selectedProfile" (selectionChange)="filterTable($event.value); selectedBigActivity = null; selectedQueue = null"
+                        data-testid="activitylog-filter-participant">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filteredProfile" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -47,14 +48,16 @@
   
           <mat-form-field class="ml-3" appearance="outline">
             <mat-label>Filter Activity</mat-label>
-            <mat-select [(ngModel)]="selectedBigActivity" (selectionChange)="filterTable($event.value); selectedProfile = null; selectedQueue = null">
+            <mat-select [(ngModel)]="selectedBigActivity" (selectionChange)="filterTable($event.value); selectedProfile = null; selectedQueue = null"
+                        data-testid="activitylog-filter-activity">
               <mat-option *ngFor="let option of bigActivityList" [value]="option.docid">{{option.activity}}</mat-option>
             </mat-select>
           </mat-form-field>
   
           <mat-form-field class="ml-3" appearance="outline">
             <mat-label>Filter Queue</mat-label>
-            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="filterTable($event.value); selectedProfile = null; selectedBigActivity = null">
+            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="filterTable($event.value); selectedProfile = null; selectedBigActivity = null"
+                        data-testid="activitylog-filter-queue">
               <mat-option *ngFor="let option of queueList" [value]="option.docid">{{option.queuename}}</mat-option>
             </mat-select>
           </mat-form-field>
