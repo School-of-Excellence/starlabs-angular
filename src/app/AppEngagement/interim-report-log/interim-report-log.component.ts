@@ -28,6 +28,7 @@ import { environment } from '../../../environments/environment.development';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import * as XLSX from 'xlsx';
+import { InterimReportDashboardComponent } from './interim-report-dashboard/interim-report-dashboard.component';
 
 
 @Component({
@@ -48,7 +49,8 @@ import * as XLSX from 'xlsx';
     MatCheckboxModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    NgxMatSelectSearchModule
+    NgxMatSelectSearchModule,
+    InterimReportDashboardComponent
   ],
   templateUrl: './interim-report-log.component.html',
   styleUrl: './interim-report-log.component.css',

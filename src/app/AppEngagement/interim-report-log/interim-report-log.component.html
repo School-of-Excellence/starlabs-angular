@@ -1,7 +1,4 @@
 <div class="mainscreen">
-  <div class="header">
-    <h2 class="heading">Participant Form Tracker</h2>
-  </div>
 
   
     <!-- Filters - only for Ask A&H and Love Letter -->
@@ -299,6 +296,13 @@
         </div>
         <mat-paginator #logPaginator [pageSizeOptions]="[25, 50, 100 , logDataSource.data.length]" [length]="logDataSource.data.length"></mat-paginator>
       </div>
+    </mat-tab>
+
+    <!-- Interim Report Dashboard (lazy: only rendered when the tab is opened) -->
+    <mat-tab label="Interim Report Dashboard">
+      <ng-template matTabContent>
+        <app-interim-report-dashboard [profiles]="mapProfiles"></app-interim-report-dashboard>
+      </ng-template>
     </mat-tab>
   </mat-tab-group>
 
