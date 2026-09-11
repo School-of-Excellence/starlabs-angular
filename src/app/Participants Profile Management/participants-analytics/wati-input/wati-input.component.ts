@@ -158,6 +158,10 @@ export class WatiInputComponent {
   newPresetName = '';
   showPresetSaveInput = false;
 
+  selectedParticipants = [];
+  communicationPlanner = null;
+  isFirstTime = true;
+
   private readonly SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-rhdwzw46ya-uc.a.run.app';
   private readonly PROD_SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-kakybqnyrq-uc.a.run.app';
 
@@ -185,16 +189,43 @@ export class WatiInputComponent {
     // Build schedule picker arrays
     this.hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
     this.minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+    
+    this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? [];
+    this.communicationPlanner = !Array.isArray(this.data) ? this.data?.communicationDoc ?? null : null;
+    this.bufferDoc['communicationplannerid'] = this.communicationPlanner?.docid ?? null;
 
-    if (this.data) {
+    if (this.selectedParticipants) {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const tag = `${pad(now.getDate())}_${pad(now.getMonth() + 1)}_${now.getFullYear()}_${pad(now.getHours())}_${pad(now.getMinutes())}`;
-      this.bufferDoc.profileid = data.map((e: any) => e.profileid);
+      this.bufferDoc.profileid = this.selectedParticipants.map((e: any) => e.profileid);
       this.bufferDoc.broadcastname = (this.bufferDoc.profileid.length === 1)
         ? `Individual_${tag}` : `Broadcast_${tag}`;
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
       this.refreshRecipientBuckets();
+
+      // if(![null , undefined , ''].includes(this.communicationPlanner)){
+      //   const watiDocId = this.communicationPlanner?.watitemplate?.docid;
+      //   if(watiDocId){
+      //     getDoc(doc(this.firestore , 'wati template' , watiDocId)).then((templateRef)=>{
+      //       const template = templateRef?.data();
+      //       this.selectedTemplate =  {
+      //         elementName: template['watitemplateid'] ?? template['templatename'] ?? '', bodyOriginal: template['textbody'] ?? template['htmlbody'] ?? '',
+      //         serverurl: template['serverurl'] ?? '', serverid: template['serverid'] ?? '', servername: template['servername'] ?? '',
+      //         id: template['templateid'] ?? '', templateid: template['templateid'] ?? '', docid: template['docid'],
+      //         category: template['category'] ?? null, subcategory: template['subcategory'] ?? null, notes: template['notes'] ?? '',
+      //       };
+
+      //       this.bufferDoc.serverurl = this.selectedTemplate['serverurl'] ?? '';
+      //       this.bufferDoc.serverid = this.selectedTemplate['serverid'] ?? '';
+      //       this.isTemplateAvailable = true;
+
+      //       this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
+      //       this.scrollToConfigureParams();
+      //     }) 
+      //   }
+      // }
+
     } else {
       this.dialogRef.close();
     }
@@ -413,6 +444,35 @@ export class WatiInputComponent {
           });
         });
         this.watiTemplates.sort((a, b) => b['lastModified'] - a['lastModified']);
+
+        if (this.isFirstTime) {
+          const plannedWatiTemplate = this.communicationPlanner?.watitemplate?.templateid;
+          if (this.communicationPlanner && plannedWatiTemplate) {
+            const tempTemplate = this.watiTemplates?.filter((temp) => temp?.id === plannedWatiTemplate);
+            if (tempTemplate.length > 0) {
+              const template = tempTemplate[0];
+              this.resetQueuedTemplateState();
+              this.selectedTemplate = template;
+              this.bufferDoc.serverurl = template.serverurl;
+              this.bufferDoc.serverid = template.serverid;
+              this.isTemplateAvailable = false;
+              try {
+                getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', template['id']))).then((snap) => {
+                  if (!snap.empty) {
+                    this.isTemplateAvailable = true;
+                    const data = snap.docs[0].data();
+                    Object.assign(this.selectedTemplate, { docid: data['docid'], category: data['category'], subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'] });
+                  }
+                }).catch((e) => { console.error(e); this.isTemplateAvailable = false; })
+              } catch (e) { console.error(e); this.isTemplateAvailable = false; }
+              this.initParamConfig(this.parseTemplateParams(template['bodyOriginal'] || ''));
+              this.scrollToConfigureParams();
+            }
+          }
+
+          this.isFirstTime = false;
+        }
+
         this.applyFiltersAndLimit();
         this.isLoading = false;
       },
@@ -695,7 +755,7 @@ export class WatiInputComponent {
     this.isValidatingNumbers = true;
     this.validNumbers = []; this.invalidNumbers = [];
     try {
-      const existing = new Set<string>(this.data.map((d: any) => d?.['number'] || d?.['phonenumber']).filter(Boolean).map((n: string) => this.cleanPhoneNumber(n.toString())));
+      const existing = new Set<string>(this.selectedParticipants.map((d: any) => d?.['number'] || d?.['phonenumber']).filter(Boolean).map((n: string) => this.cleanPhoneNumber(n.toString())));
       this.phoneNumbers.forEach(p => (existing.has(p) ? this.validNumbers : this.invalidNumbers).push(p));
       this.showValidationResults = true;
       this.snackBar.open(`Validated: ${this.validNumbers.length} valid, ${this.invalidNumbers.length} not found`, 'Close', { duration: 5000 });
@@ -730,7 +790,7 @@ export class WatiInputComponent {
   getRecipientCount() { return this.bufferDoc.profileid.length; }
   getRecipientList() {
     if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'], profileid: id }));
-    return this.data || [];
+    return this.selectedParticipants || [];
   }
 
   /** Splits the recipient list into what will actually go out and what is held back.
@@ -877,12 +937,47 @@ export class WatiInputComponent {
     return archiveDoc;
   }
 
+  checkSameDay(date: any, dateToCompare: any) {
+    const plannerDate: Date | null = date?.toDate ? date.toDate() : date instanceof Date ? date : null;
+    const sendingDate: Date | null = dateToCompare?.toDate ? dateToCompare.toDate() : dateToCompare instanceof Date ? dateToCompare : null;
+    if (!plannerDate) return true;
+    return plannerDate?.getDate() === sendingDate?.getDate() &&
+      plannerDate.getMonth() === sendingDate.getMonth() &&
+      plannerDate.getFullYear() === sendingDate.getFullYear();
+  }
+  
+  // surya
+  isValidPlannedCommunication() {
+    const sendingDate = this.isScheduled ? this.getScheduledDateTime() : new Date();
+    if (![null, undefined, ''].includes(this.communicationPlanner)) {
+      const plannedWatiTemplate = this.communicationPlanner?.watitemplate?.docid ?? null;
+      if (!this.checkSameDay(this.communicationPlanner?.date, sendingDate)) {
+        const date = this.communicationPlanner?.date?.toDate ? this.communicationPlanner?.date?.toDate() : new Date(this.communicationPlanner?.date);
+        alert(`You can't send or schedule whatsup which is planned for ${date.toDateString()}`);
+        return false
+      }
+
+      if ([null , undefined , ''].includes(plannedWatiTemplate)) {
+        alert(`Please Select Whatsup Template for Titled : ${this.communicationPlanner?.title} in communication grid planner before sending Whatsup`);
+        return false;
+      }
+
+      if (this.selectedTemplate && this.selectedTemplate['docid'] !== plannedWatiTemplate) {
+        alert(`You can't send whatsup selected template is invalid`);
+        return false
+      }
+
+    }
+    return true;
+  }
+
   // ══════════════════════════════════════════════════════════════════════
   // SUBMIT
   // ══════════════════════════════════════════════════════════════════════
   async onSubmit() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
     if (this.isQueuedTemplate) { await this.sendQueuedTemplate(); return; }
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.uploadedFile) await this.uploadFileToStorage();
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
@@ -971,6 +1066,7 @@ export class WatiInputComponent {
   async onScheduleSubmit() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
     if (!this.isScheduleValid()) { this.snackBar.open('Select a valid future date and time', 'Close', { duration: 3000 }); return; }
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.uploadedFile) await this.uploadFileToStorage();
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
