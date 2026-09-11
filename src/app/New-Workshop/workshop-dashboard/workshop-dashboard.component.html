@@ -34,6 +34,10 @@
           <p class="whd-desc" *ngIf="workshopDescription">{{ workshopDescription }}</p>
         </div>
         <div class="whd-actions">
+          <button type="button" class="whd-btn" data-testid="wdash-comm-open-btn" (click)="openCommunicationDialog()"
+                  matTooltip="Email, WhatsApp or notify anyone — enrolled in this workshop or not">
+            <mat-icon>forum</mat-icon>Communication
+          </button>
           <button type="button" class="whd-btn" (click)="openQADialog()">
             <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>

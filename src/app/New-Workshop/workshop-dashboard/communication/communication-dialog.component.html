@@ -1,0 +1,226 @@
+<div class="cm">
+  <!-- ───────── header ───────── -->
+  <header class="cm-head">
+    <div class="cm-head-text">
+      <div class="cm-eyebrow">Communication</div>
+      <h2 class="cm-title">Reach anyone — enrolled or not</h2>
+      <p class="cm-sub">
+        <strong>{{ workshopTitle || 'This workshop' }}</strong>
+        <span class="cm-dot">·</span>
+        <ng-container *ngIf="!loading && !loadError">
+          {{ counts.metadata | number }} existing, {{ counts.newUsers | number }} new,
+          {{ counts.enrolled | number }} enrolled here
+        </ng-container>
+        <ng-container *ngIf="loading">loading everyone…</ng-container>
+      </p>
+    </div>
+    <button type="button" class="cm-x" data-testid="wdash-comm-close-btn" (click)="close()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <mat-progress-bar *ngIf="loading" mode="indeterminate" class="cm-progress"></mat-progress-bar>
+
+  <div class="cm-error" *ngIf="loadError">
+    <mat-icon>error_outline</mat-icon><span>{{ loadError }}</span>
+  </div>
+
+  <ng-container *ngIf="!loading && !loadError">
+    <!-- ───────── filter bar ───────── -->
+    <section class="cm-filters">
+      <div class="cm-seg" role="group" aria-label="Audience">
+        <button type="button" data-testid="wdash-comm-audience-all"   [class.on]="audience === 'all'"   (click)="setAudience('all')">Everyone</button>
+        <button type="button" data-testid="wdash-comm-audience-exist" [class.on]="audience === 'exist'" (click)="setAudience('exist')">Existing users</button>
+        <button type="button" data-testid="wdash-comm-audience-new"   [class.on]="audience === 'new'"   (click)="setAudience('new')">New users</button>
+      </div>
+
+      <div class="cm-seg" role="group" aria-label="Enrollment">
+        <button type="button" data-testid="wdash-comm-enroll-all"      [class.on]="enrollment === 'all'"      (click)="setEnrollment('all')">Any</button>
+        <button type="button" data-testid="wdash-comm-enroll-enrolled" [class.on]="enrollment === 'enrolled'" (click)="setEnrollment('enrolled')">Enrolled</button>
+        <button type="button" data-testid="wdash-comm-enroll-not"      [class.on]="enrollment === 'not'"      (click)="setEnrollment('not')">Not enrolled</button>
+      </div>
+
+      <!-- existing-only filters -->
+      <ng-container *ngIf="showExistFilters">
+        <button type="button" class="cm-pick" data-testid="wdash-comm-status-btn" [matMenuTriggerFor]="statusMenu" [class.on]="statusFilters.length">
+          <mat-icon>verified_user</mat-icon>Customer status<span class="cm-badge" *ngIf="statusFilters.length">{{ statusFilters.length }}</span>
+        </button>
+        <mat-menu #statusMenu="matMenu" class="cm-menu">
+          <div class="cm-menu-body" (click)="$event.stopPropagation()">
+            <mat-checkbox *ngFor="let s of statusOptions" data-testid="wdash-comm-status-option"
+                          [checked]="statusFilters.includes(s)" (change)="toggleMulti(statusFilters, s)">{{ s }}</mat-checkbox>
+            <div class="cm-menu-empty" *ngIf="!statusOptions.length">No customer statuses found.</div>
+          </div>
+        </mat-menu>
+
+        <button type="button" class="cm-pick" data-testid="wdash-comm-journey-btn" [matMenuTriggerFor]="journeyMenu" [class.on]="journeyFilters.length">
+          <mat-icon>route</mat-icon>Journey<span class="cm-badge" *ngIf="journeyFilters.length">{{ journeyFilters.length }}</span>
+        </button>
+        <mat-menu #journeyMenu="matMenu" class="cm-menu">
+          <div class="cm-menu-body" (click)="$event.stopPropagation()">
+            <mat-checkbox *ngFor="let j of journeyOptions" data-testid="wdash-comm-journey-option"
+                          [checked]="journeyFilters.includes(j.id)" (change)="toggleMulti(journeyFilters, j.id)">{{ j.name }}</mat-checkbox>
+            <div class="cm-menu-empty" *ngIf="!journeyOptions.length">No journeys found.</div>
+          </div>
+        </mat-menu>
+      </ng-container>
+
+      <button type="button" class="cm-pick" data-testid="wdash-comm-country-btn" [matMenuTriggerFor]="countryMenu" [class.on]="countryFilters.length">
+        <mat-icon>public</mat-icon>Country code<span class="cm-badge" *ngIf="countryFilters.length">{{ countryFilters.length }}</span>
+      </button>
+      <mat-menu #countryMenu="matMenu" class="cm-menu">
+        <div class="cm-menu-body" (click)="$event.stopPropagation()">
+          <mat-checkbox *ngFor="let c of countryOptions" data-testid="wdash-comm-country-option"
+                        [checked]="countryFilters.includes(c)" (change)="toggleMulti(countryFilters, c)">+{{ c }}</mat-checkbox>
+          <div class="cm-menu-empty" *ngIf="!countryOptions.length">No country codes found.</div>
+        </div>
+      </mat-menu>
+
+      <span class="cm-check"><mat-checkbox data-testid="wdash-comm-need-phone" [(ngModel)]="needPhone" (change)="applyFilters()">Has phone</mat-checkbox></span>
+      <span class="cm-check"><mat-checkbox data-testid="wdash-comm-need-email" [(ngModel)]="needEmail" (change)="applyFilters()">Has email</mat-checkbox></span>
+
+      <div class="cm-search">
+        <mat-icon>search</mat-icon>
+        <input type="text" data-testid="wdash-comm-search" [(ngModel)]="search" (ngModelChange)="onSearchInput()"
+               placeholder="Search name, email, phone…" autocomplete="off" spellcheck="false">
+        <button type="button" class="cm-clear-search" *ngIf="search" (click)="clearSearch()" aria-label="Clear search">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <button type="button" class="cm-reset" data-testid="wdash-comm-clear-filters" *ngIf="activeFilterCount" (click)="clearFilters()">
+        <mat-icon>filter_alt_off</mat-icon>Clear {{ activeFilterCount }}
+      </button>
+    </section>
+
+    <!-- ───────── result strip ───────── -->
+    <div class="cm-strip">
+      <span class="cm-count" data-testid="wdash-comm-shown-count"><strong>{{ shownCount | number }}</strong> shown</span>
+      <span class="cm-dot">·</span>
+      <span class="cm-count" data-testid="wdash-comm-selected-count">
+        <strong>{{ selected.size | number }}</strong> selected
+        <span class="cm-muted" *ngIf="!selected.size">— sends go to everyone shown</span>
+      </span>
+      <span class="cm-grow"></span>
+      <span class="cm-muted cm-ready">
+        {{ withPhone | number }} with a phone · {{ withEmail | number }} with an email
+      </span>
+    </div>
+
+    <!-- ───────── selected people — survives every search and filter ───────── -->
+    <section class="cm-selected" data-testid="wdash-comm-selected-panel" *ngIf="selected.size">
+      <div class="cm-selected-head">
+        <button type="button" class="cm-selected-toggle" data-testid="wdash-comm-selected-toggle"
+                (click)="selectedOpen = !selectedOpen" [attr.aria-expanded]="selectedOpen">
+          <mat-icon>{{ selectedOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+          <strong>{{ selected.size | number }}</strong>&nbsp;selected
+          <span class="cm-selected-preview" *ngIf="!selectedOpen">— {{ selectedPreview }}</span>
+        </button>
+        <span class="cm-grow"></span>
+        <button type="button" class="cm-link" data-testid="wdash-comm-only-selected" [class.on]="onlySelected" (click)="toggleOnlySelected()">
+          <mat-icon>{{ onlySelected ? 'visibility_off' : 'visibility' }}</mat-icon>{{ onlySelected ? 'Show everyone' : 'Show only these' }}
+        </button>
+        <button type="button" class="cm-link cm-link-danger" data-testid="wdash-comm-clear-selection" (click)="clearSelection()">
+          <mat-icon>close</mat-icon>Clear selection
+        </button>
+      </div>
+      <div class="cm-chips" *ngIf="selectedOpen">
+        <span class="cm-chip" data-testid="wdash-comm-selected-chip" *ngFor="let r of selectedRows | slice:0:chipLimit; trackBy: trackRow"
+              [class.new]="r.kind === 'new'" [matTooltip]="r.email || fullPhone(r) || r.profileid">
+          {{ r.name || r.email || r.profileid }}
+          <button type="button" class="cm-chip-x" data-testid="wdash-comm-selected-remove" (click)="toggleRow(r)"
+                  [attr.aria-label]="'Remove ' + (r.name || r.profileid)"><mat-icon>close</mat-icon></button>
+        </span>
+        <span class="cm-chip cm-chip-more" *ngIf="selectedRows.length > chipLimit">+{{ selectedRows.length - chipLimit | number }} more</span>
+      </div>
+    </section>
+
+    <!-- ───────── table ───────── -->
+    <div class="cm-table-wrap">
+      <table mat-table [dataSource]="dataSource" matSort matSortActive="name" matSortDirection="asc" [trackBy]="trackRow" class="cm-table">
+
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="cm-col-select">
+            <mat-checkbox data-testid="wdash-comm-select-all" [checked]="allShownSelected" [indeterminate]="someShownSelected"
+                          (change)="toggleAllShown()" aria-label="Select everyone shown"></mat-checkbox>
+          </th>
+          <!-- The row itself toggles on click; the box must not bubble to it or the tick toggles twice. -->
+          <td mat-cell *matCellDef="let r" class="cm-col-select" (click)="$event.stopPropagation()">
+            <mat-checkbox data-testid="wdash-comm-select-row" [checked]="selected.has(r.profileid)" (change)="toggleRow(r)"
+                          [attr.aria-label]="'Select ' + (r.name || r.profileid)"></mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="cm-name">{{ r.name || '—' }}</div>
+            <div class="cm-kind" [class.new]="r.kind === 'new'">{{ r.kind === 'new' ? 'New user' : 'Existing' }}</div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
+          <td mat-cell *matCellDef="let r" class="cm-mono">{{ r.email || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="phone">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Phone</th>
+          <td mat-cell *matCellDef="let r" class="cm-mono">{{ fullPhone(r) || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="journey">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Journey</th>
+          <td mat-cell *matCellDef="let r">{{ r.journey || (r.kind === 'new' ? '' : '—') }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="customerstatus">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Customer status</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="cm-status" *ngIf="r.customerstatus" [attr.data-status]="r.customerstatus">{{ r.customerstatus }}</span>
+            <span class="cm-muted" *ngIf="!r.customerstatus">{{ r.kind === 'new' ? '' : '—' }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="enrolled">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Enrolled</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="cm-enrolled" [class.yes]="r.enrolled">{{ r.enrolled ? 'Enrolled' : 'Not enrolled' }}</span>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let r; columns: displayedColumns" [class.selected]="selected.has(r.profileid)" (click)="toggleRow(r)"></tr>
+      </table>
+
+      <div class="cm-empty" *ngIf="!shownCount">
+        <mat-icon>person_search</mat-icon>
+        <p>Nobody matches these filters.</p>
+        <button type="button" class="cm-reset" (click)="clearFilters()">Clear filters</button>
+      </div>
+    </div>
+
+    <mat-paginator [pageSizeOptions]="[25, 50, 100, 250]" [pageSize]="50" showFirstLastButtons class="cm-paginator"></mat-paginator>
+
+    <!-- ───────── action bar — the side panel's three buttons ───────── -->
+    <footer class="cm-actions">
+      <div class="cm-actions-text">
+        Sending to <strong>{{ recipientCount | number }}</strong> {{ selected.size ? 'selected' : 'shown' }}
+        <span class="cm-muted">· WhatsApp needs a phone, email needs an address; the rest are skipped.</span>
+      </div>
+      <div class="cm-grow"></div>
+      <button type="button" class="cm-act" data-testid="wdash-comm-send-email" (click)="sendEmail()" [disabled]="!withEmail"
+              matTooltip="Email — same composer as the side panel">
+        <i class="fa-solid fa-envelope"></i><span>Email</span><span class="cm-n">{{ withEmail | number }}</span>
+      </button>
+      <button type="button" class="cm-act" data-testid="wdash-comm-send-whatsapp" (click)="sendWhatsapp()" [disabled]="!withPhone"
+              matTooltip="WhatsApp — same template flow as the side panel">
+        <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span><span class="cm-n">{{ withPhone | number }}</span>
+      </button>
+      <button type="button" class="cm-act" data-testid="wdash-comm-send-notification" (click)="sendNotification()" [disabled]="!recipientCount"
+              matTooltip="In-app notification — same as the side panel">
+        <mat-icon>notifications_active</mat-icon><span>Notification</span><span class="cm-n">{{ recipientCount | number }}</span>
+      </button>
+    </footer>
+  </ng-container>
+</div>

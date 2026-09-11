@@ -661,8 +661,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // ============ Email composer (same flow as participants-analytics) ============
   // EmailInputComponent reads `profileid`, `email` and `name` off each entry, so
   // flatten the panel's participants ({ profileid, name, metadata }) into that shape.
-  private get emailRecipients(): any[] {
-    return (this.filteredParticipants || [])
+  private get emailRecipients(): any[] { return this.toEmailRecipients(this.filteredParticipants); }
+
+  /** Flattens { profileid, name, metadata } entries into what EmailInputComponent reads. */
+  private toEmailRecipients(list: any[]): any[] {
+    return (list || [])
       .filter(p => p?.['metadata']?.['email'])
       .map(p => ({
         ...p['metadata'],
@@ -672,8 +675,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       }));
   }
 
-  sendEmailToSelectedParicipant() {
-    const recipients = this.emailRecipients;
+  /** Email — the side panel's button; `recipients` lets the Communication dialog reuse it. */
+  sendEmailToSelectedParicipant(recipients?: any[]) {
+    const recipients_ = recipients ? this.toEmailRecipients(recipients) : this.emailRecipients;
+    return this.sendEmailTo(recipients_);
+  }
+  private sendEmailTo(recipients: any[]) {
     if (recipients.length === 0) {
       this.snackbarService.show('No valid recipients found');
       return;
@@ -720,7 +727,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  async sendMail() {
+  /**
+   * Opens the mail composer and sends to `recipients` — or, when none are given, to
+   * the side panel's current list, exactly as before. The Communication dialog
+   * passes its own list so it reuses this path unchanged.
+   */
+  async sendMail(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { SendmessagesComponent } = await import('./sendmessages/sendmessages.component');
     const ref = this.dialog.open(SendmessagesComponent, {
       width: '1000px',
@@ -730,11 +743,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe(async (result) => {
-      await this.handleDialogResult(result);
+      await this.handleDialogResult(result, list);
     });
   }
 
-  async sendWatti() {
+  /** WhatsApp — same contract as sendMail(recipients?). */
+  async sendWatti(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { SendmessagesComponent } = await import('./sendmessages/sendmessages.component');
     const ref = this.dialog.open(SendmessagesComponent, {
       width: '1000px',
@@ -744,20 +759,20 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe(async (result) => {
-      await this.handleWhatsappChunked(result);
+      await this.handleWhatsappChunked(result, list);
     });
   }
 
   private readonly WHATSAPP_CHUNK_SIZE = 200;
   private readonly CHUNK_DELAY_MS = 1000;
 
-  private async handleWhatsappChunked(result: any) {
+  private async handleWhatsappChunked(result: any, list: any[] = this.filteredParticipants) {
     if (result?.action !== 'sent' || result.type !== 'whatsapp') {
       return;
     }
 
     const { templateName, customParams } = result;
-    const participants = this.filteredParticipants
+    const participants = list
       .filter(participant => {
         const metadata = participant['metadata'];
         return metadata && metadata['phonenumber'] && metadata['name'];
@@ -912,11 +927,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return projectUrlMap[projectId] || '';
   }
 
-  private async handleDialogResult(result: any) {
+  private async handleDialogResult(result: any, list: any[] = this.filteredParticipants) {
     if (result?.action === 'sent') {
       if (result.type === 'mail') {
         const { subject, message } = result;
-        const recipients = this.filteredParticipants
+        const recipients = list
           .filter(participant => {
             const metadata = participant['metadata'];
             return metadata && metadata['email'] && metadata['name'];
@@ -957,7 +972,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
       } else if (result.type === 'whatsapp') {
         const { templateName, customParams } = result;
-        const participants = this.filteredParticipants
+        const participants = list
           .filter(participant => {
             const metadata = participant['metadata'];
             return metadata && metadata['phonenumber'] && metadata['name'];
@@ -1012,7 +1027,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async sendNotificationinBreakthrough() {
+  /** In-app notification — same contract as sendMail(recipients?). */
+  async sendNotificationinBreakthrough(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { AhNotificationComponent } = await import(
       '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component'
     );
@@ -1021,11 +1038,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       maxHeight: "90vh",
       disableClose: true,
       autoFocus: false,
-      data: this.filteredParticipants
+      data: list
     });
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
       if (result != null && result != undefined) {
-        var profileID = this.filteredParticipants.map(p => p.profileid);
+        var profileID = list.map(p => p.profileid);
         var notificationimage = null;
         if (result["notificationimage"] != null) {
           const { getDownloadURL, ref, uploadBytes } = await import('@angular/fire/storage');
@@ -2199,6 +2216,41 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
     this.selectedStatusInfo = null;
+  }
+
+  private communicationOpening = false;
+  /**
+   * Communication — reach anyone, enrolled here or not.
+   *
+   * The dashboard only loads metadata for enrolled profiles (the collection is
+   * large); this dialog loads everyone on demand. It hands its recipients back to
+   * the SAME three senders the side panel uses, so the composers, chunking and
+   * progress flow are shared rather than duplicated.
+   */
+  async openCommunicationDialog() {
+    if (this.communicationOpening || !this.workshopId) return;
+    this.communicationOpening = true;
+    try {
+      const { CommunicationDialogComponent } = await import('./communication/communication-dialog.component');
+      const ref = this.dialog.open(CommunicationDialogComponent, {
+        width: '1180px', maxWidth: '96vw', maxHeight: '92vh',
+        autoFocus: false, panelClass: 'wdash-comm-dialog',
+        data: {
+          workshopId: this.workshopId,
+          workshopTitle: this.workshopTitle,
+          workshopRef: doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId),
+          send: {
+            email: (r: any[]) => this.sendEmailToSelectedParicipant(r),
+            whatsapp: (r: any[]) => this.sendWatti(r),
+            notification: (r: any[]) => this.sendNotificationinBreakthrough(r),
+          },
+        },
+      });
+      ref.afterClosed().subscribe(() => { this.communicationOpening = false; });
+    } catch (e) {
+      console.error('Could not open the communication dialog:', e);
+      this.communicationOpening = false;
+    }
   }
 
   async openQADialog() {

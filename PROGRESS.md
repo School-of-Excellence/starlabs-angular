@@ -1,83 +1,18 @@
-# PROGRESS — StarLabs (atctranscription)
-
-<<<<<<< HEAD
-_Last updated: 2026-09-10 (workshop dashboard: Exist Users Enrolled card + movedtoexist rule)_
-=======
-_Last updated: 2026-09-09 (workshop configuration v2: hints, guide, new settings, editor fixes)_
->>>>>>> 9b0f8252f4ef6444767a49ed5e3c21ff3a8c3f73
-· **New session? Read `specs/ORIENTATION.md` first**, then the journals below.
-⚠️ `/specs` is gitignored (`.gitignore:8`) — the journals and HTML mockups exist only on this machine.
-
-Journals for this work, newest first:
-<<<<<<< HEAD
-`specs/journals/2026-09-10-dashboard-exist-users-card.md` ·
-=======
->>>>>>> 9b0f8252f4ef6444767a49ed5e3c21ff3a8c3f73
-`specs/journals/2026-09-09-richtext-toolbar-and-headings.md` ·
-`2026-09-04-workshop-config-hints-and-guide.md` (also carries the 09-09 entries) ·
-`2026-09-04-eiflix-popup-banner.md` · `2026-09-04-workshop-enroll-diagnostics.md` ·
-`2026-09-02-workshopconfig-v2-enrollment-design.md` (the full v2 story).
+# PROGRESS
 
 ## Current state
-<<<<<<< HEAD
-- Branch `nanda-development`. The v2 configuration work is **committed** (operator).
-  **UNCOMMITTED**: the workshop dashboard component (`.ts` + `.html`) — the new
-  Exist Users Enrolled card and the `movedtoexist` rule.
-- Previously uncommitted, now landed: 11 modified files (the three
-=======
-- Branch `nanda-development`. **UNCOMMITTED**: 11 modified files (the three
->>>>>>> 9b0f8252f4ef6444767a49ed5e3c21ff3a8c3f73
-  `workshop-configurationv2` tabs, `wc2-help.ts`, `wc2-shared.css`, the popup banner,
-  `src/styles.css`) plus one new file, `workshop-configurationv2/wc2-editor.ts`.
-  Earlier work in this line was committed by the operator mid-session. NOT pushed.
-- `/workshopconfig/:id` (v2) is the live editor; the legacy screen stays at
-  `/workshopconfigold/:id`. Enrollment, Challenges and Settings all carry per-field
-  hints written from the EiFlix Flutter app.
-- Settings now writes **55** root fields (was 53): `eiflixmobileactive` and
-  `heroeiflixmobile` were added on request.
-- Dev + production builds green. **Nothing in this line has been verified at runtime** —
-  the screens are behind login.
+- Branch `nanda-development`; last commits: dashboard filter test case, merges of `production` and `development`.
+- **Uncommitted, built green (dev + prod):** the workshop-dashboard **Communication** dialog — `workshop-dashboard/communication/*`, the header button, three dashboard senders now taking an optional recipient list, two `styles.css` rules, 41-case spec. Journal: `specs/journals/2026-09-11-dashboard-communication-dialog.md`.
+- Everything from this run of sessions (workshopconfig v2 hints/guide, EiFlix toggles, schedule/rail/rich-text fixes, enroll diagnostics, popup banner, Exist Users card) is committed but **unverified at runtime** — all behind login.
+- `ng test` is broken repo-wide by five stale stubs (wrong class names in `assigncategorydialog`, `channeltemplates`, `preview-triple-atc` specs; `import 'console'` in two components). New specs were run with a temporarily scoped `tsconfig.spec.json`, restored afterwards.
 
-<<<<<<< HEAD
-## Last session changes (2026-09-10 and the days before it)
-- **Workshop dashboard: Exist Users Enrolled.** A new card before New Users Enrolled
-  counting everyone enrolled who is not a new user, with journey + customer-status
-  filters in its side panel. The screen reads **`participant metadata`** (not
-  `profile_data`). Root fix: `new_user_data` was spread over the metadata map, so a
-  person with `movedtoexist: true` kept resolving through their stale new-user doc —
-  no journey, no customer status, counted as new forever. One rule now governs it and
-  New/Exist finally partition Total Enrolled.
-=======
-## Last session changes (2026-09-09 and the days before it)
->>>>>>> 9b0f8252f4ef6444767a49ed5e3c21ff3a8c3f73
-- **Field hints + configuration guide.** 160 fields traced read-only through
-  `/Users/nanda/Documents/Development/workshop`, each hint checked by a verifier (132
-  corrected). Headline finding: **29 settings are dead** — nothing in the user app reads
-  them. The guide has a narrative half and an "Every setting" reference with a
-  "does nothing today" filter. **The Guide button is currently commented out** at the
-  operator's request; uncommenting one block in the configuration header restores it.
-- **Two new settings**, both requested and both with the same caveat: *nothing in the
-  Flutter app reads them yet*. `eiflixmobileactive` (workshop in the EiFlix mobile app)
-  and `heroeiflixmobile` (hero banner in that app). The hero group now has three switches
-  of which only the web one demonstrably works — worth settling with the app team.
-- **Enrollment diagnostics** on `/workshop_dashboard/:id` — a Diagnose dialog that replays
-  every enroll gate for one profile (by profileid **or** email) and explains the outcome.
-- **EiFlix popup banner editor** on `/workshops`, editing `classify/eiflixpopupbanner`.
-- **Bugs fixed, each with the cause recorded in the journals:** a global Bootstrap `.row`
-  collision that stretched the header badge; an `*ngFor` identity churn that made the guide
-  nav unclickable; rail clicks needing two tries (expand-then-scroll in one tick, fixed on
-  all three rails); the Schedule row broken by my own hint rollout, plus a clipped time
-  dropdown; and the rich-text editors — h1–h6 everywhere, a **Normal** button to undo a
-  heading (the library had no way back), and the full toolbar.
+## Last session changes
+- **Communication dialog** (operator request). Answered the question first: the dashboard reads `participant metadata` **only for enrolled ids** (where-in batches of 30); only `new_user_data` is loaded whole. The dialog loads both whole, plus `workshop participant enrolled where workshopref == <workshopconfiguration ref>` and `journey`, merges them one row per person (metadata wins; `movedtoexist: true` = existing; country code spelled differently per collection), and offers audience / enrollment / status / journey / country / has-phone / has-email / search filters with sort, pagination and selection.
+- **Same send buttons, same functions:** `sendEmailToSelectedParicipant`, `sendWatti`, `sendNotificationinBreakthrough` were refactored to accept an optional recipient list (default unchanged), so the dialog and the side panel run identical composer / chunking / archive code.
+- **Bug pass after the operator tried it:** selection was pruned on every filter change (a second search un-ticked the first person) → selection is now independent of the view, with Show selected / Clear selection; search re-scanned and re-sorted everything per keystroke with per-CD getters on top → rows indexed once, 180 ms debounce, one pass per change, counts cached (30k people: 2–25 ms per change). Also fixed: MatSort/MatPaginator never attached (ViewChild inside `*ngIf`) and a nested `<label>` double-toggling the Has phone/email boxes. 41 tests passing; harness render clean.
+- Earlier in the session (committed): Exist Users Enrolled card + filters, `wdash-*` testids, 23-case spec; the CI "no spec references / nothing exercises" findings need e2e specs in the hub repo `starlabs-e2e-tests` (not checked out).
 
 ## Pending
-- **Operator runtime pass — nothing here has run.** Highest value first: save Settings and
-  confirm the two new toggles round-trip; open the Diagnose dialog on a known-refused
-  profile and one by email; save the popup banner and reopen it; apply a heading then press
-  Normal; click through each rail once.
-- **Decide the mobile flags** with the app team — three hero switches and two workshop-level
-  ones, most unread today.
-- **Decide whether to hide the 29 dead settings** from the screen instead of only labelling
-  them, and whether to re-enable the Guide button.
-- Carried: D1 (evergreen disabled-children quirk); retire `/workshopconfigold` after the
-  pass; `/eiflixhomeconfig` + `/videodashboard` visual pass; eiflix consumers/backfills.
+- Operator: commit the Communication dialog; runtime pass on it and on the earlier unverified screens (list in the journals).
+- e2e specs for `wdash-*` ids in `starlabs-e2e-tests` once it is available locally.
+- Open decisions: hide the 29 dead workshopconfig settings?; re-enable the Guide button (commented out); the three hero-mobile / two workshop-level mobile flags are mostly unread by the Flutter app; the D1 evergreen quirk; the five one-line fixes to unblock `ng test`.
