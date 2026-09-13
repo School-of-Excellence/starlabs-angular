@@ -69,7 +69,7 @@
               </tr>
             </table>
           </div>
-          <mat-paginator #paginator_tier [pageSizeOptions]="[10, 25, 100, dataSource_tier.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
+          <mat-paginator #paginator_tier data-testid="paginator_tier" [pageSizeOptions]="[10, 25, 100, dataSource_tier.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
         </div>
       </div>
     </mat-tab>
@@ -139,7 +139,7 @@
               </tr>
             </table>
           </div>
-          <mat-paginator #paginator_assigntier [pageSizeOptions]="[10, 25, 100, dataSource_assigntier.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
+          <mat-paginator #paginator_assigntier data-testid="paginator_assigntier" [pageSizeOptions]="[10, 25, 100, dataSource_assigntier.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
         </div>
       </div>
     </mat-tab>
@@ -215,7 +215,7 @@
               </tr>
             </table>
           </div>
-          <mat-paginator #paginator_assignuser [pageSizeOptions]="[10, 25, 100, dataSource_assignuser.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
+          <mat-paginator #paginator_assignuser data-testid="paginator_assignuser" [pageSizeOptions]="[10, 25, 100, dataSource_assignuser.data.length]" showFirstLastButtons class="paginator"></mat-paginator>
         </div>
       </div>
     </mat-tab>
