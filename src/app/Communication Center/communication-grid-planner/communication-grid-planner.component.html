@@ -1,0 +1,610 @@
+<div class="commnunication-grid-planner" #commnunicationGridPlanner>
+    <div class="wrap">
+        <div class="bar bar1">
+            <div class="views" role="group" aria-label="View">
+                <label for="v-cal" [class.active-tab]="activeTab == 'calendar'" (click)="onActiveTabChange('calendar')">Calendar</label>
+                <label for="v-lib" [class.active-tab]="activeTab == 'library'" (click)="onActiveTabChange('library')">Library</label>
+            </div>
+        </div>
+        <div class="bar bar2"><span class="rowlab">Status</span>
+            <mat-form-field>
+                <mat-label>Select Event</mat-label>
+                <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
+                    <mat-option [value]="null">None</mat-option>
+                    <mat-option *ngFor="let event of eventList" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
+                </mat-select>
+            </mat-form-field>
+            <button (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
+        </div>
+        <div class="header-warp">
+            <div class="header">
+                <button (click)="prevMonth()">‹</button>
+                <span>{{ displayedMonth | date:'MMMM yyyy' }}</span>
+                <button (click)="nextMonth()">›</button>
+            </div>
+            <div>
+                <div class="chip-group">
+                    <button class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
+                        <svg class="check" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        {{event?.name}}
+                    </button>
+                </div>
+            </div>
+        </div>
+        <main>
+            <section style="display:block;" *ngIf="activeTab == 'calendar'">
+                <div class="cal-wrapper">
+                    <div class="cal-h"></div>
+                    <!-- Spinner overlay -->
+                    <div class="cal-overlay" *ngIf="isAllLoaded()">
+                        <div class="cal-spinner">
+                            <div class="spinner-ring"></div>
+                            <span class="spinner-label">Loading…</span>
+                        </div>
+                    </div>
+                    <div class="cal">
+                        <div class="dow">Mon</div>
+                        <div class="dow">Tue</div>
+                        <div class="dow">Wed</div>
+                        <div class="dow">Thu</div>
+                        <div class="dow">Fri</div>
+                        <div class="dow">Sat</div>
+                        <div class="dow">Sun</div>
+                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth">
+                            <div *ngIf="days.isCurrentMonth">
+                                <div class="dhead">
+                                    <span class="dn">{{days?.date?.getDate()}}</span>
+                                    <div class="daily-comm">
+                                        <span class="comm-badge cb-email" [class.zero]="(getEmailForDay(days?.date)?.length ?? 0) === 0">
+                                            <mat-icon>mail</mat-icon>
+                                            {{getEmailForDay(days?.date)?.length ?? 0}}
+                                        </span>
+                                        <span class="comm-badge cb-wati" [class.zero]="(getWatiForDay(days?.date)?.length ?? 0) === 0">
+                                            <mat-icon>chat_bubble</mat-icon>
+                                            {{getWatiForDay(days?.date)?.length ?? 0}}
+                                        </span>
+                                        <span class="comm-badge cb-app" [class.zero]="(getAppNotificationForDay(days?.date)?.length ?? 0) === 0">
+                                            <mat-icon>notifications</mat-icon>
+                                            {{getAppNotificationForDay(days?.date)?.length ?? 0}}
+                                        </span>
+                                    </div>
+                                    <button class="add-btn" (click)="onCommunicationAddClick(days?.date)" title="Add communication" aria-label="Add communication">
+                                        <mat-icon>add</mat-icon>
+                                    </button>
+                                </div>
+                                <div class="cell-com-wrap">
+                                    <div class="cell-com">
+                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)" (click)="onCummunicationClick(comm)">
+                                            <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
+                                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section style="display:block;overflow:hidden" *ngIf="activeTab == 'library'">
+                <div class="comm-form-block">
+                    <div class="cf-toolbar">
+                        <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add Communication </button>
+                        <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
+                        <ng-container *ngIf="communicationFormMode">
+                            <button class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
+                            <button class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
+                        </ng-container>
+                    </div>
+                    
+                    <div *ngIf="communicationFormMode">
+                        <div class="mrow" *ngFor="let group of communicationForm?.controls ?? []; let i = index; let isLast = last;" [formGroup]="group">
+                            <div class="cf-head">
+                                <mat-form-field appearance="outline" class="cf-field cf-field-title">
+                                    <mat-label>Title</mat-label>
+                                    <input matInput formControlName="title" placeholder="Untitled">
+                                </mat-form-field>
+
+                                <mat-form-field appearance="outline" class="cf-field cf-field-date">
+                                    <mat-label>Choose a date</mat-label>
+                                    <input matInput [matDatepicker]="picker" formControlName="date">
+                                    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                                    <mat-datepicker #picker></mat-datepicker>
+                                </mat-form-field>
+
+                                <mat-form-field appearance="outline" class="cf-field cf-field-event">
+                                    <mat-label>Select Event</mat-label>
+                                    <mat-select formControlName="eventref">
+                                        <mat-option *ngFor="let event of eventList" [value]="event.docid">
+                                            {{ event?.name ?? 'no title' }}
+                                        </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+
+                                <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
+                                    <button mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
+                                    <button mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
+                                </div>
+                            </div>
+
+                            <div class="mopen">
+                                <div class="mcols">
+                                    <div style="display:flex; flex-direction : column; gap: 5px">
+                                        <div class="cf-email-config">
+                                            <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
+                                                <mat-label>Select Email Template</mat-label>
+                                                <mat-select formControlName="emailtemplate">
+                                                    <mat-option *ngFor="let template of emailTemplates" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
+                                            <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + New template </button>
+                                        </div>
+                                        <div class="cell">
+                                            <div class="cellh"><span>Email</span></div>
+                                            <div class="pv-mail">
+                                                <ng-container *ngIf="group.get('emailtemplate')?.value as tplId; else noEmailTpl">
+                                                    <div class="subj">
+                                                        <span class="ptxt">{{ getSelectedEmail(tplId)?.subject || 'no subject line' }}</span>
+                                                    </div>
+                                                    <div class="ptxt" [innerHtml]="getSelectedEmail(tplId)?.htmlbody"></div>
+                                                </ng-container>
+                                                <ng-template #noEmailTpl>
+                                                    <div class="subj"><span class="mt">no subject line</span></div>
+                                                    <div class="ptxt"><span class="mt">no template selected</span></div>
+                                                </ng-template>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- WHATSAPP -->
+
+                                    <div>
+                                        <div>
+                                            <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
+                                                <mat-select (selectionChange)="onTemplateChange($event , i)" >
+                                                    <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
+                                                            [ngModelOptions]="{standalone: true}"
+                                                            placeholderLabel="Search…" noEntriesFoundLabel="None found"
+                                                            (ngModelChange)="onSearchTemplate()"
+                                                            ngDefaultControl></ngx-mat-select-search></mat-option>
+                                                    <mat-option disabled *ngIf="displayTemplates.length > 0"> <small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
+                                                    <mat-option *ngFor="let t of displayTemplates" [value]="t">
+                                                        <div class="tpl-option-top-favourites">
+                                                            <div class="tpl-option">
+                                                                <div class="tpl-option-top">
+                                                                    <div class="tpl-name">{{t.elementName}}</div>
+                                                                </div>
+                                                                <div class="tpl-meta">
+                                                                    <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
+                                                                </div>
+                                                            </div>
+                                                            <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
+                                                        </div>
+                                                    </mat-option>
+                                                    <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
+                                                    <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
+                                                </mat-select>
+                                            </mat-form-field>
+                                        </div>
+                                        <div class="cell">
+                                            <div class="cellh"><span>WhatsApp</span></div>
+                                            <div class="pv-chat">
+                                                <div class="chat-msg-row">
+                                                    <div class="chat-bubble">
+                                                        <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[group?.get('watitemplate').value?.templateid])"> </div>
+                                                        <div class="ptxt" *ngIf="!group?.get('watitemplate').value?.templateid"><span class="mt">not written yet</span></div>
+                                                        <div class="bubble-meta">
+                                                            <mat-icon class="bubble-tick">done_all</mat-icon>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- APP NOTIFICATION -->
+                                    <!-- <div class="cell">
+                                        <div class="cellh"><span>App notification</span></div>
+                                        <div class="pv-note" style="--evc:var(--ev-1)">
+                                            <span class="appicon">SL</span>
+                                            <div class="notebody">
+                                                <div class="noteapp">SLD CI</div>
+                                                <div class="ntitle"><span class="mt">no title</span></div>
+                                                <div class="ptxt"><span class="mt">not written yet</span></div>
+                                            </div>
+                                        </div>
+                                    </div> -->
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <ng-container *ngIf="!isAllLoaded()">
+                    <section class="libg" style="--evc:var(--ev-1)" *ngFor="let eventId of getEventGroupKeys()">
+                        <header class="libg-h">
+                            <span class="nm"> <span class="sw"></span> {{eventMap[eventId]?.name ?? 'Unknown'}} </span>
+                            <span class="dt" *ngIf="eventId !== 'Unknown'">{{toDate(eventMap[eventId]?.start_date) | date : "mediumDate"}} · {{eventMap[eventId]?.venue}}</span>
+                            <span class="ct">{{getEventCommunications(eventId).length}} communications</span>
+                        </header>
+                        <div class="libg-b">
+                            <details [open]="openedCommunications.includes(comm?.docid)" class="mrow" *ngFor="let comm of getEventCommunications(eventId)" (click)="toggleCommunications(comm?.docid)" [id]="comm?.docid">
+                                <summary class="crow">
+                                    <span class="chev">▸</span>
+                                    <span class="mwhen ">
+                                        <b> {{getDaysFormat(comm?.date , eventMap[eventId]?.start_date)}}</b>
+                                        <span>{{toDate(comm?.date) ? (toDate(comm?.date) | date : 'mediumDate') : 'N/A'}}</span>
+                                    </span>
+                                    <span class="ctitle" [class.untitled]="!comm?.title">{{comm?.title ?? 'Untitled'}}</span>
+                                    <span class="chans">
+                                        <i [class.on]="comm?.emailtemplate" title="Email">EM</i>
+                                        <i [class.on]="comm?.watitemplate" title="WhatsApp">WA</i>
+                                        <i [class.on]="comm?.apptemplate" title="App notification">AP</i>
+                                    </span>
+                                    <button class="comm-btn comm-send-btn"
+                                        [class.comm-active]="comm?.docid == selectedCommunication?.docid"
+                                        (click)="onSendCommunication(comm); $event.stopPropagation()">
+                                        {{ comm?.docid == selectedCommunication?.docid ? 'Close' : 'Send' }}
+                                    </button>
+                
+                                    <button class="comm-btn comm-edit-btn" (click)="onCommunicationEditClick(comm); $event.stopPropagation()"> Edit </button>
+                                </summary>
+                                <div class="mopen">
+                                    <div class="mcols">
+                                        <div class="comm-email">
+                                            <div class="cell">
+                                                <div class="cellh" style="color:black;"><span>Email<span *ngIf="comm?.emailtemplate?.docid">: ( {{getSelectedEmail(comm?.emailtemplate?.docid)?.templatename}} )</span></span></div>
+                                                <div class="pv-mail">
+                                                    <div class="subj"><span class="mt" style="color:black">{{getSelectedEmail(comm?.emailtemplate?.docid)?.subject}}</span> </div>
+                                                    <div class="ptxt"><span class="mt" style="color:black" [innerHtml]="getSelectedEmail(comm?.emailtemplate?.docid)?.htmlbody"></span> </div>
+                                                    <div class="ptxt"><span class="mt" style="color:black" *ngIf="comm?.emailtemplate?.docid == null">no templateselected</span></div>
+                                                </div>
+                                            </div>
+                                            <div class="email-communication-log">
+                                                <div class="email-archive-item" *ngFor="let archive of communicationEmailLog[comm?.docid] ?? []">
+                                                    <div class="email-archive-header">
+                                                        <span class="email-broadcast-name">{{ archive.broadcastname }} </span>
+                                                        <span class="email-archive-status" [attr.data-status]="archive?.status"> {{ archive?.status }} </span>
+                                                    </div>
+                                                    <div class="email-content" *ngIf="archive?.status === 'send'">
+                                                        <button mat-button class="recipient-chip clickable-chip"
+                                                            (click)="openParticipantsPopup(archive, 'all'); $event.stopPropagation()"
+                                                            matTooltip="Click to view all participants">
+                                                            <mat-icon>group</mat-icon>
+                                                            {{ (archive.emailid || archive.profileid)?.length || 0 }}
+                                                            Recipients
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="cell">
+                                                <div class="cellh" style="color:black;"><span>WhatsApp<span *ngIf="comm?.watitemplate?.templateid">: ( {{watiTemplateMap[comm?.watitemplate?.templateid]?.templatename}} )</span></span></div>
+                                                <div class="pv-chat">
+                                                    <div class="chat-msg-row">
+                                                        <div class="chat-bubble">
+                                                            <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[comm?.watitemplate?.templateid] )"> </div>
+                                                            <div class="ptxt" *ngIf="!comm?.watitemplate?.templateid"><span class="mt">not written yet</span></div>
+                                                            <div class="bubble-meta"> <mat-icon class="bubble-tick">done_all</mat-icon> </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                
+                                            <div *ngFor="let archive of communicationwatilLog[comm?.docid] ?? []" class="wati-preview">
+                                                <div class="wati-notification-title">
+                                                    <a (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
+                                                    <div class="wati-profile-info">
+                                                        <b>Sent By :</b> {{ mapProfile[archive?.createdby]?.name ?? '' }}
+                                                    </div>
+                                                </div>
+                
+                                                <button mat-button class="wati-count-btn wati-sent-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                                    <mat-icon>check_circle</mat-icon>
+                                                    <span>{{ getSentCount(archive) }}</span>
+                                                </button>
+                
+                                                <button mat-button class="wati-count-btn wati-pending-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                                    <mat-icon>schedule</mat-icon>
+                                                    <span>{{ getPendingCount(archive) }}</span>
+                                                </button>
+                
+                                                <button mat-button class="wati-count-btn wati-failed-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                                    <mat-icon>error</mat-icon>
+                                                    <span>{{ getFailedCount(archive) }}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    <!-- <div class="cell">
+                                            <div class="cellh"><span>App notification</span></div>
+                                                <div class="pv-note" style="--evc:var(--ev-1)"><span class="appicon">SL</span>
+                                                    <div class="notebody">
+                                                        <div class="noteapp">SLD CI</div>
+                                                        <div class="ntitle"><span class="mt">no title</span></div>
+                                                        <div class="ptxt"><span class="mt">not written yet</span></div>
+                                                    </div>
+                                                </div>
+                                        </div> -->
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </section>
+                </ng-container>
+            </section>
+        </main>
+    </div>
+    <app-participants-analytics *ngIf="activeTab === 'library' && selectedCommunication" [communication]="selectedCommunication"></app-participants-analytics>
+</div>
+
+
+<!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->
+<div class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()">
+    <mat-card class="participants-modal" (click)="$event.stopPropagation()">
+        <!-- Modal Header -->
+        <mat-card-header class="participants-modal-header">
+            <div class="header-left">
+                <mat-icon class="header-icon">people</mat-icon>
+                <div class="header-text">
+                    <h2 class="modal-title">Email Participants</h2>
+                    <p class="modal-subtitle"> {{selectedArchiveForPopup?.subject || selectedArchiveForPopup?.broadcastname || 'Campaign'}} </p>
+                </div>
+            </div>
+            <button mat-icon-button (click)="closeParticipantsModal()" class="close-btn">
+                <mat-icon>close</mat-icon>
+            </button>
+        </mat-card-header>
+
+        <mat-card-content class="participants-modal-content">
+
+            <!-- Status Summary as Filters (Moved to Top) -->
+            <div class="status-summary-filters">
+                <div class="summary-grid">
+                    <div class="summary-item all" [class.active]="isStatusFilterActive('all')"
+                        (click)="toggleStatusFilter('all')" matTooltip="Show all participants">
+                        <mat-icon>people</mat-icon>
+                        <span class="count">{{participantStatusCounts.total}}</span>
+                        <span class="label">All</span>
+                    </div>
+                    <div class="summary-item sent" [class.active]="isStatusFilterActive('sent')"
+                        (click)="toggleStatusFilter('sent')" matTooltip="Filter by sent">
+                        <mat-icon>send</mat-icon>
+                        <span class="count">{{participantStatusCounts.sent}}</span>
+                        <span class="label">Sent</span>
+                    </div>
+                    <div class="summary-item delivery" [class.active]="isStatusFilterActive('delivery')"
+                        (click)="toggleStatusFilter('delivery')" matTooltip="Filter by delivered">
+                        <mat-icon>check_circle</mat-icon>
+                        <span class="count">{{participantStatusCounts.delivery}}</span>
+                        <span class="label">Delivered</span>
+                    </div>
+                    <div class="summary-item open" [class.active]="isStatusFilterActive('open')"
+                        (click)="toggleStatusFilter('open')" matTooltip="Filter by opened">
+                        <mat-icon>visibility</mat-icon>
+                        <span class="count">{{participantStatusCounts.open}}</span>
+                        <span class="label">Opened</span>
+                    </div>
+                    <div class="summary-item click" [class.active]="isStatusFilterActive('click')"
+                        (click)="toggleStatusFilter('click')" matTooltip="Filter by clicked">
+                        <mat-icon>mouse</mat-icon>
+                        <span class="count">{{participantStatusCounts.click}}</span>
+                        <span class="label">Clicked</span>
+                    </div>
+                    <div class="summary-item bounce" [class.active]="isStatusFilterActive('bounce')"
+                        (click)="toggleStatusFilter('bounce')" matTooltip="Filter by bounced">
+                        <mat-icon>error_outline</mat-icon>
+                        <span class="count">{{participantStatusCounts.bounce}}</span>
+                        <span class="label">Bounced</span>
+                    </div>
+                    <div class="summary-item subscriptionchange"
+                        [class.active]="isStatusFilterActive('subscriptionchange')"
+                        (click)="toggleStatusFilter('subscriptionchange')" matTooltip="Filter by unsubscribed">
+                        <mat-icon>unsubscribe</mat-icon>
+                        <span class="count">{{participantStatusCounts.subscriptionchange}}</span>
+                        <span class="label">Unsubscribed</span>
+                    </div>
+                    <div class="summary-item failed" [class.active]="isStatusFilterActive('failed')"
+                        (click)="toggleStatusFilter('failed')" matTooltip="Filter by failed">
+                        <mat-icon>cancel</mat-icon>
+                        <span class="count">{{participantStatusCounts.failed}}</span>
+                        <span class="label">Failed</span>
+                    </div>
+                    <div class="summary-item notSent" [class.active]="isStatusFilterActive('notSent')"
+                        (click)="toggleStatusFilter('notSent')" matTooltip="Filter by not sent">
+                        <mat-icon>block</mat-icon>
+                        <span class="count">{{participantStatusCounts.notSent}}</span>
+                        <span class="label">Not Sent</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Section -->
+            <div class="search-section">
+                <mat-form-field appearance="outline" class="search-field">
+                    <mat-label>Search participants</mat-label>
+                    <input matInput [(ngModel)]="participantSearchFilter" (input)="onParticipantSearchChange()"
+                        placeholder="Search by email, name, or profile ID...">
+                    <mat-icon matPrefix>search</mat-icon>
+                    <button matSuffix mat-icon-button *ngIf="participantSearchFilter"
+                        (click)="participantSearchFilter=''; onParticipantSearchChange()">
+                        <mat-icon>clear</mat-icon>
+                    </button>
+                </mat-form-field>
+                <div class="result-count">
+                    Showing {{filteredParticipants.length}} of {{allParticipants.length}} participants
+                </div>
+            </div>
+
+            <!-- Participants List -->
+            <div class="participants-list-container">
+                <div class="participants-list" *ngIf="filteredParticipants.length > 0">
+                    <div class="participant-item" *ngFor="let participant of filteredParticipants; let i = index">
+
+                        <!-- Participant Avatar -->
+                        <div class="participant-avatar">
+                            <mat-icon>person</mat-icon>
+                        </div>
+
+                        <!-- Participant Info -->
+                        <div class="participant-info">
+                            <div class="participant-email">{{participant.email}}</div>
+                            <div class="participant-name" *ngIf="participant.name && participant.name !== 'Unknown'">
+                                {{participant.name}}
+                                <span class="profile-id"
+                                    *ngIf="participant.profileid">({{participant.profileid}})</span>
+                            </div>
+                        </div>
+
+                        <!-- Status Badges -->
+                        <div class="participant-statuses">
+                            <ng-container *ngFor="let status of getParticipantStatusBadges(participant)">
+                                <span class="status-badge" [class]="status" [matTooltip]="getStatusLabel(status)">
+                                    <mat-icon>{{getStatusIcon(status)}}</mat-icon>
+                                </span>
+                            </ng-container>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════ ON DELIVERY HOLD ═══════ -->
+                <ng-container *ngIf="heldParticipants.length > 0">
+                    <div class="held-head">
+                        <mat-icon>block</mat-icon>
+                        <span>On delivery hold — excluded from this send</span>
+                        <span class="held-count">{{ heldParticipants.length }}</span>
+                    </div>
+                    <div class="held-note">
+                        These profiles had <strong>deliveryonhold</strong> set, so no email was sent to them and they
+                        have no delivery status.
+                    </div>
+                    <div class="participants-list">
+                        <div class="participant-item held-item" *ngFor="let p of heldParticipants">
+                            <div class="participant-avatar"><mat-icon>block</mat-icon></div>
+                            <div class="participant-info">
+                                <div class="participant-email">{{ p.email || p.profileid }}</div>
+                                <div class="participant-name" *ngIf="p.name && p.name !== 'Unknown'">{{ p.name }}</div>
+                            </div>
+                            <div class="participant-statuses">
+                                <span class="status-badge held"><mat-icon>block</mat-icon></span>
+                            </div>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- No Participants Found -->
+                <div class="no-participants" *ngIf="filteredParticipants.length === 0">
+                    <mat-icon>search_off</mat-icon>
+                    <h4>No participants found</h4>
+                    <p>Try adjusting your search or status filters</p>
+                </div>
+            </div>
+
+        </mat-card-content>
+
+        <!-- Modal Actions -->
+        <mat-card-actions class="participants-modal-actions" align="end">
+            <button mat-button (click)="closeParticipantsModal()">
+                <mat-icon>close</mat-icon>
+                Close
+            </button>
+            <!-- <button mat-raised-button color="primary" (click)="exportParticipants()">
+                <mat-icon>download</mat-icon>
+                Export Participants
+            </button> -->
+        </mat-card-actions>
+    </mat-card>
+</div>
+<!-- ==================== END UNIFIED PARTICIPANTS POPUP ==================== -->
+
+<!-- Participants Popup Overlay -->
+<div *ngIf="showParticipantsPopup()" class="wati-participants-overlay" (click)="closeParticipantsPopup()">
+    <div class="wati-participants-popup" (click)="$event.stopPropagation()">
+        <div class="wati-popup-header">
+            <h3>Participants - {{ selectedRecord()?.broadcastname || 'Notification' }}</h3>
+            <button mat-icon-button (click)="closeParticipantsPopup()" class="wati-close-btn">
+                <mat-icon>close</mat-icon>
+            </button>
+        </div>
+
+        <div class="wati-popup-content">
+            <!-- Search Field -->
+            <mat-form-field appearance="outline" class="wati-search-participants">
+                <mat-label>Search Participants</mat-label>
+                <input matInput [(ngModel)]="participantSearchText" (input)="filterParticipants()"
+                    placeholder="Search by name or phone">
+                <mat-icon matSuffix>search</mat-icon>
+            </mat-form-field>
+
+            <!-- Stats Chips -->
+            <div class="wati-participants-stats">
+                <mat-chip class="wati-stat-chip wati-sent">
+                    <mat-icon>check_circle</mat-icon>
+                    Sent: {{ selectedRecord()?.sent?.length || 0 }}
+                </mat-chip>
+                <mat-chip class="wati-stat-chip wati-pending">
+                    <mat-icon>schedule</mat-icon>
+                    Pending: {{ getPendingCount(selectedRecord()) }}
+                </mat-chip>
+                <mat-chip class="wati-stat-chip wati-failed">
+                    <mat-icon>error</mat-icon>
+                    Failed: {{ selectedRecord()?.failed?.length || 0 }}
+                </mat-chip>
+                <mat-chip class="wati-stat-chip wati-held" *ngIf="heldParticipants.length > 0">
+                    <mat-icon>block</mat-icon>
+                    On hold: {{ heldParticipants.length }}
+                </mat-chip>
+            </div>
+
+            <!-- Participants List -->
+            <div class="wati-participants-list">
+                <div *ngFor="let participant of filteredWatiParticipants" class="wati-participant-item">
+                    <div class="wati-participant-info">
+                        <a class="wati-participant-name" (click)="openWatiInbox(selectedRecord())">
+                            {{ mapProfile[participant.name]?.['name'] || 'Unknown' }}
+                        </a>
+                        <span class="wati-participant-phone">{{ participant.phone }}</span>
+                    </div>
+                    <mat-chip [class]="getParticipantWatiStatus(participant.phone)" class="wati-status-chip-small">
+                        <mat-icon>
+                            {{ getParticipantWatiStatus(participant.phone) === 'sent' ? 'check_circle' :
+                            getParticipantWatiStatus(participant.phone) === 'failed' ? 'error' : 'schedule' }}
+                        </mat-icon>
+                        {{ getParticipantWatiStatus(participant.phone) }}
+                    </mat-chip>
+                </div>
+
+                <div *ngIf="filteredWatiParticipants.length === 0" class="wati-no-participants">
+                    No participants found.
+                </div>
+
+                <!-- ═══════ ON DELIVERY HOLD ═══════ -->
+                <ng-container *ngIf="heldParticipants.length > 0">
+                    <div class="wati-held-head">
+                        <mat-icon>block</mat-icon>
+                        <span>On delivery hold — excluded from this send</span>
+                        <span class="wati-held-count">{{ heldParticipants.length }}</span>
+                    </div>
+                    <div class="wati-held-note">
+                        These profiles had <strong>deliveryonhold</strong> set, so no message was sent to them and
+                        they have no delivery status.
+                    </div>
+                    <div class="wati-participant-item wati-held-item" *ngFor="let p of filteredHeldParticipants">
+                        <div class="wati-participant-info">
+                            <span class="wati-participant-name">{{ p.name }}</span>
+                            <span class="wati-participant-phone">{{ p.phone || p.email || p.profileid }}</span>
+                        </div>
+                        <mat-chip class="wati-status-chip-small wati-held">
+                            <mat-icon>block</mat-icon>
+                            on hold
+                        </mat-chip>
+                    </div>
+                    <div *ngIf="filteredHeldParticipants.length === 0" class="wati-no-participants">
+                        No matching profiles on hold.
+                    </div>
+                </ng-container>
+            </div>
+        </div>
+    </div>
+</div>
