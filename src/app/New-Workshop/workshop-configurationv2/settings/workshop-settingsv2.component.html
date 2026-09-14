@@ -2,7 +2,7 @@
      plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
      only strips marks), so a heading was otherwise permanent. -->
 <ng-template #wc2Normal>
-  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+  <button data-testid="ws-to-normal-1" type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
           (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
 </ng-template>
 <!-- ═══════════════ shared inline icons ═══════════════ -->
@@ -22,18 +22,18 @@
 <!-- ═══════════════ people picker: one field, two directories, one stored list ═══════════════ -->
 <ng-template #peoplePicker let-path="path" let-pid="pid" let-lockRegular="lockRegular">
   <div class="pop-anchor" data-pop>
-    <div class="input chips" (click)="togglePopover(pid, lockRegular ? 'new' : 'regular')">
+    <div data-testid="ws-toggle-popover-2" class="input chips" (click)="togglePopover(pid, lockRegular ? 'new' : 'regular')">
       <span class="chip soft in" *ngFor="let id of settingsForm.get(path)?.value">
         {{ nameFor(id) }}<span class="tag" *ngIf="isNewUser(id)">new</span>
-        <button type="button" class="chip-x" (click)="$event.stopPropagation(); removeProfileId(path, id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+        <button data-testid="ws-event-3" type="button" class="chip-x" (click)="$event.stopPropagation(); removeProfileId(path, id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
       </span>
       <span class="txt ph">Add a participant or new user…</span>
       <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
     </div>
     <div class="pop" *ngIf="openPopover === pid">
       <div class="ptabs">
-        <button type="button" class="ptab" [class.on]="popTab === 'regular'" [disabled]="lockRegular" (click)="popTab = 'regular'">{{ lockRegular ? 'Participants · all have access' : 'Participants' }}</button>
-        <button type="button" class="ptab" [class.on]="popTab === 'new'" (click)="popTab = 'new'">New users</button>
+        <button data-testid="ws-pop-tab-4" type="button" class="ptab" [class.on]="popTab === 'regular'" [disabled]="lockRegular" (click)="popTab = 'regular'">{{ lockRegular ? 'Participants · all have access' : 'Participants' }}</button>
+        <button data-testid="ws-pop-tab-5" type="button" class="ptab" [class.on]="popTab === 'new'" (click)="popTab = 'new'">New users</button>
       </div>
       <div class="input sm">
         <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
@@ -41,13 +41,13 @@
       </div>
       <div class="pop-list">
         <ng-container *ngIf="popTab === 'regular'">
-          <button type="button" class="pop-row" *ngFor="let p of filteredNames" [class.sel]="inArray(path, p.id)" (click)="togglePerson(path, p.id, false)">
+          <button data-testid="ws-toggle-person-6" type="button" class="pop-row" *ngFor="let p of filteredNames" [class.sel]="inArray(path, p.id)" (click)="togglePerson(path, p.id, false)">
             <span class="box"><ng-container *ngIf="inArray(path, p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ p.name }}</span>
           </button>
           <div class="help pad" *ngIf="!filteredNames.length">No participants match.</div>
         </ng-container>
         <ng-container *ngIf="popTab === 'new'">
-          <button type="button" class="pop-row" *ngFor="let p of filteredNewNames" [class.sel]="inArray(path, p.id)" (click)="togglePerson(path, p.id, true)">
+          <button data-testid="ws-toggle-person-7" type="button" class="pop-row" *ngFor="let p of filteredNewNames" [class.sel]="inArray(path, p.id)" (click)="togglePerson(path, p.id, true)">
             <span class="box"><ng-container *ngIf="inArray(path, p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ p.name }}</span><span class="c">new</span>
           </button>
           <div class="help pad" *ngIf="!filteredNewNames.length">No new users match.</div>
@@ -55,7 +55,7 @@
       </div>
       <div class="hrow between">
         <span class="help">{{ peopleCount(path) }} selected</span>
-        <button type="button" class="link" (click)="closePopover()">Done</button>
+        <button data-testid="ws-close-popover-8" type="button" class="link" (click)="closePopover()">Done</button>
       </div>
     </div>
   </div>
@@ -68,15 +68,15 @@
     <div class="rail-label">On this page</div>
     <ng-container *ngFor="let g of groups">
       <div class="rail-group">{{ g }}</div>
-      <button type="button" class="rail-item" *ngFor="let s of sectionsIn(g)" [class.on]="activeSection === s.id" (click)="jumpTo(s.id)">
+      <button data-testid="ws-jump-to-9" type="button" class="rail-item" *ngFor="let s of sectionsIn(g)" [class.on]="activeSection === s.id" (click)="jumpTo(s.id)">
         <span class="dot" [class.ok]="railHasContent(s.id)"></span>
         <span class="n">{{ s.title }}</span>
         <span class="c" *ngIf="railHint(s.id)">{{ railHint(s.id) }}</span>
       </button>
     </ng-container>
     <div class="rail-actions">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="collapseAll()">Collapse all</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="expandAll()">Expand all</button>
+      <button data-testid="ws-collapse-all-10" type="button" class="btn btn-ghost btn-sm" (click)="collapseAll()">Collapse all</button>
+      <button data-testid="ws-expand-all-11" type="button" class="btn btn-ghost btn-sm" (click)="expandAll()">Expand all</button>
     </div>
     <div class="rail-meter">
       <div class="label"><span class="meter-label">Document size</span><span class="counter">{{ documentsize }}</span></div>
@@ -90,7 +90,7 @@
 
       <!-- ── GENERAL · Mode & visibility ── -->
       <section class="card" id="st-mode">
-        <div class="sec-head" [class.closed]="isCollapsed('mode')" (click)="toggleSection('mode')">
+        <div data-testid="ws-toggle-section-12" class="sec-head" [class.closed]="isCollapsed('mode')" (click)="toggleSection('mode')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('mode') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Mode &amp; visibility</h2>
           <span class="count on">{{ countOn(['testmode', 'active', 'webactive', 'homescreenwidget', 'qanda', 'enableshare', 'breakdown', 'triggerFunction']) }} of 8 on</span>
@@ -114,7 +114,7 @@
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('testmode')" (click)="toggleField('testmode')" aria-label="Workshop Test Mode"></button>
+            <button data-testid="ws-toggle-field-13" type="button" class="toggle" [class.on]="v('testmode')" (click)="toggleField('testmode')" aria-label="Workshop Test Mode"></button>
           </div>
 
           <div class="setting">
@@ -124,29 +124,29 @@
               <div class="help">{{ h('active') }}</div>
               <div class="help warn" *ngIf="v('active')" style="margin-top:4px;display:flex;gap:6px;align-items:center;"><ng-container [ngTemplateOutlet]="icLock"></ng-container>Active locks set order, activity order and Activity-set start dates on the Challenges tab.</div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('active')" (click)="toggleField('active')" aria-label="Workshop Active"></button>
+            <button data-testid="ws-toggle-field-14" type="button" class="toggle" [class.on]="v('active')" (click)="toggleField('active')" aria-label="Workshop Active"></button>
           </div>
 
           <div class="setting">
             <div class="s-text"><div class="s-title">Workshop Active Web</div><div class="s-desc" [class.on]="v('webactive')">{{ v('webactive') ? 'Workshop is visible on the web' : 'Workshop is hidden on the web' }}</div>
 <div class="help">{{ h('webactive') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('webactive')" (click)="toggleField('webactive')" aria-label="Workshop Active Web"></button>
+            <button data-testid="ws-toggle-field-15" type="button" class="toggle" [class.on]="v('webactive')" (click)="toggleField('webactive')" aria-label="Workshop Active Web"></button>
           </div>
 
           <div class="setting">
             <div class="s-text"><div class="s-title">Workshop EiFlix Mobile</div><div class="s-desc" [class.on]="v('eiflixmobileactive')">{{ v('eiflixmobileactive') ? 'Workshop is visible in the mobile app' : 'Workshop is hidden in the mobile app' }}</div>
 <div class="help">{{ h('eiflixmobileactive') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('eiflixmobileactive')" (click)="toggleField('eiflixmobileactive')" aria-label="Workshop EiFlix Mobile"></button>
+            <button data-testid="ws-toggle-field-16" type="button" class="toggle" [class.on]="v('eiflixmobileactive')" (click)="toggleField('eiflixmobileactive')" aria-label="Workshop EiFlix Mobile"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">Enable Home Screen Widget</div><div class="s-desc" [class.on]="v('homescreenwidget')">{{ v('homescreenwidget') ? 'Home screen widget is enabled' : 'Home screen widget is disabled' }}</div>
 <div class="help">{{ h('homescreenwidget') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('homescreenwidget')" (click)="toggleField('homescreenwidget')" aria-label="Enable Home Screen Widget"></button>
+            <button data-testid="ws-toggle-field-17" type="button" class="toggle" [class.on]="v('homescreenwidget')" (click)="toggleField('homescreenwidget')" aria-label="Enable Home Screen Widget"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">Enable Q&amp;A</div><div class="s-desc" [class.on]="v('qanda')">{{ v('qanda') ? 'Q&A is active and visible to participants' : 'Q&A is inactive and hidden from participants' }}</div>
 <div class="help">{{ h('qanda') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('qanda')" (click)="toggleField('qanda')" aria-label="Enable Q&A"></button>
+            <button data-testid="ws-toggle-field-18" type="button" class="toggle" [class.on]="v('qanda')" (click)="toggleField('qanda')" aria-label="Enable Q&A"></button>
           </div>
           <div class="setting">
             <div class="s-text">
@@ -165,24 +165,24 @@
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('enableshare')" (click)="toggleField('enableshare')" aria-label="Enable Share"></button>
+            <button data-testid="ws-toggle-field-19" type="button" class="toggle" [class.on]="v('enableshare')" (click)="toggleField('enableshare')" aria-label="Enable Share"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">Workshop Breakdown</div><div class="s-desc" [class.on]="v('breakdown')">{{ v('breakdown') ? 'Breakdown is active and visible' : 'Breakdown is inactive and hidden' }}</div>
 <div class="help">{{ h('breakdown') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('breakdown')" (click)="toggleField('breakdown')" aria-label="Workshop Breakdown"></button>
+            <button data-testid="ws-toggle-field-20" type="button" class="toggle" [class.on]="v('breakdown')" (click)="toggleField('breakdown')" aria-label="Workshop Breakdown"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">Update Participant Workshop</div><div class="s-desc" [class.on]="v('triggerFunction')">{{ v('triggerFunction') ? 'Workshop updates in participant document' : 'Workshop will not update participant document' }}</div>
 <div class="help">{{ h('triggerFunction') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('triggerFunction')" (click)="toggleField('triggerFunction')" aria-label="Update Participant Workshop"></button>
+            <button data-testid="ws-toggle-field-21" type="button" class="toggle" [class.on]="v('triggerFunction')" (click)="toggleField('triggerFunction')" aria-label="Update Participant Workshop"></button>
           </div>
         </div>
       </section>
 
       <!-- ── ACCESS · Audience ── -->
       <section class="card" id="st-audience">
-        <div class="sec-head" [class.closed]="isCollapsed('audience')" (click)="toggleSection('audience')">
+        <div data-testid="ws-toggle-section-22" class="sec-head" [class.closed]="isCollapsed('audience')" (click)="toggleSection('audience')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('audience') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Audience</h2>
           <span class="count on">{{ countOn(['activeparticipants', 'newusersonly', 'journeybased', 'tierbased', 'facilitator']) }} of 5 on</span>
@@ -193,12 +193,12 @@
           <div class="setting">
             <div class="s-text"><div class="s-title">Active Participants Only</div><div class="s-desc" [class.on]="v('activeparticipants')">{{ v('activeparticipants') ? 'Workshop is for Active participants' : 'Available to all participants' }}</div>
 <div class="help">{{ h('activeparticipants') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('activeparticipants')" (click)="toggleField('activeparticipants')" aria-label="Active Participants Only"></button>
+            <button data-testid="ws-toggle-field-23" type="button" class="toggle" [class.on]="v('activeparticipants')" (click)="toggleField('activeparticipants')" aria-label="Active Participants Only"></button>
           </div>
           <div class="setting">
             <div class="s-text"><div class="s-title">New Users Only</div><div class="s-desc" [class.on]="v('newusersonly')">{{ v('newusersonly') ? 'Workshop is for New participants' : 'Available to all users' }}</div>
 <div class="help">{{ h('newusersonly') }}</div></div>
-            <button type="button" class="toggle" [class.on]="v('newusersonly')" (click)="toggleField('newusersonly')" aria-label="New Users Only"></button>
+            <button data-testid="ws-toggle-field-24" type="button" class="toggle" [class.on]="v('newusersonly')" (click)="toggleField('newusersonly')" aria-label="New Users Only"></button>
           </div>
           <div class="setting">
             <div class="s-text">
@@ -208,21 +208,21 @@
               <div class="s-expand" *ngIf="v('journeybased')">
                 <div class="field pop-anchor" data-pop>
                   <div class="label"><span>Journeys</span><span class="counter">Selected {{ (v('selectedjourneys') || []).length }} journeys</span></div>
-                  <div class="input chips" (click)="togglePopover('journeys')">
-                    <span class="chip soft in" *ngFor="let id of v('selectedjourneys')">{{ journeyName(id) }}<button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('selectedjourneys', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+                  <div data-testid="ws-toggle-popover-25" class="input chips" (click)="togglePopover('journeys')">
+                    <span class="chip soft in" *ngFor="let id of v('selectedjourneys')">{{ journeyName(id) }}<button data-testid="ws-event-26" type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('selectedjourneys', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
                     <span class="txt ph">Add journey…</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
                   </div>
                   <div class="pop" *ngIf="openPopover === 'journeys'">
                     <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search journeys…"></div>
                     <div class="pop-list">
-                      <button type="button" class="pop-row" *ngFor="let j of filteredJourneys" [class.sel]="inArray('selectedjourneys', j.id)" (click)="toggleInArray('selectedjourneys', j.id)"><span class="box"><ng-container *ngIf="inArray('selectedjourneys', j.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ j.journey }}</span></button>
+                      <button data-testid="ws-toggle-in-array-27" type="button" class="pop-row" *ngFor="let j of filteredJourneys" [class.sel]="inArray('selectedjourneys', j.id)" (click)="toggleInArray('selectedjourneys', j.id)"><span class="box"><ng-container *ngIf="inArray('selectedjourneys', j.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ j.journey }}</span></button>
                       <div class="help pad" *ngIf="!filteredJourneys.length">No journeys match.</div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('journeybased')" (click)="toggleField('journeybased')" aria-label="Journey Based"></button>
+            <button data-testid="ws-toggle-field-28" type="button" class="toggle" [class.on]="v('journeybased')" (click)="toggleField('journeybased')" aria-label="Journey Based"></button>
           </div>
           <div class="setting">
             <div class="s-text">
@@ -232,14 +232,14 @@
               <div class="s-expand" *ngIf="v('tierbased')">
                 <div class="field pop-anchor" data-pop>
                   <div class="label"><span>Tiers</span><span class="counter">Selected {{ (v('selectedtiers') || []).length }} tiers</span></div>
-                  <div class="input chips" (click)="togglePopover('tiers')">
-                    <span class="chip soft in" *ngFor="let id of v('selectedtiers')">{{ tierName(id) }}<button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('selectedtiers', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+                  <div data-testid="ws-toggle-popover-29" class="input chips" (click)="togglePopover('tiers')">
+                    <span class="chip soft in" *ngFor="let id of v('selectedtiers')">{{ tierName(id) }}<button data-testid="ws-event-30" type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('selectedtiers', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
                     <span class="txt ph">Add tier…</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
                   </div>
                   <div class="pop" *ngIf="openPopover === 'tiers'">
                     <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search tiers…"></div>
                     <div class="pop-list">
-                      <button type="button" class="pop-row" *ngFor="let t of filteredTiers" [class.sel]="inArray('selectedtiers', t.id)" (click)="toggleInArray('selectedtiers', t.id)"><span class="box"><ng-container *ngIf="inArray('selectedtiers', t.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ t.tier }}</span></button>
+                      <button data-testid="ws-toggle-in-array-31" type="button" class="pop-row" *ngFor="let t of filteredTiers" [class.sel]="inArray('selectedtiers', t.id)" (click)="toggleInArray('selectedtiers', t.id)"><span class="box"><ng-container *ngIf="inArray('selectedtiers', t.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ t.tier }}</span></button>
                       <div class="help pad" *ngIf="!filteredTiers.length">No tiers match.</div>
                     </div>
                   </div>
@@ -247,7 +247,7 @@
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('tierbased')" (click)="toggleField('tierbased')" aria-label="Tier Based"></button>
+            <button data-testid="ws-toggle-field-32" type="button" class="toggle" [class.on]="v('tierbased')" (click)="toggleField('tierbased')" aria-label="Tier Based"></button>
           </div>
           <div class="setting">
             <div class="s-text">
@@ -261,27 +261,27 @@
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('facilitator')" (click)="toggleField('facilitator')" aria-label="Workshop Facilitator"></button>
+            <button data-testid="ws-toggle-field-33" type="button" class="toggle" [class.on]="v('facilitator')" (click)="toggleField('facilitator')" aria-label="Workshop Facilitator"></button>
           </div>
         </div>
       </section>
 
       <!-- ── ACCESS · Category based ── -->
       <section class="card" id="st-category">
-        <div class="sec-head" [class.closed]="isCollapsed('category')" (click)="toggleSection('category')">
+        <div data-testid="ws-toggle-section-34" class="sec-head" [class.closed]="isCollapsed('category')" (click)="toggleSection('category')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('category') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Category based</h2>
           <span class="count" [class.on]="v('categorybased')" [class.zero]="!v('categorybased')">{{ v('categorybased') ? 'On' : 'Off' }}</span>
           <span class="grow"></span>
           <span class="sec-hint">{{ v('categorybased') ? 'Workshop is restricted by categories' : 'No category restriction' }}</span>
-          <button type="button" class="toggle" [class.on]="v('categorybased')" (click)="$event.stopPropagation(); toggleField('categorybased')" aria-label="Category Based"></button>
+          <button data-testid="ws-event-35" type="button" class="toggle" [class.on]="v('categorybased')" (click)="$event.stopPropagation(); toggleField('categorybased')" aria-label="Category Based"></button>
         </div>
         <div class="sec-body" *ngIf="!isCollapsed('category') && v('categorybased')">
           <div class="grid2">
             <div class="field">
-              <div class="label"><span>Available categories</span><button type="button" class="link" (click)="createCategory()">+ Create category</button></div>
+              <div class="label"><span>Available categories</span><button data-testid="ws-create-category-36" type="button" class="link" (click)="createCategory()">+ Create category</button></div>
               <div class="hrow wrap" style="gap:6px;" *ngIf="workshopCategories.length; else noAvail">
-                <button type="button" class="chip click" *ngFor="let c of workshopCategories" (click)="editCategory(c)">{{ catLabel(c) }}<ng-container [ngTemplateOutlet]="icEdit"></ng-container></button>
+                <button data-testid="ws-edit-category-37" type="button" class="chip click" *ngFor="let c of workshopCategories" (click)="editCategory(c)">{{ catLabel(c) }}<ng-container [ngTemplateOutlet]="icEdit"></ng-container></button>
               </div>
               <ng-template #noAvail><div class="help">No categories yet for this workshop.</div></ng-template>
               <div class="help">Click a category to edit it. Categories live in their own collection, scoped to this workshop.</div>
@@ -290,14 +290,14 @@
             </div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Cohorts</span><span class="counter">{{ (v('cohortsforthisworkshop') || []).length }} / 2</span></div>
-              <div class="input chips" (click)="togglePopover('cohorts')">
-                <span class="chip soft in" *ngFor="let id of v('cohortsforthisworkshop')">{{ cohortNameById(id) }}<button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('cohortsforthisworkshop', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+              <div data-testid="ws-toggle-popover-38" class="input chips" (click)="togglePopover('cohorts')">
+                <span class="chip soft in" *ngFor="let id of v('cohortsforthisworkshop')">{{ cohortNameById(id) }}<button data-testid="ws-event-39" type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('cohortsforthisworkshop', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
                 <span class="txt ph">{{ (v('cohortsforthisworkshop') || []).length >= 2 ? 'Maximum 2' : 'Add cohort…' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
               </div>
               <div class="pop" *ngIf="openPopover === 'cohorts'">
                 <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search cohorts…"></div>
                 <div class="pop-list">
-                  <button type="button" class="pop-row" *ngFor="let c of filteredCohorts" [class.sel]="inArray('cohortsforthisworkshop', c.id)" [disabled]="isCohortDisabled(c.id)" (click)="toggleCohort(c.id)">
+                  <button data-testid="ws-toggle-cohort-40" type="button" class="pop-row" *ngFor="let c of filteredCohorts" [class.sel]="inArray('cohortsforthisworkshop', c.id)" [disabled]="isCohortDisabled(c.id)" (click)="toggleCohort(c.id)">
                     <span class="box"><ng-container *ngIf="inArray('cohortsforthisworkshop', c.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ c.name }}</span><span class="c">{{ isCohortDisabled(c.id) ? 'Maximum 2' : ((c.participantidlist?.length || 0) + ' participants') }}</span>
                   </button>
                   <div class="help pad" *ngIf="!filteredCohorts.length">No cohorts match.</div>
@@ -317,16 +317,16 @@
                 <span class="num">{{ i + 1 }}</span>
                 <span class="n">{{ catName(id) }}</span>
                 <span class="used" *ngIf="isCategoryUsed(id)">Used by {{ usedBySets(id) }}</span>
-                <button type="button" class="icon-btn" [disabled]="isCategoryUsed(id)" (click)="removecategoriesforthisworkshop(id)" [title]="isCategoryUsed(id) ? 'Used by a challenge set' : 'Remove'"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                <button data-testid="ws-removecategoriesforthisworkshop-41" type="button" class="icon-btn" [disabled]="isCategoryUsed(id)" (click)="removecategoriesforthisworkshop(id)" [title]="isCategoryUsed(id) ? 'Used by a challenge set' : 'Remove'"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
               </div>
             </div>
-            <div class="input chips" (click)="togglePopover('cats')">
+            <div data-testid="ws-toggle-popover-42" class="input chips" (click)="togglePopover('cats')">
               <span class="txt ph">Add a category to this workshop…</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
             </div>
             <div class="pop" *ngIf="openPopover === 'cats'">
               <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search categories…"></div>
               <div class="pop-list">
-                <button type="button" class="pop-row" *ngFor="let c of filteredCategories" [class.sel]="inArray('categoriesforthisworkshop', c.id)" [disabled]="inArray('categoriesforthisworkshop', c.id) && isCategoryUsed(c.id)" (click)="toggleWorkshopCategory(c.id)">
+                <button data-testid="ws-toggle-workshop-category-43" type="button" class="pop-row" *ngFor="let c of filteredCategories" [class.sel]="inArray('categoriesforthisworkshop', c.id)" [disabled]="inArray('categoriesforthisworkshop', c.id) && isCategoryUsed(c.id)" (click)="toggleWorkshopCategory(c.id)">
                   <span class="box"><ng-container *ngIf="inArray('categoriesforthisworkshop', c.id)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ catLabel(c) }}</span><span class="c" *ngIf="inArray('categoriesforthisworkshop', c.id) && isCategoryUsed(c.id)">used by {{ usedBySets(c.id) }}</span>
                 </button>
                 <div class="help pad" *ngIf="!filteredCategories.length">No categories match.</div>
@@ -339,7 +339,7 @@
           <div class="field" *ngIf="(v('cohortcategoriesforthisworkshop') || []).length">
             <div class="label"><span>Cohort categories</span><span class="counter">saved by the old editor</span></div>
             <div class="hrow wrap" style="gap:6px;">
-              <span class="chip soft in" *ngFor="let id of v('cohortcategoriesforthisworkshop')">{{ catName(id) }}<button type="button" class="chip-x" [disabled]="isCategoryUsed(id)" (click)="removeCohortcategoriesforthisworkshop(id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+              <span class="chip soft in" *ngFor="let id of v('cohortcategoriesforthisworkshop')">{{ catName(id) }}<button data-testid="ws-remove-cohortcategoriesforthisworkshop-44" type="button" class="chip-x" [disabled]="isCategoryUsed(id)" (click)="removeCohortcategoriesforthisworkshop(id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
             </div>
           
             <div class="help">{{ h('cohortcategoriesforthisworkshop') }}</div>
@@ -352,7 +352,7 @@
                 <span class="prev-img"><img *ngIf="v('categorythumbnail')" [src]="v('categorythumbnail')" alt=""></span>
                 <div class="input grow">
                   <input class="txt mono" formControlName="categorythumbnail" placeholder="Enter thumbnail image URL">
-                  <button type="button" class="suffix" (click)="pickFile('categorythumbnail')" title="Upload thumbnail"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
+                  <button data-testid="ws-pick-file-45" type="button" class="suffix" (click)="pickFile('categorythumbnail')" title="Upload thumbnail"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
                 </div>
               </div>
               <div class="help">{{ uploading['categorythumbnail'] ? 'Uploading…' : 'Paste a URL or upload. Uploads go to workshop/thumbnail/.' }}</div>
@@ -363,7 +363,7 @@
               <div class="label"><span>Category video</span></div>
               <div class="input">
                 <input class="txt mono" formControlName="categoryVideo" placeholder="Enter video URL">
-                <button type="button" class="suffix" (click)="pickFile('categoryVideo')" title="Upload video"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
+                <button data-testid="ws-pick-file-46" type="button" class="suffix" (click)="pickFile('categoryVideo')" title="Upload video"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
               </div>
               <div class="help">{{ uploading['categoryVideo'] ? 'Uploading…' : 'Uploads go to workshop/video/.' }}</div>
             
@@ -388,13 +388,13 @@
 
       <!-- ── ACCESS · Evergreen workshop ── -->
       <section class="card" id="st-evergreen">
-        <div class="sec-head" [class.closed]="isCollapsed('evergreen')" (click)="toggleSection('evergreen')">
+        <div data-testid="ws-toggle-section-47" class="sec-head" [class.closed]="isCollapsed('evergreen')" (click)="toggleSection('evergreen')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('evergreen') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Evergreen workshop</h2>
           <span class="count" [class.on]="v('evergreenWorkshop')" [class.zero]="!v('evergreenWorkshop')">{{ v('evergreenWorkshop') ? 'On · ' + daysLabel : 'Off' }}</span>
           <span class="grow"></span>
           <span class="sec-hint">{{ v('evergreenWorkshop') ? 'Evergreen Workshop Enabled' : 'Standard Workshop' }}</span>
-          <button type="button" class="toggle" [class.on]="v('evergreenWorkshop')" (click)="$event.stopPropagation(); toggleField('evergreenWorkshop')" aria-label="Evergreen Workshop"></button>
+          <button data-testid="ws-event-48" type="button" class="toggle" [class.on]="v('evergreenWorkshop')" (click)="$event.stopPropagation(); toggleField('evergreenWorkshop')" aria-label="Evergreen Workshop"></button>
         </div>
         <div class="sec-body" *ngIf="!isCollapsed('evergreen') && v('evergreenWorkshop')">
           <ng-container formGroupName="evergreenWorkshopMeta">
@@ -414,7 +414,7 @@
             <div class="s-sub">Daily communication <span class="help">· {{ daysLabel }}</span></div>
             <ng-container *ngIf="dayCount; else noDays">
               <div class="days">
-                <button type="button" class="day" *ngFor="let i of dayIndexes" [class.on]="selectedDay === i" [class.empty]="!dayHasContent(i)" (click)="selectedDay = i">{{ selectedDay === i ? 'Day ' + (i + 1) : (i + 1) }}</button>
+                <button data-testid="ws-selected-day-49" type="button" class="day" *ngFor="let i of dayIndexes" [class.on]="selectedDay === i" [class.empty]="!dayHasContent(i)" (click)="selectedDay = i">{{ selectedDay === i ? 'Day ' + (i + 1) : (i + 1) }}</button>
               </div>
               <div class="grid2">
                 <div class="field">
@@ -452,7 +452,7 @@
                 <div class="help">Enrollment-not-allowed messages are in Communication &rsaquo; Messages.</div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('referralworkshop')" (click)="toggleField('referralworkshop')" aria-label="Referral Workshop"></button>
+            <button data-testid="ws-toggle-field-50" type="button" class="toggle" [class.on]="v('referralworkshop')" (click)="toggleField('referralworkshop')" aria-label="Referral Workshop"></button>
           </div>
 
           <div class="setting">
@@ -470,12 +470,12 @@
 <div class="help">{{ h('paymentmap.amountstriked') }}</div></div>
                   <div class="field pop-anchor" data-pop>
                     <div class="label"><span>Payment for</span></div>
-                    <button type="button" class="input pick" (click)="togglePopover('paymentfor')"><span class="txt" [class.ph]="!v('paymentmap.paymentfor')">{{ v('paymentmap.paymentfor') === 'new' ? 'New' : v('paymentmap.paymentfor') === 'exist' ? 'Exist' : v('paymentmap.paymentfor') === 'both' ? 'Both' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
+                    <button data-testid="ws-toggle-popover-51" type="button" class="input pick" (click)="togglePopover('paymentfor')"><span class="txt" [class.ph]="!v('paymentmap.paymentfor')">{{ v('paymentmap.paymentfor') === 'new' ? 'New' : v('paymentmap.paymentfor') === 'exist' ? 'Exist' : v('paymentmap.paymentfor') === 'both' ? 'Both' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
                     <div class="pop menu" *ngIf="openPopover === 'paymentfor'"><div class="pop-list">
-                      <button type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'new'" (click)="setField('paymentmap.paymentfor', 'new')"><span class="n">New</span></button>
-                      <button type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'exist'" (click)="setField('paymentmap.paymentfor', 'exist')"><span class="n">Exist</span></button>
-                      <button type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'both'" (click)="setField('paymentmap.paymentfor', 'both')"><span class="n">Both</span></button>
-                      <button type="button" class="pop-row" [class.sel]="!v('paymentmap.paymentfor')" (click)="setField('paymentmap.paymentfor', '')"><span class="n">Not set</span></button>
+                      <button data-testid="ws-set-field-52" type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'new'" (click)="setField('paymentmap.paymentfor', 'new')"><span class="n">New</span></button>
+                      <button data-testid="ws-set-field-53" type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'exist'" (click)="setField('paymentmap.paymentfor', 'exist')"><span class="n">Exist</span></button>
+                      <button data-testid="ws-set-field-54" type="button" class="pop-row" [class.sel]="v('paymentmap.paymentfor') === 'both'" (click)="setField('paymentmap.paymentfor', 'both')"><span class="n">Both</span></button>
+                      <button data-testid="ws-set-field-55" type="button" class="pop-row" [class.sel]="!v('paymentmap.paymentfor')" (click)="setField('paymentmap.paymentfor', '')"><span class="n">Not set</span></button>
                     </div></div>
                     <div class="help">New · Exist · Both · or not set</div>
                   </div>
@@ -489,36 +489,36 @@
                 <div class="grid2">
                   <div class="field pop-anchor" data-pop>
                     <div class="label"><span>Payment based on customer status</span><span class="counter">{{ (v('paymentmap.customerstatus') || []).length }} selected</span></div>
-                    <div class="input chips" (click)="togglePopover('custstatus')">
-                      <span class="chip soft in" *ngFor="let s of v('paymentmap.customerstatus')">{{ s }}<button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('paymentmap.customerstatus', s)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+                    <div data-testid="ws-toggle-popover-56" class="input chips" (click)="togglePopover('custstatus')">
+                      <span class="chip soft in" *ngFor="let s of v('paymentmap.customerstatus')">{{ s }}<button data-testid="ws-event-57" type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('paymentmap.customerstatus', s)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
                       <span class="txt ph">Add status…</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
                     </div>
                     <div class="pop menu" *ngIf="openPopover === 'custstatus'"><div class="pop-list">
-                      <button type="button" class="pop-row" *ngFor="let s of customerStatuses" [class.sel]="inArray('paymentmap.customerstatus', s)" (click)="toggleInArray('paymentmap.customerstatus', s)"><span class="box"><ng-container *ngIf="inArray('paymentmap.customerstatus', s)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ s }}</span></button>
+                      <button data-testid="ws-toggle-in-array-58" type="button" class="pop-row" *ngFor="let s of customerStatuses" [class.sel]="inArray('paymentmap.customerstatus', s)" (click)="toggleInArray('paymentmap.customerstatus', s)"><span class="box"><ng-container *ngIf="inArray('paymentmap.customerstatus', s)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ s }}</span></button>
                     </div></div>
                     <div class="help">non active · active · discontinued · none · banned · late</div>
                   </div>
                   <div class="field pop-anchor" data-pop>
                     <div class="label"><span>Payment based on financial status</span><span class="counter">{{ (v('paymentmap.financialstatus') || []).length }} selected</span></div>
-                    <div class="input chips" (click)="togglePopover('finstatus')">
-                      <span class="chip soft in" *ngFor="let s of v('paymentmap.financialstatus')">{{ s }}<button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('paymentmap.financialstatus', s)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
+                    <div data-testid="ws-toggle-popover-59" class="input chips" (click)="togglePopover('finstatus')">
+                      <span class="chip soft in" *ngFor="let s of v('paymentmap.financialstatus')">{{ s }}<button data-testid="ws-event-60" type="button" class="chip-x" (click)="$event.stopPropagation(); toggleInArray('paymentmap.financialstatus', s)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button></span>
                       <span class="txt ph">Add status…</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
                     </div>
                     <div class="pop menu" *ngIf="openPopover === 'finstatus'"><div class="pop-list">
-                      <button type="button" class="pop-row" *ngFor="let s of financialStatuses" [class.sel]="inArray('paymentmap.financialstatus', s)" (click)="toggleInArray('paymentmap.financialstatus', s)"><span class="box"><ng-container *ngIf="inArray('paymentmap.financialstatus', s)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ s }}</span></button>
+                      <button data-testid="ws-toggle-in-array-61" type="button" class="pop-row" *ngFor="let s of financialStatuses" [class.sel]="inArray('paymentmap.financialstatus', s)" (click)="toggleInArray('paymentmap.financialstatus', s)"><span class="box"><ng-container *ngIf="inArray('paymentmap.financialstatus', s)" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ s }}</span></button>
                     </div></div>
                     <div class="help">fully paid · regular · discontinued · locked · defaulted · banned · late</div>
                   </div>
                 </div>
               </div>
             </div>
-            <button type="button" class="toggle" [class.on]="v('payment')" (click)="toggleField('payment')" aria-label="Payment"></button>
+            <button data-testid="ws-toggle-field-62" type="button" class="toggle" [class.on]="v('payment')" (click)="toggleField('payment')" aria-label="Payment"></button>
           </div>
 
           <div class="s-sub">Who are all able to refer this workshop</div>
           <div class="grid2">
             <div class="field">
-              <div class="input tog"><span class="tog-label">All users can refer</span><button type="button" class="toggle" [class.on]="v('referallowedusers.all')" (click)="toggleField('referallowedusers.all')" aria-label="All users can refer"></button></div>
+              <div class="input tog"><span class="tog-label">All users can refer</span><button data-testid="ws-toggle-field-63" type="button" class="toggle" [class.on]="v('referallowedusers.all')" (click)="toggleField('referallowedusers.all')" aria-label="All users can refer"></button></div>
               <div class="help">{{ v('referallowedusers.all') ? 'All users can refer.' : 'Only selected users can refer.' }}</div>
               <ng-container *ngIf="!v('referallowedusers.all')">
                 <div class="label"><span>People who can refer</span><span class="counter">Selected {{ peopleCount('referallowedusers.referallowedusers') }} users</span></div>
@@ -526,7 +526,7 @@
               </ng-container>
             </div>
             <div class="field">
-              <div class="input tog"><span class="tog-label">New users are also allowed to refer</span><button type="button" class="toggle" [class.on]="v('referallowedusers.newuserreferallowed')" (click)="toggleField('referallowedusers.newuserreferallowed')" aria-label="New users can refer"></button></div>
+              <div class="input tog"><span class="tog-label">New users are also allowed to refer</span><button data-testid="ws-toggle-field-64" type="button" class="toggle" [class.on]="v('referallowedusers.newuserreferallowed')" (click)="toggleField('referallowedusers.newuserreferallowed')" aria-label="New users can refer"></button></div>
               <div class="help">{{ v('referallowedusers.newuserreferallowed') ? 'New users are also allowed to refer' : 'New users cannot refer' }}</div>
             </div>
           </div>
@@ -534,13 +534,13 @@
           <div class="s-sub">Evergreen access to</div>
           <div class="grid2">
             <div class="field">
-              <div class="input tog"><span class="tog-label">All users have access</span><button type="button" class="toggle" [class.on]="v('evergreenaccessto.all')" (click)="toggleField('evergreenaccessto.all')" aria-label="All users have access"></button></div>
+              <div class="input tog"><span class="tog-label">All users have access</span><button data-testid="ws-toggle-field-65" type="button" class="toggle" [class.on]="v('evergreenaccessto.all')" (click)="toggleField('evergreenaccessto.all')" aria-label="All users have access"></button></div>
               <div class="label"><span>People with access</span><span class="counter">Selected {{ peopleCount('evergreenaccessto.selected') }} users</span></div>
               <ng-container [ngTemplateOutlet]="peoplePicker" [ngTemplateOutletContext]="{ path: 'evergreenaccessto.selected', pid: 'pp:access', lockRegular: !!v('evergreenaccessto.all') }"></ng-container>
               <div class="help">"All" on: every participant has access and the picker only offers new users. "All" off: only the people picked here.</div>
             </div>
             <div class="field">
-              <div class="input tog"><span class="tog-label">New users have access</span><button type="button" class="toggle" [class.on]="v('evergreenaccessto.new')" (click)="toggleField('evergreenaccessto.new')" aria-label="New users have access"></button></div>
+              <div class="input tog"><span class="tog-label">New users have access</span><button data-testid="ws-toggle-field-66" type="button" class="toggle" [class.on]="v('evergreenaccessto.new')" (click)="toggleField('evergreenaccessto.new')" aria-label="New users have access"></button></div>
               <div class="help">{{ v('evergreenaccessto.new') ? 'New users have access' : 'New users do not have access' }}</div>
             </div>
           </div>
@@ -550,7 +550,7 @@
 
       <!-- ── COMMUNICATION · Logs & chat ── -->
       <section class="card" id="st-logs">
-        <div class="sec-head" [class.closed]="isCollapsed('logs')" (click)="toggleSection('logs')">
+        <div data-testid="ws-toggle-section-67" class="sec-head" [class.closed]="isCollapsed('logs')" (click)="toggleSection('logs')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('logs') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Logs &amp; chat</h2>
           <span class="grow"></span>
@@ -561,21 +561,21 @@
             <div class="field">
               <div class="label"><span>Workshop activity log</span><span class="counter">Slack channel</span></div>
               <div class="seg">
-                <button type="button" *ngFor="let ch of activityChannels" [class.on]="v('workshopactivitychannel') === ch" (click)="setField('workshopactivitychannel', ch)">{{ ch }}</button>
+                <button data-testid="ws-set-field-68" type="button" *ngFor="let ch of activityChannels" [class.on]="v('workshopactivitychannel') === ch" (click)="setField('workshopactivitychannel', ch)">{{ ch }}</button>
               </div>
             
               <div class="help">{{ h('selectedgroup') }}</div>
             </div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Chat group</span><span class="counter">from supportchat · newest first</span></div>
-              <button type="button" class="input pick" (click)="togglePopover('group')"><span class="txt" [class.ph]="!v('selectedgroup')">{{ v('selectedgroup') ? (groupName(v('selectedgroup')) || v('selectedgroup')) : 'Select a chat group…' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
+              <button data-testid="ws-toggle-popover-69" type="button" class="input pick" (click)="togglePopover('group')"><span class="txt" [class.ph]="!v('selectedgroup')">{{ v('selectedgroup') ? (groupName(v('selectedgroup')) || v('selectedgroup')) : 'Select a chat group…' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
               <div class="pop" *ngIf="openPopover === 'group'">
                 <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search groups…"></div>
                 <div class="pop-list">
-                  <button type="button" class="pop-row" *ngFor="let g of filteredGroups" [class.sel]="v('selectedgroup') === g.id" (click)="setField('selectedgroup', g.id)"><span class="box"><ng-container *ngIf="v('selectedgroup') === g.id" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ g.group_name }}</span></button>
+                  <button data-testid="ws-set-field-70" type="button" class="pop-row" *ngFor="let g of filteredGroups" [class.sel]="v('selectedgroup') === g.id" (click)="setField('selectedgroup', g.id)"><span class="box"><ng-container *ngIf="v('selectedgroup') === g.id" [ngTemplateOutlet]="icCheck"></ng-container></span><span class="n">{{ g.group_name }}</span></button>
                   <div class="help pad" *ngIf="!filteredGroups.length">No groups match.</div>
                 </div>
-                <div class="hrow between" *ngIf="v('selectedgroup')"><span class="help">Selected: {{ groupName(v('selectedgroup')) || v('selectedgroup') }}</span><button type="button" class="link" (click)="setField('selectedgroup', '')">Clear</button></div>
+                <div class="hrow between" *ngIf="v('selectedgroup')"><span class="help">Selected: {{ groupName(v('selectedgroup')) || v('selectedgroup') }}</span><button data-testid="ws-set-field-71" type="button" class="link" (click)="setField('selectedgroup', '')">Clear</button></div>
               </div>
             </div>
           </div>
@@ -584,7 +584,7 @@
 
       <!-- ── COMMUNICATION · Mail template ── -->
       <section class="card" id="st-mail">
-        <div class="sec-head" [class.closed]="isCollapsed('mail')" (click)="toggleSection('mail')">
+        <div data-testid="ws-toggle-section-72" class="sec-head" [class.closed]="isCollapsed('mail')" (click)="toggleSection('mail')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('mail') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Mail template</h2>
           <span class="grow"></span>
@@ -602,7 +602,7 @@
 
       <!-- ── COMMUNICATION · Messages ── -->
       <section class="card" id="st-messages">
-        <div class="sec-head" [class.closed]="isCollapsed('messages')" (click)="toggleSection('messages')">
+        <div data-testid="ws-toggle-section-73" class="sec-head" [class.closed]="isCollapsed('messages')" (click)="toggleSection('messages')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('messages') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Messages</h2>
           <span class="grow"></span>
@@ -624,7 +624,7 @@
 
       <!-- ── COMMUNICATION · Hero ── -->
       <section class="card" id="st-hero">
-        <div class="sec-head" [class.closed]="isCollapsed('hero')" (click)="toggleSection('hero')">
+        <div data-testid="ws-toggle-section-74" class="sec-head" [class.closed]="isCollapsed('hero')" (click)="toggleSection('hero')">
           <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('hero') ? icChevRight : icChevDown"></ng-container></span>
           <h2 class="sec-title">Hero</h2>
           <span class="count" [class.on]="v('hero') || v('heromobile')" [class.zero]="!v('hero') && !v('heromobile')">{{ railHint('hero') === 'Off' ? 'Off' : railHint('hero') + ' on' }}</span>
@@ -633,9 +633,9 @@
         </div>
         <div class="sec-body" *ngIf="!isCollapsed('hero')">
           <div class="grid3">
-            <div class="input tog"><span class="tog-label">Web hero active<span class="help">{{ v('hero') ? 'Workshop Web Hero is active and visible' : 'Workshop Web Hero is inactive and hidden' }}</span></span><button type="button" class="toggle" [class.on]="v('hero')" (click)="toggleField('hero')" aria-label="Web hero active"></button></div>
-            <div class="input tog"><span class="tog-label">Mobile hero active<span class="help">{{ v('heromobile') ? 'Workshop Mobile Hero is active and visible' : 'Workshop Mobile Hero is inactive and hidden' }}</span></span><button type="button" class="toggle" [class.on]="v('heromobile')" (click)="toggleField('heromobile')" aria-label="Mobile hero active"></button></div>
-            <div class="input tog"><span class="tog-label">EiFlix mobile hero active<span class="help">{{ v('heroeiflixmobile') ? 'Hero shows in the EiFlix mobile app' : 'Hero is hidden in the EiFlix mobile app' }}</span></span><button type="button" class="toggle" [class.on]="v('heroeiflixmobile')" (click)="toggleField('heroeiflixmobile')" aria-label="EiFlix mobile hero active"></button></div>
+            <div class="input tog"><span class="tog-label">Web hero active<span class="help">{{ v('hero') ? 'Workshop Web Hero is active and visible' : 'Workshop Web Hero is inactive and hidden' }}</span></span><button data-testid="ws-toggle-field-75" type="button" class="toggle" [class.on]="v('hero')" (click)="toggleField('hero')" aria-label="Web hero active"></button></div>
+            <div class="input tog"><span class="tog-label">Mobile hero active<span class="help">{{ v('heromobile') ? 'Workshop Mobile Hero is active and visible' : 'Workshop Mobile Hero is inactive and hidden' }}</span></span><button data-testid="ws-toggle-field-76" type="button" class="toggle" [class.on]="v('heromobile')" (click)="toggleField('heromobile')" aria-label="Mobile hero active"></button></div>
+            <div class="input tog"><span class="tog-label">EiFlix mobile hero active<span class="help">{{ v('heroeiflixmobile') ? 'Hero shows in the EiFlix mobile app' : 'Hero is hidden in the EiFlix mobile app' }}</span></span><button data-testid="ws-toggle-field-77" type="button" class="toggle" [class.on]="v('heroeiflixmobile')" (click)="toggleField('heroeiflixmobile')" aria-label="EiFlix mobile hero active"></button></div>
           </div>
           <div class="help">{{ h('heroeiflixmobile') }}</div>
           <div class="grid3">
@@ -645,11 +645,11 @@
 <div class="help">{{ h('heroDescription') }}</div></div>
             <div class="field pop-anchor" data-pop>
               <div class="label"><span>Hero type</span></div>
-              <button type="button" class="input pick" (click)="togglePopover('herotype')"><span class="txt" [class.ph]="!v('heroshowtype')">{{ v('heroshowtype') === 'image' ? 'Image' : v('heroshowtype') === 'video' ? 'Video' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
+              <button data-testid="ws-toggle-popover-78" type="button" class="input pick" (click)="togglePopover('herotype')"><span class="txt" [class.ph]="!v('heroshowtype')">{{ v('heroshowtype') === 'image' ? 'Image' : v('heroshowtype') === 'video' ? 'Video' : 'Not set' }}</span><span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span></button>
               <div class="pop menu" *ngIf="openPopover === 'herotype'"><div class="pop-list">
-                <button type="button" class="pop-row" [class.sel]="v('heroshowtype') === 'image'" (click)="setField('heroshowtype', 'image')"><span class="n">Image</span></button>
-                <button type="button" class="pop-row" [class.sel]="v('heroshowtype') === 'video'" (click)="setField('heroshowtype', 'video')"><span class="n">Video</span></button>
-                <button type="button" class="pop-row" [class.sel]="!v('heroshowtype')" (click)="setField('heroshowtype', '')"><span class="n">Not set</span></button>
+                <button data-testid="ws-set-field-79" type="button" class="pop-row" [class.sel]="v('heroshowtype') === 'image'" (click)="setField('heroshowtype', 'image')"><span class="n">Image</span></button>
+                <button data-testid="ws-set-field-80" type="button" class="pop-row" [class.sel]="v('heroshowtype') === 'video'" (click)="setField('heroshowtype', 'video')"><span class="n">Video</span></button>
+                <button data-testid="ws-set-field-81" type="button" class="pop-row" [class.sel]="!v('heroshowtype')" (click)="setField('heroshowtype', '')"><span class="n">Not set</span></button>
               </div></div>
               <div class="label" style="margin-top:8px;"><span>Hero accent colour</span></div>
               <div class="input" [class.error]="settingsForm.get('heroAccent')?.invalid">
@@ -664,25 +664,25 @@
               <div class="label"><span>Web hero image</span><span class="counter">Recommended 3840 × 1350</span></div>
               <ng-container *ngIf="v('heroImage'); else dropWeb">
                 <div class="preview"><img [src]="v('heroImage')" alt="Hero Image"></div>
-                <div class="hrow" style="gap:8px;"><button type="button" class="btn btn-sm" (click)="pickFile('heroImage')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroImage')">Remove</button></div>
+                <div class="hrow" style="gap:8px;"><button data-testid="ws-pick-file-82" type="button" class="btn btn-sm" (click)="pickFile('heroImage')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button data-testid="ws-remove-hero-asset-83" type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroImage')">Remove</button></div>
               </ng-container>
-              <ng-template #dropWeb><div class="drop" (click)="pickFile('heroImage')" (dragover)="onDragOver($event)" (drop)="onDrop('heroImage', $event)"><ng-container [ngTemplateOutlet]="icUpload"></ng-container><span class="help">{{ uploading['heroImage'] ? 'Uploading…' : 'Drop an image or choose a file' }}</span></div></ng-template>
+              <ng-template #dropWeb><div data-testid="ws-pick-file-84" class="drop" (click)="pickFile('heroImage')" (dragover)="onDragOver($event)" (drop)="onDrop('heroImage', $event)"><ng-container [ngTemplateOutlet]="icUpload"></ng-container><span class="help">{{ uploading['heroImage'] ? 'Uploading…' : 'Drop an image or choose a file' }}</span></div></ng-template>
             </div>
             <div class="field">
               <div class="label"><span>Mobile hero image</span><span class="counter">EiFlix series image size</span></div>
               <ng-container *ngIf="v('heroImageMobile'); else dropMobile">
                 <div class="preview"><img [src]="v('heroImageMobile')" alt="Hero Image"></div>
-                <div class="hrow" style="gap:8px;"><button type="button" class="btn btn-sm" (click)="pickFile('heroImageMobile')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroImageMobile')">Remove</button></div>
+                <div class="hrow" style="gap:8px;"><button data-testid="ws-pick-file-85" type="button" class="btn btn-sm" (click)="pickFile('heroImageMobile')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button data-testid="ws-remove-hero-asset-86" type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroImageMobile')">Remove</button></div>
               </ng-container>
-              <ng-template #dropMobile><div class="drop" (click)="pickFile('heroImageMobile')" (dragover)="onDragOver($event)" (drop)="onDrop('heroImageMobile', $event)"><ng-container [ngTemplateOutlet]="icUpload"></ng-container><span class="help">{{ uploading['heroImageMobile'] ? 'Uploading…' : 'Drop an image or choose a file' }}</span></div></ng-template>
+              <ng-template #dropMobile><div data-testid="ws-pick-file-87" class="drop" (click)="pickFile('heroImageMobile')" (dragover)="onDragOver($event)" (drop)="onDrop('heroImageMobile', $event)"><ng-container [ngTemplateOutlet]="icUpload"></ng-container><span class="help">{{ uploading['heroImageMobile'] ? 'Uploading…' : 'Drop an image or choose a file' }}</span></div></ng-template>
             </div>
             <div class="field">
               <div class="label"><span>Hero video</span></div>
               <ng-container *ngIf="v('heroVideo'); else dropVideo">
                 <div class="preview"><video [src]="v('heroVideo')" controls></video></div>
-                <div class="hrow" style="gap:8px;"><button type="button" class="btn btn-sm" (click)="pickFile('heroVideo')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroVideo')">Remove</button></div>
+                <div class="hrow" style="gap:8px;"><button data-testid="ws-pick-file-88" type="button" class="btn btn-sm" (click)="pickFile('heroVideo')"><ng-container [ngTemplateOutlet]="icUpload"></ng-container>Replace</button><button data-testid="ws-remove-hero-asset-89" type="button" class="btn btn-sm btn-danger-o" (click)="removeHeroAsset('heroVideo')">Remove</button></div>
               </ng-container>
-              <ng-template #dropVideo><div class="drop" (click)="pickFile('heroVideo')" (dragover)="onDragOver($event)" (drop)="onDrop('heroVideo', $event)"><ng-container [ngTemplateOutlet]="icVideo"></ng-container><span class="help">{{ uploading['heroVideo'] ? 'Uploading…' : 'Drop a video or choose a file' }}</span></div></ng-template>
+              <ng-template #dropVideo><div data-testid="ws-pick-file-90" class="drop" (click)="pickFile('heroVideo')" (dragover)="onDragOver($event)" (drop)="onDrop('heroVideo', $event)"><ng-container [ngTemplateOutlet]="icVideo"></ng-container><span class="help">{{ uploading['heroVideo'] ? 'Uploading…' : 'Drop a video or choose a file' }}</span></div></ng-template>
             </div>
           </div>
           <div class="help">Uploads go to workshops/&lt;workshop id&gt;/hero_&lt;timestamp&gt;. Remove clears the link only; the file stays in storage.</div>
@@ -697,7 +697,7 @@
           <span class="pill pill-mute">No changes</span>
           <span class="help warn" *ngIf="saveWarning">{{ saveWarning }}</span>
           <span class="grow"></span>
-          <button type="button" class="btn btn-primary" disabled>Save Settings</button>
+          <button data-testid="ws-button-91" type="button" class="btn btn-primary" disabled>Save Settings</button>
         </ng-container>
         <ng-container *ngSwitchCase="'dirty'">
           <span class="pill pill-warn"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Unsaved changes</span>
@@ -705,8 +705,8 @@
           <span class="help warn" *ngIf="saveWarning">{{ saveWarning }}</span>
           <span class="grow"></span>
           <span class="help">Saves all Settings together. Enrollment and Challenges save separately.</span>
-          <button type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
-          <button type="button" class="btn btn-primary" (click)="saveSettings()">
+          <button data-testid="ws-discard-changes-92" type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
+          <button data-testid="ws-save-settings-93" type="button" class="btn btn-primary" (click)="saveSettings()">
             <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 3v5h7V3M8 21v-7h8v7"></path></svg>
             <span>Save Settings</span>
           </button>
@@ -714,24 +714,24 @@
         <ng-container *ngSwitchCase="'blocked'">
           <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>{{ blockedReason }}</span>
           <span class="grow"></span>
-          <button type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
-          <button type="button" class="btn btn-primary" disabled>Save Settings</button>
+          <button data-testid="ws-discard-changes-94" type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
+          <button data-testid="ws-button-95" type="button" class="btn btn-primary" disabled>Save Settings</button>
         </ng-container>
         <ng-container *ngSwitchCase="'saving'">
           <span class="pill pill-warn">Saving…</span>
           <span class="grow"></span>
-          <button type="button" class="btn btn-primary" disabled style="opacity:.8;"><span class="spin"></span>Saving</button>
+          <button data-testid="ws-button-96" type="button" class="btn btn-primary" disabled style="opacity:.8;"><span class="spin"></span>Saving</button>
         </ng-container>
         <ng-container *ngSwitchCase="'saved'">
           <span class="pill pill-ok"><ng-container [ngTemplateOutlet]="icCheck"></ng-container>Saved just now</span>
           <span class="grow"></span>
-          <button type="button" class="btn btn-primary" disabled>Save Settings</button>
+          <button data-testid="ws-button-97" type="button" class="btn btn-primary" disabled>Save Settings</button>
         </ng-container>
         <ng-container *ngSwitchCase="'error'">
           <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Could not save</span>
           <span class="help">Error saving settings. Please try again.</span>
           <span class="grow"></span>
-          <button type="button" class="btn btn-primary" (click)="saveSettings()">Retry</button>
+          <button data-testid="ws-save-settings-98" type="button" class="btn btn-primary" (click)="saveSettings()">Retry</button>
         </ng-container>
       </ng-container>
     </div>

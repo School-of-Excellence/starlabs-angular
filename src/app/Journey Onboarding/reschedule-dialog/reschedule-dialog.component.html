@@ -7,7 +7,7 @@
   
     <header class="header">
       <h1 class="title">Completed - {{mapappointments['completed']['data'].length}}</h1>
-      <button mat-icon-button mat-dialog-close class="close-button">
+      <button data-testid="jrsd-btn-001" mat-icon-button mat-dialog-close class="close-button">
         <mat-icon style="color: white;">close</mat-icon>
       </button>
     </header>
@@ -23,14 +23,14 @@
     
             <mat-form-field appearance="outline">
               <mat-label>Search Name</mat-label>
-              <input type="text" matInput formControlName="name" placeholder="Search">
+              <input data-testid="jrsd-inp-002" type="text" matInput formControlName="name" placeholder="Search">
             </mat-form-field>
   
             &nbsp;&nbsp;
   
             <mat-form-field appearance="outline">
               <mat-label>Onboarded By</mat-label>
-              <mat-select formControlName="onboardedby">
+              <mat-select data-testid="jrsd-msel-003" formControlName="onboardedby">
                 <mat-option value="">All Coaches</mat-option>
                 <mat-option *ngFor="let coach of coachesList" [value]="mapProfile[coach]">
                   {{mapProfile[coach]}}
@@ -44,8 +44,8 @@
               <mat-form-field appearance="outline" class="date-range-picker">
                 <mat-label>Onboarded Date</mat-label>
                 <mat-date-range-input [rangePicker]="rangePicker">
-                  <input matStartDate formControlName="start" placeholder="Start date">
-                  <input matEndDate formControlName="end" placeholder="End date">
+                  <input data-testid="jrsd-inp-004" matStartDate formControlName="start" placeholder="Start date">
+                  <input data-testid="jrsd-inp-005" matEndDate formControlName="end" placeholder="End date">
                 </mat-date-range-input>
                 <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
                 <mat-date-range-picker #rangePicker></mat-date-range-picker>
@@ -58,8 +58,8 @@
               <mat-form-field appearance="outline"  class="date-range-picker">
                 <mat-label>Purchase Date</mat-label>
                 <mat-date-range-input [rangePicker]="rangePicker2">
-                  <input matStartDate formControlName="start" placeholder="Start date">
-                  <input matEndDate formControlName="end" placeholder="End date">
+                  <input data-testid="jrsd-inp-006" matStartDate formControlName="start" placeholder="Start date">
+                  <input data-testid="jrsd-inp-007" matEndDate formControlName="end" placeholder="End date">
                 </mat-date-range-input>
                 <mat-datepicker-toggle matSuffix [for]="rangePicker2"></mat-datepicker-toggle>
                 <mat-date-range-picker #rangePicker2></mat-date-range-picker>
@@ -68,7 +68,7 @@
   
             &nbsp;&nbsp;
     
-            <button mat-mini-fab color="primary" (click)="resetFilters()" class="reset-button">
+            <button data-testid="jrsd-btn-008" mat-mini-fab color="primary" (click)="resetFilters()" class="reset-button">
               <mat-icon>filter_alt_off</mat-icon>
             </button>
           </div>
@@ -187,7 +187,7 @@
           <ng-container matColumnDef="report">
             <th mat-header-cell *matHeaderCellDef>Onboarding Remarks</th>
             <td mat-cell *matCellDef="let element">
-              <button mat-icon-button *ngIf="element.onboardingreport || element.opportunities?.length != 0" (click)="openRemarks(element)" class="remarks-button"><mat-icon>edit_note</mat-icon></button>
+              <button data-testid="jrsd-btn-009" mat-icon-button *ngIf="element.onboardingreport || element.opportunities?.length != 0" (click)="openRemarks(element)" class="remarks-button"><mat-icon>edit_note</mat-icon></button>
             </td>
           </ng-container>
     

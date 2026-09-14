@@ -2,7 +2,7 @@
   <mat-drawer #drawer mode="over" position="end" class="participant-drawer" autoFocus="false">
     <div class="drawer-header">
       <h3><i class="fa-solid fa-users"></i>&nbsp;&nbsp;{{drawerTitle}}</h3>
-      <button mat-icon-button (click)="drawer.close()"><mat-icon>close</mat-icon></button>
+      <button data-testid="cd-drawer-1" mat-icon-button (click)="drawer.close()"><mat-icon>close</mat-icon></button>
     </div>
     <mat-divider></mat-divider>
     <div class="drawer-list">
@@ -14,8 +14,8 @@
           <span class="atc-tag" *ngFor="let atc of p.atcModels">{{ atc }}</span>
         </span>
         <mat-menu #profileMenu="matMenu">
-          <button mat-menu-item (click)="openProfile(p.profileId,'userprofile')"><mat-icon>person</mat-icon><span>{{ p.name }}'s User Profile</span></button>
-          <button mat-menu-item (click)="openProfile(p.profileId,'profilesummary')"><mat-icon>person</mat-icon><span>{{ p.name }}'s Profile Summary</span></button>
+          <button data-testid="cd-open-profile-2" mat-menu-item (click)="openProfile(p.profileId,'userprofile')"><mat-icon>person</mat-icon><span>{{ p.name }}'s User Profile</span></button>
+          <button data-testid="cd-open-profile-3" mat-menu-item (click)="openProfile(p.profileId,'profilesummary')"><mat-icon>person</mat-icon><span>{{ p.name }}'s Profile Summary</span></button>
         </mat-menu>
       </div>
       <div class="drawer-list-item empty" *ngIf="!drawerParticipants.length">
@@ -34,18 +34,18 @@
           </div>
           <div class="summary-card-body">
             <div class="participant-badges">
-              <span class="summary-badge active clickable" (click)="openParticipantDrawer(drawer, 'active')"><span class="badge-label">Active</span><span class="badge-value">{{ activeCount }}</span></span>
-              <span class="summary-badge nonactive clickable" (click)="openParticipantDrawer(drawer, 'nonactive')"><span class="badge-label">Non-Active</span><span class="badge-value">{{ nonActiveCount }}</span></span>
-              <span class="summary-badge total clickable" (click)="openParticipantDrawer(drawer, 'total')"><span class="badge-label">Total</span><span class="badge-value">{{ activeCount + nonActiveCount }}</span></span>
+              <span data-testid="cd-open-participant-drawer-4" class="summary-badge active clickable" (click)="openParticipantDrawer(drawer, 'active')"><span class="badge-label">Active</span><span class="badge-value">{{ activeCount }}</span></span>
+              <span data-testid="cd-open-participant-drawer-5" class="summary-badge nonactive clickable" (click)="openParticipantDrawer(drawer, 'nonactive')"><span class="badge-label">Non-Active</span><span class="badge-value">{{ nonActiveCount }}</span></span>
+              <span data-testid="cd-open-participant-drawer-6" class="summary-badge total clickable" (click)="openParticipantDrawer(drawer, 'total')"><span class="badge-label">Total</span><span class="badge-value">{{ activeCount + nonActiveCount }}</span></span>
             </div>
             <div class="journey-list">
               <div class="stat-row stat-row-header"><span class="stat-label"></span><span class="stat-header-label">Active</span><span class="stat-header-label">Non-Active</span><span class="stat-header-label">Total</span></div>
               <div class="journey-item" *ngFor="let j of journeySummary | keyvalue">
                 <span class="journey-label">{{ journeydata[j.key]['journey'] }}</span>
                 <div class="journey-badges">
-                  <span class="mini-badge active clickable" (click)="openJourneyDrawer(drawer, j.key, 'active')">{{ j.value.active }}</span>
-                  <span class="mini-badge nonactive clickable" (click)="openJourneyDrawer(drawer, j.key, 'nonactive')">{{ j.value.nonactive }}</span>
-                  <span class="mini-badge total clickable" (click)="openJourneyDrawer(drawer, j.key, 'total')">{{ j.value.total }}</span>
+                  <span data-testid="cd-open-journey-drawer-7" class="mini-badge active clickable" (click)="openJourneyDrawer(drawer, j.key, 'active')">{{ j.value.active }}</span>
+                  <span data-testid="cd-open-journey-drawer-8" class="mini-badge nonactive clickable" (click)="openJourneyDrawer(drawer, j.key, 'nonactive')">{{ j.value.nonactive }}</span>
+                  <span data-testid="cd-open-journey-drawer-9" class="mini-badge total clickable" (click)="openJourneyDrawer(drawer, j.key, 'total')">{{ j.value.total }}</span>
                 </div>
               </div>
             </div>
@@ -62,17 +62,17 @@
               <div class="stat-row clickable-row" *ngFor="let model of filteredAtcModelLevelup | keyvalue">
                 <span class="stat-label">{{ model.key }}</span>
                 <span class="stat-value">{{ model.value }}</span>
-                <span class="stat-value-unique clickable" (click)="openAtcModelDrawer(drawer, model.key)">{{ filteredAtcModelUniqueParticipants[model.key]?.size || 0 }}</span>
+                <span data-testid="cd-open-atc-model-drawer-10" class="stat-value-unique clickable" (click)="openAtcModelDrawer(drawer, model.key)">{{ filteredAtcModelUniqueParticipants[model.key]?.size || 0 }}</span>
               </div>
               <div class="stat-row total-row">
                 <span class="stat-label">Total</span>
                 <span class="stat-value highlight">{{ filteredTotalRecords }}</span>
-                <span class="stat-value-unique highlight clickable" (click)="openAtcModelDrawer(drawer, null)">{{ filteredTotalUniqueParticipants.size }}</span>
+                <span data-testid="cd-open-atc-model-drawer-11" class="stat-value-unique highlight clickable" (click)="openAtcModelDrawer(drawer, null)">{{ filteredTotalUniqueParticipants.size }}</span>
               </div>
               <div class="stat-row not-started-row">
                 <span class="stat-label">Not Started</span>
                 <span class="stat-value"></span>
-                <span class="stat-value-notstarted clickable" (click)="openNotStartedDrawer(drawer)">{{ filteredNotStartedParticipants.size }}</span>
+                <span data-testid="cd-open-not-started-drawer-12" class="stat-value-notstarted clickable" (click)="openNotStartedDrawer(drawer)">{{ filteredNotStartedParticipants.size }}</span>
               </div>
               <!-- <div class="stat-row not-started-row">
                 <span class="stat-label">Not Started</span>
@@ -93,12 +93,12 @@
               <div class="stat-row clickable-row" *ngFor="let model of filteredBeforeDiagnosticCounts | keyvalue">
                 <span class="stat-label">{{ model.key }}</span>
                 <span class="stat-value">{{ model.value }}</span>
-                <span class="stat-value-unique clickable" (click)="openBeforeDiagnosticDrawer(drawer, model.key)">{{ filteredBeforeDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
+                <span data-testid="cd-open-before-diagnostic-drawer-13" class="stat-value-unique clickable" (click)="openBeforeDiagnosticDrawer(drawer, model.key)">{{ filteredBeforeDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
               </div>
               <div class="stat-row total-row">
                 <span class="stat-label">Total</span>
                 <span class="stat-value highlight-before">{{ filteredBeforeDiagnosticTotal }}</span>
-                <span class="stat-value-unique highlight-before clickable" (click)="openBeforeDiagnosticDrawer(drawer, null)">{{ filteredBeforeDiagnosticTotalUnique.size }}</span>
+                <span data-testid="cd-open-before-diagnostic-drawer-14" class="stat-value-unique highlight-before clickable" (click)="openBeforeDiagnosticDrawer(drawer, null)">{{ filteredBeforeDiagnosticTotalUnique.size }}</span>
               </div>
             </div>
           </div>
@@ -114,12 +114,12 @@
               <div class="stat-row clickable-row" *ngFor="let model of filteredAfterDiagnosticCounts | keyvalue">
                 <span class="stat-label">{{ model.key }}</span>
                 <span class="stat-value">{{ model.value }}</span>
-                <span class="stat-value-unique clickable" (click)="openAfterDiagnosticDrawer(drawer, model.key)">{{ filteredAfterDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
+                <span data-testid="cd-open-after-diagnostic-drawer-15" class="stat-value-unique clickable" (click)="openAfterDiagnosticDrawer(drawer, model.key)">{{ filteredAfterDiagnosticUniqueParticipants[model.key]?.size || 0 }}</span>
               </div>
               <div class="stat-row total-row">
                 <span class="stat-label">Total</span>
                 <span class="stat-value highlight-after">{{ filteredAfterDiagnosticTotal }}</span>
-                <span class="stat-value-unique highlight-after clickable" (click)="openAfterDiagnosticDrawer(drawer, null)">{{ filteredAfterDiagnosticTotalUnique.size }}</span>
+                <span data-testid="cd-open-after-diagnostic-drawer-16" class="stat-value-unique highlight-after clickable" (click)="openAfterDiagnosticDrawer(drawer, null)">{{ filteredAfterDiagnosticTotalUnique.size }}</span>
               </div>
             </div>
           </div>
@@ -167,7 +167,7 @@
               </mat-select>
             </mat-form-field>
           </div>
-          <button mat-stroked-button class="clear-btn" (click)="onClearFilter()"><i class="fa-solid fa-rotate-left"></i>&nbsp;&nbsp;Clear Filters</button>
+          <button data-testid="cd-on-clear-filter-17" mat-stroked-button class="clear-btn" (click)="onClearFilter()"><i class="fa-solid fa-rotate-left"></i>&nbsp;&nbsp;Clear Filters</button>
         </div>
       </div>
       <div class="category-cards" *ngIf="displayCategories.length">
@@ -176,9 +176,9 @@
             <mat-card-title><span class="category-icon"><i class="fa-solid fa-chart-pie"></i></span>{{cat}}<span class="category-total">{{categoryUniqueParticipants[cat] || 0}}</span></mat-card-title>
             <mat-card-subtitle>
               <div class="header-chips">
-                <span class="chip-badge fasttrack" (click)="openDrawer(drawer, cat, null, 'fasttrack')"><i class="fa-solid fa-bolt"></i> Fast Track: {{categoryTotals[cat]?.fasttrack || 0}}</span>
-                <span class="chip-badge regular" (click)="openDrawer(drawer, cat, null, 'regular')"><i class="fa-solid fa-clock"></i> Regular: {{categoryTotals[cat]?.regular || 0}}</span>
-                <span class="chip-badge total" (click)="openDrawer(drawer, cat, null, 'total')"><i class="fa-solid fa-users"></i> Total: {{categoryTotals[cat]?.total || 0}}</span>
+                <span data-testid="cd-open-drawer-18" class="chip-badge fasttrack" (click)="openDrawer(drawer, cat, null, 'fasttrack')"><i class="fa-solid fa-bolt"></i> Fast Track: {{categoryTotals[cat]?.fasttrack || 0}}</span>
+                <span data-testid="cd-open-drawer-19" class="chip-badge regular" (click)="openDrawer(drawer, cat, null, 'regular')"><i class="fa-solid fa-clock"></i> Regular: {{categoryTotals[cat]?.regular || 0}}</span>
+                <span data-testid="cd-open-drawer-20" class="chip-badge total" (click)="openDrawer(drawer, cat, null, 'total')"><i class="fa-solid fa-users"></i> Total: {{categoryTotals[cat]?.total || 0}}</span>
               </div>
             </mat-card-subtitle>
           </mat-card-header>
@@ -187,9 +187,9 @@
               <div *ngFor="let lvl of allLevelsPerCategory[cat] || []" class="level-row">
                 <span class="level-name">{{lvl.levelName}}</span>
                 <div class="level-counts">
-                  <span class="count-badge fasttrack" (click)="openDrawer(drawer, cat, lvl.levelName, 'fasttrack')" title="Fast Track">{{categoryLevelCounts[cat]?.[lvl.levelName]?.fasttrack || 0}}</span>
-                  <span class="count-badge regular" (click)="openDrawer(drawer, cat, lvl.levelName, 'regular')" title="Regular">{{categoryLevelCounts[cat]?.[lvl.levelName]?.regular || 0}}</span>
-                  <span class="count-badge total" (click)="openDrawer(drawer, cat, lvl.levelName, 'total')" title="Total">{{categoryLevelCounts[cat]?.[lvl.levelName]?.total || 0}}</span>
+                  <span data-testid="cd-open-drawer-21" class="count-badge fasttrack" (click)="openDrawer(drawer, cat, lvl.levelName, 'fasttrack')" title="Fast Track">{{categoryLevelCounts[cat]?.[lvl.levelName]?.fasttrack || 0}}</span>
+                  <span data-testid="cd-open-drawer-22" class="count-badge regular" (click)="openDrawer(drawer, cat, lvl.levelName, 'regular')" title="Regular">{{categoryLevelCounts[cat]?.[lvl.levelName]?.regular || 0}}</span>
+                  <span data-testid="cd-open-drawer-23" class="count-badge total" (click)="openDrawer(drawer, cat, lvl.levelName, 'total')" title="Total">{{categoryLevelCounts[cat]?.[lvl.levelName]?.total || 0}}</span>
                 </div>
               </div>
             </div>

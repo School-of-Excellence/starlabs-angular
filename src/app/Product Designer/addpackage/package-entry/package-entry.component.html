@@ -11,8 +11,8 @@
         </div>
         <p *ngIf="crossmatch" style="color: red;text-align: center;margin-top: 0;">{{this.croosmatcherrormessage}}</p>
         <div class="formrow">
-            <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-            <button  [disabled]="addPackageForm.invalid" mat-raised-button color="primary" (click)="onformsubmit(addPackageForm.value)">{{submitbutton}}</button>
+            <button data-testid="pe-on-cancel-1" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+            <button data-testid="pe-onformsubmit-2"  [disabled]="addPackageForm.invalid" mat-raised-button color="primary" (click)="onformsubmit(addPackageForm.value)">{{submitbutton}}</button>
         </div>
     </div>
 </div>
@@ -24,7 +24,7 @@
             <h3>Are you sure you want to delete?</h3>
     </div>
     <div mat-dialog-action>
-        <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-        <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+        <button data-testid="pe-on-cancel-3" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+        <button data-testid="pe-ondelete-4" mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
     </div>
 </div>

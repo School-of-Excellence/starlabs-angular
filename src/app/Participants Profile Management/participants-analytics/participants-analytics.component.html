@@ -1,63 +1,63 @@
 <main class="m-2">
 
   <div class="d-flex flex-row-reverse mb-3 g-2">
-    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="Checklists">Checklists</button>
-    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="actions">Actions</button>
-    <button mat-stroked-button class="ms-2" [matMenuTriggerFor]="exports"> Export </button>
-    <button mat-stroked-button class="ms-2" (click)="handleImportClick()"> Import </button>
-    <input type="file" #inputFile (change)="onChange($event)" style="display: none;">
-    <button mat-stroked-button class="ms-2" (click)="showSectionType='showTableColumn'"> Add Column to Table </button>
-    <button mat-stroked-button class="ms-2" (click)="showSectionType='savedFilters'"> Saved Filters </button>
-    <button mat-stroked-button class="ms-2" (click)="showSectionType='filters'"> Filters </button>
-    <button mat-stroked-button matButton="elevated" [matBadge]="pendingEmailsList.length" matBadgePosition="after" class="ms-2" (click)="sendEmailToSelectedParicipant()"> Queued Emails </button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-menu-checklists" [matMenuTriggerFor]="Checklists">Checklists</button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-menu-actions" [matMenuTriggerFor]="actions">Actions</button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-menu-exports" [matMenuTriggerFor]="exports"> Export </button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-import" (click)="handleImportClick()"> Import </button>
+    <input type="file" #inputFile data-testid="pa-import-file" (change)="onChange($event)" style="display: none;">
+    <button mat-stroked-button class="ms-2" data-testid="pa-show-addcolumn" (click)="showSectionType='showTableColumn'"> Add Column to Table </button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-show-savedfilters" (click)="showSectionType='savedFilters'"> Saved Filters </button>
+    <button mat-stroked-button class="ms-2" data-testid="pa-show-filters" (click)="showSectionType='filters'"> Filters </button>
+    <button mat-stroked-button matButton="elevated" [matBadge]="pendingEmailsList.length" matBadgePosition="after" class="ms-2" data-testid="pa-queued-emails" (click)="sendEmailToSelectedParicipant()"> Queued Emails </button>
     <mat-menu #Checklists="matMenu">
-      <button mat-menu-item (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
-      <button mat-menu-item (click)="patchCustomerStatus()">Customer Status</button>
-      <button mat-menu-item (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
-      <button mat-menu-item (click)="openCheckListForProductEvent()">Product Event Event</button>
-      <button mat-menu-item (click)="openCheckListForLastAttendedEvent()">Last Attended Event</button>
-      <button mat-menu-item (click)="openCheckListForQueueEvent()">Queue Event</button>
-      <button mat-menu-item (click)="openCheckListForHigherOrderPurchase()">Corrected HigherOrderPurchase</button>
-      <button mat-menu-item (click)="openFirstPurchaseCheckList()">FirstPurchase CheckList</button>
-      <button mat-menu-item (click)="openCheckListForPurchase()">Overall Purchase</button>
-      <button mat-menu-item (click)="openCheckListForJourneyOnboarding()">Journey Onboarding</button>
-      <button mat-menu-item (click)="openCheckListForPaymentPlan()">Payment Plan</button>
+      <button mat-menu-item data-testid="pa-cl-higherorderpurchase" (click)="navigateTochecklists('higherorderpurchase')">Higher Order Purchase</button>
+      <button mat-menu-item data-testid="pa-cl-customerstatus" (click)="patchCustomerStatus()">Customer Status</button>
+      <button mat-menu-item data-testid="pa-cl-watsonstatus" (click)="navigateTochecklists('watsonstatus')">Watson Status</button>
+      <button mat-menu-item data-testid="pa-cl-productevent" (click)="openCheckListForProductEvent()">Product Event Event</button>
+      <button mat-menu-item data-testid="pa-cl-lastattended" (click)="openCheckListForLastAttendedEvent()">Last Attended Event</button>
+      <button mat-menu-item data-testid="pa-cl-queueevent" (click)="openCheckListForQueueEvent()">Queue Event</button>
+      <button mat-menu-item data-testid="pa-cl-corrected-hop" (click)="openCheckListForHigherOrderPurchase()">Corrected HigherOrderPurchase</button>
+      <button mat-menu-item data-testid="pa-cl-firstpurchase" (click)="openFirstPurchaseCheckList()">FirstPurchase CheckList</button>
+      <button mat-menu-item data-testid="pa-cl-overallpurchase" (click)="openCheckListForPurchase()">Overall Purchase</button>
+      <button mat-menu-item data-testid="pa-cl-journeyonboarding" (click)="openCheckListForJourneyOnboarding()">Journey Onboarding</button>
+      <button mat-menu-item data-testid="pa-cl-paymentplan" (click)="openCheckListForPaymentPlan()">Payment Plan</button>
     </mat-menu>
-    <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" (click)="sendWatiMessage()"> Queued WhatsApp </button>
+    <button mat-stroked-button matButton="elevated" [matBadge]="pendingWatiList.length" matBadgePosition="after" class="ms-2" data-testid="pa-queued-whatsapp" (click)="sendWatiMessage()"> Queued WhatsApp </button>
     <mat-menu #actions="matMenu">
-      <button mat-menu-item [mat-menu-trigger-for]="playlist">Playlist</button>
+      <button mat-menu-item data-testid="pa-act-playlist" [mat-menu-trigger-for]="playlist">Playlist</button>
       <!-- <button mat-menu-item *ngIf="workshopadmin.includes(loggedInProfileId)" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages (Workshop Only)</button> -->
-      <button mat-menu-item (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages</button>
+      <button mat-menu-item data-testid="pa-act-wati-workshop" (click)="sendWattiWorkshop()" [disabled]="selection.selected.length === 0">Send Wati Messages</button>
       <!-- <button mat-menu-item [mat-menu-trigger-for]="email">Email</button> -->
       <!-- <button mat-menu-item (click)="exportWithFilters()">Export With Filters</button> -->
       <!-- <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Send Wati Messages</button> -->
-      <button mat-menu-item (click)="openWatiConfig()">Wati Configuration</button>
-      <button mat-menu-item (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
-      <button mat-menu-item (click)="bulkAddProducts()" [disabled]="selection.selected.length === 0">Add Products</button>
-      <button mat-menu-item (click)="tagParticipants()">Tags</button>
+      <button mat-menu-item data-testid="pa-act-wati-config" (click)="openWatiConfig()">Wati Configuration</button>
+      <button mat-menu-item data-testid="pa-act-add-remarks" (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
+      <button mat-menu-item data-testid="pa-act-add-products" (click)="bulkAddProducts()" [disabled]="selection.selected.length === 0">Add Products</button>
+      <button mat-menu-item data-testid="pa-act-tags" (click)="tagParticipants()">Tags</button>
       <!-- <button mat-menu-item (click)="addSegments()">Create Segments</button> -->
-      <button mat-menu-item mat-menu-item [mat-menu-trigger-for]="communication">Send Communication</button>
-      <button mat-menu-item (click)="addSubscription(selection.selected)" [disabled]="selection.selected.length === 0">Extent Subscription</button>
+      <button mat-menu-item data-testid="pa-act-communication" mat-menu-item [mat-menu-trigger-for]="communication">Send Communication</button>
+      <button mat-menu-item data-testid="pa-act-extend-subscription" (click)="addSubscription(selection.selected)" [disabled]="selection.selected.length === 0">Extent Subscription</button>
       <!-- <button mat-menu-item (click)="sendNotificationinBreakthrough()" [disabled]="selection.selected.length === 0">Send Notifications in Breakthroughs</button> -->
-      <button mat-menu-item (click)="addBulkActionPending()" [disabled]="selection.selected.length === 0">App Action Pending</button>
-      <button mat-menu-item (click)="sendChatBroadcast()">Send Broadcast in Breakthroughs</button>
-      <button mat-menu-item (click)="onParticipantEvolution(selection.selected)" [disabled]="selection.selected.length === 0">Participant Evolution Summary</button>
-      <button mat-menu-item (click)="sendInterimReport(selection.selected)" [disabled]="selection.selected.length === 0">Manage Interim Report</button>
-      <button mat-menu-item (click)="sendEvolutionWishList(selection.selected)" [disabled]="selection.selected.length === 0">Evolution Wishlist</button>
+      <button mat-menu-item data-testid="pa-act-app-action-pending" (click)="addBulkActionPending()" [disabled]="selection.selected.length === 0">App Action Pending</button>
+      <button mat-menu-item data-testid="pa-act-broadcast" (click)="sendChatBroadcast()">Send Broadcast in Breakthroughs</button>
+      <button mat-menu-item data-testid="pa-act-evolution-summary" (click)="onParticipantEvolution(selection.selected)" [disabled]="selection.selected.length === 0">Participant Evolution Summary</button>
+      <button mat-menu-item data-testid="pa-act-interim-report" (click)="sendInterimReport(selection.selected)" [disabled]="selection.selected.length === 0">Manage Interim Report</button>
+      <button mat-menu-item data-testid="pa-act-evolution-wishlist" (click)="sendEvolutionWishList(selection.selected)" [disabled]="selection.selected.length === 0">Evolution Wishlist</button>
       <!-- <button mat-menu-item (click)="updatelist(selection.selected)" [disabled]="selection.selected.length === 0">Update List</button> -->
-      <button mat-menu-item (click)="managelist(selection.selected)">Manage List & Segments</button>
+      <button mat-menu-item data-testid="pa-act-manage-list" (click)="managelist(selection.selected)">Manage List & Segments</button>
 
     </mat-menu>
     <mat-menu #exports="matMenu">
-      <button mat-menu-item (click)="exportExcel(false)">Export Table</button>
-      <button mat-menu-item  *ngIf="selection.hasValue()" (click)="exportExcel(true)">Export Selection Table </button>
-      <button mat-menu-item (click)="exportContentConsumption()">Content Consumption</button>
+      <button mat-menu-item data-testid="pa-exp-table" (click)="exportExcel(false)">Export Table</button>
+      <button mat-menu-item  *ngIf="selection.hasValue()" data-testid="pa-exp-selection" (click)="exportExcel(true)">Export Selection Table </button>
+      <button mat-menu-item data-testid="pa-exp-content" (click)="exportContentConsumption()">Content Consumption</button>
     </mat-menu>
     <mat-menu #playlist="matMenu">
-      <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant()" [disabled]="selection.selected.length === 0">Recommend</button>
+      <button mat-menu-item data-testid="pa-pl-recommend" (click)="createRecommendedPlaylistToSelectedParticipant()" [disabled]="selection.selected.length === 0">Recommend</button>
       <!-- <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant(false)" [disabled]="selection.selected.length === 0"> Recommend</button>
       <button mat-menu-item (click)="createRecommendedPlaylistToSelectedParticipant(true)" [disabled]="selection.selected.length === 0"> Curate</button> -->
-      <button mat-menu-item (click)="onViewRecommendedPlaylist()"> View Recommened</button>
+      <button mat-menu-item data-testid="pa-pl-view" (click)="onViewRecommendedPlaylist()"> View Recommened</button>
     </mat-menu>
     <!-- <mat-menu #email="matMenu">
       <button mat-menu-item (click)="sendEmailToSelectedParicipant()" [disabled]="selection.selected.length === 0"> Send</button>
@@ -66,9 +66,9 @@
     </mat-menu> -->
 
     <mat-menu #communication="matMenu">
-      <button mat-menu-item (click)="sendNotificationinBreakthrough()" [disabled]="selection.selected.length === 0">Notification</button>
-      <button mat-menu-item (click)="sendEmailToSelectedParicipant()" [disabled]="selection.selected.length === 0">Email</button>
-      <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Wati</button>
+      <button mat-menu-item data-testid="pa-comm-notification" (click)="sendNotificationinBreakthrough()" [disabled]="selection.selected.length === 0">Notification</button>
+      <button mat-menu-item data-testid="pa-comm-email" (click)="sendEmailToSelectedParicipant()" [disabled]="selection.selected.length === 0">Email</button>
+      <button mat-menu-item data-testid="pa-comm-wati" (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Wati</button>
     </mat-menu>
   </div>
 
@@ -86,7 +86,7 @@
         <div class="d-flex flex-row justify-content-center">
           <mat-form-field style="width:50%;" appearance="outline">
             <mat-label>Search Saved Filters</mat-label>
-            <input type="text" matInput [(ngModel)]="searchsavedfilters" placeholder="Search" (keyup)="savedfiltersearch()">
+            <input type="text" matInput [(ngModel)]="searchsavedfilters" data-testid="pa-savedfilters-search" placeholder="Search" (keyup)="savedfiltersearch()">
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
         </div>
@@ -127,7 +127,7 @@
           <!-- {{participantform.form.value | json}} -->
           <mat-form-field appearance="outline">
             <mat-label>Participant Mode</mat-label>
-            <mat-select [(ngModel)]="filterdata['participantmode']" name="participantmode" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['participantmode']" name="participantmode" data-testid="pa-filter-participantmode" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterparticipantmode" name="filterparticipantmode" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -139,7 +139,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Customer Status</mat-label>
-            <mat-select [(ngModel)]="filterdata['customerstatus']" name="customerstatus" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['customerstatus']" name="customerstatus" data-testid="pa-filter-customerstatus" (selectionChange)="returnFilterText()" multiple>
               <mat-option [value]="'none'">None</mat-option>
               <mat-option *ngFor="let option of ['non active','active','discontinued']" [value]="option.toLowerCase()">
                 {{option}}
@@ -148,7 +148,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Financial Status</mat-label>
-            <mat-select [(ngModel)]="filterdata['financialstatus']" name="financialstatus" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['financialstatus']" name="financialstatus" data-testid="pa-filter-financialstatus" (selectionChange)="returnFilterText()" multiple>
               <mat-option [value]="'none'">None</mat-option>
               <mat-option *ngFor="let option of ['null','regular','locked','defaulted', 'discontinued', 'banned']" [value]="option.toLowerCase()">
                 {{option}}
@@ -157,7 +157,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Active Journey</mat-label>
-            <mat-select [(ngModel)]="filterdata['activejourney']" name="activejourney" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['activejourney']" name="activejourney" data-testid="pa-filter-activejourney" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterjourneylist" name="filterjourneylist0" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -169,7 +169,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline" style="min-width:300px">
             <mat-label>Last Completed Journey</mat-label>
-            <mat-select [(ngModel)]="filterdata['lastcompletedjourney']" name="lastcompletedjourney" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['lastcompletedjourney']" name="lastcompletedjourney" data-testid="pa-filter-lastcompletedjourney" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterjourneylist" name="filterjourneylist" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -181,7 +181,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Active Products</mat-label>
-            <mat-select [(ngModel)]="filterdata['activeproduct']" name="activeproduct" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['activeproduct']" name="activeproduct" data-testid="pa-filter-activeproduct" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist0" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -193,7 +193,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Profile Tags</mat-label>
-            <mat-select [(ngModel)]="filterdata['profiletags']" name="profiletags" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['profiletags']" name="profiletags" data-testid="pa-filter-profiletags" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterTagList" name="filterTagList" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -263,7 +263,7 @@
           </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field appearance="outline" style="min-width: 350px;">
             <mat-label>Select Product</mat-label>
-            <mat-select [(ngModel)]="filterdata['products']" name="products" (selectionChange)="returnFilterText()">
+            <mat-select [(ngModel)]="filterdata['products']" name="products" data-testid="pa-filter-products" (selectionChange)="returnFilterText()">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist3" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -272,7 +272,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2 mr-2" appearance="outline">
             <mat-label>Select Event</mat-label>
-            <mat-select [(ngModel)]="filterdata['productevent']" name="productevent" (ngModelChange)="returnFilterText()" aria-label="select event">
+            <mat-select [(ngModel)]="filterdata['productevent']" name="productevent" data-testid="pa-filter-productevent" (ngModelChange)="returnFilterText()" aria-label="select event">
                <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterevent" name="filterevent" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -291,7 +291,7 @@
           </mat-form-field> -->
           <mat-form-field class="ml-2 mr-2" appearance="outline">
             <mat-label>Select QueueEvent</mat-label>
-            <mat-select [(ngModel)]="filterdata['queueevent']" name="queueevent" (ngModelChange)="returnFilterText()" (selectionChange)="handleQueueSelection()" aria-label="select QueueEvent">
+            <mat-select [(ngModel)]="filterdata['queueevent']" name="queueevent" data-testid="pa-filter-queueevent" (ngModelChange)="returnFilterText()" (selectionChange)="handleQueueSelection()" aria-label="select QueueEvent">
                <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterqueue" name="filterqueue" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -313,7 +313,7 @@
           </mat-form-field>&nbsp;&nbsp; -->
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>ATC Count</mat-label>
-            <input matInput type="number" [(ngModel)]="filterdata['atccount']" name="atccount" (ngModelChange)="returnFilterText()" placeholder="enter atc count">
+            <input matInput type="number" [(ngModel)]="filterdata['atccount']" name="atccount" data-testid="pa-filter-atccount" (ngModelChange)="returnFilterText()" placeholder="enter atc count">
           </mat-form-field>&nbsp;&nbsp;
           <!-- <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Purchase</mat-label>
@@ -340,7 +340,7 @@
           </div> -->
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Addons</mat-label>
-            <mat-select [(ngModel)]="filterdata['addons']" name="addons" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['addons']" name="addons" data-testid="pa-filter-addons" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist4" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -351,7 +351,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Gifts</mat-label>
-            <mat-select [(ngModel)]="filterdata['gifts']" name="gifts" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['gifts']" name="gifts" data-testid="pa-filter-gifts" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist5" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -362,7 +362,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Bonus</mat-label>
-            <mat-select [(ngModel)]="filterdata['bonus']" name="bonus" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['bonus']" name="bonus" data-testid="pa-filter-bonus" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterproductlist" name="filterproductlist6" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -373,7 +373,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Customer Support</mat-label>
-            <mat-select [(ngModel)]="filterdata['customersupport']" name="customersupport" (selectionChange)="returnFilterText()">
+            <mat-select [(ngModel)]="filterdata['customersupport']" name="customersupport" data-testid="pa-filter-customersupport" (selectionChange)="returnFilterText()">
               <mat-option *ngFor="let option of ['Open','Closed']" [value]="option.toLowerCase()">
                 {{option}}
               </mat-option>
@@ -381,7 +381,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Customer Support Category</mat-label>
-            <mat-select [(ngModel)]="filterdata['customersupportcategory']" name="customersupportcategory" (selectionChange)="returnFilterText()">
+            <mat-select [(ngModel)]="filterdata['customersupportcategory']" name="customersupportcategory" data-testid="pa-filter-customersupportcategory" (selectionChange)="returnFilterText()">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filtercategorys" name="filtercategorys" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -392,7 +392,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field appearance="outline">
             <mat-label>Tier</mat-label>
-            <mat-select [(ngModel)]="filterdata['tier']" name="tier" (selectionChange)="returnFilterText()" multiple>
+            <mat-select [(ngModel)]="filterdata['tier']" name="tier" data-testid="pa-filter-tier" (selectionChange)="returnFilterText()" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filtertier" name="filtertier" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -403,7 +403,7 @@
           </mat-form-field>&nbsp;&nbsp;
           <mat-form-field class="ml-2" appearance="outline">
             <mat-label>Registered User</mat-label>
-            <mat-select [(ngModel)]="filterdata['registereduser']" name="registereduser" multiple (selectionChange)="returnFilterText()">
+            <mat-select [(ngModel)]="filterdata['registereduser']" name="registereduser" multiple data-testid="pa-filter-registereduser" (selectionChange)="returnFilterText()">
               <mat-option *ngFor="let option of ['Registered','Non-Registered']" [value]="option.toLowerCase()">
                 {{option}}
               </mat-option>
@@ -470,14 +470,14 @@
                                             Count must be greater than or equal to 0
                                         </mat-error>
                                     </mat-form-field>
-                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)" type="button">
+                                    <button mat-icon-button color="warn" [attr.data-testid]="'pa-remove-consumed-' + i" (click)="removeConsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
                             </div>
                         </div>
         
-                        <button mat-stroked-button color="primary" (click)="addConsumedProduct()" type="button">
+                        <button mat-stroked-button color="primary" data-testid="pa-add-consumed" (click)="addConsumedProduct()" type="button">
                             <mat-icon>add</mat-icon>
                             Add Consumed Product
                         </button>
@@ -536,13 +536,13 @@
                                             Count must be greater than or equal to 0
                                         </mat-error>
                                     </mat-form-field>
-                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)" type="button">
+                                    <button mat-icon-button color="warn" [attr.data-testid]="'pa-remove-unconsumed-' + i" (click)="removeUnconsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <button mat-stroked-button color="primary" (click)="addUnconsumedProduct()" type="button">
+                        <button mat-stroked-button color="primary" data-testid="pa-add-unconsumed" (click)="addUnconsumedProduct()" type="button">
                             <mat-icon>add</mat-icon>
                             Add Unconsumed Product
                         </button>
@@ -560,7 +560,7 @@
             <div class="chips-wrap">
               <div class="chip" *ngFor="let product of (filterByProducts.consumed || []); let i = index">
                 <span>{{ getProductString(product) }}</span>
-                <button class="chip-btn" (click)="unSelectConsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
+                <button class="chip-btn" [attr.data-testid]="'pa-unselect-consumed-' + i" (click)="unSelectConsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                     <path d="M1 1L7 7M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                   </svg>
@@ -576,7 +576,7 @@
             <div class="chips-wrap">
               <div class="chip" *ngFor="let product of (filterByProducts.unconsumed || []); let i = index">
                 <span>{{ getProductString(product) }}</span>
-                <button class="chip-btn" (click)="unSelectUnconsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
+                <button class="chip-btn" [attr.data-testid]="'pa-unselect-unconsumed-' + i" (click)="unSelectUnconsumedProduct(product?.productId)" [attr.aria-label]="'Remove ' + getProductString(product)">
                   <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                     <path d="M1 1L7 7M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                   </svg>
@@ -587,9 +587,9 @@
           <!-- <button mat-stroked-button type="button" (click)="exportWithFilters()">Product Filter</button>&nbsp;&nbsp; -->
         </div>
         <div class="d-flex justify-content-center" style="margin-bottom:10px;">
-          <button mat-stroked-button type="button" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
-          <button mat-stroked-button type="button" (click)="openModal();">Save Search</button>&nbsp;&nbsp;
-          <button mat-stroked-button type="button" (click)="onformreset();">Reset</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" data-testid="pa-filter-search" (click)="onDataSearch();" [disabled]="searchValidation()">Search</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" data-testid="pa-filter-save" (click)="openModal();">Save Search</button>&nbsp;&nbsp;
+          <button mat-stroked-button type="button" data-testid="pa-filter-reset" (click)="onformreset();">Reset</button>&nbsp;&nbsp;
         </div>
       </div>
       <mat-divider></mat-divider>
@@ -600,7 +600,7 @@
         <div class="d-flex flex-row justify-content-center">
           <mat-form-field class="w-50" appearance="outline">
             <mat-label>Add Column to Table</mat-label>
-            <mat-select [(ngModel)]="selectedColumns" name="selectedColumns" 
+            <mat-select [(ngModel)]="selectedColumns" name="selectedColumns" data-testid="pa-addcolumn-select"
             (selectionChange)="onColumnNameSelect(selectedColumns)" multiple>
               <mat-select-trigger>
                 {{this.displayedColumns ? this.displayedColumns[0] : ''}}
@@ -618,7 +618,7 @@
                 {{item}}
               </mat-option>
             </mat-select>
-            <mat-hint class="clickable-hint" (click)="onDataSearch()">
+            <mat-hint class="clickable-hint" data-testid="pa-addcolumn-refresh" (click)="onDataSearch()">
               Click here to get updated data on table ({{nooftimesloaded}}).
             </mat-hint>
           </mat-form-field>
@@ -637,7 +637,7 @@
         <span>
           <mat-form-field appearance="fill" style="min-width: 300px;">
             <mat-label>Filter</mat-label>
-            <input matInput (keyup)="applyFilter($event)" #input>
+            <input matInput data-testid="pa-table-filter" (keyup)="applyFilter($event)" #input>
           </mat-form-field>
         </span>&nbsp;&nbsp;&nbsp;&nbsp;
         <span style="margin-top: 40px;">
@@ -645,7 +645,7 @@
         </span>
       </div>
       <div *ngIf="isCheckListActive">
-        <button mat-stroked-button (click)="clearCustomerStatus()" style="background-color:green; color: white">Clear CustomerStatus</button>
+        <button mat-stroked-button data-testid="pa-clear-customerstatus" (click)="clearCustomerStatus()" style="background-color:green; color: white">Clear CustomerStatus</button>
       </div>
     </div>
     <div>
@@ -656,6 +656,7 @@
             <mat-checkbox (change)="$event ? toggleAllRows() : null"
                           [checked]="selection.hasValue() && isAllSelected()"
                           [indeterminate]="selection.hasValue() && !isAllSelected()"
+                          data-testid="pa-select-all"
                           [aria-label]="checkboxLabel()">
             </mat-checkbox>
           </th>
@@ -663,6 +664,7 @@
             <mat-checkbox (click)="$event.stopPropagation()"
                           (change)="$event ? selection.toggle(row) : null"
                           [checked]="selection.isSelected(row)"
+                          [attr.data-testid]="'pa-row-select-' + row.profileid"
                           [aria-label]="checkboxLabel(row)">
             </mat-checkbox>
           </td>
@@ -696,6 +698,7 @@
               </app-profile-picture>
 
               <a class="profilename"
+                [attr.data-testid]="'pa-profile-link-' + element['profileid']"
                 [routerLink]="'/userprofile/' + element['profileid']"
                 target="_blank">
                 {{ element['name'] }}
@@ -752,7 +755,7 @@
             <!-- show remarks -->
             <span *ngIf="['remarks'].includes(column)">
               <li *ngFor="let item of element[column]">{{item.note}} - {{mapParticipantName[item.givenby]}}</li>
-              <button *ngIf="element[column] != undefined" class="deletebtn" mat-icon-button type="button" [disabled]="selection.selected.length === 0" (click)="editremarks(selection.selected)">
+              <button *ngIf="element[column] != undefined" class="deletebtn" mat-icon-button type="button" [attr.data-testid]="'pa-edit-remarks-' + element['profileid']" [disabled]="selection.selected.length === 0" (click)="editremarks(selection.selected)">
                 <mat-icon>edit</mat-icon>
               </button>
             </span>
@@ -816,7 +819,7 @@
         <strong>Tag History</strong>
         <p class="tag-history-subname">{{ selectedTagHistoryName }}</p>
       </div>
-      <button mat-icon-button (click)="closeTagHistory()">
+      <button mat-icon-button data-testid="pa-tag-history-close" (click)="closeTagHistory()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -860,7 +863,7 @@
         <h2>Filter Records</h2>
         <p>Narrow results by label</p>
       </div>
-      <button mat-icon-button (click)="closeModal()">
+      <button mat-icon-button data-testid="pa-modal-close" (click)="closeModal()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -873,6 +876,7 @@
         matInput
         [(ngModel)]="filterdata['label']"
         name="label"
+        data-testid="pa-modal-label"
         placeholder="e.g. Invoice, Report..."
       />
       <mat-icon matSuffix>search</mat-icon>
@@ -881,8 +885,8 @@
 
     <!-- Footer Actions -->
     <div class="modal-footer">
-      <button mat-stroked-button (click)="clearField()">Clear</button>
-      <button mat-flat-button color="primary" (click)="saveSearchedFilter(filterdata);">
+      <button mat-stroked-button data-testid="pa-modal-clear" (click)="clearField()">Clear</button>
+      <button mat-flat-button color="primary" data-testid="pa-modal-save" (click)="saveSearchedFilter(filterdata);">
         Save Filter
       </button>
     </div>

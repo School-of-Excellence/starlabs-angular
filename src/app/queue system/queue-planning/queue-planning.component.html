@@ -8,7 +8,7 @@
       <!-- Queue Selection -->
       <mat-form-field appearance="outline" class="queue-select">
         <mat-label>Select Queue</mat-label>
-        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" data-testid="qp-queue-select">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="searchQueue" placeholderLabel="Search Queue..."
               noEntriesFoundLabel="No queues found">
@@ -21,7 +21,7 @@
         </mat-select>
       </mat-form-field>
 
-      <button mat-stroked-button type="button" (click)="managelist()">Lists & Segments</button>
+      <button mat-stroked-button type="button" (click)="managelist()" data-testid="qp-manage-lists">Lists & Segments</button>
 
     </div>
     
@@ -30,7 +30,7 @@
     <span *ngFor="let live of liveQueueList">
       <button mat-stroked-button class="me-2 mb-2"
         [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
-        (click)="selectedQueue = live; onQueueSelect()">
+        (click)="selectedQueue = live; onQueueSelect()" [attr.data-testid]="'qp-livequeue-' + live['docid']">
         {{live["queuename"]}}
       </button>
     </span>
@@ -48,7 +48,7 @@
           <mat-icon>filter_list</mat-icon>
           Filters
         </h3>
-        <button mat-stroked-button class="clear-filters-btn" (click)="clearAllFilters()" *ngIf="hasActiveFilters()">
+        <button mat-stroked-button class="clear-filters-btn" (click)="clearAllFilters()" *ngIf="hasActiveFilters()" data-testid="qp-clear-filters">
           <mat-icon>clear_all</mat-icon>
           Clear All Filters
         </button>
@@ -80,7 +80,7 @@
             <mat-label>Search Segments</mat-label>
             <input matInput [(ngModel)]="filterSegmentSearch" placeholder="Type segment name...">
             <mat-icon matPrefix>search</mat-icon>
-            <button mat-icon-button matSuffix *ngIf="filterSegmentSearch" (click)="filterSegmentSearch = ''">
+            <button mat-icon-button matSuffix *ngIf="filterSegmentSearch" (click)="filterSegmentSearch = ''" data-testid="qp-segsearch-clear">
               <mat-icon>clear</mat-icon>
             </button>
           </mat-form-field>
@@ -163,7 +163,7 @@
                 <div class="th-content">
                   <b>{{ stage }}</b>
                   <button mat-icon-button type="button" (click)="createSlotMultipleSegments(stage)"
-                    [matTooltip]="'Create Slot for ' + stage">
+                    [matTooltip]="'Create Slot for ' + stage" [attr.data-testid]="'qp-createslot-' + stage">
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
@@ -203,7 +203,7 @@
                 <!-- Non-Selected Participants Count -->
                 <div class="segment-actions">
                   <button mat-stroked-button class="btn-edit-row" (click)="editSegment(row)"
-                    [disabled]="!row.selectedVariation"
+                    [disabled]="!row.selectedVariation" [attr.data-testid]="'qp-editsegment-' + row.id"
                     [matTooltip]="!row.selectedVariation ? 'Select variation first' : 'Edit segment'">
                     <mat-icon>edit</mat-icon> Edit Segment
                   </button>
@@ -216,7 +216,7 @@
                     Non-Queue Participants
                   </button> -->
                   <button mat-stroked-button class="btn-delete" (click)="removeRow(row.id)"
-                    [disabled]="planningRows.length === 1">
+                    [disabled]="planningRows.length === 1" [attr.data-testid]="'qp-removerow-' + row.id">
                     <mat-icon>delete</mat-icon> Remove Row
                   </button>
 
@@ -245,7 +245,7 @@
                 </div>
 
                 <div class="variation-actions">
-                  <button mat-stroked-button class="btn-edit-row" (click)="editVariation(row)">
+                  <button mat-stroked-button class="btn-edit-row" (click)="editVariation(row)" [attr.data-testid]="'qp-editvariation-' + row.id">
                     <mat-icon>edit</mat-icon> Edit Variation
                   </button>
                 </div>
@@ -278,7 +278,7 @@
                           </div>
                         </div>
                 
-                        <mat-icon class="edit-cohort-btn" (click)="editCohort(row, stage)" matTooltip="Edit cohorts">edit</mat-icon>
+                        <mat-icon class="edit-cohort-btn" (click)="editCohort(row, stage)" matTooltip="Edit cohorts" [attr.data-testid]="'qp-editcohort-' + row.id + '-' + stage">edit</mat-icon>
                       </div>
                 
                       <!-- Edit Mode: Show multi-select dropdown -->
@@ -297,8 +297,8 @@
                           </mat-select>
                         </mat-form-field>
                         <div class="cohort-actions">
-                          <button mat-button (click)="cancelCohortEdit()">Cancel</button>
-                          <button mat-raised-button color="primary" (click)="saveCohortEdit()">Submit</button>
+                          <button mat-button (click)="cancelCohortEdit()" [attr.data-testid]="'qp-cohort-cancel-' + row.id + '-' + stage">Cancel</button>
+                          <button mat-raised-button color="primary" (click)="saveCohortEdit()" [attr.data-testid]="'qp-cohort-submit-' + row.id + '-' + stage">Submit</button>
                         </div>
                       </div>
                     </div>
@@ -315,7 +315,7 @@
                       <div class="slot-header">
                         <b>Slot : {{i+1}}</b>
                         <mat-icon class="btn-delete" [matTooltip]="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? 'Participants Confirmed for this slot' : 'Remove slot'" 
-                          (click)="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? null : removeDateFromStage(row, stage, i)">delete</mat-icon>
+                          (click)="dateEntry.startdate && dateEntry.enddate && dateEntry.participants?.length > 0 ? null : removeDateFromStage(row, stage, i)" [attr.data-testid]="'qp-slotdel-' + row.id + '-' + stage + '-' + i">delete</mat-icon>
                       </div>
                       <div style="display: flex;flex-direction: row;justify-content: space-between;">
                         <div class="date-row">
@@ -332,7 +332,7 @@
                         </div>
                         <div>
                           <mat-icon class="btn-edit" (click)="editDateEntry(row, stage, i)"
-                            matTooltip="Edit slot">edit_note</mat-icon>
+                            matTooltip="Edit slot" [attr.data-testid]="'qp-slotedit-' + row.id + '-' + stage + '-' + i">edit_note</mat-icon>
                         </div>
                       </div>
 
@@ -368,7 +368,7 @@
                   </div>
 
                   <!-- Always show Add New button -->
-                  <button mat-button class="add-date-btn" (click)="addDateToStage(row, stage)">
+                  <button mat-button class="add-date-btn" (click)="addDateToStage(row, stage)" [attr.data-testid]="'qp-addslot-' + row.id + '-' + stage">
                     + Add New Slot
                   </button>
                 </div>
@@ -384,7 +384,7 @@
                 <div class="no-results-message">
                   <mat-icon>search_off</mat-icon>
                   <p>No rows match the current filters</p>
-                  <button mat-stroked-button (click)="clearAllFilters()">
+                  <button mat-stroked-button (click)="clearAllFilters()" data-testid="qp-noresults-clear">
                     <mat-icon>clear_all</mat-icon>
                     Clear Filters
                   </button>
@@ -407,7 +407,7 @@
                 </span>
               </ng-container>
             </div>
-            <button mat-raised-button class="add-segment-btn" (click)="addRow()">
+            <button mat-raised-button class="add-segment-btn" (click)="addRow()" data-testid="qp-add-segment">
               + Add Segment
             </button>
           </div>
@@ -424,7 +424,7 @@
           panelType === 'non-confirmed' ? 'schedule' : 'people' }}</mat-icon>
         {{ panelTitle }}
       </h3>
-      <button mat-icon-button (click)="closeParticipantPanel()" class="close-panel-btn">
+      <button mat-icon-button (click)="closeParticipantPanel()" class="close-panel-btn" data-testid="qp-panel-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -491,7 +491,7 @@
 
       <!-- Communication Actions -->
       <div class="status-container text-end" *ngIf="selectedQueue != null">
-        <div class="status-item whatsapp" (click)="sendWhatsApp()">
+        <div class="status-item whatsapp" (click)="sendWhatsApp()" data-testid="qp-comm-whatsapp">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -501,7 +501,7 @@
           <span class="status-label">Whatsapp({{ getSelectedParticipantsCount() }})</span>
         </div>
 
-        <div class="status-item email" (click)="sendEmail()">
+        <div class="status-item email" (click)="sendEmail()" data-testid="qp-comm-email">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -511,7 +511,7 @@
           <span class="status-label">Email({{ getSelectedParticipantsCount() }})</span>
         </div>
 
-        <div class="status-item notification" [class.active]="true" (click)="sendNotification()">
+        <div class="status-item notification" [class.active]="true" (click)="sendNotification()" data-testid="qp-comm-notification">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -556,7 +556,7 @@
         <div class="participants-header">
           <h4>Participants ({{ nonSelectedParticipants.length }})</h4>
           <mat-checkbox [checked]="areAllParticipantsSelected()" [indeterminate]="areSomeParticipantsSelected()"
-            (change)="toggleAllParticipants($event.checked)">
+            (change)="toggleAllParticipants($event.checked)" data-testid="qp-select-all">
             Select All
           </mat-checkbox>
         </div>
@@ -671,8 +671,8 @@
       </div>
     </div>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-raised-button color="primary" (click)="saveVariationEdit()">Save</button>
+      <button mat-button mat-dialog-close data-testid="qp-vardlg-cancel">Cancel</button>
+      <button mat-raised-button color="primary" (click)="saveVariationEdit()" data-testid="qp-vardlg-save">Save</button>
     </mat-dialog-actions>
   </div>
 </ng-template>
@@ -697,8 +697,8 @@
     </div>
   </div>
   <mat-dialog-actions align="end">
-    <button mat-button mat-dialog-close>Cancel</button>
-    <button mat-raised-button color="primary" (click)="saveSegmentEdit()">Save</button>
+    <button mat-button mat-dialog-close data-testid="qp-segdlg-cancel">Cancel</button>
+    <button mat-raised-button color="primary" (click)="saveSegmentEdit()" data-testid="qp-segdlg-save">Save</button>
   </mat-dialog-actions>
 </ng-template>
 
@@ -810,12 +810,12 @@
       </div>
     </div>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Cancel</button>
-      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'single'" (click)="saveDateEntry()">
+      <button mat-button mat-dialog-close data-testid="qp-datedlg-cancel">Cancel</button>
+      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'single'" (click)="saveDateEntry()" data-testid="qp-datedlg-save">
         Save
       </button>
       <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'multi'" (click)="saveMultiSegmentSlot()"
-        [disabled]="!isMultiSlotDataValid()">
+        [disabled]="!isMultiSlotDataValid()" data-testid="qp-datedlg-createmulti">
         Create Slots for {{ multiSlotData.selectedSegments?.length || 0 }} Segment(s)
       </button>
     </mat-dialog-actions>

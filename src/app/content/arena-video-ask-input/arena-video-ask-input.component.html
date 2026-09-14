@@ -5,7 +5,7 @@
     <div style="margin-left:20px;margin-top: 20px;">
       <mat-form-field appearance="outline" class="w-50">
         <mat-label>Select Event</mat-label>
-        <mat-select [(ngModel)]="videoAskForm.eventid">
+        <mat-select data-testid="ava-msel-001" [(ngModel)]="videoAskForm.eventid">
           <mat-option [value]="null">None</mat-option>
           <mat-option *ngFor="let option of eventlist" [value]="option.id">{{option.name}}</mat-option>
         </mat-select>
@@ -15,7 +15,7 @@
     <div class="spacerv1">
       <mat-form-field appearance="outline" class="w-50">
         <mat-label>Type of question</mat-label>
-        <mat-select [(ngModel)]="videoAskForm.questiontype" >
+        <mat-select data-testid="ava-msel-002" [(ngModel)]="videoAskForm.questiontype" >
           <mat-option *ngFor="let option of ['image','video']" [value]="option">{{option}}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -24,11 +24,11 @@
     <div class="spacerv1">
       <div *ngIf="videoAskForm.questiontype === 'image'">
         <label>Select thumbnail : </label>
-        <input #thumbnail type="file" multiple="false" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)"required>
+        <input data-testid="ava-inp-003" #thumbnail type="file" multiple="false" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)"required>
       </div>
       <div *ngIf="videoAskForm.questiontype === 'video'">
         <label> Select Video : </label>
-        <input #video type="file" multiple="false" accept=".mp4,.mov,.mkv,.avi" (change)="uploadVideo($event)"required>
+        <input data-testid="ava-inp-004" #video type="file" multiple="false" accept=".mp4,.mov,.mkv,.avi" (change)="uploadVideo($event)"required>
       </div>
     </div>
     <!-- preview video or image -->
@@ -50,26 +50,26 @@
     <div class="spacerv1">
       <mat-form-field appearance="outline" class="w-50">
         <mat-label>Title</mat-label>
-        <input type="text" matInput [(ngModel)]="videoAskForm.title">
+        <input data-testid="ava-inp-005" type="text" matInput [(ngModel)]="videoAskForm.title">
       </mat-form-field>
     </div>
     <!-- description -->
     <div class="spacerv1">
       <mat-form-field appearance="outline" class="w-50">
         <mat-label>Description</mat-label>
-        <textarea matInput [(ngModel)]="videoAskForm.description" cols="30" rows="10"></textarea>
+        <textarea data-testid="ava-txt-006" matInput [(ngModel)]="videoAskForm.description" cols="30" rows="10"></textarea>
       </mat-form-field>
     </div>
     <!-- Submit -->
     <div class="spacerv1 d-flex flex-row justify-content-center mb-2">
-     <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="videoAskForm.uploadurl === null">Submit</button>
+     <button data-testid="ava-btn-007" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="videoAskForm.uploadurl === null">Submit</button>
     </div>
   </div>
   <!-- table -->
   <div class="m-4">
     <mat-form-field appearance="outline">
       <mat-label>Filter</mat-label>
-      <input matInput (keyup)="applyFilter($event)" placeholder="Ex....." #input>
+      <input data-testid="ava-inp-008" matInput (keyup)="applyFilter($event)" placeholder="Ex....." #input>
     </mat-form-field>
     
     <div class="mat-elevation-z8">
@@ -111,14 +111,14 @@
         <ng-container matColumnDef="active">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Active </th>
           <td mat-cell *matCellDef="let row">
-            <mat-slide-toggle [checked]="row.active" (change)="docChange($event,row)">Active</mat-slide-toggle>
+            <mat-slide-toggle data-testid="ava-matslidetoggle-009" [checked]="row.active" (change)="docChange($event,row)">Active</mat-slide-toggle>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="delete">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
           <td mat-cell *matCellDef="let row">
-            <button mat-stroked-button type="button" (click)="onDocDelete(row)">Delete</button>
+            <button data-testid="ava-btn-010" mat-stroked-button type="button" (click)="onDocDelete(row)">Delete</button>
           </td>
         </ng-container>
     

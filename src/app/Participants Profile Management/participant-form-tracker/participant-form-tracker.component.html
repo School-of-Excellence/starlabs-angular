@@ -12,7 +12,7 @@
 
     <mat-form-field appearance="outline">
         <mat-label>Participant</mat-label>
-        <mat-select [(value)]="selectedParticipant">
+        <mat-select [(value)]="selectedParticipant" data-testid="pft-participant-select">
             <mat-option>
                 <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
                     noEntriesFoundLabel="No participant found">
@@ -23,13 +23,13 @@
         </mat-select>
     </mat-form-field>
 
-    <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
-    <button mat-stroked-button (click)="clearFilters()">Clear</button>
+    <button mat-raised-button color="primary" data-testid="pft-apply" (click)="applyFilters()">Apply</button>
+    <button mat-stroked-button data-testid="pft-clear" (click)="clearFilters()">Clear</button>
 </div>
 
 <!-- Action buttons -->
 <div class="table-actions" *ngIf="selectedRecords.length > 0">
-    <button mat-raised-button color="accent" (click)="viewMerged()">
+    <button mat-raised-button color="accent" data-testid="pft-view-merged" (click)="viewMerged()">
         View Merged ({{ selectedRecords.length }})
     </button>
 </div>
@@ -59,11 +59,12 @@
                 <th mat-header-cell *matHeaderCellDef>
                     <mat-checkbox [checked]="isAllSelected()"
                         [indeterminate]="selectedRecords.length > 0 && !isAllSelected()"
+                        data-testid="pft-select-all"
                         (change)="toggleAll($event.checked)">
                     </mat-checkbox>
                 </th>
                 <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
-                    <mat-checkbox [checked]="isSelected(row)" (change)="toggleRow(row, $event.checked)">
+                    <mat-checkbox [checked]="isSelected(row)" [attr.data-testid]="'pft-row-select-' + row.profileid" (change)="toggleRow(row, $event.checked)">
                     </mat-checkbox>
                 </td>
             </ng-container>
@@ -114,7 +115,7 @@
   <div class="overlay-panel" [class.wide]="activeTab === 2" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>{{ overlayTitle }}</h2>
-      <button mat-icon-button (click)="closeOverlay()">
+      <button mat-icon-button data-testid="pft-overlay-close" (click)="closeOverlay()">
         <mat-icon>close</mat-icon>
       </button>
     </div>

@@ -6,29 +6,31 @@
       <div class="col-md-4">
         <mat-form-field appearance="outline" style="width: 100%;">
           <mat-label>Search Participant</mat-label>
-          <input matInput [(ngModel)]="searchTerm" (input)="filterData()" placeholder="Type Participant Name">
-          <mat-icon matSuffix (click)="clearSearch()">clear</mat-icon>
+          <input matInput [(ngModel)]="searchTerm" data-testid="np-search-input" (input)="filterData()" placeholder="Type Participant Name">
+          <mat-icon matSuffix data-testid="np-search-clear" (click)="clearSearch()">clear</mat-icon>
         </mat-form-field>
         <div *ngIf="filteredProfiles.length > 0" class="search-results">
           <h4>Participant List</h4>
           <ul>
-            <li 
-              *ngFor="let profile of filteredProfiles" 
-              (click)="onProfileIdClickedSubsEnd(profile.id)" 
+            <li
+              *ngFor="let profile of filteredProfiles"
+              [attr.data-testid]="'np-result-' + profile.id"
+              (click)="onProfileIdClickedSubsEnd(profile.id)"
               style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
             >
               {{ profile.name }}
               <span style="display: flex; align-items: center;">
-                <mat-icon 
+                <mat-icon
                   [matMenuTriggerFor]="menuIndiv"
+                  [attr.data-testid]="'np-result-menu-' + profile.id"
                   (click)="$event.stopPropagation()"
                   style="cursor: pointer;"
                 >
                   timeline
                 </mat-icon>
                 <mat-menu #menuIndiv="matMenu">
-                  <button mat-menu-item (click)="navigatetoTimeline([profile.id], '', 'Absolute')">Absolute</button>
-                  <button mat-menu-item (click)="navigatetoTimeline([profile.id], '', 'Relative')">Relative</button>
+                  <button mat-menu-item [attr.data-testid]="'np-result-abs-' + profile.id" (click)="navigatetoTimeline([profile.id], '', 'Absolute')">Absolute</button>
+                  <button mat-menu-item [attr.data-testid]="'np-result-rel-' + profile.id" (click)="navigatetoTimeline([profile.id], '', 'Relative')">Relative</button>
                 </mat-menu>
               </span>
             </li>
@@ -108,9 +110,10 @@
               <h3>Subscription Ends</h3>&nbsp;&nbsp;&nbsp;&nbsp;
               <mat-form-field appearance="outline">
                   <mat-label>Select Date</mat-label>
-                  <input 
-                    matInput 
-                    [matDatepicker]="picker" 
+                  <input
+                    matInput
+                    data-testid="np-subs-date"
+                    [matDatepicker]="picker"
                     [(ngModel)]="selectedDate"
                     (dateChange)="updateMonthLabels()">
                   <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
@@ -120,7 +123,7 @@
               </div>
               <div>
                 <div class="row supscription" style="display: flex; justify-content: center; align-items: center;padding: 20px;">
-                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('Last Month')">
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" data-testid="np-month-last" (click)="onMonthClick('Last Month')">
                     <p [style.border]="selectedMonthForSubscription === 'Last Month'?'2px solid #000000': ''"
                     [style.border-radius]="selectedMonthForSubscription === 'Last Month'?'10px': ''">                    
                       <span style="color: red;font-weight: bold;font-size: 24px;">{{lastMonthCount.count}}</span><br>
@@ -129,7 +132,7 @@
                       <span style="color: black;">{{ lastMonth | date: 'MMMM' }}</span>
                     </p>
                   </div>
-                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('This Month')">
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" data-testid="np-month-this" (click)="onMonthClick('This Month')">
                     <p [style.border]="selectedMonthForSubscription === 'This Month'?'2px solid #000000': ''"
                     [style.border-radius]="selectedMonthForSubscription === 'This Month'?'10px': ''">                    
                       <span style="color: green;font-weight: bold;font-size: 24px;">{{currentMonthCount.count }}</span><br>
@@ -138,7 +141,7 @@
                       <span style="color: black;">{{ currentMonth | date: 'MMMM' }}</span>
                     </p>
                   </div>
-                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" (click)="onMonthClick('Next Month')">
+                  <div class="col-sm-3" style="text-align: center;cursor: pointer;" data-testid="np-month-next" (click)="onMonthClick('Next Month')">
                     <p [style.border]="selectedMonthForSubscription === 'Next Month'?'2px solid #000000': ''"
                     [style.border-radius]="selectedMonthForSubscription === 'Next Month'?'10px': ''">                    
                       <span style="color: grey;font-weight: bold;font-size: 24px;">{{nextMonthCount.count }}</span><br>
@@ -153,17 +156,19 @@
                   <mat-radio-group
                     class="radio-group"
                     aria-label="Select an option"
+                    data-testid="np-engagement-group"
                     [(ngModel)]="selectedEngagementCategory"
                     (change)="onEngagementCategoryChange($event.value)"
                   >
                     <!-- <mat-radio-button value="All">All</mat-radio-button>&nbsp;&nbsp;&nbsp; -->
-                    <mat-radio-button value="ActiveOnly">Active Subscription</mat-radio-button>&nbsp;&nbsp;&nbsp;
-                    <mat-radio-button value="CustomerActive">Non-Active Subscription</mat-radio-button>
+                    <mat-radio-button value="ActiveOnly" data-testid="np-eng-active">Active Subscription</mat-radio-button>&nbsp;&nbsp;&nbsp;
+                    <mat-radio-button value="CustomerActive" data-testid="np-eng-nonactive">Non-Active Subscription</mat-radio-button>
                   </mat-radio-group>
                 
                   <div class="card-containerminibox">
                     <div
                     class="card2 disappear"
+                    data-testid="np-englevel-disappear"
                     (click)="engagementLevelClick('Disappear', engagementLevel.disappear)">
                     <div class="label2">Disappear</div>
                     <div class="value">{{ engagementLevel.disappear.length }}</div>
@@ -172,17 +177,19 @@
                       matTooltip="View Timeline"
                       class="icon-container"
                       [matMenuTriggerFor]="menuDisappear"
+                      data-testid="np-englevel-disappear-timeline"
                       (click)="$event.stopPropagation()"
                       >
                       <mat-icon>timeline</mat-icon>
                     </button>
                     <mat-menu #menuDisappear="matMenu">
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Absolute')">Absolute</button>
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Relative')">Relative</button>
+                      <button mat-menu-item data-testid="np-englevel-disappear-abs" (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Absolute')">Absolute</button>
+                      <button mat-menu-item data-testid="np-englevel-disappear-rel" (click)="navigatetoTimeline(engagementLevel.disappear, 'Disappear', 'Relative')">Relative</button>
                     </mat-menu>
                   </div>                
                     <div
                       class="card2 minimal"
+                      data-testid="np-englevel-minimal"
                       (click)="engagementLevelClick('Minimal', engagementLevel.minimal)">
                       <div class="label2">Minimal</div>
                       <div class="value">{{ engagementLevel.minimal.length }}</div>
@@ -196,17 +203,19 @@
                       matTooltip="View Timeline"
                       class="icon-container"
                       [matMenuTriggerFor]="menuMinimal"
+                      data-testid="np-englevel-minimal-timeline"
                       (click)="$event.stopPropagation()"
                       >
                       <mat-icon>timeline</mat-icon>
                     </button>
                     <mat-menu #menuMinimal="matMenu">
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Absolute')">Absolute</button>
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Relative')">Relative</button>
+                      <button mat-menu-item data-testid="np-englevel-minimal-abs" (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item data-testid="np-englevel-minimal-rel" (click)="navigatetoTimeline(engagementLevel.minimal, 'Minimal', 'Relative')">Relative</button>
                     </mat-menu>
                     </div>
                     <div
                       class="card2 average"
+                      data-testid="np-englevel-average"
                       (click)="engagementLevelClick('Average', engagementLevel.average)">
                       <div class="label2">Average</div>
                       <div class="value">{{ engagementLevel.average.length }}</div>
@@ -220,17 +229,19 @@
                       matTooltip="View Timeline"
                       class="icon-container"
                       [matMenuTriggerFor]="menuAverage"
+                      data-testid="np-englevel-average-timeline"
                       (click)="$event.stopPropagation()"
                       >
                       <mat-icon>timeline</mat-icon>
                     </button>
                     <mat-menu #menuAverage="matMenu">
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Absolute')">Absolute</button>
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Relative')">Relative</button>
+                      <button mat-menu-item data-testid="np-englevel-average-abs" (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Absolute')">Absolute</button>
+                      <button mat-menu-item data-testid="np-englevel-average-rel" (click)="navigatetoTimeline(engagementLevel.average, 'Average', 'Relative')">Relative</button>
                     </mat-menu>
                     </div>
                     <div
                       class="card2 optimal"
+                      data-testid="np-englevel-optimal"
                       (click)="engagementLevelClick('Optimal', engagementLevel.optimal)">
                       <div class="label2">Optimal</div>
                       <div class="value">{{ engagementLevel.optimal.length }}</div>
@@ -244,17 +255,19 @@
                       matTooltip="View Timeline"
                       class="icon-container"
                       [matMenuTriggerFor]="menuOptimal"
+                      data-testid="np-englevel-optimal-timeline"
                       (click)="$event.stopPropagation()"
                       >
                       <mat-icon>timeline</mat-icon>
                     </button>
                     <mat-menu #menuOptimal="matMenu">
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Absolute')">Absolute</button>
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Relative')">Relative</button>
+                      <button mat-menu-item data-testid="np-englevel-optimal-abs" (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item data-testid="np-englevel-optimal-rel" (click)="navigatetoTimeline(engagementLevel.optimal, 'Optimal', 'Relative')">Relative</button>
                     </mat-menu>
                     </div>
                     <div
                       class="card2 super-optimal"
+                      data-testid="np-englevel-superoptimal"
                       (click)="engagementLevelClick('Super Optimal', engagementLevel.superoptimal)">
                       <div class="label2">Super Optimal</div>
                       <div class="value">{{ engagementLevel.superoptimal.length }}</div>
@@ -268,13 +281,14 @@
                       matTooltip="View Timeline"
                       class="icon-container"
                       [matMenuTriggerFor]="menuSuperoptimal"
+                      data-testid="np-englevel-superoptimal-timeline"
                       (click)="$event.stopPropagation()"
                       >
                       <mat-icon>timeline</mat-icon>
                     </button>
                     <mat-menu #menuSuperoptimal="matMenu">
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Absolute')">Absolute</button>
-                      <button mat-menu-item (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Relative')">Relative</button>
+                      <button mat-menu-item data-testid="np-englevel-superoptimal-abs" (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Absolute')">Absolute</button>
+                      <button mat-menu-item data-testid="np-englevel-superoptimal-rel" (click)="navigatetoTimeline(engagementLevel.superoptimal, 'Super Optimal', 'Relative')">Relative</button>
                     </mat-menu>
                     </div>
                   </div>

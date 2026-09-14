@@ -2,7 +2,7 @@
 <div class="appointment-dialog">
     <header class="header color-teal">
         <h1 class="title">Schedule Appointment</h1>
-        <button mat-icon-button mat-dialog-close class="close-button">
+        <button data-testid="sie-button" mat-icon-button mat-dialog-close class="close-button">
             <mat-icon style="color:white">close</mat-icon>
         </button>
     </header>
@@ -14,7 +14,7 @@
                 <div class="editor-container">
                     <mat-form-field appearance="outline" class="subject-field">
                         <mat-label>Subject</mat-label>
-                        <input matInput placeholder="Enter Subject" required formControlName="subject">
+                        <input data-testid="sie-subject" matInput placeholder="Enter Subject" required formControlName="subject">
                     </mat-form-field>
 
                     <!-- <angular-editor #editor class="email-editor" (ngModelChange)="onContentChange()"
@@ -27,13 +27,13 @@
                         <div class="button-grid">
                             <div class="form-group">
                                 <label for="buttonName" class="form-control-label">Button Name</label>
-                                <input id="buttonName" class="form-control" type="text" [(ngModel)]="buttonName"
+                                <input data-testid="sie-buttonname" id="buttonName" class="form-control" type="text" [(ngModel)]="buttonName"
                                     placeholder="Enter button text" required />
                             </div>
 
                             <div class="form-group">
                                 <label for="buttonSize" class="form-control-label">Button Size</label>
-                                <select id="buttonSize" class="form-control" [(ngModel)]="buttonSize" required>
+                                <select data-testid="sie-buttonsize" id="buttonSize" class="form-control" [(ngModel)]="buttonSize" required>
                                     <option value="small">Small</option>
                                     <option value="medium" selected>Medium</option>
                                     <option value="large">Large</option>
@@ -42,7 +42,7 @@
 
                             <div class="form-group">
                                 <label for="buttonAlign" class="form-control-label">Alignment</label>
-                                <select id="buttonAlign" class="form-control" [(ngModel)]="buttonAlign" required>
+                                <select data-testid="sie-buttonalign" id="buttonAlign" class="form-control" [(ngModel)]="buttonAlign" required>
                                     <option value="left">Left</option>
                                     <option value="center" selected>Center</option>
                                     <option value="right">Right</option>
@@ -51,12 +51,12 @@
 
                             <div class="form-group">
                                 <label for="buttonLink" class="form-control-label">Button Link</label>
-                                <input id="buttonLink" class="form-control" type="text" [(ngModel)]="buttonLink"
+                                <input data-testid="sie-buttonlink" id="buttonLink" class="form-control" type="text" [(ngModel)]="buttonLink"
                                     placeholder="https://example.com" required />
                             </div>
 
                             <div class="form-group">
-                                <button [disabled]="validateButton()"
+                                <button data-testid="sie-insertbutton" [disabled]="validateButton()"
                                     (click)="insertButton(buttonName,buttonSize,buttonLink,buttonAlign)"
                                     class="insert-button">
                                     Insert Button
@@ -87,7 +87,7 @@
                     <div class="notes-section">
                         <mat-form-field appearance="outline" class="notes-field">
                             <mat-label><strong>Notes for creating these emails to Participants</strong></mat-label>
-                            <textarea matInput name="notes" rows="3" placeholder="" formControlName="notes"></textarea>
+                            <textarea data-testid="sie-notes" matInput name="notes" rows="3" placeholder="" formControlName="notes"></textarea>
                         </mat-form-field>
                     </div>
                 </div>
@@ -98,7 +98,7 @@
                     <div class="d-flex justify-content-around">
                         <mat-form-field appearance="outline" class="from-address">
                             <mat-label>From Address</mat-label>
-                            <input matInput [matAutocomplete]="auto" formControlName="from"
+                            <input data-testid="sie-from" matInput [matAutocomplete]="auto" formControlName="from"
                                 placeholder="Enter email address">
                             <mat-autocomplete #auto="matAutocomplete">
                                 <mat-option *ngFor="let mailid of senderEmailID"
@@ -108,7 +108,7 @@
 
                         <mat-form-field appearance="outline" class="from-address">
                             <mat-label>Template</mat-label>
-                            <mat-select (selectionChange)="onTemplateSelect($event.value)" formControlName="template">
+                            <mat-select data-testid="sie-template" (selectionChange)="onTemplateSelect($event.value)" formControlName="template">
                                 <mat-option *ngFor="let template of templateArray" [value]="template">
                                     {{template.templatename}}
                                 </mat-option>
@@ -124,18 +124,18 @@
                                     Send Test
                                 </button> -->
 
-                                <button mat-stroked-button class="create-button" [disabled]="!emailform.valid"
+                                <button data-testid="sie-sendemail" mat-stroked-button class="create-button" [disabled]="!emailform.valid"
                                     (click)="sendEMail(emailform.value)">
                                     Send Email
                                 </button>
 
-                                <button mat-icon-button class="device-button"
+                                <button data-testid="sie-setsize" mat-icon-button class="device-button"
                                     [ngClass]="{'active': previewMode === 'mobile'}" (click)="setSize('mobile')"
                                     matTooltip="Mobile Preview">
                                     <mat-icon>smartphone</mat-icon>
                                 </button>
 
-                                <button mat-icon-button class="device-button"
+                                <button data-testid="sie-setsize-2" mat-icon-button class="device-button"
                                     [ngClass]="{'active': previewMode === 'web'}" (click)="setSize('web')"
                                     matTooltip="Desktop Preview">
                                     <mat-icon>computer</mat-icon>

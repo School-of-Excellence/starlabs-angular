@@ -64,12 +64,16 @@
       "src/app/quiz/**/*.unit.spec.ts",
       "src/app/New-Workshop/quiz/**/*.unit.spec.ts",
       "src/app/video-player/**/*.unit.spec.ts",
-      "src/app/Customer Support/add-issue/**/*.unit.spec.ts"
+      "src/app/Customer Support/add-issue/**/*.unit.spec.ts",
+      "src/app/AppEngagement/**/*.unit.spec.ts"
     ],
     "authroles": [
       "src/app/login/**/*.unit.spec.ts",
       "src/app/exceptionalrouting/**/*.unit.spec.ts",
       "src/app/route-configuration/**/*.unit.spec.ts",
+      "src/app/route-configuration-duplicate/**/*.unit.spec.ts",
+      "src/app/slackwebhookurls/**/*.unit.spec.ts",
+      "src/app/updatesnackbar/**/*.unit.spec.ts",
       "src/app/icon-list.unit.spec.ts"
     ],
     "workshops": [

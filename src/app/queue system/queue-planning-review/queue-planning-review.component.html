@@ -9,7 +9,7 @@
       <!-- Queue Selection -->
       <mat-form-field appearance="outline" class="queue-select">
         <mat-label>Select Queue</mat-label>
-        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" data-testid="qpr-queue-select">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="searchQueue" placeholderLabel="Search Queue..."
               noEntriesFoundLabel="No queues found">
@@ -40,16 +40,16 @@
               <div class="fw-bold h5 mb-0">Live Queue</div>
               <button mat-stroked-button
                 [color]="liveQueueExportModeOn ? 'primary' : ''"
-                (click)="toggleLiveQueueExportMode()">
+                (click)="toggleLiveQueueExportMode()" data-testid="qpr-livequeue-exportmode">
                 <mat-icon>{{ liveQueueExportModeOn ? 'checklist' : 'checklist_rtl' }}</mat-icon>
                 {{ liveQueueExportModeOn ? 'Exit Export Mode' : 'Select for Export' }}
               </button>
             </div>
 
-            <span *ngFor="let live of liveQueueList" 
+            <span *ngFor="let live of liveQueueList"
               class="d-inline-flex align-items-center me-2 mb-2"
               [style.cursor]="liveQueueExportModeOn ? 'pointer' : 'default'"
-              (click)="liveQueueExportModeOn ? onLiveQueueClick(live) : null">
+              (click)="liveQueueExportModeOn ? onLiveQueueClick(live) : null" [attr.data-testid]="'qpr-livequeue-row-' + live['docid']">
               <span *ngIf="liveQueueExportModeOn" class="me-1"
                 [style.color]="liveQueueExportSelection.has(live['docid']) ? '#1976d2' : '#aaa'">
                 <mat-icon>
@@ -61,7 +61,7 @@
                   'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid'],
                   'export-selected': liveQueueExportModeOn && liveQueueExportSelection.has(live['docid'])
                 }"
-                (click)="!liveQueueExportModeOn ? onLiveQueueClick(live) : null">
+                (click)="!liveQueueExportModeOn ? onLiveQueueClick(live) : null" [attr.data-testid]="'qpr-livequeue-btn-' + live['docid']">
                 {{live["queuename"]}}
               </button>
             </span>
@@ -81,12 +81,12 @@
 
               <button mat-raised-button color="primary"
                 [disabled]="!liveQueueExportRange.startDate || !liveQueueExportRange.endDate || liveQueueExportBusy"
-                (click)="exportLiveQueuesByDateRange()">
+                (click)="exportLiveQueuesByDateRange()" data-testid="qpr-livequeue-export">
                 <mat-spinner *ngIf="liveQueueExportBusy" diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
                 Export
               </button>
 
-              <button mat-icon-button matTooltip="Clear" (click)="toggleLiveQueueExportMode()">
+              <button mat-icon-button matTooltip="Clear" (click)="toggleLiveQueueExportMode()" data-testid="qpr-livequeue-export-clear">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -95,7 +95,7 @@
       </div>
       <mat-form-field appearance="outline" class="filter-field overall-segment" *ngIf="this.selectedQueue != null">
         <mat-label>Filter by Segment</mat-label>
-        <mat-select [(ngModel)]="overallSegmentFilter" multiple [disabled]="panelViewType === 'slot'">
+        <mat-select [(ngModel)]="overallSegmentFilter" multiple [disabled]="panelViewType === 'slot'" data-testid="qpr-segment-filter">
           <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['id']">
             {{ segment['segmentname'] }}
           </mat-option>
@@ -110,7 +110,7 @@
           <button mat-stroked-button class="interim-filter-btn"
             [class.interim-active]="interimDataLoaded"
             [disabled]="interimReportLoading"
-            (click)="showInterimDatePicker = !showInterimDatePicker">
+            (click)="showInterimDatePicker = !showInterimDatePicker" data-testid="qpr-interim-filter">
             <mat-icon>assignment_turned_in</mat-icon>
             <span *ngIf="!interimDataLoaded">Interim Filter</span>
             <span *ngIf="interimDataLoaded">
@@ -133,7 +133,7 @@
             </mat-form-field>
             <button mat-raised-button color="primary" class="interim-apply-btn"
               [disabled]="!interimReportStartDate || !interimReportEndDate || interimReportLoading"
-              (click)="applyInterimReportFilter()">
+              (click)="applyInterimReportFilter()" data-testid="qpr-interim-apply">
               {{ interimDataLoaded ? 'Update' : 'Apply' }}
             </button>
           </div>
@@ -141,7 +141,7 @@
           <!-- Reset button (only when data loaded) -->
           <button mat-icon-button class="interim-reset-btn" *ngIf="interimDataLoaded"
             matTooltip="Reset Interim Filter"
-            (click)="resetInterimReportFilter()">
+            (click)="resetInterimReportFilter()" data-testid="qpr-interim-reset">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -153,7 +153,7 @@
       <div class="ep-filter-wrapper" *ngIf="selectedQueue != null">
         <button mat-stroked-button class="ep-filter-btn"
           [disabled]="revertHistoryLoading"
-          (click)="openOverallSlotRevertHistory()">
+          (click)="openOverallSlotRevertHistory()" data-testid="qpr-revert-history">
           <mat-icon>manage_history</mat-icon>
           <span>Revert History</span>
           <mat-spinner *ngIf="revertHistoryLoading" diameter="14"
@@ -168,7 +168,7 @@
         <button mat-stroked-button class="ep-filter-btn"
           [class.ep-filter-active]="eventParticipationDataLoaded"
           [disabled]="eventParticipationLoading"
-          (click)="showEventParticipationPicker = !showEventParticipationPicker; loadEventParticipationList()">
+          (click)="showEventParticipationPicker = !showEventParticipationPicker; loadEventParticipationList()" data-testid="qpr-event-filter">
           <mat-icon>event</mat-icon>
           <span *ngIf="!eventParticipationDataLoaded">Event Filter</span>
           <span *ngIf="eventParticipationDataLoaded">{{ selectedArenaEventName }}</span>
@@ -191,7 +191,7 @@
             <div class="ep-list">
               <div *ngFor="let item of filteredEventParticipationList"
                 class="ep-list-item"
-                (click)="onEventParticipationSelect(item)">
+                (click)="onEventParticipationSelect(item)" [attr.data-testid]="'qpr-epitem-' + item.name">
                 <span>{{ item.name }}</span>
                 <span class="ep-type-badge">{{ item.type }}</span>
               </div>
@@ -203,7 +203,7 @@
 
           <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length > 0">
             <div class="ep-back-btn"
-              (click)="selectedEventParticipation = null; arenaEventFilterList = []; arenaEventProfileMap = {}; selectedArenaEventId = null;">
+              (click)="selectedEventParticipation = null; arenaEventFilterList = []; arenaEventProfileMap = {}; selectedArenaEventId = null;" data-testid="qpr-event-back">
               <mat-icon>arrow_back</mat-icon>
               <span>{{ selectedEventParticipation?.name }}</span>
             </div>
@@ -211,7 +211,7 @@
               <div *ngFor="let event of arenaEventFilterList"
                 class="ep-list-item"
                 [class.ep-list-item-selected]="selectedArenaEventId === event.docid"
-                (click)="selectedArenaEventId = event.docid">
+                (click)="selectedArenaEventId = event.docid" [attr.data-testid]="'qpr-epevent-' + event.docid">
                 <mat-icon class="ep-radio-icon">
                   {{ selectedArenaEventId === event.docid ? 'radio_button_checked' : 'radio_button_unchecked' }}
                 </mat-icon>
@@ -220,7 +220,7 @@
             </div>
             <button mat-raised-button color="primary" class="ep-apply-btn"
               [disabled]="!selectedArenaEventId"
-              (click)="applyEventParticipationFilter()">
+              (click)="applyEventParticipationFilter()" data-testid="qpr-event-apply">
               Apply
             </button>
           </ng-container>
@@ -230,7 +230,7 @@
         <button mat-icon-button class="ep-reset-btn"
           *ngIf="eventParticipationDataLoaded"
           matTooltip="Reset Event Filter"
-          (click)="resetEventParticipationFilter()">
+          (click)="resetEventParticipationFilter()" data-testid="qpr-event-reset">
           <mat-icon>close</mat-icon>
         </button>
 
@@ -240,7 +240,7 @@
     <div class="overall-counts-section" [class.with-interim-cards]="interimDataLoaded" *ngIf="selectedQueue && !loading">
       <div>
         <div [class]="`overall-count-card queue-tokens-card ${nonSegmentParticipant() > 0 ? 'error':''}`"
-          (click)="openOverallQueueTokensPanel()">
+          (click)="openOverallQueueTokensPanel()" data-testid="qpr-card-queuetokens">
           <div class="count-icon">
             <mat-icon>confirmation_number</mat-icon>
           </div>
@@ -249,16 +249,16 @@
             <span class="count-value">{{ getOverallQueueTokenCount() }}</span>
           </div>
           <button mat-icon-button class="card-export-btn" matTooltip="Export All Queue Tokens"
-            (click)="exportOverallQueueTokens(); $event.stopPropagation()">
+            (click)="exportOverallQueueTokens(); $event.stopPropagation()" data-testid="qpr-export-queuetokens-card">
             <mat-icon>file_download</mat-icon>
           </button>
         </div>
-        <div class="error-message" (click)="openOverallInvalidQueueTokensPanel()">
+        <div class="error-message" (click)="openOverallInvalidQueueTokensPanel()" data-testid="qpr-card-invalidtokens">
           ⚠️ Invalid token count. Please verify the queue status.
         </div>
       </div>
 
-      <div class="overall-count-card segment-participants-card" (click)="openOverallSegmentParticipantsPanel()">
+      <div class="overall-count-card segment-participants-card" (click)="openOverallSegmentParticipantsPanel()" data-testid="qpr-card-segparts">
         <div class="count-icon">
           <mat-icon>groups</mat-icon>
         </div>
@@ -267,7 +267,7 @@
           <span class="count-value">{{ getOverallSegmentParticipantsCount() }}</span>
         </div>
         <button mat-icon-button class="card-export-btn" matTooltip="Export All Segment Participants"
-          (click)="exportOverallSegmentParticipants(); $event.stopPropagation()">
+          (click)="exportOverallSegmentParticipants(); $event.stopPropagation()" data-testid="qpr-export-segparts-card">
           <mat-icon>file_download</mat-icon>
         </button>
       </div>
@@ -276,7 +276,7 @@
       <div class="overall-count-card interim-completed-card"
         *ngIf="interimDataLoaded"
         [class.interim-card-active]="activeInterimCard === 'completed'"
-        (click)="toggleInterimCard('completed')">
+        (click)="toggleInterimCard('completed')" data-testid="qpr-card-interim-completed">
         <div class="count-icon">
           <mat-icon>check_circle</mat-icon>
         </div>
@@ -289,7 +289,7 @@
       <div class="overall-count-card interim-not-completed-card"
         *ngIf="interimDataLoaded"
         [class.interim-card-active]="activeInterimCard === 'not-completed'"
-        (click)="toggleInterimCard('not-completed')">
+        (click)="toggleInterimCard('not-completed')" data-testid="qpr-card-interim-pending">
         <div class="count-icon">
           <mat-icon>pending</mat-icon>
         </div>
@@ -312,7 +312,7 @@
         <table class="merged-table">
           <thead>
             <tr>
-              <th *ngFor="let stage of queueStages" class="stage-col" (click)="openSlotPlannerForStage(stage)">
+              <th *ngFor="let stage of queueStages" class="stage-col" (click)="openSlotPlannerForStage(stage)" [attr.data-testid]="'qpr-stagecol-' + stage">
               <div class="stage-header-card">
                 <div class="stage-header-top">
                   <mat-icon class="stage-th-icon">view_timeline</mat-icon>
@@ -333,7 +333,7 @@
                 <div class="stage-column-content">
                   <!-- Slot Cards for this Stage -->
                   <div *ngFor="let slot of getSlotsForStage(stage)" class="slot-card-wrapper">
-                    <div class="slot-card" (click)="openSlotPanel(slot, stage)">
+                    <div class="slot-card" (click)="openSlotPanel(slot, stage)" [attr.data-testid]="'qpr-slotcard-' + stage">
                       <div class="slot-datetime-box">
                         <div class="datetime-row slot-title-row" 
                           *ngIf="getSlotTitle(slot, stage)">
@@ -436,7 +436,7 @@
           <mat-icon>confirmation_number</mat-icon>
           Overall Queue Tokens
           <button mat-icon-button class="header-export-btn" matTooltip="Export All Queue Tokens"
-            (click)="exportOverallQueueTokens(); $event.stopPropagation()">
+            (click)="exportOverallQueueTokens(); $event.stopPropagation()" data-testid="qpr-export-queuetokens-header">
             <mat-icon>file_download</mat-icon>
           </button>
         </h3>
@@ -444,7 +444,7 @@
           <mat-icon>groups</mat-icon>
           Overall Segment Participants
           <button mat-icon-button class="header-export-btn" matTooltip="Export All Segment Participants"
-            (click)="exportOverallSegmentParticipants(); $event.stopPropagation()">
+            (click)="exportOverallSegmentParticipants(); $event.stopPropagation()" data-testid="qpr-export-segparts-header">
             <mat-icon>file_download</mat-icon>
           </button>
         </h3>
@@ -462,7 +462,7 @@
           </span>
         </h4>
       </span>
-      <button mat-icon-button (click)="closeSlotPanel()" class="close-panel-btn">
+      <button mat-icon-button (click)="closeSlotPanel()" class="close-panel-btn" data-testid="qpr-panel-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -496,7 +496,7 @@
       <div class="overall-status-counts"
         *ngIf="(panelViewType === 'overall-queue-tokens' || panelViewType === 'overall-segment-participants')">
         <div class="status-count-card queue-participants-status-card"
-          [class.active-status]="currentStatusView === 'queue-participants'" (click)="showOverallQueueParticipants()">
+          [class.active-status]="currentStatusView === 'queue-participants'" (click)="showOverallQueueParticipants()" data-testid="qpr-status-queue-participants">
           <div class="status-icon">
             <mat-icon>people</mat-icon>
           </div>
@@ -509,7 +509,7 @@
         </div>
 
         <div class="status-count-card non-queue-status-card" [class.active-status]="currentStatusView === 'non-queue'"
-          (click)="showOverallNonQueueParticipants()">
+          (click)="showOverallNonQueueParticipants()" data-testid="qpr-status-non-queue">
           <div class="status-icon">
             <mat-icon>person_off</mat-icon>
           </div>
@@ -617,7 +617,7 @@
       <ng-container *ngIf="panelViewType === 'slot'">
         <!-- Merged Variations List -->
         <span class="merged-variations-section">
-          <div class="section-header-clickable" (click)="toggleVariationsExpansion()">
+          <div class="section-header-clickable" (click)="toggleVariationsExpansion()" data-testid="qpr-toggle-variations">
             <span>
               Segments & Variations ({{getSegmentVariationsWithCounts().length}})
             </span>
@@ -645,7 +645,7 @@
 
         <!-- Stage Range Information -->
         <span class="stage-range-info" *ngIf="getStageRangeDetails().hasNonConfirmed">
-          <div class="stage-range-header" (click)="toggleStageRange()">
+          <div class="stage-range-header" (click)="toggleStageRange()" data-testid="qpr-toggle-stagerange">
             <mat-icon>route</mat-icon>
             <span>Stage Range for Non-Confirmed Participants</span>
             <mat-icon class="expand-icon" [class.expanded]="isStageRangeExpanded">
@@ -686,7 +686,7 @@
         <!-- Overall Participants Summary -->
         <span class="summary-grids">
           <!-- Confirmed Participants Grid -->
-          <div class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()">
+          <div class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()" data-testid="qpr-summary-confirmed">
             <div class="summary-content-compact">
               <span class="summary-label">Confirmed</span>
               <span class="summary-count">{{ getAllConfirmedCount() }}</span>
@@ -698,7 +698,7 @@
           </div>
 
           <!-- Non-Confirmed Participants Grid -->
-          <div class="summary-card non-confirmed-card" (click)="showAllNonConfirmedParticipants()">
+          <div class="summary-card non-confirmed-card" (click)="showAllNonConfirmedParticipants()" data-testid="qpr-summary-nonconfirmed">
             <div class="summary-content-compact">
               <span class="summary-label">Non-Confirmed</span>
               <span class="summary-count">{{ getAllNonConfirmedCount() }}</span>
@@ -706,7 +706,7 @@
           </div>
 
           <!-- B!G Participants Grid -->
-          <div class="summary-card big-card" (click)="showAllBigParticipants()">
+          <div class="summary-card big-card" (click)="showAllBigParticipants()" data-testid="qpr-summary-big">
             <div class="summary-content-compact">
               <span class="summary-label">B!G Participants</span>
               <span class="summary-count">{{ getAllBigParticipantsCount() }}</span>
@@ -743,17 +743,17 @@
             <button mat-icon-button *ngIf="currentStatusView === 'queue-participants' 
                           && nonSegmentParticipant()>0" class="non-segment-icon non-segment-filter"
               [class.active]="nonSegmentedParticipants" (click)="filterNonSegmentParticipants()"
-              matTooltip="non-Segment Participant">
+              matTooltip="non-Segment Participant" data-testid="qpr-nonsegment-filter">
               <mat-icon>person_off</mat-icon>
             </button>
             <button mat-icon-button class="export-btn" matTooltip="Export to Excel"
               [disabled]="getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="exportParticipantsToExcel()">
+              (click)="exportParticipantsToExcel()" data-testid="qpr-export-excel">
               <mat-icon>file_download</mat-icon>
             </button>
             <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
               [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
-              (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')">
+              (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')" data-testid="qpr-select-all">
               <b>Select All</b>
             </mat-checkbox>
           </div>
@@ -763,7 +763,7 @@
           <div class="action-buttons-horizontal">
             <button mat-raised-button class="action-btn-compact notification-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="sendNotification()">
+              (click)="sendNotification()" data-testid="qpr-comm-notification">
               <mat-icon>notifications</mat-icon>
               <span>Notification -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
@@ -771,7 +771,7 @@
 
             <button mat-raised-button class="action-btn-compact whatsapp-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="sendWhatsApp()">
+              (click)="sendWhatsApp()" data-testid="qpr-comm-whatsapp">
               <mat-icon>chat</mat-icon>
               <span>WhatsApp -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
@@ -779,14 +779,14 @@
 
             <button mat-raised-button class="action-btn-compact email-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="sendEmail()">
+              (click)="sendEmail()" data-testid="qpr-comm-email">
               <mat-icon>email</mat-icon>
               <span>Email -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
             </button>
             <button mat-raised-button class="action-btn-compact oneway-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
-              (click)="sendChannel()">
+              (click)="sendChannel()" data-testid="qpr-comm-channel">
               <mat-icon>campaign</mat-icon>
               <span>Channel -</span>
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
@@ -950,7 +950,7 @@
                 *ngIf="activePanelSection === 'confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"
                 matTooltip="Revert Slot"
                 class="revert-btn"
-                (click)="revertSlot(participant, selectedStageForPanel); $event.stopPropagation()">
+                (click)="revertSlot(participant, selectedStageForPanel); $event.stopPropagation()" [attr.data-testid]="'qpr-revert-' + (participant.profile_id || participant.profileid)">
                 <mat-icon>undo</mat-icon>
               </button>
 
@@ -959,7 +959,7 @@
                 *ngIf="activePanelSection === 'non-confirmed' && !participant.isNonQueueParticipant && selectedStageForPanel"
                 matTooltip="Book Slot"
                 class="book-btn"
-                (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()">
+                (click)="openBookSlotDialog(participant, selectedStageForPanel); $event.stopPropagation()" [attr.data-testid]="'qpr-book-' + (participant.profile_id || participant.profileid)">
                 <mat-icon>event_available</mat-icon>
               </button>
 
@@ -976,7 +976,7 @@
   <div class="slot-planner" *ngIf="selectedStage" [class.with-panel]="showQueueTabPanel">
     <div class="top-bar">
       <h1>Slot Planner <span>— {{selectedStage}}</span></h1>
-     <button mat-dialog-close mat-icon-button class="close-btn">
+     <button mat-dialog-close mat-icon-button class="close-btn" data-testid="qpr-planner-close">
       <mat-icon>close</mat-icon>
     </button>
     </div>
@@ -1016,7 +1016,7 @@
     <div class="scoreboard-toggle">
         <span class="toggle-label" [class.active-label]="showFromToday">From Today</span>
         <label class="toggle-switch">
-          <input type="checkbox" [checked]="!showFromToday" (change)="showFromToday = !showFromToday">
+          <input type="checkbox" [checked]="!showFromToday" (change)="showFromToday = !showFromToday" data-testid="qpr-planner-fromtoday">
           <span class="toggle-slider"></span>
         </label>
         <span class="toggle-label" [class.active-label]="!showFromToday">Overall</span>
@@ -1028,21 +1028,21 @@
       <button class="ctrl-btn">12 Feb</button>
       <button class="ctrl-btn">13 Feb</button> -->
       <div class="day-slider-wrapper">
-        <button class="slider-arrow" (click)="scrollDays('left')" [disabled]="!canScrollLeft">
+        <button class="slider-arrow" (click)="scrollDays('left')" [disabled]="!canScrollLeft" data-testid="qpr-planner-scroll-left">
           ◀
         </button>
 
         <div class="day-buttons-scroll" #dayButtonsScroll (scroll)="onScroll()">
           <div class="day-buttons-track">
-            <button class="ctrl-btn" [class.active]="selectedDates.length === 0" (click)="selectAllDays()">All
+            <button class="ctrl-btn" [class.active]="selectedDates.length === 0" (click)="selectAllDays()" data-testid="qpr-planner-alldays">All
               Days</button>
             <button class="ctrl-btn" [class.active]="selectedDates.includes(date)"
               *ngFor="let date of getSlotDatesOfStage()"
-              (click)="onDateClick(date)">{{getDateAndMonthString(date)}}</button>
+              (click)="onDateClick(date)" [attr.data-testid]="'qpr-planner-date-' + date">{{getDateAndMonthString(date)}}</button>
           </div>
         </div>
 
-        <button class="slider-arrow" (click)="scrollDays('right')" [disabled]="!canScrollRight">
+        <button class="slider-arrow" (click)="scrollDays('right')" [disabled]="!canScrollRight" data-testid="qpr-planner-scroll-right">
           ▶
         </button>
       </div>
@@ -1070,30 +1070,30 @@
       <div class="interim-toggle-btns" *ngIf="interimDataLoaded">
         <button class="interim-toggle-btn interim-done-btn"
           [class.interim-btn-active]="activeInterimCard === 'completed'"
-          (click)="toggleInterimCard('completed')">
+          (click)="toggleInterimCard('completed')" data-testid="qpr-planner-interim-done">
           <mat-icon>check_circle</mat-icon>
           Done ({{ interimCompletedCount }})
         </button>
         <button class="interim-toggle-btn interim-pending-btn"
           [class.interim-btn-active]="activeInterimCard === 'not-completed'"
-          (click)="toggleInterimCard('not-completed')">
+          (click)="toggleInterimCard('not-completed')" data-testid="qpr-planner-interim-pending">
           <mat-icon>pending</mat-icon>
           Pending ({{ interimNotCompletedCount }})
         </button>
       </div>
-      <button class="export-btn" (click)="exportParticipantsDetailsForStage()">📊 Export</button>
-      <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()">{{expandAllRow ?
+      <button class="export-btn" (click)="exportParticipantsDetailsForStage()" data-testid="qpr-planner-export">📊 Export</button>
+      <button class="expand-toggle" (click)="expandAllRow? expandedAllRows() : collapseAllRows()" data-testid="qpr-planner-expand">{{expandAllRow ?
         'Expand All':'Collapse All Participants'}}</button>
     </div>
     <div class="slot-planner-tabs">
       <button class="tab-btn"
         [class.active-tab]="activeSlotPlannerTab === 'appointment'"
-        (click)="activeSlotPlannerTab = 'appointment'">
+        (click)="activeSlotPlannerTab = 'appointment'" data-testid="qpr-planner-tab-appointment">
         Appointment
       </button>
       <button class="tab-btn"
         [class.active-tab]="activeSlotPlannerTab === 'queue'"
-        (click)="activeSlotPlannerTab = 'queue'; expandedQueueRows = []">
+        (click)="activeSlotPlannerTab = 'queue'; expandedQueueRows = []" data-testid="qpr-planner-tab-queue">
         Queue
       </button>
     </div>
@@ -1327,21 +1327,21 @@
           <td><strong>TOTAL</strong></td>
           <td style="text-align:center">
             <span class="badge badge-booked clickable-badge"
-              (click)="openTotalPanelForStage('confirmed')">
+              (click)="openTotalPanelForStage('confirmed')" data-testid="qpr-total-confirmed">
               <mat-icon class="badge-click-icon">how_to_reg</mat-icon>
               {{ getTotalConfirmedParticipantInTable() }}
             </span>
           </td>
           <td style="text-align:center">
             <span class="badge badge-nonconf clickable-badge"
-              (click)="openTotalPanelForStage('non-confirmed')">
+              (click)="openTotalPanelForStage('non-confirmed')" data-testid="qpr-total-nonconfirmed">
               <mat-icon class="badge-click-icon">schedule</mat-icon>
               {{ getTotalQueueNonConfirmedInTable() }}
             </span>
           </td>
           <td style="text-align:center">
             <span class="badge badge-none clickable-badge"
-              (click)="openTotalPanelForStage('all')">
+              (click)="openTotalPanelForStage('all')" data-testid="qpr-total-all">
               <mat-icon class="badge-click-icon">people</mat-icon>
               {{ getTotalConfirmedParticipantInTable() + getTotalQueueNonConfirmedInTable() }}
             </span>
@@ -1360,7 +1360,7 @@
             <mat-icon>send</mat-icon>
             <span>Send Communication</span>
           </div>
-          <button mat-icon-button class="queue-panel-close-btn" (click)="showQueueTabPanel = false">
+          <button mat-icon-button class="queue-panel-close-btn" (click)="showQueueTabPanel = false" data-testid="qpr-qpanel-close">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -1380,13 +1380,13 @@
       <div class="queue-panel-type-tabs">
         <button class="queue-type-tab"
           [class.active]="queueTabPanelType === 'confirmed'"
-          (click)="switchPanelType('confirmed')">
+          (click)="switchPanelType('confirmed')" data-testid="qpr-qpanel-tab-confirmed">
           <mat-icon>how_to_reg</mat-icon>
           Confirmed
         </button>
         <button class="queue-type-tab"
           [class.active]="queueTabPanelType === 'non-confirmed'"
-          (click)="switchPanelType('non-confirmed')">
+          (click)="switchPanelType('non-confirmed')" data-testid="qpr-qpanel-tab-nonconfirmed">
           <mat-icon>schedule</mat-icon>
           Non-Confirmed
         </button>
@@ -1398,25 +1398,25 @@
           <mat-checkbox
             [checked]="areAllQueuePanelSelected()"
             [indeterminate]="areSomeQueuePanelSelected()"
-            (change)="toggleAllQueuePanel($event.checked)">
+            (change)="toggleAllQueuePanel($event.checked)" data-testid="qpr-qpanel-selectall">
             Select All ({{ allParticipantsForStage.length }})
           </mat-checkbox>
         </div>
         <div class="queue-panel-comm-actions" *ngIf="getSelectedParticipantsCount('all') > 0">
           <button mat-mini-fab class="comm-fab notification-fab" matTooltip="Send Notification"
-            (click)="sendNotification()">
+            (click)="sendNotification()" data-testid="qpr-qpanel-notification">
             <mat-icon>notifications</mat-icon>
           </button>
           <button mat-mini-fab class="comm-fab whatsapp-fab" matTooltip="Send WhatsApp"
-            (click)="sendWhatsApp()">
+            (click)="sendWhatsApp()" data-testid="qpr-qpanel-whatsapp">
             <mat-icon>chat</mat-icon>
           </button>
           <button mat-mini-fab class="comm-fab email-fab" matTooltip="Send Email"
-            (click)="sendEmail()">
+            (click)="sendEmail()" data-testid="qpr-qpanel-email">
             <mat-icon>email</mat-icon>
           </button>
           <button mat-mini-fab class="comm-fab oneway-fab" matTooltip="One Way Broadcast"
-            (click)="sendChannel()">
+            (click)="sendChannel()" data-testid="qpr-qpanel-channel">
             <mat-icon>campaign</mat-icon>
           </button>
           <span class="comm-count-label">{{ getSelectedParticipantsCount('all') }} selected</span>
@@ -1458,15 +1458,15 @@
   </div>
 </ng-template>
 <!-- Book Slot Dialog -->
-<div class="book-slot-overlay" *ngIf="showBookSlotDialog" (click)="closeBookSlotDialog()">
-  <div class="book-slot-dialog" (click)="$event.stopPropagation()">
+<div class="book-slot-overlay" *ngIf="showBookSlotDialog" (click)="closeBookSlotDialog()" data-testid="qpr-bookslot-overlay">
+  <div class="book-slot-dialog" (click)="$event.stopPropagation()" data-testid="qpr-bookslot-dialog">
 
     <div class="book-slot-header">
       <h3>
         <mat-icon>event_available</mat-icon>
         Book Slot — {{ bookSlotStageName }}
       </h3>
-      <button mat-icon-button (click)="closeBookSlotDialog()">
+      <button mat-icon-button (click)="closeBookSlotDialog()" data-testid="qpr-bookslot-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -1504,12 +1504,12 @@
     </div>
 
     <div class="book-slot-footer">
-      <button mat-stroked-button (click)="closeBookSlotDialog()" [disabled]="bookSlotLoading">
+      <button mat-stroked-button (click)="closeBookSlotDialog()" [disabled]="bookSlotLoading" data-testid="qpr-bookslot-cancel">
         Cancel
       </button>
       <button mat-raised-button color="primary"
         [disabled]="bookSlotSelectedIndex === null || bookSlotLoading"
-        (click)="confirmBookSlot()">
+        (click)="confirmBookSlot()" data-testid="qpr-bookslot-confirm">
         <mat-spinner *ngIf="bookSlotLoading" diameter="18" style="display:inline-block; margin-right:6px;"></mat-spinner>
         Confirm Booking
       </button>
@@ -1519,15 +1519,15 @@
 </div>
 <!-- Overall Slot Revert History Dialog -->
 <div class="revert-history-overlay" *ngIf="showOverallSlotRevertHistory"
-  (click)="showOverallSlotRevertHistory = false">
-  <div class="revert-history-dialog" (click)="$event.stopPropagation()">
+  (click)="showOverallSlotRevertHistory = false" data-testid="qpr-revert-overlay">
+  <div class="revert-history-dialog" (click)="$event.stopPropagation()" data-testid="qpr-revert-dialog-inner">
 
     <div class="revert-history-dialog-header">
       <div class="revert-history-title">
         <mat-icon>manage_history</mat-icon>
         <span>Slot history ({{ overallSlotRevertHistory.length }})</span>
       </div>
-      <button mat-icon-button (click)="showOverallSlotRevertHistory = false">
+      <button mat-icon-button (click)="showOverallSlotRevertHistory = false" data-testid="qpr-revert-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -1546,14 +1546,14 @@
     <div class="history-tabs">
       <button class="history-tab-btn"
         [class.tab-active-reverted]="activeHistoryTab === 'reverted'"
-        (click)="switchHistoryTab('reverted')">
+        (click)="switchHistoryTab('reverted')" data-testid="qpr-revert-tab-reverted">
         <mat-icon>undo</mat-icon>
         Reverted
         <span class="history-tab-badge reverted-badge">{{ revertedCount }}</span>
       </button>
       <button class="history-tab-btn"
         [class.tab-active-booked]="activeHistoryTab === 'booked'"
-        (click)="switchHistoryTab('booked')">
+        (click)="switchHistoryTab('booked')" data-testid="qpr-revert-tab-booked">
         <mat-icon>event_available</mat-icon>
         Booked
         <span class="history-tab-badge booked-badge">{{ bookedCount }}</span>

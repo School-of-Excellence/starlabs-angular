@@ -9,7 +9,7 @@
         <mat-option *ngFor="let type of typeList" [value]="type">{{type}}</mat-option>
       </mat-select>
     </mat-form-field>&nbsp;&nbsp;
-    <button *ngIf="selectedType == null" mat-stroked-button class="cancelbtn" (click)="closeDialog()">Close</button>
+    <button data-testid="ud-close-dialog-1" *ngIf="selectedType == null" mat-stroked-button class="cancelbtn" (click)="closeDialog()">Close</button>
   </div>
   <div [ngSwitch]="selectedType">
     <!-- Appointment type -->
@@ -47,8 +47,8 @@
           </mat-form-field>
         </div>
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-close-dialog-2" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button data-testid="ud-submit-appointment-3" type="submit" mat-stroked-button class="successbtn" (click)="submitAppointment(appointmentform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
@@ -115,7 +115,7 @@
               </div>
             </div>
             <div class="fb-section-right">
-              <button *ngIf="formarray.length > 1" mat-button type="button" class="fb-collapse-all" (click)="toggleAllCollapsed()">
+              <button data-testid="ud-toggle-all-collapsed-4" *ngIf="formarray.length > 1" mat-button type="button" class="fb-collapse-all" (click)="toggleAllCollapsed()">
                 {{allCollapsed ? 'Expand all' : 'Collapse all'}}
               </button>
               <span class="fb-count">{{formarray.length}} {{formarray.length === 1 ? 'field' : 'fields'}}</span>
@@ -127,7 +127,7 @@
           <div class="fb-card" [class.fb-collapsed]="isCollapsed(list)" cdkDrag
             *ngFor="let list of formarray.controls;let i = index" [formGroupName]="i">
             <div class="fb-card-head">
-              <button mat-icon-button type="button" class="fb-icon-btn" [title]="isCollapsed(list) ? 'Expand' : 'Collapse'"
+              <button data-testid="ud-toggle-collapsed-5" mat-icon-button type="button" class="fb-icon-btn" [title]="isCollapsed(list) ? 'Expand' : 'Collapse'"
                 [attr.aria-label]="isCollapsed(list) ? 'Expand field' : 'Collapse field'" (click)="toggleCollapsed(list)">
                 <mat-icon class="fb-chevron">expand_more</mat-icon>
               </button>
@@ -135,15 +135,15 @@
               <span class="fb-card-name">{{formarray.controls[i].get('fieldname')?.value || 'Untitled field'}}</span>
               <span class="fb-card-type" *ngIf="formarray.controls[i].get('type')?.value">{{formarray.controls[i].get('type')?.value}}</span>
               <span class="fb-flex-spacer"></span>
-              <button mat-icon-button type="button" class="fb-icon-btn" title="Duplicate this field (added at the end)"
+              <button data-testid="ud-duplicate-field-6" mat-icon-button type="button" class="fb-icon-btn" title="Duplicate this field (added at the end)"
                 aria-label="Duplicate this field" (click)="duplicateField(i)">
                 <mat-icon>content_copy</mat-icon>
               </button>
-              <button mat-icon-button type="button" class="fb-icon-btn" title="Add a field below"
+              <button data-testid="ud-addarray-7" mat-icon-button type="button" class="fb-icon-btn" title="Add a field below"
                 aria-label="Add a field below" (click)="addarray(i)">
                 <mat-icon>add</mat-icon>
               </button>
-              <button mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this field"
+              <button data-testid="ud-removearray-8" mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this field"
                 aria-label="Remove this field" (click)="removearray(i)" [disabled]="formarray.length === 1">
                 <mat-icon>delete_outline</mat-icon>
               </button>
@@ -217,7 +217,7 @@
 
               <div class="fb-card-foot" *ngIf="!['array','video','audio'].includes(formarray.controls[i].get('type')?.value)">
                 <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
-                <mat-checkbox *ngIf="values[formarray.controls[i].get('type')?.value] == true && flippingFor.includes(formarray.controls[i].get('type')?.value)"
+                <mat-checkbox data-testid="ud-change-on-flipping-value-change-9" *ngIf="values[formarray.controls[i].get('type')?.value] == true && flippingFor.includes(formarray.controls[i].get('type')?.value)"
                   formControlName="flipping" (change)="onFlippingValueChange(i)">
                   Flipping <span class="fb-muted">(the answer flips into a follow-up question)</span>
                 </mat-checkbox>
@@ -303,14 +303,14 @@
                       <div class="fb-subrow-foot">
                         <mat-slide-toggle formControlName="required">Required</mat-slide-toggle>
                         <span class="fb-flex-spacer"></span>
-                        <button mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this sub-field"
+                        <button data-testid="ud-remove-sub-form-control-10" mat-icon-button type="button" class="fb-icon-btn fb-icon-danger" title="Remove this sub-field"
                           (click)="removeSubFormControl(i, subindex)">
                           <mat-icon>delete_outline</mat-icon>
                         </button>
                       </div>
                     </div>
                   </div>
-                  <button mat-stroked-button type="button" class="fb-add-btn" (click)="addSubFormControl(i)">
+                  <button data-testid="ud-add-sub-form-control-11" mat-stroked-button type="button" class="fb-add-btn" (click)="addSubFormControl(i)">
                     <mat-icon>add</mat-icon> Add sub-field
                   </button>
                 </div>
@@ -319,20 +319,20 @@
           </div>
           </div>
 
-          <button mat-stroked-button type="button" class="fb-add-btn fb-add-field" (click)="addarray(formarray.length - 1)">
+          <button data-testid="ud-addarray-12" mat-stroked-button type="button" class="fb-add-btn fb-add-field" (click)="addarray(formarray.length - 1)">
             <mat-icon>add</mat-icon> Add field
           </button>
           </div>
         </section>
 
         <footer class="fb-footer">
-          <button *ngIf="data != null" mat-button type="button" class="fb-delete" (click)="deleteForm()" [disabled]="loading">
+          <button data-testid="ud-delete-form-13" *ngIf="data != null" mat-button type="button" class="fb-delete" (click)="deleteForm()" [disabled]="loading">
             <mat-icon>delete_outline</mat-icon> Delete form
           </button>
           <span class="fb-flex-spacer"></span>
           <span class="fb-autosave"><span class="fb-autosave-dot"></span>Autosaves when valid</span>
-          <button type="button" mat-stroked-button class="fb-close" (click)="closeDialog()" [disabled]="loading">Close</button>
-          <button type="submit" mat-flat-button class="fb-save" (click)="submitForm(formform.value, true)" [disabled]="loading">Save</button>
+          <button data-testid="ud-close-dialog-14" type="button" mat-stroked-button class="fb-close" (click)="closeDialog()" [disabled]="loading">Close</button>
+          <button data-testid="ud-submit-form-15" type="submit" mat-flat-button class="fb-save" (click)="submitForm(formform.value, true)" [disabled]="loading">Save</button>
         </footer>
       </form>
     </div>
@@ -348,8 +348,8 @@
           </mat-error>
         </mat-form-field>
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitReport(reportform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-close-dialog-16" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button data-testid="ud-submit-report-17" type="submit" mat-stroked-button class="successbtn" (click)="submitReport(reportform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
@@ -374,8 +374,8 @@
           </mat-error>
         </mat-form-field> -->
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitEvents(eventform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-close-dialog-18" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button data-testid="ud-submit-events-19" type="submit" mat-stroked-button class="successbtn" (click)="submitEvents(eventform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
@@ -411,8 +411,8 @@
         </mat-form-field> -->
 
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitQueue(queueform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-close-dialog-20" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button data-testid="ud-submit-queue-21" type="submit" mat-stroked-button class="successbtn" (click)="submitQueue(queueform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>
@@ -428,8 +428,8 @@
           </mat-error>
         </mat-form-field>
         <div class="btnRow">
-          <button type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
-          <button type="submit" mat-stroked-button class="successbtn" (click)="submitFieldwork(fieldworkform.value)" [disabled]="loading">Submit</button>
+          <button data-testid="ud-close-dialog-22" type="button" mat-stroked-button class="cancelbtn" (click)="closeDialog()" [disabled]="loading">Cancel</button>
+          <button data-testid="ud-submit-fieldwork-23" type="submit" mat-stroked-button class="successbtn" (click)="submitFieldwork(fieldworkform.value)" [disabled]="loading">Submit</button>
         </div>
       </form>
     </div>

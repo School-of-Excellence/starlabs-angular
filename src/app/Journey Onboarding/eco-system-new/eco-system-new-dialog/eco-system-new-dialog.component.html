@@ -1,5 +1,5 @@
 <div class="dialog-header">
-  <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+  <button data-testid="esnd-btn-001" mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
     <mat-icon>close</mat-icon>
   </button>
 </div>
@@ -37,7 +37,7 @@
         <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Decreased</span>
       </div>
     </div> <br>
-    <input
+    <input data-testid="esnd-inp-002"
       type="text"
       placeholder="Search..."
       [(ngModel)]="searchTerm"
@@ -47,14 +47,14 @@
   </div>
 
   <!-- <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
-    <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+    <div data-testid="esnd-div-003" class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
       {{ mapProfile[profile] }}
     </div>
   </div> -->
 
   <div class="scrollable-content">
     <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
-      <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+      <div data-testid="esnd-div-004" class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
         <div class="profile-name">{{ mapProfile[profile] }}</div>
         <div *ngIf="sectionMetric === 'MetricSection'" class="metrics-container">
           <div class="previous-metrics">
@@ -102,7 +102,7 @@
       </div>
     </div>
     <div *ngIf="heading === 'Limitation Years' || heading === 'Saved Years' || heading === 'Total Adjustment' || heading === 'Un Aware' || heading === 'Aware'" class="item-container">
-      <div class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
+      <div data-testid="esnd-div-005" class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
         {{ mapProfile[profile.key] }} - {{ profile.value }}
       </div>
     </div>

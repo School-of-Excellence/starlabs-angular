@@ -35,7 +35,7 @@
       <div class="text-left" formArrayName="metrics">
         <div class="mb-2">
           <label class="subtitle">Metrics to Move To Next Level</label>
-          <button mat-icon-button type="button" (click)="addMetrics()">
+          <button data-testid="umlc-add-metrics-1" mat-icon-button type="button" (click)="addMetrics()">
             <mat-icon>add_circle_outline</mat-icon>
           </button>
         </div>
@@ -56,7 +56,7 @@
               Required
             </mat-error>
           </mat-form-field>
-          <button class="ml-2" mat-icon-button type="button" (click)="removeMetrics(i)">
+          <button data-testid="umlc-remove-metrics-2" class="ml-2" mat-icon-button type="button" (click)="removeMetrics(i)">
             <mat-icon>remove_circle_outline</mat-icon>
           </button>
         </div>
@@ -137,8 +137,8 @@
       </div>
     </div>
     <div class="mt-2 text-center">
-      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Config'}}</button>
+      <button data-testid="umlc-close-3" mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+      <button data-testid="umlc-button-4" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Config'}}</button>
     </div>
   </form>
 </div>

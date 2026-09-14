@@ -3,7 +3,7 @@
   <div class="d-flex flex-row justify-content-center w-100" >
     <mat-form-field appearance="outline" class="w-50" >
       <mat-label>Select an Event</mat-label>
-      <mat-select [compareWith]="compareFn" [(ngModel)]="selectedEventType" (selectionChange)="onEventSelect()">
+      <mat-select data-testid="epa-event-select" [compareWith]="compareFn" [(ngModel)]="selectedEventType" (selectionChange)="onEventSelect()">
         <mat-option *ngFor="let list of eventList" [value]="list">{{list.name}}
         </mat-option>
       </mat-select>
@@ -76,7 +76,7 @@
       <div class="actionbox">
         <mat-form-field class="search mt-2 " appearance="outline" style="margin-left: 10px;min-width: 300px;">
           <mat-label>Filter</mat-label>
-          <input matInput (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
+          <input matInput data-testid="epa-approved-filter" (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
         <div class="overall-profiles">
           <div class="op-pill">
@@ -131,7 +131,7 @@
         <div>
           <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
             <mat-label>Filter</mat-label>
-            <input matInput (keyup)="applyFilterD2($event)" placeholder="Ex. Mia" #input>
+            <input matInput data-testid="epa-attend-filter" (keyup)="applyFilterD2($event)" placeholder="Ex. Mia" #input>
           </mat-form-field>
         </div>
         <div class="overall-profiles">
@@ -143,8 +143,8 @@
           </div>
         </div>
         <div *ngIf="attendanceselection.selected.length != 0">
-          <button class="greenbtn" mat-stroked-button (click)="markAsAttended()">Mark as Attended ({{attendanceselection.selected.length}})</button>
-          <button class="redbtn" mat-stroked-button (click)="markAsUnattendedAndCancelProduct()">Mark as Not Attended ({{attendanceselection.selected.length}})</button>
+          <button class="greenbtn" mat-stroked-button data-testid="epa-attend-mark-attended" (click)="markAsAttended()">Mark as Attended ({{attendanceselection.selected.length}})</button>
+          <button class="redbtn" mat-stroked-button data-testid="epa-attend-mark-notattended" (click)="markAsUnattendedAndCancelProduct()">Mark as Not Attended ({{attendanceselection.selected.length}})</button>
         </div>
       </div>
       <div>
@@ -177,6 +177,7 @@
           <ng-container matColumnDef="action">
             <th mat-header-cell *matHeaderCellDef>
               <mat-checkbox
+                data-testid="epa-attend-select-all"
                 (change)="$event ? masterToggleattendance() : null"
                 [checked]="attendanceselection.hasValue() && isAllSelectedattendance()"
                 [indeterminate]="attendanceselection.hasValue() && !isAllSelectedattendance()"
@@ -186,6 +187,7 @@
             <td mat-cell *matCellDef="let row">
               <mat-checkbox
                 (click)="$event.stopPropagation()"
+                data-testid="epa-attend-row-check"
                 (change)="$event ? attendanceselection.toggle(row) : null"
                 [checked]="attendanceselection.isSelected(row)"
               >
@@ -214,7 +216,7 @@
       <div>
         <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
           <mat-label>Filter</mat-label>
-          <input matInput (keyup)="applyFilterD3($event)" placeholder="Ex. Mia" #input>
+          <input matInput data-testid="epa-attended-filter" (keyup)="applyFilterD3($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
       </div>
       <div class="overall-profiles">
@@ -226,8 +228,8 @@
         </div>
       </div>
       <div>
-        <button *ngIf="attendedselection.selected.length != 0" class="redbtn mr-3" mat-stroked-button (click)="markAsUnattendedAndCancelProduct(attendedselection)">Mark as Not Attended ({{attendedselection.selected.length}})</button>
-        <button type="button" mat-stroked-button (click)="exportCSV()">Export CSV</button>
+        <button *ngIf="attendedselection.selected.length != 0" class="redbtn mr-3" mat-stroked-button data-testid="epa-attended-mark-notattended" (click)="markAsUnattendedAndCancelProduct(attendedselection)">Mark as Not Attended ({{attendedselection.selected.length}})</button>
+        <button type="button" mat-stroked-button data-testid="epa-attended-export-csv" (click)="exportCSV()">Export CSV</button>
       </div>
     </div>
     <div #table>
@@ -260,6 +262,7 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef>
             <mat-checkbox
+              data-testid="epa-attended-select-all"
               (change)="$event ? masterToggleattended() : null"
               [checked]="attendedselection.hasValue() && isAllSelectedattended()"
               [indeterminate]="attendedselection.hasValue() && !isAllSelectedattended()"
@@ -269,6 +272,7 @@
           <td mat-cell *matCellDef="let row">
             <mat-checkbox
               (click)="$event.stopPropagation()"
+              data-testid="epa-attended-row-check"
               (change)="$event ? attendedselection.toggle(row) : null"
               [checked]="attendedselection.isSelected(row)"
             >
@@ -297,7 +301,7 @@
       <div>
         <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
           <mat-label>Filter</mat-label>
-          <input matInput (keyup)="applyFilterD5($event)" placeholder="Ex. Mia" #input>
+          <input matInput data-testid="epa-unattended-filter" (keyup)="applyFilterD5($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
       </div>
       <div class="overall-profiles">
@@ -309,7 +313,7 @@
         </div>
       </div>
       <div>
-        <button *ngIf="unattendedselection.selected.length != 0" class="greenbtn" mat-stroked-button (click)="markAsAttended(unattendedselection, true)">Mark as Attended ({{unattendedselection.selected.length}})</button>
+        <button *ngIf="unattendedselection.selected.length != 0" class="greenbtn" mat-stroked-button data-testid="epa-unattended-mark-attended" (click)="markAsAttended(unattendedselection, true)">Mark as Attended ({{unattendedselection.selected.length}})</button>
       </div>
     </div>
     <div>
@@ -342,6 +346,7 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef>
             <mat-checkbox
+              data-testid="epa-unattended-select-all"
               (change)="$event ? masterToggleunattended() : null"
               [checked]="unattendedselection.hasValue() && isAllSelectedunattended()"
               [indeterminate]="unattendedselection.hasValue() && !isAllSelectedunattended()"
@@ -351,6 +356,7 @@
           <td mat-cell *matCellDef="let row">
             <mat-checkbox
               (click)="$event.stopPropagation()"
+              data-testid="epa-unattended-row-check"
               (change)="$event ? unattendedselection.toggle(row) : null"
               [checked]="unattendedselection.isSelected(row)"
             >
@@ -373,7 +379,7 @@
     <div class="actionbox">
       <mat-form-field class="search mt-2" appearance="outline" style="margin-left: 10px;min-width: 300px;">
         <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilterD4($event)" placeholder="Ex. Mia" #input>
+        <input matInput data-testid="epa-revoke-filter" (keyup)="applyFilterD4($event)" placeholder="Ex. Mia" #input>
       </mat-form-field>
       <div class="overall-profiles">
         <div class="op-pill">

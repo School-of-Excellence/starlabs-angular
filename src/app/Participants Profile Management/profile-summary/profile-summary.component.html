@@ -5,8 +5,8 @@
   <div class="searchprofile" *ngIf="offsetFlag == true">
     <mat-form-field style="color: white;" appearance="fill">
       <mat-label>Search profile ...</mat-label>
-      <input type="text" matInput [formControl]="myControl" [matAutocomplete]="auto">
-      <button  matPrefix mat-icon-button>
+      <input type="text" matInput data-testid="ps-search-input" [formControl]="myControl" [matAutocomplete]="auto">
+      <button  matPrefix mat-icon-button data-testid="ps-search-btn">
         <mat-icon>search</mat-icon>
       </button>
       <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onProfileSelect($event.option.value)">
@@ -57,16 +57,16 @@
   
         <div *ngIf="selectedProfileid != null && selectedProfileid != undefined" class="m-2">
           <h4>Navigate To:</h4>
-          <button class="me-2" mat-raised-button [routerLink]="'/participantpurchase/' + selectedProfileid">
+          <button class="me-2" mat-raised-button data-testid="ps-nav-purchase" [routerLink]="'/participantpurchase/' + selectedProfileid">
             <span>Manage Purchase</span>
           </button>
-          <button class="me-2" mat-raised-button [routerLink]="'/journeysupport/' + selectedProfileid">
+          <button class="me-2" mat-raised-button data-testid="ps-nav-journey-support" [routerLink]="'/journeysupport/' + selectedProfileid">
             <span>Journey Support</span>
           </button>
-          <button class="me-2" mat-raised-button [routerLink]="'/participantdeliverysequence/' + selectedProfileid">
+          <button class="me-2" mat-raised-button data-testid="ps-nav-delivery-seq" [routerLink]="'/participantdeliverysequence/' + selectedProfileid">
             <span>Participant Delivery Sequence</span>
           </button>
-          <button class="me-2" mat-raised-button [routerLink]="'/userprofile/' + selectedProfileid">
+          <button class="me-2" mat-raised-button data-testid="ps-nav-full-profile" [routerLink]="'/userprofile/' + selectedProfileid">
             <span>Participant Full Profile</span>
           </button>
         </div>
@@ -78,7 +78,7 @@
           <img *ngIf="![null,undefined].includes(profileData['profile'])" style="width:200px;height:200px;" [src]="profileData['profile']">
         </span>
         <br>
-        <button style="width: 200px;margin-top: 20px;" mat-raised-button color="legacy" (click)="onNavigateATC()">View ATC</button>
+        <button style="width: 200px;margin-top: 20px;" mat-raised-button color="legacy" data-testid="ps-view-atc" (click)="onNavigateATC()">View ATC</button>
       </div>
     </div>
   
@@ -96,13 +96,13 @@
         <div>
           <mat-form-field appearance="outline">
             <mat-label>Filter</mat-label>
-            <input style="height: 20px;" matInput (keyup)="fullfillmentFilter($event)" placeholder="Search" #input>
+            <input style="height: 20px;" matInput data-testid="ps-fulfillment-filter" (keyup)="fullfillmentFilter($event)" placeholder="Search" #input>
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
     
         </div>
         <div>
-          <button class="issuebtn" mat-raised-button (click)="addfullfillmentissue()">Add Fullfillment Challenge <mat-icon>add</mat-icon></button>
+          <button class="issuebtn" mat-raised-button data-testid="ps-add-fulfillment" (click)="addfullfillmentissue()">Add Fullfillment Challenge <mat-icon>add</mat-icon></button>
           <!-- <button *ngIf="admin['admin']" class="statusbtn" mat-raised-button (click)="editstatus()">Add/Edit status</button> -->
         </div>
       </div>
@@ -160,7 +160,7 @@
           <ng-container matColumnDef="action">
             <th mat-header-cell *matHeaderCellDef>ACTION</th>
             <td mat-cell *matCellDef="let row">
-              <button type="button" mat-mini-fab class="edit" color="legacy" (click)="updatefullfillmentissue(row)" ><mat-icon>edit_note</mat-icon></button>
+              <button type="button" mat-mini-fab class="edit" color="legacy" [attr.data-testid]="'ps-fulfillment-edit-' + row.issueno" (click)="updatefullfillmentissue(row)" ><mat-icon>edit_note</mat-icon></button>
             </td>
           </ng-container>
         
@@ -208,12 +208,12 @@
         <div>
           <mat-form-field appearance="outline">
             <mat-label>Filter</mat-label>
-            <input style="height: 20px;" matInput (keyup)="customersupportFilter($event)" placeholder="Search" #input>
+            <input style="height: 20px;" matInput data-testid="ps-cs-filter" (keyup)="customersupportFilter($event)" placeholder="Search" #input>
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
         </div>
         <div>
-          <button class="issuebtn" mat-raised-button (click)="addcustomersupportissue()">Add Issue <mat-icon>add</mat-icon></button>
+          <button class="issuebtn" mat-raised-button data-testid="ps-add-cs-issue" (click)="addcustomersupportissue()">Add Issue <mat-icon>add</mat-icon></button>
         </div>
       </div>
   
@@ -288,7 +288,7 @@
           <ng-container matColumnDef="action">
             <th mat-header-cell *matHeaderCellDef>ACTION</th>
             <td mat-cell *matCellDef="let row">
-              <button type="button" mat-mini-fab class="edit" color="legacy" (click)="updatecustomersupportissue(row)" ><mat-icon>edit_note</mat-icon></button>
+              <button type="button" mat-mini-fab class="edit" color="legacy" [attr.data-testid]="'ps-cs-edit-' + row.issueno" (click)="updatecustomersupportissue(row)" ><mat-icon>edit_note</mat-icon></button>
             </td>
           </ng-container>
         
@@ -307,7 +307,7 @@
                   </ul>
                 </div>
                 <div id="btnn" class="example-element-diagram4">
-                  <button mat-mini-fab type="button" class="edit" color="legacy" (click)="updatecustomersupportissue(element)"><mat-icon>edit_note</mat-icon></button>
+                  <button mat-mini-fab type="button" class="edit" color="legacy" [attr.data-testid]="'ps-cs-edit-exp-' + element.issueno" (click)="updatecustomersupportissue(element)"><mat-icon>edit_note</mat-icon></button>
                 </div>
               </div>
             </div>
@@ -340,7 +340,7 @@
       <div style="width: 50vw;">
         <div style="display: flex;flex-direction: row;width:50vw;">
           <h4>General Notes :</h4>
-          <button class="issuebtn" mat-raised-button (click)="addgeneralnotes()"><mat-icon>playlist_add</mat-icon>General Notes</button>
+          <button class="issuebtn" mat-raised-button data-testid="ps-add-general-notes" (click)="addgeneralnotes()"><mat-icon>playlist_add</mat-icon>General Notes</button>
         </div>
       <br>
       <div class="notes">
@@ -363,7 +363,7 @@
     <div style="width: 50vw;">
       <div style="display: flex;flex-direction: row;">
         <h4 style="float:left;">Private Notes :</h4>
-        <button class="issuebtn" mat-raised-button (click)="addprivatenotes()"><mat-icon>playlist_add</mat-icon>Private Notes</button>
+        <button class="issuebtn" mat-raised-button data-testid="ps-add-private-notes" (click)="addprivatenotes()"><mat-icon>playlist_add</mat-icon>Private Notes</button>
       </div>
       <br>
       <div class="notes">

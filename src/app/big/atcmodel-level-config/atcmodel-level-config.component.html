@@ -59,7 +59,7 @@
       <ng-container matColumnDef="action">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let row;">
-          <button class="deletebtn" mat-icon-button type="button" (click)="updateList(row)">
+          <button data-testid="modelconfig-update-list-1" class="deletebtn" mat-icon-button type="button" (click)="updateList(row)">
             <mat-icon>edit</mat-icon>
           </button>
         </td>

@@ -29,8 +29,8 @@
     </div>
 
     <div class="btnarea">
-      <button class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
-      <button class="submitbtn" mat-stroked-button (click)="onformsubmit(apptRoleForm.value)" [disabled]="loading">
+      <button data-testid="ard-close-1" class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
+      <button data-testid="ard-onformsubmit-2" class="submitbtn" mat-stroked-button (click)="onformsubmit(apptRoleForm.value)" [disabled]="loading">
         {{data != null ? "Update" : "Create"}}
       </button>
     </div>

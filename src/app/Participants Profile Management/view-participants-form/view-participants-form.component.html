@@ -1,5 +1,5 @@
 <main class="m-4">
-  <input type="file" id="emailImportInput" accept=".xlsx,.xls,.csv"  (change)="onImportEmails($event)" style="display: none;">
+  <input type="file" id="emailImportInput" accept=".xlsx,.xls,.csv" data-testid="vpf-import-file" (change)="onImportEmails($event)" style="display: none;">
   <div class="top-bar" [formGroup]="filterForm">
     <mat-form-field appearance="outline" class="compact-field date-field">
       <mat-label>Date Range</mat-label>
@@ -11,11 +11,11 @@
       <mat-date-range-picker #picker></mat-date-range-picker>
     </mat-form-field>
 
-    <button mat-stroked-button color="primary" type="button" (click)="fetchData()">Fetch</button>
+    <button mat-stroked-button color="primary" type="button" data-testid="vpf-fetch" (click)="fetchData()">Fetch</button>
 
     <mat-form-field appearance="outline" class="compact-field">
       <mat-label>Participant</mat-label>
-      <mat-select formControlName="name" multiple (selectionChange)="onFilter(filterForm.value)">
+      <mat-select formControlName="name" multiple data-testid="vpf-filter-participant" (selectionChange)="onFilter(filterForm.value)">
         <mat-option>
           <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search..."
             noEntriesFoundLabel="No match"></ngx-mat-select-search>
@@ -28,7 +28,7 @@
 
     <mat-form-field appearance="outline" class="compact-field">
       <mat-label>Queue</mat-label>
-      <mat-select formControlName="queue" multiple (selectionChange)="onFilter(filterForm.value)">
+      <mat-select formControlName="queue" multiple data-testid="vpf-filter-queue" (selectionChange)="onFilter(filterForm.value)">
         <mat-option>
           <ngx-mat-select-search [formControl]="queueFilterCtrl" placeholderLabel="Search..."
             noEntriesFoundLabel="No match"></ngx-mat-select-search>
@@ -39,7 +39,7 @@
 
     <mat-form-field appearance="outline" class="compact-field">
       <mat-label>Workshop</mat-label>
-      <mat-select formControlName="workshop" multiple (selectionChange)="onFilter(filterForm.value)">
+      <mat-select formControlName="workshop" multiple data-testid="vpf-filter-workshop" (selectionChange)="onFilter(filterForm.value)">
         <mat-option>
           <ngx-mat-select-search [formControl]="workshopFilterCtrl" placeholderLabel="Search..."
             noEntriesFoundLabel="No match"></ngx-mat-select-search>
@@ -52,7 +52,7 @@
 
     <mat-form-field appearance="outline" class="compact-field">
       <mat-label>Form</mat-label>
-      <mat-select formControlName="formname" multiple (selectionChange)="onFilter(filterForm.value)">
+      <mat-select formControlName="formname" multiple data-testid="vpf-filter-form" (selectionChange)="onFilter(filterForm.value)">
         <mat-option>
           <ngx-mat-select-search [formControl]="formFilterCtrl" placeholderLabel="Search..."
             noEntriesFoundLabel="No match"></ngx-mat-select-search>
@@ -62,30 +62,30 @@
     </mat-form-field>
 
     <div style="display: flex; flex-direction: column; align-items: flex-start;">
-      <button mat-stroked-button color="accent" (click)="triggerFileInput()"
+      <button mat-stroked-button color="accent" data-testid="vpf-import-emails" (click)="triggerFileInput()"
         matTooltip="Column name of email should be 'Email' (Case-insensitive)">
         <mat-icon>upload_file</mat-icon> Import Emails
       </button>
     </div>
 
-    <button mat-stroked-button (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''"
+    <button mat-stroked-button data-testid="vpf-filter-liked" (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''"
       matTooltip="Filter liked forms">
       <mat-icon>{{ filterLiked ? 'favorite' : 'favorite_border' }}</mat-icon>
       Liked
     </button>
 
-    <button mat-stroked-button (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''"
+    <button mat-stroked-button data-testid="vpf-filter-flagged" (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''"
       matTooltip="Filter flagged forms">
       <mat-icon>{{ filterFlagged ? 'flag' : 'outlined_flag' }}</mat-icon>
       Flagged
     </button>
 
     <button mat-stroked-button color="primary" matTooltip="Save forms selected in 'Form' dropdown to My Forms"
-      [disabled]="filterForm.get('formname')?.value?.length === 0" (click)="addSelectedFormsToMyForms()">
+      [disabled]="filterForm.get('formname')?.value?.length === 0" data-testid="vpf-save-myforms" (click)="addSelectedFormsToMyForms()">
       <mat-icon>bookmark_add</mat-icon> Save to My Forms
     </button>
 
-    <button mat-icon-button matTooltip="Clear all filters" (click)="ngOnInit();onFilter(filterForm.value)">
+    <button mat-icon-button matTooltip="Clear all filters" data-testid="vpf-clear-filters" (click)="ngOnInit();onFilter(filterForm.value)">
       <mat-icon>restart_alt</mat-icon>
     </button>
   </div>
@@ -97,16 +97,16 @@
       <span class="my-forms-label">My Forms</span>
       <div class="my-forms-chips">
         <div class="my-form-chip" *ngFor="let form of myForms"
-          [class.chip-active]="selectedMyForms.includes(form.formname)" (click)="toggleMyFormChip(form.formname)">
+          [class.chip-active]="selectedMyForms.includes(form.formname)" [attr.data-testid]="'vpf-myform-chip-' + form.formname" (click)="toggleMyFormChip(form.formname)">
           <span class="chip-text">{{ form.formname }}</span>
-          <mat-icon class="chip-remove"
+          <mat-icon class="chip-remove" [attr.data-testid]="'vpf-myform-remove-' + form.formname"
             (click)="$event.stopPropagation(); removeFromMyForms(form.formname)">close</mat-icon>
         </div>
       </div>
     </div>
     <div class="my-forms-right">
       <button mat-stroked-button class="compact-btn" *ngIf="selectedMyForms.length > 0"
-        (click)="clearMyFormsSelection()">
+        data-testid="vpf-clear-myforms" (click)="clearMyFormsSelection()">
         Clear Filter
       </button>
     </div>
@@ -116,18 +116,18 @@
     <div class="my-forms-left">
       <mat-icon class="my-forms-icon" style="color: #1976d2;">cloud_upload</mat-icon>
       <span class="my-forms-label" style="color: #1976d2;">Imported Emails Filter Active</span>
-      <button mat-stroked-button (click)="openImportSummaryModal('matched')"
+      <button mat-stroked-button data-testid="vpf-import-matched" (click)="openImportSummaryModal('matched')"
         style="font-size: 12px; color: #2e7d32; border-color: #2e7d32; margin-left: 8px;">
         Matched {{ matchedEmailsCount }}
       </button>
 
-      <button mat-stroked-button *ngIf="unmatchedEmailsCount > 0" (click)="openImportSummaryModal('notfound')"
+      <button mat-stroked-button *ngIf="unmatchedEmailsCount > 0" data-testid="vpf-import-notfound" (click)="openImportSummaryModal('notfound')"
         style="font-size: 12px; color: #c62828; border-color: #c62828; margin-left: 8px;">
         Not Found {{ unmatchedEmailsCount }}
       </button>
     </div>
     <div class="my-forms-right">
-      <button mat-stroked-button class="compact-btn" color="accent" (click)="clearImportedEmailsFilter()">
+      <button mat-stroked-button class="compact-btn" color="accent" data-testid="vpf-clear-import" (click)="clearImportedEmailsFilter()">
         Clear Import Filter
       </button>
     </div>
@@ -137,33 +137,33 @@
   <div class="bulk-actions" *ngIf="selection.hasValue()">
     <span class="selection-count">{{selection.selected.length}} item(s) selected</span>
 
-    <button mat-flat-button color="accent" (click)="viewMergedOverlay()">
+    <button mat-flat-button color="accent" data-testid="vpf-view-merged" (click)="viewMergedOverlay()">
       <mat-icon>merge_type</mat-icon>
       View Merged
     </button>
 
-    <button mat-flat-button color="primary" [matMenuTriggerFor]="downloadMenu">
+    <button mat-flat-button color="primary" data-testid="vpf-download-menu" [matMenuTriggerFor]="downloadMenu">
       <mat-icon>download</mat-icon>
       Download Options
       <mat-icon>arrow_drop_down</mat-icon>
     </button>
 
     <mat-menu #downloadMenu="matMenu">
-      <button mat-menu-item (click)="downloadSelectedAsExcel()">
+      <button mat-menu-item data-testid="vpf-download-excel" (click)="downloadSelectedAsExcel()">
         <mat-icon>table_chart</mat-icon>
         <span>Download as Excel</span>
       </button>
-      <button mat-menu-item (click)="downloadSelectedAsMergedPDF()">
+      <button mat-menu-item data-testid="vpf-download-merged-pdf" (click)="downloadSelectedAsMergedPDF()">
         <mat-icon>picture_as_pdf</mat-icon>
         <span>Download as Merged PDF</span>
       </button>
-      <button mat-menu-item (click)="downloadSelectedPDFs()">
+      <button mat-menu-item data-testid="vpf-download-individual-pdf" (click)="downloadSelectedPDFs()">
         <mat-icon>folder_zip</mat-icon>
         <span>Download Individual PDFs</span>
       </button>
     </mat-menu>
 
-    <button mat-stroked-button color="warn" (click)="clearSelection()">
+    <button mat-stroked-button color="warn" data-testid="vpf-clear-selection" (click)="clearSelection()">
       Clear Selection
     </button>
   </div>
@@ -175,12 +175,12 @@
       <ng-container matColumnDef="select">
         <th mat-header-cell *matHeaderCellDef>
           <mat-checkbox (change)="$event ? toggleAllRows() : null" [checked]="selection.hasValue() && isAllSelected()"
-            [indeterminate]="selection.hasValue() && !isAllSelected()">
+            [indeterminate]="selection.hasValue() && !isAllSelected()" data-testid="vpf-select-all">
           </mat-checkbox>
         </th>
         <td mat-cell *matCellDef="let row">
           <mat-checkbox (click)="$event.stopPropagation()" (change)="$event ? selection.toggle(row) : null"
-            [checked]="selection.isSelected(row)">
+            [checked]="selection.isSelected(row)" [attr.data-testid]="'vpf-row-select-' + row.profileid">
           </mat-checkbox>
         </td>
       </ng-container>
@@ -239,7 +239,7 @@
         <th mat-header-cell *matHeaderCellDef>Notes</th>
         <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
           <div class="notes-cell">
-            <button mat-icon-button (click)="openNotes(row)"
+            <button mat-icon-button [attr.data-testid]="'vpf-notes-' + row.profileid" (click)="openNotes(row)"
               [color]="row.notes && row.notes.length > 0 ? 'primary' : ''">
               <mat-icon>{{ row.notes && row.notes.length > 0 ? 'sticky_note_2' : 'note_add' }}</mat-icon>
             </button>
@@ -255,7 +255,7 @@
         <th mat-header-cell *matHeaderCellDef>Like</th>
         <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
           <div class="like-flag-cell">
-            <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
+            <button mat-icon-button [attr.data-testid]="'vpf-like-' + row.profileid" (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
               <mat-icon>{{ row.liked ? 'favorite' : 'favorite_border' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.liked && row.likedetails">
@@ -273,7 +273,7 @@
         <th mat-header-cell *matHeaderCellDef>Flag</th>
         <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
           <div class="like-flag-cell">
-            <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
+            <button mat-icon-button [attr.data-testid]="'vpf-flag-' + row.profileid" (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
               <mat-icon>{{ row.tagged ? 'flag' : 'outlined_flag' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.tagged && row.tagdetails">
@@ -290,7 +290,7 @@
         <th mat-header-cell *matHeaderCellDef>Opportunity</th>
         <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
           <div class="like-flag-cell">
-            <button mat-icon-button (click)="toggleOpportunity(row)" [color]="row.opportunity ? 'accent' : ''">
+            <button mat-icon-button [attr.data-testid]="'vpf-opp-' + row.profileid" (click)="toggleOpportunity(row)" [color]="row.opportunity ? 'accent' : ''">
               <mat-icon>{{ row.opportunity ? 'attach_money' : 'money_off' }}</mat-icon>
             </button>
             <div class="like-flag-meta" *ngIf="row.opportunity && row.opportunitydetails">
@@ -310,11 +310,11 @@
         <th mat-header-cell *matHeaderCellDef> Actions </th>
         <td mat-cell *matCellDef="let row">
           <div class="action-buttons">
-            <button mat-stroked-button (click)="$event.stopPropagation(); openFormOverlay(row)">View</button>
-            <button mat-icon-button (click)="$event.stopPropagation(); onFormPreview(row)" matTooltip="Open in New Tab">
+            <button mat-stroked-button [attr.data-testid]="'vpf-view-' + row.profileid" (click)="$event.stopPropagation(); openFormOverlay(row)">View</button>
+            <button mat-icon-button [attr.data-testid]="'vpf-preview-' + row.profileid" (click)="$event.stopPropagation(); onFormPreview(row)" matTooltip="Open in New Tab">
               <mat-icon>open_in_new</mat-icon>
             </button>
-            <button mat-icon-button (click)="$event.stopPropagation(); downloadFormPDF(row)" matTooltip="Download PDF">
+            <button mat-icon-button [attr.data-testid]="'vpf-rowdownload-' + row.profileid" (click)="$event.stopPropagation(); downloadFormPDF(row)" matTooltip="Download PDF">
               <mat-icon>download</mat-icon>
             </button>
           </div>
@@ -351,11 +351,11 @@
     <div class="overlay-header">
       <h2>{{ overlayTitle }}</h2>
       <div class="overlay-header-actions">
-        <button mat-icon-button matTooltip="Open in New Tab"
+        <button mat-icon-button matTooltip="Open in New Tab" data-testid="vpf-overlay-newtab"
           (click)="overlayMode === 'individual' ? onFormPreview(currentOverlayRow) : openMergedInNewTabs()">
           <mat-icon>open_in_new</mat-icon>
         </button>
-        <button mat-icon-button (click)="closeOverlay()">
+        <button mat-icon-button data-testid="vpf-overlay-close" (click)="closeOverlay()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -416,14 +416,14 @@
   <div class="notes-panel" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>Notes - {{ notesParticipantName }}</h2>
-      <button mat-icon-button (click)="closeNotes()">
+      <button mat-icon-button data-testid="vpf-notes-close" (click)="closeNotes()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
     <div class="notes-content">
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Add a note</mat-label>
-        <textarea matInput [(ngModel)]="notesText" rows="3" placeholder="Write your notes here..."></textarea>
+        <textarea matInput [(ngModel)]="notesText" rows="3" data-testid="vpf-notes-text" placeholder="Write your notes here..."></textarea>
       </mat-form-field>
 
       <div class="notes-history" *ngIf="notesRecord?.notes && notesRecord.notes.length > 0">
@@ -439,8 +439,8 @@
       </div>
     </div>
     <div class="notes-actions">
-      <button mat-stroked-button (click)="closeNotes()">Cancel</button>
-      <button mat-raised-button color="primary" (click)="saveNotes()" [disabled]="!notesText?.trim()">Save</button>
+      <button mat-stroked-button data-testid="vpf-notes-cancel" (click)="closeNotes()">Cancel</button>
+      <button mat-raised-button color="primary" data-testid="vpf-notes-save" (click)="saveNotes()" [disabled]="!notesText?.trim()">Save</button>
     </div>
   </div>
 </div>
@@ -455,7 +455,7 @@
       <h2 *ngIf="importSummaryMode === 'notfound'" style="color: #c62828;">
         Not Found ({{ unmatchedEmailsCount }})
       </h2>
-      <button mat-icon-button (click)="closeImportSummaryModal()">
+      <button mat-icon-button data-testid="vpf-import-summary-close" (click)="closeImportSummaryModal()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -478,7 +478,7 @@
       </ng-container>
     </div>
     <div class="notes-actions">
-      <button mat-raised-button color="primary" (click)="closeImportSummaryModal()">Close</button>
+      <button mat-raised-button color="primary" data-testid="vpf-import-summary-done" (click)="closeImportSummaryModal()">Close</button>
     </div>
   </div>
 </div>

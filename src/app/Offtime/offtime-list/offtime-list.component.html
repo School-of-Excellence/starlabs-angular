@@ -9,12 +9,12 @@
       <div class="actionitem">
         <mat-form-field appearance="outline">
           <mat-label>Search</mat-label>
-          <input matInput #search (input)="applyFilter($event)" #input autocomplete="off">
+          <input data-testid="ofl-input" matInput #search (input)="applyFilter($event)" #input autocomplete="off">
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="slotbtn" mat-stroked-button (click)="addOfftime()">Mark Offtime</button>
-        <button *ngIf="selection.selected.length != 0" mat-raised-button class="deleteBtn" (click)="deleteSelectedOff()">
+        <button data-testid="ofl-addofftime" class="slotbtn" mat-stroked-button (click)="addOfftime()">Mark Offtime</button>
+        <button data-testid="ofl-deleteselectedoff" *ngIf="selection.selected.length != 0" mat-raised-button class="deleteBtn" (click)="deleteSelectedOff()">
           <mat-icon>delete</mat-icon>Delete Selected
         </button>
       </div>
@@ -55,7 +55,7 @@
       <!-- Action -->
       <ng-container matColumnDef="action">
         <th mat-header-cell *matHeaderCellDef>
-          <mat-checkbox
+          <mat-checkbox data-testid="ofl-event-mastertoggle"
             (change)="$event ? masterToggle() : null"
             [checked]="selection.hasValue() && isAllSelected()"
             [indeterminate]="selection.hasValue() && !isAllSelected()"
@@ -63,7 +63,7 @@
           </mat-checkbox>
         </th>
         <td mat-cell *matCellDef="let row">
-          <mat-checkbox
+          <mat-checkbox data-testid="ofl-event-stoppropagation"
             (click)="$event.stopPropagation()"
             (change)="$event ? selection.toggle(row) : null"
             [checked]="selection.isSelected(row)"

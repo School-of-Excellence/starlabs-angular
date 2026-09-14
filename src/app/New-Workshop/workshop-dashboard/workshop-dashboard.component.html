@@ -10,7 +10,7 @@
           <mat-icon class="error-icon">error</mat-icon>
           <h3>Error Loading Dashboard</h3>
           <p>{{ error }}</p>
-          <button mat-raised-button color="primary" (click)="loadWorkshopDashboard()">
+          <button data-testid="wd-load-workshop-dashboard-1" mat-raised-button color="primary" (click)="loadWorkshopDashboard()">
             <mat-icon>refresh</mat-icon>
             Retry
           </button>
@@ -34,17 +34,17 @@
           <p class="whd-desc" *ngIf="workshopDescription">{{ workshopDescription }}</p>
         </div>
         <div class="whd-actions">
-          <button type="button" class="whd-btn" (click)="openQADialog()">
+          <button data-testid="wd-open-qadialog-2" type="button" class="whd-btn" (click)="openQADialog()">
             <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>
-          <button type="button" class="whd-btn" (click)="openDiagnoseDialog()"
+          <button data-testid="wd-open-diagnose-dialog-3" type="button" class="whd-btn" (click)="openDiagnoseDialog()"
                   matTooltip="Check why a profile can or cannot enroll in this workshop">
             <mat-icon>troubleshoot</mat-icon>Diagnose
           </button>
-          <button type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
+          <button data-testid="wd-open-clear-dialog-4" type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
             <mat-icon>delete</mat-icon>Clear
           </button>
-          <button type="button" class="whd-btn whd-btn-primary" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
+          <button data-testid="wd-manualenroll-5" type="button" class="whd-btn whd-btn-primary" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
             <mat-icon>person_add</mat-icon>Enroll
           </button>
         </div>
@@ -52,7 +52,7 @@
     <div class="metrics-section">
         <div class="metrics-grid">
 
-          <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalEnrolled')">
+          <mat-card data-testid="wd-on-metric-click-6" class="metric-card clickable-metric" (click)="onMetricClick('totalEnrolled')">
             <mat-card-content>
               <div class="metric-content">
                 <mat-icon class="metric-icon">group</mat-icon>
@@ -65,7 +65,7 @@
           </mat-card>
 
           <ng-container *ngIf="workshopData?.categorybased === true">
-            <mat-card class="metric-card clickable-metric category-metric"
+            <mat-card data-testid="wd-on-category-click-7" class="metric-card clickable-metric category-metric"
                       *ngFor="let cat of categoryWiseEnrolled"
                       (click)="onCategoryClick(cat)">
               <mat-card-content>
@@ -80,7 +80,7 @@
             </mat-card>
           </ng-container>
 
-          <mat-card class="metric-card clickable-metric cohort-metric"
+          <mat-card data-testid="wd-on-cohort-click-8" class="metric-card clickable-metric cohort-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCohortClick()">
             <mat-card-content>
@@ -94,7 +94,7 @@
             </mat-card-content>
           </mat-card>
 
-          <mat-card class="metric-card clickable-metric facilitator-metric"
+          <mat-card data-testid="wd-on-facilitator-click-9" class="metric-card clickable-metric facilitator-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onFacilitatorClick()">
             <mat-card-content>
@@ -108,7 +108,7 @@
             </mat-card-content>
           </mat-card>
 
-          <mat-card class="metric-card clickable-metric active-metric"
+          <mat-card data-testid="wd-on-category-based-metric-click-10" class="metric-card clickable-metric active-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCategoryBasedMetricClick('active')">
             <mat-card-content>
@@ -122,7 +122,7 @@
             </mat-card-content>
           </mat-card>
 
-          <mat-card class="metric-card clickable-metric completed-metric"
+          <mat-card data-testid="wd-on-category-based-metric-click-11" class="metric-card clickable-metric completed-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCategoryBasedMetricClick('completed')">
             <mat-card-content>
@@ -136,7 +136,7 @@
             </mat-card-content>
           </mat-card>
 
-          <mat-card class="metric-card clickable-metric notstartedm-metric"
+          <mat-card data-testid="wd-on-category-based-metric-click-12" class="metric-card clickable-metric notstartedm-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCategoryBasedMetricClick('notStarted')">
             <mat-card-content>
@@ -179,7 +179,7 @@
           </mat-card>
 
           <ng-container *ngIf="workshopData?.categorybased === true">
-            <mat-card class="metric-card clickable-metric category-progress-metric"
+            <mat-card data-testid="wd-on-category-based-metric-click-13" class="metric-card clickable-metric category-progress-metric"
                       *ngFor="let catProg of categoryBasedMetrics.categoryProgress"
                       (click)="onCategoryBasedMetricClick('categoryCompleted', catProg.categoryId)">
               <mat-card-content>
@@ -196,7 +196,7 @@
             </mat-card>
           </ng-container>
 
-          <mat-card class="metric-card clickable-metric cohort-progress-metric"
+          <mat-card data-testid="wd-on-category-based-metric-click-14" class="metric-card clickable-metric cohort-progress-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCategoryBasedMetricClick('cohortCompleted')">
             <mat-card-content>
@@ -212,7 +212,7 @@
             </mat-card-content>
           </mat-card>
 
-          <mat-card class="metric-card clickable-metric facilitator-progress-metric"
+          <mat-card data-testid="wd-on-category-based-metric-click-15" class="metric-card clickable-metric facilitator-progress-metric"
                     *ngIf="workshopData?.categorybased === true"
                     (click)="onCategoryBasedMetricClick('facilitatorCompleted')">
             <mat-card-content>
@@ -229,7 +229,7 @@
           </mat-card>
 
           <ng-container *ngIf="workshopData?.categorybased !== true">
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalStarted')">
+            <mat-card data-testid="wd-on-metric-click-16" class="metric-card clickable-metric" (click)="onMetricClick('totalStarted')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon">play_arrow</mat-icon>
@@ -240,7 +240,7 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('notStarted')">
+            <mat-card data-testid="wd-on-metric-click-17" class="metric-card clickable-metric" (click)="onMetricClick('notStarted')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon">pause_circle_outline</mat-icon>
@@ -251,7 +251,7 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('activeParticipants')">
+            <mat-card data-testid="wd-on-metric-click-18" class="metric-card clickable-metric" (click)="onMetricClick('activeParticipants')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon">trending_up</mat-icon>
@@ -284,7 +284,7 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
+            <mat-card data-testid="wd-on-metric-click-19" class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-smile"></i></mat-icon>
@@ -295,7 +295,7 @@
                 </div>
               </mat-card-content>
             </mat-card>
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsersNotEnrolled')">
+            <mat-card data-testid="wd-on-metric-click-20" class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsersNotEnrolled')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon-small"><i class="fa-regular fa-face-frown"></i></mat-icon>
@@ -310,7 +310,7 @@
 
           <!-- Evergreen-only referral cards -->
           <ng-container *ngIf="workshopData?.evergreenWorkshop === true">
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
+            <mat-card data-testid="wd-on-metric-click-21" class="metric-card clickable-metric" (click)="onMetricClick('shareClicked')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon">share</mat-icon>
@@ -322,7 +322,7 @@
               </mat-card-content>
             </mat-card>
 
-            <mat-card class="metric-card clickable-metric" (click)="onMetricClick('shareClaimed')">
+            <mat-card data-testid="wd-on-metric-click-22" class="metric-card clickable-metric" (click)="onMetricClick('shareClaimed')">
               <mat-card-content>
                 <div class="metric-content">
                   <mat-icon class="metric-icon">redeem</mat-icon>
@@ -335,7 +335,7 @@
             </mat-card>
 
             <!-- Purchasers: evergreen + paid workshops only -->
-            <mat-card class="metric-card clickable-metric" *ngIf="workshopData?.payment === true"
+            <mat-card data-testid="wd-on-metric-click-23" class="metric-card clickable-metric" *ngIf="workshopData?.payment === true"
               (click)="onMetricClick('purchase')">
               <mat-card-content>
                 <div class="metric-content">
@@ -368,7 +368,7 @@
         </div>
 
         <div class="ev-day-track">
-          <button type="button"
+          <button data-testid="wd-on-day-click-24" type="button"
                   class="ev-day-node"
                   *ngFor="let d of evergreenDayDistribution"
                   [class.is-empty]="d.count === 0"
@@ -379,7 +379,7 @@
             <span class="ev-day-caption">Day {{ d.day }}</span>
           </button>
 
-          <button type="button"
+          <button data-testid="wd-on-day-click-25" type="button"
                   class="ev-day-node ev-day-node--done"
                   *ngIf="evergreenCompletedBucket.count > 0"
                   (click)="onDayClick(evergreenCompletedBucket)">
@@ -390,7 +390,7 @@
             <span class="ev-day-caption">Completed</span>
           </button>
 
-          <button type="button"
+          <button data-testid="wd-open-extended-timeline-26" type="button"
                   class="ev-day-node ev-day-node--ext"
                   *ngIf="evergreenExtendedBucket.count > 0"
                   [matTooltip]="evergreenExtendedBucket.activeCount + ' active · '
@@ -669,7 +669,7 @@
              [style.display]="isChallengeVisibleForCategory(i) ? '' : 'none'"
              [class.cpo-open]="isChallengeExpanded(i)">
 
-          <button type="button" class="cpo-card-hd" (click)="toggleChallengePanel(i)"
+          <button data-testid="wd-toggle-challenge-panel-27" type="button" class="cpo-card-hd" (click)="toggleChallengePanel(i)"
                   [attr.aria-expanded]="isChallengeExpanded(i)">
             <span class="cpo-num" [class.cpo-num-zoom]="workshopData?.challenges?.[i]?.type === 'zoomcall'">
               <ng-container *ngIf="workshopData?.challenges?.[i]?.type !== 'zoomcall'">{{ i + 1 }}</ng-container>
@@ -693,32 +693,32 @@
           <div class="cpo-body" *ngIf="isChallengeExpanded(i)">
 
             <div class="cpo-actions">
-              <button type="button" class="cpo-chip st-completed cpo-click"
+              <button data-testid="wd-on-challenge-main-status-click-28" type="button" class="cpo-chip st-completed cpo-click"
                       (click)="onChallengeMainStatusClick('completed', i, challengeStat.participantsByStatus.get('completed')?.length || 0)">
                 {{ challengeStat.participantsByStatus.get('completed')?.length || 0 }} Completed
               </button>
-              <button type="button" class="cpo-chip st-inprogress cpo-click"
+              <button data-testid="wd-on-challenge-main-status-click-29" type="button" class="cpo-chip st-inprogress cpo-click"
                       (click)="onChallengeMainStatusClick('inprogress', i, challengeStat.participantsByStatus.get('inprogress')?.length || 0)">
                 {{ challengeStat.participantsByStatus.get('inprogress')?.length || 0 }} In Progress
               </button>
-              <button type="button" class="cpo-chip st-notstartedcurrent cpo-click"
+              <button data-testid="wd-on-challenge-main-status-click-30" type="button" class="cpo-chip st-notstartedcurrent cpo-click"
                       *ngIf="(challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0) > 0"
                       (click)="onChallengeMainStatusClick('notstartedcurrent', i, challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0)">
                 {{ challengeStat.participantsByStatus.get('notstartedcurrent')?.length || 0 }} Ready to Start
               </button>
-              <button type="button" class="cpo-chip st-notstarted cpo-click"
+              <button data-testid="wd-on-challenge-main-status-click-31" type="button" class="cpo-chip st-notstarted cpo-click"
                       (click)="onChallengeMainStatusClick('notstarted', i, challengeStat.participantsByStatus.get('notstarted')?.length || 0)">
                 {{ challengeStat.participantsByStatus.get('notstarted')?.length || 0 }} Not Started
               </button>
 
               <span class="cpo-actions-spacer"></span>
 
-              <button type="button" class="cpo-zoombtn cpo-click"
+              <button data-testid="wd-open-zoom-dialog-32" type="button" class="cpo-zoombtn cpo-click"
                       *ngIf="workshopData?.challenges?.[i]?.type === 'zoomcall'"
                       (click)="openZoomDialog(workshopData?.challenges?.[i],i)">
                 <mat-icon>video_call</mat-icon> Zoom Call Action
               </button>
-              <button type="button" class="cpo-chip st-inprogress cpo-click"
+              <button data-testid="wd-open-zoom-attendees-33" type="button" class="cpo-chip st-inprogress cpo-click"
                       *ngIf="
                         workshopData?.challenges?.[i]?.type === 'zoomcall' &&
                         workshopData?.challenges?.[i]?.zoomattended?.length > 0"
@@ -755,7 +755,7 @@
 
               <div class="cpo-dots">
                 <ng-container *ngFor="let status of ['completed', 'inreview', 'rework', 'readyformobile', 'inprogress', 'notstarted']">
-                  <button type="button" class="cpo-chip cpo-click st-{{ status }}"
+                  <button data-testid="wd-on-status-click-34" type="button" class="cpo-chip cpo-click st-{{ status }}"
                           *ngIf="(subStat.participantsByStatus.get(status)?.length || 0) > 0"
                           (click)="onStatusClick(status, i, j, subStat.participantsByStatus.get(status)?.length || 0)">
                     {{ subStat.participantsByStatus.get(status)?.length || 0 }} {{ statusDisplayMap.get(status) || status }}
@@ -781,7 +781,7 @@
             </mat-card-subtitle>
           </div>
           <span style="flex: 1 1 auto;"></span>
-          <button mat-raised-button 
+          <button data-testid="wd-export-participants-to-csv-35" mat-raised-button 
             color="primary" 
             (click)="exportParticipantsToCSV()"
             [disabled]="loading || enrolledParticipants.length === 0"
@@ -821,7 +821,7 @@
               </mat-select>
             </mat-form-field>
 
-            <button mat-icon-button
+            <button data-testid="wd-clear-table-filters-36" mat-icon-button
                     *ngIf="tableTypeFilter !== 'all' || tableStatusFilter !== 'all'"
                     (click)="clearTableFilters()"
                     matTooltip="Clear filters"
@@ -966,7 +966,7 @@
               <ng-container matColumnDef="action">
                 <th mat-header-cell *matHeaderCellDef>Action</th>
                 <td mat-cell *matCellDef="let participant">
-                  <button mat-raised-button 
+                  <button data-testid="wd-move-participant-to-next-37" mat-raised-button 
                           [disabled]="participant.progressPercentage === 100 || 
                                     isMovingParticipant === participant.profileid ||
                                     workshopData?.challenges[participant.currentChallengeIndex]?.type === 'zoomcall'"
@@ -984,7 +984,7 @@
               <ng-container matColumnDef="assignment">
                 <th mat-header-cell *matHeaderCellDef>Assignment</th>
                 <td mat-cell *matCellDef="let participant">
-                  <button mat-stroked-button 
+                  <button data-testid="wd-review-assignment-38" mat-stroked-button 
                           (click)="reviewAssignment(participant)"
                           [disabled]="!canReviewAssignment(participant)"
                           [matTooltip]="canReviewAssignment(participant) ? 'Review assignment' : 'No assignment to review'">
@@ -994,7 +994,7 @@
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row 
+              <tr data-testid="wd-on-participant-click-39" mat-row 
                 *matRowDef="let row; columns: displayedColumns;" 
                 class="participant-row clickable-row"
                 (click)="onParticipantClick(row)"
@@ -1061,7 +1061,7 @@
                 <i *ngIf="workshopData?.categorybased === true" [style.width.%]="getAccessBasedProgressForProfile(selectedParticipantData.profileid)"></i>
               </span>
             </div>
-            <button type="button" class="pd-clear" (click)="clearSelectedParticipant()" matTooltip="Clear selection" aria-label="Clear selection">
+            <button data-testid="wd-clear-selected-participant-40" type="button" class="pd-clear" (click)="clearSelectedParticipant()" matTooltip="Clear selection" aria-label="Clear selection">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -1126,35 +1126,35 @@
 
                     <div class="pd-acts"
                          *ngIf="subChallenge.canViewQuiz || subChallenge.canViewVA || subChallenge.canViewForm || subChallenge.canViewAssignmentForm || subChallenge.canViewAssignmentQuestion || subChallenge.hasOldResults">
-                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewQuiz"
+                      <button data-testid="wd-view-quiz-41" type="button" class="pd-act" *ngIf="subChallenge.canViewQuiz"
                               (click)="viewQuiz(subChallenge, i, j)"
                               matTooltip="Click to view quiz results ({{ subChallenge.quizResultsCount }} result{{ subChallenge.quizResultsCount > 1 ? 's' : '' }})">
                         <mat-icon>radio_button_checked</mat-icon> Quiz Results
                         <span class="pd-act-n" *ngIf="subChallenge.quizResultsCount > 1">{{ subChallenge.quizResultsCount }}</span>
                       </button>
-                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewVA"
+                      <button data-testid="wd-view-video-ask-42" type="button" class="pd-act" *ngIf="subChallenge.canViewVA"
                               (click)="viewVideoAsk(subChallenge, i, j)"
                               matTooltip="Click to view the VideoAsk video">
                         <mat-icon>videocam</mat-icon> Video Ask
                       </button>
-                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewForm"
+                      <button data-testid="wd-view-form-43" type="button" class="pd-act" *ngIf="subChallenge.canViewForm"
                               (click)="viewForm(subChallenge, i, j)"
                               matTooltip="Click to view current form">
                         <mat-icon>description</mat-icon> Form
                       </button>
-                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentForm"
+                      <button data-testid="wd-view-form-44" type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentForm"
                               (click)="viewForm(subChallenge, i, j)"
                               matTooltip="Click to view current assignment form">
                         <mat-icon>assignment</mat-icon> Assignment (Form)
                       </button>
-                      <button type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentQuestion"
+                      <button data-testid="wd-view-question-assignment-45" type="button" class="pd-act" *ngIf="subChallenge.canViewAssignmentQuestion"
                               (click)="viewQuestionAssignment(subChallenge, i, j)"
                               matTooltip="Click to review assignment submissions">
                         <mat-icon>quiz</mat-icon> Assignment (Question)
                         <span class="pd-act-n" *ngIf="subChallenge.metadata.originalData.assignmentresult">{{ subChallenge.metadata.originalData.assignmentresult.length }}</span>
                       </button>
                       <ng-container *ngIf="subChallenge.hasOldResults">
-                        <button type="button" class="pd-act pd-act-old"
+                        <button data-testid="wd-handle-old-result-click-46" type="button" class="pd-act pd-act-old"
                                 *ngFor="let oldResult of subChallenge.oldResults.slice().reverse(); let reversedIndex = index"
                                 (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)"
                                 [matTooltip]="getOldResultTooltip(oldResult)">
@@ -1203,7 +1203,7 @@
                         <span class="pd-assign-name">Assignment Form</span>
                         <span class="pd-assign-sub">Form-based Assignment</span>
                       </div>
-                      <button mat-stroked-button class="pd-view-btn" (click)="viewForm(subChallenge, i, j)">
+                      <button data-testid="wd-view-form-47" mat-stroked-button class="pd-view-btn" (click)="viewForm(subChallenge, i, j)">
                         <mat-icon>visibility</mat-icon> View
                       </button>
                     </div>
@@ -1214,7 +1214,7 @@
                         <span class="pd-assign-name">Assignment Question</span>
                         <span class="pd-assign-sub">{{ subChallenge.metadata.originalData.assignmentresult?.length || 0 }} file(s) submitted</span>
                       </div>
-                      <button mat-stroked-button class="pd-view-btn" (click)="viewQuestionAssignment(subChallenge, i, j)">
+                      <button data-testid="wd-view-question-assignment-48" mat-stroked-button class="pd-view-btn" (click)="viewQuestionAssignment(subChallenge, i, j)">
                         <mat-icon>visibility</mat-icon> Review
                       </button>
                     </div>
@@ -1245,7 +1245,7 @@
                             <p class="pd-note" *ngFor="let note of oldResult.notes">{{ note }}</p>
                           </div>
                         </div>
-                        <button mat-stroked-button class="pd-view-btn"
+                        <button data-testid="wd-handle-old-result-click-49" mat-stroked-button class="pd-view-btn"
                                 (click)="handleOldResultClick(subChallenge, i, j, subChallenge.oldResults.length - 1 - reversedIndex, oldResult)">
                           <mat-icon>visibility</mat-icon> View
                         </button>
@@ -1305,7 +1305,7 @@
 
   <div class="arc-card" *ngFor="let assignment of assignmentsList; let i = index"
        [class.arc-open]="isArchiveGroupExpanded('assign-' + i)">
-    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('assign-' + i)"
+    <button data-testid="wd-toggle-archive-group-50" type="button" class="arc-card-hd" (click)="toggleArchiveGroup('assign-' + i)"
             [attr.aria-expanded]="isArchiveGroupExpanded('assign-' + i)">
       <span class="arc-ico"><mat-icon>assignment</mat-icon></span>
       <span class="arc-titles">
@@ -1326,7 +1326,7 @@
       </div>
 
       <div *ngIf="assignment.participants.length > 0" class="arc-grid">
-        <div *ngFor="let participant of assignment.participants"
+        <div data-testid="wd-participant-51" *ngFor="let participant of assignment.participants"
              class="arc-pcard"
              [class.arc-click]="participant.hasResult"
              (click)="participant.hasResult ? viewParticipantAssignment(assignment, participant) : null">
@@ -1376,7 +1376,7 @@
       <h2 class="arc-title">All Forms</h2>
       <p class="arc-sub">{{ challengeForms.length }} Form(s) in {{ workshopTitle }} workshop</p>
     </div>
-    <button mat-stroked-button color="primary" class="forms-export-btn"
+    <button data-testid="wd-export-forms-to-excel-52" mat-stroked-button color="primary" class="forms-export-btn"
             (click)="exportFormsToExcel()"
             [disabled]="isExportingForms || challengeForms.length === 0">
       <mat-icon>download</mat-icon>
@@ -1392,7 +1392,7 @@
 
   <div class="arc-card" *ngFor="let form of challengeForms; let i = index"
        [class.arc-open]="isArchiveGroupExpanded('form-' + i)">
-    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('form-' + i)"
+    <button data-testid="wd-toggle-archive-group-53" type="button" class="arc-card-hd" (click)="toggleArchiveGroup('form-' + i)"
             [attr.aria-expanded]="isArchiveGroupExpanded('form-' + i)">
       <span class="arc-ico arc-ico-form"><mat-icon>description</mat-icon></span>
       <span class="arc-titles">
@@ -1411,7 +1411,7 @@
       </div>
 
       <div *ngIf="form.participants.length > 0" class="arc-grid">
-        <div *ngFor="let participant of form.participants"
+        <div data-testid="wd-open-challenge-form-review-54" *ngFor="let participant of form.participants"
              class="arc-pcard arc-click"
              (click)="openChallengeFormReview(form, participant)">
           <div class="arc-prow">
@@ -1450,7 +1450,7 @@
 
   <div class="arc-card" *ngFor="let va of videoAskList; let i = index"
        [class.arc-open]="isArchiveGroupExpanded('va-' + i)">
-    <button type="button" class="arc-card-hd" (click)="toggleArchiveGroup('va-' + i)"
+    <button data-testid="wd-toggle-archive-group-55" type="button" class="arc-card-hd" (click)="toggleArchiveGroup('va-' + i)"
             [attr.aria-expanded]="isArchiveGroupExpanded('va-' + i)">
       <span class="arc-ico arc-ico-va"><mat-icon>videocam</mat-icon></span>
       <span class="arc-titles">
@@ -1464,7 +1464,7 @@
 
     <div class="arc-body" *ngIf="isArchiveGroupExpanded('va-' + i)">
       <div *ngIf="va.participants.length > 0" class="arc-grid">
-        <div *ngFor="let participant of va.participants"
+        <div data-testid="wd-participant-56" *ngFor="let participant of va.participants"
              class="arc-pcard"
              [class.arc-click]="!participant.vaPlaying"
              [class.va-playing-card]="participant.vaPlaying"
@@ -1487,7 +1487,7 @@
           <div *ngIf="participant.vaPlaying" class="va-card-player">
             <div class="va-player-head">
               <span>{{ participant.name }}</span>
-              <button type="button" class="va-player-close" (click)="stopVideoAsk(participant); $event.stopPropagation()" aria-label="Close player">✕</button>
+              <button data-testid="wd-stop-video-ask-57" type="button" class="va-player-close" (click)="stopVideoAsk(participant); $event.stopPropagation()" aria-label="Close player">✕</button>
             </div>
             <video class="va-player" controls autoplay playsinline preload="auto">
               <source [src]="participant.vaUrl" type="video/mp4">
@@ -1510,16 +1510,16 @@
       </div>
 
       <div class="panel-actions">
-        <button mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
+        <button data-testid="wd-send-email-to-selected-paricipant-58" mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
           <i class="fa-solid fa-envelope"></i>
         </button>
-        <button mat-icon-button class="close-button" (click)="sendWatti()">
+        <button data-testid="wd-send-watti-59" mat-icon-button class="close-button" (click)="sendWatti()">
           <i class="fa-brands fa-whatsapp"></i>
         </button>
-        <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+        <button data-testid="wd-send-notificationin-breakthrough-60" mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
           <mat-icon>notifications_active</mat-icon>
         </button>
-        <button mat-icon-button class="close-button" (click)="closeParticipantPanel()">
+        <button data-testid="wd-close-participant-panel-61" mat-icon-button class="close-button" (click)="closeParticipantPanel()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -1533,7 +1533,7 @@
         <span class="label">participants</span><br>
         <span class="label" style="font-size: 10px;">*click to export</span> 
       </div>
-      <button class="export-btn" (click)="exportParticipants()">
+      <button data-testid="wd-export-participants-62" class="export-btn" (click)="exportParticipants()">
         <mat-icon>file_download</mat-icon>
       </button>
     </div>
@@ -1543,11 +1543,11 @@
           <div>  
         <ng-container *ngIf="selectedStatusInfo?.status !== 'totalNewUsers' && 
                             selectedStatusInfo?.status !== 'totalNewUsersNotEnrolled'">
-          <button mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
+          <button data-testid="wd-button-63" mat-icon-button [matMenuTriggerFor]="filterMenu" aria-label="Filter participants">
             <mat-icon>filter_list</mat-icon>
           </button>
           <mat-menu #filterMenu="matMenu">
-            <mat-radio-group [(ngModel)]="filterOption" (change)="applyFilterSide()">
+            <mat-radio-group data-testid="wd-change-apply-filter-side-64" [(ngModel)]="filterOption" (change)="applyFilterSide()">
               <mat-radio-button value="all">All</mat-radio-button><br />
               <mat-radio-button value="new">New</mat-radio-button><br />
               <mat-radio-button value="old">Old</mat-radio-button>
@@ -1556,13 +1556,13 @@
         </ng-container>
 
     <ng-container *ngIf="selectedStatusInfo?.status === 'totalNewUsers' || selectedStatusInfo?.status === 'totalNewUsersNotEnrolled'">
-          <button mat-icon-button [matMenuTriggerFor]="newUserFilterMenu" aria-label="Filter new users"
+          <button data-testid="wd-button-65" mat-icon-button [matMenuTriggerFor]="newUserFilterMenu" aria-label="Filter new users"
             [color]="selectedSubscriberCode.length > 0 || showReferredOnly ? 'accent' : ''">
             <mat-icon>filter_list</mat-icon>
           </button>
 
               <mat-menu #newUserFilterMenu="matMenu">
-                <div style="padding: 12px 16px; min-width: 260px;"
+                <div data-testid="wd-event-66" style="padding: 12px 16px; min-width: 260px;"
                     (click)="$event.stopPropagation()">
 
                   <p style="font-size: 11px; font-weight: 700; margin: 0 0 8px;
@@ -1587,7 +1587,7 @@
                         text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6;">
                 Referred
               </p>
-              <mat-checkbox
+              <mat-checkbox data-testid="wd-change-apply-filter-side-67"
                 [(ngModel)]="showReferredOnly"
                 [disabled]="selectedSubscriberCode.length > 0"
                 (change)="applyFilterSide()"
@@ -1600,14 +1600,14 @@
 
     </ng-container>
           <ng-container *ngIf="selectedStatusInfo?.status === 'cohortParticipants'">
-            <button mat-icon-button
+            <button data-testid="wd-button-68" mat-icon-button
                     [matMenuTriggerFor]="cohortTypeFilterMenu"
                     [color]="cohortTypeFilter !== 'all' ? 'accent' : ''"
                     aria-label="Filter by participant type">
               <mat-icon>filter_alt</mat-icon>
             </button>
             <mat-menu #cohortTypeFilterMenu="matMenu">
-              <mat-radio-group [(ngModel)]="cohortTypeFilter"
+              <mat-radio-group data-testid="wd-event-69" [(ngModel)]="cohortTypeFilter"
                                (change)="applyFilterSide()"
                                (click)="$event.stopPropagation()"
                                style="display: flex; flex-direction: column; padding: 8px 16px; gap: 6px;">
@@ -1618,20 +1618,20 @@
             </mat-menu>
           </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
-            <button mat-icon-button
+            <button data-testid="wd-button-70" mat-icon-button
                     [matMenuTriggerFor]="journeyFilterMenu"
                     [color]="(selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0) ? 'accent' : ''">
               <mat-icon>sort</mat-icon>
             </button>
             <mat-menu #journeyFilterMenu="matMenu" class="filter-scroll-menu">
-              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+              <div data-testid="wd-event-71" style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
 
                 <!-- Journey Filter -->
                 <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
                   Journey Filter
                 </div>
                 <div style="padding: 4px 0;">
-                  <mat-checkbox
+                  <mat-checkbox data-testid="wd-change-toggle-journey-filter-72"
                     *ngFor="let journey of workshopData?.selectedjourneys"
                     [checked]="selectedJourneyFilters.includes(journey)"
                     (change)="toggleJourneyFilter(journey)"
@@ -1646,7 +1646,7 @@
                     Tier Filter
                   </div>
                   <div style="padding: 4px 0;">
-                    <mat-checkbox
+                    <mat-checkbox data-testid="wd-change-toggle-tier-filter-73"
                       *ngFor="let tier of workshopData?.selectedtiers"
                       [checked]="selectedTierFilters.includes(tier)"
                       (change)="toggleTierFilter(tier)"
@@ -1662,7 +1662,7 @@
                     Category Filter
                   </div>
                   <div style="padding: 4px 0;">
-                    <mat-checkbox
+                    <mat-checkbox data-testid="wd-change-toggle-category-filter-74"
                       *ngFor="let catId of workshopData?.categoriesforthisworkshop"
                       [checked]="selectedCategoryFilters.includes(catId)"
                       (change)="toggleCategoryFilter(catId)"
@@ -1677,13 +1677,13 @@
                   Enrollment Status
                 </div>
                 <div style="padding: 4px 0;">
-                  <mat-checkbox
+                  <mat-checkbox data-testid="wd-change-toggle-enrollment-status-filter-75"
                     [checked]="selectedEnrollmentStatusFilters.includes('enrolled')"
                     (change)="toggleEnrollmentStatusFilter('enrolled')"
                     style="display: block; padding: 6px 16px;">
                     Started
                   </mat-checkbox>
-                  <mat-checkbox
+                  <mat-checkbox data-testid="wd-change-toggle-enrollment-status-filter-76"
                     [checked]="selectedEnrollmentStatusFilters.includes('enrollednotstarted')"
                     (change)="toggleEnrollmentStatusFilter('enrollednotstarted')"
                     style="display: block; padding: 6px 16px;">
@@ -1695,7 +1695,7 @@
 
               <!-- Clear all at the bottom -->
               <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
-                <button mat-button color="warn" style="font-size: 11px; width: 100%;"
+                <button data-testid="wd-clear-journey-filters-77" mat-button color="warn" style="font-size: 11px; width: 100%;"
                         (click)="clearJourneyFilters(); clearTierFilters(); clearCategoryFilters(); clearEnrollmentStatusFilters(); $event.stopPropagation()">
                   <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
                   Clear All Filters
@@ -1743,19 +1743,19 @@
             </div>
           </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'notStarted'">
-            <button mat-icon-button
+            <button data-testid="wd-button-78" mat-icon-button
                     [matMenuTriggerFor]="notStartedFilterMenu"
                     [color]="(selectedCategoryFilters.length > 0 || selectedNotStartedTypeFilters.length > 0) ? 'accent' : ''">
               <mat-icon>sort</mat-icon>
             </button>
             <mat-menu #notStartedFilterMenu="matMenu" class="filter-scroll-menu">
-              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+              <div data-testid="wd-event-79" style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
                 <ng-container *ngIf="workshopData?.categoriesforthisworkshop?.length > 0">
                   <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
                     Category Filter
                   </div>
                   <div style="padding: 4px 0;">
-                    <mat-checkbox
+                    <mat-checkbox data-testid="wd-change-toggle-category-filter-80"
                       *ngFor="let catId of workshopData?.categoriesforthisworkshop"
                       [checked]="selectedCategoryFilters.includes(catId)"
                       (change)="toggleCategoryFilter(catId)"
@@ -1768,13 +1768,13 @@
                   Enrollment Status
                 </div>
                 <div style="padding: 4px 0;">
-                  <mat-checkbox
+                  <mat-checkbox data-testid="wd-change-toggle-not-started-type-filter-81"
                     [checked]="selectedNotStartedTypeFilters.includes('enrollednotstarted')"
                     (change)="toggleNotStartedTypeFilter('enrollednotstarted')"
                     style="display: block; padding: 6px 16px;">
                     Category Not Selected
                   </mat-checkbox>
-                  <mat-checkbox
+                  <mat-checkbox data-testid="wd-change-toggle-not-started-type-filter-82"
                     [checked]="selectedNotStartedTypeFilters.includes('enrolled_zero_progress')"
                     (change)="toggleNotStartedTypeFilter('enrolled_zero_progress')"
                     style="display: block; padding: 6px 16px;">
@@ -1784,7 +1784,7 @@
 
               </div>
               <div style="padding: 6px 16px 8px; border-top: 1px solid rgba(128,128,128,0.2);">
-                <button mat-button color="warn" style="font-size: 11px; width: 100%;"
+                <button data-testid="wd-clear-category-filters-83" mat-button color="warn" style="font-size: 11px; width: 100%;"
                         (click)="clearCategoryFilters(); clearNotStartedTypeFilters(); $event.stopPropagation()">
                   <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
                   Clear All Filters
@@ -1882,7 +1882,7 @@
         </mat-card> -->
         <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
-            <a
+            <a data-testid="wd-a-84"
               *ngIf="!selectedStatusInfo?.evergreenCompleted"
               class="participant-item"
               [href]="'/userprofile/' + participant.profileid"
@@ -1917,7 +1917,7 @@
             <!-- Evergreen Completed panel: no profile navigation — clicking a
                  participant opens the extend-until date picker instead. -->
             <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted">
-              <button type="button" class="participant-item extend-item"
+              <button data-testid="wd-toggle-extend-target-85" type="button" class="participant-item extend-item"
                       (click)="toggleExtendTarget(participant.profileid)">
                 <mat-icon class="participant-avatar">person</mat-icon>
                 <div class="participant-details">
@@ -1929,21 +1929,21 @@
                 </mat-icon>
               </button>
 
-              <div class="extend-box"
+              <div data-testid="wd-event-86" class="extend-box"
                    *ngIf="extendTargetProfileId === participant.profileid"
                    (click)="$event.stopPropagation()">
                 <mat-form-field appearance="outline" class="extend-field">
                   <mat-label>Extend until</mat-label>
-                  <input matInput [matDatepicker]="extendPicker" [min]="extendMinDate"
+                  <input data-testid="wd-extend-picker-87" matInput [matDatepicker]="extendPicker" [min]="extendMinDate"
                          [(ngModel)]="extendDate" [ngModelOptions]="{ standalone: true }"
                          readonly (click)="extendPicker.open()" />
                   <mat-datepicker-toggle matIconSuffix [for]="extendPicker"></mat-datepicker-toggle>
                   <mat-datepicker #extendPicker></mat-datepicker>
                 </mat-form-field>
                 <div class="extend-actions">
-                  <button mat-button type="button" (click)="toggleExtendTarget(participant.profileid)"
+                  <button data-testid="wd-toggle-extend-target-88" mat-button type="button" (click)="toggleExtendTarget(participant.profileid)"
                           [disabled]="extendSaving">Cancel</button>
-                  <button mat-flat-button color="primary" type="button"
+                  <button data-testid="wd-confirm-extend-89" mat-flat-button color="primary" type="button"
                           (click)="confirmExtend(participant)"
                           [disabled]="!extendDate || extendSaving">
                     <mat-spinner diameter="16" *ngIf="extendSaving"></mat-spinner>
@@ -1960,7 +1960,7 @@
   </div>
 
 
-  <div class="panel-overlay" 
+  <div data-testid="wd-close-participant-panel-90" class="panel-overlay" 
        [class.overlay-visible]="showParticipantPanel"
        (click)="closeParticipantPanel()"></div>
 </div>

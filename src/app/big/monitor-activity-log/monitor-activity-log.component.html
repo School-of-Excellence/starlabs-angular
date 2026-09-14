@@ -65,7 +65,7 @@
   <div class="pagination-controls" *ngIf="filteredTokenData.length">
     <div class="page-size-selector">
       <label>Items per page:</label>
-      <select (change)="onPageSizeChange(+$event)">
+      <select data-testid="monitor-change-on-page-size-change-1" (change)="onPageSizeChange(+$event)">
         <option *ngFor="let size of pageSizeOptions" [value]="size" [selected]="size === pageSize">
           {{ size }}
         </option>
@@ -73,11 +73,11 @@
     </div>
     
     <div class="page-navigation">
-      <button [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
-      <button [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+      <button data-testid="monitor-go-to-page-2" [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
+      <button data-testid="monitor-go-to-page-3" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
       <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
-      <button [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
+      <button data-testid="monitor-go-to-page-4" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+      <button data-testid="monitor-go-to-page-5" [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
     </div>
   </div>
 
@@ -97,10 +97,10 @@
             <span>{{token['tokennumber']}}</span>
             <span>Current Stage: &nbsp;&nbsp;{{token['currentstage']}}</span>
             <span>Status : &nbsp;&nbsp;{{ [null,'queued','invited'].includes(token['status']) ? "Queued" : (token['status'] === 'ready' ? "Waiting" : "Live") }}</span>
-            <button class="expand-button" (click)="toggleRow(token.profile_id)">
+            <button data-testid="monitor-toggle-row-6" class="expand-button" (click)="toggleRow(token.profile_id)">
               {{ isRowExpanded(token.profile_id) ? 'Collapse' : 'Expand' }}
             </button>
-            <mat-checkbox 
+            <mat-checkbox data-testid="monitor-change-on-validate-big-activity-by-participant-7" 
               [checked]="token['bigactivityreview'] != undefined ? token['bigactivityreview'] : false" 
               (change)="onValidateBigActivityByParticipant($event,token)"
             >
@@ -138,7 +138,7 @@
                   </div>
                   <!-- button to add & remove queueActivityLog -->
                   <div *ngIf="editrole">
-                    <button mat-stroked-button type="button" (click)="onManageQueueActivityLog( hasActivityLogs(stage.liveassignmentid) ? 'remove' : 'add',stage)">
+                    <button data-testid="monitor-on-manage-queue-activity-log-8" mat-stroked-button type="button" (click)="onManageQueueActivityLog( hasActivityLogs(stage.liveassignmentid) ? 'remove' : 'add',stage)">
                       {{ hasActivityLogs(stage.liveassignmentid) ? 'Remove' : 'Add'}}
                     </button>
                   </div>
@@ -181,7 +181,7 @@
   <div class="pagination-controls" *ngIf="filteredTokenData.length">
     <div class="page-size-selector">
       <label>Items per page:</label>
-      <select (change)="onPageSizeChange(+$event)">
+      <select data-testid="monitor-change-on-page-size-change-9" (change)="onPageSizeChange(+$event)">
         <option *ngFor="let size of pageSizeOptions" [value]="size" [selected]="size === pageSize">
           {{ size }}
         </option>
@@ -189,11 +189,11 @@
     </div>
     
     <div class="page-navigation">
-      <button [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
-      <button [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+      <button data-testid="monitor-go-to-page-10" [disabled]="currentPage === 1" (click)="goToPage(1)">First</button>
+      <button data-testid="monitor-go-to-page-11" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
       <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-      <button [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
-      <button [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
+      <button data-testid="monitor-go-to-page-12" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">Next</button>
+      <button data-testid="monitor-go-to-page-13" [disabled]="currentPage === totalPages" (click)="goToPage(totalPages)">Last</button>
     </div>
   </div>
 </div>

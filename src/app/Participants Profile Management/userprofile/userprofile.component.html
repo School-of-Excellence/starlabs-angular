@@ -90,14 +90,14 @@
             <span class="detail-label">Financial Status/Customer Status</span>
             <span class="detail-value">{{userData['financialstatus'] || 'Not available'}}/{{userData['customerstatus'] || 'Not available'}}</span>
           </div>
-          <span (click)="openStatusEditor()" style="cursor: pointer;"><i class="fas fa-edit detail-icon"></i></span>
+          <span (click)="openStatusEditor()" data-testid="up-status-edit" style="cursor: pointer;"><i class="fas fa-edit detail-icon"></i></span>
         </div>
         <!-- Edit customer status -->
         <div class="status-editor-overlay" *ngIf="showStatusEditor" (click)="closeStatusEditor()">
           <div class="status-editor-card" (click)="$event.stopPropagation()">
             <div class="editor-header">
               <h3>Edit Customer Status</h3>
-              <i class="fas fa-times close-icon" (click)="closeStatusEditor()"></i>
+              <i class="fas fa-times close-icon" data-testid="up-status-close" (click)="closeStatusEditor()"></i>
             </div>
             
             <div class="editor-body">
@@ -107,7 +107,7 @@
         
               <div class="status-selector">
                 <label for="statusSelect">Select New Status</label>
-                <select id="statusSelect" [(ngModel)]="selectedStatus" class="status-dropdown">
+                <select id="statusSelect" [(ngModel)]="selectedStatus" data-testid="up-status-select" class="status-dropdown">
                   <option value="">-- Select Status --</option>
                   <option value="banned">Banned</option>
                   <option value="late">Late</option>
@@ -117,9 +117,10 @@
             </div>
         
             <div class="editor-footer">
-              <button class="btn-cancel" (click)="closeStatusEditor()">Cancel</button>
-              <button class="btn-save" 
-                      [disabled]="!selectedStatus" 
+              <button class="btn-cancel" data-testid="up-status-cancel" (click)="closeStatusEditor()">Cancel</button>
+              <button class="btn-save"
+                      data-testid="up-status-update"
+                      [disabled]="!selectedStatus"
                       (click)="updateCustomerStatus()">
                 Update Status
               </button>
@@ -137,9 +138,10 @@
 
 <!-- Navigation Tabs -->
 <div class="nav-tabs">
-  <button 
-    *ngFor="let tab of tabs" 
+  <button
+    *ngFor="let tab of tabs"
     [class.active]="activeTab === tab"
+    [attr.data-testid]="'up-tab-' + tab"
     (click)="selectTab(tab)"
     class="nav-tab">
     {{ tab }}
@@ -159,7 +161,7 @@
                   <div class="header-actions">
                       <span class="badge ongoing">{{ journey.journeystatus || 'addon product' }}</span>
                       <span class="badge journey-dates">{{ journey.subscriptionstart?.toDate() | date: 'mediumDate' }} - {{ journey.subscriptionend?.toDate() | date: 'mediumDate' }}</span>
-                      <button mat-icon-button (click)="toggleProductSection(journey)" class="toggle-btn">
+                      <button mat-icon-button [attr.data-testid]="'up-journey-toggle-' + i" (click)="toggleProductSection(journey)" class="toggle-btn">
                           <mat-icon *ngIf="!journey.showProductSection">keyboard_arrow_down</mat-icon>
                           <mat-icon *ngIf="journey.showProductSection">keyboard_arrow_up</mat-icon>
                       </button>
@@ -175,7 +177,7 @@
               <div class="products-section" *ngIf="products.length != 0">
                   <div class="section-header">
                       <h6 style="font-size: 12px;" class="section-title">Products</h6>
-                      <button mat-icon-button class="add-button" [routerLink]="'/participantpurchase/' + profileId">
+                      <button mat-icon-button class="add-button" [attr.data-testid]="'up-journey-addproduct-' + i" [routerLink]="'/participantpurchase/' + profileId">
                           <mat-icon>add</mat-icon>
                       </button>
                   </div>
@@ -241,7 +243,7 @@
               <div class="header">
                 <h5 class="journey-title">Products</h5>
                 <div class="header-actions">
-                    <button mat-icon-button (click)="openAllproduct()" class="toggle-btn">
+                    <button mat-icon-button data-testid="up-products-toggle" (click)="openAllproduct()" class="toggle-btn">
                         <mat-icon *ngIf="!openProductsection">keyboard_arrow_down</mat-icon>
                         <mat-icon *ngIf="openProductsection">keyboard_arrow_up</mat-icon>
                     </button>
@@ -361,10 +363,10 @@
     <h4 style="margin-left: 10px;font-weight: bold;">Your Events</h4>
     <div class="tabs-container">
       <div class="tabs">
-          <button class="tab" [ngClass]="{'active-tab': eventTab === 'All'}" (click)="seteventTab('All')">All</button>
-          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Attended'}" (click)="seteventTab('Events Attended')">Events Attended</button>
-          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Not Attended'}" (click)="seteventTab('Events Not Attended')">Events Not Attended</button>
-          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Upcoming Events'}" (click)="seteventTab('Upcoming Events')">Upcoming Events</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'All'}" data-testid="up-eventtab-all" (click)="seteventTab('All')">All</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Attended'}" data-testid="up-eventtab-attended" (click)="seteventTab('Events Attended')">Events Attended</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Events Not Attended'}" data-testid="up-eventtab-notattended" (click)="seteventTab('Events Not Attended')">Events Not Attended</button>
+          <button class="tab" [ngClass]="{'active-tab': eventTab === 'Upcoming Events'}" data-testid="up-eventtab-upcoming" (click)="seteventTab('Upcoming Events')">Upcoming Events</button>
       </div>
     </div> 
     <div *ngIf="eventTab === 'All'">
@@ -669,7 +671,7 @@
                       </tr>
                   </thead>
                   <ng-container *ngFor="let form of paginatedForms; let i = index">
-                      <tr (click)="onFormPreview(form)" style="cursor: pointer;"> 
+                      <tr [attr.data-testid]="'up-form-row-' + i" (click)="onFormPreview(form)" style="cursor: pointer;">
                           <td>{{ i + 1 }}.</td>
                           <td class="product-name-column">{{ form['formname'] }}</td>
                           <td>{{ mapWorkshop[form['workshopref']?.id] || 'N/A'}}</td>
@@ -714,7 +716,7 @@
             </thead>
             <tbody>
                 <ng-container *ngFor="let report of paginatedReports; let i = index">
-                    <tr style="cursor: pointer;" (click)="reportView(report)">
+                    <tr style="cursor: pointer;" [attr.data-testid]="'up-report-row-' + i" (click)="reportView(report)">
                         <td>{{ i + 1 }}.</td>
                         <td>
                           <ul>
@@ -994,7 +996,7 @@
         Selected Average Time Interval: {{timeDelayAvg}}.
         <!-- <span class="text-secondary"> (Includes: {{timedelayTouchPoint.join(", ")}})</span> -->
       </mat-label>
-      <mat-checkbox class="me-1" *ngFor="let touchpoint of selectedTouchPoint;" [checked]="timedelayTouchPoint.includes(touchpoint)" (change)="updateTimeDelayTouchPoint(touchpoint)">{{touchpoint}}</mat-checkbox>
+      <mat-checkbox class="me-1" *ngFor="let touchpoint of selectedTouchPoint;" [checked]="timedelayTouchPoint.includes(touchpoint)" [attr.data-testid]="'up-touchpoint-' + touchpoint" (change)="updateTimeDelayTouchPoint(touchpoint)">{{touchpoint}}</mat-checkbox>
     </div>
     <div class="card">
         <table class="product-table">

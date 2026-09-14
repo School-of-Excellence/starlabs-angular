@@ -22,7 +22,7 @@
   <ng-container matColumnDef="share">
     <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
     <td mat-cell *matCellDef="let row">
-      <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+      <button data-testid="aescp-btn-1" mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
     </td>
   </ng-container>
   <!-- Expanded Content Column - The detail row is made up of this one column that spans across all columns -->
@@ -39,7 +39,7 @@
           </div>
           <div class="d-flex justify-content-center">
             <p>
-              <b>{{list.title}}</b> <span class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
+              <b>{{list.title}}</b> <span [attr.data-testid]="'aescp-act-2-' + i" class="hlstest" (click)="testHLS(list['hls'])">(HLS: {{list["hls"] != null && list["hls"] != undefined}})</span>
             </p>
           </div>
         </div>

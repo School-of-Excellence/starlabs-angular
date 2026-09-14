@@ -6,7 +6,7 @@
     <div class="profilebox">
       <mat-form-field appearance="outline">
         <mat-label>Select Profile</mat-label>
-        <mat-select [(ngModel)]="selectedProfileid" (selectionChange)="changeProfile()" [disabled]="true">
+        <mat-select [(ngModel)]="selectedProfileid" data-testid="pds-profile-select" (selectionChange)="changeProfile()" [disabled]="true">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="profileFilterCtrl" name="name" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -26,15 +26,15 @@
           </mat-radio-button>
         </mat-radio-group>
         <br>
-        <mat-checkbox [(ngModel)]="sequencechanged" (change)="onDataStatusChange()">Delivery Sequence Changes</mat-checkbox>
+        <mat-checkbox [(ngModel)]="sequencechanged" data-testid="pds-seq-changed" (change)="onDataStatusChange()">Delivery Sequence Changes</mat-checkbox>
         <br>
-        <mat-checkbox [(ngModel)]="migrationrequired" (change)="onDataStatusChange()">Migration Required</mat-checkbox>
+        <mat-checkbox [(ngModel)]="migrationrequired" data-testid="pds-migration-required" (change)="onDataStatusChange()">Migration Required</mat-checkbox>
       </div>
     </div>
     <div *ngIf="participantProducts.length != 0">
       <div class="submitbox mt-4">
-        <button class="resetbtn" mat-stroked-button (click)="resetJourney()">Reset Changes</button>
-        <button class="submitbtn" mat-stroked-button (click)="submitJourney()">Update Delivery Plan</button>
+        <button class="resetbtn" mat-stroked-button data-testid="pds-reset" (click)="resetJourney()">Reset Changes</button>
+        <button class="submitbtn" mat-stroked-button data-testid="pds-submit" (click)="submitJourney()">Update Delivery Plan</button>
       </div>
       <div class="row">
         <div class="col colbox">
@@ -47,7 +47,7 @@
                 <!-- <button mat-icon-button (click)="removeProduct(i)">
                   <mat-icon>remove_circle_outline</mat-icon>
                 </button> -->
-                <button [ngClass]="{'selectedContainer': selectedProductIndex == i}" mat-icon-button (click)="onProductSelect(i)">
+                <button [ngClass]="{'selectedContainer': selectedProductIndex == i}" mat-icon-button [attr.data-testid]="'pds-product-select-' + i" (click)="onProductSelect(i)">
                   <mat-icon>arrow_forward_ios</mat-icon>
                 </button>
               </div>
@@ -80,7 +80,7 @@
               <br>
               <mat-form-field class="singlefield" appearance="outline">
                 <mat-label>Product Status</mat-label>
-                <mat-select [(ngModel)]="participantProducts[selectedProductIndex].status">
+                <mat-select [(ngModel)]="participantProducts[selectedProductIndex].status" data-testid="pds-product-status">
                   <mat-option [value]="null">Clear Status</mat-option>
                   <mat-option *ngFor="let status of statusList" [value]="status.toLowerCase()">{{status}}</mat-option>
                 </mat-select>
@@ -118,10 +118,10 @@
                     </mat-expansion-panel>                  
                   </div>
                   <div>
-                    <button mat-icon-button (click)="deleteDeliverable(i, mapdeliveries[mapDeliveryDoc[delivery.sequenceref.path]['deliveryref']['path']], delivery.sequenceref.path)">
+                    <button mat-icon-button [attr.data-testid]="'pds-delivery-delete-' + i" (click)="deleteDeliverable(i, mapdeliveries[mapDeliveryDoc[delivery.sequenceref.path]['deliveryref']['path']], delivery.sequenceref.path)">
                       <mat-icon>remove_circle_outline</mat-icon>
                     </button>
-                    <button mat-icon-button [ngClass]="{'selectedContainer': selectDeliveryIndex == i}" (click)="onDeliverySelect(i)">
+                    <button mat-icon-button [ngClass]="{'selectedContainer': selectDeliveryIndex == i}" [attr.data-testid]="'pds-delivery-select-' + i" (click)="onDeliverySelect(i)">
                       <mat-icon>arrow_forward_ios</mat-icon>
                     </button>
                   </div>
@@ -130,11 +130,11 @@
               <div class="newdeliverybox">
                 <mat-form-field class="newdeliveryfield" appearance="outline">
                   <mat-label>New Delivery</mat-label>
-                  <mat-select [(ngModel)]="newDelivery">
+                  <mat-select [(ngModel)]="newDelivery" data-testid="pds-new-delivery">
                     <mat-option class="matoption" *ngFor="let item of deliveryList" [value]="item">{{mapdeliveries[item.path]}} ({{item.type}})</mat-option>
                   </mat-select>
                 </mat-form-field>
-                <button class="newdeliverybtn" mat-stroked-button (click)="newDeliverable()">
+                <button class="newdeliverybtn" mat-stroked-button data-testid="pds-add-delivery" (click)="newDeliverable()">
                   Add
                 </button>
               </div>
@@ -146,7 +146,7 @@
             <h6 class="coltitle">{{mapdeliveries[mapDeliveryDoc[participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].sequenceref.path]['deliveryref']['path']]}}</h6>
             <mat-form-field class="singlefield" appearance="outline">
               <mat-label>Delivery Status</mat-label>
-              <mat-select [(ngModel)]="participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].status">
+              <mat-select [(ngModel)]="participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].status" data-testid="pds-delivery-status">
                 <mat-option [value]="null">Clear Status</mat-option>
                 <mat-option *ngFor="let status of deliveryStatus" [value]="status.toLowerCase()">{{status}}</mat-option>
               </mat-select>
@@ -154,7 +154,7 @@
             <br>
             <mat-form-field *ngIf="participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].type == 'appointment'" class="singlefield" appearance="outline">
               <mat-label>Map Existing Appointments</mat-label>
-              <mat-select [(ngModel)]="selectedAppointments" multiple (selectionChange)="onAppointmentSelection()">
+              <mat-select [(ngModel)]="selectedAppointments" multiple data-testid="pds-map-appointments" (selectionChange)="onAppointmentSelection()">
                 <mat-option class="matoption" *ngFor="let appt of returnExistingAppt(mapDeliveryDoc[participantProducts[selectedProductIndex].delivery[selectDeliveryIndex].sequenceref.path]['deliveryref']['path'])" [value]="appt.id">{{mapAppointment[appt.data()["appointment"].id]}} - ({{appt.data()["starttime"].toDate() | date:'medium'}})</mat-option>
               </mat-select>
             </mat-form-field>

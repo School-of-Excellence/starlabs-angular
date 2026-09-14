@@ -23,6 +23,7 @@
             <button
               mat-icon-button
               class="ll-drawer-close"
+              data-testid="ll-drawer-close"
               aria-label="Close details"
               (click)="detailsDrawer.close()">
               <mat-icon>close</mat-icon>
@@ -72,6 +73,7 @@
               mat-flat-button
               color="primary"
               class="ll-maps-btn"
+              data-testid="ll-drawer-maps"
               (click)="openInGoogleMaps(participant)">
               <mat-icon>open_in_new</mat-icon>
               Open in Google Maps
@@ -80,6 +82,7 @@
             <button
               mat-stroked-button
               class="ll-maps-btn"
+              data-testid="ll-drawer-measure"
               (click)="useParticipantAsReference(participant)">
               <mat-icon>my_location</mat-icon>
               Measure distances from here
@@ -165,6 +168,7 @@
         <div class="ll-header-actions" [hidden]="activeTab() !== 0">
           <mat-slide-toggle
             class="ll-auto-toggle"
+            data-testid="ll-auto-refresh"
             [checked]="(autoRefresh | async) ?? false"
             (change)="toggleAutoRefresh($event.checked)"
             matTooltip="Re-reads the latest locations every 30 seconds">
@@ -175,6 +179,7 @@
             mat-flat-button
             color="primary"
             class="ll-refresh-btn"
+            data-testid="ll-refresh"
             [disabled]="(loading | async) ?? false"
             (click)="refresh()">
             <mat-icon>refresh</mat-icon>
@@ -239,9 +244,9 @@
 
           <div class="ll-reference-actions">
             @if (reference | async) {
-              <button mat-button class="ll-reference-clear" (click)="clearReference()">Clear</button>
+              <button mat-button class="ll-reference-clear" data-testid="ll-ref-clear" (click)="clearReference()">Clear</button>
             }
-            <button mat-stroked-button (click)="togglePicker()">
+            <button mat-stroked-button data-testid="ll-ref-toggle-picker" (click)="togglePicker()">
               <mat-icon>{{ (pickerOpen | async) ? 'expand_less' : 'edit_location_alt' }}</mat-icon>
               {{ (reference | async) ? 'Change' : 'Set location' }}
             </button>
@@ -260,6 +265,7 @@
                 type="search"
                 autocomplete="off"
                 placeholder="Vettuvankeni, Chennai"
+                data-testid="ll-place-search"
                 [formControl]="placeSearchControl" />
               @if (searching()) {
                 <span matSuffix class="ll-mini-spinner" aria-label="Searching"></span>
@@ -271,7 +277,7 @@
                 <ul class="ll-place-list" role="listbox" aria-label="Search results">
                   @for (place of places; track place.displayName) {
                     <li>
-                      <button type="button" class="ll-place" (click)="usePlaceAsReference(place)">
+                      <button type="button" class="ll-place" data-testid="ll-place-option" (click)="usePlaceAsReference(place)">
                         <mat-icon>place</mat-icon>
                         <span class="ll-place-text">
                           <span class="ll-place-name">
@@ -319,7 +325,7 @@
                     {{ formatCoordinate(point.latitude) }}, {{ formatCoordinate(point.longitude) }}
                   </span>
                 </div>
-                <button mat-flat-button color="primary" (click)="usePendingPoint()">
+                <button mat-flat-button color="primary" data-testid="ll-use-pending" (click)="usePendingPoint()">
                   <mat-icon>check</mat-icon>
                   Use this location
                 </button>
@@ -335,12 +341,13 @@
               <button
                 mat-stroked-button
                 [disabled]="(deviceState | async)?.loading"
+                data-testid="ll-use-device"
                 (click)="useDeviceAsReference()">
                 <mat-icon>gps_fixed</mat-icon>
                 {{ (deviceState | async)?.loading ? 'Locating…' : 'Use this device' }}
               </button>
 
-              <button mat-stroked-button (click)="toggleManualEntry()">
+              <button mat-stroked-button data-testid="ll-toggle-manual" (click)="toggleManualEntry()">
                 <mat-icon>edit</mat-icon>
                 Enter coordinates
               </button>
@@ -368,6 +375,7 @@
                       inputmode="decimal"
                       placeholder="12.940029"
                       [formControl]="latControl"
+                      data-testid="ll-manual-lat"
                       (paste)="onCoordinatePaste($event)" />
                   </mat-form-field>
 
@@ -378,10 +386,11 @@
                       inputmode="decimal"
                       placeholder="80.253343"
                       [formControl]="lngControl"
+                      data-testid="ll-manual-lng"
                       (paste)="onCoordinatePaste($event)" />
                   </mat-form-field>
 
-                  <button mat-flat-button color="primary" (click)="applyManualReference()">
+                  <button mat-flat-button color="primary" data-testid="ll-apply-manual" (click)="applyManualReference()">
                     Use these coordinates
                   </button>
                 </div>
@@ -406,7 +415,7 @@
         <div class="ll-banner ll-banner-error" role="alert">
           <mat-icon>error_outline</mat-icon>
           <span>{{ loadError }}</span>
-          <button mat-button (click)="refresh()">Try again</button>
+          <button mat-button data-testid="ll-error-retry" (click)="refresh()">Try again</button>
         </div>
       }
 
@@ -455,6 +464,7 @@
               tabindex="0"
               role="button"
               matTooltip="Sort by farthest first"
+              data-testid="ll-stat-farthest"
               (click)="showFarthest()"
               (keydown.enter)="showFarthest()">
               <div class="ll-stat-icon"><mat-icon>explore</mat-icon></div>
@@ -480,6 +490,7 @@
                   type="search"
                   placeholder="Search participant by name"
                   autocomplete="off"
+                  data-testid="ll-search"
                   [formControl]="searchControl"
                   aria-label="Search participant by name" />
                 @if (searchControl.value) {
@@ -487,6 +498,7 @@
                     mat-icon-button
                     matSuffix
                     aria-label="Clear search"
+                    data-testid="ll-search-clear"
                     (click)="searchControl.setValue('')">
                     <mat-icon>close</mat-icon>
                   </button>
@@ -495,7 +507,7 @@
 
               <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
                 <mat-label>Sort by</mat-label>
-                <mat-select [value]="(sortKey | async) ?? 'newest'" (valueChange)="setSort($event)">
+                <mat-select data-testid="ll-sort" [value]="(sortKey | async) ?? 'newest'" (valueChange)="setSort($event)">
                   @for (option of sortOptions; track option.value) {
                     <mat-option [value]="option.value">{{ option.label }}</mat-option>
                   }
@@ -513,6 +525,7 @@
                       [class.ll-toggle-on]="active.freshness === option.value"
                       [matTooltip]="option.hint ?? ''"
                       [attr.aria-pressed]="active.freshness === option.value"
+                      data-testid="ll-freshness-toggle"
                       (click)="setFreshness(option.value)">
                       @if (option.value !== 'all') {
                         <span class="ll-toggle-dot" [class]="'ll-status-' + option.value"></span>
@@ -524,7 +537,7 @@
 
                 <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
                   <mat-label>Reported</mat-label>
-                  <mat-select [value]="active.timeWindow" (valueChange)="setTimeWindow($event)">
+                  <mat-select data-testid="ll-timewindow" [value]="active.timeWindow" (valueChange)="setTimeWindow($event)">
                     @for (option of timeWindowOptions; track option.value) {
                       <mat-option [value]="option.value">{{ option.label }}</mat-option>
                     }
@@ -534,6 +547,7 @@
                 <mat-form-field appearance="outline" class="ll-select-field" subscriptSizing="dynamic">
                   <mat-label>Distance</mat-label>
                   <mat-select
+                    data-testid="ll-distance"
                     [value]="active.distance"
                     [disabled]="!(referenceCoords | async)"
                     (valueChange)="setDistance($event)">
@@ -548,7 +562,7 @@
                 </span>
 
                 @if (view.activeFilterCount > 0) {
-                  <button mat-stroked-button class="ll-clear-btn" (click)="clearFilters()">
+                  <button mat-stroked-button class="ll-clear-btn" data-testid="ll-clear-filters" (click)="clearFilters()">
                     <mat-icon>filter_alt_off</mat-icon>
                     Clear ({{ view.activeFilterCount }})
                   </button>
@@ -655,9 +669,9 @@
                 }
               </p>
               @if (view.stats.total > 0) {
-                <button mat-stroked-button (click)="clearFilters()">Clear filters</button>
+                <button mat-stroked-button data-testid="ll-empty-clear-filters" (click)="clearFilters()">Clear filters</button>
               } @else {
-                <button mat-stroked-button (click)="refresh()">Refresh</button>
+                <button mat-stroked-button data-testid="ll-empty-refresh" (click)="refresh()">Refresh</button>
               }
             </section>
           } @else {
@@ -736,6 +750,7 @@
                           color="primary"
                           matTooltip="Locate"
                           [attr.aria-label]="'Locate ' + p.name"
+                          data-testid="ll-row-locate"
                           (click)="select(p)">
                           <mat-icon>my_location</mat-icon>
                         </button>
@@ -743,6 +758,7 @@
                           mat-icon-button
                           matTooltip="Measure distances from here"
                           [attr.aria-label]="'Set ' + p.name + '\'s location as the reference'"
+                          data-testid="ll-row-measure"
                           (click)="useParticipantAsReference(p); $event.stopPropagation()">
                           <mat-icon>my_location</mat-icon>
                         </button>
@@ -750,6 +766,7 @@
                           mat-icon-button
                           matTooltip="Open in Google Maps"
                           [attr.aria-label]="'Open ' + p.name + ' in Google Maps'"
+                          data-testid="ll-row-maps"
                           (click)="openInGoogleMaps(p, $event)">
                           <mat-icon>open_in_new</mat-icon>
                         </button>
@@ -855,6 +872,7 @@
         mat-fab
         color="primary"
         class="ll-fab"
+        data-testid="ll-fab-refresh"
         aria-label="Refresh locations"
         [disabled]="(loading | async) ?? false"
         (click)="refresh()">

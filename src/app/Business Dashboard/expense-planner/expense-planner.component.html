@@ -17,10 +17,10 @@
   <div class="header">
     <div class="header-left">
       <div class="title-tabs">
-        <button [class.active]="activeTab === 'expense'" class="title-tab" (click)="setActiveTab('expense')" >
+        <button data-testid="exp-setactivetab" [class.active]="activeTab === 'expense'" class="title-tab" (click)="setActiveTab('expense')" >
           EXPENSE PLANNER
         </button>
-        <button class="title-tab" [class.active]="activeTab === 'inflow'" (click)="setActiveTab('inflow')" >
+        <button data-testid="exp-setactivetab-2" class="title-tab" [class.active]="activeTab === 'inflow'" (click)="setActiveTab('inflow')" >
           INFLOW UPDATES
         </button>
       </div>
@@ -30,10 +30,10 @@
       @if (activeTab === 'expense') {
       <div class="filter-bar">
         <div class="filter-tabs">
-          <button class="filter-tab" [class.active]="filterType === 'month'" (click)="setFilterType('month')" >
+          <button data-testid="exp-setfiltertype" class="filter-tab" [class.active]="filterType === 'month'" (click)="setFilterType('month')" >
             Monthly
           </button>
-          <button class="filter-tab" [class.active]="filterType === 'range'" (click)="setFilterType('range')" >
+          <button data-testid="exp-setfiltertype-2" class="filter-tab" [class.active]="filterType === 'range'" (click)="setFilterType('range')" >
             Date Range
           </button>
         </div>
@@ -41,11 +41,11 @@
           <div class="filter-inputs">
             <!-- Month Filter -->
             <div *ngIf="filterType === 'month'" class="month-picker">
-              <button class="nav-btn" aria-label="Previous month" (click)="backwardMonth()" >
+              <button data-testid="exp-backwardmonth" class="nav-btn" aria-label="Previous month" (click)="backwardMonth()" >
                 <mat-icon>chevron_left</mat-icon>
               </button>
-              <input class="month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()" />
-              <button class="nav-btn" aria-label="Next month" (click)="forwardMonth()" >
+              <input data-testid="exp-updatedate" class="month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()" />
+              <button data-testid="exp-forwardmonth" class="nav-btn" aria-label="Next month" (click)="forwardMonth()" >
                 <mat-icon>chevron_right</mat-icon>
               </button>
             </div>
@@ -54,8 +54,8 @@
             <div *ngIf="filterType === 'range'" class="range-picker">
               <mat-form-field appearance="outline" class="compact-field">
                 <mat-date-range-input [rangePicker]="picker">
-                  <input matStartDate [(ngModel)]="startDate" placeholder="Start" />
-                  <input matEndDate [(ngModel)]="endDate" placeholder="End" />
+                  <input data-testid="exp-start" matStartDate [(ngModel)]="startDate" placeholder="Start" />
+                  <input data-testid="exp-end" matEndDate [(ngModel)]="endDate" placeholder="End" />
                 </mat-date-range-input>
                 <mat-datepicker-toggle matIconSuffix [for]="picker" ></mat-datepicker-toggle>
                 <mat-date-range-picker #picker (closed)="loadData()" ></mat-date-range-picker>
@@ -65,7 +65,7 @@
         </div>
       </div>
 
-      <button class="add-entry-btn" (click)="addEntry()">
+      <button data-testid="exp-addentry" class="add-entry-btn" (click)="addEntry()">
         <mat-icon class="material-icons-round">add</mat-icon>
         Add Entry
       </button>
@@ -74,11 +74,11 @@
       <!-- Current Date Display - Only for Inflow tab -->
       @if (activeTab === 'inflow') {
       <div class="inflow-month-toggle">
-        <button class="month-toggle-btn" [class.active]="inflowMonth === 'current'" (click)="setInflowMonth('current')" >
+        <button data-testid="exp-setinflowmonth" class="month-toggle-btn" [class.active]="inflowMonth === 'current'" (click)="setInflowMonth('current')" >
           <mat-icon class="material-icons-round">calendar_today</mat-icon>
           <span>{{ currentMonthName }}</span>
         </button>
-        <button class="month-toggle-btn" [class.active]="inflowMonth === 'next'" (click)="setInflowMonth('next')" >
+        <button data-testid="exp-setinflowmonth-2" class="month-toggle-btn" [class.active]="inflowMonth === 'next'" (click)="setInflowMonth('next')" >
           <mat-icon class="material-icons-round">event</mat-icon>
           <span>{{ nextMonthName }}</span>
         </button>
@@ -156,7 +156,7 @@
               <div class="expense-items">
                 @for (desc of expense.description; track $index; let idx = $index) {
                 <div class="expense-item" [class.paid]="desc.paid">
-                  <input
+                  <input data-testid="exp-updatepaidstatus"
                     type="checkbox"
                     class="expense-checkbox"
                     [checked]="desc.paid"
@@ -174,7 +174,7 @@
             <span class="amount-cell amount-planned"> {{ getTotalPlanned(expense).toLocaleString("en-IN") }} </span>
           </td>
           <td>
-            <input
+            <input data-testid="exp-input"
               type="number"
               class="editable-input"
               [value]="expense.totalpaid"
@@ -200,10 +200,10 @@
           </td>
           <td>
             <div class="actions-cell">
-              <button class="action-btn" (click)="editEntry(expense)" title="Edit" >
+              <button data-testid="exp-editentry" class="action-btn" (click)="editEntry(expense)" title="Edit" >
                 <mat-icon class="material-icons-round">edit</mat-icon>
               </button>
-              <button class="action-btn delete" (click)="deleteEntry(expense.docid)" title="Delete" >
+              <button data-testid="exp-deleteentry" class="action-btn delete" (click)="deleteEntry(expense.docid)" title="Delete" >
                 <mat-icon class="material-icons-round">delete</mat-icon>
               </button>
             </div>
@@ -217,11 +217,11 @@
 
   <!-- Expense Modal Dialog -->
   @if (isDialogOpen) {
-  <div class="modal-overlay" (click)="onOverlayClick($event)">
+  <div data-testid="exp-onoverlayclick" class="modal-overlay" (click)="onOverlayClick($event)">
     <div class="model">
       <div class="modal-header">
         <h2>{{ editingExpense ? "Edit Entry" : "Add New Entry" }}</h2>
-        <button class="modal-close" (click)="closeDialog()">
+        <button data-testid="exp-closedialog" class="modal-close" (click)="closeDialog()">
           <mat-icon class="material-icons-round">close</mat-icon>
         </button>
       </div>
@@ -230,7 +230,7 @@
         <div class="modal-body">
           <mat-form-field class="form-group">
             <mat-label>Date</mat-label>
-            <input
+            <input data-testid="exp-date"
               name="date"
               matInput
               [matDatepicker]="expensePicker"
@@ -248,7 +248,7 @@
             *ngIf="isEditMode || showCompleteForm" >
             <div class="expense-items-header">
               <h4>Expense Descriptions</h4>
-              <button class="add-item-btn" (click)="addDescription()">
+              <button data-testid="exp-adddescription" class="add-item-btn" (click)="addDescription()">
                 <mat-icon class="material-icons-round">add</mat-icon>
                 Add Item
               </button>
@@ -259,17 +259,17 @@
                 class="form-expense-item"
                 *ngFor="let desc of description.controls; let i = index"
                 [formGroupName]="i" >
-                <input type="text" placeholder="Name" formControlName="name" />
-                <input
+                <input data-testid="exp-name" type="text" placeholder="Name" formControlName="name" />
+                <input data-testid="exp-amount"
                   type="number"
                   placeholder="Amount"
                   formControlName="amount"
                   min="0" />
                 <label class="paid-toggle">
-                  <input type="checkbox" formControlName="paid" />
+                  <input data-testid="exp-paid" type="checkbox" formControlName="paid" />
                   <span>Paid</span>
                 </label>
-                <button
+                <button data-testid="exp-removedescription"
                   class="remove-item-btn"
                   (click)="removeDescription(i)"
                   [disabled]="entryForm.value.description.length <= 1" >
@@ -282,8 +282,8 @@
       </form>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" (click)="closeDialog()"> Cancel </button>
-        <button class="btn btn-primary" (click)="saveEntry()"> Save Entry </button>
+        <button data-testid="exp-closedialog-2" class="btn btn-secondary" (click)="closeDialog()"> Cancel </button>
+        <button data-testid="exp-saveentry" class="btn btn-primary" (click)="saveEntry()"> Save Entry </button>
       </div>
     </div>
   </div>

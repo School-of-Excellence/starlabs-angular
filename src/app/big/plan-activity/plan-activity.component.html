@@ -16,14 +16,14 @@
         </div>
 
         <div class="action-buttons">
-          <button class="btn-reset" mat-raised-button (click)="assignmentForm.reset()">
+          <button data-testid="pact-assignment-form-1" class="btn-reset" mat-raised-button (click)="assignmentForm.reset()">
             <i class="fas fa-redo-alt mr-2"></i>Reset
           </button>
-          <button class="btn-submit" mat-raised-button type="button" (click)="onSubmit()"
+          <button data-testid="pact-on-submit-2" class="btn-submit" mat-raised-button type="button" (click)="onSubmit()"
             [disabled]="assignmentForm.invalid">
             <i class="fas fa-check mr-2"></i>Submit
           </button>
-          <button class="btn-cancel" mat-button (click)="closeDialog()">
+          <button data-testid="pact-close-dialog-3" class="btn-cancel" mat-button (click)="closeDialog()">
             <i class="fas fa-times mr-2"></i>Cancel
           </button>
         </div>
@@ -50,9 +50,9 @@
                 <div class="col-md-6">
                   <mat-form-field class="w-100 dt-field" appearance="outline">
                     <mat-label>Start Date & Time</mat-label>
-                    <input #startdate matInput type="datetime-local" formControlName="startdate"
+                    <input data-testid="pact-startdate-4" #startdate matInput type="datetime-local" formControlName="startdate"
                       (click)="startdate.showPicker && startdate.showPicker()">
-                    <button type="button" matSuffix mat-icon-button aria-label="Pick date"
+                    <button data-testid="pact-startdate-5" type="button" matSuffix mat-icon-button aria-label="Pick date"
                       (click)="startdate.showPicker ? startdate.showPicker() : startdate.focus(); $event.stopPropagation()">
                       <mat-icon>event</mat-icon>
                     </button>
@@ -64,9 +64,9 @@
                 <div class="col-md-6">
                   <mat-form-field class="w-100 dt-field" appearance="outline">
                     <mat-label>End Date & Time</mat-label>
-                    <input #enddate matInput type="datetime-local" formControlName="enddate"
+                    <input data-testid="pact-enddate-6" #enddate matInput type="datetime-local" formControlName="enddate"
                       (click)="enddate.showPicker && enddate.showPicker()">
-                    <button type="button" matSuffix mat-icon-button aria-label="Pick date"
+                    <button data-testid="pact-enddate-7" type="button" matSuffix mat-icon-button aria-label="Pick date"
                       (click)="enddate.showPicker ? enddate.showPicker() : enddate.focus(); $event.stopPropagation()">
                       <mat-icon>event</mat-icon>
                     </button>
@@ -146,12 +146,12 @@
             <h5><i class="fa-brands fa-whatsapp"></i> Wati Notification</h5>
             <div class="p-4">
               <div class="btn-group">
-                <button type="button" class="btn"
+                <button data-testid="pact-set-notification-8" type="button" class="btn"
                   [ngClass]="{'btn-primary': assignmentForm.controls['watinotification'].value, 'btn-outline-primary': !assignmentForm.controls['watinotification'].value}"
                   (click)="setNotification(true)">
                   <i class="fa-regular fa-bell"></i> Enable Notifications
                 </button>
-                <button type="button" class="btn"
+                <button data-testid="pact-set-notification-9" type="button" class="btn"
                   [ngClass]="{'btn-primary': !assignmentForm.controls['watinotification'].value, 'btn-outline-primary': assignmentForm.controls['watinotification'].value}"
                   (click)="setNotification(false)">
                   <i class="fa-regular fa-bell-slash"></i> Disable Notifications
@@ -163,14 +163,14 @@
             <div class="selection-toggle">
               <h4><i class="fas fa-user-friends mr-2"></i>Participant Selection Mode</h4>
               <div class="btn-group">
-                <button
+                <button data-testid="pact-set-selection-mode-10"
                   [disabled]="data.type === 'edit' && assignmentForm.controls['selectionMode'].value === 'individual'"
                   type="button" class="btn"
                   [ngClass]="{'btn-primary': assignmentForm.controls['selectionMode'].value === 'group', 'btn-outline-primary': assignmentForm.controls['selectionMode'].value !== 'group'}"
                   (click)="setSelectionMode('group')">
                   <i class="fas fa-users mr-2"></i>Group Selection
                 </button>
-                <button [disabled]="data.type === 'edit' && assignmentForm.controls['selectionMode'].value === 'group'"
+                <button data-testid="pact-set-selection-mode-11" [disabled]="data.type === 'edit' && assignmentForm.controls['selectionMode'].value === 'group'"
                   type="button" class="btn"
                   [ngClass]="{'btn-primary': assignmentForm.controls['selectionMode'].value === 'individual', 'btn-outline-primary': assignmentForm.controls['selectionMode'].value !== 'individual'}"
                   (click)="setSelectionMode('individual')">
@@ -223,7 +223,7 @@
                     class="participant-item">
                     <span>{{i+1}}</span>
                     <span class="participant-name">{{mapProfile[participant.participantid]}}</span>
-                    <button class="remove-btn" (click)="removeParticipant(i)" title="Remove participant">
+                    <button data-testid="pact-remove-participant-12" class="remove-btn" (click)="removeParticipant(i)" title="Remove participant">
                       <i class="fas fa-times"></i>
                     </button>
                   </li>
@@ -244,7 +244,7 @@
                 <h4><i class="fas fa-user-slash mr-2"></i>Removed</h4>
                 <div class="header-actions">
                   <span class="badge">{{removedParticipantslist.length}}</span>
-                  <button *ngIf="removedParticipantslist.length > 0" class="restore-btn" (click)="restoreAll()"
+                  <button data-testid="pact-restore-all-13" *ngIf="removedParticipantslist.length > 0" class="restore-btn" (click)="restoreAll()"
                     title="restore all">
                     <i class="fas fa-undo"></i>
                   </button>
@@ -256,7 +256,7 @@
                   <li *ngFor="let participant of removedParticipantslist; let i = index" class="participant-item">
                     <span>{{i+1}}</span>
                     <span class="participant-name">{{mapProfile[participant.participantid]}}</span>
-                    <button class="remove-btn" (click)="restoreParticipant(i)" title="Restore participant">
+                    <button data-testid="pact-restore-participant-14" class="remove-btn" (click)="restoreParticipant(i)" title="Restore participant">
                       <i class="fas fa-undo"></i>
                     </button>
                   </li>

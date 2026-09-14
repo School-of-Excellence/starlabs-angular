@@ -18,7 +18,7 @@
       </button>
       <input type="file" #fileInput accept=".csv,.xls,.xlsx" (change)="onFileSelected($event)" hidden />
       <span class="csv-hint">💡 <strong>CSV</strong>: Email · Title · Video URL</span> -->
-      <button mat-icon-button class="close-btn" (click)="closeDialog()" title="Close">
+      <button data-testid="ema-close-dialog-1" mat-icon-button class="close-btn" (click)="closeDialog()" title="Close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -53,8 +53,8 @@
       <tr mat-row *matRowDef="let row; columns: ['email', 'title', 'videourl', 'profile'];"></tr>
     </table>
     <div class="bulk-actions">
-      <button mat-raised-button color="primary" (click)="uploadBulk()" [disabled]="disableButton">Upload Bulk</button>
-      <button mat-raised-button color="warn" (click)="importPreview = []">Clear</button>
+      <button data-testid="ema-upload-bulk-2" mat-raised-button color="primary" (click)="uploadBulk()" [disabled]="disableButton">Upload Bulk</button>
+      <button data-testid="ema-import-preview-3" mat-raised-button color="warn" (click)="importPreview = []">Clear</button>
     </div>
     <hr class="divider">
   </div>
@@ -95,7 +95,7 @@
           <span class="step-badge">2</span> Select Video Type
         </p>
         <div class="video-title-list">
-          <div
+          <div data-testid="ema-on-type-select-4"
             *ngFor="let type of videoTypes"
             class="video-title-card"
             [class.selected]="selectedType === type"
@@ -114,12 +114,12 @@
       <div class="step-block" *ngIf="selectedType && filteredVideoOptions.length > 0">
         <!-- Select All / Clear All — Add mode only -->
         <div *ngIf="data == null" class="select-all-row">
-          <button mat-stroked-button color="primary" (click)="selectAllVideos()">
+          <button data-testid="ema-select-all-videos-5" mat-stroked-button color="primary" (click)="selectAllVideos()">
             <mat-icon>done_all</mat-icon> Select All
           </button>
         </div>
         <div class="video-title-list">
-          <div
+          <div data-testid="ema-on-video-title-select-6"
             *ngFor="let v of filteredVideoOptions"
             class="video-title-card"
             [class.selected]="isVideoSelected(v.title)"
@@ -162,7 +162,7 @@
           </mat-form-field>
         </div>
         <div class="dialog-actions">
-          <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+          <button data-testid="ema-add-evolution-7" mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
             <mat-icon>save</mat-icon> Update Mapping
           </button>
         </div>
@@ -177,7 +177,7 @@
             <!-- <button mat-stroked-button color="warn" (click)="clearAllVideos()">
               <mat-icon>clear_all</mat-icon> Clear All
             </button> -->
-            <button mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
+            <button data-testid="ema-add-evolution-8" mat-raised-button color="primary" (click)="addEvolution()" [disabled]="disableButton">
               <mat-icon>add_circle</mat-icon>
               Save Mapping{{ selectedVideos.size > 1 ? 's' : '' }}
             </button>
@@ -191,7 +191,7 @@
           </div>
         </div>
         <div class="selected-video-list">
-          <div *ngFor="let v of getSelectedVideoObjects()" class="selected-video-row" style="cursor: pointer;"(click)="onVideoTitleSelect(v, true)">
+          <div data-testid="ema-on-video-title-select-9" *ngFor="let v of getSelectedVideoObjects()" class="selected-video-row" style="cursor: pointer;"(click)="onVideoTitleSelect(v, true)">
             <mat-icon class="selected-video-icon" [style.color]="previewVideo?.title === v.title ? '#1976d2' : ''">
               {{ previewVideo?.title === v.title ? 'play_circle' : 'check_circle' }}
             </mat-icon>
@@ -202,7 +202,7 @@
               </span>
               <span class="selected-video-date no-date" *ngIf="!v.recordeddate">No date</span>
             </div>
-            <button mat-icon-button color="warn" (click)="removeSelectedVideo(v.title); $event.stopPropagation()" title="Remove">
+            <button data-testid="ema-remove-selected-video-10" mat-icon-button color="warn" (click)="removeSelectedVideo(v.title); $event.stopPropagation()" title="Remove">
               <mat-icon>remove_circle_outline</mat-icon>
             </button>
           </div>
