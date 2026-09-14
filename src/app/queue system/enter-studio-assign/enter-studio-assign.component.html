@@ -15,7 +15,7 @@
         <div class="esa__actlabel" *ngIf="row.locked">{{ mapActivity[row.activity] || 'Activity' }}</div>
         <mat-form-field *ngIf="!row.locked" class="esa__ff" appearance="outline">
           <mat-label>Activity</mat-label>
-          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+          <mat-select [attr.data-testid]="'esas-sel-1-' + i" [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
             <mat-option>
               <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
                 [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
@@ -48,7 +48,7 @@
       <div class="esa__rowhead">
         <mat-form-field class="esa__ff" appearance="outline" subscriptSizing="dynamic">
           <mat-label>Activity</mat-label>
-          <mat-select [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
+          <mat-select [attr.data-testid]="'esas-sel-2-' + i" [(ngModel)]="row.activity" (selectionChange)="onActivityChange(row)" (openedChange)="$event && resetActivitySearch()">
             <mat-option>
               <ngx-mat-select-search [ngModel]="activitySearch" (ngModelChange)="onActivitySearchChange($event)" [ngModelOptions]="{standalone: true}"
                 [placeholderLabel]="'Search activity'" [noEntriesFoundLabel]="'No matching activity'" ngDefaultControl></ngx-mat-select-search>
@@ -56,12 +56,12 @@
             <mat-option *ngFor="let a of filteredActivities" [value]="a.key">{{ a.value }}</mat-option>
           </mat-select>
         </mat-form-field>
-        <button type="button" class="esa__rowremove" (click)="removeOptionalRow(i)" aria-label="Remove">
+        <button [attr.data-testid]="'esas-btn-3-' + i" type="button" class="esa__rowremove" (click)="removeOptionalRow(i)" aria-label="Remove">
           <mat-icon>remove_circle_outline</mat-icon>
         </button>
       </div>
       <div class="esa__pills esa__pills--specialist" *ngIf="row.activity">
-        <button type="button" class="esa__pill"
+        <button [attr.data-testid]="'esas-btn-4-' + s" type="button" class="esa__pill"
                 *ngFor="let s of specialistsFor(row.activity)"
                 [class.esa__pill--on]="row.selected.has(s.profileid)"
                 (click)="toggleSpecialist(row, s.profileid)">
@@ -79,7 +79,7 @@
 
   <!-- Footer -->
   <div class="esa__foot">
-    <button type="button" class="esa__ghost" (click)="dialogRef.close(null)">Cancel</button>
+    <button data-testid="esas-btn-5" type="button" class="esa__ghost" (click)="dialogRef.close(null)">Cancel</button>
     <button type="button" class="esa__enter" [disabled]="!canEnter" (click)="enterStudio()" data-testid="esa-enter-studio">
       {{ ctaLabel }} <mat-icon>arrow_forward</mat-icon>
     </button>

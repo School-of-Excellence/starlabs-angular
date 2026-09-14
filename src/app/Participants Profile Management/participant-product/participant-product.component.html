@@ -272,7 +272,7 @@
             </ng-container>
     
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="showMore(row)"></tr>
+            <tr [attr.data-testid]="'pp-row-' + i" mat-row *matRowDef="let row; columns: displayedColumns; let i = index" (click)="showMore(row)"></tr>
     
             <tr class="mat-row" *matNoDataRow>
                 <td class="mat-cell text-secondary text-center p-2" [attr.colspan]="displayedColumns.length">

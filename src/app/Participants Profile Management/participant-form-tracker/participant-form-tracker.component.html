@@ -63,7 +63,7 @@
                         (change)="toggleAll($event.checked)">
                     </mat-checkbox>
                 </th>
-                <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+                <td mat-cell *matCellDef="let row" [attr.data-testid]="'pft-select-cell-' + row.profileid" (click)="$event.stopPropagation()">
                     <mat-checkbox [checked]="isSelected(row)" [attr.data-testid]="'pft-row-select-' + row.profileid" (change)="toggleRow(row, $event.checked)">
                     </mat-checkbox>
                 </td>
@@ -95,7 +95,7 @@
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date']; sticky: true"></tr>
-            <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date']"
+            <tr [attr.data-testid]="'pft-tr-' + row.profileid" mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date']"
                 [class.selected-row]="isSelected(row)" (click)="viewRow(row)"></tr>
         </table>
 
@@ -111,8 +111,8 @@
 
 <!-- Overlay -->
 <!-- Overlay -->
-<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
-  <div class="overlay-panel" [class.wide]="activeTab === 2" (click)="$event.stopPropagation()">
+<div data-testid="pft-overlay-backdrop" class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div data-testid="pft-overlay-panel" class="overlay-panel" [class.wide]="activeTab === 2" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>{{ overlayTitle }}</h2>
       <button mat-icon-button data-testid="pft-overlay-close" (click)="closeOverlay()">

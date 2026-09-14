@@ -93,8 +93,8 @@
           <span (click)="openStatusEditor()" data-testid="up-status-edit" style="cursor: pointer;"><i class="fas fa-edit detail-icon"></i></span>
         </div>
         <!-- Edit customer status -->
-        <div class="status-editor-overlay" *ngIf="showStatusEditor" (click)="closeStatusEditor()">
-          <div class="status-editor-card" (click)="$event.stopPropagation()">
+        <div data-testid="up-status-overlay" class="status-editor-overlay" *ngIf="showStatusEditor" (click)="closeStatusEditor()">
+          <div data-testid="up-status-card" class="status-editor-card" (click)="$event.stopPropagation()">
             <div class="editor-header">
               <h3>Edit Customer Status</h3>
               <i class="fas fa-times close-icon" data-testid="up-status-close" (click)="closeStatusEditor()"></i>
@@ -620,7 +620,7 @@
                 <i class="fas fa-calendar"></i>
                 <span>Reported on {{ ticket.status.date.toDate() | date:'mediumDate' }}</span>
               </div>
-              <button [ngClass]="{'status-open' : ticket.status.status === 'Open', 'status-closed' : ticket.status.status === 'Closed' }" class="status-btn">
+              <button [attr.data-testid]="'up-ticket-status-' + ticket.issueno" [ngClass]="{'status-open' : ticket.status.status === 'Open', 'status-closed' : ticket.status.status === 'Closed' }" class="status-btn">
                 {{ getStatusText(ticket.status.status) }}
               </button>
               
@@ -784,7 +784,8 @@
           
           <div class="card-actions">
             <div class="likes-section">
-              <button 
+              <button
+                [attr.data-testid]="'up-like-' + i"
                 class="like-btn"
                 [class.liked]="post.isLiked">
                 <i class="far fa-heart" [class.fas]="post.isLiked"></i>

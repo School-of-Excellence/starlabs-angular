@@ -322,7 +322,7 @@
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="selection.toggle(row)"
+      <tr [attr.data-testid]="'vpf-tr-' + row.profileid" mat-row *matRowDef="let row; columns: displayedColumns;" (click)="selection.toggle(row)"
         [class.selected-row]="selection.isSelected(row)"></tr>
 
       <tr class="mat-row" *matNoDataRow>
@@ -346,8 +346,8 @@
 
 <app-form-overlay-view #formOverlay />
 <!-- ========== OVERLAY ========== -->
-<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
-  <div class="overlay-panel" (click)="$event.stopPropagation()">
+<div data-testid="vpf-overlay-backdrop" class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div data-testid="vpf-overlay-panel" class="overlay-panel" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>{{ overlayTitle }}</h2>
       <div class="overlay-header-actions">
@@ -412,8 +412,8 @@
 </div>
 
 <!-- ========== NOTES OVERLAY ========== -->
-<div class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()">
-  <div class="notes-panel" (click)="$event.stopPropagation()">
+<div data-testid="vpf-notes-backdrop" class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()">
+  <div data-testid="vpf-notes-panel" class="notes-panel" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>Notes - {{ notesParticipantName }}</h2>
       <button mat-icon-button data-testid="vpf-notes-close" (click)="closeNotes()">
@@ -446,8 +446,8 @@
 </div>
 
 <!-- Import Summary Modal -->
-<div class="overlay-backdrop" *ngIf="showImportSummaryModal" (click)="closeImportSummaryModal()">
-  <div class="notes-panel" (click)="$event.stopPropagation()" style="max-width: 400px;">
+<div data-testid="vpf-import-backdrop" class="overlay-backdrop" *ngIf="showImportSummaryModal" (click)="closeImportSummaryModal()">
+  <div data-testid="vpf-import-panel" class="notes-panel" (click)="$event.stopPropagation()" style="max-width: 400px;">
     <div class="overlay-header">
       <h2 *ngIf="importSummaryMode === 'matched'" style="color: #2e7d32;">
         Matched Participants ({{ matchedEmailsCount }})

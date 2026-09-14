@@ -581,6 +581,7 @@
                       class="ll-seg-btn"
                       [class.ll-seg-on]="active.customDistance.direction === 'within'"
                       [attr.aria-pressed]="active.customDistance.direction === 'within'"
+                      data-testid="ll-dist-within"
                       (click)="setCustomDirection('within')">
                       Within
                     </button>
@@ -589,6 +590,7 @@
                       class="ll-seg-btn"
                       [class.ll-seg-on]="active.customDistance.direction === 'beyond'"
                       [attr.aria-pressed]="active.customDistance.direction === 'beyond'"
+                      data-testid="ll-dist-beyond"
                       (click)="setCustomDirection('beyond')">
                       Farther than
                     </button>
@@ -617,6 +619,7 @@
                         class="ll-seg-btn"
                         [class.ll-seg-on]="active.customDistance.unit === unit"
                         [attr.aria-pressed]="active.customDistance.unit === unit"
+                        [attr.data-testid]="'ll-dist-unit-' + unit"
                         (click)="setCustomUnit(unit)">
                         {{ unit }}
                       </button>
@@ -780,6 +783,7 @@
                       class="ll-row"
                       tabindex="0"
                       [class.ll-row-selected]="(selectedId | async) === p.profileid"
+                      [attr.data-testid]="'ll-tablerow-' + p.profileid"
                       (click)="select(p)"
                       (keydown.enter)="select(p)"></tr>
                   </table>
@@ -792,6 +796,7 @@
                       class="ll-card"
                       [class.ll-card-selected]="(selectedId | async) === p.profileid"
                       tabindex="0"
+                      [attr.data-testid]="'ll-card-' + p.profileid"
                       (click)="select(p)"
                       (keydown.enter)="select(p)">
                       <div class="ll-avatar" [style.background]="getAvatarGradient(p.profileid)">

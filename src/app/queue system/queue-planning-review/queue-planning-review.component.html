@@ -72,8 +72,8 @@
               <mat-form-field appearance="outline" style="width:260px">
                 <mat-label>Date range</mat-label>
                 <mat-date-range-input [rangePicker]="exportRangePicker">
-                  <input matStartDate placeholder="Start" [(ngModel)]="liveQueueExportRange.startDate">
-                  <input matEndDate placeholder="End" [(ngModel)]="liveQueueExportRange.endDate">
+                  <input data-testid="qplr-inp-1" matStartDate placeholder="Start" [(ngModel)]="liveQueueExportRange.startDate">
+                  <input data-testid="qplr-inp-2" matEndDate placeholder="End" [(ngModel)]="liveQueueExportRange.endDate">
                 </mat-date-range-input>
                 <mat-datepicker-toggle matIconSuffix [for]="exportRangePicker"></mat-datepicker-toggle>
                 <mat-date-range-picker #exportRangePicker></mat-date-range-picker>
@@ -125,8 +125,8 @@
           <div class="interim-date-inline" *ngIf="showInterimDatePicker">
             <mat-form-field appearance="outline" class="interim-date-field">
               <mat-date-range-input [rangePicker]="interimPicker">
-                <input matStartDate placeholder="Start" [(ngModel)]="interimReportStartDate">
-                <input matEndDate placeholder="End" [(ngModel)]="interimReportEndDate">
+                <input data-testid="qplr-inp-3" matStartDate placeholder="Start" [(ngModel)]="interimReportStartDate">
+                <input data-testid="qplr-inp-4" matEndDate placeholder="End" [(ngModel)]="interimReportEndDate">
               </mat-date-range-input>
               <mat-datepicker-toggle matIconSuffix [for]="interimPicker"></mat-datepicker-toggle>
               <mat-date-range-picker #interimPicker></mat-date-range-picker>
@@ -185,7 +185,7 @@
           </div>
 
           <ng-container *ngIf="!eventParticipationLoading && arenaEventFilterList.length === 0">
-            <input class="ep-search-input" type="text"
+            <input data-testid="qplr-inp-5" class="ep-search-input" type="text"
               [(ngModel)]="eventParticipationSearchTerm"
               placeholder="Search events or queues...">
             <div class="ep-list">
@@ -474,7 +474,7 @@
         <div class="filters-grid">
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Segment</mat-label>
-            <mat-select [(ngModel)]="selectedSegmentFilter" (selectionChange)="onSegmentFilterChange()" multiple>
+            <mat-select data-testid="qplr-sel-6" [(ngModel)]="selectedSegmentFilter" (selectionChange)="onSegmentFilterChange()" multiple>
              <mat-option *ngFor="let segment of getSegmentsInQueuePlanning()" [value]="segment['docid'] || segment['id']">
                       {{ segment['segmentname'] }}
               </mat-option>
@@ -483,7 +483,7 @@
 
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Stage</mat-label>
-            <mat-select [(ngModel)]="selectedStageFilter" (selectionChange)="onStageFilterChange()" multiple>
+            <mat-select data-testid="qplr-sel-7" [(ngModel)]="selectedStageFilter" (selectionChange)="onStageFilterChange()" multiple>
               <mat-option *ngFor="let stage of queueStages" [value]="stage">
                 {{ stage }}
               </mat-option>
@@ -540,7 +540,7 @@
         *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
         <mat-form-field appearance="outline" class="stage-filter">
           <mat-label>Filter by Stage</mat-label>
-          <mat-select [(ngModel)]="selectedStageFilter">
+          <mat-select data-testid="qplr-sel-8" [(ngModel)]="selectedStageFilter">
             <mat-option value="all">All Stages</mat-option>
             <mat-option *ngFor="let stage of queueStages" [value]="stage">
               {{ stage }}
@@ -552,7 +552,7 @@
       <!-- Stage Status Counts (only for stage-specific views) -->
       <div class="stage-status-counts"
         *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
-        <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+        <div data-testid="qplr-act-9" class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>check_circle</mat-icon>
           </div>
@@ -566,7 +566,7 @@
           </div>
         </div>
 
-        <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+        <div data-testid="qplr-act-10" class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>schedule</mat-icon>
           </div>
@@ -584,7 +584,7 @@
       <!-- NEW: Confirmed/Non-Confirmed Counts (only for stage-specific views) -->
       <div class="stage-status-counts"
         *ngIf="panelViewType === 'queue-tokens' || panelViewType === 'segment-participants'">
-        <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+        <div data-testid="qplr-act-11" class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>check_circle</mat-icon>
           </div>
@@ -598,7 +598,7 @@
           </div>
         </div>
 
-        <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+        <div data-testid="qplr-act-12" class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>schedule</mat-icon>
           </div>
@@ -1057,8 +1057,8 @@
 
         <mat-date-range-input [rangePicker]="picker" [dateFilter]="allowedDateForFilter">
 
-          <input matStartDate placeholder="Start date" [(ngModel)]="slotPlannerFilter.startDate">
-          <input matEndDate placeholder="End date" [(ngModel)]="slotPlannerFilter.endDate">
+          <input data-testid="qplr-inp-13" matStartDate placeholder="Start date" [(ngModel)]="slotPlannerFilter.startDate">
+          <input data-testid="qplr-inp-14" matEndDate placeholder="End date" [(ngModel)]="slotPlannerFilter.endDate">
 
         </mat-date-range-input>
 
@@ -1129,7 +1129,7 @@
           <ng-container *ngFor="let slot of dayGroup.slots; let i = index">
   
             <!-- Slot Row -->
-            <tr class="slot-row" (click)="toggleRow(slot)">
+            <tr [attr.data-testid]="'qplr-act-15-' + i" class="slot-row" (click)="toggleRow(slot)">
               <td>
                 <span class="expand-arrow" [class.expanded]="slot.expanded" *ngIf="slot.showExpand">▶</span>
               </td>
@@ -1228,11 +1228,11 @@
 
               <!-- Main Row -->
               <tr class="slot-row" [class.active-panel-row]="isActivePanelSlot(slot)">
-                <td (click)="toggleQueueRow(slot)">
+                <td [attr.data-testid]="'qplr-act-16-' + slot" (click)="toggleQueueRow(slot)">
                   <span class="expand-arrow"
                     [class.expanded]="isQueueRowExpanded(slot)">▶</span>
                 </td>
-                <td (click)="toggleQueueRow(slot)">
+                <td [attr.data-testid]="'qplr-act-17-' + slot" (click)="toggleQueueRow(slot)">
                   <div *ngIf="getSlotTitle(slot, selectedStage)"
                     class="table-slot-title">
                     <span class="datetime-label" style="color: black;">Title:</span>  
@@ -1242,21 +1242,21 @@
                   {{ getTimeString(slot.startdate, slot.enddate) }}
                 </td>
                 <td style="text-align:center">
-                  <span class="badge badge-booked clickable-badge"
+                  <span [attr.data-testid]="'qplr-act-18-' + slot" class="badge badge-booked clickable-badge"
                     (click)="openQueueTabPanelForSlot(slot, selectedStage, 'confirmed')">
                     <mat-icon class="badge-click-icon">how_to_reg</mat-icon>
                     {{ getConfirmedCountForSlot(slot, selectedStage) }}
                   </span>
                 </td>
                 <td style="text-align:center">
-                  <span class="badge badge-nonconf clickable-badge"
+                  <span [attr.data-testid]="'qplr-act-19-' + slot" class="badge badge-nonconf clickable-badge"
                     (click)="openQueueTabPanelForSlot(slot, selectedStage, 'non-confirmed')">
                     <mat-icon class="badge-click-icon">schedule</mat-icon>
                     {{ getNonConfirmedCountForSlot(slot, selectedStage) }}
                   </span>
                 </td>
                 <td style="text-align:center">
-                  <span class="badge badge-none clickable-badge"
+                  <span [attr.data-testid]="'qplr-act-20-' + slot" class="badge badge-none clickable-badge"
                     (click)="openQueueTabPanelForSlot(slot, selectedStage, 'all')">
                     <mat-icon class="badge-click-icon">people</mat-icon>
                     {{ getConfirmedCountForSlot(slot, selectedStage) + getNonConfirmedCountForSlot(slot, selectedStage) }}
@@ -1286,7 +1286,7 @@
                         <ng-container *ngFor="let segmentVar of slot.segmentVariations">
                           <tr class="segment-row" [class.segment-row-selected]="isSegmentSelected(segmentVar.segmentId)">
                             <td>
-                              <mat-checkbox
+                              <mat-checkbox [attr.data-testid]="'qplr-change-21-' + segmentVar"
                                 [checked]="isSegmentSelected(segmentVar.segmentId)"
                                 (change)="toggleSegmentSelection(segmentVar.segmentId, $event.checked, slot, selectedStage)"
                                 (click)="$event.stopPropagation()">
@@ -1294,19 +1294,19 @@
                             </td>
                             <td>{{ segmentVar.segmentName }}</td>
                             <td style="text-align:center">
-                              <span class="badge badge-booked clickable-badge"
+                              <span [attr.data-testid]="'qplr-act-22-' + segmentVar" class="badge badge-booked clickable-badge"
                                 (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'confirmed'); $event.stopPropagation()">
                                 {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
                               </span>
                             </td>
                             <td style="text-align:center">
-                              <span class="badge badge-nonconf clickable-badge"
+                              <span [attr.data-testid]="'qplr-act-23-' + segmentVar" class="badge badge-nonconf clickable-badge"
                                 (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'non-confirmed'); $event.stopPropagation()">
                                 {{ getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
                               </span>
                             </td>
                             <td style="text-align:center">
-                              <span class="badge badge-none clickable-badge"
+                              <span [attr.data-testid]="'qplr-act-24-' + segmentVar" class="badge badge-none clickable-badge"
                                 (click)="openQueueTabPanel(slot, selectedStage, segmentVar.segmentId, 'all')">
                                 <mat-icon class="badge-click-icon">people</mat-icon>
                                 {{ getConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) + getNonConfirmedCountForSegmentSlot(slot, selectedStage, segmentVar.segmentId) }}
@@ -1425,11 +1425,11 @@
 
       <!-- Participants List -->
       <div class="queue-panel-list-redesign">
-        <div class="queue-participant-card"
+        <div [attr.data-testid]="'qplr-act-25-' + i" class="queue-participant-card"
           *ngFor="let participant of allParticipantsForStage; let i = index"
           [class.selected]="participant.selected"
           (click)="participant.selected = !participant.selected">
-          <mat-checkbox [(ngModel)]="participant.selected" (click)="$event.stopPropagation()">
+          <mat-checkbox [attr.data-testid]="'qplr-act-26-' + i" [(ngModel)]="participant.selected" (click)="$event.stopPropagation()">
           </mat-checkbox>
           <div class="queue-participant-details">
             <div class="queue-participant-name">
@@ -1481,7 +1481,7 @@
       <p class="book-slot-label">Select a slot:</p>
 
       <div class="book-slot-list">
-        <div
+        <div [attr.data-testid]="'qplr-act-27-' + i"
           *ngFor="let slot of bookSlotAvailableSlots; let i = index"
           class="book-slot-item"
           [class.book-slot-selected]="bookSlotSelectedIndex === i"
@@ -1536,7 +1536,7 @@
     <div style="padding: 8px 16px;">
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Search by participant or stage</mat-label>
-        <input matInput [(ngModel)]="revertHistorySearchTerm" 
+        <input data-testid="qplr-inp-28" matInput [(ngModel)]="revertHistorySearchTerm" 
           (ngModelChange)="filterRevertHistory()"
           placeholder="Search...">
         <mat-icon matSuffix>search</mat-icon>

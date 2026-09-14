@@ -92,6 +92,7 @@
         </div>
         <mat-chip-set>
             <mat-chip-option
+              [attr.data-testid]="'pa-savedfilter-' + option.docid"
               *ngFor="let option of savedfiltersearch();let i = index;"
               [selected]="selectedSavedFilterQueryLabel === option['label']"
               (click)="loadtabledata(savedfilterquery[i]);"
@@ -99,15 +100,17 @@
               <div class="chip-content">
                 <span class="label">{{option.label}}</span>
                 <div class="icon-group">
-                  <mat-icon 
-                    (click)="updateDefaultSearch(savedfilterquery[i])" 
+                  <mat-icon
+                    [attr.data-testid]="'pa-savedfilter-default-' + option.docid"
+                    (click)="updateDefaultSearch(savedfilterquery[i])"
                     [class.selected]="option.docid === defaultSearchDocId"
                     [matTooltip]="option.docid === defaultSearchDocId ? 'Default search' : 'Set as default'"
                     class="action-icon bookmark-icon">
                     {{ option.docid === defaultSearchDocId ? 'bookmark' : 'bookmark_border' }}
                   </mat-icon>
-                  <mat-icon 
-                    (click)="ondeletefilterdata(savedfilterquery[i])" 
+                  <mat-icon
+                    [attr.data-testid]="'pa-savedfilter-delete-' + option.docid"
+                    (click)="ondeletefilterdata(savedfilterquery[i])"
                     class="action-icon delete-icon"
                     matTooltip="Delete filter">
                     delete
@@ -706,7 +709,7 @@
 
             </span>
             <span *ngIf="column == 'atccount'">{{element[column] ?? 0}}</span>
-            <span *ngIf="column == 'kyj'"><a class="profilename" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
+            <span *ngIf="column == 'kyj'"><a class="profilename" [attr.data-testid]="'pa-kyj-link-' + element['profileid']" [routerLink]="'/knowyourjourney/' + element['profileid']" target="_blank">{{element[column]}}</a></span>
             <!-- <span *ngIf="column == 'activejourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
             <span *ngIf="['activejourney','lastcompletedjourney', 'lastsubscribedjourney','higherorderpurchase'].includes(column)">{{mapfiltervalues[element[column]]}}</span>
             <!-- <span *ngIf="column == 'lastcompletedjourney'"><a class="profilename" [routerLink]="'/participantpurchase/' + element['profileid']" target="_blank">{{mapfiltervalues[element[column]]}}</a></span> -->
@@ -794,7 +797,7 @@
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"(click)="selection.toggle(row)"></tr>
+        <tr [attr.data-testid]="'pa-tr-' + row.profileid" mat-row *matRowDef="let row; columns: displayedColumns;"(click)="selection.toggle(row)"></tr>
       </table>
       <mat-paginator
         [pageSizeOptions]="[15, 50, 100, 200, dataSource.data.length]"
@@ -812,7 +815,7 @@
     </div>
   </section>
   <!-- Tag History Side Panel -->
-  <div class="tag-history-overlay" *ngIf="showTagHistory" (click)="closeTagHistory()"></div>
+  <div data-testid="pa-taghistory-overlay" class="tag-history-overlay" *ngIf="showTagHistory" (click)="closeTagHistory()"></div>
   <div class="tag-history-panel" *ngIf="showTagHistory">
     <div class="tag-history-header">
       <div>
@@ -853,7 +856,7 @@
   </div>
 </main>
 
-<div class="backdrop" *ngIf="isModalOpen" (click)="onBackdropClick($event)">
+<div data-testid="pa-modal-backdrop" class="backdrop" *ngIf="isModalOpen" (click)="onBackdropClick($event)">
 
   <div class="modal-card">
 

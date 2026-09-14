@@ -60,20 +60,20 @@
             <div class="fieldbox">
               <mat-form-field class="w-50" appearance="outline">
                 <mat-label>Subscription Start</mat-label>
-                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionstart" [matDatepicker]="startpicker" (click)="startpicker.open()" placeholder="MM-DD-YYYY">
+                <input data-testid="pds-date-start" matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionstart" [matDatepicker]="startpicker" (click)="startpicker.open()" placeholder="MM-DD-YYYY">
                 <mat-datepicker-toggle matSuffix [for]="startpicker"></mat-datepicker-toggle>
                 <mat-datepicker #startpicker></mat-datepicker>
               </mat-form-field>
               <mat-form-field class="w-50" appearance="outline">
                 <mat-label>Subscription End</mat-label>
-                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionend" [matDatepicker]="endpicker" (click)="endpicker.open()" placeholder="MM-DD-YYYY">
+                <input data-testid="pds-date-end" matInput [(ngModel)]="participantProducts[selectedProductIndex].subscriptionend" [matDatepicker]="endpicker" (click)="endpicker.open()" placeholder="MM-DD-YYYY">
                 <mat-datepicker-toggle matSuffix [for]="endpicker"></mat-datepicker-toggle>
                 <mat-datepicker #endpicker></mat-datepicker>
               </mat-form-field>
               <br>
               <mat-form-field class="singlefield" appearance="outline">
                 <mat-label>Tentative Start Date</mat-label>
-                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].tentativestart" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+                <input data-testid="pds-date-tentative" matInput [(ngModel)]="participantProducts[selectedProductIndex].tentativestart" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
                 <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                 <mat-datepicker #picker></mat-datepicker>
               </mat-form-field>
@@ -87,7 +87,7 @@
               </mat-form-field>
               <mat-form-field class="singlefield" *ngIf="participantProducts[selectedProductIndex].status != null" appearance="outline">
                 <mat-label>{{participantProducts[selectedProductIndex].status}} On</mat-label>
-                <input matInput [(ngModel)]="participantProducts[selectedProductIndex].statusdate[participantProducts[selectedProductIndex].status]" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+                <input data-testid="pds-date-status" matInput [(ngModel)]="participantProducts[selectedProductIndex].statusdate[participantProducts[selectedProductIndex].status]" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
                 <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                 <mat-datepicker #picker></mat-datepicker>
               </mat-form-field> 

@@ -1,7 +1,7 @@
 <div class="big-planner-container">
     <!-- Header Bar -->
     <mat-toolbar  class="header-toolbar">
-      <button mat-icon-button (click)="toggleSidebar()">
+      <button data-testid="bpln-btn-1" mat-icon-button (click)="toggleSidebar()">
         <mat-icon>menu</mat-icon>
       </button>
       <span class="title-spacer"></span>
@@ -25,7 +25,7 @@
         </mat-select>
       </mat-form-field>
       <div class="event-chips-container">
-        <div *ngFor="let event of selectedEventsList" (click)="onEventClick(event)" [class.active]="selectedEvent === event">
+        <div [attr.data-testid]="'bpln-act-2-' + event" *ngFor="let event of selectedEventsList" (click)="onEventClick(event)" [class.active]="selectedEvent === event">
           {{mapEvent[event].name}}
         </div>
       </div>
@@ -107,7 +107,7 @@
                         <span class="stat-label">Pair</span>
                         <span class="stat-value" data-testid="bp-stat-pair">{{profilePairCount[invitation]?.length || 0}}</span>
                       </div>
-                      <div class="stat-chip chip-duplicate" (mouseenter)="onEnter($event, invitation , 'duplicate')"
+                      <div [attr.data-testid]="'bpln-act-3-' + i" class="stat-chip chip-duplicate" (mouseenter)="onEnter($event, invitation , 'duplicate')"
                         (mouseleave)="onLeave()" (click)="onDuplicateClick(invitation)">
                         <mat-icon class="chip-icon">content_copy</mat-icon>
                         <span class="stat-label">Duplicate</span>
@@ -136,7 +136,7 @@
 
                     <mat-form-field appearance="outline">
                       <mat-label>Activity</mat-label>
-                      <mat-select [(ngModel)]="pair.activity">
+                      <mat-select [attr.data-testid]="'bpln-sel-4-' + i" [(ngModel)]="pair.activity">
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filterActivity" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
@@ -148,7 +148,7 @@
                     
                     <mat-form-field appearance="outline" >
                       <mat-label>Participant</mat-label>
-                      <mat-select [(ngModel)]="pair.profileid" >
+                      <mat-select [attr.data-testid]="'bpln-sel-5-' + i" [(ngModel)]="pair.profileid" >
                         <mat-option>
                           <ngx-mat-select-search [(ngModel)]="filterText" placeholderLabel="Search" noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
                         </mat-option>
@@ -164,13 +164,13 @@
                   </div>
 
                   <div class="role-form-actions">
-                    <button *ngIf="i !== 0" type="button" class="row-action-btn remove" (click)="removePair(i)" aria-label="Remove">
+                    <button [attr.data-testid]="'bpln-btn-6-' + i" *ngIf="i !== 0" type="button" class="row-action-btn remove" (click)="removePair(i)" aria-label="Remove">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
                 </div>
 
-                <button type="button" class="add-pair-btn" (click)="addPair()">
+                <button data-testid="bpln-btn-7" type="button" class="add-pair-btn" (click)="addPair()">
                   <mat-icon>add</mat-icon>
                   <span>Add Participant</span>
                 </button>
@@ -180,7 +180,7 @@
                     <div class="overall-atc-field">
                       <div class="overall-atc-label">ATC Model (applies to all)</div>
                       <mat-form-field appearance="outline" class="overall-atc-model">
-                        <mat-select [(ngModel)]="overallAtcModel" multiple placeholder="Select ATC models">
+                        <mat-select data-testid="bpln-sel-8" [(ngModel)]="overallAtcModel" multiple placeholder="Select ATC models">
                           <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
                             {{list.atcmodel}}
                           </mat-option>
@@ -190,7 +190,7 @@
                     <div class="overall-atc-field">
                       <div class="overall-atc-label">Mandatory Activities</div>
                       <mat-form-field appearance="outline" class="overall-atc-model">
-                        <mat-select [(ngModel)]="overallMandatoryActivities" multiple placeholder="Select activities">
+                        <mat-select data-testid="bpln-sel-9" [(ngModel)]="overallMandatoryActivities" multiple placeholder="Select activities">
                           <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
                             {{activity.activity}}
                           </mat-option>
@@ -203,7 +203,7 @@
                 <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']" [(ngModel)]="openViduEnabled">Let this Studio use OpenVidu to make Call.</mat-checkbox>
     
                 <div class="assign-button-container">
-                  <button mat-raised-button color="primary" (click)="assignRoles()">
+                  <button data-testid="bpln-btn-10" mat-raised-button color="primary" (click)="assignRoles()">
                     Assign Role
                   </button>
                 </div>
@@ -218,7 +218,7 @@
                 <div class="card-title-row">
                   <span>B!G Roles Assign</span>
                   <span class="role-count">Active {{studioinStudio}}/{{studioPairingList.length}}</span>
-                  <button mat-icon-button (click)="toggleFilters()">
+                  <button data-testid="bpln-btn-11" mat-icon-button (click)="toggleFilters()">
                     <mat-icon>filter_list</mat-icon>
                   </button>
                 </div>
@@ -231,10 +231,10 @@
               <div class="filter-row">
                 <mat-form-field appearance="outline">
                   <mat-label>Filter by Participant</mat-label>
-                  <input matInput [(ngModel)]="filterStudioText" 
+                  <input data-testid="bpln-inp-12" matInput [(ngModel)]="filterStudioText" 
                     (ngModelChange)="filterStudios()" 
                     placeholder="Enter name">
-                  <button *ngIf="filterStudioText" 
+                  <button data-testid="bpln-btn-13" *ngIf="filterStudioText" 
                     mat-icon-button matSuffix 
                     (click)="filterStudioText=''; filterStudios()">
                     <mat-icon>close</mat-icon>
@@ -243,7 +243,7 @@
   
                 <mat-form-field appearance="outline">
                   <mat-label>Filter by Activity</mat-label>
-                  <mat-select [(ngModel)]="filterActivityValue" 
+                  <mat-select data-testid="bpln-sel-14" [(ngModel)]="filterActivityValue" 
                     (ngModelChange)="filterStudios()">
                     <mat-option [value]="''">All Activities</mat-option>
                     <mat-option>
@@ -257,7 +257,7 @@
   
                 <mat-form-field appearance="outline">
                   <mat-label>Filter by ATC Model</mat-label>
-                  <mat-select [(ngModel)]="filterAtcModelValue" 
+                  <mat-select data-testid="bpln-sel-15" [(ngModel)]="filterAtcModelValue" 
                     (ngModelChange)="filterStudios()">
                     <mat-option [value]="''">All ATC Models</mat-option>
                     <mat-option *ngFor="let model of productList" 
@@ -269,7 +269,7 @@
   
                 <mat-form-field appearance="outline">
                   <mat-label>Status</mat-label>
-                  <mat-select [(ngModel)]="filterStatusValue" 
+                  <mat-select data-testid="bpln-sel-16" [(ngModel)]="filterStatusValue" 
                     (ngModelChange)="filterStudios()">
                     <mat-option [value]="''">All Status</mat-option>
                     <mat-option [value]="true">Active</mat-option>
@@ -318,7 +318,7 @@
                       <div *ngIf="!viewOnly" class="w-100 mt-1">
                         <mat-form-field appearance="outline">
                           <mat-label>Pre-Assign Token</mat-label>
-                          <mat-select 
+                          <mat-select data-testid="bpln-sel-17" 
                             [(ngModel)]="studioPreAssign[studio['docid']]" 
                             (selectionChange)="updatePreAssigned(studio['docid'], $event.value)" 
                             multiple>
@@ -373,7 +373,7 @@
                           <span class="chip chip-atc" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
                           <span class="chip-empty" *ngIf="!(studio['atcmodel'] && studio['atcmodel'].length)">—</span>
                         </div>
-                        <button *ngIf="!viewOnly" class="cell-edit-btn" (click)="openAtcEditMode(studio['docid'])" matTooltip="Edit ATC Model">
+                        <button data-testid="bpln-btn-18" *ngIf="!viewOnly" class="cell-edit-btn" (click)="openAtcEditMode(studio['docid'])" matTooltip="Edit ATC Model">
                           <mat-icon>edit</mat-icon>
                         </button>
                       </div>
@@ -389,7 +389,7 @@
                           <span class="chip chip-mandatory" *ngFor="let actId of studio['mandatoryactivities'] || []">{{ mapBigActivity[actId] }}</span>
                           <span class="chip-empty" *ngIf="!(studio['mandatoryactivities'] && studio['mandatoryactivities'].length)">—</span>
                         </div>
-                        <button *ngIf="!viewOnly" class="cell-edit-btn" (click)="openMandatoryEditMode(studio['docid'])" matTooltip="Edit Mandatory Activities">
+                        <button data-testid="bpln-btn-19" *ngIf="!viewOnly" class="cell-edit-btn" (click)="openMandatoryEditMode(studio['docid'])" matTooltip="Edit Mandatory Activities">
                           <mat-icon>edit</mat-icon>
                         </button>
                       </div>
@@ -409,7 +409,7 @@
                           <span>Studio</span>
                         </button>
 
-                        <button type="button" class="action-pill"
+                        <button data-testid="bpln-btn-20" type="button" class="action-pill"
                           [class.on]="studio.checkin"
                           (click)="toggleCheckin(studio)"
                           [matTooltip]="studio.checkin ? 'Checked In' : 'Checked Out'">
@@ -417,7 +417,7 @@
                           <span>{{ studio.checkin ? 'In' : 'Out' }}</span>
                         </button>
 
-                        <button type="button" class="action-pill"
+                        <button data-testid="bpln-btn-21" type="button" class="action-pill"
                           *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']"
                           [class.on]="studio.openvidu"
                           (click)="toggleOpenVidu(studio)"
@@ -426,7 +426,7 @@
                           <span>OpenVidu</span>
                         </button>
                         
-                        <button *ngIf="deleteOption" 
+                        <button data-testid="bpln-btn-22" *ngIf="deleteOption" 
                           mat-icon-button color="warn" 
                           (click)="deleteStudio(studio)" 
                           matTooltip="Delete Studio">
@@ -497,8 +497,8 @@
 
 
 <!-- Backdrop overlay -->
-<div class="modal-backdrop" *ngIf="editAtcModel" (click)="cancelAtcEdit()">
-  <div class="modal-card" (click)="$event.stopPropagation()">
+<div data-testid="bpln-act-23" class="modal-backdrop" *ngIf="editAtcModel" (click)="cancelAtcEdit()">
+  <div data-testid="bpln-act-24" class="modal-card" (click)="$event.stopPropagation()">
 
     <!-- Header -->
     <div class="modal-header">
@@ -509,14 +509,14 @@
           <span class="modal-subtitle">Select one or more models for this studio</span>
         </div>
       </div>
-      <button class="close-btn" (click)="cancelAtcEdit()" aria-label="Close">&#x2715;</button>
+      <button data-testid="bpln-btn-25" class="close-btn" (click)="cancelAtcEdit()" aria-label="Close">&#x2715;</button>
     </div>
 
     <!-- Body -->
     <div class="modal-body">
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>ATC Model</mat-label>
-        <mat-select [(ngModel)]="editAtcModelData" multiple>
+        <mat-select data-testid="bpln-sel-26" [(ngModel)]="editAtcModelData" multiple>
           <mat-option
             *ngFor="let list of productList"
             [value]="list.atcmodel"
@@ -529,15 +529,15 @@
 
     <!-- Footer -->
     <div class="modal-footer">
-      <button mat-stroked-button class="btn-ghost" (click)="cancelAtcEdit()">Cancel</button>
-      <button mat-flat-button color="primary" class="btn-primary" (click)="applyAtcEdit()">Apply</button>
+      <button data-testid="bpln-btn-27" mat-stroked-button class="btn-ghost" (click)="cancelAtcEdit()">Cancel</button>
+      <button data-testid="bpln-btn-28" mat-flat-button color="primary" class="btn-primary" (click)="applyAtcEdit()">Apply</button>
     </div>
 
   </div>
 </div>
 
-<div class="modal-backdrop" *ngIf="editMandatoryActivities" (click)="cancelMandatoryEdit()">
-  <div class="modal-card" (click)="$event.stopPropagation()">
+<div data-testid="bpln-act-29" class="modal-backdrop" *ngIf="editMandatoryActivities" (click)="cancelMandatoryEdit()">
+  <div data-testid="bpln-act-30" class="modal-card" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-header-leading">
         <div class="modal-header-icon"><mat-icon>assignment_turned_in</mat-icon></div>
@@ -546,12 +546,12 @@
           <span class="modal-subtitle">Choose activities required for this studio</span>
         </div>
       </div>
-      <button class="close-btn" (click)="cancelMandatoryEdit()" aria-label="Close">&#x2715;</button>
+      <button data-testid="bpln-btn-31" class="close-btn" (click)="cancelMandatoryEdit()" aria-label="Close">&#x2715;</button>
     </div>
     <div class="modal-body">
       <mat-form-field appearance="outline" style="width: 100%;">
         <mat-label>Mandatory Activities</mat-label>
-        <mat-select [(ngModel)]="editMandatoryActivitiesData" multiple>
+        <mat-select data-testid="bpln-sel-32" [(ngModel)]="editMandatoryActivitiesData" multiple>
           <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
             {{ activity.activity }}
           </mat-option>
@@ -559,8 +559,8 @@
       </mat-form-field>
     </div>
     <div class="modal-footer">
-      <button mat-stroked-button class="btn-ghost" (click)="cancelMandatoryEdit()">Cancel</button>
-      <button mat-flat-button color="primary" class="btn-primary" (click)="applyMandatoryEdit()">Apply</button>
+      <button data-testid="bpln-btn-33" mat-stroked-button class="btn-ghost" (click)="cancelMandatoryEdit()">Cancel</button>
+      <button data-testid="bpln-btn-34" mat-flat-button color="primary" class="btn-primary" (click)="applyMandatoryEdit()">Apply</button>
     </div>
   </div>
 </div>
@@ -569,7 +569,7 @@
   <div class="tm-modal" *ngIf="duplicatedStudios">
     <div class="tm-header">
       <span class="tm-header__title">Duplicated Studios</span>
-      <button class="tm-header__close" (click)="closeDuplicateStuioModel(false)" >✕</button>
+      <button data-testid="bpln-btn-35" class="tm-header__close" (click)="closeDuplicateStuioModel(false)" >✕</button>
     </div>
     <div class="tm-notice">
       <mat-icon class="tm-notice__icon">info</mat-icon>
@@ -613,8 +613,8 @@
       </div>
     </div>
     <div class="tm-footer">
-      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeDuplicateStuioModel(false)">Cancel</button>
-      <button class="tm-btn tm-btn--proceed" (click)="closeDuplicateStuioModel(true)">Proceed</button>
+      <button data-testid="bpln-btn-36" class="tm-bassignRolestn tm-btn--cancel" (click)="closeDuplicateStuioModel(false)">Cancel</button>
+      <button data-testid="bpln-btn-37" class="tm-btn tm-btn--proceed" (click)="closeDuplicateStuioModel(true)">Proceed</button>
     </div>
   </div>
 </ng-template>

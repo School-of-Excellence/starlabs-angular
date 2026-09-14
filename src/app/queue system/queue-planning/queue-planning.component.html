@@ -60,14 +60,14 @@
           <div class="date-range-inputs">
             <mat-form-field appearance="outline" class="date-filter">
               <mat-label>Start Date</mat-label>
-              <input matInput [matDatepicker]="filterStartPicker" [(ngModel)]="filterDateStart" placeholder="From">
+              <input data-testid="qpln-inp-1" matInput [matDatepicker]="filterStartPicker" [(ngModel)]="filterDateStart" placeholder="From">
               <mat-datepicker-toggle matSuffix [for]="filterStartPicker"></mat-datepicker-toggle>
               <mat-datepicker #filterStartPicker></mat-datepicker>
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="date-filter">
               <mat-label>End Date</mat-label>
-              <input matInput [matDatepicker]="filterEndPicker" [(ngModel)]="filterDateEnd" placeholder="To">
+              <input data-testid="qpln-inp-2" matInput [matDatepicker]="filterEndPicker" [(ngModel)]="filterDateEnd" placeholder="To">
               <mat-datepicker-toggle matSuffix [for]="filterEndPicker"></mat-datepicker-toggle>
               <mat-datepicker #filterEndPicker></mat-datepicker>
             </mat-form-field>
@@ -78,7 +78,7 @@
         <div class="filter-group">
           <mat-form-field appearance="outline" class="segment-search-filter">
             <mat-label>Search Segments</mat-label>
-            <input matInput [(ngModel)]="filterSegmentSearch" placeholder="Type segment name...">
+            <input data-testid="qpln-inp-3" matInput [(ngModel)]="filterSegmentSearch" placeholder="Type segment name...">
             <mat-icon matPrefix>search</mat-icon>
             <button mat-icon-button matSuffix *ngIf="filterSegmentSearch" (click)="filterSegmentSearch = ''" data-testid="qp-segsearch-clear">
               <mat-icon>clear</mat-icon>
@@ -90,7 +90,7 @@
         <div class="filter-group">
           <mat-form-field appearance="outline" class="tags-filter">
             <mat-label>Filter by Tags</mat-label>
-            <mat-select [(ngModel)]="filterSelectedTags" multiple placeholder="Select tags">
+            <mat-select data-testid="qpln-sel-4" [(ngModel)]="filterSelectedTags" multiple placeholder="Select tags">
               <mat-option *ngFor="let tag of participantTagsList" [value]="tag.id">
                 {{ tag.name }}
               </mat-option>
@@ -103,7 +103,7 @@
         <div class="filter-group">
           <mat-form-field appearance="outline" class="lists-filter">
             <mat-label>Filter by Participant Lists</mat-label>
-            <mat-select [(ngModel)]="filterSelectedLists" multiple placeholder="Select lists">
+            <mat-select data-testid="qpln-sel-5" [(ngModel)]="filterSelectedLists" multiple placeholder="Select lists">
               <mat-option *ngFor="let list of participantListsList" [value]="list.id">
                 {{ list.listname }}
               </mat-option>
@@ -285,7 +285,7 @@
                       <div class="cohort-edit-mode" *ngIf="editingRow === row && editingStageName === stage && editingCohort">
                         <mat-form-field appearance="outline" class="cohort-select">
                           <mat-label>Select Cohorts</mat-label>
-                          <mat-select [(ngModel)]="editingCohortData.cohortIds" placeholder="Select Cohorts" [multiple]="true">
+                          <mat-select [attr.data-testid]="'qpln-sel-6-' + stage" [(ngModel)]="editingCohortData.cohortIds" placeholder="Select Cohorts" [multiple]="true">
                             <mat-option>
                               <ngx-mat-select-search [(ngModel)]="searchCohort" placeholderLabel="Search Cohort..."
                                 noEntriesFoundLabel="No cohorts found">
@@ -661,7 +661,7 @@
       <div class="row-edit-form">
         <mat-form-field appearance="outline">
           <mat-label>Variation</mat-label>
-          <mat-select [(ngModel)]="editingVariationData.selectedVariation" placeholder="Select Variation">
+          <mat-select data-testid="qpln-sel-7" [(ngModel)]="editingVariationData.selectedVariation" placeholder="Select Variation">
             <mat-option *ngFor="let variation of queueVariationList" [value]="variation.id">
               {{ variation.variationname }}
             </mat-option>
@@ -685,7 +685,7 @@
       <div class="row-edit-form">
         <mat-form-field appearance="outline">
           <mat-label>Segment</mat-label>
-          <mat-select [(ngModel)]="editingSegmentData.selectedSegment" placeholder="Select Segment">
+          <mat-select data-testid="qpln-sel-8" [(ngModel)]="editingSegmentData.selectedSegment" placeholder="Select Segment">
             <mat-option *ngFor="let segment of segmentList" [value]="segment.id"
               [disabled]="isSegmentDisabled(segment.id, editingRowForSegment?.id)">
               {{ segment.segmentname }}
@@ -720,7 +720,7 @@
 
         <mat-form-field appearance="outline" *ngIf="slotDialogMode === 'multi'">
           <mat-label>Select Segments</mat-label>
-          <mat-select [(ngModel)]="multiSlotData.selectedSegments" multiple placeholder="Select Segments">
+          <mat-select data-testid="qpln-sel-9" [(ngModel)]="multiSlotData.selectedSegments" multiple placeholder="Select Segments">
             <mat-option>
               <ngx-mat-select-search [(ngModel)]="searchSegmentForMulti" placeholderLabel="Search Segment..."
                 noEntriesFoundLabel="No segments found">
@@ -756,54 +756,54 @@
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="slot-field">
             <mat-label>Title</mat-label>
-            <input matInput type="text" [(ngModel)]="editingDateEntry.title">
+            <input data-testid="qpln-inp-10" matInput type="text" [(ngModel)]="editingDateEntry.title">
           </mat-form-field>
         </div>
 
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="slot-field">
             <mat-label>Description</mat-label>
-            <textarea matInput type="text" [(ngModel)]="editingDateEntry.description"></textarea>
+            <textarea data-testid="qpln-txt-11" matInput type="text" [(ngModel)]="editingDateEntry.description"></textarea>
           </mat-form-field>
         </div>
         
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>Start Date</mat-label>
-            <input matInput [matDatepicker]="startPicker" [(ngModel)]="editingDateEntry.startdate">
+            <input data-testid="qpln-inp-12" matInput [matDatepicker]="startPicker" [(ngModel)]="editingDateEntry.startdate">
             <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
             <mat-datepicker #startPicker></mat-datepicker>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="time-field">
             <mat-label>Start Time</mat-label>
-            <input matInput type="time" [(ngModel)]="editingDateEntry.starttime">
+            <input data-testid="qpln-inp-13" matInput type="time" [(ngModel)]="editingDateEntry.starttime">
           </mat-form-field>
         </div>
 
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>End Date</mat-label>
-            <input matInput [matDatepicker]="endPicker" [(ngModel)]="editingDateEntry.enddate">
+            <input data-testid="qpln-inp-14" matInput [matDatepicker]="endPicker" [(ngModel)]="editingDateEntry.enddate">
             <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
             <mat-datepicker #endPicker></mat-datepicker>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="time-field">
             <mat-label>End Time</mat-label>
-            <input matInput type="time" [(ngModel)]="editingDateEntry.endtime">
+            <input data-testid="qpln-inp-15" matInput type="time" [(ngModel)]="editingDateEntry.endtime">
           </mat-form-field>
         </div>
 
         <div class="slot-fields-row">
           <mat-form-field appearance="outline" class="slot-field">
             <mat-label>Max Slot</mat-label>
-            <input matInput type="number" [(ngModel)]="editingDateEntry.maxslot" min="0">
+            <input data-testid="qpln-inp-16" matInput type="number" [(ngModel)]="editingDateEntry.maxslot" min="0">
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="slot-field" *ngIf="slotDialogMode === 'single'">
             <mat-label>Used Slot</mat-label>
-            <input matInput type="number" [(ngModel)]="editingDateEntry.usedslot" min="0" readonly>
+            <input data-testid="qpln-inp-17" matInput type="number" [(ngModel)]="editingDateEntry.usedslot" min="0" readonly>
             <mat-hint>Read only - Auto-calculated from participants</mat-hint>
           </mat-form-field>
         </div>

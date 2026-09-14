@@ -181,7 +181,8 @@
           </ng-container>
       
           <tr mat-header-row  *matHeaderRowDef="fullfillmentheader"></tr>
-          <tr mat-row   matRipple *matRowDef="let row; columns: fullfillmentheader;"
+          <tr mat-row   matRipple *matRowDef="let row; columns: fullfillmentheader; let fri = index"
+          [attr.data-testid]="'ps-fulfil-row-' + fri"
           class="example-element-row"
           [class.example-expanded-row]="expandedElement === row"
           (click)="expandedElement = expandedElement === row ? null : row"
@@ -315,7 +316,8 @@
           </ng-container>
       
           <tr mat-header-row  *matHeaderRowDef="customersupportheader"></tr>
-          <tr mat-row   matRipple *matRowDef="let row; columns: customersupportheader;"
+          <tr mat-row   matRipple *matRowDef="let row; columns: customersupportheader; let cri = index"
+          [attr.data-testid]="'ps-cs-row-' + cri"
           class="example-element-row"
           [class.example-expanded-row]="expandedElement === row"
           (click)="expandedElement = expandedElement === row ? null : row"

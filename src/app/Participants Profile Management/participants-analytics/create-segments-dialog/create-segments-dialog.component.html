@@ -17,6 +17,7 @@
         </div>
         <div class="header-actions">
           <button
+            data-testid="csd-history-toggle-1"
             mat-stroked-button
             class="history-btn"
             (click)="toggleHistoryPanel()"
@@ -25,6 +26,7 @@
             History
           </button>
           <button
+            data-testid="csd-create-toggle-2"
             mat-raised-button
             color="primary"
             (click)="toggleCreateForm()"
@@ -114,6 +116,7 @@
               </div>
             </div>
             <button
+              data-testid="csd-create-submit-3"
               mat-raised-button
               color="primary"
               (click)="onCreateSegment()"
@@ -217,6 +220,7 @@
               </th>
               <td mat-cell *matCellDef="let segment" class="actions-cell">
                 <button
+                  [attr.data-testid]="'csd-seg-edit-' + segment.docid"
                   mat-icon-button
                   color="primary"
                   (click)="onSelectSegment(segment)"
@@ -224,6 +228,7 @@
                   <mat-icon>edit</mat-icon>
                 </button>
                 <button
+                  [attr.data-testid]="'csd-seg-delete-' + segment.docid"
                   mat-icon-button
                   color="warn"
                   (click)="deleteSegment(segment, $event)"
@@ -235,6 +240,7 @@
 
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr
+              [attr.data-testid]="'csd-seg-row-' + row.docid"
               mat-row
               *matRowDef="let row; columns: displayedColumns;"
               [class.selected-row]="selectedSegment?.docid === row.docid"
@@ -264,7 +270,7 @@
         <mat-icon class="panel-icon">edit</mat-icon>
         <h2 class="panel-title">Edit Segment</h2>
       </div>
-      <button mat-icon-button (click)="closeSidePanel()">
+      <button data-testid="csd-sidepanel-close-4" mat-icon-button (click)="closeSidePanel()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -280,8 +286,9 @@
             <span class="info-label">Segment Name</span>
             <div class="edit-name-wrapper" *ngIf="!isEditingName">
               <span class="info-value">{{ selectedSegment.segmentname }}</span>
-              <button 
-                mat-icon-button 
+              <button
+                data-testid="csd-edit-name-toggle-5"
+                mat-icon-button
                 color="primary"
                 (click)="toggleEditName()"
                 matTooltip="Edit name">
@@ -300,8 +307,9 @@
                 </mat-error>
               </mat-form-field>
               <div class="edit-name-actions">
-                <button 
-                  mat-icon-button 
+                <button
+                  data-testid="csd-edit-name-save-6"
+                  mat-icon-button
                   color="primary"
                   (click)="saveSegmentName()"
                   [disabled]="editSegmentForm.invalid || updatingSegment"
@@ -309,8 +317,9 @@
                   <mat-spinner diameter="20" *ngIf="updatingSegment" class="button-spinner"></mat-spinner>
                   <mat-icon *ngIf="!updatingSegment">check</mat-icon>
                 </button>
-                <button 
-                  mat-icon-button 
+                <button
+                  data-testid="csd-edit-name-cancel-7"
+                  mat-icon-button
                   (click)="toggleEditName()"
                   [disabled]="updatingSegment"
                   matTooltip="Cancel">
@@ -351,8 +360,9 @@
               <mat-icon class="list-icon">person</mat-icon>
               <span class="list-name">{{ mapParticipantList[list]['listname']}}</span>
             </div>
-            <button 
-              mat-icon-button 
+            <button
+              [attr.data-testid]="'csd-remove-list-' + list"
+              mat-icon-button
               color="warn"
               (click)="removeListFromSegment(list)"
               [disabled]="updatingSegment"
@@ -388,9 +398,10 @@
             <mat-icon matPrefix>person_add</mat-icon>
           </mat-form-field>
           
-          <button 
-            mat-raised-button 
-            color="primary" 
+          <button
+            data-testid="csd-add-list-8"
+            mat-raised-button
+            color="primary"
             (click)="addListToSegment()"
             [disabled]="addListForm.invalid || updatingSegment"
             class="add-button">
@@ -421,8 +432,9 @@
               <mat-icon class="tag-icon">label</mat-icon>
               <span class="tag-name">{{ mapParticipantTag[tagId]?.name || 'Unknown' }}</span>
             </div>
-            <button 
-              mat-icon-button 
+            <button
+              [attr.data-testid]="'csd-remove-tag-' + tagId"
+              mat-icon-button
               color="warn"
               (click)="removeTagFromSegment(tagId)"
               [disabled]="updatingSegment"
@@ -459,9 +471,10 @@
             <mat-icon matPrefix>local_offer</mat-icon>
           </mat-form-field>
           
-          <button 
-            mat-raised-button 
-            color="primary" 
+          <button
+            data-testid="csd-add-tag-9"
+            mat-raised-button
+            color="primary"
             (click)="addTagToSegment()"
             [disabled]="addTagForm.invalid || updatingSegment"
             class="add-button">
@@ -479,7 +492,7 @@
   </div>
 
   <!-- Edit Side Panel Backdrop -->
-  <div class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+  <div data-testid="csd-backdrop-10" class="backdrop" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
 
   <!-- history panel -->
   <div class="history-panel" [class.open]="historyPanelOpen">
@@ -490,7 +503,7 @@
         <h2 class="hp-title">History Log</h2>
         <span class="hp-badge">{{ logs.length }} entries</span>
       </div>
-      <button mat-icon-button (click)="toggleHistoryPanel()">
+      <button data-testid="csd-history-close-11" mat-icon-button (click)="toggleHistoryPanel()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -501,7 +514,7 @@
         <mat-label>Search by segment, list or participant name</mat-label>
         <input matInput [(ngModel)]="historySearchTerm" (ngModelChange)="applyHistoryFilter()" autocomplete="off">
         <mat-icon matPrefix>search</mat-icon>
-        <button mat-icon-button matSuffix *ngIf="historySearchTerm" (click)="historySearchTerm=''; applyHistoryFilter()">
+        <button data-testid="csd-history-search-clear-12" mat-icon-button matSuffix *ngIf="historySearchTerm" (click)="historySearchTerm=''; applyHistoryFilter()">
           <mat-icon>close</mat-icon>
         </button>
       </mat-form-field>
@@ -515,7 +528,7 @@
         <mat-hint>MM/DD/YYYY – MM/DD/YYYY</mat-hint>
         <mat-datepicker-toggle matIconSuffix [for]="historyDatePicker"></mat-datepicker-toggle>
         <mat-date-range-picker #historyDatePicker></mat-date-range-picker>
-        <button mat-icon-button matSuffix *ngIf="historyDateStart || historyDateEnd"
+        <button data-testid="csd-history-date-clear-13" mat-icon-button matSuffix *ngIf="historyDateStart || historyDateEnd"
           (click)="historyDateStart=null; historyDateEnd=null; applyHistoryFilter()" style="margin-right:36px">
           <mat-icon>close</mat-icon>
         </button>
@@ -523,19 +536,19 @@
 
       <p class="hp-chips-label">Filter by activity</p>
       <div class="hp-chips">
-        <span class="hp-chip" [class.chip-all]="historyFilter==='all'" (click)="setHistoryFilter('all')">
+        <span data-testid="csd-history-filter-all-14" class="hp-chip" [class.chip-all]="historyFilter==='all'" (click)="setHistoryFilter('all')">
           <mat-icon>list</mat-icon> All
           <span class="hp-chip-count">{{ logs.length }}</span>
         </span>
-        <span class="hp-chip" [class.chip-created]="historyFilter==='create'" (click)="setHistoryFilter('create')">
+        <span data-testid="csd-history-filter-create-15" class="hp-chip" [class.chip-created]="historyFilter==='create'" (click)="setHistoryFilter('create')">
           <mat-icon>create_new_folder</mat-icon> Created
           <span class="hp-chip-count">{{ getLogCountByType('create') }}</span>
         </span>
-        <span class="hp-chip" [class.chip-deleted]="historyFilter==='delete'" (click)="setHistoryFilter('delete')">
+        <span data-testid="csd-history-filter-delete-16" class="hp-chip" [class.chip-deleted]="historyFilter==='delete'" (click)="setHistoryFilter('delete')">
           <mat-icon>delete</mat-icon> Deleted
           <span class="hp-chip-count">{{ getLogCountByType('delete') }}</span>
         </span>
-        <span class="hp-chip" [class.chip-added]="historyFilter==='edit'" (click)="setHistoryFilter('edit')">
+        <span data-testid="csd-history-filter-edit-17" class="hp-chip" [class.chip-added]="historyFilter==='edit'" (click)="setHistoryFilter('edit')">
           <mat-icon>edit</mat-icon> Edited
           <span class="hp-chip-count">{{ getLogCountByType('edit') }}</span>
         </span>
@@ -578,6 +591,7 @@
           </div>
           <ng-container *ngIf="getLogProfiles(log) as profiles">
             <div *ngIf="profiles.length > 0"
+                 [attr.data-testid]="'csd-log-expand-' + log.doc_id"
                  class="hp-expand-row"
                  [ngClass]="getLogExpandClass(log.action_type)"
                  (click)="toggleLogExpand(log.doc_id)">
@@ -611,15 +625,15 @@
     <div class="hp-footer" *ngIf="!logsLoading && filteredLogs.length > 0">
       <span>Showing {{ pagedFilteredLogs.length }} of {{ filteredLogs.length }} entries</span>
       <div class="hp-pagination">
-        <button mat-stroked-button [disabled]="logsPage === 0" (click)="logsPage = logsPage - 1; scrollLogTop()">
+        <button data-testid="csd-history-page-prev-18" mat-stroked-button [disabled]="logsPage === 0" (click)="logsPage = logsPage - 1; scrollLogTop()">
           <mat-icon>chevron_left</mat-icon>
         </button>
         <span>{{ logsPage + 1 }} / {{ totalLogPages }}</span>
-        <button mat-stroked-button [disabled]="logsPage >= totalLogPages - 1" (click)="logsPage = logsPage + 1; scrollLogTop()">
+        <button data-testid="csd-history-page-next-19" mat-stroked-button [disabled]="logsPage >= totalLogPages - 1" (click)="logsPage = logsPage + 1; scrollLogTop()">
           <mat-icon>chevron_right</mat-icon>
         </button>
       </div>
     </div>
   </div>
-  <div class="history-backdrop" *ngIf="historyPanelOpen" (click)="toggleHistoryPanel()"></div>
+  <div data-testid="csd-history-backdrop-20" class="history-backdrop" *ngIf="historyPanelOpen" (click)="toggleHistoryPanel()"></div>
 </div>
