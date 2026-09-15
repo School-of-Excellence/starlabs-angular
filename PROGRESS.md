@@ -1,19 +1,16 @@
 # PROGRESS
 
 ## Current state
-- Branch `nanda-development` at `dff7de77` "release workshop dashboard" (Communication dialog, Exist card, fixes — all committed by the operator).
-- **Uncommitted (this repo):** dashboard `.ts/.html/.css` + dialog `.html` + exist-users spec — 8 new `data-testid`s (7 dialog, 1 dashboard), the Exist panel's chips moved into their own container (they never rendered before), and **platform_name** end to end: label map (blank/`eiflixweb` → EiFlix Web, `eiflixapp` → EiFlix App), a pill per sub-challenge card, "via …" in the Participant Data hero, and a **Platform Usage** section (ApexCharts donut of enrolment platform + stacked bars of touched steps by platform). Prod build green; dashboard Karma suites 81/81.
-- **Hub repo cloned** at `../starlabs-e2e-tests` (npm ci done). **Untracked there:** `workshops/workshop-dashboard-communication.spec.ts` — 10 behavioural Playwright tests + an addressable list covering all 55 `wdash-*` hooks. Compiles; adversarially reviewed; NOT run (no Java runtime, no SA secret on this Mac).
-- Release Console: this branch is **Blocked**. Reproduce locally with `node scripts/readiness/readiness.cjs --app ../starlabs-angular --base origin/development --head HEAD --json` in the hub.
+- Branch `nanda-development` — pushed. Contains: the Communication dialog + Exist Users card + platform_name work, and the **merge of `meena-development`** (`c7f57bab`: her dashboard engine extraction, `wd-*` hooks across the app, unit-test workflow, support suite caller).
+- Merged tree verified: prod build green; 194/194 unit cases (her engine suite + the three dashboard suites); console readiness script → **MATCHED** (drift 0, no missing test cases).
+- **Hub `starlabs-e2e-tests`** (clone at `../starlabs-e2e-tests`): `workshops/workshop-dashboard-communication.spec.ts` (10 tests, all 55 `wdash-*` hooks) + journal committed on local `main` as `e6d098a` — **NOT pushed: this account is pull-only on the hub** (`push:false`). A maintainer must push it (or grant write) before the console can run it.
 
 ## Last session changes
-- Read the gate (`scripts/readiness/lib.cjs`): four checks; the console truncates the drift list to 5. Journal: `specs/journals/2026-09-15-cicd-readiness-workshops-specs.md`.
-- **"Selectors gone" is not ours:** 1,076 hub-spec ids that exist only on `origin/meena-development` (rollout approved). Clears when her branch reaches `development` and is merged here — that merge conflicts in `workshop-dashboard.component.{ts,html}`; keep both sides' hooks.
-- **"Missing test cases" is fixed on our side:** readiness now reports no element flags and no untested new component. Spec follows `workshop-dashboard.spec.ts` (anti-circular oracles, seed people, console guard) and WS-14's guard-free stance for the composers (`disableClose:true` on two of them → dismissed via their own buttons).
-- Bug found by the review and fixed: Exist panel chips were inside the category-based block.
-- Added the platform pill, the hero's enrolment platform and the Platform Usage charts (operator request); rules tested in Karma, hub WDC-08/09 assert them against the seed.
+- Merge conflicts (dashboard .ts/.html) resolved keeping both sides: moved methods dropped in favour of her engine, my methods and her hooks kept. `amazon-chime-sdk-js` installed `--no-save`; Zoom peers restored after the prune.
+- Readiness gate understood and reproduced locally (`node scripts/readiness/readiness.cjs --app ../starlabs-angular --base origin/development --head HEAD --json`); journal `specs/journals/2026-09-15-cicd-readiness-workshops-specs.md` §1–9.
+- platform_name end to end (label map, pill, hero, Platform Usage charts) — earlier today, see §7–8.
 
 ## Pending
-- Operator: (1) commit + push the two templates here; (2) commit the hub spec and land it on hub `main` (the callers use `e2e_ref: main`); (3) after meena-development merges, merge `development` here and resolve the dashboard conflict; then recheck in the console — expected MATCHED, then the workshops suite runs the new spec for the first time.
-- If that first run fails, the evidence report names the step; likeliest: composer heading text in WDC-07, timing.
-- Still open from before: runtime pass on the Communication dialog; the five stale spec stubs that break `ng test` repo-wide.
+- **Hub push** — hand `e6d098a` to a maintainer (`git -C ../starlabs-e2e-tests push origin main`), or get write access; until then the console still reports "no spec references" for the workshop hooks.
+- Console recheck after the hub lands: expected MATCHED → workshops suite runs the new spec for the first time (never run locally: no Java / no SA on this Mac).
+- Still open: runtime pass on the Communication dialog and the platform charts; the stale spec stubs that break a full `ng test`.
