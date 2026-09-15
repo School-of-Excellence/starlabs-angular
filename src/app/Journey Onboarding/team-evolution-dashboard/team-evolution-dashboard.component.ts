@@ -254,6 +254,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     completed: 0,
     notStarted: 0
   };
+  ahMemberProfileIds: Set<string> = new Set();
 
   overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
   
@@ -263,11 +264,28 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   ) { }
 
   async ngOnInit() {
+    await this.getAhMembers();
     await Promise.all([
       this.getDfuProducts(),
       this.getParticipantMetadata()
     ]);
     this.mapDfuParticipants();
+  }
+
+  // get ahmember from users_roles
+  async getAhMembers(){
+    try {
+      const q = query(collection(this.firestore, 'users_roles'), where('ahmember', '==', true));
+      const ahMembersSnapshot = await getDocs(q);
+
+      ahMembersSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        this.ahMemberProfileIds.add(data['profile_ref'].id);
+      });
+      console.log('AH Member profileids fetched:', this.ahMemberProfileIds);
+    } catch (error) {
+      console.error('Error fetching AH members:', error);
+    }
   }
 
   // fetch the DFU products type from products collection
@@ -290,8 +308,18 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   // fetch the participant metadata from participant metadata collection
   async getParticipantMetadata(){
     try {
+      const profileIds = Array.from(this.ahMemberProfileIds);
       const participantsRef = collection(this.firestore,'participant metadata');
-      const participants = await firstValueFrom(collectionData(query(participantsRef), { idField: 'id' }));
+      const chunkSize = 30;
+      const participants: any[] = [];
+
+      for (let i = 0; i < profileIds.length; i += chunkSize) {
+        const chunk = profileIds.slice(i, i + chunkSize);
+        const q = query(participantsRef, where('profileid', 'in', chunk));
+        const chunkData = await firstValueFrom(collectionData(q, { idField: 'id' }));
+        participants.push(...chunkData);
+      }
+
       this.participantMetadata = participants;
       console.log('Participant metadata fetched:', this.participantMetadata);
     } catch (error) {
@@ -305,10 +333,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     const totals = { ongoing: 0, completed: 0, notStarted: 0 };
 
     this.participantMetadata.forEach(participant => {
-      if (!(participant.email?.toLowerCase().endsWith('@soexcellence.com'))) {
-        return;
-      }
-
       const ongoingProducts = (participant.activeproduct || [])
         .filter((id: string) => this.dfuProductsMap[id]);
       const completedProducts = (participant.consumedproducts || [])
