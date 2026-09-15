@@ -31,7 +31,7 @@
   
     <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
       <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
-      <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index" class="mr-3" (click)="visitOtherStudio(studio)">
+      <button [attr.data-testid]="'dstu-btn-1-' + i" mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index" class="mr-3" (click)="visitOtherStudio(studio)">
         <span>Studio {{i+1}}:</span>&nbsp;
         <span *ngFor="let participant of studio['pairing']; let j = index">
           <span>{{mapProfile[participant]}}</span>
@@ -60,9 +60,9 @@
   
      <!-- Participant Conversation -->
     <!-- <div *ngIf="chatdiv"> -->
-      <div class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
-        <button mat-icon-button (click)="toggleChatContainer()">
-          <mat-icon (click)="toggleChatContainer()">chat</mat-icon>
+      <div data-testid="dstu-act-2" class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
+        <button data-testid="dstu-btn-3" mat-icon-button (click)="toggleChatContainer()">
+          <mat-icon data-testid="dstu-act-4" (click)="toggleChatContainer()">chat</mat-icon>
         </button>      
       </div>
      
@@ -72,7 +72,7 @@
           <span *ngIf="pendingMessagesCount[participant.docid] && pendingMessagesCount[participant.docid] > 0">
             ({{ pendingMessagesCount[participant.docid] }} unread)
           </span>
-            <button mat-icon-button (click)="getstudiochat(participant)">
+            <button [attr.data-testid]="'dstu-btn-5-' + i" mat-icon-button (click)="getstudiochat(participant)">
               <mat-icon>chat</mat-icon>
             </button>
             <div *ngIf="selectedParticipant === true && selectedChat && selectedChat.docid === participant.docid">
@@ -116,7 +116,7 @@
               <section>
                 <br>
                 <form [formGroup]="messageform" (ngSubmit)="sendMessage(messageform.value)">
-                  <textarea 
+                  <textarea [attr.data-testid]="'dstu-txt-6-' + i" 
                     name="sms" 
                     autofocus
                     id="message" 
@@ -170,11 +170,11 @@
   
     
     <!-- Expanded profile image overlay -->
-    <div *ngIf="expandedImage" class="image-lightbox" (click)="expandedImage = null">
-      <button type="button" class="image-lightbox__close" (click)="expandedImage = null; $event.stopPropagation()">
+    <div data-testid="dstu-act-7" *ngIf="expandedImage" class="image-lightbox" (click)="expandedImage = null">
+      <button data-testid="dstu-btn-8" type="button" class="image-lightbox__close" (click)="expandedImage = null; $event.stopPropagation()">
         <mat-icon>close</mat-icon>
       </button>
-      <img class="image-lightbox__img" [src]="expandedImage" (click)="$event.stopPropagation()" alt="Profile image">
+      <img data-testid="dstu-act-9" class="image-lightbox__img" [src]="expandedImage" (click)="$event.stopPropagation()" alt="Profile image">
     </div>
 
     <!-- Live Assignment -->
@@ -185,7 +185,7 @@
             <span class="profile-card__eyebrow">You are with</span>
           </div>
 
-          <div class="profile-card__avatar"
+          <div data-testid="dstu-act-10" class="profile-card__avatar"
             [class.profile-card__avatar--image]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
             [class.profile-card__avatar--clickable]="mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile"
             (click)="(mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile) && (expandedImage = (mapProfileData[liveAssignment['token']?.profile_id]?.profileimg || mapProfileData[liveAssignment['token']?.profile_id]?.profile))">
@@ -232,7 +232,7 @@
         <div class="statusmessage" *ngIf="ongoingQueue['zoomlinkrequired'] != false && [false,undefined].includes(ongoingQueue['enablezoommeetingsdk']) && selectedStudio['openvidu'] != true">
           <mark>
             We have invited the participant '{{mapProfile[liveAssignment["token"]?.profile_id]}}' to join this zoom meeting.
-            <a class="zoomlink" [href]="liveAssignment['zoomdata']?.start_url" target="_blank">{{liveAssignment['zoomdata']?.start_url == null ? 'Generating Link...' : 'https://us02web.zoom.us/j'}}</a> - Please join the Zoom Link.<br>
+            <a data-testid="dstu-link-11" class="zoomlink" [href]="liveAssignment['zoomdata']?.start_url" target="_blank">{{liveAssignment['zoomdata']?.start_url == null ? 'Generating Link...' : 'https://us02web.zoom.us/j'}}</a> - Please join the Zoom Link.<br>
             <button class="button-36 mt-2"  type="button" (click)="navigateMeeting(liveAssignment)" data-testid="studio-zoom-start-btn" [disabled]="liveAssignment['zoomdata'] === undefined">Start Meeting</button><br>
           </mark>
           <button class="mt-2" *ngIf="liveAssignment['zoomdata']?.start_url != null && zoomlinkGenerator && ongoingQueue['stageproperty'][liveAssignment['stagename']]['enablezoom']" mat-raised-button (click)="regenerateZoomLink()" data-testid="studio-zoom-regen-btn">Generate New Link?</button>
@@ -259,7 +259,7 @@
         <div *ngIf="participantForm.length != 0" class="widgetbox mat-elevation-z2">
           <span class="actiontitle">Forms submitted by the Participant</span>
           <br>
-          <button *ngFor="let form of participantForm" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewform(form)">
+          <button [attr.data-testid]="'dstu-btn-12-' + form" *ngFor="let form of participantForm" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewform(form)">
             {{form["formname"]}} - ({{mapQueue[form["queueid"]]}})
             <mat-icon>open_in_new</mat-icon>
           </button>
@@ -277,7 +277,7 @@
                 <h5 class="fw-bold fs-6">{{i+1}}. {{crossover.key}}</h5>
                 <mat-form-field appearance="outline" class="w-50 mt-2">
                   <mat-label>Current Level</mat-label>
-                  <mat-select [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
+                  <mat-select [attr.data-testid]="'dstu-sel-13-' + i" [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
                     <mat-option *ngFor="let option of aelLevelList" [value]="option['startpoint'] + '---' + option['endpoint']">{{option["startpoint"]}} to {{option["endpoint"]}}</mat-option>
                   </mat-select>
                 </mat-form-field>
@@ -292,14 +292,14 @@
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('viewtripleatc')">
             <span class="actiontitle">Triple ATC Submitted by '{{mapProfile[liveAssignment["token"]?.profile_id]}}' - Yet To Validate</span><br>
             <span *ngIf="tripleATCList.length == 0" class="text-secondary font-italic mt-2">No Triple ATC found for validation!</span>
-            <button *ngFor="let atc of tripleATCList; let i = index" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewTripleATC(atc['atcid'])">
+            <button [attr.data-testid]="'dstu-btn-14-' + i" *ngFor="let atc of tripleATCList; let i = index" class="actionbtn mt-2 mr-3" mat-stroked-button (click)="viewTripleATC(atc['atcid'])">
               Triple ATC {{i+1}}: {{atc["prescription_date"].toDate() | date}} - ({{mapQueue[atc["queueid"]]}}) <mat-icon>open_in_new</mat-icon>
             </button>
           </div>
   
           <!-- Get Previous ATC (widget-driven) -->
           <div class="previous-atc-card" *ngIf="liveAssignment['participantid'] && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('previousatc')" [class.previous-atc-card--open]="showPreviousATC">
-            <button type="button" class="previous-atc-toggle" (click)="showPreviousATC = !showPreviousATC" [attr.aria-expanded]="showPreviousATC">
+            <button data-testid="dstu-btn-15" type="button" class="previous-atc-toggle" (click)="showPreviousATC = !showPreviousATC" [attr.aria-expanded]="showPreviousATC">
               <span class="previous-atc-toggle__icon">
                 <mat-icon>history</mat-icon>
               </span>
@@ -316,7 +316,7 @@
 
           <!-- Show Love Letter (widget-driven) -->
           <div class="previous-atc-card love-letter-card" *ngIf="liveAssignment['participantid'] && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('loveletters')" [class.previous-atc-card--open]="showLoveLetter">
-            <button type="button" class="previous-atc-toggle" (click)="toggleLoveLetter()" [attr.aria-expanded]="showLoveLetter">
+            <button data-testid="dstu-btn-16" type="button" class="previous-atc-toggle" (click)="toggleLoveLetter()" [attr.aria-expanded]="showLoveLetter">
               <span class="previous-atc-toggle__icon">
                 <mat-icon>favorite</mat-icon>
               </span>
@@ -351,13 +351,13 @@
           <!-- Prescribed Alpha ATC List -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedvalidatedatc')">
             <span class="actiontitle">ATC Prescribed to the Participant</span>
-            <button class="ml-1 text-success" mat-icon-button (click)="previewATC('alpha')"><mat-icon>refresh</mat-icon></button>
+            <button data-testid="dstu-btn-17" class="ml-1 text-success" mat-icon-button (click)="previewATC('alpha')"><mat-icon>refresh</mat-icon></button>
             <br>
             <div class="text-secondary ml-3 mt-2" *ngIf="alphaATCList.length == 0">No ATC Found!</div>
             <div class="ml-3" *ngFor="let atc of alphaATCList; let i = index">
               <div class="steplabel mt-3">
                 ATC {{i+1}}: {{atc["atcdata"]["prescription_date"].toDate() | date}} - ({{mapQueue[atc["atcdata"]["queueid"]]}})
-                <button class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'alpha', '')">Edit ATC</button>
+                <button [attr.data-testid]="'dstu-btn-18-' + i" class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'alpha', '')">Edit ATC</button>
                 <!-- <button class="editbtn" mat-stroked-button (click)="editDiagnosticsATC(atc.atcid)">Edit ATC</button> -->
               </div>
 
@@ -409,13 +409,13 @@
           <!-- Prescribed Unvalidated ATC List -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('prescribedunvalidatedatc')">
             <span class="actiontitle">ATC Prescribed to the Participant (Yet to Validate)</span>
-            <button class="ml-1 text-success" mat-icon-button (click)="previewATC('validation')"><mat-icon>refresh</mat-icon></button>
+            <button data-testid="dstu-btn-19" class="ml-1 text-success" mat-icon-button (click)="previewATC('validation')"><mat-icon>refresh</mat-icon></button>
             <br>
             <div class="text-secondary ml-3 mt-2" *ngIf="unvalidatedATCList.length == 0">No ATC Found!</div>
             <div class="ml-3" *ngFor="let atc of unvalidatedATCList; let i = index">
               <div class="steplabel mt-3">
                 ATC {{i+1}}: {{atc["atcdata"]["prescription_date"].toDate() | date}} - ({{mapQueue[atc["atcdata"]["queueid"]]}})
-                <button class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'validation', '')">Edit ATC</button>
+                <button [attr.data-testid]="'dstu-btn-20-' + i" class="editbtn" mat-stroked-button (click)="updateATC(atc.atcid, 'validation', '')">Edit ATC</button>
               </div>
 
               <div class="ms-3" *ngFor="let activity of atc['atcdata']['bigactivity'] | keyvalue; trackBy: trackById">
@@ -465,14 +465,14 @@
           <!-- Prescribe ATC -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc') || ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')">
             <span class="actiontitle">Prescribe New ATC for the Participant</span><br>
-            <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(true,liveAssignment['token']?.profile_id)">Add ATC for Implementation/Event</button>
-            <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(false,liveAssignment['token']?.profile_id)">Add ATC for Consultation/Review (Requires Validation)</button> 
+            <button data-testid="dstu-btn-21" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(true,liveAssignment['token']?.profile_id)">Add ATC for Implementation/Event</button>
+            <button data-testid="dstu-btn-22" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc')" class="actionbtn me-2 ml-3" mat-stroked-button (click)="addATC(false,liveAssignment['token']?.profile_id)">Add ATC for Consultation/Review (Requires Validation)</button> 
           </div>
   
           <!-- Assign Changeagent -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('assignprocedure')">
             <span class="actiontitle">Assign Changeagent to Procedures</span><br>
-            <button class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(true)">Open ATC</button>
+            <button data-testid="dstu-btn-23" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(true)">Open ATC</button>
             <!-- <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addvalidatedatc')" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(true)">Open ATC given for Changework</button>
             <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('addunvalidatedatc')" class="actionbtn mt-2 ml-3" mat-stroked-button (click)="assignChangeagent(false)">Open ATC given for Consultation</button> -->
           </div>
@@ -514,7 +514,7 @@
           <!-- move participants to next month review -->
           <div class="widgetbox mat-elevation-z2" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets.includes('movetonextqueue')">
             <span class="actiontitle">Move Participants to next month Review</span><br>
-            <button class="actionbtn mt-2 ml-3" mat-stroked-button (click)=" movetoNextMonthReview()">Mark participant for next month review</button>
+            <button data-testid="dstu-btn-24" class="actionbtn mt-2 ml-3" mat-stroked-button (click)=" movetoNextMonthReview()">Mark participant for next month review</button>
           </div>
         </div>
   

@@ -4,13 +4,13 @@
     <h2 class="draft-dialog-title">Select Draft</h2>
     <div class="draft-list">
       <!-- Always how Draft 1 -->
-      <div class="draft-item" (click)="selectDraft(allDrafts[0])">
+      <div data-testid="for-select-draft-1" class="draft-item" (click)="selectDraft(allDrafts[0])">
         <span>Draft 1 : {{ allDrafts[0]['date']?.toDate ?
           (allDrafts[0]['date'].toDate() | date:'d MMM yyyy, HH:mm') :
           (allDrafts[0]['date'] | date:'d MMM yyyy, HH:mm') }}
         </span>
       </div>
-      <button class="see-more-btn"
+      <button data-testid="for-show-all-drafts-2" class="see-more-btn"
               *ngIf="allDrafts.length > 1 && !showAllDrafts"
               (click)="showAllDrafts = true">
         See More ({{ allDrafts.length - 1 }} more)
@@ -18,7 +18,7 @@
       <div class="see-more-list"
            *ngIf="showAllDrafts"
            [class.scrollable]="allDrafts.length - 1 > 5">
-        <div class="draft-item"
+        <div data-testid="for-select-draft-3" class="draft-item"
              *ngFor="let draft of allDrafts.slice(1); let i = index"
              (click)="selectDraft(draft)">
           <span>Draft {{ i + 2 }} : {{ draft['date']?.toDate ?
@@ -28,7 +28,7 @@
         </div>
       </div>
     </div>
-    <button class="draft-close-btn" (click)="dismissDraftDialog()">
+    <button data-testid="for-dismiss-draft-dialog-4" class="draft-close-btn" (click)="dismissDraftDialog()">
       Close
     </button>
   </div>
@@ -38,7 +38,7 @@
 <div class="form-page-wrapper">
   <div class="form-top-bar" *ngIf="!formpatch">
     <div class="top-bar-left">
-      <button class="top-bar-back-btn" 
+      <button data-testid="for-back-clicked-5" class="top-bar-back-btn" 
               *ngIf="isInline"
               (click)="backClicked.emit()">
         ← Back
@@ -96,7 +96,7 @@
 
     <!-- Right: Drafts button -->
     <div class="top-bar-right">
-      <button class="top-bar-drafts-btn"
+      <button data-testid="for-open-drafts-dialog-6" class="top-bar-drafts-btn"
               (click)="openDraftsDialog()"
               [disabled]="allDrafts.length === 0">
         <mat-icon>history</mat-icon>
@@ -296,7 +296,7 @@
         <!-- Checkbox with improved styling -->
         <ng-container *ngIf="['Checkbox'].includes(form.type)">
           <div class="checkbox-container">
-            <mat-checkbox
+            <mat-checkbox data-testid="for-change-auto-save-7"
               [formControlName]="form.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
               (change)="autoSave(this.deliveryForm.value)"
@@ -325,7 +325,7 @@
           <div class="slider-container">
             <span class="slider-min-label">{{form.options[0]}}</span>
             <!-- [required]="![null,undefined].includes(form.required) ? form.required : false" -->
-            <mat-slider
+            <mat-slider data-testid="for-change-auto-save-8"
               class="custom-slider"
               [min]="1"
               [max]="form.options.length"
@@ -393,7 +393,7 @@
             </h3>
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
-          <mat-radio-group [formControlName]="form.formcontrol"
+          <mat-radio-group data-testid="for-change-auto-save-9" [formControlName]="form.formcontrol"
             class="radio-group"
             [required]="![null,undefined].includes(form.required) ? form.required : false"
             (change)="autoSave(this.deliveryForm.value)">
@@ -440,7 +440,7 @@
                     (change)="onSliderFlippingValueChange($event,flippingvalue.key,form);autoSave(this.deliveryForm.value)">
                     <input matSliderThumb [value]="+clientform.formarray[i].flippingquestion.value[$any(flippingvalue.key)]">
                   </mat-slider> -->
-                  <mat-slider
+                  <mat-slider data-testid="for-change-on-slider-flipping-value-change-10"
                     class="custom-slider"
                     [min]="1"
                     [max]="10"
@@ -568,7 +568,7 @@
                   <!-- Checkbox in array -->
                   <ng-container *ngIf="['Checkbox'].includes(obj.type)">
                     <div class="array-field checkbox-container">
-                      <mat-checkbox [formControlName]="obj.formarraycontrol"
+                      <mat-checkbox data-testid="for-change-auto-save-11" [formControlName]="obj.formarraycontrol"
                         [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                         (change)="autoSave(this.deliveryForm.value)">
                         <span class="checkbox-label">
@@ -590,7 +590,7 @@
                         {{obj.fieldname}}
                         <span class="required-indicator" *ngIf="![null,undefined].includes(obj.required) ? obj.required : false">*</span>
                       </h5>
-                      <mat-radio-group [formControlName]="obj.formarraycontrol"
+                      <mat-radio-group data-testid="for-change-auto-save-12" [formControlName]="obj.formarraycontrol"
                         class="radio-group"
                         [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                         (change)="autoSave(this.deliveryForm.value)">
@@ -611,7 +611,7 @@
 
               <!-- Array item actions -->
               <div class="form-array-actions">
-                <button *ngIf="j == (getFormArray(form.formcontrol).length - 1)"
+                <button data-testid="for-on-add-13" *ngIf="j == (getFormArray(form.formcontrol).length - 1)"
                   type="button"
                   mat-mini-fab
                   color="primary"
@@ -622,7 +622,7 @@
                   matTooltipPosition="above">
                   <mat-icon>add</mat-icon>
                 </button>
-                <button *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)"
+                <button data-testid="for-on-remove-14" *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)"
                   type="button"
                   mat-mini-fab
                   color="warn"
@@ -665,7 +665,7 @@
     </div> -->
     <!-- Form submission buttons with improved styling -->
     <div class="form-actions">
-    <button *ngIf="!formpatch" mat-raised-button color="primary" type="button" [disabled]="connectivityState === 'offline' || connectivityState === 'reconnecting'" [matTooltip]="connectivityState !== 'online' ? 'Please wait until internet connection is restored' : ''" matTooltipPosition="above" (click)="onSubmit(this.deliveryForm.value)" class="submit-button">
+    <button data-testid="for-on-submit-15" *ngIf="!formpatch" mat-raised-button color="primary" type="button" [disabled]="connectivityState === 'offline' || connectivityState === 'reconnecting'" [matTooltip]="connectivityState !== 'online' ? 'Please wait until internet connection is restored' : ''" matTooltipPosition="above" (click)="onSubmit(this.deliveryForm.value)" class="submit-button">
       <mat-icon>{{ connectivityState !== 'online' ? 'cloud_off' : 'visibility' }}</mat-icon>
       {{ connectivityState !== 'online' ? 'Waiting for connection…' : 'Preview & Submit' }}
     </button>

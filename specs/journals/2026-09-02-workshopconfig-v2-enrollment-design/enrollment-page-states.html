@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Configuration v2 — Enrollment Page states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+    :root{--primary:#1a3c5e;--primary-light:#2a5a8e;--accent:#c8a96e;--success:#2e7d52;--success-bg:#e8f5ed;--danger:#c0392b;--danger-bg:#fdecea;--warn:#a8630f;--warn-bg:#fff4e0;--bg:#f4f6f9;--border:#dde3ec;--border-light:#edf0f5;--t1:#1a2535;--t2:#5a6880;--t3:#8a98ac;--sh-sm:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);--sh-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);--sh-lg:0 8px 24px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.06);}
+    *{box-sizing:border-box;}
+    body{margin:0;font-family:'DM Sans',system-ui,sans-serif;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased;}
+    a{color:var(--primary);text-decoration:none;} a:hover{color:var(--primary-light);}
+    .i{width:16px;height:16px;flex-shrink:0;} .i14{width:14px;height:14px;flex-shrink:0;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;line-height:1;border:1px solid var(--border);background:#fff;color:var(--t1);white-space:nowrap;}
+    .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 8px rgba(26,60,94,.25);}
+    .btn-ghost{border-color:transparent;background:transparent;color:var(--t2);}
+    .btn-danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+    .btn-sm{height:32px;padding:0 12px;font-size:12.5px;}
+    .btn.off{opacity:.45;box-shadow:none;}
+    .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--t3);flex-shrink:0;}
+    .card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm);}
+    .panel{display:flex;flex-direction:column;gap:12px;}
+    .cap{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);}
+    .cap-note{font-size:12.5px;color:var(--t2);line-height:1.45;margin-top:-6px;}
+    .sec-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border-light);}
+    .sec-title{font-size:15px;font-weight:600;margin:0;}
+    .sec-hint{font-size:12px;color:var(--t3);}
+    .grow{flex:1;min-width:0;}
+    .count{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:#eef3f9;color:var(--primary);font-size:11.5px;font-weight:600;white-space:nowrap;}
+    .count.full{background:var(--warn-bg);color:var(--warn);}
+    .tag-req{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+    .sec-body{padding:16px 20px;display:flex;flex-direction:column;gap:12px;}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;font-weight:600;}
+    .counter{font-size:11.5px;font-weight:500;color:var(--t3);}
+    .input{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13.5px;min-width:0;}
+    .input .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .input.ph{color:var(--t3);}
+    .input.focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,60,94,.12);}
+    .input.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(192,57,43,.10);}
+    .help{font-size:12px;color:var(--t3);line-height:1.4;}
+    .err{font-size:12px;color:var(--danger);display:flex;gap:6px;align-items:center;font-weight:500;}
+    .row{display:flex;align-items:center;gap:10px;}
+    .rt{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;}
+    .rt.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(192,57,43,.10);}
+    .rt-bar{display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--border-light);background:#fafbfd;}
+    .rt-b{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;border-radius:4px;font-size:12.5px;font-weight:600;color:var(--t2);}
+    .rt-sep{width:1px;height:18px;background:var(--border);margin:0 4px;}
+    .rt-body{padding:12px 14px;font-size:13.5px;line-height:1.55;min-height:56px;color:var(--t3);}
+    .thumb{width:40px;height:40px;border-radius:8px;background:#eef3f9;display:flex;align-items:center;justify-content:center;color:var(--primary);flex-shrink:0;}
+    .pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:12px;font-weight:600;white-space:nowrap;}
+    .pill-warn{background:var(--warn-bg);color:var(--warn);}
+    .pill-ok{background:var(--success-bg);color:var(--success);}
+    .pill-err{background:var(--danger-bg);color:var(--danger);}
+    .pill-mute{background:#f1f3f7;color:var(--t3);}
+    .drag{color:var(--t3);display:flex;flex-shrink:0;}
+    .list-row{display:flex;align-items:center;gap:8px;}
+    .list-row .input{flex:1;}
+    .badge{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}
+    .badge-rich{background:#e7f6ee;color:#1a8f5b;}
+    .badge-icon{background:#eef2ff;color:#4f46e5;}
+    .block{border:1px solid var(--border);border-radius:10px;background:#fff;overflow:hidden;}
+    .block-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fafbfd;}
+    .block-head .name{font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .savebar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh-md);}
+    .rail-item{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--t2);}
+    .rail-item .n{flex:1;}
+    .rail-item .c{font-size:11px;color:var(--t3);}
+    .rail-item.on{background:#eef3f9;color:var(--primary);font-weight:600;}
+    .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;border:1.5px solid #c9d2df;background:#fff;}
+    .dot.ok{background:var(--success);border-color:var(--success);}
+    .dot.attn{background:var(--danger);border-color:var(--danger);}
+    .spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;}
+    .grid-icons{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+    .ic{height:52px;border-radius:8px;border:1px solid var(--border-light);background:#f8fafd;display:flex;align-items:center;justify-content:center;color:var(--primary);}
+    .ic.sel{border:2px solid var(--primary);background:#eef3f9;}
+    .dialog{background:#fff;border-radius:14px;box-shadow:var(--sh-lg);padding:22px 24px;display:flex;flex-direction:column;gap:12px;}
+  
+
+    .page{max-width:1440px;margin:0 auto;padding:32px 36px 40px;background:#f4f6f9;display:flex;flex-direction:column;gap:20px;}
+    @media (max-width: 1100px){ .page > div:last-child{grid-template-columns:repeat(2,minmax(0,1fr)) !important;} }
+    @media (max-width: 760px){ .page{padding:16px;} .page > div:last-child{grid-template-columns:minmax(0,1fr) !important;} }
+
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="display:flex;flex-direction:column;gap:4px;">
+    <div class="cap">Enrollment page · states &amp; details</div>
+    <div style="font-size:20px;font-weight:600;">Interaction states the build must cover</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start;">
+
+    <!-- 1. Save bar states -->
+    <div class="panel">
+      <div class="cap">1 · Save bar</div>
+      <div class="cap-note">Sticky at the bottom of the page. Save is enabled only when there is something to save and nothing blocking.</div>
+      <div class="savebar">
+        <span class="pill pill-mute">No changes</span>
+        <span class="grow"></span>
+        <span class="btn btn-primary off">Save Enrollment</span>
+      </div>
+      <div class="savebar">
+        <span class="pill pill-warn"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>Unsaved changes</span>
+        <span class="help">2 sections</span>
+        <span class="grow"></span>
+        <span class="btn btn-ghost">Discard</span>
+        <span class="btn btn-primary">Save Enrollment</span>
+      </div>
+      <div class="savebar">
+        <span class="pill pill-warn">Saving…</span>
+        <span class="grow"></span>
+        <span class="btn btn-primary off" style="opacity:.8;"><span class="spin"></span>Saving</span>
+      </div>
+      <div class="savebar">
+        <span class="pill pill-err"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>Description is required</span>
+        <span class="grow"></span>
+        <span class="btn btn-ghost">Discard</span>
+        <span class="btn btn-primary off">Save Enrollment</span>
+      </div>
+      <div class="savebar" style="border-color:#2e7d52;">
+        <span class="pill pill-ok"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg>Saved just now</span>
+        <span class="grow"></span>
+        <span class="btn btn-primary off">Save Enrollment</span>
+      </div>
+    </div>
+
+    <!-- 2. Required error -->
+    <div class="panel">
+      <div class="cap">2 · Required field</div>
+      <div class="cap-note">Workshop description is the only required field. The rail dot turns red and the save bar names the blocker.</div>
+      <div class="card">
+        <div class="sec-body">
+          <div class="field">
+            <div class="label"><span class="row" style="gap:8px;">Workshop description <span class="tag-req">Required</span></span></div>
+            <div class="rt error">
+              <div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-sep"></span><span class="rt-b">H1</span><span class="rt-b">H2</span></div>
+              <div class="rt-body">Enter a detailed workshop description…</div>
+            </div>
+            <div class="err"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>Workshop description is required</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:8px;">
+        <div class="rail-item"><span class="dot ok"></span><span class="n">Page blocks</span><span class="c">3</span></div>
+        <div class="rail-item on" style="color:#c0392b;"><span class="dot attn"></span><span class="n">Description &amp; Join us</span></div>
+        <div class="rail-item"><span class="dot ok"></span><span class="n">Sneak peak</span><span class="c">3/9</span></div>
+      </div>
+    </div>
+
+    <!-- 3. Limit reached -->
+    <div class="panel">
+      <div class="cap">3 · Limit reached</div>
+      <div class="cap-note">Same limits as today (9 / 9 / 9 / 20 / 10 templates). The Add button disables instead of toasting "Limit exceeded".</div>
+      <div class="card">
+        <div class="sec-head">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          <h2 class="sec-title">Sneak peak</h2>
+          <span class="count full">9 / 9</span>
+          <span class="grow"></span>
+          <span class="btn btn-sm off"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add item</span></span>
+        </div>
+        <div class="sec-body" style="gap:8px;">
+          <div class="list-row">
+            <div class="input" style="width:150px;padding-left:6px;"><span class="thumb" style="width:28px;height:28px;border-radius:6px;"></span><span class="txt">Map</span></div>
+            <div class="input"><span class="txt">Your own emotion map by day 14</span><span class="counter">30 / 300</span></div>
+            <span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span>
+          </div>
+          <div class="help" style="color:#a8630f;">Maximum of 9 items reached. Remove one to add another.</div>
+        </div>
+      </div>
+      <div class="cap" style="margin-top:8px;">Add-row rule for lists</div>
+      <div class="cap-note">Today the Add button vanishes until every row is filled. Proposed: it stays visible, disabled, with the reason.</div>
+      <div class="card">
+        <div class="sec-head">
+          <h2 class="sec-title">Requirements</h2>
+          <span class="count">2</span>
+          <span class="grow"></span>
+          <span class="btn btn-sm off"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add</span></span>
+        </div>
+        <div class="sec-body" style="gap:8px;">
+          <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input" style="height:36px;"><span class="txt">20 minutes a day</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          <div class="list-row"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><div class="input ph focus" style="height:36px;"><span class="txt">Enter a requirement</span></div><span class="icon-btn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></span></div>
+          <div class="help">Fill the empty row before adding another.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Icon picker -->
+    <div class="panel">
+      <div class="cap">4 · Icon picker</div>
+      <div class="cap-note">Replaces the 40px-image dropdown. Same source: the workshop images collection, type = icon.</div>
+      <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh-lg);">
+        <div class="input" style="height:36px;">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <span class="txt" style="color:#8a98ac;">Search icons…</span>
+        </div>
+        <div class="grid-icons">
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+          <span class="ic sel"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-4a8 8 0 0116 0v4"></path><rect x="3" y="14" width="4" height="6" rx="1"></rect><rect x="17" y="14" width="4" height="6" rx="1"></rect></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l4-14 5 9 4-5 5 10z"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.5"></circle><path d="M3 19c0-3 3-5 6-5s6 2 6 5M15 15c3 0 5 1.5 5 4"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M6 15V9M10 15V5M14 15v-4M18 15V7"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.5-7 10-7 10z"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H8l-4 4z"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg></span>
+          <span class="ic"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"></path></svg></span>
+        </div>
+        <div class="row" style="justify-content:space-between;">
+          <span class="help">Selected: Live circle</span>
+          <span class="help" style="color:#1a3c5e;font-weight:600;">Manage icons ↗</span>
+        </div>
+      </div>
+      <div class="cap" style="margin-top:8px;">Date + time pair</div>
+      <div class="cap-note">Two pickers, one stored timestamp. A clear-both control on hover.</div>
+      <div class="row" style="gap:8px;">
+        <div class="input" style="width:150px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span class="txt">05 Sep 2026</span></div>
+        <div class="input" style="width:110px;"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span class="txt">10:00</span></div>
+        <span class="icon-btn"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+      </div>
+    </div>
+
+    <!-- 5. Rail legend + collapse -->
+    <div class="panel">
+      <div class="cap">5 · Section rail</div>
+      <div class="cap-note">Sticky jump list. Dot = has content · hollow = empty · red = required missing. Counts show n / max where a limit exists.</div>
+      <div class="card" style="padding:8px;">
+        <div class="rail-item on"><span class="dot ok"></span><span class="n">Current section</span></div>
+        <div class="rail-item"><span class="dot ok"></span><span class="n">Has content</span><span class="c">3/9</span></div>
+        <div class="rail-item"><span class="dot"></span><span class="n">Empty</span><span class="c">0/9</span></div>
+        <div class="rail-item" style="color:#c0392b;"><span class="dot attn"></span><span class="n">Needs attention</span></div>
+      </div>
+      <div class="cap" style="margin-top:8px;">Collapsed section</div>
+      <div class="cap-note">Header stays informative when closed: count plus a one-line summary of the first items.</div>
+      <div class="card">
+        <div class="sec-head" style="border-bottom:0;">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          <h2 class="sec-title">Overview</h2>
+          <span class="count">2 / 9</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Live circle · Coach support</span>
+        </div>
+      </div>
+      <div class="cap" style="margin-top:8px;">Dragging a page block</div>
+      <div class="cap-note">Lifted card, drop line between siblings. Sequence is rewritten on save.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="block"><div class="block-head"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><span class="badge badge-rich">Rich text</span><span class="name">Why this workshop works</span></div></div>
+        <div style="height:3px;border-radius:2px;background:#1a3c5e;margin:0 6px;"></div>
+        <div class="block" style="box-shadow:var(--sh-lg);transform:rotate(-1deg);border-color:#1a3c5e;"><div class="block-head" style="background:#fff;"><span class="drag" style="color:#1a3c5e;"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><span class="badge badge-icon">Icon text</span><span class="name">How the 14 days unfold</span></div></div>
+        <div class="block" style="opacity:.6;"><div class="block-head"><span class="drag"><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></span><span class="badge badge-rich">Rich text</span><span class="name">Who will guide you</span></div></div>
+      </div>
+    </div>
+
+    <!-- 6. Leave guard -->
+    <div class="panel">
+      <div class="cap">6 · Leaving with unsaved changes</div>
+      <div class="cap-note" style="color:#a8630f;">New behaviour, needs your yes: today navigating away silently loses edits. Also fires when switching to the Challenges or Settings tab.</div>
+      <div style="background:rgba(26,37,53,.35);border-radius:14px;padding:36px 28px;">
+        <div class="dialog">
+          <div style="font-size:16px;font-weight:600;">Leave without saving?</div>
+          <div style="font-size:13.5px;color:#5a6880;line-height:1.5;">You have unsaved changes in <strong>Workshop information</strong> and <strong>Requirements</strong>. They will be lost if you leave now.</div>
+          <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px;">
+            <span class="btn">Stay</span>
+            <span class="btn btn-danger">Leave without saving</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap" style="margin-top:8px;">Save failed</div>
+      <div class="cap-note">Inline, persistent until retried. Replaces the 1-second toast.</div>
+      <div class="savebar" style="border-color:#c0392b;background:#fff8f7;">
+        <span class="pill pill-err"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>Could not save</span>
+        <span class="help">Check your connection and try again.</span>
+        <span class="grow"></span>
+        <span class="btn btn-primary">Retry</span>
+      </div>
+      <div class="cap" style="margin-top:8px;">Empty section</div>
+      <div class="card">
+        <div class="sec-head" style="border-bottom:0;">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#8a98ac" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+          <h2 class="sec-title">Page blocks</h2>
+          <span class="count" style="background:#f1f3f7;color:#8a98ac;">0</span>
+          <span class="grow"></span>
+          <span class="sec-hint">No blocks yet</span>
+          <span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span>Add block</span></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

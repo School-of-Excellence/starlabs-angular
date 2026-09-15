@@ -24,7 +24,7 @@
   </mat-form-field>
 
   <div style="display: flex; gap: 10px; margin-top: 10px;">
-    <button
+    <button data-testid="wc3-save-category-1"
       mat-raised-button
       color="primary"
       (click)="saveCategory()"
@@ -35,7 +35,7 @@
       <span *ngIf="isSaving">{{ isEditMode ? 'Updating...' : 'Creating...' }}</span>
     </button>
 
-    <button
+    <button data-testid="wc3-cancel-2"
       mat-button
       (click)="cancel()"
       [disabled]="isSaving"

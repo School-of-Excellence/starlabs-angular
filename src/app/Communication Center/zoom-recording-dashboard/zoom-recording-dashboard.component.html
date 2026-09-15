@@ -58,14 +58,14 @@
   <form [formGroup]="form" class="filters">
     <mat-form-field appearance="outline" class="f-search">
       <mat-label>Search topic, host or meeting ID</mat-label>
-      <input type="text" matInput (keyup)="applyFilter()" formControlName="search" />
+      <input data-testid="zrd-search" type="text" matInput (keyup)="applyFilter()" formControlName="search" />
     </mat-form-field>
 
     <mat-form-field appearance="outline">
       <mat-label>Date range</mat-label>
       <mat-date-range-input [rangePicker]="picker">
-        <input matStartDate placeholder="Start" formControlName="startDate" (dateChange)="onDateChange()" />
-        <input matEndDate placeholder="End" formControlName="endDate" (dateChange)="onDateChange()" />
+        <input data-testid="zrd-startdate" matStartDate placeholder="Start" formControlName="startDate" (dateChange)="onDateChange()" />
+        <input data-testid="zrd-enddate" matEndDate placeholder="End" formControlName="endDate" (dateChange)="onDateChange()" />
       </mat-date-range-input>
       <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
       <mat-date-range-picker #picker></mat-date-range-picker>
@@ -73,7 +73,7 @@
 
     <mat-form-field appearance="outline" class="f-status">
       <mat-label>Status</mat-label>
-      <mat-select (selectionChange)="applyFilter()" formControlName="status">
+      <mat-select data-testid="zrd-status" (selectionChange)="applyFilter()" formControlName="status">
         <mat-option [value]="''">All</mat-option>
         <mat-option [value]="'completed'">Completed</mat-option>
         <mat-option [value]="'processing'">Processing</mat-option>
@@ -86,12 +86,12 @@
   <!-- ===== migrate-from-Zoom panel ===== -->
   <section class="zoom-panel">
     <div class="zoom-panel__bar">
-      <button class="zoom-toggle" (click)="toggleZoomPanel()">
+      <button data-testid="zrd-togglezoompanel" class="zoom-toggle" (click)="toggleZoomPanel()">
         {{ showZoomPanel ? '▾' : '▸' }} Migrate from Zoom
         <span class="zoom-toggle__hint">— fetch the selected date's Zoom recordings and migrate on demand</span>
       </button>
       @if (showZoomPanel) {
-      <button class="reload-btn" (click)="loadZoomRecordings()" [disabled]="zoomLoading">
+      <button data-testid="zrd-loadzoomrecordings" class="reload-btn" (click)="loadZoomRecordings()" [disabled]="zoomLoading">
         {{ zoomLoading ? 'Loading…' : '↻ Reload' }}
       </button>
       }
@@ -168,9 +168,9 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
             @if (isInFlight(r)) {
-            <button class="migrate-btn" disabled>Migrating…</button>
+            <button data-testid="zrd-button" class="migrate-btn" disabled>Migrating…</button>
             } @else if (canMigrate(r)) {
-            <button class="migrate-btn" (click)="migrate(r)">
+            <button data-testid="zrd-migrate" class="migrate-btn" (click)="migrate(r)">
               {{ migrationFor(r.uuid) ? 'Retry →' : 'Migrate →' }}
             </button>
             } @else if (r.totalSize <= 0) {
@@ -281,9 +281,9 @@
       <ng-container matColumnDef="file">
         <th mat-header-cell *matHeaderCellDef></th>
         <td mat-cell *matCellDef="let el">
-          <button class="view-btn" (click)="openFileModel(el.id)">View files →</button>
+          <button data-testid="zrd-openfilemodel" class="view-btn" (click)="openFileModel(el.id)">View files →</button>
           @if (dropboxFolderUrl(el); as dbUrl) {
-          <a class="dropbox-link-sm" [href]="dbUrl" target="_blank" rel="noopener"
+          <a data-testid="zrd-link" class="dropbox-link-sm" [href]="dbUrl" target="_blank" rel="noopener"
              title="Open this recording's folder in Dropbox">📁 Dropbox ↗</a>
           }
         </td>
@@ -306,8 +306,8 @@
 
 <!-- ===== file modal ===== -->
 @if (files !== null) {
-<div class="model-overlay" (click)="closeFileModel()">
-  <div class="file-container" (click)="$event.stopPropagation()">
+<div data-testid="zrd-closefilemodel" class="model-overlay" (click)="closeFileModel()">
+  <div data-testid="zrd-event-stoppropagation" class="file-container" (click)="$event.stopPropagation()">
     <div class="modal-head">
       <div>
         <span class="dash-eyebrow">Files</span>
@@ -329,13 +329,13 @@
         </p>
         @if (dropboxFolderUrl(activeRecord); as dbUrl) {
         <p class="modal-meta">
-          <a class="dropbox-link" [href]="dbUrl" target="_blank" rel="noopener">
+          <a data-testid="zrd-link-2" class="dropbox-link" [href]="dbUrl" target="_blank" rel="noopener">
             📁 Open folder in Dropbox ↗
           </a>
         </p>
         }
       </div>
-      <button class="close-x" (click)="closeFileModel()">✕</button>
+      <button data-testid="zrd-closefilemodel-2" class="close-x" (click)="closeFileModel()">✕</button>
     </div>
 
     @if (files.length > 0) {

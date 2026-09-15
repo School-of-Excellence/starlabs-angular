@@ -3,7 +3,7 @@
     <h2 mat-dialog-title>
       {{ isEditMode ? 'Edit ' : 'Add ' }}{{ widgettype === 'ads' ? 'Ad' : 'Upcoming Workshop' }}
     </h2>
-    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+    <button data-testid="cre-cancel-1" mat-icon-button type="button" (click)="cancel()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -16,7 +16,7 @@
         <div class="grid">
           <mat-form-field appearance="outline">
             <mat-label>Event Date</mat-label>
-            <input matInput [matDatepicker]="picker" formControlName="eventdate" readonly (click)="picker.open()" />
+            <input data-testid="cre-picker-2" matInput [matDatepicker]="picker" formControlName="eventdate" readonly (click)="picker.open()" />
             <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
             <mat-datepicker #picker></mat-datepicker>
             <mat-error *ngIf="form.get('eventdate')?.hasError('required')">Event date is required.</mat-error>
@@ -268,7 +268,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Start Date</mat-label>
-              <input matInput [matDatepicker]="startPicker" formControlName="startdate" readonly
+              <input data-testid="cre-start-picker-3" matInput [matDatepicker]="startPicker" formControlName="startdate" readonly
                 (click)="startPicker.open()" />
               <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
               <mat-datepicker #startPicker></mat-datepicker>
@@ -280,7 +280,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>End Date</mat-label>
-              <input matInput [matDatepicker]="endPicker" formControlName="enddate" [min]="minEndDate" readonly
+              <input data-testid="cre-end-picker-4" matInput [matDatepicker]="endPicker" formControlName="enddate" [min]="minEndDate" readonly
                 (click)="endPicker.open()" />
               <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
               <mat-datepicker #endPicker></mat-datepicker>
@@ -305,7 +305,7 @@
                 {{ watiTemplates.length }} template(s) loaded
               </span>
               <span class="wati-error" *ngIf="watiTemplatesError">{{ watiTemplatesError }}</span>
-              <button mat-stroked-button type="button" (click)="loadWatiTemplates(true)"
+              <button data-testid="cre-load-wati-templates-5" mat-stroked-button type="button" (click)="loadWatiTemplates(true)"
                 [disabled]="watiTemplatesLoading">
                 <mat-icon>refresh</mat-icon>
                 {{ watiTemplatesLoading ? 'Loading templates…' : (watiTemplates.length ? 'Reload templates' : 'Load templates') }}
@@ -491,12 +491,12 @@
 
               <div class="upload-side">
                 <div class="upload-actions">
-                  <button mat-stroked-button type="button" (click)="uploadImage(f.key)"
+                  <button data-testid="cre-upload-image-6" mat-stroked-button type="button" (click)="uploadImage(f.key)"
                     [disabled]="isUploadingKey(f.key)">
                     <mat-icon>upload</mat-icon>
                     {{ isUploadingKey(f.key) ? 'Uploading…' : (imageUrlOf(f.key) ? 'Replace image' : 'Upload image') }}
                   </button>
-                  <button mat-button type="button" class="upload-remove"
+                  <button data-testid="cre-remove-image-7" mat-button type="button" class="upload-remove"
                     *ngIf="imageUrlOf(f.key) && !isUploadingKey(f.key)" (click)="removeImage(f.key)">
                     Remove
                   </button>
@@ -515,8 +515,8 @@
     </mat-dialog-content>
 
     <mat-dialog-actions align="end" class="dialog-actions">
-      <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving || isUploadingAny">
+      <button data-testid="cre-cancel-8" mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+      <button data-testid="cre-button-9" mat-flat-button color="primary" type="submit" [disabled]="isSaving || isUploadingAny">
         <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
         <span *ngIf="!isSaving">{{ isUploadingAny ? 'Uploading…' : (isEditMode ? 'Update' : 'Save') }}</span>
       </button>

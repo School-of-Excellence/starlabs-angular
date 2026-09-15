@@ -9,14 +9,14 @@
         <div class="ov-sub">{{ mode==='past' ? 'Past events · frozen at finalize' : 'Current & upcoming events' }} &middot; open a row to work a product</div>
 
         <div class="ov-toggle">
-          <button class="ov-seg" [class.on]="mode==='upcoming'" (click)="setMode('upcoming')">Upcoming</button>
-          <button class="ov-seg" [class.on]="mode==='past'" (click)="setMode('past')">Past</button>
+          <button data-testid="epc-overview-mode-upcoming" class="ov-seg" [class.on]="mode==='upcoming'" (click)="setMode('upcoming')">Upcoming</button>
+          <button data-testid="epc-overview-mode-past" class="ov-seg" [class.on]="mode==='past'" (click)="setMode('past')">Past</button>
         </div>
 
         <div class="ov-filters">
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ov-search">
             <mat-label>Search</mat-label>
-            <input matInput [(ngModel)]="searchOverview" (ngModelChange)="onSearch()" placeholder="Event or product">
+            <input data-testid="epc-overview-search" matInput [(ngModel)]="searchOverview" (ngModelChange)="onSearch()" placeholder="Event or product">
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
           <span class="ov-showing" *ngIf="isFiltered">Showing {{ filteredRows.length | number }} of {{ overviewRows.length | number }}</span>
@@ -24,7 +24,7 @@
 
         <div class="ov-error" *ngIf="loadError">
           <span><mat-icon>error_outline</mat-icon> Couldn't load events.</span>
-          <button mat-stroked-button (click)="retry()">Retry</button>
+          <button data-testid="epc-overview-retry" mat-stroked-button (click)="retry()">Retry</button>
         </div>
 
         <div class="ov-loading" *ngIf="loadingOverview">
@@ -46,7 +46,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let row of pagedRows" class="ov-row" role="button" tabindex="0"
+              <tr data-testid="epc-overview-row" *ngFor="let row of pagedRows" class="ov-row" role="button" tabindex="0"
                 [attr.aria-label]="'Open ' + row.productName + ' ' + row.eventName"
                 (click)="openProduct(row)" (keydown)="onRowKey($event, row)">
                 <td>
@@ -73,7 +73,7 @@
               <tr *ngIf="filteredRows.length === 0">
                 <td colspan="8" class="ov-empty">
                   {{ isFiltered ? 'No events match “' + searchOverview + '”' : (mode==='past' ? 'No past events in the last 6 months' : 'No current or upcoming events') }}
-                  <button mat-button *ngIf="isFiltered" (click)="searchOverview=''; onSearch()">Clear search</button>
+                  <button data-testid="epc-overview-clear-search" mat-button *ngIf="isFiltered" (click)="searchOverview=''; onSearch()">Clear search</button>
                 </td>
               </tr>
             </tbody>
@@ -90,7 +90,7 @@
         <span class="tab-label">
           <span class="tab-prod">{{ tab.productName }}</span>
           <span class="tab-evt">{{ tab.eventName }}</span>
-          <button type="button" class="tab-close" aria-label="Close tab" (click)="closeTab(i, $event)"><mat-icon>close</mat-icon></button>
+          <button data-testid="epc-tab-close" type="button" class="tab-close" aria-label="Close tab" (click)="closeTab(i, $event)"><mat-icon>close</mat-icon></button>
         </span>
       </ng-template>
       <ng-template matTabContent>

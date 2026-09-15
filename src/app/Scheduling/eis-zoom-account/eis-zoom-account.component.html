@@ -9,7 +9,7 @@
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="updateAccount(null)">Add Zoom Credentials</button>
+        <button data-testid="eza-update-account-1" class="addbtn" mat-stroked-button (click)="updateAccount(null)">Add Zoom Credentials</button>
       </div>
     </div>
     <table mat-table [dataSource]="dataSource" matSort>
@@ -59,7 +59,7 @@
       <ng-container matColumnDef="Edit">
         <th mat-header-cell *matHeaderCellDef> Edit </th>
         <td mat-cell *matCellDef="let row">
-          <button class="editbtn" mat-icon-button type="button" (click)="updateAccount(row)">
+          <button data-testid="eza-update-account-2" class="editbtn" mat-icon-button type="button" (click)="updateAccount(row)">
             <mat-icon> edit</mat-icon>
           </button>
         </td>

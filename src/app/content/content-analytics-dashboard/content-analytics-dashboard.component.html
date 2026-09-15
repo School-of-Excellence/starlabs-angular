@@ -28,40 +28,40 @@
                     <!-- <mat-form-field appearance="outline">
                         <mat-label>Select Date Range</mat-label>
                         <mat-date-range-input [rangePicker]="rangePicker">
-                            <input matStartDate [formControl]="startDate" placeholder="Start date">
-                            <input matEndDate [formControl]="endDate" placeholder="End date">
+                            <input data-testid="cad-inp-001" matStartDate [formControl]="startDate" placeholder="Start date">
+                            <input data-testid="cad-inp-002" matEndDate [formControl]="endDate" placeholder="End date">
                         </mat-date-range-input>
                         <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
                         <mat-date-range-picker #rangePicker></mat-date-range-picker>
                     </mat-form-field> -->
                     <!-- HTML Template -->
                     <!-- HTML Template -->
-                    <div class="range-field" (click)="rangePicker.open()">
+                    <div data-testid="cad-div-003" class="range-field" (click)="rangePicker.open()">
                         <svg class="cal-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
                             <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.2" />
                             <path d="M1 6h14" stroke="currentColor" stroke-width="1.2" />
                             <path d="M5 1v2M11 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
                         </svg>
                         <div class="date-inputs">
-                            <input [value]="startDate.value | date:'M/d/yyyy'" placeholder="Start date" readonly>
+                            <input data-testid="cad-inp-004" [value]="startDate.value | date:'M/d/yyyy'" placeholder="Start date" readonly>
                             <span class="sep">→</span>
-                            <input [value]="endDate.value | date:'M/d/yyyy'" placeholder="End date" readonly>
+                            <input data-testid="cad-inp-005" [value]="endDate.value | date:'M/d/yyyy'" placeholder="End date" readonly>
                         </div>
-                        <!-- <button class="clear-btn" [class.show]="startDate.value" (click)="clearDates($event)">
+                        <!-- <button data-testid="cad-btn-006" class="clear-btn" [class.show]="startDate.value" (click)="clearDates($event)">
                             <mat-icon>close</mat-icon>
                         </button> -->
 
                         <!-- Mat picker hidden but functional -->
                         <mat-date-range-input [rangePicker]="rangePicker"
                             style="position:absolute; width:0; height:0; overflow:hidden; opacity:0;">
-                            <input matStartDate [formControl]="startDate">
-                            <input matEndDate [formControl]="endDate">
+                            <input data-testid="cad-inp-007" matStartDate [formControl]="startDate">
+                            <input data-testid="cad-inp-008" matEndDate [formControl]="endDate">
                         </mat-date-range-input>
                         <mat-date-range-picker #rangePicker></mat-date-range-picker>
                     </div>
                 </div>
-                <div class="date-badge" (click)="applyDateRangeFilter()">
-                    <button mat-button><span class="date-text">Apply</span></button>
+                <div data-testid="cad-div-009" class="date-badge" (click)="applyDateRangeFilter()">
+                    <button data-testid="cad-btn-010" mat-button><span class="date-text">Apply</span></button>
                 </div>
             </div>
         </div>
@@ -82,7 +82,7 @@
                 <div class="kpi-label">Period</div>
                 <div class="kpi-value" style="color:rgb(7, 233, 222)">{{ totalDays  }} Days</div>
             </div>
-            <div class="kpi-card" (click)="openDialog('uniqueusers')" style="cursor:pointer">
+            <div data-testid="cad-div-011" class="kpi-card" (click)="openDialog('uniqueusers')" style="cursor:pointer">
                 <div class="kpi-label" >Unique Users</div>
                 <div class="kpi-value" style="color:#93C5FD">{{totalUniqueUsers}}
                 </div>
@@ -99,17 +99,17 @@
                 <div class="kpi-label">Unique Videos</div>
                 <div class="kpi-value" style="color:#FCD34D">{{totalUniueContents}}</div>
             </div>
-            <div class="kpi-card" (click)="openDialog('superfans')" style="cursor:pointer">
+            <div data-testid="cad-div-012" class="kpi-card" (click)="openDialog('superfans')" style="cursor:pointer">
                 <div class="kpi-label">SuperFans</div>
                 <div class="kpi-value" style="color:#FCA5A5">{{totalSuperFans}}
                 </div>
             </div>
-            <div class="kpi-card" (click)="openDialog('atrisk')" style="cursor:pointer">
+            <div data-testid="cad-div-013" class="kpi-card" (click)="openDialog('atrisk')" style="cursor:pointer">
                 <div class="kpi-label">At Risk</div>
                 <div class="kpi-value" style="color:#FCA5A5">
                     {{getAtRiskParticipants()?.length}}</div>
             </div>
-            <div class="kpi-card" (click)="openDialog('risingfans')" style="cursor:pointer">
+            <div data-testid="cad-div-014" class="kpi-card" (click)="openDialog('risingfans')" style="cursor:pointer">
                 <div class="kpi-label">Rising Fans</div>
                 <div class="kpi-value" style="color:#C4B5FD">
                     {{totalRisingFans}}</div>
@@ -161,7 +161,7 @@
             <!-- <mat-form-field appearance="outline" class="white-field">
                 <mat-label>Search Participant</mat-label>
 
-                <input matInput #participantSearch (input)="filterParticipants(participantSearch.value)"
+                <input data-testid="cad-inp-015" matInput #participantSearch (input)="filterParticipants(participantSearch.value)"
                     autocomplete="off">
             </mat-form-field> -->
             <div class="search-box">
@@ -169,7 +169,7 @@
                     <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
                     <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
                 </svg>
-                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #participantSearch
+                <input data-testid="cad-inp-016" class="search-input" type="text" placeholder="Search" autocomplete="off" #participantSearch
                     (input)="filterParticipantTable(participantSearch.value)" />
             </div>
         </div>
@@ -354,7 +354,7 @@
         <div class="grid-3">
             <div class="card" style="border-color:rgba(252,211,77,0.15)">
                 <div class="opp-icon">🎯</div>
-                <div class="opp-title">SolarVoice</div><span class="sm-tag"
+                <div class="opp-title">SolarVoice</div><span data-testid="cad-span-017" class="sm-tag"
                     style="background:rgba(252,211,77,0.18);color:#FCD34D;border:1px solid rgba(252,211,77,0.28)"
                     (click)="openDialog('onlysolarvoice')">{{getProfilesOnlyWatchSolarVoice().length}}</span>
                 <!-- <p class="opp-desc">160 SolarVoice users who have never touched Eiflix. Warm, high-intent, already trust
@@ -366,7 +366,7 @@
             </div>
             <div class="card" style="border-color:rgba(147,197,253,0.15)">
                 <div class="opp-icon">🔄</div>
-                <div class="opp-title">Eiflix</div><span class="sm-tag"
+                <div class="opp-title">Eiflix</div><span data-testid="cad-span-018" class="sm-tag"
                     style="background:rgba(147,197,253,0.18);color:#93C5FD;border:1px solid rgba(147,197,253,0.28)"
                     (click)="openDialog('onlyeiflix')">{{getProfilesOnlyWatchEifilx().length}}</span>
                 <!-- <p class="opp-desc">78 Eiflix-only users who have never explored SolarVoice. GONG Trance or Crossover
@@ -471,13 +471,13 @@
                     </div>
                     <!-- <span class="mono" style="font-size:24px;font-weight:700;color:#6EE7B7">{{(contentTypeMap['solarvoice']?.watchHours / totalWatchHours).toFixed(0)}}</span> -->
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('solarvoice' , false)"><span
+                <div data-testid="cad-div-019" class="plat-row" (click)="openPlatformComparView('solarvoice' , false)"><span
                         class="plat-row-label">Participants</span><span class="plat-row-val"
                         style="color:#6EE7B7">{{contentTypeMap['solarvoice']?.profileid.size}}</span></div>
                 <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
                         style="color:#6EE7B7">{{convertToHours(contentTypeMap['solarvoice']?.watchHours).toFixed(1)}}h</span>
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('solarvoice' , true)"><span
+                <div data-testid="cad-div-020" class="plat-row" (click)="openPlatformComparView('solarvoice' , true)"><span
                         class="plat-row-label">Completed</span><span class="plat-row-val"
                         style="color:#6EE7B7">{{(contentTypeMap['solarvoice']?.completed.size)}}</span>
                 </div>
@@ -496,14 +496,14 @@
                         <!-- <div style="font-size:11px;color:#6B7280">224 users · 410h total</div> -->
                     </div><span class="mono" style="font-size:24px;font-weight:700;color:#93C5FD"></span>
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('eiflixcontent' , false)"><span
+                <div data-testid="cad-div-021" class="plat-row" (click)="openPlatformComparView('eiflixcontent' , false)"><span
                         class="plat-row-label">Participant</span><span class="plat-row-val"
                         style="color:#6EE7B7">{{(contentTypeMap['eiflixcontent']?.profileid.size)}}</span>
                 </div>
                 <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
                         style="color:#93C5FD">{{convertToHours(contentTypeMap['eiflixcontent']?.watchHours).toFixed(1)}}h</span>
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('eiflixcontent' , true)"><span
+                <div data-testid="cad-div-022" class="plat-row" (click)="openPlatformComparView('eiflixcontent' , true)"><span
                         class="plat-row-label">Completed</span><span class="plat-row-val"
                         style="color:#FCD34D">{{(contentTypeMap['eiflixcontent']?.completed.size)}}</span></div>
                 <div class="plat-bar-track">
@@ -521,13 +521,13 @@
                         <!-- <div style="font-size:11px;color:#6B7280">138 users · 36h total</div> -->
                     </div><span class="mono" style="font-size:24px;font-weight:700;color:#FCD34D"></span>
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('generalcontent' , false)"><span
+                <div data-testid="cad-div-023" class="plat-row" (click)="openPlatformComparView('generalcontent' , false)"><span
                         class="plat-row-label">Participant</span><span class="plat-row-val"
                         style="color:#6EE7B7">{{(contentTypeMap['generalcontent']?.profileid.size)}}</span></div>
                 <div class="plat-row"><span class="plat-row-label">Hours</span><span class="plat-row-val"
                         style="color:#FCD34D">{{convertToHours(contentTypeMap['generalcontent']?.watchHours).toFixed(1)}}h</span>
                 </div>
-                <div class="plat-row" (click)="openPlatformComparView('generalcontent' , true)"><span
+                <div data-testid="cad-div-024" class="plat-row" (click)="openPlatformComparView('generalcontent' , true)"><span
                         class="plat-row-label">Completed</span><span class="plat-row-val"
                         style="color:#FCA5A5">{{(contentTypeMap['generalcontent']?.completed.size)}}</span></div>
 
@@ -550,7 +550,7 @@
         <div class="participant-filter">
             <!-- <mat-form-field appearance="outline" class="white-field">
                 <mat-label>Search Playlist</mat-label>
-                <input matInput #playlistSearch (input)="filterPlayListTable(playlistSearch.value)" autocomplete="off">
+                <input data-testid="cad-inp-025" matInput #playlistSearch (input)="filterPlayListTable(playlistSearch.value)" autocomplete="off">
 
             </mat-form-field> -->
             <div class="search-box">
@@ -558,7 +558,7 @@
                     <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
                     <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
                 </svg>
-                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #playlistSearch
+                <input data-testid="cad-inp-026" class="search-input" type="text" placeholder="Search" autocomplete="off" #playlistSearch
                     (input)="filterPlayListTable(playlistSearch.value)" />
             </div>
         </div>
@@ -592,7 +592,7 @@
                     <!-- Assigned Column -->
                     <ng-container matColumnDef="assigned">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Assigned</th>
-                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'profileid')">
+                        <td data-testid="cad-td-027" mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'profileid')">
                             <span class="mono stat-val">{{ p?.profileid?.size }}</span>
                         </td>
                     </ng-container>
@@ -600,7 +600,7 @@
                     <!-- Started Column -->
                     <ng-container matColumnDef="started">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Started</th>
-                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'startedProfiles')">
+                        <td data-testid="cad-td-028" mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'startedProfiles')">
                             <span class="mono stat-val started-val">{{p?.startedProfiles?.size}}</span>
                         </td>
                     </ng-container>
@@ -608,7 +608,7 @@
                     <!-- Ongoing Column -->
                     <ng-container matColumnDef="ongoing">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Ongoing</th>
-                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'ongoingProfiles')">
+                        <td data-testid="cad-td-029" mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'ongoingProfiles')">
                             <span class="mono stat-val ongoing-val">{{ p.ongoingProfiles?.size }}</span>
                         </td>
                     </ng-container>
@@ -616,7 +616,7 @@
                     <!-- Completed Column -->
                     <ng-container matColumnDef="completed">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
-                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'completedProfiles')">
+                        <td data-testid="cad-td-030" mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'completedProfiles')">
                             <span class="mono stat-val completed-val">{{ p.completedProfiles?.size }}</span>
                         </td>
                     </ng-container>
@@ -624,7 +624,7 @@
                     <!-- Not Started Column -->
                     <ng-container matColumnDef="notstarted">
                         <th mat-header-cell *matHeaderCellDef mat-sort-header>Not Started</th>
-                        <td mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'notStartedProfiles')">
+                        <td data-testid="cad-td-031" mat-cell *matCellDef="let p" (click)="openPlayListPanelView(p , 'notStartedProfiles')">
                             <span class="mono stat-val notstarted-val">{{ p.notStartedProfiles?.size }}</span>
                         </td>
                     </ng-container>
@@ -667,7 +667,7 @@
         <div class="participant-filter">
             <!-- <mat-form-field appearance="outline" class="white-field">
                 <mat-label>Search Content</mat-label>
-                <input matInput #contentSearch (input)="filterContentTable(contentSearch.value)" autocomplete="off">
+                <input data-testid="cad-inp-032" matInput #contentSearch (input)="filterContentTable(contentSearch.value)" autocomplete="off">
 
             </mat-form-field> -->
             <div class="search-box">
@@ -675,7 +675,7 @@
                     <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.3" />
                     <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
                 </svg>
-                <input class="search-input" type="text" placeholder="Search" autocomplete="off" #contentSearch
+                <input data-testid="cad-inp-033" class="search-input" type="text" placeholder="Search" autocomplete="off" #contentSearch
                     (input)="filterContentTable(contentSearch.value)" />
             </div>
         </div>
@@ -733,7 +733,7 @@
                             <!-- Viewers Column -->
                             <ng-container matColumnDef="viewers">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Viewers</th>
-                                <td mat-cell *matCellDef="let c" (click)="openContentPanelView(c , 'profileid')">
+                                <td data-testid="cad-td-034" mat-cell *matCellDef="let c" (click)="openContentPanelView(c , 'profileid')">
                                     <span class="mono viewers-val">{{ c.profileid?.size }}</span>
                                 </td>
                             </ng-container>
@@ -766,7 +766,7 @@
 
                             <ng-container matColumnDef="completion">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Completed</th>
-                                <td mat-cell *matCellDef="let c"
+                                <td data-testid="cad-td-035" mat-cell *matCellDef="let c"
                                     (click)="openContentPanelView(c , 'completedProfiles')">
                                     <span class="mono viewers-val">{{c.completedProfiles.size}}</span>
                                 </td>
@@ -775,7 +775,7 @@
                             <!-- Rewatches Column -->
                             <ng-container matColumnDef="rewatches">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Rewatches</th>
-                                <td mat-cell *matCellDef="let c"
+                                <td data-testid="cad-td-036" mat-cell *matCellDef="let c"
                                     (click)="openContentPanelView(c , 'rewatchedProfiles')">
                                     <span class="mono viewers-val">{{ c.rewatchedProfiles.size }}</span>
                                 </td>
@@ -812,8 +812,8 @@
             <div class="dialog-header">
                 <h3 class="dialog-title">{{ dialogTitle }}</h3>
                 <div class="dialog-actions">
-                    <button mat-stroked-button (click)="exportdialogData()">Export</button>
-                    <button mat-icon-button (click)="closedialog()">
+                    <button data-testid="cad-btn-037" mat-stroked-button (click)="exportdialogData()">Export</button>
+                    <button data-testid="cad-btn-038" mat-icon-button (click)="closedialog()">
                         <mat-icon>close</mat-icon>
                     </button>
                 </div>
@@ -835,7 +835,7 @@
                     <tbody>
                         <tr *ngFor="let p of dialogProfiles; trackBy: trackByProfileId">
                         <td>
-                        <span class="dialog-value" style="text-decoration: underline; color: blue; cursor: pointer;"
+                        <span data-testid="cad-span-039" class="dialog-value" style="text-decoration: underline; color: blue; cursor: pointer;"
                             (click)="profiledetails(p?.profileid)">
                             {{ p?.name || 'Unknown participant' }}
                         </span>

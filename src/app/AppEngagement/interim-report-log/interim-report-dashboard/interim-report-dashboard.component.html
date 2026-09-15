@@ -13,8 +13,8 @@
         <div class="f"><span class="k">JOURNEY</span><select id="fJourney"></select></div>
         <div class="f"><span class="k">EVENT ATTENDED</span><select id="fEvent"></select></div>
         <div class="f"><span class="k">PARTICIPANT</span>
-          <input id="fWho" placeholder="Search a name…"></div>
-        <button class="f clearf" id="fClear">Clear</button>
+          <input id="fWho" data-testid="ird-filter-participant" placeholder="Search a name…"></div>
+        <button class="f clearf" id="fClear" data-testid="ird-filter-clear">Clear</button>
       </div>
     </div>
 
@@ -27,10 +27,10 @@
     <div class="mo">
       <div class="mo-head">
         <div><h3 id="moTitle"></h3><div class="sub" id="moSub"></div></div>
-        <button class="x" id="moX">&times;</button>
+        <button class="x" id="moX" data-testid="ird-modal-close">&times;</button>
       </div>
       <div class="mo-body">
-        <input class="mo-search" id="moSearch" placeholder="Search participant…">
+        <input class="mo-search" id="moSearch" data-testid="ird-modal-search" placeholder="Search participant…">
         <div id="moBody"></div>
       </div>
     </div>
@@ -41,17 +41,17 @@
     <div class="lg-box">
       <div class="lg-head">
         <div><div class="lg-k">NEW LOG</div><h3 id="lgName"></h3></div>
-        <button class="lg-x" id="lgX" aria-label="Close">&times;</button>
+        <button class="lg-x" id="lgX" aria-label="Close" data-testid="ird-log-close">&times;</button>
       </div>
       <div class="lg-tabs" role="tablist">
-        <button role="tab" data-lgtab="Call">Call</button>
-        <button role="tab" data-lgtab="Schedule">Schedule</button>
-        <button role="tab" data-lgtab="Note">Note</button>
+        <button role="tab" data-lgtab="Call" data-testid="ird-log-tab-call">Call</button>
+        <button role="tab" data-lgtab="Schedule" data-testid="ird-log-tab-schedule">Schedule</button>
+        <button role="tab" data-lgtab="Note" data-testid="ird-log-tab-note">Note</button>
       </div>
       <div id="lgPane"></div>
       <div class="lg-foot">
-        <button id="lgCancel">Cancel</button>
-        <button class="lg-save" id="lgSave">Save</button>
+        <button id="lgCancel" data-testid="ird-log-cancel">Cancel</button>
+        <button class="lg-save" id="lgSave" data-testid="ird-log-save">Save</button>
       </div>
     </div>
   </dialog>

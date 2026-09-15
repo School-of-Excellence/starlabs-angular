@@ -11,7 +11,7 @@
 
   <div class="sx-error" *ngIf="loadError">
     <span><mat-icon>error_outline</mat-icon> Couldn't load participants.</span>
-    <button mat-stroked-button (click)="retry()">Retry</button>
+    <button data-testid="pf-error-retry" mat-stroked-button (click)="retry()">Retry</button>
   </div>
 
   <div class="sx-loading" *ngIf="loading">
@@ -26,7 +26,7 @@
         <div class="sx-bd-panel">
           <div class="sx-bd-about">{{ p.about }}</div>
           <ng-container *ngFor="let r of p.rows">
-            <button type="button"
+            <button data-testid="pf-breakdown-row" type="button"
               class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
               [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
               [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
@@ -41,15 +41,15 @@
             <div class="sx-pot-split" *ngIf="r.key === 'potential'">
               <span *ngIf="!splitsReady" class="sx-pot-load"><mat-icon class="spin">progress_activity</mat-icon> customer status…</span>
               <ng-container *ngIf="splitsReady">
-                <button type="button" class="sx-pot-chip act" [class.on]="segment==='potential' && customerFilter==='active'"
+                <button data-testid="pf-potsplit-active" type="button" class="sx-pot-chip act" [class.on]="segment==='potential' && customerFilter==='active'"
                   (click)="setCustomerChip('active')" matTooltipClass="sx-tip" matTooltip="Show only active-status participants in the table">
                   Active <b>{{ potentialStatusCount('active') | number }}</b>
                 </button>
-                <button type="button" class="sx-pot-chip non" [class.on]="segment==='potential' && customerFilter==='nonactive'"
+                <button data-testid="pf-potsplit-nonactive" type="button" class="sx-pot-chip non" [class.on]="segment==='potential' && customerFilter==='nonactive'"
                   (click)="setCustomerChip('nonactive')" matTooltipClass="sx-tip" matTooltip="Show only non-active-status participants in the table">
                   Non-Active <b>{{ potentialStatusCount('nonactive') | number }}</b>
                 </button>
-                <button type="button" class="sx-pot-chip disc" [class.on]="segment==='potential' && customerFilter==='discontinued'"
+                <button data-testid="pf-potsplit-discontinued" type="button" class="sx-pot-chip disc" [class.on]="segment==='potential' && customerFilter==='discontinued'"
                   (click)="setCustomerChip('discontinued')" matTooltipClass="sx-tip" matTooltip="Show only discontinued-status participants in the table">
                   Discontinued <b>{{ potentialStatusCount('discontinued') | number }}</b>
                 </button>
@@ -59,7 +59,7 @@
         </div>
 
         <!-- Overall requested = still-requested + approved + terminal (unattended, revoked) — clickable card below Approved -->
-        <button type="button" class="sx-overall-card" *ngIf="p.total === 'approved'"
+        <button data-testid="pf-overall-requested" type="button" class="sx-overall-card" *ngIf="p.total === 'approved'"
           [class.on]="segment==='overallRequested'" (click)="setSegment('overallRequested')"
           matTooltip="Show everyone who raised their hand: still-requested + approved + unattended + revoked" matTooltipClass="sx-tip">
           <span class="sx-oc-dot"></span>
@@ -77,7 +77,7 @@
           <div class="sx-jhead">
             <span class="sx-jdot"></span>
             <span class="sx-jtitle">Approved by journey</span>
-            <button type="button" class="sx-jgroup-btn" [class.on]="groupEditMode"
+            <button data-testid="pf-journey-group-toggle" type="button" class="sx-jgroup-btn" [class.on]="groupEditMode"
               (click)="toggleGroupEdit()" matTooltipClass="sx-tip"
               [matTooltip]="groupEditMode ? 'Done grouping' : 'Group journeys together'">
               <mat-icon>{{ groupEditMode ? 'check' : 'workspaces' }}</mat-icon>{{ groupEditMode ? 'Done' : 'Group' }}
@@ -90,20 +90,20 @@
           <ng-container *ngIf="splitsReady && groupEditMode">
             <div class="sx-jedit-hint">Tick journeys, type a group name, then Group. Repeat to build more groups.</div>
             <div class="sx-jgroup-bar">
-              <input class="sx-jgroup-input" type="text" placeholder="Group name…" [(ngModel)]="groupNameInput">
-              <button type="button" class="sx-jgroup-apply" [disabled]="!journeySel.size || !groupNameInput.trim()"
+              <input data-testid="pf-journey-group-name" class="sx-jgroup-input" type="text" placeholder="Group name…" [(ngModel)]="groupNameInput">
+              <button data-testid="pf-journey-group-apply" type="button" class="sx-jgroup-apply" [disabled]="!journeySel.size || !groupNameInput.trim()"
                 (click)="groupSelected()">Group{{ journeySel.size ? ' (' + journeySel.size + ')' : '' }}</button>
-              <button type="button" class="sx-jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
+              <button data-testid="pf-journey-group-ungroup" type="button" class="sx-jgroup-ungroup" [disabled]="!journeySel.size" (click)="ungroupSelected()">Ungroup</button>
             </div>
             <!-- Existing groups: click one to reuse its name (adds the ticked journeys to that group) -->
             <div class="sx-jgroup-existing" *ngIf="existingGroupNames.length">
               <span class="sx-jgroup-existing-lab">Add to:</span>
-              <button type="button" class="sx-jgroup-chip" *ngFor="let g of existingGroupNames"
+              <button data-testid="pf-journey-group-chip" type="button" class="sx-jgroup-chip" *ngFor="let g of existingGroupNames"
                 [class.on]="groupNameInput.trim() === g" (click)="groupNameInput = g"
                 matTooltipClass="sx-tip" [matTooltip]="'Use the group “' + g + '”'">{{ g }}</button>
             </div>
             <label class="sx-jedit" *ngFor="let j of approvedByJourney; trackBy: trackJourneyKey">
-              <input type="checkbox" class="sx-jchk" [checked]="isJourneySel(j.label)" (change)="toggleJourneySel(j.label)">
+              <input data-testid="pf-journey-edit-check" type="checkbox" class="sx-jchk" [checked]="isJourneySel(j.label)" (change)="toggleJourneySel(j.label)">
               <span class="sx-jrdot" [style.background]="journeyColor(journeyGroups[j.label] ? ('grp:' + journeyGroups[j.label]) : j.key)"></span>
               <span class="sx-jrlab">{{ j.label }}</span>
               <span class="sx-jgroup-tag" *ngIf="journeyGroups[j.label]">{{ journeyGroups[j.label] }}</span>
@@ -115,7 +115,7 @@
           <ng-container *ngIf="splitsReady && !groupEditMode">
             <div class="sx-jgrp" *ngFor="let j of displayedJourneys; trackBy: trackJourneyKey">
               <div class="sx-jrowline">
-                <button type="button" class="sx-jrow"
+                <button data-testid="pf-journey-row" type="button" class="sx-jrow"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='all'"
                   (click)="setJourneyChip(j)" matTooltipClass="sx-tip" [matTooltip]="'Show all approved from ' + j.label">
                   <span class="sx-jrdot" [style.background]="journeyColor(j.key)"></span>
@@ -125,7 +125,7 @@
                   <span class="sx-jnum">{{ j.total | number }}</span>
                 </button>
                 <!-- Participants open in an overlay (mat-menu), so the card stays compact -->
-                <button type="button" class="sx-jexp" [matMenuTriggerFor]="jmenu" (click)="$event.stopPropagation()"
+                <button data-testid="pf-journey-expand" type="button" class="sx-jexp" [matMenuTriggerFor]="jmenu" (click)="$event.stopPropagation()"
                   matTooltipClass="sx-tip" matTooltip="Show participants and their journeys">
                   <mat-icon>group</mat-icon>
                 </button>
@@ -140,7 +140,7 @@
 
               <div class="sx-jfr">
                 <!-- Clicking a pill filters the table AND opens the same journey-grouped breakdown for that subset -->
-                <button type="button" class="sx-frpill first" [matMenuTriggerFor]="frFirstMenu"
+                <button data-testid="pf-journey-first" type="button" class="sx-frpill first" [matMenuTriggerFor]="frFirstMenu"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='first'"
                   (click)="setJourneyFr(j, 'first')" matTooltipClass="sx-tip" [matTooltip]="'Show first-timers from ' + j.label">First-timer {{ j.first | number }}</button>
                 <mat-menu #frFirstMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
@@ -149,7 +149,7 @@
                   </ng-template>
                 </mat-menu>
 
-                <button type="button" class="sx-frpill rpt" [matMenuTriggerFor]="frRepeatMenu"
+                <button data-testid="pf-journey-repeat" type="button" class="sx-frpill rpt" [matMenuTriggerFor]="frRepeatMenu"
                   [class.on]="segment==='approved' && journeyFilter===j.key && frFilter==='repeat'"
                   (click)="setJourneyFr(j, 'repeat')" matTooltipClass="sx-tip" [matTooltip]="'Show repeat from ' + j.label">Repeat {{ j.repeat | number }}</button>
                 <mat-menu #frRepeatMenu="matMenu" class="sx-jmenu-panel" xPosition="before">
@@ -163,7 +163,7 @@
 
           <!-- Shared overlay body: participants grouped by journey, each showing their own journey. -->
           <ng-template #frPanelTpl let-j="j" let-fr="fr" let-count="count" let-label="label">
-            <div class="sx-jmenu" (click)="$event.stopPropagation()">
+            <div data-testid="pf-journey-menu-stop" class="sx-jmenu" (click)="$event.stopPropagation()">
               <div class="sx-jmenu-head">
                 <div class="sx-jmenu-title"><mat-icon class="sx-jgrp-ic" *ngIf="j.isGroup">workspaces</mat-icon>{{ j.label }}</div>
                 <div class="sx-jmenu-sub">{{ count | number }} {{ label }}<span *ngIf="j.isGroup"> · {{ j.members?.length }} journeys</span></div>
@@ -192,7 +192,7 @@
       <ng-container *ngIf="selectionMode==='approve'">
         <mat-form-field appearance="outline" class="sx-seq" subscriptSizing="dynamic">
           <mat-label>Delivery sequence</mat-label>
-          <mat-select [(ngModel)]="selectedDeliverySet" required>
+          <mat-select data-testid="pf-bar-delivery-set" [(ngModel)]="selectedDeliverySet" required>
             <mat-option *ngFor="let set of deliverySetList" [value]="set['deliverytype']">{{ set['deliverytype'] }}</mat-option>
             <mat-option *ngIf="!deliverySetList.length" disabled>No sequence configured for this product</mat-option>
           </mat-select>
@@ -200,15 +200,15 @@
         <mat-form-field appearance="outline" class="sx-seq"
           *ngIf="arena?.type === 'queue' && queueVariationList.length" subscriptSizing="dynamic">
           <mat-label>Queue variation</mat-label>
-          <mat-select [(ngModel)]="selectedQueueVariation">
+          <mat-select data-testid="pf-bar-queue-variation" [(ngModel)]="selectedQueueVariation">
             <mat-option *ngFor="let v of queueVariationList" [value]="v.id">{{ v.data['variationname'] }}</mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-flat-button class="sx-approve" [disabled]="!canApprove()"
+        <button data-testid="pf-bar-approve" mat-flat-button class="sx-approve" [disabled]="!canApprove()"
           [matTooltip]="approveDisabledReason()" matTooltipClass="sx-tip" (click)="approveSelected()">
           <mat-icon>check</mat-icon> Approve {{ readyCount }}
         </button>
-        <button mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length===0"
+        <button data-testid="pf-bar-revoke-requested" mat-stroked-button class="sx-danger" [disabled]="selectedToRevokeRequested.length===0"
           matTooltipClass="sx-tip" matTooltip="Revoke: cancel the selected participation request(s)"
           (click)="markRevokedRequested(selectedToRevokeRequested)">
           <mat-icon>block</mat-icon> Revoke {{ selectedToRevokeRequested.length }}
@@ -226,47 +226,47 @@
           <mat-icon>person_off</mat-icon> Mark {{ selectedToUnattend.length }} not attended
         </button>
         -->
-        <button mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length===0" (click)="markRevoked(selectedToRevoke)"
+        <button data-testid="pf-bar-revoke-attend" mat-stroked-button class="sx-danger" [disabled]="selectedToRevoke.length===0" (click)="markRevoked(selectedToRevoke)"
           matTooltipClass="sx-tip" matTooltip="Revoke: cancel the product, then assign a new one (destructive)">
           <mat-icon>block</mat-icon> Revoke {{ selectedToRevoke.length }}
         </button>
       </ng-container>
 
-      <button mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
+      <button data-testid="pf-bar-finalize" mat-flat-button class="sx-approve" *ngIf="canFinalize" (click)="finalizeAttendance()"
         matTooltipClass="sx-tip" matTooltip="Close the event: mark no-show on approved participants who did not attend, and lock the final numbers">
         <mat-icon>how_to_reg</mat-icon> Finalize attendance<span *ngIf="pendingNoShow.length"> ({{ pendingNoShow.length }})</span>
       </button>
 
       <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
         <mat-label>Finance</mat-label>
-        <mat-select [(ngModel)]="financeFilter" (ngModelChange)="onFinance()">
+        <mat-select data-testid="pf-bar-finance" [(ngModel)]="financeFilter" (ngModelChange)="onFinance()">
           <mat-option *ngFor="let f of financeOptions" [value]="f.value">{{ f.label }}</mat-option>
         </mat-select>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="sx-finance" subscriptSizing="dynamic">
         <mat-label>Customer status</mat-label>
-        <mat-select [(ngModel)]="customerFilter" (ngModelChange)="onCustomer()">
+        <mat-select data-testid="pf-bar-customer-status" [(ngModel)]="customerFilter" (ngModelChange)="onCustomer()">
           <mat-option value="all">All customers</mat-option>
           <mat-option *ngFor="let c of customerFilterOptions" [value]="c.key">{{ c.label }}</mat-option>
         </mat-select>
       </mat-form-field>
 
-      <button mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
+      <button data-testid="pf-bar-send" mat-stroked-button class="sx-ghost" [matMenuTriggerFor]="sendMenu" [disabled]="!segmentRows.length"
         matTooltipClass="sx-tip" matTooltip="Message the participants in this segment">
         <mat-icon>campaign</mat-icon> Send
       </button>
       <mat-menu #sendMenu="matMenu" class="sx-menu-panel">
-        <button mat-menu-item (click)="sendWhatsApp()"><mat-icon>chat</mat-icon> WhatsApp ({{ segmentRows.length }})</button>
-        <button mat-menu-item (click)="sendNotification()"><mat-icon>notifications</mat-icon> App notification ({{ segmentRows.length }})</button>
-        <button mat-menu-item (click)="sendEmail()"><mat-icon>mail</mat-icon> Email ({{ segmentRows.length }})</button>
+        <button data-testid="pf-send-whatsapp" mat-menu-item (click)="sendWhatsApp()"><mat-icon>chat</mat-icon> WhatsApp ({{ segmentRows.length }})</button>
+        <button data-testid="pf-send-notification" mat-menu-item (click)="sendNotification()"><mat-icon>notifications</mat-icon> App notification ({{ segmentRows.length }})</button>
+        <button data-testid="pf-send-email" mat-menu-item (click)="sendEmail()"><mat-icon>mail</mat-icon> Email ({{ segmentRows.length }})</button>
       </mat-menu>
 
-      <button mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
+      <button data-testid="pf-bar-export" mat-stroked-button class="sx-ghost" (click)="exportList()"><mat-icon>download</mat-icon> Export</button>
 
       <mat-form-field appearance="outline" class="sx-search" subscriptSizing="dynamic">
         <mat-label>Filter</mat-label>
-        <input matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
+        <input data-testid="pf-bar-filter" matInput [(ngModel)]="searchText" (ngModelChange)="onSearch()" placeholder="Name or email">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
     </div>
@@ -279,7 +279,7 @@
         <thead>
           <tr>
             <th class="sx-c-check" *ngIf="showSelect">
-              <mat-checkbox [checked]="isAllSelected()" [indeterminate]="hasSelectionInView() && !isAllSelected()"
+              <mat-checkbox data-testid="pf-table-select-all" [checked]="isAllSelected()" [indeterminate]="hasSelectionInView() && !isAllSelected()"
                 (change)="masterToggle()" aria-label="Select all"></mat-checkbox>
             </th>
             <th>Name</th>
@@ -297,7 +297,7 @@
         <tbody>
           <tr *ngFor="let row of pagedRows">
             <td class="sx-c-check" *ngIf="showSelect">
-              <mat-checkbox [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
+              <mat-checkbox data-testid="pf-table-row-select" [checked]="selection.isSelected(row)" [disabled]="!isSelectable(row)"
                 (change)="toggleRow(row)"
                 [attr.aria-label]="isSelectable(row) ? ('Select ' + row.name) : ('Cannot select ' + row.name + (row.reason ? ' — ' + row.reason : ''))"></mat-checkbox>
             </td>
@@ -363,7 +363,7 @@
               <!-- Reason (no product / in queue) -->
               <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
                 <span class="sx-reason" [class.sx-reason-mut]="segment==='inQueue'">{{ row.reason }}</span>
-                <button mat-button class="sx-assign" *ngIf="segment==='noProduct' && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
+                <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="segment==='noProduct' && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
               </ng-container>
               <!-- Attendance (approved/attended/no-show) -->
               <ng-container *ngIf="selectionMode==='attend'">
@@ -379,7 +379,7 @@
                 <!-- Not attended button hidden per operator request
                 <button mat-button class="sx-mark-danger" (click)="markUnattended([row])">Not attended</button>
                 -->
-                <button mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
+                <button data-testid="pf-row-revoke-attend" mat-button class="sx-mark-danger" (click)="markRevoked([row])">Revoke</button>
               </ng-container>
               <!-- Unattended segment -->
               <span class="sx-unatt" *ngIf="segment==='unattended'">
@@ -398,14 +398,14 @@
                 <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>
               <!-- Revoke: requested -> status-only, approved -> full product-cancel path -->
-              <button mat-button class="sx-mark-danger" *ngIf="selectionMode!=='attend' && segment!=='unattended' && segment!=='revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
+              <button data-testid="pf-row-revoke" mat-button class="sx-mark-danger" *ngIf="selectionMode!=='attend' && segment!=='unattended' && segment!=='revoked' && ((row.isApproved && row.approvedRequestId) || (row.isRequested && !row.isApproved && row.requestData?.docid))"
                 (click)="revoke(row)">Revoke</button>
             </td>
           </tr>
           <tr *ngIf="segmentRows.length === 0">
             <td [attr.colspan]="colSpan" class="sx-empty">
               {{ isFiltered ? (searchText ? 'No participants match “' + searchText + '”' : 'No participants match the current filter') : 'No participants in this segment' }}
-              <button mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; customerFilter='all'; journeyFilter='all'; frFilter='all'; onFinance()">Clear filter</button>
+              <button data-testid="pf-table-clear-filter" mat-button *ngIf="isFiltered" (click)="searchText=''; financeFilter='all'; customerFilter='all'; journeyFilter='all'; frFilter='all'; onFinance()">Clear filter</button>
             </td>
           </tr>
         </tbody>
@@ -423,7 +423,7 @@
     <p class="sx-imp-total" *ngIf="importPreview">{{ importPreview.total | number }} row(s) read from the file.</p>
 
     <div class="sx-imp-sec sx-imp-add" *ngIf="importPreview">
-      <button type="button" class="sx-imp-head" (click)="importExpand.willAdd = !importExpand.willAdd">
+      <button data-testid="pf-import-toggle-add" type="button" class="sx-imp-head" (click)="importExpand.willAdd = !importExpand.willAdd">
         <mat-icon>{{ importExpand.willAdd ? 'expand_more' : 'chevron_right' }}</mat-icon>
         <span>Will be initiated</span><span class="sx-imp-n">{{ importPreview.willAdd.length }}</span>
       </button>
@@ -434,7 +434,7 @@
     </div>
 
     <div class="sx-imp-sec sx-imp-queue" *ngIf="importPreview">
-      <button type="button" class="sx-imp-head" (click)="importExpand.inQueue = !importExpand.inQueue">
+      <button data-testid="pf-import-toggle-queue" type="button" class="sx-imp-head" (click)="importExpand.inQueue = !importExpand.inQueue">
         <mat-icon>{{ importExpand.inQueue ? 'expand_more' : 'chevron_right' }}</mat-icon>
         <span>Already in an active queue — skipped</span><span class="sx-imp-n">{{ importPreview.inQueue.length }}</span>
       </button>
@@ -445,7 +445,7 @@
     </div>
 
     <div class="sx-imp-sec sx-imp-no" *ngIf="importPreview">
-      <button type="button" class="sx-imp-head" (click)="importExpand.noProduct = !importExpand.noProduct">
+      <button data-testid="pf-import-toggle-noproduct" type="button" class="sx-imp-head" (click)="importExpand.noProduct = !importExpand.noProduct">
         <mat-icon>{{ importExpand.noProduct ? 'expand_more' : 'chevron_right' }}</mat-icon>
         <span>No product — needs assigning</span><span class="sx-imp-n">{{ importPreview.noProduct.length }}</span>
       </button>
@@ -454,14 +454,14 @@
         <li *ngIf="!importPreview.noProduct.length" class="sx-mut">None</li>
       </ul>
       <div class="sx-imp-no-act" *ngIf="importPreview.noProduct.length">
-        <button mat-stroked-button class="sx-ghost" (click)="assignImportNoProduct()"><mat-icon>add</mat-icon> Assign product</button>
-        <button mat-button class="sx-mark" (click)="exportImportNoProduct()">Export</button>
+        <button data-testid="pf-import-assign-product" mat-stroked-button class="sx-ghost" (click)="assignImportNoProduct()"><mat-icon>add</mat-icon> Assign product</button>
+        <button data-testid="pf-import-export" mat-button class="sx-mark" (click)="exportImportNoProduct()">Export</button>
       </div>
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button [mat-dialog-close]="false">Cancel</button>
-    <button mat-flat-button color="primary" [disabled]="!importPreview?.willAdd?.length" (click)="confirmImport()">
+    <button data-testid="pf-import-cancel" mat-button [mat-dialog-close]="false">Cancel</button>
+    <button data-testid="pf-import-confirm" mat-flat-button color="primary" [disabled]="!importPreview?.willAdd?.length" (click)="confirmImport()">
       Initiate {{ importPreview?.willAdd?.length || 0 }}
     </button>
   </mat-dialog-actions>
@@ -474,8 +474,8 @@
     <p class="sx-warnline" *ngIf="data.warn"><mat-icon>warning</mat-icon> {{ data.warn }}</p>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button [mat-dialog-close]="false">Cancel</button>
-    <button mat-flat-button color="primary" [mat-dialog-close]="true">{{ data.confirm }}</button>
+    <button data-testid="pf-confirm-cancel" mat-button [mat-dialog-close]="false">Cancel</button>
+    <button data-testid="pf-confirm-ok" mat-flat-button color="primary" [mat-dialog-close]="true">{{ data.confirm }}</button>
   </mat-dialog-actions>
 </ng-template>
 
@@ -494,7 +494,7 @@
     <ul class="sx-fail"><li *ngFor="let n of data.failed">{{ n }}</li></ul>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button [mat-dialog-close]="false">Close</button>
-    <button mat-flat-button color="primary" [mat-dialog-close]="'retry'">Retry {{ data.failed.length }}</button>
+    <button data-testid="pf-failures-close" mat-button [mat-dialog-close]="false">Close</button>
+    <button data-testid="pf-failures-retry" mat-flat-button color="primary" [mat-dialog-close]="'retry'">Retry {{ data.failed.length }}</button>
   </mat-dialog-actions>
 </ng-template>

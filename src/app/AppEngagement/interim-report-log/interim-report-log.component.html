@@ -16,7 +16,7 @@
 
                 <mat-form-field appearance="outline">
                   <mat-label>Participant</mat-label>
-                  <mat-select [(value)]="selectedParticipant">
+                  <mat-select [(value)]="selectedParticipant" data-testid="irl-filters-participant">
                     <mat-option>
                       <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search participant..."
                         noEntriesFoundLabel="No participant found">
@@ -27,8 +27,8 @@
                   </mat-select>
                 </mat-form-field>
 
-                <button mat-raised-button color="primary" (click)="applyFilters()">Apply</button>
-                <button mat-stroked-button (click)="clearFilters()">Clear</button>
+                <button mat-raised-button color="primary" (click)="applyFilters()" data-testid="irl-filters-apply">Apply</button>
+                <button mat-stroked-button (click)="clearFilters()" data-testid="irl-filters-clear">Clear</button>
               </div>
             </ng-template>
     
@@ -37,7 +37,7 @@
       <ng-template #metricsshownTemplate>
 
         <!-- Total -->
-        <div class="total-letter" (click)="filterLetterDataWithBoxClick('totalletters')"[class.active]="selectedFilterTypes.length === 0">
+        <div class="total-letter" data-testid="irl-metric-total" (click)="filterLetterDataWithBoxClick('totalletters')"[class.active]="selectedFilterTypes.length === 0">
           <div class="letter__header">
             <div class="letter__icon">
               <mat-icon>description</mat-icon></div>
@@ -49,7 +49,7 @@
        </div>
 
         <!-- Happy-->
-        <div class="letter-happy" (click)="filterLetterDataWithBoxClick('happy')"[class.active]="selectedFilterTypes.includes('happy')">
+        <div class="letter-happy" data-testid="irl-metric-happy" (click)="filterLetterDataWithBoxClick('happy')"[class.active]="selectedFilterTypes.includes('happy')">
           <div class="happy__header">
             <div class="happy_icon">
             <mat-icon>sentiment_very_satisfied</mat-icon></div>
@@ -62,7 +62,7 @@
 
 
         <!-- Needs Attention -->
-        <div class="attention" (click)="filterLetterDataWithBoxClick('attention')"[class.active]="selectedFilterTypes.includes('attention')">
+        <div class="attention" data-testid="irl-metric-attention" (click)="filterLetterDataWithBoxClick('attention')"[class.active]="selectedFilterTypes.includes('attention')">
           <div class="attention__header">
             <div class="attention__icon">
               <mat-icon>info</mat-icon></div>
@@ -74,7 +74,7 @@
         </div>
 
         <!-- Opportunity -->
-        <div class="letter-opportunity" (click)="filterLetterDataWithBoxClick('opportunity')"[class.active]="selectedFilterTypes.includes('opportunity')">
+        <div class="letter-opportunity" data-testid="irl-metric-opportunity" (click)="filterLetterDataWithBoxClick('opportunity')"[class.active]="selectedFilterTypes.includes('opportunity')">
           <div class="opportunity_header">
             <div class="opportunity_icon">
               <mat-icon>lock_open</mat-icon></div>
@@ -86,7 +86,7 @@
         </div>
 
         <!-- Critical -->
-        <div class="letter-critical" (click)="filterLetterDataWithBoxClick ('critical')"[class.active]="selectedFilterTypes.includes ('critical')">
+        <div class="letter-critical" data-testid="irl-metric-critical" (click)="filterLetterDataWithBoxClick ('critical')"[class.active]="selectedFilterTypes.includes ('critical')">
           <div class="critical_header">
             <div class="critical_icon">
               <mat-icon>error</mat-icon></div>
@@ -113,7 +113,7 @@
       <ng-container *ngTemplateOutlet="filtersTemplate"></ng-container>
 
       <div class="table-actions" *ngIf="selectedRecords.length > 0">
-        <button mat-raised-button color="accent" (click)="viewMerged()">
+        <button mat-raised-button color="accent" (click)="viewMerged()" data-testid="irl-viewmerged">
           View Merged ({{ selectedRecords.length }})
         </button>
       </div>
@@ -132,7 +132,7 @@
     <ng-container *ngTemplateOutlet="filtersTemplate"></ng-container>
 
     <div class="table-actions" *ngIf="selectedRecords.length > 0">
-      <button mat-raised-button color="accent" (click)="viewMerged()">
+      <button mat-raised-button color="accent" (click)="viewMerged()" data-testid="irl-loveletter-viewmerged">
         View Merged ({{ selectedRecords.length }})
       </button>
     </div>
@@ -147,7 +147,7 @@
           <section class="report-section">
         
             <!-- Total Reports -->
-            <div class="report report-total" (click)="filterLogDataWithBoxClick('total')" [class.active]="selectedFilterType === 'total'">
+            <div class="report report-total" data-testid="irl-report-total" (click)="filterLogDataWithBoxClick('total')" [class.active]="selectedFilterType === 'total'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>description</mat-icon>
@@ -160,7 +160,7 @@
             </div>
         
             <!-- Completed -->
-            <div class="report report-completed" (click)="filterLogDataWithBoxClick('completed')" [class.active]="selectedFilterType === 'completed'">
+            <div class="report report-completed" data-testid="irl-report-completed" (click)="filterLogDataWithBoxClick('completed')" [class.active]="selectedFilterType === 'completed'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>check_circle</mat-icon>
@@ -173,7 +173,7 @@
             </div>
         
             <!-- Ongoing -->
-            <div class="report report-ongoing" (click)="filterLogDataWithBoxClick('ongoing')" [class.active]="selectedFilterType === 'ongoing'">
+            <div class="report report-ongoing" data-testid="irl-report-ongoing" (click)="filterLogDataWithBoxClick('ongoing')" [class.active]="selectedFilterType === 'ongoing'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>schedule</mat-icon>
@@ -186,7 +186,7 @@
             </div>
 
             <!-- Not Started -->
-            <div class="report report-not-started" (click)="filterLogDataWithBoxClick('notstarted')" [class.active]="selectedFilterType === 'notstarted'">
+            <div class="report report-not-started" data-testid="irl-report-notstarted" (click)="filterLogDataWithBoxClick('notstarted')" [class.active]="selectedFilterType === 'notstarted'">
               <div class="report__header">
                 <div class="report__icon">
                   <mat-icon>radio_button_unchecked</mat-icon>
@@ -203,7 +203,7 @@
             <div class="actionitem">
               <mat-form-field appearance="outline">
                 <mat-label>Filter Table</mat-label>
-                <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off">
+                <input matInput (keyup)="filterLogData(logInput.value)" #logInput autocomplete="off" data-testid="irl-log-filter">
               </mat-form-field>
               <div class="log-date-range">
                 <mat-form-field appearance="outline">
@@ -215,27 +215,27 @@
                   <mat-datepicker-toggle matSuffix [for]="rangePickerlog"></mat-datepicker-toggle>
                   <mat-date-range-picker #rangePickerlog ></mat-date-range-picker>
                 </mat-form-field>
-                <button mat-raised-button color="primary" (click)="fetchInterimLog()">Apply</button>
-                <button mat-stroked-button (click)="clearInterimReportFilter()">Clear Date</button>
+                <button mat-raised-button color="primary" (click)="fetchInterimLog()" data-testid="irl-log-apply">Apply</button>
+                <button mat-stroked-button (click)="clearInterimReportFilter()" data-testid="irl-log-cleardate">Clear Date</button>
               </div>
               <div *ngIf="selection.hasValue()" class="action-btn-group">
-              <button class="action-btn action-btn--notification" mat-stroked-button (click)="sendNotificationinBreakthrough()">
+              <button class="action-btn action-btn--notification" mat-stroked-button (click)="sendNotificationinBreakthrough()" data-testid="irl-log-send-notification">
                 <mat-icon>notifications</mat-icon>
                 <span>Notification</span>
               </button>
               
-              <button class="action-btn action-btn--whatsapp" mat-stroked-button (click)="sendWatiMessage()">
+              <button class="action-btn action-btn--whatsapp" mat-stroked-button (click)="sendWatiMessage()" data-testid="irl-log-send-whatsapp">
                 <mat-icon>chat</mat-icon>
                 <span>WhatsApp</span>
               </button>
               
-              <button class="action-btn action-btn--email" mat-stroked-button (click)="sendEmailToSelectedParicipant()">
+              <button class="action-btn action-btn--email" mat-stroked-button (click)="sendEmailToSelectedParicipant()" data-testid="irl-log-send-email">
                 <mat-icon>mail</mat-icon>
                 <span>Email</span>
               </button>
               </div>
             </div>
-            <button mat-raised-button color="primary" (click)="exportTable()">Export Table</button>
+            <button mat-raised-button color="primary" (click)="exportTable()" data-testid="irl-log-export">Export Table</button>
           </div>
         </div>
         <div class="table-container">
@@ -243,12 +243,13 @@
 
             <ng-container matColumnDef="select">
               <th mat-header-cell *matHeaderCellDef>
-                <mat-checkbox (change)="$event ? toggleAllRows() : null" [checked]="selection.hasValue() && isAllSelectedLogs()"
+                <mat-checkbox (change)="$event ? toggleAllRows() : null" data-testid="irl-log-selectall" [checked]="selection.hasValue() && isAllSelectedLogs()"
                   [indeterminate]="selection.hasValue() && !isAllSelectedLogs()" [aria-label]="checkboxLabel()">
                 </mat-checkbox>
               </th>
               <td mat-cell *matCellDef="let row">
                 <mat-checkbox (click)="$event.stopPropagation()" (change)="$event ? selection.toggle(row) : null"
+                  [attr.data-testid]="'irl-logrow-select-' + row?.profileid"
                   [checked]="selection.isSelected(row)" [aria-label]="checkboxLabel(row)">
                 </mat-checkbox>
               </td>
@@ -318,11 +319,11 @@
         <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>
             <mat-checkbox [checked]="isAllSelected()"
-              [indeterminate]="selectedRecords.length > 0 && !isAllSelected()" (change)="toggleAll($event.checked)">
+              [indeterminate]="selectedRecords.length > 0 && !isAllSelected()" (change)="toggleAll($event.checked)" data-testid="irl-table-selectall">
             </mat-checkbox>
           </th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
-            <mat-checkbox [checked]="isSelected(row)" (change)="toggleRow(row, $event.checked)">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-select-' + row?.profileid">
+            <mat-checkbox [checked]="isSelected(row)" (change)="toggleRow(row, $event.checked)" [attr.data-testid]="'irl-row-select-' + row?.profileid">
             </mat-checkbox>
           </td>
         </ng-container>
@@ -346,9 +347,9 @@
 
         <ng-container matColumnDef="like">
           <th mat-header-cell *matHeaderCellDef>Happy</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-like-' + row?.profileid">
             <div class="action-cell">
-              <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''">
+              <button mat-icon-button (click)="toggleLike(row)" [color]="row.liked ? 'warn' : ''" [attr.data-testid]="'irl-row-like-' + row?.profileid">
                 <mat-icon>{{ row.liked ? 'favorite' : 'favorite_border' }}</mat-icon>
               </button>
               <div class="action-meta" *ngIf="row.liked && row.likedetails">
@@ -362,9 +363,9 @@
         
         <ng-container matColumnDef="flag">
           <th mat-header-cell *matHeaderCellDef>Needs Attention</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-flag-' + row?.profileid">
             <div class="action-cell">
-              <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''">
+              <button mat-icon-button (click)="toggleFlag(row)" [color]="row.tagged ? 'accent' : ''" [attr.data-testid]="'irl-row-flag-' + row?.profileid">
                 <mat-icon>{{ row.tagged ? 'flag' : 'outlined_flag' }}</mat-icon>
               </button>
               <div class="action-meta" *ngIf="row.tagged && row.tagdetails">
@@ -378,9 +379,9 @@
 
         <ng-container matColumnDef="opportunity">
           <th mat-header-cell *matHeaderCellDef>Opportunity</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-opportunity-' + row?.profileid">
             <div class="action-cell">
-              <button mat-icon-button (click)="toggleOpportunity(row)" [color]="row.opportunity ? 'accent' : ''">
+              <button mat-icon-button (click)="toggleOpportunity(row)" [color]="row.opportunity ? 'accent' : ''" [attr.data-testid]="'irl-row-opportunity-' + row?.profileid">
                 <mat-icon>{{ row.opportunity ? 'attach_money' : 'money_off' }}</mat-icon>
               </button>
               <div class="action-meta" *ngIf="row.opportunity && row.opportunitydetails">
@@ -394,9 +395,9 @@
 
         <ng-container matColumnDef="critical">
           <th mat-header-cell *matHeaderCellDef>Critical</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-critical-' + row?.profileid">
             <div class="action-cell">
-              <button mat-icon-button (click)="toggleCritical(row)">
+              <button mat-icon-button (click)="toggleCritical(row)" [attr.data-testid]="'irl-row-critical-' + row?.profileid">
                 <span class="sos-icon" [class.sos-active]="row.critical">SOS</span>
               </button>
               <div class="action-meta" *ngIf="row.critical && row.criticaldetails">
@@ -410,9 +411,9 @@
 
         <ng-container matColumnDef="resolved">
           <th mat-header-cell *matHeaderCellDef>Resolved</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-resolved-' + row?.profileid">
             <div class="action-cell">
-              <button mat-icon-button (click)="toggleResolved(row)">
+              <button mat-icon-button (click)="toggleResolved(row)" [attr.data-testid]="'irl-row-resolved-' + row?.profileid">
                 <span class="sos-resolved" [class.sos-resolved-active]="row.resolved">OK</span>
               </button>
               <div class="action-meta" *ngIf="row.resolved && row.resolveddetails">
@@ -427,9 +428,10 @@
 
         <ng-container matColumnDef="notes">
           <th mat-header-cell *matHeaderCellDef>Notes</th>
-          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()" [attr.data-testid]="'irl-cell-notes-' + row?.profileid">
             <div class="notes-cell">
               <button mat-icon-button (click)="openNotes(row)"
+                [attr.data-testid]="'irl-row-notes-' + row?.profileid"
                 [color]="row.notes && row.notes.length > 0 ? 'primary' : ''">
                 <mat-icon>{{ row.notes && row.notes.length > 0 ? 'sticky_note_2' : 'note_add' }}</mat-icon>
               </button>
@@ -442,7 +444,7 @@
 
         <tr mat-header-row *matHeaderRowDef="['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity', 'critical', 'resolved']; sticky: true"></tr>
         <tr mat-row *matRowDef="let row; columns: ['select', 'sno', 'name', 'date', 'notes', 'like', 'flag', 'opportunity', 'critical', 'resolved']"
-          [class.selected-row]="isSelected(row)" (click)="viewRow(row)"></tr>
+          [class.selected-row]="isSelected(row)" (click)="viewRow(row)" [attr.data-testid]="'irl-row-' + row?.profileid"></tr>
       </table>
 
       <div *ngIf="!loading && records.length === 0" class="no-data">
@@ -456,11 +458,11 @@
   </ng-template>
 
   <!-- View Overlay -->
-  <div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
-    <div class="overlay-panel" (click)="$event.stopPropagation()">
+  <div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()" data-testid="irl-view-overlay">
+    <div class="overlay-panel" (click)="$event.stopPropagation()" data-testid="irl-view-panel">
       <div class="overlay-header">
         <h2>{{ overlayTitle }}</h2>
-        <button mat-icon-button (click)="closeOverlay()">
+        <button mat-icon-button (click)="closeOverlay()" data-testid="irl-view-close">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -508,11 +510,11 @@
   </div>
 
   <!-- Notes Overlay -->
-  <div class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()">
-    <div class="notes-panel" (click)="$event.stopPropagation()">
+  <div class="overlay-backdrop" *ngIf="showNotesOverlay" (click)="closeNotes()" data-testid="irl-notes-overlay">
+    <div class="notes-panel" (click)="$event.stopPropagation()" data-testid="irl-notes-panel">
       <div class="overlay-header">
         <h2>Notes - {{ notesRecord?.profileName }}</h2>
-        <button mat-icon-button (click)="closeNotes()">
+        <button mat-icon-button (click)="closeNotes()" data-testid="irl-notes-close">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -520,7 +522,7 @@
         <!-- Add new note -->
         <mat-form-field appearance="outline" style="width: 100%;">
           <mat-label>Add a note</mat-label>
-          <textarea matInput [(ngModel)]="notesText" rows="3" placeholder="Write your notes here..."></textarea>
+          <textarea matInput [(ngModel)]="notesText" rows="3" placeholder="Write your notes here..." data-testid="irl-notes-text"></textarea>
         </mat-form-field>
 
         <!-- Previous notes -->
@@ -536,8 +538,8 @@
         </div>
       </div>
       <div class="notes-actions">
-        <button mat-stroked-button (click)="closeNotes()">Cancel</button>
-        <button mat-raised-button color="primary" (click)="saveNotes()" [disabled]="!notesText.trim()">Save</button>
+        <button mat-stroked-button (click)="closeNotes()" data-testid="irl-notes-cancel">Cancel</button>
+        <button mat-raised-button color="primary" (click)="saveNotes()" [disabled]="!notesText.trim()" data-testid="irl-notes-save">Save</button>
       </div>
     </div>
   </div>

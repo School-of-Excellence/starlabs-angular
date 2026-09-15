@@ -5,7 +5,7 @@
       <h1 class="dash-title">Audio Library</h1>
       <p class="dash-sub">Manage your solar voice audio collection</p>
     </div>
-    <button class="btn-primary" (click)="openDialog()" [disabled]="userRole == 'viewer' || userRole == 'editer'">
+    <button data-testid="aud-btn-001" class="btn-primary" (click)="openDialog()" [disabled]="userRole == 'viewer' || userRole == 'editer'">
       <mat-icon>add</mat-icon>
       <span>New Audio</span>
     </button>
@@ -15,12 +15,12 @@
   <div class="filters-row">
     <div class="input-box search-box">
       <mat-icon class="ib-icon">search</mat-icon>
-      <input type="text" class="ib-input" placeholder="Search by name, description..." (keyup)="ApplyFilter($event)" />
+      <input data-testid="aud-inp-002" type="text" class="ib-input" placeholder="Search by name, description..." (keyup)="ApplyFilter($event)" />
     </div>
 
     <div class="input-box select-box" [class.focused]="tagSelectOpen">
       <mat-icon class="ib-icon">sell</mat-icon>
-      <mat-select multiple [(ngModel)]="activeTagFilters" (selectionChange)="filterByTags()"
+      <mat-select data-testid="aud-msel-003" multiple [(ngModel)]="activeTagFilters" (selectionChange)="filterByTags()"
         (openedChange)="tagSelectOpen = $event" placeholder="Filter by Tags"
         panelClass="custom-tag-panel" disableRipple>
         <mat-select-trigger>
@@ -29,12 +29,12 @@
         </mat-select-trigger>
         <mat-option *ngFor="let tag of availableTags" [value]="tag.id">{{ tag.name }}</mat-option>
       </mat-select>
-      <button *ngIf="activeTagFilters.length" class="clear-btn" (click)="clearTagFilter($event)">
+      <button data-testid="aud-btn-004" *ngIf="activeTagFilters.length" class="clear-btn" (click)="clearTagFilter($event)">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
-    <button class="input-box sort-box" (click)="toggleDateSort()">
+    <button data-testid="aud-btn-005" class="input-box sort-box" (click)="toggleDateSort()">
       <mat-icon class="ib-icon">swap_vert</mat-icon>
       <span class="sort-label">Date</span>
       <span class="sort-dir">{{ dateSortDirection === 'asc' ? '↑ Oldest' : '↓ Newest' }}</span>
@@ -46,9 +46,9 @@
     <span class="label-upper">Filtered:</span>
     <span class="chip" *ngFor="let tid of activeTagFilters">
       {{ mapTaxonomy[tid] }}
-      <mat-icon class="chip-x" (click)="removeTagFilter(tid)">close</mat-icon>
+      <mat-icon data-testid="aud-maticon-006" class="chip-x" (click)="removeTagFilter(tid)">close</mat-icon>
     </span>
-    <button class="btn-link" (click)="clearTagFilter($event)">Clear all</button>
+    <button data-testid="aud-btn-007" class="btn-link" (click)="clearTagFilter($event)">Clear all</button>
   </div>
 
   <!-- Loading -->
@@ -65,7 +65,7 @@
         <ng-container matColumnDef="thumbnail">
           <th mat-header-cell *matHeaderCellDef class="col-thumb"></th>
           <td mat-cell *matCellDef="let row" class="col-thumb">
-            <div class="thumb" (click)="togglePlay(row)">
+            <div data-testid="aud-div-008" class="thumb" (click)="togglePlay(row)">
               <img *ngIf="row.imageUrl" [src]="row.imageUrl" class="thumb-img" />
               <div *ngIf="!row.imageUrl" class="thumb-ph"><mat-icon>music_note</mat-icon></div>
               <div class="thumb-ov" [class.playing]="currentlyPlaying === row.id">
@@ -120,17 +120,17 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="col-act"></th>
           <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-down" [class.is-downloading]="downloadingIds.has(row.id)"
+            <button data-testid="aud-btn-009" class="a-btn a-down" [class.is-downloading]="downloadingIds.has(row.id)"
               [disabled]="downloadingIds.has(row.id)" (click)="downloadAudio(row)" title="Download audio">
               <span *ngIf="downloadingIds.has(row.id) && downloadProgress[row.id]; else dlIcon" class="dl-pct">{{ downloadProgress[row.id] }}%</span>
               <ng-template #dlIcon>
                 <mat-icon>{{ downloadingIds.has(row.id) ? 'downloading' : 'download' }}</mat-icon>
               </ng-template>
             </button>
-            <button class="a-btn a-edit" [disabled]="userRole == 'viewer'" (click)="onaudioedit(row.id,row.url,row.name,row.description,row.imageUrl,row.tags,row.hlsurl)">
+            <button data-testid="aud-btn-010" class="a-btn a-edit" [disabled]="userRole == 'viewer'" (click)="onaudioedit(row.id,row.url,row.name,row.description,row.imageUrl,row.tags,row.hlsurl)">
               <mat-icon>edit</mat-icon>
             </button>
-            <button class="a-btn a-del" [disabled]="userRole == 'viewer' || userRole == 'editer'" (click)="onaudiodelete(row.id,row.url,row.imageUrl)">
+            <button data-testid="aud-btn-011" class="a-btn a-del" [disabled]="userRole == 'viewer' || userRole == 'editer'" (click)="onaudiodelete(row.id,row.url,row.imageUrl)">
               <mat-icon>delete_outline</mat-icon>
             </button>
           </td>
@@ -160,17 +160,17 @@
         <span class="player-desc">{{ playerRow.description }}</span>
       </div>
       <span class="player-time">{{ formatTime(playerCurrentTime) }}</span>
-      <div class="player-track" #playerTrack (click)="onPlayerSeek($event, playerTrack)">
+      <div data-testid="aud-div-012" class="player-track" #playerTrack (click)="onPlayerSeek($event, playerTrack)">
         <div class="player-track-bg"></div>
         <div class="player-track-fill" [style.width.%]="playerProgress"></div>
         <div class="player-track-knob" [style.left.%]="playerProgress"></div>
       </div>
       <span class="player-time">{{ formatTime(playerDuration) }}</span>
       <div class="player-controls">
-        <button class="player-btn" (click)="playerIsPlaying ? pausePlayer() : resumePlayer()">
+        <button data-testid="aud-btn-013" class="player-btn" (click)="playerIsPlaying ? pausePlayer() : resumePlayer()">
           <mat-icon>{{ playerIsPlaying ? 'pause_circle_filled' : 'play_circle_filled' }}</mat-icon>
         </button>
-        <button class="player-btn player-close" (click)="closePlayer()">
+        <button data-testid="aud-btn-014" class="player-btn player-close" (click)="closePlayer()">
           <mat-icon>close</mat-icon>
         </button>
       </div>

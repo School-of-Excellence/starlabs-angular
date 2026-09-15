@@ -235,6 +235,21 @@ body {
   color: #fff;
 }
 
+/* Workshop dashboard — the Communication dialog (edge-to-edge header/footer). */
+.wdash-comm-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0;
+}
+.wdash-comm-dialog .mat-mdc-dialog-container,
+.wdash-comm-dialog .mdc-dialog__content {
+  padding: 0 !important;
+}
+/* its filter menus render in the CDK overlay, outside the component */
+.cm-menu.mat-mdc-menu-panel { border-radius: 10px; border: 1px solid #e3e8ef; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.cm-menu .mat-mdc-checkbox { display: block; }
+.cm-menu .mdc-form-field { width: 100%; padding: 2px 10px; }
+
 /* Workshop configuration — the configuration guide behind the "i" button. */
 .wc2-help-dialog .mat-mdc-dialog-surface {
   border-radius: 14px !important;

@@ -12,9 +12,9 @@
         </div>
 
         <div class="row justify-content-center">
-            <button mat-raised-button type="button" style="color:green" (click)="onSubmit()">Send To Participants</button>
+            <button data-testid="vtp-onsubmit" mat-raised-button type="button" style="color:green" (click)="onSubmit()">Send To Participants</button>
             &nbsp;&nbsp;
-            <button mat-raised-button type="button" style="color: red;" (click)="dialogRef.close()">Close</button>
+            <button data-testid="vtp-dialogref-close" mat-raised-button type="button" style="color: red;" (click)="dialogRef.close()">Close</button>
         </div>
     </div>
     <div *ngIf="templateData['type'] == 'email'">

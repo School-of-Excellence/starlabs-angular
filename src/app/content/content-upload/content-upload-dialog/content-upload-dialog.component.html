@@ -7,7 +7,7 @@
       <h2 class="dialog-title">{{ editMode ? 'Edit Content' : 'Add New Content' }}</h2>
       <p class="dialog-sub">{{ editMode ? 'Update video details and tags' : 'Upload video with details and tags' }}</p>
     </div>
-    <button class="dialog-close" (click)="dialogClose()">
+    <button data-testid="cud-btn-001" class="dialog-close" (click)="dialogClose()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -20,7 +20,7 @@
             <label class="label">Title <span class="required">*</span></label>
             <div class="input-box" [class.error]="contentform.get('title')?.touched && contentform.get('title')?.hasError('required')">
               <mat-icon class="ib-icon">title</mat-icon>
-              <input type="text" class="ib-input" placeholder="Enter content title" formControlName="title" />
+              <input data-testid="cud-inp-002" type="text" class="ib-input" placeholder="Enter content title" formControlName="title" />
             </div>
             <span class="field-error" *ngIf="contentform.get('title')?.touched && contentform.get('title')?.hasError('required')">Title is required</span>
           </div>
@@ -34,8 +34,8 @@
 
         <div class="field-group">
           <label class="label">Video</label>
-          <div class="upload-zone" *ngIf="Videourl.length === 0" (click)="videoFileInput.click()">
-            <input #videoFileInput type="file" (change)="uploadVideo($event)" accept=".mp4,.mov,.mkv,.avi" hidden />
+          <div data-testid="cud-div-003" class="upload-zone" *ngIf="Videourl.length === 0" (click)="videoFileInput.click()">
+            <input data-testid="cud-inp-004" #videoFileInput type="file" (change)="uploadVideo($event)" accept=".mp4,.mov,.mkv,.avi" hidden />
             <div class="upload-zone-content">
               <mat-icon class="upload-icon">videocam</mat-icon>
               <span class="upload-text">Click to upload video</span>
@@ -49,7 +49,7 @@
             <div class="media-card-bar">
               <mat-icon class="media-bar-icon">videocam</mat-icon>
               <span class="media-bar-name">{{ doc.filename }}</span>
-              <button class="a-btn a-del" (click)="cancelVideo(i)" [disabled]="isUploading">
+              <button data-testid="cud-btn-005" class="a-btn a-del" (click)="cancelVideo(i)" [disabled]="isUploading">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -58,8 +58,8 @@
 
         <div class="field-group">
           <label class="label">Thumbnail</label>
-          <div class="upload-zone" *ngIf="Thumbnailurl.length === 0" (click)="thumbFileInput.click()">
-            <input #thumbFileInput type="file" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)" hidden />
+          <div data-testid="cud-div-006" class="upload-zone" *ngIf="Thumbnailurl.length === 0" (click)="thumbFileInput.click()">
+            <input data-testid="cud-inp-007" #thumbFileInput type="file" accept=".png,.jpg,.jpeg" (change)="uploadThumbnail($event)" hidden />
             <div class="upload-zone-content">
               <mat-icon class="upload-icon">image</mat-icon>
               <span class="upload-text">Click to upload thumbnail</span>
@@ -71,7 +71,7 @@
             <div class="media-card-bar">
               <mat-icon class="media-bar-icon">image</mat-icon>
               <span class="media-bar-name">{{ doc.filename }}</span>
-              <button class="a-btn a-del" (click)="cancelthumbnail(i)" [disabled]="isUploading">
+              <button data-testid="cud-btn-008" class="a-btn a-del" (click)="cancelthumbnail(i)" [disabled]="isUploading">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -94,14 +94,14 @@
             <label class="label">Publish Date <span class="required">*</span></label>
             <mat-form-field class="date-range-field" appearance="outline">
               <mat-label>Publish Date</mat-label>
-              <input matInput [matDatepicker]="datepicker" [(ngModel)]="publishdate"
+              <input data-testid="cud-inp-009" matInput [matDatepicker]="datepicker" [(ngModel)]="publishdate"
                 name="date" #date="ngModel" required />
               <mat-hint>MM/DD/YYYY</mat-hint>
               <mat-datepicker-toggle matSuffix [for]="datepicker"></mat-datepicker-toggle>
               <mat-datepicker #datepicker>
                 <mat-datepicker-actions>
-                  <button mat-button matDatepickerCancel>Cancel</button>
-                  <button mat-raised-button color="primary" matDatepickerApply>Apply</button>
+                  <button data-testid="cud-btn-010" mat-button matDatepickerCancel>Cancel</button>
+                  <button data-testid="cud-btn-011" mat-raised-button color="primary" matDatepickerApply>Apply</button>
                 </mat-datepicker-actions>
               </mat-datepicker>
             </mat-form-field>
@@ -123,15 +123,15 @@
           <div class="selected-tags" *ngIf="tags.length">
             <span class="chip" *ngFor="let tag of tags; let i = index">
               {{ mapTaxonomy[tag] }}
-              <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+              <mat-icon data-testid="cud-maticon-012" class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
             </span>
           </div>
           <div class="input-box">
             <mat-icon class="ib-icon">search</mat-icon>
-            <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+            <input data-testid="cud-inp-013" type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
           </div>
           <div class="available-tags" *ngIf="filteredTaxonomyList.length">
-            <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+            <span data-testid="cud-span-014" class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
               <mat-icon>add_circle_outline</mat-icon>
               {{ tag['name'] }}
             </span>
@@ -153,8 +153,8 @@
   </div>
 
   <mat-dialog-actions class="dialog-footer">
-    <button class="btn-cancel" type="button" (click)="dialogClose()" [disabled]="isUploading">Back</button>
-    <button class="btn-primary" type="button"
+    <button data-testid="cud-btn-015" class="btn-cancel" type="button" (click)="dialogClose()" [disabled]="isUploading">Back</button>
+    <button data-testid="cud-btn-016" class="btn-primary" type="button"
       (click)="submit(contentform.value)"
       [disabled]="contentform.invalid || myForm.invalid || isUploading">
       <mat-icon>{{ editMode ? 'save' : 'cloud_upload' }}</mat-icon>

@@ -172,7 +172,7 @@
             </div>
 
             <!-- Action button -->
-            <button class="qwv-action-btn"
+            <button data-testid="qwv1-btn-1" class="qwv-action-btn"
                 *ngIf="buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['type'] !== 'default' && buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['type'] !== 'activity'"
                 (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])">
                 {{ buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel'] }}
