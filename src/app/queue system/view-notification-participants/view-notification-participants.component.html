@@ -93,8 +93,8 @@
           <td class="name-cell">
             <div class="name-with-icon">
               <span style="display:inline-flex;align-items:center;gap:6px;">
-                <app-profile-picture [profileId]="profileid" [name]="data.mapProfile[profileid]['name']" [size]="28"></app-profile-picture>
-                <span>{{ data.mapProfile[profileid]['name'] || 'Unknown' }}</span>
+                <app-profile-picture [profileId]="profileid" [name]="data.mapProfile[profileid]?.['name']" [size]="28"></app-profile-picture>
+                <span>{{ data.mapProfile[profileid]?.['name'] || 'Unknown' }}</span>
               </span>
             </div>
           </td>

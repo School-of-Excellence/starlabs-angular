@@ -26,7 +26,7 @@
       </mat-form-field>
       <div class="event-chips-container">
         <div [attr.data-testid]="'bpln-act-2-' + event" *ngFor="let event of selectedEventsList" (click)="onEventClick(event)" [class.active]="selectedEvent === event">
-          {{mapEvent[event].name}}
+          {{mapEvent[event]?.name}}
         </div>
       </div>
     </div>

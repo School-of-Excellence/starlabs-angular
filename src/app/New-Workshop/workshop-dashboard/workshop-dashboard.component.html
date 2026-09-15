@@ -842,7 +842,7 @@
                     <mat-icon class="participant-icon">person</mat-icon>
                     <!-- {{ mapProfile[participant.profileid]['name'] }} -->
                     <div class="participant-details">
-                      <span class="participant-name">{{ mapProfile[participant.profileid]['name'] }}</span>
+                      <span class="participant-name">{{ mapProfile[participant.profileid]?.['name'] }}</span>
                       <img
                         *ngIf="mapProfile[participant.profileid]?.workshoponly"
                         src="assets/new.png"
@@ -1035,7 +1035,7 @@
             <span class="pd-avatar"><mat-icon>person</mat-icon></span>
             <div class="pd-hero-main">
               <div class="pd-hero-name">
-                {{ mapProfile[selectedParticipantData.profileid]['name'] }}
+                {{ mapProfile[selectedParticipantData.profileid]?.['name'] }}
                 <img *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly"
                      src="assets/new.png" alt="New" class="new-badge" />
               </div>
