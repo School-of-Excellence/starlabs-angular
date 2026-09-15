@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
+import { ContentAnalyticsv2Component } from './content/content-analytics-v2/content-analytics-v2.component';
+import { content } from 'html2canvas/dist/types/css/property-descriptors/content';
 
 export const routes: Routes = [
   {path: 'slackwebhookurls',loadComponent:()=> import('./slackwebhookurls/slackwebhookurls.component').then(m => m.SlackwebhookurlsComponent), canActivate:[authGuard]},
@@ -112,6 +114,7 @@ export const routes: Routes = [
     {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
     {path:'editseries', loadComponent: () => import('./content/series-dashboard/edit-series/edit-series.component').then(m => m.EditSeriesComponent), canActivate:[authGuard]},
   ]},
+  {path: 'ContentAnalyticsv2', loadComponent:() => import('./content/content-analytics-v2/content-analytics-v2.component').then(m => m.ContentAnalyticsv2Component)},
   {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
   {path: 'zoomaccount', loadComponent: () => import('./queue system/zoom-account/zoom-account.component').then(m => m.ZoomAccountComponent), canActivate:[authGuard]},
   {path: 'arenastudioactivity', loadComponent: () => import('./queue system/arenastudioactivity/arenastudioactivity.component').then(m => m.ArenastudioactivityComponent), canActivate:[authGuard, roleGuard(['developer','admin','ah'])]},

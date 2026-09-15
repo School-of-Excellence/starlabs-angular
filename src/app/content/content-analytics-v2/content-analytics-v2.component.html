@@ -1,0 +1,268 @@
+<div class="ca-dash">
+
+  <div class="wrap">
+
+    <div class="phead">
+      <div>
+        <h1>Content Analytics</h1>
+        <p>What people watched, how far they got, and where they dropped off.</p>
+      </div>
+      <div class="grow"></div>
+      <button class="btn" (click)="exportcsv()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+    </div>
+
+    <div class="card period">
+      <span class="lbl">Period</span>
+      <div class="presets">
+        <button [class.on]="activeDays==7" (click)="changeperiod(7)">7 days</button>
+        <button [class.on]="activeDays==14" (click)="changeperiod(14)">14 days</button>
+        <button [class.on]="activeDays==30" (click)="changeperiod(30)">30 days</button>
+        <button [class.on]="activeDays==90" (click)="changeperiod(90)">90 days</button>
+      </div>
+      <div class="range">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <input type="date" [(ngModel)]="startDate" (change)="daterangechange()">
+        <span>→</span>
+        <input type="date" [(ngModel)]="endDate" (change)="daterangechange()">
+      </div>
+      <div class="grow"></div>
+      <span class="live" *ngIf="loading">Loading…</span>
+    </div>
+
+    <div class="tabs">
+      <button [class.on]="activeTab=='log'" (click)="settab('log')">Activity log <span class="cnt">{{contentData.filteredLog.length}}</span></button>
+      <button [class.on]="activeTab=='content'" (click)="settab('content')">By content <span class="cnt">{{contentData.contentList.length}}</span></button>
+      <button [class.on]="activeTab=='participant'" (click)="settab('participant')">By participant <span class="cnt">{{contentData.participantList.length}}</span></button>
+      <button [class.on]="activeTab=='mode'" (click)="settab('mode')">Mode based <span class="cnt">{{modeRollup.length}}</span></button>
+      <button [class.on]="activeTab=='rec'" (click)="settab('rec')">Recommendation based <span class="cnt">{{viaRollup.length}}</span></button>
+      <button [class.on]="activeTab=='tier'" (click)="settab('tier')">EiFLIX tier based <span class="cnt">{{tierRollup.length}}</span></button>
+    </div>
+
+    <!-- stat tiles, same 5 numbers on every tab -->
+    <div class="tiles">
+      <div class="card tile">
+        <div class="k">Period</div>
+        <div class="v mono">{{contentData.days}} day{{contentData.days==1?'':'s'}}</div>
+        <div class="s">{{startDate}} – {{endDate}}</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Unique viewers</div>
+        <div class="v mono">{{contentData.uniqueViewers}}</div>
+        <div class="s"><b>{{contentData.totalViews}}</b> views</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Total watch time</div>
+        <div class="v mono">{{contentData.totalWatchTimeText}}</div>
+        <div class="s">Avg per viewer <b>{{contentData.avgPerViewerText}}</b></div>
+      </div>
+      <div class="card tile">
+        <div class="k">Completion rate</div>
+        <div class="v mono">{{contentData.completionRate}}%</div>
+        <div class="s"><b>{{contentData.totalCompleted}}</b> completed</div>
+      </div>
+      <div class="card tile">
+        <div class="k">Bounced</div>
+        <div class="v mono">{{contentData.totalBounced}}</div>
+        <div class="s">under 30s or under 5% reach</div>
+      </div>
+    </div>
+
+    <!-- filters, only meaningful on the log tab but kept visible everywhere like the design -->
+    <div class="card filters">
+      <div class="srch">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Search participant or video…" [(ngModel)]="searchText" (ngModelChange)="filterdata()">
+      </div>
+      <select class="f" [class.act]="selectedSource" [(ngModel)]="selectedSource" (ngModelChange)="filterdata()">
+        <option value="">All sources</option>
+        <option value="eiflixcontent">EiFLIX Content</option>
+        <option value="eiflixworkshop">EiFLIX Workshop</option>
+        <option value="solarvoice">Solar Voice</option>
+        <option value="generalcontent">General Content</option>
+      </select>
+      <select class="f" [class.act]="selectedPlatform" [(ngModel)]="selectedPlatform" (ngModelChange)="filterdata()">
+        <option value="">All platforms</option>
+        <option value="web">Web</option>
+        <option value="ios">iOS</option>
+        <option value="android">Android</option>
+      </select>
+      <select class="f" [class.act]="selectedOutcome" [(ngModel)]="selectedOutcome" (ngModelChange)="filterdata()">
+        <option value="">Any outcome</option>
+        <option value="completed">Completed</option>
+        <option value="progress">In progress</option>
+        <option value="bounced">Bounced</option>
+      </select>
+      <div class="grow"></div>
+      <div class="chips">
+        <span class="chip" *ngIf="searchText">"{{searchText}}" <button (click)="searchText='';filterdata()">×</button></span>
+        <span class="chip" *ngIf="selectedSource">{{selectedSource}} <button (click)="selectedSource='';filterdata()">×</button></span>
+        <span class="chip" *ngIf="selectedPlatform">{{selectedPlatform}} <button (click)="selectedPlatform='';filterdata()">×</button></span>
+        <span class="chip" *ngIf="selectedOutcome">{{selectedOutcome}} <button (click)="selectedOutcome='';filterdata()">×</button></span>
+      </div>
+      <button class="clr" *ngIf="searchText||selectedSource||selectedPlatform||selectedOutcome" (click)="resetfilters()">Clear all</button>
+    </div>
+
+    <!-- ══ Activity log ══ -->
+    <div *ngIf="activeTab=='log'" class="card">
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" [class.on]="sortField=='logdate'" (click)="sortdata('logdate')">When <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="sortable" [class.on]="sortField=='participantName'" (click)="sortdata('participantName')">Participant <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="sortable" [class.on]="sortField=='videoname'" (click)="sortdata('videoname')">Content <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th>Source</th>
+            <th class="num sortable" [class.on]="sortField=='totalruntime'" (click)="sortdata('totalruntime')">Overall Duration <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='dropped'" (click)="sortdata('dropped')">Dropped at <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='totaltimespend'" (click)="sortdata('totaltimespend')">Spend time <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th>Platform</th>
+            <th>Outcome</th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let row of contentData.pagedLog">
+              <td class="when">{{row.logdate | date:'MMM d, h:mm a'}}</td>
+              <td><div class="pname">{{row.participantName}}</div></td>
+              <td><div class="vname">{{row.videoname}}</div></td>
+              <td><span class="src"><i [style.background]="row.sourceColor"></i>{{row.sourceLabel}}</span></td>
+              <td class="num">{{row.durationText}}</td>
+              <td class="num">{{row.droppedText}}</td>
+              <td class="num">{{row.spentText}}</td>
+              <td><span class="plat">{{row.platform_name}}</span></td>
+              <td>
+                <span class="pill" [ngClass]="row.statusCode=='completed'?'ok':row.statusCode=='bounced'?'low':'mid'">{{row.statusLabel}}</span>
+              </td>
+            </tr>
+            <tr *ngIf="!contentData.filteredLog.length"><td colspan="9"><div class="empty"><h3>No activity in this range</h3><p>Try widening the period or clearing filters.</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tfoot">
+        <span><b>{{contentData.pagedLog.length}}</b> of <b>{{contentData.filteredLog.length}}</b> rows shown</span>
+        <button class="btn" *ngIf="contentData.pagedLog.length < contentData.filteredLog.length" (click)="loadmore()">Load more</button>
+      </div>
+    </div>
+
+    <!-- ══ By content ══ -->
+    <div *ngIf="activeTab=='content'" class="card">
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" [class.on]="sortField=='videoname'" (click)="sortdata('videoname')">Content <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num">Duration</th>
+            <th class="num sortable" [class.on]="sortField=='views'" (click)="sortdata('views')">Views <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='viewers'" (click)="sortdata('viewers')">Viewers <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='completed'" (click)="sortdata('completed')">Completed <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='bounced'" (click)="sortdata('bounced')">Bounced <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='watch'" (click)="sortdata('watch')">Watch time <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let c of contentData.contentList">
+              <td><div class="vname">{{c.videoname}}</div></td>
+              <td class="num" style="color:var(--t2)">{{c.durationText}}</td>
+              <td class="num">{{c.views}}</td>
+              <td class="num">{{c.viewers}}</td>
+              <td class="num">{{c.completed}}</td>
+              <td class="num">{{c.bounced}}</td>
+              <td class="num" style="font-weight:600">{{c.watchText}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tfoot"><span><b>{{contentData.contentList.length}}</b> items shown</span></div>
+    </div>
+
+    <!-- ══ By participant ══ -->
+    <div *ngIf="activeTab=='participant'" class="card">
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" [class.on]="sortField=='participantName'" (click)="sortdata('participantName')">Participant <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='unique'" (click)="sortdata('unique')">Unique content <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='views'" (click)="sortdata('views')">Views <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th class="num sortable" [class.on]="sortField=='watch'" (click)="sortdata('watch')">Watch time <span class="arw">{{sortDir=='asc'?'▲':'▼'}}</span></th>
+            <th>Last active</th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let p of contentData.participantList">
+              <td><div class="pname">{{p.participantName}}</div></td>
+              <td class="num">{{p.unique}}</td>
+              <td class="num" style="font-weight:700">{{p.views}}</td>
+              <td class="num" style="font-weight:600">{{p.watchText}}</td>
+              <td style="color:var(--t2);white-space:nowrap">{{p.last | date:'MMM d, h:mm a'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tfoot"><span><b>{{contentData.participantList.length}}</b> participants active in this period</span></div>
+    </div>
+
+    <!-- ══ Mode based (mocked — see note in component) ══ -->
+    <div *ngIf="activeTab=='mode'">
+      <div class="note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><b>Mocked view.</b> Your backend doesn't store a mode/journey field yet, so each row is assigned a mode deterministically from its own data just to populate this layout. Swap in real mode data once it's tracked.</span>
+      </div>
+      <div class="ladder">
+        <div class="card step" *ngFor="let m of modeRollup">
+          <div class="k" [style.color]="m.color">{{m.label}}</div>
+          <div class="v">{{m.views}}</div>
+          <div class="s">views · {{m.people}} people</div>
+          <div class="split">
+            <div class="bar"><i [style.width.%]="m.compPct" [style.background]="m.color"></i></div>
+            <div class="lg"><span>{{m.compPct}}% completed</span><span>{{m.watchText}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Recommendation based (mocked) ══ -->
+    <div *ngIf="activeTab=='rec'">
+      <div class="note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><b>Mocked view.</b> "Via" (how someone reached a video — widget, recommendation, own discovery…) isn't tracked in Firestore yet, so this is a deterministic mock grouping for layout purposes only.</span>
+      </div>
+      <div class="card">
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Route</th><th class="num">Views</th><th class="num">Viewers</th><th class="num">Watch time</th><th class="num">Completion</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let v of viaRollup">
+                <td><span class="jy" [style.color]="v.color"><i [style.background]="v.color"></i>{{v.label}}</span></td>
+                <td class="num">{{v.views}}</td>
+                <td class="num">{{v.people}}</td>
+                <td class="num">{{v.watchText}}</td>
+                <td class="num">{{v.compPct}}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ EiFLIX tier based (mocked) ══ -->
+    <div *ngIf="activeTab=='tier'">
+      <div class="note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span><b>Mocked view.</b> Tier isn't in your participant metadata yet, so each participant is assigned a tier (1–10) deterministically from their profile id, just to populate this layout.</span>
+      </div>
+      <div class="card">
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Participant</th><th>Tier</th><th class="num">Views</th><th class="num">Watch time</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let t of tierRollup">
+                <td><div class="pname">{{t.participantName}}</div></td>
+                <td><span class="tierpill">Tier {{t.tier}}</span></td>
+                <td class="num">{{t.views}}</td>
+                <td class="num" style="font-weight:600">{{t.watchText}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
