@@ -101,7 +101,7 @@ jobs:
               const def = manifest.suites[n];
               if (!def) { console.error(`Unknown suite: ${n}`); process.exit(1); }
               if (!def.ciReady) { console.error(`Suite not CI-ready: ${n}`); process.exit(1); }
-              return { suite: n, config: def.config };
+              return { suite: n, config: def.config, only: def.only || "" };
             });
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(legs)}\n`);
             console.log("matrix:", JSON.stringify(legs, null, 2));
@@ -120,6 +120,7 @@ jobs:
     with:
       suite: ${{ matrix.suite }}
       config: ${{ matrix.config }}
+      only: ${{ matrix.only }}   # curated gate subset when the manifest suite sets `only` (e.g. queue); '' = full suite
       e2e_ref: main
       firebase_project: starlabs-cicd
       stage: branch-suite
