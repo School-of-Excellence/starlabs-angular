@@ -897,3 +897,15 @@ export function formatDate(timestamp: any): string {
     return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch { return ''; }
 }
+
+/** Like formatDate, with the clock time: "15 Sept 2026, 8:05 pm" — for moments, not days. */
+export function formatDateTime(timestamp: any): string {
+  if (!timestamp) { return ''; }
+  try {
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) { return ''; }
+    const day = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const time = date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return `${day}, ${time}`;
+  } catch { return ''; }
+}

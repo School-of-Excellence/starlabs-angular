@@ -34,6 +34,10 @@
           <p class="whd-desc" *ngIf="workshopDescription">{{ workshopDescription }}</p>
         </div>
         <div class="whd-actions">
+          <button type="button" class="whd-btn" data-testid="wdash-comm-open-btn" (click)="openCommunicationDialog()"
+                  matTooltip="Email, WhatsApp or notify anyone — enrolled in this workshop or not">
+            <mat-icon>forum</mat-icon>Communication
+          </button>
           <button data-testid="wd-open-qadialog-2" type="button" class="whd-btn" (click)="openQADialog()">
             <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>
@@ -284,6 +288,17 @@
                 </div>
               </mat-card-content>
             </mat-card>
+            <mat-card class="metric-card clickable-metric" data-testid="wdash-exist-users-card" (click)="onMetricClick('existUsersEnrolled')">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-user"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value" data-testid="wdash-exist-users-count">{{ totalExistUsersEnrolled }}</h2>
+                    <p class="metric-label">Exist Users Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
             <mat-card data-testid="wd-on-metric-click-19" class="metric-card clickable-metric" (click)="onMetricClick('totalNewUsers')">
               <mat-card-content>
                 <div class="metric-content">
@@ -302,6 +317,19 @@
                   <div class="metric-details">
                     <h2 class="metric-value">{{ totalNewUsersNotEnrolled }}</h2>
                     <p class="metric-label">New Users Not Enrolled</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+            <!-- Only for a workshop with a chat group, and only while someone enrolled is missing from it. -->
+            <mat-card class="metric-card clickable-metric" data-testid="wdash-chat-card" *ngIf="showNotInChatCard"
+                      (click)="onMetricClick('notInChatGroup')" matTooltip="Enrolled people whose login is not yet in the workshop's chat group">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-comments"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value" data-testid="wdash-chat-count">{{ totalNotInChatGroup }}</h2>
+                    <p class="metric-label">Users Not in Chat Group</p>
                   </div>
                 </div>
               </mat-card-content>
@@ -1050,6 +1078,9 @@
                 <span class="pd-meta-item">
                   <mat-icon>event</mat-icon> Enrolled {{ formatDate(selectedParticipantData.enrollmentdate) }}
                 </span>
+                <span class="pd-meta-item" data-testid="wdash-pd-platform" matTooltip="Platform this participant enrolled from">
+                  <mat-icon>devices</mat-icon> via {{ enrollmentPlatform }}
+                </span>
               </div>
             </div>
             <div class="pd-hero-progress">
@@ -1120,6 +1151,11 @@
 
                     <div class="pd-sub-meta">
                       <span class="pd-type-pill">{{ subChallenge.subChallengeType }}</span>
+                      <!-- Only a completed step has a platform worth showing; an untouched one would just print the fallback. -->
+                      <span class="pd-platform-pill" data-testid="wdash-sub-platform" *ngIf="subChallenge.statusClass === 'completed'"
+                            matTooltip="Platform the participant completed this step on">
+                        <mat-icon>devices</mat-icon>{{ subChallenge.platformName }}
+                      </span>
                       <span class="pd-meta-item" *ngIf="subChallenge.startedDate"><mat-icon>schedule</mat-icon> {{ subChallenge.startedDate }}</span>
                       <span class="pd-meta-item" *ngIf="subChallenge.completedDate"><mat-icon>done</mat-icon> {{ subChallenge.completedDate }}</span>
                     </div>
@@ -1498,6 +1534,72 @@
     </div>
   </div>
 </section>
+
+      <!-- ═════ Platform usage — where participants enrol from and where each step is done.
+           Reads `platform_name` on the progress document (enrolment) and on every sub-challenge
+           (steps); blank means the web app. Live: recomputed with the progress snapshot. ═════ -->
+      <section class="plat" data-testid="wdash-platform-section">
+        <div class="plat-head">
+          <div>
+            <h2 class="plat-title">Platform Usage</h2>
+            <p class="plat-sub">How participants reach this workshop, and where each step gets done</p>
+          </div>
+        </div>
+
+        <div class="plat-empty" *ngIf="!platformTotalParticipants">
+          <mat-icon>devices</mat-icon>
+          <p>No participant progress yet — the charts fill in as people enrol and complete steps.</p>
+        </div>
+
+        <div class="plat-grid" *ngIf="platformTotalParticipants">
+          <!-- enrolment platform -->
+          <div class="plat-card" data-testid="wdash-platform-enroll-card">
+            <div class="plat-card-hd">
+              <h3>Enrolled via <span class="plat-hint">· click a platform to open its participants</span></h3>
+              <span class="plat-n">{{ platformTotalParticipants }} participant{{ platformTotalParticipants === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="plat-donut-row">
+              <apx-chart class="plat-donut"
+                         [series]="platDonutSeries" [labels]="platDonutLabels" [chart]="platDonutChart"
+                         [colors]="platformColors" [legend]="platDonutLegend" [dataLabels]="platDonutDataLabels"
+                         [plotOptions]="platDonutPlot" [stroke]="platDonutStroke" [tooltip]="platDonutTooltip"></apx-chart>
+              <ul class="plat-legend">
+                <li *ngFor="let r of platformEnrollRows; let i = index" data-testid="wdash-platform-enroll-row"
+                    class="plat-legend-click" role="button" tabindex="0"
+                    (click)="onPlatformClick(r.label)" (keydown.enter)="onPlatformClick(r.label)"
+                    matTooltip="Open everyone enrolled via {{ r.label }}">
+                  <span class="plat-dot" [style.background]="platformColors[i % platformColors.length]"></span>
+                  <span class="plat-legend-name">{{ r.label }}</span>
+                  <span class="plat-legend-n">{{ r.count }}</span>
+                  <span class="plat-legend-pct">{{ r.pct }}%</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- step platform -->
+          <div class="plat-card" data-testid="wdash-platform-steps-card">
+            <div class="plat-card-hd">
+              <h3>Steps by platform</h3>
+              <span class="plat-n">{{ platformTotalSteps }} step{{ platformTotalSteps === 1 ? '' : 's' }} touched</span>
+            </div>
+            <div class="plat-empty plat-empty-sm" *ngIf="!platformTotalSteps">
+              <p>No step has been started yet.</p>
+            </div>
+            <apx-chart *ngIf="platformTotalSteps" class="plat-bars"
+                       [series]="platBarSeries" [chart]="platBarChart" [xaxis]="platBarXaxis" [yaxis]="platBarYaxis"
+                       [colors]="platBarColors" [plotOptions]="platBarPlot" [legend]="platBarLegend"
+                       [dataLabels]="platBarDataLabels" [grid]="platBarGrid" [tooltip]="platBarTooltip"></apx-chart>
+            <ul class="plat-legend plat-legend-steps" *ngIf="platformTotalSteps">
+              <li *ngFor="let r of platformStepRows" data-testid="wdash-platform-step-row">
+                <span class="plat-legend-name">{{ r.label }}</span>
+                <span class="plat-legend-n"><b>{{ r.completed }}</b> completed</span>
+                <span class="plat-legend-pct">{{ r.inProgress }} in progress</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
   <div class="participant-panel" [class.panel-visible]="showParticipantPanel">
@@ -1510,6 +1612,13 @@
       </div>
 
       <div class="panel-actions">
+        <button *ngIf="selectedStatusInfo?.status === 'notInChatGroup'" type="button" class="chat-add-all-btn"
+                data-testid="wdash-chat-add-all-btn" (click)="addAllToChatGroup()"
+                [disabled]="chatAddAllBusy || !chatAddableCount"
+                matTooltip="Add everyone listed (who has a login) to the chat group">
+          <mat-icon>group_add</mat-icon>{{ chatAddAllBusy ? 'Adding…' : 'Add all to group' }}
+          <span class="chat-add-all-n" *ngIf="!chatAddAllBusy">{{ chatAddableCount }}</span>
+        </button>
         <button data-testid="wd-send-email-to-selected-paricipant-58" mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
           <i class="fa-solid fa-envelope"></i>
         </button>
@@ -1616,6 +1725,88 @@
                 <mat-radio-button value="cohort">Above Diagnostics</mat-radio-button>
               </mat-radio-group>
             </mat-menu>
+          </ng-container>
+          <!-- Exist Users Enrolled: its own journey + customer-status filters. Options are
+               derived from the people actually in the list, so they are never empty. -->
+          <ng-container *ngIf="selectedStatusInfo?.status === 'existUsersEnrolled'">
+            <button mat-icon-button
+                    data-testid="wdash-exist-filter-btn"
+                    [matMenuTriggerFor]="existFilterMenu"
+                    [color]="(selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0) ? 'primary' : ''"
+                    matTooltip="Filter by journey or customer status">
+              <mat-icon>sort</mat-icon>
+            </button>
+            <mat-menu #existFilterMenu="matMenu" data-testid="wdash-exist-filter-menu" class="filter-scroll-menu">
+              <div data-testid="wdash-exist-filter-body" style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+
+                <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Journey Filter
+                </div>
+                <div style="padding: 4px 0;" *ngIf="existJourneyOptions.length; else noExistJourneys">
+                  <mat-checkbox
+                    data-testid="wdash-exist-journey-option"
+                    *ngFor="let journey of existJourneyOptions"
+                    [checked]="selectedJourneyFilters.includes(journey)"
+                    (change)="toggleJourneyFilter(journey)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ JourneyMap[journey] || journey }}
+                  </mat-checkbox>
+                </div>
+                <ng-template #noExistJourneys>
+                  <div style="padding: 4px 16px 8px; font-size: 12px; opacity: 0.6;">No journeys on these participants.</div>
+                </ng-template>
+
+                <div style="padding: 8px 16px 4px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
+                  Customer Status
+                </div>
+                <div style="padding: 4px 0;" *ngIf="customerStatusOptions.length; else noExistStatuses">
+                  <mat-checkbox
+                    data-testid="wdash-exist-status-option"
+                    *ngFor="let status of customerStatusOptions"
+                    [checked]="selectedCustomerStatusFilters.includes(status)"
+                    (change)="toggleCustomerStatusFilter(status)"
+                    style="display: block; padding: 6px 16px;">
+                    {{ status }}
+                  </mat-checkbox>
+                </div>
+                <ng-template #noExistStatuses>
+                  <div style="padding: 4px 16px 8px; font-size: 12px; opacity: 0.6;">No customer status on these participants.</div>
+                </ng-template>
+
+                <div style="padding: 6px 16px 10px; margin-top: 4px; border-top: 1px solid rgba(128,128,128,0.2);"
+                     *ngIf="selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0">
+                  <button mat-button color="warn" style="font-size: 11px;"
+                          data-testid="wdash-exist-clear-filters-btn"
+                          (click)="clearJourneyFilters(); $event.stopPropagation()">
+                    <mat-icon style="font-size: 14px; height: 14px; width: 14px; vertical-align: middle;">clear_all</mat-icon>
+                    Clear All Filters
+                  </button>
+                </div>
+              </div>
+            </mat-menu>
+            <!-- The Exist panel's own chips — this block must stay inside the Exist container: the
+                 category-based Total Enrolled chips further down never render for this panel. -->
+            <div *ngIf="selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+              <mat-chip
+                data-testid="wdash-exist-journey-chip"
+                *ngFor="let journey of selectedJourneyFilters"
+                [removable]="true"
+                (removed)="toggleJourneyFilter(journey)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ JourneyMap[journey] || journey }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                data-testid="wdash-exist-status-chip"
+                *ngFor="let status of selectedCustomerStatusFilters"
+                [removable]="true"
+                (removed)="toggleCustomerStatusFilter(status)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ status }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+            </div>
           </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button data-testid="wd-button-70" mat-icon-button
@@ -1913,6 +2104,21 @@
                 </span>
               </div>
             </a>
+
+            <!-- Chat group panel: one action per person — add their login to the group, or say why we cannot. -->
+            <div class="chat-row-actions" *ngIf="selectedStatusInfo?.status === 'notInChatGroup'">
+              <button *ngIf="participant.uid || uidOf(participant.profileid); else noUid" type="button" class="chat-add-btn"
+                      data-testid="wdash-chat-add-btn" (click)="addToChatGroup(participant); $event.stopPropagation()"
+                      [disabled]="chatAddBusy.has(participant.profileid)">
+                <mat-icon>person_add</mat-icon>{{ chatAddBusy.has(participant.profileid) ? 'Adding…' : 'Add to group' }}
+              </button>
+              <ng-template #noUid>
+                <span class="chat-no-uid" data-testid="wdash-chat-no-uid"
+                      matTooltip="No login found for this person — neither their participant record nor their profile carries a user reference. They may not have signed up in the app yet.">
+                  <mat-icon>person_off</mat-icon>No login yet
+                </span>
+              </ng-template>
+            </div>
 
             <!-- Evergreen Completed panel: no profile navigation — clicking a
                  participant opens the extend-until date picker instead. -->

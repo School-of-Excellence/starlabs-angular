@@ -13,6 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { NgApexchartsModule } from 'ng-apexcharts';
 import { MatDialogModule } from '@angular/material/dialog';
 import { RouterModule } from '@angular/router';
 import {
@@ -46,7 +47,7 @@ import {
   accessBasedProgress, areChallengesEqual, averageProgress, bucketByProgress,
   calculateParticipantProgress, canReviewAssignment, challengeCategoryNames, challengeDisplayStatus,
   challengeStatusBuckets, completionRatePct, createCsvContent, evergreenDayDistribution,
-  evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate,
+  evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate, formatDateTime,
   groupProgressStat, hasAccessToChallenge, headlineMetrics, isChallengeVisibleForCategory,
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
   overallProgressLabel, participantTypeClass, participantTypeLabel
@@ -61,7 +62,7 @@ import {
     MatPaginatorModule, MatSortModule, MatChipsModule, MatExpansionModule, MatSnackBarModule,
     MatListModule, MatTooltipModule, MatDialogModule, MatFormFieldModule, MatInputModule,
     RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule,
-    MatDatepickerModule
+    MatDatepickerModule, NgApexchartsModule
   ],
   templateUrl: './workshop-dashboard.component.html',
   styleUrls: ['./workshop-dashboard.component.css']
@@ -161,6 +162,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   ];
 
   selectedJourneyFilters: string[] = [];
+  /** Customer status filter for the Exist Users Enrolled panel (participant metadata). */
+  selectedCustomerStatusFilters: string[] = [];
   selectedTierFilters: string[] = [];
   selectedCategoryFilters: string[] = [];
   selectedEnrollmentStatusFilters: string[] = [];
@@ -193,7 +196,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   private recalculateSubject$ = new Subject<void>();
   journeyData: any[] = [];
 
-  statusDisplayMap = new Map([
+  statusDisplayMap = new Map<string, string>([
+    ['existUsersEnrolled', 'Exist Users Enrolled'],
+    ['platform', 'Enrolled via'],
+    ['notInChatGroup', 'Not in Chat Group'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -449,6 +455,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
     this.destroyed = true;
     this.clearSelectedParticipant();
     // Tear down every live Firestore listener (workshop config, enrolled,
@@ -504,6 +511,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (this.destroyed) return;
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
+        this.watchSupportChat(this.workshopData['selectedgroup']);
         this.updateWorkshopDisplayData();
         this.triggerRecalculation();
 
@@ -670,8 +678,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // ============ Email composer (same flow as participants-analytics) ============
   // EmailInputComponent reads `profileid`, `email` and `name` off each entry, so
   // flatten the panel's participants ({ profileid, name, metadata }) into that shape.
-  private get emailRecipients(): any[] {
-    return (this.filteredParticipants || [])
+  private get emailRecipients(): any[] { return this.toEmailRecipients(this.filteredParticipants); }
+
+  /** Flattens { profileid, name, metadata } entries into what EmailInputComponent reads. */
+  private toEmailRecipients(list: any[]): any[] {
+    return (list || [])
       .filter(p => p?.['metadata']?.['email'])
       .map(p => ({
         ...p['metadata'],
@@ -681,8 +692,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       }));
   }
 
-  sendEmailToSelectedParicipant() {
-    const recipients = this.emailRecipients;
+  /** Email — the side panel's button; `recipients` lets the Communication dialog reuse it. */
+  sendEmailToSelectedParicipant(recipients?: any[]) {
+    const recipients_ = recipients ? this.toEmailRecipients(recipients) : this.emailRecipients;
+    return this.sendEmailTo(recipients_);
+  }
+  private sendEmailTo(recipients: any[]) {
     if (recipients.length === 0) {
       this.snackbarService.show('No valid recipients found');
       return;
@@ -729,7 +744,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  async sendMail() {
+  /**
+   * Opens the mail composer and sends to `recipients` — or, when none are given, to
+   * the side panel's current list, exactly as before. The Communication dialog
+   * passes its own list so it reuses this path unchanged.
+   */
+  async sendMail(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { SendmessagesComponent } = await import('./sendmessages/sendmessages.component');
     const ref = this.dialog.open(SendmessagesComponent, {
       width: '1000px',
@@ -739,11 +760,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe(async (result) => {
-      await this.handleDialogResult(result);
+      await this.handleDialogResult(result, list);
     });
   }
 
-  async sendWatti() {
+  /** WhatsApp — same contract as sendMail(recipients?). */
+  async sendWatti(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { SendmessagesComponent } = await import('./sendmessages/sendmessages.component');
     const ref = this.dialog.open(SendmessagesComponent, {
       width: '1000px',
@@ -753,20 +776,20 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     });
 
     ref.afterClosed().subscribe(async (result) => {
-      await this.handleWhatsappChunked(result);
+      await this.handleWhatsappChunked(result, list);
     });
   }
 
   private readonly WHATSAPP_CHUNK_SIZE = 200;
   private readonly CHUNK_DELAY_MS = 1000;
 
-  private async handleWhatsappChunked(result: any) {
+  private async handleWhatsappChunked(result: any, list: any[] = this.filteredParticipants) {
     if (result?.action !== 'sent' || result.type !== 'whatsapp') {
       return;
     }
 
     const { templateName, customParams } = result;
-    const participants = this.filteredParticipants
+    const participants = list
       .filter(participant => {
         const metadata = participant['metadata'];
         return metadata && metadata['phonenumber'] && metadata['name'];
@@ -921,11 +944,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return projectUrlMap[projectId] || '';
   }
 
-  private async handleDialogResult(result: any) {
+  private async handleDialogResult(result: any, list: any[] = this.filteredParticipants) {
     if (result?.action === 'sent') {
       if (result.type === 'mail') {
         const { subject, message } = result;
-        const recipients = this.filteredParticipants
+        const recipients = list
           .filter(participant => {
             const metadata = participant['metadata'];
             return metadata && metadata['email'] && metadata['name'];
@@ -966,7 +989,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
       } else if (result.type === 'whatsapp') {
         const { templateName, customParams } = result;
-        const participants = this.filteredParticipants
+        const participants = list
           .filter(participant => {
             const metadata = participant['metadata'];
             return metadata && metadata['phonenumber'] && metadata['name'];
@@ -1021,7 +1044,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async sendNotificationinBreakthrough() {
+  /** In-app notification — same contract as sendMail(recipients?). */
+  async sendNotificationinBreakthrough(recipients?: any[]) {
+    const list = recipients ?? this.filteredParticipants;
     const { AhNotificationComponent } = await import(
       '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component'
     );
@@ -1030,11 +1055,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       maxHeight: "90vh",
       disableClose: true,
       autoFocus: false,
-      data: this.filteredParticipants
+      data: list
     });
     dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(async result => {
       if (result != null && result != undefined) {
-        var profileID = this.filteredParticipants.map(p => p.profileid);
+        var profileID = list.map(p => p.profileid);
         var notificationimage = null;
         if (result["notificationimage"] != null) {
           const { getDownloadURL, ref, uploadBytes } = await import('@angular/fire/storage');
@@ -1150,11 +1175,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
             subChallengeIndex: subIndex,
             subChallengeName: subChallenge.name || 'Unknown Sub-Challenge',
             subChallengeType: (subChallenge.type || '').charAt(0).toUpperCase() + (subChallenge.type || '').slice(1),
+            platformName: this.platformNameOf(subChallenge),
             statusClass: subStatus,
             statusDisplayName: this.statusDisplayMap.get(subStatus) || 'Unknown Status',
             isCurrentSubChallenge,
             startedDate: subChallenge.started ? this.formatDate(subChallenge.started) : '',
-            completedDate: subChallenge.completed ? this.formatDate(subChallenge.completed) : '',
+            completedDate: subChallenge.completed ? this.formatDateTime(subChallenge.completed) : '',
             canViewForm: subChallenge.type === 'form' && subChallenge.status === 'completed' && subChallenge.result,
             canViewQuiz: subChallenge.type === 'quiz' && subChallenge.status === 'completed' && (subChallenge.quizResults || subChallenge.result),
             quizResultsCount,
@@ -1213,7 +1239,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
       if (this.destroyed) return; // component torn down while awaiting
-      this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
+      // Overlay only the still-new users: a moved-to-existing person keeps their
+      // `participant metadata` (which carries activejourney / customerstatus).
+      this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
+      this.recomputeNotInChat();
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1265,6 +1294,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // enrolled-participants and participant-workshop snapshots so both stay in sync,
   // for evergreen, category-based, and plain workshops alike.
   private recomputeDerivedState() {
+    this.computePlatformStats();
     if (this.workshopData?.categorybased === true) {
       this.participantCohortMap.clear();
       this.participantWorkshopCategoryMap.clear();
@@ -1603,16 +1633,75 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   calculateZoomCallStats(challenge: any, challengeIndex: number, challengeStats: any, progressList?: any[]) {
   }
 
+  /**
+   * Whether this profile still counts as a NEW user.
+   *
+   * `new_user_data` keeps the document after a person is migrated to a full
+   * profile and marks it `movedtoexist: true`. Those people are existing users:
+   * their live details (journey, customer status) are in `participant metadata`,
+   * and the stale new_user_data doc must not be used for them.
+   */
+  isNewUserProfile(profileId: string): boolean {
+    const nu = this.mapProfileNew[profileId];
+    return !!nu && nu['movedtoexist'] !== true;
+  }
+
+  /** Only the still-new entries, for overlaying onto the metadata map. */
+  private newUserOverlay(): { [id: string]: any } {
+    const out: { [id: string]: any } = {};
+    for (const id of Object.keys(this.mapProfileNew)) {
+      if (this.isNewUserProfile(id)) out[id] = this.mapProfileNew[id];
+    }
+    return out;
+  }
+
   get totalNewUsersEnrolled(): number {
     const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
     return Object.keys(this.mapProfileNew)
-      .filter(profileId => enrolledProfileIds.includes(profileId)).length;
+      .filter(profileId => this.isNewUserProfile(profileId) && enrolledProfileIds.includes(profileId)).length;
   }
 
   get totalNewUsersNotEnrolled(): number {
     const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
     return Object.keys(this.mapProfileNew)
-      .filter(profileId => !enrolledProfileIds.includes(profileId)).length;
+      .filter(profileId => this.isNewUserProfile(profileId) && !enrolledProfileIds.includes(profileId)).length;
+  }
+
+  /** Enrolled people who are NOT new users — including anyone moved to existing. */
+  get totalExistUsersEnrolled(): number {
+    return this.enrolledParticipants.filter(p => !this.isNewUserProfile(p.profileid)).length;
+  }
+
+  /** Customer statuses actually present among the enrolled existing users. */
+  get customerStatusOptions(): string[] {
+    const seen = new Set<string>();
+    for (const p of this.enrolledParticipants) {
+      if (this.isNewUserProfile(p.profileid)) continue;
+      const cs = (this.mapProfile[p.profileid]?.customerstatus || '').toString().trim();
+      if (cs) seen.add(cs);
+    }
+    return Array.from(seen).sort();
+  }
+
+  /** Journeys actually held by the enrolled existing users. */
+  get existJourneyOptions(): string[] {
+    const seen = new Set<string>();
+    for (const p of this.enrolledParticipants) {
+      if (this.isNewUserProfile(p.profileid)) continue;
+      const j = (this.mapProfile[p.profileid]?.activejourney || '').toString().trim();
+      if (j) seen.add(j);
+    }
+    return Array.from(seen).sort((a, b) => (this.JourneyMap[a] || a).localeCompare(this.JourneyMap[b] || b));
+  }
+
+  toggleCustomerStatusFilter(status: string) {
+    const i = this.selectedCustomerStatusFilters.indexOf(status);
+    if (i >= 0) { this.selectedCustomerStatusFilters.splice(i, 1); } else { this.selectedCustomerStatusFilters.push(status); }
+    this.applyFilterSide();
+  }
+  clearCustomerStatusFilters() {
+    this.selectedCustomerStatusFilters = [];
+    this.applyFilterSide();
   }
 
   get totalEnrolled() { return this.metrics.get('totalEnrolled')?.length || 0; }
@@ -1646,9 +1735,51 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onMetricClick(metricType: string) {
-    if (metricType === 'totalNewUsers') {
+    if (metricType === 'existUsersEnrolled') {
+      // Everyone enrolled who is not a new user — people moved out of new_user_data
+      // belong here, which is why the check goes through isNewUserProfile().
+      const existing = this.enrolledParticipants
+        .filter(p => !this.isNewUserProfile(p.profileid))
+        .map(p => this.buildParticipantEntry(p.profileid));
+      this.selectedParticipants = existing;
+      this.selectedStatusInfo = {
+        status: 'existUsersEnrolled',
+        challengeName: 'All Participants',
+        subChallengeName: 'Exist Users Enrolled',
+        count: existing.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
+      this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
+      this.applyFilterSide();
+
+    } else if (metricType === 'notInChatGroup') {
+      const list = this.notInChatParticipants;
+      this.selectedParticipants = list;
+      this.selectedStatusInfo = {
+        status: 'notInChatGroup',
+        challengeName: 'Chat Group',
+        subChallengeName: 'Enrolled but not in the group',
+        count: list.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
+      this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
+      this.applyFilterSide();
+
+    } else if (metricType === 'totalNewUsers') {
       const newUserParticipants = this.enrolledParticipants
-        .filter(p => this.mapProfileNew[p.profileid])
+        .filter(p => this.isNewUserProfile(p.profileid))
         .map(p => ({
           profileid: p.profileid,
           name: this.mapProfileNew[p.profileid]?.name || 'Unknown',
@@ -1671,7 +1802,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     } else if (metricType === 'totalNewUsersNotEnrolled') {
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const notEnrolledNewUsers = Object.keys(this.mapProfileNew)
-        .filter(profileId => !enrolledProfileIds.includes(profileId))
+        .filter(profileId => this.isNewUserProfile(profileId) && !enrolledProfileIds.includes(profileId))
         .map(profileId => ({
           profileid: profileId,
           name: this.mapProfileNew[profileId]?.name || 'Unknown',
@@ -1906,6 +2037,41 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
     this.selectedStatusInfo = null;
+  }
+
+  private communicationOpening = false;
+  /**
+   * Communication — reach anyone, enrolled here or not.
+   *
+   * The dashboard only loads metadata for enrolled profiles (the collection is
+   * large); this dialog loads everyone on demand. It hands its recipients back to
+   * the SAME three senders the side panel uses, so the composers, chunking and
+   * progress flow are shared rather than duplicated.
+   */
+  async openCommunicationDialog() {
+    if (this.communicationOpening || !this.workshopId) return;
+    this.communicationOpening = true;
+    try {
+      const { CommunicationDialogComponent } = await import('./communication/communication-dialog.component');
+      const ref = this.dialog.open(CommunicationDialogComponent, {
+        width: '1180px', maxWidth: '96vw', maxHeight: '92vh',
+        autoFocus: false, panelClass: 'wdash-comm-dialog',
+        data: {
+          workshopId: this.workshopId,
+          workshopTitle: this.workshopTitle,
+          workshopRef: doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId),
+          send: {
+            email: (r: any[]) => this.sendEmailToSelectedParicipant(r),
+            whatsapp: (r: any[]) => this.sendWatti(r),
+            notification: (r: any[]) => this.sendNotificationinBreakthrough(r),
+          },
+        },
+      });
+      ref.afterClosed().subscribe(() => { this.communicationOpening = false; });
+    } catch (e) {
+      console.error('Could not open the communication dialog:', e);
+      this.communicationOpening = false;
+    }
   }
 
   async openQADialog() {
@@ -2283,6 +2449,23 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       base = base.filter(p => !this.mapProfile[p.profileid]?.workshoponly);
     }
 
+    // Exist Users Enrolled carries its own journey + customer-status filters. They are
+    // not gated on categorybased: this card exists on every workshop, so gating them
+    // would hide the filters almost everywhere.
+    if (this.selectedStatusInfo?.status === 'existUsersEnrolled' && this.selectedJourneyFilters.length > 0) {
+      base = base.filter(p => {
+        const activeJourney: string = this.mapProfile[p.profileid]?.activejourney || '';
+        return this.selectedJourneyFilters.includes(activeJourney);
+      });
+    }
+
+    if (this.selectedStatusInfo?.status === 'existUsersEnrolled' && this.selectedCustomerStatusFilters.length > 0) {
+      base = base.filter(p => {
+        const cs: string = (this.mapProfile[p.profileid]?.customerstatus || '').toString().trim();
+        return this.selectedCustomerStatusFilters.includes(cs);
+      });
+    }
+
     if (this.workshopData?.categorybased === true &&
       this.selectedStatusInfo?.status === 'totalEnrolled' &&
       this.selectedJourneyFilters.length > 0) {
@@ -2360,6 +2543,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
         .filter(([profileId, p]: any) => {
+          if (!this.isNewUserProfile(profileId)) return false;   // moved to existing — not a new user
           if (!this.selectedSubscriberCode.includes(p?.refferedby)) return false;
           if (p?.subscriber !== true) return false;
           const isEnrolled = enrolledProfileIds.has(profileId);
@@ -2383,6 +2567,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const isEnrolledView = this.selectedStatusInfo?.status === 'totalNewUsers';
       base = Object.entries(this.mapProfileNew)
         .filter(([profileId, p]: any) => {
+          if (!this.isNewUserProfile(profileId)) return false;   // moved to existing — not a new user
           if (!p?.refferedby) return false;
           if (p?.subscriber === true) return false;
           const isEnrolled = enrolledProfileIds.has(profileId);
@@ -2406,6 +2591,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   clearJourneyFilters() {
     this.selectedJourneyFilters = [];
+    this.selectedCustomerStatusFilters = [];
     this.applyFilterSide();
   }
 
@@ -2657,6 +2843,279 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.applyFilterSide();
   }
 
+  /**
+   * Display name for a stored platform value. The web app stamps "Eiflixweb", the mobile app
+   * "eiflixapp"; older rows carry nothing and were all web. Anything else is shown as stored.
+   */
+  platformLabel(raw: any): string {
+    const v = raw === null || raw === undefined ? '' : String(raw).trim();
+    if (!v) return 'EiFlix Web';
+    switch (v.toLowerCase().replace(/[^a-z0-9]/g, '')) {
+      case 'eiflixweb': return 'EiFlix Web';
+      case 'eiflixapp': return 'EiFlix App';
+      default: return v;
+    }
+  }
+
+  /** Where the participant did this step. */
+  platformNameOf(subChallenge: any): string { return this.platformLabel(subChallenge?.platform_name); }
+
+  /** Where the selected participant enrolled from — the platform stored on their progress document itself. */
+  get enrollmentPlatform(): string { return this.platformLabel(this.participantWorkshopData?.['platform_name']); }
+
+  // ── Platform usage (dashboard chart) — recomputed with the live progress snapshot ──
+  /** Participants by the platform on their progress document. */
+  platformEnrollRows: { label: string; count: number; pct: number }[] = [];
+  /** Steps touched (any status) by the platform stamped on the step, split completed / in progress. */
+  platformStepRows: { label: string; completed: number; inProgress: number }[] = [];
+  platformTotalParticipants = 0;
+  platformTotalSteps = 0;
+  readonly platformColors = ['#2557C7', '#2E9E5B', '#E0A93E', '#7B5CC9', '#D96A5B', '#4E8FDB'];
+  platDonutSeries: number[] = [];
+  platDonutLabels: string[] = [];
+  platDonutChart: any = {
+    type: 'donut', height: 240, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false },
+    // A slice click opens the same side panel as the legend rows. ApexCharts fires this outside
+    // Angular's zone, hence ngZone.run.
+    events: { dataPointSelection: (_e: any, _ctx: any, cfg: any) => this.ngZone.run(() => this.onPlatformClick(this.platDonutLabels[cfg?.dataPointIndex])) },
+  };
+  platDonutLegend: any = { show: false };
+  platDonutDataLabels: any = { enabled: false };
+  platDonutPlot: any = { pie: { donut: { size: '68%', labels: { show: true, name: { show: true, fontSize: '12px', color: '#8B92A6' }, value: { show: true, fontSize: '22px', fontWeight: 700, color: '#1B2130' }, total: { show: true, label: 'Participants', fontSize: '12px', color: '#8B92A6' } } } } };
+  platDonutStroke: any = { width: 2, colors: ['#fff'] };
+  platDonutTooltip: any = { y: { formatter: (v: number) => `${v} participant${v === 1 ? '' : 's'}` } };
+  platBarSeries: any[] = [];
+  platBarChart: any = { type: 'bar', height: 240, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false } };
+  platBarXaxis: any = { categories: [], labels: { style: { colors: '#8B92A6', fontSize: '11px' } } };
+  platBarYaxis: any = { labels: { style: { colors: '#525A6E', fontSize: '12px', fontWeight: 600 } } };
+  platBarPlot: any = { bar: { horizontal: true, barHeight: '46%', borderRadius: 4 } };
+  platBarColors = ['#2E9E5B', '#E0A93E'];
+  platBarLegend: any = { position: 'top', horizontalAlign: 'left', markers: { size: 6 }, fontSize: '12px' };
+  platBarDataLabels: any = { enabled: true, style: { fontSize: '11px', fontWeight: 600 } };
+  platBarGrid: any = { borderColor: '#E2E5EE', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } };
+  platBarTooltip: any = { y: { formatter: (v: number) => `${v} step${v === 1 ? '' : 's'}` } };
+
+  // ───────────────────────── Support-chat group membership ─────────────────────────
+  // `workshopconfiguration.selectedgroup` names a `supportchat` document whose `members` array holds
+  // Firebase Auth uids. The card lists enrolled people whose uid is missing from that array.
+  supportChatGroupId = '';
+  /** null until the group document has been read once. */
+  supportChatMembers: Set<string> | null = null;
+  private supportChatUnsub: Unsubscribe | null = null;
+  notInChatParticipants: any[] = [];
+  chatAddBusy = new Set<string>();
+  chatAddAllBusy = false;
+
+  /** The card only exists for a workshop with a group, and only while someone is missing from it. */
+  get showNotInChatCard(): boolean { return !!this.supportChatGroupId && this.notInChatParticipants.length > 0; }
+  get totalNotInChatGroup(): number { return this.notInChatParticipants.length; }
+  /** How many of the people shown in the panel can actually be added (have a login uid). */
+  get chatAddableCount(): number { return this.filteredParticipants.filter(p => !!(p.uid || this.uidOf(p.profileid))).length; }
+
+  /** The id segment of a /user_data/{uid} reference, whether stored as a reference or a path string. */
+  private refId(ref: any): string {
+    if (!ref) return '';
+    if (typeof ref === 'string') return ref.split('/').filter(Boolean).pop() || '';
+    return typeof ref.id === 'string' ? ref.id : '';
+  }
+
+  /**
+   * profile_data.user_ref ids for existing users whose participant metadata carries no login reference,
+   * fetched on demand (batched) and cached: '' means "looked, none there".
+   */
+  private profileUserRefs = new Map<string, string>();
+  private profileUserRefsPending = new Set<string>();
+
+  /**
+   * Firebase Auth uid for an enrolled profile. A still-new user carries it on new_user_data.uid. An
+   * existing user's participant metadata points at their user_data document (firebaseuserref, or the
+   * older user_ref spelling); when metadata has neither, profile_data.user_ref — the reference set at
+   * sign-up — is the fallback (fetched by resolveProfileUserRefs).
+   */
+  uidOf(profileid: string): string {
+    if (this.isNewUserProfile(profileid)) {
+      const v = this.mapProfileNew[profileid]?.['uid'];
+      return v === null || v === undefined ? '' : String(v).trim();
+    }
+    const m = this.mapProfile[profileid];
+    return this.refId(m?.['firebaseuserref']) || this.refId(m?.['user_ref']) || this.profileUserRefs.get(profileid) || '';
+  }
+
+  /** Looks up profile_data.user_ref for existing users still without a uid, then recomputes the list. */
+  private async resolveProfileUserRefs(profileIds: string[]): Promise<void> {
+    const todo = profileIds.filter(id => !this.profileUserRefs.has(id) && !this.profileUserRefsPending.has(id));
+    if (!todo.length) return;
+    todo.forEach(id => this.profileUserRefsPending.add(id));
+    try {
+      const BATCH = 30;
+      const reads: Promise<any>[] = [];
+      for (let i = 0; i < todo.length; i += BATCH) {
+        const ids = todo.slice(i, i + BATCH);
+        reads.push(getDocs(query(collection(this.firestoreDefault, 'profile_data'), where('profileid', 'in', ids))));
+      }
+      const found = new Map<string, string>();
+      for (const snap of await Promise.all(reads)) {
+        snap.docs.forEach((d: any) => {
+          const data = d.data() || {};
+          const pid = String(data['profileid'] || d.id);
+          const uid = this.refId(data['user_ref']) || this.refId(data['firebaseuserref']);
+          if (uid) found.set(pid, uid);
+        });
+      }
+      todo.forEach(id => this.profileUserRefs.set(id, found.get(id) || ''));
+    } catch (e) {
+      console.error('Could not read profile_data user references:', e);
+      todo.forEach(id => this.profileUserRefs.set(id, ''));
+    } finally {
+      todo.forEach(id => this.profileUserRefsPending.delete(id));
+    }
+    if (!this.destroyed) this.recomputeNotInChat();
+  }
+
+  /** Follow the workshop's group document live, so the card and panel drop people as they are added. */
+  private watchSupportChat(groupId: any): void {
+    const id = groupId === null || groupId === undefined ? '' : String(groupId).trim();
+    if (id === this.supportChatGroupId && (id === '' || this.supportChatUnsub)) return;
+    if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
+    this.supportChatGroupId = id;
+    this.supportChatMembers = null;
+    this.recomputeNotInChat();
+    if (!id) return;
+    this.supportChatUnsub = onSnapshot(doc(this.firestoreDefault, 'supportchat', id), (snap) => {
+      if (this.destroyed) return;
+      const raw = snap.exists() ? snap.data()?.['members'] : [];
+      this.supportChatMembers = new Set((Array.isArray(raw) ? raw : []).map((u: any) => String(u)));
+      this.recomputeNotInChat();
+    }, (err) => {
+      console.error('Error listening to the support chat group:', err);
+      this.supportChatMembers = new Set();
+      this.recomputeNotInChat();
+    });
+  }
+
+  /** Enrolled people (existing and new) whose uid is not in the group — or who have no uid to add. */
+  recomputeNotInChat(): void {
+    const members = this.supportChatMembers;
+    if (!this.supportChatGroupId || !members) { this.notInChatParticipants = []; }
+    else {
+      this.notInChatParticipants = this.enrolledParticipants
+        .map(p => p.profileid)
+        .filter(id => { const uid = this.uidOf(id); return !uid || !members.has(uid); })
+        .map(id => ({ ...this.buildParticipantEntry(id), uid: this.uidOf(id) }));
+      // Existing users still without a uid: try profile_data.user_ref once, then recompute.
+      const unresolved = this.notInChatParticipants
+        .filter(p => !p.uid && !this.isNewUserProfile(p.profileid))
+        .map(p => p.profileid);
+      if (unresolved.length) void this.resolveProfileUserRefs(unresolved);
+    }
+    // Keep an open panel in step with the live group document.
+    if (this.selectedStatusInfo?.status === 'notInChatGroup') {
+      this.selectedParticipants = this.notInChatParticipants;
+      this.selectedStatusInfo = { ...this.selectedStatusInfo, count: this.notInChatParticipants.length };
+      this.applyFilterSide();
+    }
+  }
+
+  /** Adds one person's uid to the group's members array. The listener then removes them from the list. */
+  async addToChatGroup(participant: any): Promise<void> {
+    const uid = participant?.uid || this.uidOf(participant?.profileid);
+    if (!this.supportChatGroupId || !uid || this.chatAddBusy.has(participant.profileid)) return;
+    this.chatAddBusy.add(participant.profileid);
+    try {
+      await updateDoc(doc(this.firestoreDefault, 'supportchat', this.supportChatGroupId), { members: arrayUnion(uid) });
+      this.snackbarService.show(`${participant.name || 'Participant'} added to the chat group`);
+    } catch (e) {
+      console.error('Could not add to the chat group:', e);
+      this.snackbarService.show('Could not add to the chat group');
+    } finally {
+      this.chatAddBusy.delete(participant.profileid);
+    }
+  }
+
+  /** Adds everyone currently shown in the panel who has a uid, in one write. */
+  async addAllToChatGroup(): Promise<void> {
+    const uids = Array.from(new Set(
+      this.filteredParticipants.map(p => p.uid || this.uidOf(p.profileid)).filter((u: string) => !!u),
+    ));
+    if (!this.supportChatGroupId || !uids.length || this.chatAddAllBusy) return;
+    this.chatAddAllBusy = true;
+    try {
+      await updateDoc(doc(this.firestoreDefault, 'supportchat', this.supportChatGroupId), { members: arrayUnion(...uids) });
+      const skipped = this.filteredParticipants.length - uids.length;
+      this.snackbarService.show(`${uids.length} added to the chat group${skipped ? ` · ${skipped} skipped (no login yet)` : ''}`);
+    } catch (e) {
+      console.error('Could not add to the chat group:', e);
+      this.snackbarService.show('Could not add to the chat group');
+    } finally {
+      this.chatAddAllBusy = false;
+    }
+  }
+
+  /**
+   * Enrolled via <platform> → the side panel, exactly as a metric card opens it. The list is built
+   * from the progress documents, the same source the donut counts, so the panel count always equals
+   * the slice.
+   */
+  onPlatformClick(label: string): void {
+    if (!label) return;
+    const ids: string[] = [];
+    for (const [profileid, pw] of this.participantWorkshopMap) {
+      if (this.platformLabel(pw?.['platform_name']) === label) ids.push(profileid);
+    }
+    const list = ids.map(id => this.buildParticipantEntry(id));
+    this.selectedParticipants = list;
+    this.selectedStatusInfo = { status: 'platform', challengeName: 'Enrolled via', subChallengeName: label, count: list.length };
+    this.showParticipantPanel = true;
+    this.filterOption = 'all';
+    this.selectedJourneyFilters = [];
+    this.selectedCustomerStatusFilters = [];
+    this.selectedEnrollmentStatusFilters = [];
+    this.selectedTierFilters = [];
+    this.selectedCategoryFilters = [];
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
+  }
+
+  /**
+   * Reads both levels of `platform_name` across every progress document of this workshop: the
+   * document's own field (how the participant enrolled) and each sub-challenge's (where the step was
+   * done). A step only counts once it has a status — untouched steps have no platform yet.
+   */
+  private computePlatformStats(): void {
+    const enroll = new Map<string, number>();
+    const steps = new Map<string, { completed: number; inProgress: number }>();
+    let totalSteps = 0;
+    for (const pw of this.participantWorkshopMap.values()) {
+      const p = this.platformLabel(pw?.['platform_name']);
+      enroll.set(p, (enroll.get(p) || 0) + 1);
+      for (const ch of (pw?.['challenges'] || [])) {
+        for (const sub of (ch?.['challenges'] || [])) {
+          const status = this.normalizeStatus(sub?.['status']);
+          if (!sub?.['status']) continue;
+          const sp = this.platformLabel(sub?.['platform_name']);
+          const row = steps.get(sp) || { completed: 0, inProgress: 0 };
+          if (status === 'completed') row.completed++; else row.inProgress++;
+          steps.set(sp, row); totalSteps++;
+        }
+      }
+    }
+    this.platformTotalParticipants = this.participantWorkshopMap.size;
+    this.platformTotalSteps = totalSteps;
+    this.platformEnrollRows = Array.from(enroll, ([label, count]) => ({
+      label, count, pct: this.platformTotalParticipants ? Math.round((count / this.platformTotalParticipants) * 100) : 0,
+    })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    this.platformStepRows = Array.from(steps, ([label, r]) => ({ label, ...r }))
+      .sort((a, b) => (b.completed + b.inProgress) - (a.completed + a.inProgress) || a.label.localeCompare(b.label));
+
+    this.platDonutSeries = this.platformEnrollRows.map(r => r.count);
+    this.platDonutLabels = this.platformEnrollRows.map(r => r.label);
+    this.platBarXaxis = { ...this.platBarXaxis, categories: this.platformStepRows.map(r => r.label) };
+    this.platBarSeries = [
+      { name: 'Completed', data: this.platformStepRows.map(r => r.completed) },
+      { name: 'In progress', data: this.platformStepRows.map(r => r.inProgress) },
+    ];
+  }
+
   normalizeStatus(status: string | undefined): string { return normalizeSubChallengeStatus(status); }
 
   calculateChallengeDisplayStatus(challenge: any, challengeIndex: number): string {
@@ -2905,6 +3364,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.onFormPreview(formData);
   }
   formatDate(timestamp: any): string { return formatDate(timestamp); }
+  formatDateTime(timestamp: any): string { return formatDateTime(timestamp); }
   loadVideoAsks(): void {
     if (!this.participantProgressList || this.participantProgressList.length === 0) {
       this.videoAskList = []; return;
