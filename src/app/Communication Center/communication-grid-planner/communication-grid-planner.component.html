@@ -6,32 +6,41 @@
                 <label for="v-lib" [class.active-tab]="activeTab == 'library'" (click)="onActiveTabChange('library')">Library</label>
             </div>
         </div>
-        <div class="bar bar2"><span class="rowlab">Status</span>
-            <mat-form-field>
-                <mat-label>Select Event</mat-label>
-                <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
-                    <mat-option [value]="null">None</mat-option>
-                    <mat-option *ngFor="let event of eventList" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
-                </mat-select>
-            </mat-form-field>
+        <div class="bar bar2">
+            <div class="event-select">
+                <!-- <span class="rowlab">Select Event</span> -->
+                <mat-form-field>
+                    <mat-label>Select Event</mat-label>
+                    <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option *ngFor="let event of eventList" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
+                    </mat-select>
+                </mat-form-field>
+            </div>
+            <div>
+                <mat-form-field>
+                    <mat-label>Search Communication</mat-label>
+                    <input matInput [(ngModel)]="communicationSearch" (input)="filterCommunications()">
+                </mat-form-field>
+            </div>
             <button (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
         </div>
         <div class="header-warp">
             <div class="header">
-                <button (click)="prevMonth()">‹</button>
+                <button (click)="prevMonth()" type="button">‹</button>
                 <span>{{ displayedMonth | date:'MMMM yyyy' }}</span>
-                <button (click)="nextMonth()">›</button>
+                <button (click)="nextMonth()" type="button">›</button>
             </div>
-            <div>
-                <div class="chip-group">
-                    <button class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
-                        <svg class="check" viewBox="0 0 16 16" fill="none">
-                            <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        {{event?.name}}
-                    </button>
-                </div>
+            
+            <div class="chip-group">
+                <button class="chip" [class.is-active]="selectedEvent === event?.docid" type="button" *ngFor="let event of upcomingEvents" (click)="onEventChipClick(event?.docid)">
+                    <svg class="check" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {{event?.name}}
+                </button>
             </div>
+            
         </div>
         <main>
             <section style="display:block;" *ngIf="activeTab == 'calendar'">
@@ -70,7 +79,7 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button class="add-btn" (click)="onCommunicationAddClick(days?.date)" title="Add communication" aria-label="Add communication">
+                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date)" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
@@ -89,137 +98,10 @@
             </section>
             <section style="display:block;overflow:hidden" *ngIf="activeTab == 'library'">
                 <div class="comm-form-block">
-                    <div class="cf-toolbar">
-                        <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add Communication </button>
-                        <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
-                        <ng-container *ngIf="communicationFormMode">
-                            <button class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
-                            <button class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
-                        </ng-container>
-                    </div>
-                    
-                    <div *ngIf="communicationFormMode">
-                        <div class="mrow" *ngFor="let group of communicationForm?.controls ?? []; let i = index; let isLast = last;" [formGroup]="group">
-                            <div class="cf-head">
-                                <mat-form-field appearance="outline" class="cf-field cf-field-title">
-                                    <mat-label>Title</mat-label>
-                                    <input matInput formControlName="title" placeholder="Untitled">
-                                </mat-form-field>
-
-                                <mat-form-field appearance="outline" class="cf-field cf-field-date">
-                                    <mat-label>Choose a date</mat-label>
-                                    <input matInput [matDatepicker]="picker" formControlName="date">
-                                    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-                                    <mat-datepicker #picker></mat-datepicker>
-                                </mat-form-field>
-
-                                <mat-form-field appearance="outline" class="cf-field cf-field-event">
-                                    <mat-label>Select Event</mat-label>
-                                    <mat-select formControlName="eventref">
-                                        <mat-option *ngFor="let event of eventList" [value]="event.docid">
-                                            {{ event?.name ?? 'no title' }}
-                                        </mat-option>
-                                    </mat-select>
-                                </mat-form-field>
-
-                                <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
-                                    <button mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
-                                    <button mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
-                                </div>
-                            </div>
-
-                            <div class="mopen">
-                                <div class="mcols">
-                                    <div style="display:flex; flex-direction : column; gap: 5px">
-                                        <div class="cf-email-config">
-                                            <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
-                                                <mat-label>Select Email Template</mat-label>
-                                                <mat-select formControlName="emailtemplate">
-                                                    <mat-option *ngFor="let template of emailTemplates" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
-                                                </mat-select>
-                                            </mat-form-field>
-                                            <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + New template </button>
-                                        </div>
-                                        <div class="cell">
-                                            <div class="cellh"><span>Email</span></div>
-                                            <div class="pv-mail">
-                                                <ng-container *ngIf="group.get('emailtemplate')?.value as tplId; else noEmailTpl">
-                                                    <div class="subj">
-                                                        <span class="ptxt">{{ getSelectedEmail(tplId)?.subject || 'no subject line' }}</span>
-                                                    </div>
-                                                    <div class="ptxt" [innerHtml]="getSelectedEmail(tplId)?.htmlbody"></div>
-                                                </ng-container>
-                                                <ng-template #noEmailTpl>
-                                                    <div class="subj"><span class="mt">no subject line</span></div>
-                                                    <div class="ptxt"><span class="mt">no template selected</span></div>
-                                                </ng-template>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- WHATSAPP -->
-
-                                    <div>
-                                        <div>
-                                            <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
-                                                <mat-select (selectionChange)="onTemplateChange($event , i)" >
-                                                    <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
-                                                            [ngModelOptions]="{standalone: true}"
-                                                            placeholderLabel="Search…" noEntriesFoundLabel="None found"
-                                                            (ngModelChange)="onSearchTemplate()"
-                                                            ngDefaultControl></ngx-mat-select-search></mat-option>
-                                                    <mat-option disabled *ngIf="displayTemplates.length > 0"> <small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
-                                                    <mat-option *ngFor="let t of displayTemplates" [value]="t">
-                                                        <div class="tpl-option-top-favourites">
-                                                            <div class="tpl-option">
-                                                                <div class="tpl-option-top">
-                                                                    <div class="tpl-name">{{t.elementName}}</div>
-                                                                </div>
-                                                                <div class="tpl-meta">
-                                                                    <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
-                                                                </div>
-                                                            </div>
-                                                            <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
-                                                        </div>
-                                                    </mat-option>
-                                                    <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
-                                                    <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
-                                                </mat-select>
-                                            </mat-form-field>
-                                        </div>
-                                        <div class="cell">
-                                            <div class="cellh"><span>WhatsApp</span></div>
-                                            <div class="pv-chat">
-                                                <div class="chat-msg-row">
-                                                    <div class="chat-bubble">
-                                                        <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[group?.get('watitemplate').value?.templateid])"> </div>
-                                                        <div class="ptxt" *ngIf="!group?.get('watitemplate').value?.templateid"><span class="mt">not written yet</span></div>
-                                                        <div class="bubble-meta">
-                                                            <mat-icon class="bubble-tick">done_all</mat-icon>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- APP NOTIFICATION -->
-                                    <!-- <div class="cell">
-                                        <div class="cellh"><span>App notification</span></div>
-                                        <div class="pv-note" style="--evc:var(--ev-1)">
-                                            <span class="appicon">SL</span>
-                                            <div class="notebody">
-                                                <div class="noteapp">SLD CI</div>
-                                                <div class="ntitle"><span class="mt">no title</span></div>
-                                                <div class="ptxt"><span class="mt">not written yet</span></div>
-                                            </div>
-                                        </div>
-                                    </div> -->
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" *ngIf="!communicationFormMode"> + Add
+                        Communication </button>
+                    <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)"
+                        *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
                 </div>
                 <ng-container *ngIf="!isAllLoaded()">
                     <section class="libg" style="--evc:var(--ev-1)" *ngFor="let eventId of getEventGroupKeys()">
@@ -279,20 +161,23 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div>
+                                        <div class="pv-chat-wrap">
                                             <div class="cell">
-                                                <div class="cellh" style="color:black;"><span>WhatsApp<span *ngIf="comm?.watitemplate?.templateid">: ( {{watiTemplateMap[comm?.watitemplate?.templateid]?.templatename}} )</span></span></div>
+                                                <div class="cellh" style="color:black;"><span>WhatsApp<span *ngIf="comm?.watitemplate?.templateid">: (
+                                                            {{watiTemplateMap[comm?.watitemplate?.templateid]?.templatename}} )</span></span></div>
                                                 <div class="pv-chat">
                                                     <div class="chat-msg-row">
                                                         <div class="chat-bubble">
-                                                            <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[comm?.watitemplate?.templateid] )"> </div>
-                                                            <div class="ptxt" *ngIf="!comm?.watitemplate?.templateid"><span class="mt">not written yet</span></div>
+                                                            <div class="bubble-content"
+                                                                [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[comm?.watitemplate?.templateid] )"> </div>
+                                                            <div class="ptxt" *ngIf="!comm?.watitemplate?.templateid"><span class="mt">not written yet</span>
+                                                            </div>
                                                             <div class="bubble-meta"> <mat-icon class="bubble-tick">done_all</mat-icon> </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                
+                                        
                                             <div *ngFor="let archive of communicationwatilLog[comm?.docid] ?? []" class="wati-preview">
                                                 <div class="wati-notification-title">
                                                     <a (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
@@ -300,33 +185,46 @@
                                                         <b>Sent By :</b> {{ mapProfile[archive?.createdby]?.name ?? '' }}
                                                     </div>
                                                 </div>
-                
-                                                <button mat-button class="wati-count-btn wati-sent-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                        
+                                                <button mat-button class="wati-count-btn wati-sent-btn"
+                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>check_circle</mat-icon>
                                                     <span>{{ getSentCount(archive) }}</span>
                                                 </button>
-                
-                                                <button mat-button class="wati-count-btn wati-pending-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                        
+                                                <button mat-button class="wati-count-btn wati-pending-btn"
+                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>schedule</mat-icon>
                                                     <span>{{ getPendingCount(archive) }}</span>
                                                 </button>
-                
-                                                <button mat-button class="wati-count-btn wati-failed-btn" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                                        
+                                                <button mat-button class="wati-count-btn wati-failed-btn"
+                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>error</mat-icon>
                                                     <span>{{ getFailedCount(archive) }}</span>
                                                 </button>
                                             </div>
                                         </div>
-                                    <!-- <div class="cell">
+                                        <div class="cell">
                                             <div class="cellh"><span>App notification</span></div>
-                                                <div class="pv-note" style="--evc:var(--ev-1)"><span class="appicon">SL</span>
-                                                    <div class="notebody">
-                                                        <div class="noteapp">SLD CI</div>
+                                            <div class="pv-note">
+                                                <div class="notebody">
+                                                    <!-- <div class="noteapp">SLD CI</div> -->
+                                                    <ng-container *ngIf="comm.apptemplate?.docid as tplId; else noAppTpl">
+                                                        <div class="subj">
+                                                            <span class="ptxt">{{ appNotificationTemplateMap[tplId]?.title || 'no title' }}</span>
+                                                        </div>
+                                                        <div class="ptxt">{{appNotificationTemplateMap[tplId]?.message}}</div>
+                                                    </ng-container>
+                                                    <ng-template #noAppTpl>
                                                         <div class="ntitle"><span class="mt">no title</span></div>
                                                         <div class="ptxt"><span class="mt">not written yet</span></div>
-                                                    </div>
+                                                    </ng-template>
+                                                    <!-- <div class="ntitle"><span class="mt">no title</span></div>
+                                                    <div class="ptxt"><span class="mt">not written yet</span></div> -->
                                                 </div>
-                                        </div> -->
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </details>
@@ -338,6 +236,177 @@
     </div>
     <app-participants-analytics *ngIf="activeTab === 'library' && selectedCommunication" [communication]="selectedCommunication"></app-participants-analytics>
 </div>
+
+
+<!-- communication form -->
+<ng-template #communicationDialog>
+    <div class="comm-dialog">
+
+        <!-- HEADER -->
+        <div class="comm-dialog__header">
+            <div class="comm-dialog__heading">
+                <span class="comm-dialog__title">Communications</span>
+                <span class="comm-dialog__subtitle">Schedule what gets sent for each event</span>
+            </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="cf-toolbar">
+            <!-- <button class="cf-btn cf-btn-ghost" (click)="openCommunicationForm()" > + Add Communication </button> -->
+            <button class="cf-btn cf-btn-close" (click)="onSendCommunication(selectedCommunication)" *ngIf="selectedCommunication"> ✕ Close Participant Analytics </button>
+            <ng-container *ngIf="communicationFormMode">
+                <button class="cf-btn cf-btn-primary" (click)="saveCommunicationFrom()"> Save Communication </button>
+                <button class="cf-btn cf-btn-ghost" (click)="clearForm()"> Cancel </button>
+            </ng-container>
+        </div>
+
+        <!-- BODY -->
+        <div class="comm-dialog__body">
+            <div>
+                <div class="mrow" *ngFor="let group of communicationForm?.controls ?? []; let i = index; let isLast = last;" [formGroup]="group">
+
+                    <div class="cf-head">
+                        <mat-form-field appearance="outline" class="cf-field cf-field-title">
+                            <mat-label>Title</mat-label>
+                            <input matInput formControlName="title" placeholder="Untitled">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="cf-field cf-field-date">
+                            <mat-label>Choose a date</mat-label>
+                            <input matInput [matDatepicker]="picker" formControlName="date" [matDatepickerFilter]="dateFilter">
+                            <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                            <mat-datepicker #picker></mat-datepicker>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline" class="cf-field cf-field-event">
+                            <mat-label>Select Event</mat-label>
+                            <mat-select formControlName="eventref">
+                                <mat-option *ngFor="let event of eventList" [value]="event.docid">
+                                    {{ event?.name ?? 'no title' }}
+                                </mat-option>
+                            </mat-select>
+                        </mat-form-field>
+
+                        <div class="cf-head-actions" *ngIf="communicationFormMode == 'add'">
+                            <button mat-button class="cf-btn cf-btn-ghost" (click)="addCommunicationFrom()" *ngIf="isLast"> + Add row </button>
+                            <button mat-button class="cf-btn cf-btn-danger" (click)="removeCommunicationForm(i)"> Remove </button>
+                        </div>
+                    </div>
+
+                    <div class="mopen">
+                        <div class="mcols">
+                            <div style="display:flex; flex-direction : column; gap: 5px">
+                                <div class="cf-email-config">
+                                    <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
+                                        <mat-label>Select Email Template</mat-label>
+                                        <mat-select formControlName="emailtemplate">
+                                            <mat-option *ngFor="let template of emailTemplates" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                    <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + </button>
+                                </div>
+                            </div>
+
+                            <!-- WHATSAPP -->
+                            <div>
+                                <div>
+                                    <mat-form-field appearance="outline" class="full-width"><mat-label>Search templates</mat-label><mat-icon matPrefix>search</mat-icon>
+                                        <mat-select (selectionChange)="onTemplateChange($event , i)" >
+                                            <mat-option><ngx-mat-select-search [(ngModel)]="searchTemplate"
+                                                    [ngModelOptions]="{standalone: true}"
+                                                    placeholderLabel="Search…" noEntriesFoundLabel="None found"
+                                                    (ngModelChange)="onSearchTemplate()"
+                                                    ngDefaultControl></ngx-mat-select-search></mat-option>
+                                            <mat-option disabled *ngIf="displayTemplates.length > 0"> <small class="count-label">{{getTemplatesCountInfo()}}</small></mat-option>
+                                            <mat-option *ngFor="let t of displayTemplates" [value]="t">
+                                                <div class="tpl-option-top-favourites">
+                                                    <div class="tpl-option">
+                                                        <div class="tpl-option-top">
+                                                            <div class="tpl-name">{{t.elementName}}</div>
+                                                        </div>
+                                                        <div class="tpl-meta">
+                                                            <span class="tpl-server-tag">{{t.servername}}</span><span class="tpl-cat-tag" *ngIf="t.category">{{t.category}}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button class="fav-inline-btn" [class.fav-inline-btn-active]="isFavourite(t)" (click)="toggleFavourite($event, t)" [matTooltip]="isFavourite(t) ? 'Remove' : 'Add to favourites'"><mat-icon>{{isFavourite(t)? 'star' : 'star_border'}}</mat-icon></button>
+                                                </div>
+                                            </mat-option>
+                                            <mat-option disabled *ngIf="hasMoreTemplates"><button mat-stroked-button class="load-more-btn" (click)="loadMoreTemplates(); $event.stopPropagation();">Load more…</button></mat-option>
+                                            <mat-option disable *ngIf="displayTemplates.length === 0 && !watiTemplateLoading && !iswatiSearching"><span class="empty-label">No matches</span></mat-option>
+                                        </mat-select>
+                                    </mat-form-field>
+                                </div>
+                            </div>
+
+                            <!-- APP NOTIFICATION -->
+                            <div>
+                                <mat-form-field appearance="outline" class="full-width">
+                                    <mat-label>Select App Template</mat-label>
+                                    <mat-select formControlName="apptemplate">
+                                        <mat-option *ngFor="let template of appNotificationTemplate" [value]="template.docid"> {{ template?.title ??
+                                            'no title' }} </mat-option>
+                                    </mat-select>
+                                </mat-form-field>
+                            </div>
+
+                        </div>
+
+                        <div class="mcols">
+                            <div class="cell">
+                                <div class="cellh"><span>Email</span></div>
+                                <div class="pv-mail">
+                                    <ng-container *ngIf="group.get('emailtemplate')?.value as tplId; else noEmailTpl">
+                                        <div class="subj">
+                                            <span class="ptxt">{{ getSelectedEmail(tplId)?.subject || 'no subject line' }}</span>
+                                        </div>
+                                        <div class="ptxt" [innerHtml]="getSelectedEmail(tplId)?.htmlbody"></div>
+                                    </ng-container>
+                                    <ng-template #noEmailTpl>
+                                        <div class="subj"><span class="mt">no subject line</span></div>
+                                        <div class="ptxt"><span class="mt">no template selected</span></div>
+                                    </ng-template>
+                                </div>
+                            </div>
+                            <div class="cell">
+                                <div class="cellh"><span>WhatsApp</span></div>
+                                <div class="pv-chat">
+                                    <div class="chat-msg-row">
+                                        <div class="chat-bubble">
+                                            <div class="bubble-content" [innerHTML]="getFormattedPreviewHtml(watiTemplateMap[group?.get('watitemplate').value?.templateid])">
+                                            </div>
+                                            <div class="ptxt" *ngIf="!group?.get('watitemplate').value?.templateid"><span class="mt">not written yet</span></div>
+                                            <div class="bubble-meta">
+                                                <mat-icon class="bubble-tick">done_all</mat-icon>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cell">
+                                <div class="cellh"><span>App notification</span></div>
+                                <div class="pv-note">
+                                    <div class="notebody">
+                                        <ng-container *ngIf="group.get('apptemplate')?.value as tplId; else noAppTpl">
+                                            <div class="subj">
+                                                <span class="ptxt">{{ appNotificationTemplateMap[tplId]?.title || 'no title' }}</span>
+                                            </div>
+                                            <div class="ptxt">{{appNotificationTemplateMap[tplId]?.message}}</div>
+                                        </ng-container>
+                                        <ng-template #noAppTpl>
+                                            <div class="ntitle"><span class="mt">no title</span></div>
+                                            <div class="ptxt"><span class="mt">not written yet</span></div>
+                                        </ng-template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</ng-template>
 
 
 <!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->

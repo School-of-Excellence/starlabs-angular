@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, TemplateRef, ViewChild, signal } from '@angular/core';
 import { arrayUnion, collection, collectionData, doc, Firestore, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, Timestamp, where, writeBatch } from '@angular/fire/firestore';
 import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import { ParticipantsAnalyticsComponent } from '../../Participants Profile Manag
 import { WatiService } from '../../wati.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { MatDialog } from '@angular/material/dialog';
 
 const FAVOURITES_KEY = 'wati_favourite_templates';
 
@@ -99,6 +100,7 @@ interface StatusCounts {
 export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   @ViewChild('commnunicationGridPlanner', { static: false }) commnunicationGridPlanner !: ElementRef;
+  @ViewChild('communicationDialog') communicationDialog!: TemplateRef<any>;
 
   private destroy$ = new Subject<void>();
 
@@ -108,6 +110,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   loggedInProfile = null;
   localStorageKey = 'communicationform';
+  today : Date = new Date();
 
   // communication planner
   dateBasedMap = {};
@@ -115,6 +118,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   eventBasedGroupMap = {};
   selectedCommunication = null;
   openedCommunications = [];
+  communicationSearch = '';
 
   // profile data
   mapProfile = {};
@@ -132,6 +136,10 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // email template
   emailTemplates = [];
   emailTemplateMap = {};
+
+  // app notification template
+  appNotificationTemplate = [];
+  appNotificationTemplateMap = {};
 
   // wati template
   serverUrls: any[] = [];
@@ -210,7 +218,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     private authService: AuthguardService,
     private watiService: WatiService,
     private snackBar: MatSnackBar,
+    private dialog : MatDialog,
   ) {
+    this.today.setHours(0,0,0,0)
     this.buildCalendar();
     this.authService.getRoles().then((data) => this.loggedInProfile = data);
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
@@ -227,6 +237,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     this.fetchEvents();
     this.fetchEmailTemplates();
     this.fetchWatiTemplates();
+    this.fetchAppNotificationTemplates();
     this.loadTemplatesFromAllServers();
   }
 
@@ -247,10 +258,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // function to handle tab switch
   onActiveTabChange(tab) {
     if (tab !== this.activeTab) { this.activeTab = tab };
-    this.communicationFormMode = null;
-    this.communicationForm.clear();
     this.selectedCommunication = null;
     this.openedCommunications = [];
+    this.clearForm();
   }
 
   // is all load
@@ -387,10 +397,19 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   // ==================== COMMUNICATION FROM ====================
 
+  openCommunicationPopUp(){
+    this.dialog.open(this.communicationDialog, {
+      panelClass: 'comm-dialog-panel',
+      width : '90vw',
+      autoFocus: false
+    });
+  }
+
   // function to open form
   openCommunicationForm() {
     this.communicationFormMode = 'add';
     this.addCommunicationFrom();
+    this.openCommunicationPopUp();
   }
 
   // function to add new communication to form
@@ -412,7 +431,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   // function remove added communication from formarray
   removeCommunicationForm(index) {
     if (this.communicationForm?.controls.length === 1) {
-      this.communicationFormMode = null;
+      this.clearForm();
     }
     this.communicationForm.removeAt(index);
   }
@@ -449,6 +468,8 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
           }
           const emailTemplate = this.getSelectedEmail(values.emailtemplate);
           const emailTemplateObject = values.emailtemplate ? { docid: values.emailtemplate, templatealias: emailTemplate?.templatealias, postmarktemplateid: emailTemplate.postmarktemplateid } : null
+          
+          const appNotificationObject = { docid : values.apptemplate }
           const communicationDoc = {
             docid: docref.id,
             title: values?.title ?? '',
@@ -456,7 +477,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
             eventref: eventRef,
             emailtemplate: emailTemplateObject ?? null,
             watitemplate: values.watitemplate ?? null,
-            apptemplate: values.apptemplate ?? null,
+            apptemplate: appNotificationObject ?? null,
             lastupated: lastupated,
             type: values?.type ?? null
           }
@@ -466,8 +487,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
           batch.set(docref, communicationDoc, { merge: true });
         })
         await batch.commit();
-        this.communicationFormMode = null;
-        this.communicationForm.clear();
+        this.clearForm();
         console.log('Successfully saved communication')
         alert('Successfully saved communication');
       } catch (error) {
@@ -492,20 +512,19 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         type: [communication?.type ?? null],
         emailtemplate: [communication?.emailtemplate?.docid ?? null],
         watitemplate: [communication?.watitemplate ?? null],
-        apptemplate: [communication?.apptemplate ?? null],
+        apptemplate: [communication?.apptemplate?.docid ?? null],
       })
     );
     this.communicationFormMode = 'edit';
-    this.commnunicationGridPlanner.nativeElement.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
+    this.openCommunicationPopUp();
+    // this.commnunicationGridPlanner.nativeElement.scrollTo({
+    //   top: 0,
+    //   behavior: 'smooth'
+    // })
   }
   
   // to handel day cell click
   onCommunicationAddClick(date: Date) {
-    this.onActiveTabChange('library');
-
     this.communicationForm.push(
       this.from.group({
         docid: [doc(collection(this.firestore, 'communication planner')).id],
@@ -519,10 +538,24 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
       })
     );
     this.communicationFormMode = 'add';
+    this.openCommunicationPopUp();
   }
+
+  showAddButtonInDateCell(date : Date){
+    return this.today <= date;
+  }
+
+  dateFilter = (date: Date | null): boolean => {
+    if (!date) {
+      return false;
+    }
+
+    return this.today <= date;
+  };
 
   // function to clear form
   clearForm() {
+    this.dialog.closeAll()
     this.communicationForm.clear();
     this.communicationFormMode = null;
   }
@@ -573,10 +606,26 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   // function to apply filter
   applyFilter(communication) {
+    const search = this.communicationSearch.trim()?.toLowerCase();
     if (this.selectedEvent !== null) {
       const eventId = communication?.eventref?.id ?? null;
-      return this.selectedEvent === eventId;
+      if (this.selectedEvent !== eventId) {
+        return false;
+      }
     }
+
+    if (search.length > 0) {
+      const communicationTitle = communication?.title?.toLowerCase() ?? '';
+      const emailTemplate = this.emailTemplateMap[communication?.emailtemplate?.docid ?? '']?.templatename?.toLowerCase() ?? '';
+      const watiTemplate = this.watiTemplateMap[communication?.watitemplate?.templateid ?? '']?.templatename?.toLowerCase() ?? '';
+      const appNotification = this.appNotificationTemplateMap[communication?.apptemplate?.docid ?? '']?.title?.toLowerCase() ?? '';
+
+      console.log(this.watiTemplateMap[communication?.watitemplate?.templateid ?? '']?.templatename)
+      if (!(communicationTitle.includes(search) || emailTemplate.includes(search) || watiTemplate.includes(search) || appNotification.includes(search))) {
+        return false
+      }
+    }
+
     return true
   }
 
@@ -821,6 +870,21 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
       watiTemplateMap[template['templateid']] = template;
     });
     this.watiTemplateMap = watiTemplateMap;
+  }
+
+  async fetchAppNotificationTemplates() {
+    const q = query(collection(this.firestore, 'savednotifications'));
+    const appNotificationTemplate = [];
+    const appNotificationTemplateMap = {}
+    const templatesSnap = await getDocs(q);
+    templatesSnap.docs.forEach((templateDoc) => {
+      const template = templateDoc.data();
+      template['docid'] = templateDoc.id;
+      appNotificationTemplate.push(template);
+      appNotificationTemplateMap[templateDoc.id] = template;
+    });
+    this.appNotificationTemplate = appNotificationTemplate;
+    this.appNotificationTemplateMap = appNotificationTemplateMap;
   }
 
   // load wati templates from all server
