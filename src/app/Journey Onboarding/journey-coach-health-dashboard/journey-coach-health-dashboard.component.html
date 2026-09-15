@@ -76,6 +76,8 @@
           <button type="button" [class.on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">Active</button>
           <button type="button" [class.on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">Non-active</button>
           <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
+          <button type="button" *ngIf="summary.noStatus || shownLifecycle==='nostatus'"
+                  [class.on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')">No status</button>
         </div>
         <div class="fb-journey">
           <button type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
@@ -124,14 +126,18 @@
             <span class="ios2-title">{{ selectedCoachId === ALL ? 'All participants' : (selectedCoachId === UNASSIGNED ? 'Unassigned' : 'Assigned to me') }}</span>
             <span class="ios2-tot">{{ summary.total }}</span>
           </div>
+          <!-- Lifecycle split = participant-metadata customerstatus (active / non active /
+               discontinued). "No status" is the residual — blank or unrecognised customerstatus —
+               shown only when it is non-zero so those people are never counted as Active. -->
           <div class="sb-bar" *ngIf="summary.total">
-            <span class="sb-seg sb-active" [style.width.%]="(summary.total - summary.nonActive - summary.discontinued) / summary.total * 100"></span>
+            <span class="sb-seg sb-active" [style.width.%]="summary.active / summary.total * 100"></span>
             <span class="sb-seg sb-nonactive" [style.width.%]="summary.nonActive / summary.total * 100"></span>
             <span class="sb-seg sb-disc" [style.width.%]="summary.discontinued / summary.total * 100"></span>
+            <span class="sb-seg sb-nostatus" *ngIf="summary.noStatus" [style.width.%]="summary.noStatus / summary.total * 100"></span>
           </div>
           <div class="sb-segs">
             <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">
-              <span class="sb-num">{{ summary.total - summary.nonActive - summary.discontinued }}</span>
+              <span class="sb-num">{{ summary.active }}</span>
               <span class="sb-label"><i class="sb-dot dot-active"></i>Active</span>
             </button>
             <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">
@@ -142,11 +148,17 @@
               <span class="sb-num">{{ summary.discontinued }}</span>
               <span class="sb-label"><i class="sb-dot dot-disc"></i>Discontinued</span>
             </button>
+            <button type="button" class="sb-tile" *ngIf="summary.noStatus" [class.is-on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')"
+                    matTooltip="Participants whose metadata customerstatus is blank or unrecognised">
+              <span class="sb-num">{{ summary.noStatus }}</span>
+              <span class="sb-label"><i class="sb-dot dot-nostatus"></i>No status</span>
+            </button>
           </div>
         </section>
       </div>
 
-      <!-- Row 2: six KPI tiles -->
+      <!-- Row 2: KPI tiles. Unassigned was removed (operator directive, 2026-08-26) — the
+           coach selector still offers the Unassigned scope, with its own live count. -->
       <div class="ios2-tiles">
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
@@ -162,17 +174,59 @@
         </button>
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('tickets')">
           <span class="ios2-app ap-teal"><mat-icon>confirmation_number</mat-icon></span>
-          <span class="ios2-n">{{ summary.withOpenTickets }}</span><span class="ios2-l">Open tickets</span>
+          <span class="ios2-n">{{ summary.withOpenTickets }}</span><span class="ios2-l">People with tickets</span>
         </button>
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('flagged')">
           <span class="ios2-app ap-pink"><mat-icon>flag</mat-icon></span>
           <span class="ios2-n">{{ flaggedCount() }}</span><span class="ios2-l">Flagged</span>
         </button>
-        <button type="button" class="ios2-tile" (click)="goToUnassigned()">
-          <span class="ios2-app ap-purple"><mat-icon>person_off</mat-icon></span>
-          <span class="ios2-n">{{ unassignedCount }}</span><span class="ios2-l">Unassigned</span>
-        </button>
       </div>
+
+      <!-- JC pipeline (doc item 8): completed JCs = attended journey-coach appointments, scoped to
+           the current view. Read-only cards — there is no lever for "a JC happened". -->
+      <section class="ios2-card jc-pipeline">
+        <div class="ios2-head">
+          <span class="ios2-app ap-indigo"><mat-icon>event_available</mat-icon></span>
+          <span class="ios2-title">JC pipeline</span>
+          <span class="fb-hint" *ngIf="!jcPipeline().ready">loading…</span>
+        </div>
+        <div class="jcp-row">
+          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='today'" (click)="setJcWindow('today')"
+                  matTooltip="Journey coaches completed since midnight">
+            <span class="jcp-num">{{ jcPipeline().today }}</span>
+            <span class="jcp-label">JC done today</span>
+            <span class="jcp-range">{{ jcRange('today').from | date:'d MMM' }}</span>
+          </button>
+          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='week'" (click)="setJcWindow('week')"
+                  matTooltip="Completed in the last 7 days">
+            <span class="jcp-num">{{ jcPipeline().week }}</span>
+            <span class="jcp-label">JC done last week</span>
+            <span class="jcp-range">{{ jcRange('week').from | date:'d MMM' }} – {{ jcRange('week').to | date:'d MMM' }}</span>
+          </button>
+          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='month'" (click)="setJcWindow('month')"
+                  matTooltip="Completed in the last 30 days">
+            <span class="jcp-num">{{ jcPipeline().month }}</span>
+            <span class="jcp-label">JC done last month</span>
+            <span class="jcp-range">{{ jcRange('month').from | date:'d MMM' }} – {{ jcRange('month').to | date:'d MMM' }}</span>
+          </button>
+        </div>
+
+        <!-- The individual sessions behind the selected tile: WHO it was with, and WHEN. -->
+        <div class="jcp-list" *ngIf="jcDoneList().length; else noJc">
+          <div class="jcp-item" *ngFor="let j of jcDoneList()" (click)="openJcParticipant(j.profileid)"
+               matTooltip="Open participant">
+            <span class="ios-avatar av-xs" [ngClass]="avatarClass(j.profileid)">{{ initials(j.participant) }}</span>
+            <span class="jcp-who">
+              <span class="jcp-p">{{ j.participant }}</span>
+              <span class="jcp-c">with {{ j.coach }}</span>
+            </span>
+            <span class="jcp-when">{{ j.date | date:'d MMM y, h:mm a' }}</span>
+          </div>
+        </div>
+        <ng-template #noJc>
+          <p class="ios2-empty" *ngIf="jcPipeline().ready">No journey coaches completed in this period.</p>
+        </ng-template>
+      </section>
 
       <!-- Row 3: coach-set health + by journey -->
       <div class="ios2-bot">
@@ -323,8 +377,9 @@
         <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
         <span class="mc-num">{{ summary.renewalsSoon }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')" matTooltip="Only open tickets">
-        <span class="mc-label"><span class="mc-dot dot-teal"></span>Open tickets</span>
+      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
+              matTooltip="Participants with at least one OPEN support ticket (not a ticket total)">
+        <span class="mc-label"><span class="mc-dot dot-teal"></span>People with tickets</span>
         <span class="mc-num">{{ summary.withOpenTickets }}</span>
       </button>
       <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
@@ -358,10 +413,10 @@
         <label class="jchd-pill jchd-pill-select">
           <span class="jchd-pill-label">Status</span>
           <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" aria-label="Status">
+            <!-- Options come from the data (rebuildStatusOptions), not a hardcoded list, so every
+                 customerstatus actually in use is selectable and the wording matches what is stored. -->
             <option value="">All</option>
-            <option value="active">Active</option>
-            <option value="late">Late</option>
-            <option value="discontinued">Discontinued</option>
+            <option *ngFor="let o of statusOptions" [value]="o.value">{{ o.label }} ({{ o.count }})</option>
           </select>
           <svg class="jchd-pill-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -575,18 +630,13 @@
           </td>
         </ng-container>
 
-        <!-- Tickets: count, amber when >0, muted 0 -->
+        <!-- Open tickets only (never a lifetime total) — amber when >0, muted 0. -->
         <ng-container matColumnDef="tickets">
-          <th mat-header-cell *matHeaderCellDef>Tickets</th>
+          <th mat-header-cell *matHeaderCellDef matTooltip="Open support tickets only">Open tickets</th>
           <td mat-cell *matCellDef="let r">
-            <span class="tick-count tnum" [ngClass]="r.openTickets > 0 ? 'amber' : 'zero'">{{ r.openTickets }}</span>
+            <span class="tick-count tnum" [ngClass]="r.openTickets > 0 ? 'amber' : 'zero'"
+                  [matTooltip]="r.openTickets > 0 ? r.openTickets + ' open ticket' + (r.openTickets > 1 ? 's' : '') : 'No open tickets'">{{ r.openTickets }}</span>
           </td>
-        </ng-container>
-
-        <!-- Last touch: "68d ago" -->
-        <ng-container matColumnDef="lastcoach">
-          <th mat-header-cell *matHeaderCellDef>Last touch</th>
-          <td mat-cell *matCellDef="let r"><span class="lasttouch tnum">{{ lastTouchLabel(r) }}</span></td>
         </ng-container>
 
         <!-- Unassigned (assignment) view only: selection checkbox + per-row assign action. -->
@@ -604,10 +654,15 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
             <span class="row-actions" (click)="$event.stopPropagation()">
+              <!-- Always rendered (operator directive, 2026-08-26): previously hidden when the row had
+                   no Needs-Attention issue, which read as a missing/broken control. Now it is always
+                   visible and simply disabled when there is nothing to address, with a tooltip saying so. -->
               <button mat-icon-button (click)="markAddressed(r, !isAddressed(r))"
-                      *ngIf="r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0 || isAddressed(r)"
+                      [disabled]="!hasAddressableIssue(r) && !isAddressed(r)"
                       [class.is-addressed]="isAddressed(r)"
-                      [matTooltip]="isAddressed(r) ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
+                      [matTooltip]="isAddressed(r) ? 'Addressed — click to re-open'
+                        : (hasAddressableIssue(r) ? 'Mark addressed (clears Needs Attention until a new issue)'
+                                                  : 'Nothing to address — this participant has no active issues')">
                 <mat-icon>{{ isAddressed(r) ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
               </button>
               <button mat-icon-button [matMenuTriggerFor]="assignMenu" matTooltip="Assign coach">
@@ -675,18 +730,64 @@
           <div class="coach-top">
             <span class="ios-avatar" [ngClass]="avatarClass(card.coachId)">{{ initials(card.coachName) }}</span>
             <div class="coach-id">
-              <div class="coach-name">{{ card.coachName }}</div>
-              <div class="coach-sub">Caseload {{ card.caseload }} · {{ card.needToday }} need action today</div>
+              <!-- doc item 9: the NAME opens this coach's participant list -->
+              <button type="button" class="coach-name coach-name-btn"
+                      (click)="$event.stopPropagation(); openCoachBase(card.coachId)"
+                      matTooltip="Open this coach's participants">{{ card.coachName }}</button>
+              <div class="coach-sub">
+                Caseload {{ card.caseload }} · {{ card.activeCaseload }} active · {{ card.needToday }} need action today
+              </div>
             </div>
             <span class="coach-chev"><mat-icon>chevron_right</mat-icon></span>
           </div>
 
+          <!-- Every number is clickable: it opens the card and lists exactly those people below. -->
           <div class="stat-row">
-            <div class="stat"><div class="v">{{ card.caseload }}</div><div class="k">Caseload</div></div>
-            <div class="stat"><div class="v red">{{ card.needToday }}</div><div class="k">Need today</div></div>
-            <div class="stat"><div class="v orange">{{ card.goingQuiet }}</div><div class="k">Going quiet</div></div>
-            <div class="stat"><div class="v pink">{{ card.flagged }}</div><div class="k">Flagged</div></div>
+            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'caseload')"
+                    (click)="drillCoach(card.coachId,'caseload',$event)">
+              <div class="v">{{ card.caseload }}</div><div class="k">Caseload</div></button>
+            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'active')"
+                    (click)="drillCoach(card.coachId,'active',$event)">
+              <div class="v">{{ card.activeCaseload }}</div><div class="k">Active</div></button>
+            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'needToday')"
+                    (click)="drillCoach(card.coachId,'needToday',$event)">
+              <div class="v red">{{ card.needToday }}</div><div class="k">Need today</div></button>
+            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'goingQuiet')"
+                    (click)="drillCoach(card.coachId,'goingQuiet',$event)">
+              <div class="v orange">{{ card.goingQuiet }}</div><div class="k">Going quiet</div></button>
+            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'flagged')"
+                    (click)="drillCoach(card.coachId,'flagged',$event)">
+              <div class="v pink">{{ card.flagged }}</div><div class="k">Flagged</div></button>
             <div class="stat"><div class="v green">{{ card.handled }}</div><div class="k">Handled</div></div>
+          </div>
+
+          <!-- doc item 9: JC pipeline for this coach. Sessions RUN by them (appointments.hosts),
+               which is a different question from who their participants are assigned to. -->
+          <div class="coach-jc">
+            <div class="cjc-head">JC pipeline</div>
+            <div class="cjc-grid">
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneToday')"
+                      (click)="drillCoach(card.coachId,'doneToday',$event)">
+                <span class="v">{{ card.jc.doneToday }}</span><span class="k">Done today</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneWeek')"
+                      (click)="drillCoach(card.coachId,'doneWeek',$event)">
+                <span class="v">{{ card.jc.doneWeek }}</span><span class="k">Done last week</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneMonth')"
+                      (click)="drillCoach(card.coachId,'doneMonth',$event)">
+                <span class="v">{{ card.jc.doneMonth }}</span><span class="k">Done last month</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueToday')"
+                      (click)="drillCoach(card.coachId,'dueToday',$event)">
+                <span class="v">{{ card.jc.dueToday }}</span><span class="k">Due today</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueWeek')"
+                      (click)="drillCoach(card.coachId,'dueWeek',$event)">
+                <span class="v">{{ card.jc.dueWeek }}</span><span class="k">Due this week</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'pending')"
+                      (click)="drillCoach(card.coachId,'pending',$event)">
+                <span class="v">{{ card.jc.pending }}</span><span class="k">Pending</span></button>
+              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'overdue')"
+                      (click)="drillCoach(card.coachId,'overdue',$event)">
+                <span class="v red">{{ card.jc.overdue }}</span><span class="k">Overdue</span></button>
+            </div>
           </div>
 
           <div class="progress-wrap">
@@ -698,18 +799,38 @@
           </div>
 
           <div class="coach-expand">
-            <div class="expand-inner">
-              <div class="eh">Needs action — top of queue</div>
-              <div class="mini-person" *ngFor="let p of card.queue"
-                   (click)="$event.stopPropagation(); openSlideover(p)" [matTooltip]="p.reason">
-                <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
-                <span class="mp-name">{{ p.name }}</span>
-                <span class="mp-reason">{{ p.reason }}</span>
-              </div>
-              <div class="mini-person-empty" *ngIf="card.queue.length === 0">
-                No one in this coach's loaded queue needs action.
-              </div>
+            <!-- A clicked number drives this list; with nothing clicked it falls back to the queue. -->
+            <div class="expand-inner" *ngIf="coachDrill() as d; else defaultQueue">
+              <ng-container *ngIf="d.coachId === card.coachId; else defaultQueue">
+                <div class="eh">{{ coachDrillTitle(d.metric) }}</div>
+                <ng-container *ngIf="coachDrillPeople(card.coachId, d.metric) as people">
+                  <div class="mini-person" *ngFor="let p of people"
+                       (click)="$event.stopPropagation(); openJcParticipant(p.profileid)"
+                       [matTooltip]="p.detail">
+                    <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
+                    <span class="mp-name">{{ p.name }}</span>
+                    <span class="mp-reason">{{ p.detail }}</span>
+                  </div>
+                  <div class="mini-person-empty" *ngIf="people.length === 0">
+                    No participants behind this number.
+                  </div>
+                </ng-container>
+              </ng-container>
             </div>
+            <ng-template #defaultQueue>
+              <div class="expand-inner">
+                <div class="eh">Needs action — top of queue</div>
+                <div class="mini-person" *ngFor="let p of card.queue"
+                     (click)="$event.stopPropagation(); openSlideover(p)" [matTooltip]="p.reason">
+                  <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
+                  <span class="mp-name">{{ p.name }}</span>
+                  <span class="mp-reason">{{ p.reason }}</span>
+                </div>
+                <div class="mini-person-empty" *ngIf="card.queue.length === 0">
+                  No one in this coach's base needs action.
+                </div>
+              </div>
+            </ng-template>
           </div>
         </div>
 

@@ -1,0 +1,88 @@
+<div class="hlp">
+  <aside class="hlp-nav">
+    <div class="hlp-nav-head">
+      <div class="eyebrow">Guide</div>
+      <div class="hlp-nav-title">Configuring a workshop</div>
+    </div>
+
+    <div class="seg hlp-seg">
+      <button type="button" [class.on]="view === 'guide'" (click)="setView('guide')">Guide</button>
+      <button type="button" [class.on]="view === 'reference'" (click)="setView('reference')">Every setting</button>
+    </div>
+
+    <div class="input hlp-search">
+      <input class="txt" type="text" [(ngModel)]="q" name="helpsearch"
+             [placeholder]="view === 'guide' ? 'Search the guide…' : 'Search settings…'"
+             autocomplete="off" spellcheck="false">
+    </div>
+
+    <nav class="hlp-list" *ngIf="view === 'guide'">
+      <button type="button" class="hlp-item" *ngFor="let x of shown; trackBy: trackSection"
+              [class.on]="x.i === currentIndex" (click)="select(x.i)">
+        <span class="hlp-num">{{ x.i + 1 }}</span>
+        <span class="hlp-item-t">{{ x.s.title }}</span>
+      </button>
+      <div class="help hlp-empty" *ngIf="!shown.length">Nothing in the guide matches that.</div>
+    </nav>
+
+    <div class="hlp-list" *ngIf="view === 'reference'">
+      <button type="button" class="hlp-item" [class.on]="!onlyUnused" (click)="onlyUnused = false">
+        <span class="hlp-item-t">All settings</span><span class="hlp-count">{{ allFields.length }}</span>
+      </button>
+      <button type="button" class="hlp-item" [class.on]="onlyUnused" (click)="onlyUnused = true">
+        <span class="hlp-item-t">Does nothing today</span><span class="hlp-count">{{ unusedCount }}</span>
+      </button>
+      <div class="help hlp-note">
+        Settings marked <strong>no effect</strong> are read nowhere in the app. Filling them in
+        changes nothing a learner sees.
+      </div>
+    </div>
+  </aside>
+
+  <section class="hlp-main">
+    <div class="hlp-top">
+      <h2 class="hlp-title">{{ view === 'guide' ? current?.title : (onlyUnused ? 'Settings that do nothing today' : 'Every setting') }}</h2>
+      <button type="button" class="btn btn-sm" (click)="dialogRef.close()">Close</button>
+    </div>
+
+    <!-- ───────── guide ───────── -->
+    <div class="hlp-body" *ngIf="view === 'guide' && current as s">
+      <p class="hlp-p" *ngFor="let p of s.body">{{ p }}</p>
+
+      <div class="hlp-block" *ngIf="s.steps?.length">
+        <div class="hlp-block-t">Do it in this order</div>
+        <ol class="hlp-steps"><li *ngFor="let st of s.steps">{{ st }}</li></ol>
+      </div>
+
+      <div class="hlp-block warn" *ngIf="s.warnings?.length">
+        <div class="hlp-block-t">Watch out for</div>
+        <ul class="hlp-warns"><li *ngFor="let w of s.warnings">{{ w }}</li></ul>
+      </div>
+    </div>
+
+    <!-- ───────── reference ───────── -->
+    <div class="hlp-body" *ngIf="view === 'reference'">
+      <div class="help hlp-count-line">{{ matches.length }} of {{ allFields.length }} settings</div>
+
+      <ng-container *ngFor="let g of groups">
+        <ng-container *ngIf="inGroup(g).length">
+          <div class="hlp-group">{{ g }}</div>
+          <div class="hlp-field" *ngFor="let f of inGroup(g); trackBy: trackField" [class.dead]="f.unused">
+            <div class="hlp-field-head">
+              <span class="hlp-field-t">{{ f.label }}</span>
+              <span class="badge b-dead" *ngIf="f.unused">no effect</span>
+            </div>
+            <p class="hlp-field-d">{{ f.detail }}</p>
+          </div>
+        </ng-container>
+      </ng-container>
+
+      <div class="help hlp-empty" *ngIf="!matches.length">No setting matches that.</div>
+    </div>
+
+    <div class="hlp-foot">
+      Everything here describes what the learner actually experiences in the app.
+      Settings are named as they appear on this screen.
+    </div>
+  </section>
+</div>

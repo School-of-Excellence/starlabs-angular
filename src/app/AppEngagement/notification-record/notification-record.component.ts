@@ -100,7 +100,9 @@ export class NotificationRecordComponent {
   recipientSearchText: '';
   showLogs = false;
 
-  selectedTab: 'success' | 'failed' = 'success';
+  selectedTab: 'success' | 'failed' | 'held' = 'success';
+  heldRecipients: any[] = [];
+  filteredHeldRecipients: any[] = [];
   successRecipients: any[] = [];
   failedRecipients: any[] = [];
   filteredSuccessRecipients: any[] = [];
@@ -530,6 +532,8 @@ export class NotificationRecordComponent {
     this.selectedTab = 'success';
     this.successRecipients = [];
     this.failedRecipients = [];
+    this.heldRecipients = [];
+    this.filteredHeldRecipients = [];
     this.recipientSearchText = '';
     this.successPageIndex = 0;
     this.failedPageIndex = 0;
@@ -569,6 +573,18 @@ export class NotificationRecordComponent {
       });
     }
     this.filteredSuccessRecipients = [...this.successRecipients];
+
+    // Process ON-HOLD recipients — profiles the deliveryonhold filter skipped, so they
+    // are in neither profilesuccess nor profilefailed. Written by the composer at
+    // compose time and by the send function at dispatch (arrayUnion of both).
+    if (Array.isArray(notificationData.communicationhold)) {
+      this.heldRecipients = notificationData.communicationhold.map(profileId => ({
+        profileId,
+        name: this.mapProfile[profileId] || 'Unknown',
+        email: this.mapProfiledata[profileId]?.email ?? '',
+      }));
+    }
+    this.filteredHeldRecipients = [...this.heldRecipients];
 
     // Process FAILED recipients
     if (notificationData.profilefailed && Array.isArray(notificationData.profilefailed)) {
@@ -635,6 +651,11 @@ export class NotificationRecordComponent {
 
   // Add method to load logs only for visible items (pagination optimization)
   loadLogsForVisibleItems() {
+    // Held profiles were never sent to — no delivery logs exist to fetch.
+    if (this.selectedTab === 'held') return;
+    // Captured after the guard: narrowing on a mutable property does not survive
+    // into the forEach callback below.
+    const tab: 'success' | 'failed' = this.selectedTab;
     const currentList = this.selectedTab === 'success' ? this.filteredSuccessRecipients : this.filteredFailedRecipients;
     const pageIndex = this.selectedTab === 'success' ? this.successPageIndex : this.failedPageIndex;
     const startIndex = pageIndex * this.pageSize;
@@ -643,7 +664,7 @@ export class NotificationRecordComponent {
 
     visibleItems.forEach(recipient => {
       if (!recipient.logsChecked && recipient.hasUserRef) {
-        this.fetchRecipientLogs(recipient.profileId, this.currentNotificationData.docid, this.selectedTab);
+        this.fetchRecipientLogs(recipient.profileId, this.currentNotificationData.docid, tab);
       }
     });
   }
@@ -835,12 +856,16 @@ export class NotificationRecordComponent {
     if (!searchTerm) {
       this.filteredSuccessRecipients = [...this.successRecipients];
       this.filteredFailedRecipients = [...this.failedRecipients];
+      this.filteredHeldRecipients = [...this.heldRecipients];
     } else {
       this.filteredSuccessRecipients = this.successRecipients.filter(r =>
         r.name?.toLowerCase().includes(searchTerm)
       );
       this.filteredFailedRecipients = this.failedRecipients.filter(r =>
         r.name?.toLowerCase().includes(searchTerm) || r.reason?.toLowerCase().includes(searchTerm)
+      );
+      this.filteredHeldRecipients = this.heldRecipients.filter(r =>
+        r.name?.toLowerCase().includes(searchTerm) || r.email?.toLowerCase().includes(searchTerm)
       );
     }
 
@@ -851,7 +876,7 @@ export class NotificationRecordComponent {
   }
 
   // Add tab switch method:
-  switchTab(tab: 'success' | 'failed') {
+  switchTab(tab: 'success' | 'failed' | 'held') {
     this.selectedTab = tab;
     this.recipientSearchText = '';
     this.filterRecipients();

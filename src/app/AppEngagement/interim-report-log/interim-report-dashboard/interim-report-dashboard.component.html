@@ -1,0 +1,58 @@
+<!-- Extracted from interim-report-dashboard (8).html. Behaviour lives in interim-report-dashboard.script.ts -->
+<div class="stage">
+  <div class="wrap">
+    <div class="page-head">
+      <div class="filters">
+        <div class="f fdate"><span class="k">DATE</span>
+          <mat-date-range-input class="drange" [formGroup]="range" [rangePicker]="rangePicker">
+            <input matStartDate formControlName="start" placeholder="Start date" aria-label="Start date">
+            <input matEndDate formControlName="end" placeholder="End date" aria-label="End date">
+          </mat-date-range-input>
+          <mat-datepicker-toggle class="dtoggle" [for]="rangePicker"></mat-datepicker-toggle>
+          <mat-date-range-picker #rangePicker></mat-date-range-picker></div>
+        <div class="f"><span class="k">JOURNEY</span><select id="fJourney"></select></div>
+        <div class="f"><span class="k">EVENT ATTENDED</span><select id="fEvent"></select></div>
+        <div class="f"><span class="k">PARTICIPANT</span>
+          <input id="fWho" placeholder="Search a name…"></div>
+        <button class="f clearf" id="fClear">Clear</button>
+      </div>
+    </div>
+
+    <div class="ovw" id="overview"></div>
+
+  </div>
+
+  <!-- ══════════ MODAL ══════════ -->
+  <dialog class="ov" id="ov" aria-labelledby="moTitle">
+    <div class="mo">
+      <div class="mo-head">
+        <div><h3 id="moTitle"></h3><div class="sub" id="moSub"></div></div>
+        <button class="x" id="moX">&times;</button>
+      </div>
+      <div class="mo-body">
+        <input class="mo-search" id="moSearch" placeholder="Search participant…">
+        <div id="moBody"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ══════════ NEW LOG ══════════ -->
+  <dialog class="lg" id="lg" aria-labelledby="lgName">
+    <div class="lg-box">
+      <div class="lg-head">
+        <div><div class="lg-k">NEW LOG</div><h3 id="lgName"></h3></div>
+        <button class="lg-x" id="lgX" aria-label="Close">&times;</button>
+      </div>
+      <div class="lg-tabs" role="tablist">
+        <button role="tab" data-lgtab="Call">Call</button>
+        <button role="tab" data-lgtab="Schedule">Schedule</button>
+        <button role="tab" data-lgtab="Note">Note</button>
+      </div>
+      <div id="lgPane"></div>
+      <div class="lg-foot">
+        <button id="lgCancel">Cancel</button>
+        <button class="lg-save" id="lgSave">Save</button>
+      </div>
+    </div>
+  </dialog>
+</div>

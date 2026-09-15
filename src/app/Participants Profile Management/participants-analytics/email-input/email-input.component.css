@@ -2445,3 +2445,19 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── Delivery hold ───────────────────────────────────────────────── */
+.rc-group-head { display: flex; align-items: center; gap: 6px; margin: 8px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.rc-group-head mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.rc-group-count { border-radius: 9px; font-size: 11px; font-weight: 700; padding: 0 7px; letter-spacing: 0; }
+.rc-group-send { color: #1e8e3e; }
+.rc-group-send .rc-group-count { background: #e6f4ea; color: #1e8e3e; }
+.rc-group-hold { color: #b3261e; }
+.rc-group-hold .rc-group-count { background: #fdecea; color: #b3261e; }
+.recipient-pill.on-hold { background: #fdecea; border-color: #e57373; }
+.recipient-pill.on-hold .pill-name { color: #b3261e; text-decoration: line-through; }
+.recipient-pill.on-hold .pill-email { color: #a6635c; }
+.recipient-pill.on-hold .pill-avatar { opacity: .6; }
+.rc-empty-note { font-size: 12px; color: #b3261e; padding: 6px 2px; }
+.hold-count-badge { display: inline-flex; align-items: center; gap: 2px; background: #d93025; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 7px 1px 5px; margin-left: 6px; }
+.hold-count-badge mat-icon { font-size: 13px !important; width: 13px !important; height: 13px !important; color: #fff !important; }

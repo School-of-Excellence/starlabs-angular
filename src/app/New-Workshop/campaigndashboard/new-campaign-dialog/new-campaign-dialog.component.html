@@ -1,0 +1,153 @@
+<div class="dialog-header">
+  <h2>{{ isEdit ? '✏️ Edit Campaign' : '🆕 New Campaign' }}</h2>
+  <button mat-icon-button class="close-btn" (click)="cancel()" aria-label="Close">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content class="dialog-body">
+
+  <!-- Campaign Name -->
+  <label class="field-label">Campaign Name</label>
+  <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+    <input matInput [(ngModel)]="campaignName" placeholder="e.g. CTD Launch — July 2025" />
+  </mat-form-field>
+
+  <!-- Dates + Segment -->
+  <div class="row three-col">
+    <div class="field">
+      <label class="field-label">Start Date</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input matInput [matDatepicker]="startPicker" [(ngModel)]="startDate" placeholder="dd/mm/yyyy" readonly (click)="startPicker.open()" />
+        <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+      </mat-form-field>
+    </div>
+
+    <div class="field">
+      <label class="field-label">End Date</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input matInput [matDatepicker]="endPicker" [(ngModel)]="endDate" [min]="startDate" placeholder="dd/mm/yyyy" readonly (click)="endPicker.open()" />
+        <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+      </mat-form-field>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Segment</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <mat-select [(ngModel)]="segment" placeholder="Select segment...">
+          @if (loadingTags) {
+            <mat-option disabled>Loading segments…</mat-option>
+          }
+          @for (tag of tags; track tag.id) {
+            <mat-option [value]="tag.id">{{ tag.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- Sales Targets -->
+  <div class="section-title">Sales Targets</div>
+  <div class="row three-col">
+    <div class="field">
+      <label class="field-label">Expected Sale Value (₹)</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input matInput type="number" min="0" [(ngModel)]="expectedSaleValue" placeholder="e.g. 5,00,000" />
+      </mat-form-field>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Achieved Sales Value (₹)</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input matInput type="number" min="0" [(ngModel)]="achievedSalesValue" placeholder="0" />
+      </mat-form-field>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Number of Sales</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input matInput type="number" min="0" [(ngModel)]="numberOfSales" placeholder="0" />
+      </mat-form-field>
+    </div>
+  </div>
+
+  <!-- Channels -->
+  <label class="field-label">Channels</label>
+  <div class="channels-row">
+    @for (channel of channelOptions; track channel) {
+      <mat-checkbox [checked]="isChannelSelected(channel)" (change)="toggleChannel(channel)">
+        {{ channel }}
+      </mat-checkbox>
+    }
+  </div>
+
+  <!-- Manual Notes / Items -->
+  <div class="section-title">Manual Notes / Items</div>
+  <div class="input-with-add">
+    <mat-form-field appearance="outline" class="grow" subscriptSizing="dynamic">
+      <textarea matInput rows="1" [(ngModel)]="noteDraft" placeholder="Add note, task, or follow-up item..."></textarea>
+    </mat-form-field>
+    <button type="button" class="add-btn" (click)="addNote()" [disabled]="!noteDraft.trim()">+ Add</button>
+  </div>
+  @if (manualNotes.length) {
+    <mat-chip-set class="notes-chips">
+      @for (note of manualNotes; track $index) {
+        <mat-chip (removed)="removeNote($index)">
+          {{ note }}
+          <button matChipRemove aria-label="Remove note">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+      }
+    </mat-chip-set>
+  }
+
+  <!-- Campaign Assets -->
+  <div class="section-title">Campaign Assets</div>
+  <div class="input-with-add">
+    <mat-form-field appearance="outline" class="asset-type" subscriptSizing="dynamic">
+      <mat-select [(ngModel)]="assetType" placeholder="Type">
+        @for (type of assetTypes; track type) {
+          <mat-option [value]="type">{{ type }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="grow" subscriptSizing="dynamic">
+      <input matInput [(ngModel)]="assetName" placeholder="Asset name or description" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="grow" subscriptSizing="dynamic">
+      <input matInput [(ngModel)]="assetUrl" placeholder="Paste URL (optional)" />
+    </mat-form-field>
+
+    <button type="button" class="add-btn" (click)="addAsset()" [disabled]="!canAddAsset">+ Add</button>
+  </div>
+  @if (campaignAssets.length) {
+    <div class="asset-list">
+      @for (asset of campaignAssets; track $index) {
+        <div class="asset-item">
+          <span class="asset-item-type">{{ asset.type }}</span>
+          <span class="asset-item-name">{{ asset.name }}</span>
+          @if (asset.url) {
+            <a class="asset-item-url" [href]="asset.url" target="_blank" rel="noopener">{{ asset.url }}</a>
+          }
+          <button mat-icon-button (click)="removeAsset($index)" aria-label="Remove asset">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Save -->
+  <button type="button" class="create-btn" (click)="save()" [disabled]="isSaving || !canSave">
+    @if (isSaving) {
+      <mat-spinner diameter="18" class="save-spinner"></mat-spinner>
+    }
+    {{ isEdit ? 'Update Campaign' : 'Create Campaign' }}
+  </button>
+
+</mat-dialog-content>

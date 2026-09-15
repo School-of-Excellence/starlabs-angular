@@ -784,3 +784,14 @@
   gap: 12px;
   align-items: flex-start;
 }
+/* ── Delivery hold ───────────────────────────────────────────────── */
+.stat-chip.held { background: #fdecea !important; color: #b3261e !important; }
+.stat-chip.held mat-icon { color: #d93025 !important; }
+.held-head { display: flex; align-items: center; gap: 6px; margin: 18px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #b3261e; }
+.held-head mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.held-count { background: #fdecea; color: #b3261e; border-radius: 9px; font-size: 11px; padding: 0 7px; letter-spacing: 0; }
+.held-note { font-size: 12px; color: #7a2e28; background: #fdecea; border: 1px solid #e57373; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.participant-item.held-item { opacity: .85; }
+.participant-item.held-item .participant-name { color: #b3261e; }
+.status-chip-small.held { background: #fdecea !important; color: #b3261e !important; }
+.status-chip-small.held mat-icon { color: #d93025 !important; }

@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { doc, docData, DocumentReference, Firestore, query, where, getDocs, serverTimestamp, setDoc, collection, orderBy, limit, getDoc } from '@angular/fire/firestore';
+import { doc, docData, DocumentReference, Firestore, query, where, getDocs, serverTimestamp, setDoc, updateDoc, arrayUnion, collection, orderBy, limit, getDoc } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WatiService } from '../../../wati.service';
 import { AuthguardService } from '../../../authguard.service';
@@ -92,6 +92,8 @@ export class WatiInputComponent {
   mapProfile: Record<string, any> = {};
   selectedQueuedTemplate: any = null;
   queuedRecipients: any[] = [];
+  sendableRecipients: any[] = [];
+  heldRecipients: any[] = [];
 
   bufferDoc: any = {
     profileid: [], createdby: null, date: new Date(), status: 'created',
@@ -156,6 +158,10 @@ export class WatiInputComponent {
   newPresetName = '';
   showPresetSaveInput = false;
 
+  selectedParticipants = [];
+  communicationPlanner = null;
+  isFirstTime = true;
+
   private readonly SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-rhdwzw46ya-uc.a.run.app';
   private readonly PROD_SEND_FUNCTION_URL = 'https://sendwhatsappbroadcast-kakybqnyrq-uc.a.run.app';
 
@@ -183,15 +189,43 @@ export class WatiInputComponent {
     // Build schedule picker arrays
     this.hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
     this.minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+    
+    this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? [];
+    this.communicationPlanner = !Array.isArray(this.data) ? this.data?.communicationDoc ?? null : null;
+    this.bufferDoc['communicationplannerid'] = this.communicationPlanner?.docid ?? null;
 
-    if (this.data) {
+    if (this.selectedParticipants) {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const tag = `${pad(now.getDate())}_${pad(now.getMonth() + 1)}_${now.getFullYear()}_${pad(now.getHours())}_${pad(now.getMinutes())}`;
-      this.bufferDoc.profileid = data.map((e: any) => e.profileid);
+      this.bufferDoc.profileid = this.selectedParticipants.map((e: any) => e.profileid);
       this.bufferDoc.broadcastname = (this.bufferDoc.profileid.length === 1)
         ? `Individual_${tag}` : `Broadcast_${tag}`;
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
+      this.refreshRecipientBuckets();
+
+      // if(![null , undefined , ''].includes(this.communicationPlanner)){
+      //   const watiDocId = this.communicationPlanner?.watitemplate?.docid;
+      //   if(watiDocId){
+      //     getDoc(doc(this.firestore , 'wati template' , watiDocId)).then((templateRef)=>{
+      //       const template = templateRef?.data();
+      //       this.selectedTemplate =  {
+      //         elementName: template['watitemplateid'] ?? template['templatename'] ?? '', bodyOriginal: template['textbody'] ?? template['htmlbody'] ?? '',
+      //         serverurl: template['serverurl'] ?? '', serverid: template['serverid'] ?? '', servername: template['servername'] ?? '',
+      //         id: template['templateid'] ?? '', templateid: template['templateid'] ?? '', docid: template['docid'],
+      //         category: template['category'] ?? null, subcategory: template['subcategory'] ?? null, notes: template['notes'] ?? '',
+      //       };
+
+      //       this.bufferDoc.serverurl = this.selectedTemplate['serverurl'] ?? '';
+      //       this.bufferDoc.serverid = this.selectedTemplate['serverid'] ?? '';
+      //       this.isTemplateAvailable = true;
+
+      //       this.initParamConfig(this.parseTemplateParams(this.selectedTemplate['bodyOriginal'] || ''));
+      //       this.scrollToConfigureParams();
+      //     }) 
+      //   }
+      // }
+
     } else {
       this.dialogRef.close();
     }
@@ -410,6 +444,35 @@ export class WatiInputComponent {
           });
         });
         this.watiTemplates.sort((a, b) => b['lastModified'] - a['lastModified']);
+
+        if (this.isFirstTime) {
+          const plannedWatiTemplate = this.communicationPlanner?.watitemplate?.templateid;
+          if (this.communicationPlanner && plannedWatiTemplate) {
+            const tempTemplate = this.watiTemplates?.filter((temp) => temp?.id === plannedWatiTemplate);
+            if (tempTemplate.length > 0) {
+              const template = tempTemplate[0];
+              this.resetQueuedTemplateState();
+              this.selectedTemplate = template;
+              this.bufferDoc.serverurl = template.serverurl;
+              this.bufferDoc.serverid = template.serverid;
+              this.isTemplateAvailable = false;
+              try {
+                getDocs(query(collection(this.firestore, 'wati templates'), where('templateid', '==', template['id']))).then((snap) => {
+                  if (!snap.empty) {
+                    this.isTemplateAvailable = true;
+                    const data = snap.docs[0].data();
+                    Object.assign(this.selectedTemplate, { docid: data['docid'], category: data['category'], subcategory: data['subcategory'], notes: data['notes'], templateid: data['templateid'] });
+                  }
+                }).catch((e) => { console.error(e); this.isTemplateAvailable = false; })
+              } catch (e) { console.error(e); this.isTemplateAvailable = false; }
+              this.initParamConfig(this.parseTemplateParams(template['bodyOriginal'] || ''));
+              this.scrollToConfigureParams();
+            }
+          }
+
+          this.isFirstTime = false;
+        }
+
         this.applyFiltersAndLimit();
         this.isLoading = false;
       },
@@ -441,6 +504,7 @@ export class WatiInputComponent {
       this.profiles = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p['number']);
       this.filteredProfiles = [...this.profiles];
       snap.docs.forEach(d => { const pd = d.data(); if (pd['number']) this.mapProfile[d.id] = { id: d.id, ...pd }; });
+      this.refreshRecipientBuckets();
     } catch (e) { console.error(e); }
     finally { this.isLoadingProfiles = false; }
   }
@@ -585,11 +649,12 @@ export class WatiInputComponent {
       }
       this.queuedRecipients = recipients;
       this.bufferDoc.profileid = profileIds;
+      this.refreshRecipientBuckets();
     } catch (e) { console.error(e); }
     finally { this.isLoadingQueuedRecipients = false; }
   }
 
-  resetQueuedTemplateState() { this.isQueuedTemplate = false; this.selectedQueuedTemplate = null; this.queuedRecipients = []; }
+  resetQueuedTemplateState() { this.isQueuedTemplate = false; this.selectedQueuedTemplate = null; this.queuedRecipients = []; this.refreshRecipientBuckets(); }
 
   // ══════════════════════════════════════════════════════════════════════
   // EXCEL HELPERS
@@ -690,7 +755,7 @@ export class WatiInputComponent {
     this.isValidatingNumbers = true;
     this.validNumbers = []; this.invalidNumbers = [];
     try {
-      const existing = new Set<string>(this.data.map((d: any) => d?.['number'] || d?.['phonenumber']).filter(Boolean).map((n: string) => this.cleanPhoneNumber(n.toString())));
+      const existing = new Set<string>(this.selectedParticipants.map((d: any) => d?.['number'] || d?.['phonenumber']).filter(Boolean).map((n: string) => this.cleanPhoneNumber(n.toString())));
       this.phoneNumbers.forEach(p => (existing.has(p) ? this.validNumbers : this.invalidNumbers).push(p));
       this.showValidationResults = true;
       this.snackBar.open(`Validated: ${this.validNumbers.length} valid, ${this.invalidNumbers.length} not found`, 'Close', { duration: 5000 });
@@ -724,17 +789,88 @@ export class WatiInputComponent {
   onShowRecipients() { this.showRecipients = !this.showRecipients; }
   getRecipientCount() { return this.bufferDoc.profileid.length; }
   getRecipientList() {
-    if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'] }));
-    return this.data || [];
+    if (this.isQueuedTemplate) return this.bufferDoc.profileid.map((id: string) => ({ name: this.mapProfile[id]?.['name'], email: this.mapProfile[id]?.['email'], profile: this.mapProfile[id]?.['profile'], profileid: id }));
+    return this.selectedParticipants || [];
   }
+
+  /** Splits the recipient list into what will actually go out and what is held back.
+   *  Cached in fields — the template must not rebuild these arrays every change-detection cycle. */
+  refreshRecipientBuckets() {
+    const all = this.getRecipientList();
+    this.sendableRecipients = all.filter((r: any) => !this.isDeliveryOnHold(r?.profileid));
+    this.heldRecipients = all.filter((r: any) => this.isDeliveryOnHold(r?.profileid));
+  }
+
+  trackRecipient(_: number, r: any) { return r?.profileid ?? r?.email ?? _; }
   canUploadExcel() { return this.isTemplatePresent() && !this.isTestMode; }
 
   private populateNumbersAndMap() {
     this.bufferDoc.numbers = []; this.bufferDoc.numbermap = {};
     this.bufferDoc.profileid.forEach((id: string) => {
+      if (this.isDeliveryOnHold(id)) return; // delivery on hold — never dispatched
       const p = this.mapProfile[id];
       if (p) { const num = p.phone || p.phoneNumber || p.number || ''; if (num) { this.bufferDoc.numbers.push(num); this.bufferDoc.numbermap[num] = id; } }
     });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // DELIVERY HOLD  (profile_data.deliveryonhold === true)
+  // ══════════════════════════════════════════════════════════════════════
+  isDeliveryOnHold(profileid: string): boolean {
+    return this.mapProfile[profileid]?.['deliveryonhold'] === true;
+  }
+
+  getHeldProfileIds(): string[] {
+    return (this.bufferDoc.profileid || []).filter((id: string) => this.isDeliveryOnHold(id));
+  }
+
+  getSendableProfileIds(): string[] {
+    return (this.bufferDoc.profileid || []).filter((id: string) => !this.isDeliveryOnHold(id));
+  }
+
+  getHeldCount(): number { return this.getHeldProfileIds().length; }
+
+  /** Blocks dispatch when nothing is left to send. Returns true when the caller may continue. */
+  private assertHasSendableRecipients(): boolean {
+    if (this.bufferDoc.numbers.length > 0) return true;
+    const held = this.getHeldCount();
+    this.snackBar.open(
+      held > 0
+        ? `Nothing to send — all ${held} recipient(s) are on delivery hold.`
+        : 'Nothing to send — no valid phone numbers for the selected recipients.',
+      'Close', { duration: 5000 });
+    return false;
+  }
+
+  /** A profile may have been put on delivery hold after the broadcast was queued.
+   *  Re-check against profile_data and rewrite the archive doc before the send
+   *  function reads it. Returns false when nothing sendable is left. */
+  private async stripHeldFromQueuedArchive(archiveid: string): Promise<boolean> {
+    const held = this.getHeldProfileIds();
+    if (held.length) {
+      const heldSet = new Set(held);
+      const numbermap: Record<string, string> = this.bufferDoc.numbermap || {};
+      const numbers: string[] = (this.bufferDoc.numbers || []).filter((n: string) => !heldSet.has(numbermap[n]));
+      const cleanMap: Record<string, string> = {};
+      Object.entries(numbermap).forEach(([n, pid]) => { if (!heldSet.has(pid)) cleanMap[n] = pid; });
+
+      this.bufferDoc.numbers = numbers;
+      this.bufferDoc.numbermap = cleanMap;
+      this.bufferDoc.profileid = this.getSendableProfileIds();
+
+      await updateDoc(doc(this.firestore, 'wati archive', archiveid), {
+        profileid: this.bufferDoc.profileid,
+        numbers, numbermap: cleanMap, pending: numbers,
+        // arrayUnion, not assignment — the doc may already carry holds from queue time.
+        communicationhold: arrayUnion(...held),
+      });
+      this.snackBar.open(`${held.length} recipient(s) on delivery hold were removed from this broadcast.`, 'Close', { duration: 5000 });
+    }
+    if (!(this.bufferDoc.numbers || []).length) {
+      this.snackBar.open('Nothing to send — all queued recipients are on delivery hold.', 'Close', { duration: 5000 });
+      return false;
+    }
+    return true;
   }
 
   async sendQueuedTemplate() {
@@ -743,6 +879,7 @@ export class WatiInputComponent {
     if (!archiveid) { this.snackBar.open('Archive ID not found', 'Close', { duration: 3000 }); return; }
     this.isSendingQueued = true;
     try {
+      if (!(await this.stripHeldFromQueuedArchive(archiveid))) { this.isSendingQueued = false; return; }
       const projectId = (environment as any)['projectId'] ?? (environment as any)['firebase']?.['projectId'] ?? '';
       await this.http.post(this.PROD_SEND_FUNCTION_URL, { archiveid, projectId }, { headers: { 'Content-Type': 'application/json' } }).toPromise();
       this.snackBar.open('Message sent successfully!', 'Close', { duration: 4000 });
@@ -782,6 +919,10 @@ export class WatiInputComponent {
       templateData: { ...this.selectedTemplate },
       watiCategory: this.selectedWatiCategory || null,
       workshopTitle: this.workshopTitle,
+      profileid: this.getSendableProfileIds(),
+      // Held profiles, recorded alongside sent/failed. The send function appends any
+      // it additionally finds (a hold set between compose and dispatch).
+      communicationhold: this.getHeldProfileIds(),
     };
     if (status === 'queued') { archiveDoc.queuedAt = serverTimestamp(); archiveDoc.templatevalidated = false; }
     if (this.uploadedFile && this.fileUploadUrl) {
@@ -796,17 +937,53 @@ export class WatiInputComponent {
     return archiveDoc;
   }
 
+  checkSameDay(date: any, dateToCompare: any) {
+    const plannerDate: Date | null = date?.toDate ? date.toDate() : date instanceof Date ? date : null;
+    const sendingDate: Date | null = dateToCompare?.toDate ? dateToCompare.toDate() : dateToCompare instanceof Date ? dateToCompare : null;
+    if (!plannerDate) return true;
+    return plannerDate?.getDate() === sendingDate?.getDate() &&
+      plannerDate.getMonth() === sendingDate.getMonth() &&
+      plannerDate.getFullYear() === sendingDate.getFullYear();
+  }
+  
+  // surya
+  isValidPlannedCommunication() {
+    const sendingDate = this.isScheduled ? this.getScheduledDateTime() : new Date();
+    if (![null, undefined, ''].includes(this.communicationPlanner)) {
+      const plannedWatiTemplate = this.communicationPlanner?.watitemplate?.docid ?? null;
+      if (!this.checkSameDay(this.communicationPlanner?.date, sendingDate)) {
+        const date = this.communicationPlanner?.date?.toDate ? this.communicationPlanner?.date?.toDate() : new Date(this.communicationPlanner?.date);
+        alert(`You can't send or schedule whatsup which is planned for ${date.toDateString()}`);
+        return false
+      }
+
+      if ([null , undefined , ''].includes(plannedWatiTemplate)) {
+        alert(`Please Select Whatsup Template for Titled : ${this.communicationPlanner?.title} in communication grid planner before sending Whatsup`);
+        return false;
+      }
+
+      if (this.selectedTemplate && this.selectedTemplate['docid'] !== plannedWatiTemplate) {
+        alert(`You can't send whatsup selected template is invalid`);
+        return false
+      }
+
+    }
+    return true;
+  }
+
   // ══════════════════════════════════════════════════════════════════════
   // SUBMIT
   // ══════════════════════════════════════════════════════════════════════
   async onSubmit() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
     if (this.isQueuedTemplate) { await this.sendQueuedTemplate(); return; }
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.uploadedFile) await this.uploadFileToStorage();
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'created'))
       .then(() => this.dialogRef.close({ status: 'success', archiveid }))
       .catch(() => this.dialogRef.close({ status: 'failed' }));
@@ -819,6 +996,7 @@ export class WatiInputComponent {
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     await setDoc(doc(this.firestore, 'wati archive', archiveid), this.buildArchiveDoc(archiveid, 'queued'))
       .then(() => { this.snackBar.open('Added to queue', 'Close', { duration: 3000 }); this.dialogRef.close('queued'); })
       .catch(() => this.dialogRef.close('failed'));
@@ -888,11 +1066,13 @@ export class WatiInputComponent {
   async onScheduleSubmit() {
     if (!this.isTemplatePresent()) { this.snackBar.open('Select a template first', 'Close', { duration: 3000 }); return; }
     if (!this.isScheduleValid()) { this.snackBar.open('Select a valid future date and time', 'Close', { duration: 3000 }); return; }
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.uploadedFile) await this.uploadFileToStorage();
     const docID = doc(collection(this.firestore, 'wati templates')).id;
     await this.ensureTemplateExists(docID);
     const archiveid = doc(collection(this.firestore, 'wati archive')).id;
     this.populateNumbersAndMap();
+    if (!this.assertHasSendableRecipients()) return;
     const scheduledAt = this.getScheduledDateTime()!;
     const archiveDoc = this.buildArchiveDoc(archiveid, 'scheduled');
     archiveDoc.scheduledAt = scheduledAt;

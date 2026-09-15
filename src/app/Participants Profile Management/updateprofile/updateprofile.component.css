@@ -194,3 +194,8 @@
   color: #222;
   font-size: 13px;
 }
+
+/* ── Delivery hold audit stamp ───────────────────────────────────── */
+.hold-stamp { margin: 4px 0 0 32px; font-size: 12px; color: #666; }
+.hold-stamp.on { color: #b3261e; }
+.hold-stamp strong { font-weight: 600; }

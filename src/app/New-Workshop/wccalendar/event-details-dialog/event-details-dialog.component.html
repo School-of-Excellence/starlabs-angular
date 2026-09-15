@@ -1,0 +1,45 @@
+<div class="md-body">
+  <div class="md-top">
+    @if (showBack) {
+      <button type="button" class="md-back" (click)="back()" aria-label="Back">‹</button>
+    }
+    <div class="md-title">{{ selected ? '📌 Event Details' : '🗓 ' + (dayLabel || 'Events') }}</div>
+    <button type="button" class="md-x" (click)="close()" aria-label="Close">✕</button>
+  </div>
+
+  @if (!selected) {
+    <!-- Day list view -->
+    <div class="ev-list">
+      @for (e of events; track e.id) {
+        <div class="ev-row" (click)="pick(e)">
+          <span class="ev-chip {{ typeClass(e) }}">{{ typeLabel(e) }}</span>
+          <div class="ev-row-main">
+            <div class="ev-row-title">{{ e.title }}</div>
+            <div class="ev-row-sub">{{ listSub(e) }}</div>
+          </div>
+          <span class="ev-row-arrow">›</span>
+        </div>
+      }
+    </div>
+  } @else {
+    <!-- Single event view -->
+    <div class="ev-detail">
+      <span class="ev-chip {{ typeClass(selected) }}">{{ typeLabel(selected) }}</span>
+      <div class="ev-title">{{ selected.title }}</div>
+      <div class="ev-dates">{{ dateRange(selected) }}</div>
+      @if (locationName(selected)) {
+        <div class="ev-location">📍 {{ locationName(selected) }}</div>
+      }
+      @if (selected.note) {
+        <div class="ev-note">{{ selected.note }}</div>
+      }
+    </div>
+
+    <div class="ev-actions">
+      <button type="button" class="ev-btn" (click)="edit()">✎ Edit</button>
+      <button type="button" class="ev-btn ev-btn-danger" (click)="remove()" [disabled]="isDeleting">
+        {{ isDeleting ? 'Deleting…' : (deleteArmed ? 'Confirm Delete?' : '🗑 Delete') }}
+      </button>
+    </div>
+  }
+</div>

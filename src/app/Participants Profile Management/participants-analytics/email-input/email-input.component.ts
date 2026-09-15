@@ -97,6 +97,9 @@ export class EmailInputComponent {
   selectedTemplate: any = {};
   selectedQueuedEmail: any = {};
   mapProfileEmail: any = {};
+  heldProfileIds = new Set<string>();
+  sendableRecipients: any[] = [];
+  heldRecipients: any[] = [];
 
   /** Per-variable config map */
   variableConfigs: { [variable: string]: VariableConfig } = {};
@@ -160,6 +163,10 @@ export class EmailInputComponent {
   /** How many templates to show in grid. Start at 12, expand on "Load more" */
   visibleTemplateCount = 12;
 
+  selectedParticipants = [];
+  communicationPlanner = null;
+  isFirstTime = true;
+
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
   private destroy$ = new Subject<void>();
@@ -182,13 +189,16 @@ export class EmailInputComponent {
       this.templateCategories = d['categories'];
       this.templateSubCategories = d['subcategories'];
     });
+ 
+    this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? []; 
+    this.communicationPlanner = !Array.isArray(this.data) ? this.data?.communicationDoc ?? null  : null;
 
-    if (this.data.length === 0) { this.selectedTabIndex = 1; }
+    if (this.selectedParticipants?.length === 0) { this.selectedTabIndex = 1; }
 
-    if (this.data) {
-      this.bufferDoc.profileid = this.data.map((e: any) => e.profileid);
-      this.bufferDoc.emailid = this.data.map((e: any) => e.email);
-      this.bufferDoc.emailmap = this.data.reduce((acc: any, e: any) => {
+    if (this.selectedParticipants.length > 0) {
+      this.bufferDoc.profileid = this.selectedParticipants.map((e: any) => e.profileid);
+      this.bufferDoc.emailid = this.selectedParticipants.map((e: any) => e.email);
+      this.bufferDoc.emailmap = this.selectedParticipants.reduce((acc: any, e: any) => {
         acc[e.email] = e.profileid; return acc;
       }, {});
 
@@ -200,6 +210,7 @@ export class EmailInputComponent {
 
       this.auth.getRoles().then((e: any) => this.bufferDoc.createdby = e['profile_ref'].id);
       this.auth.getProfileMap().then((e: any) => this.mapProfileEmail = e.mapEmailData);
+      this.refreshRecipientBuckets();
       this.fetchTemplates();
       this.fetchPostmarkSenders();
       this.fetchProfiles();
@@ -253,13 +264,29 @@ export class EmailInputComponent {
         this.templateArray.push(t);
         this.tempTemplateArray.push(t);
       });
+
+      if (this.isFirstTime) {
+        const plannedEmailTemplate = this.communicationPlanner?.emailtemplate?.docid;
+        if (this.communicationPlanner && plannedEmailTemplate) {
+          const template = templates?.filter((temp)=>temp?.docid === plannedEmailTemplate);
+          if (template.length > 0) {
+            this.onTemplateChange(template[0]);
+          }
+        }
+
+        this.isFirstTime = false;
+      }
       this.filteredTemplates = [...this.templateArray];
       this.visibleTemplateCount = 12;
     });
   }
 
   async fetchProfiles() {
-    collectionData(collection(this.firestore, 'profile_data')).pipe(takeUntil(this.destroy$)).subscribe((profiles: any[]) => {
+    collectionData(collection(this.firestore, 'profile_data'), { idField: '_docid' }).pipe(takeUntil(this.destroy$)).subscribe((profiles: any[]) => {
+      this.heldProfileIds = new Set<string>(
+        profiles.filter(p => p['deliveryonhold'] === true).map(p => p['_docid'])
+      );
+      this.refreshRecipientBuckets();
       this.profileList = profiles.map(p => ({
         id: p['profileid'],
         name: p['name'] || p['displayName'] || 'Unknown',
@@ -610,7 +637,7 @@ export class EmailInputComponent {
     this.validEmails = [];
     this.invalidEmails = [];
     const existing = new Set<string>();
-    this.data.forEach((d: any) => {
+    this.selectedParticipants.forEach((d: any) => {
       const e = d?.['email'] || d?.['mail'];
       if (e) existing.add(e.trim().toLowerCase());
     });
@@ -708,9 +735,44 @@ export class EmailInputComponent {
     );
   }
 
+  checkSameDay(date: any) {
+    const plannerDate: Date | null = date?.toDate ? date.toDate() : date instanceof Date ? date : null;
+    const today = new Date();
+    if (!plannerDate) return true;
+    return plannerDate?.getDate() === today?.getDate() &&
+      plannerDate.getMonth() === today.getMonth() &&
+      plannerDate.getFullYear() === today.getFullYear();
+  }
+
+  // surya
+  isValidPlannedCommunication(){
+    if(![null , undefined , ''].includes(this.communicationPlanner)){
+      const plannedEmailTemplate = this.communicationPlanner?.emailtemplate?.docid ?? null;
+      if(!this.checkSameDay(this.communicationPlanner?.date)){
+        const date = this.communicationPlanner?.date?.toDate ? this.communicationPlanner?.date?.toDate() : new Date(this.communicationPlanner?.date);
+        alert(`You can't send email which is planner for ${date.toDateString()} instead you can queue it`);
+        return false
+      }
+
+      if ([null , undefined , ''].includes(plannedEmailTemplate)) {
+        alert(`Please Select Email Template for Titled : ${this.communicationPlanner?.title} in communication grid planner before sending email`);
+        return false;
+      }
+
+      if (this.selectedTemplate && this.selectedTemplate['docid'] !== plannedEmailTemplate) {
+        alert(`You can't send email selected template is invalid`);
+        return false
+      }
+
+    }
+    return true;
+  }
+
   async onSubmit(): Promise<void> {
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.formValidation()) { alert('Please fill in all required fields...'); return; }
     if (confirm('Are you sure to send email to Participants?')) {
+      if (!this.applyDeliveryHoldFilter()) return;
       await this.maybeUploadSheet();
       this.closeWithPayload('send');
     }
@@ -732,6 +794,7 @@ export class EmailInputComponent {
   async onAddToQueue(): Promise<void> {
     if (this.formValidation()) { alert('Please fill in all required fields before adding to queue.'); return; }
     if (confirm('Add email to sending queue?')) {
+      if (!this.applyDeliveryHoldFilter()) return;
       await this.maybeUploadSheet();
       this.closeWithPayload('queued');
     }
@@ -854,7 +917,51 @@ export class EmailInputComponent {
 
   getRecipientCount(): number { return this.bufferDoc.profileid.length; }
 
-  getRecipientList(): any[] { return this.data || []; }
+  getRecipientList(): any[] { return this.selectedParticipants || []; }
+
+  // ─── Delivery hold (profile_data.deliveryonhold === true) ────────────────────
+  isDeliveryOnHold(profileid: string): boolean {
+    return !!profileid && this.heldProfileIds.has(profileid);
+  }
+
+  /** Cached in fields — the template must not rebuild these every change-detection cycle. */
+  refreshRecipientBuckets(): void {
+    const all = this.getRecipientList();
+    this.sendableRecipients = all.filter((r: any) => !this.isDeliveryOnHold(r?.profileid));
+    this.heldRecipients = all.filter((r: any) => this.isDeliveryOnHold(r?.profileid));
+  }
+
+  trackRecipient(_: number, r: any) { return r?.profileid ?? r?.email ?? _; }
+
+  /** Strips held profiles out of the payload the caller will write to `email archive`.
+   *  Returns false when nothing sendable is left. */
+  private applyDeliveryHoldFilter(): boolean {
+    const emailmap = this.bufferDoc.emailmap || {};
+    const held: string[] = (this.bufferDoc.profileid || []).filter((id: string) => this.isDeliveryOnHold(id));
+
+    if (held.length) {
+      this.bufferDoc.emailid = (this.bufferDoc.emailid || [])
+        .filter((e: string) => !this.isDeliveryOnHold(emailmap[e]));
+      const cleanMap: any = {};
+      Object.entries(emailmap).forEach(([e, pid]: any) => { if (!this.isDeliveryOnHold(pid)) cleanMap[e] = pid; });
+      this.bufferDoc.emailmap = cleanMap;
+      this.bufferDoc.profileid = (this.bufferDoc.profileid || []).filter((id: string) => !this.isDeliveryOnHold(id));
+    }
+
+    // Held profiles, recorded alongside sent/failed. Re-sending a queued email writes
+    // back to the same doc, so merge with whatever it recorded at queue time rather
+    // than replacing it. The send function appends anything it additionally finds.
+    const previouslyHeld: string[] = this.selectedQueuedEmail?.['communicationhold'] || [];
+    this.bufferDoc.communicationhold = [...new Set([...previouslyHeld, ...held])];
+
+    if (!(this.bufferDoc.emailid || []).length) {
+      alert(held.length
+        ? `Nothing to send — all ${held.length} recipient(s) are on delivery hold.`
+        : 'Nothing to send — no email addresses for the selected recipients.');
+      return false;
+    }
+    return true;
+  }
 
   removeCategory(c: string) { this.selectedCategory = this.selectedCategory.filter(x => x !== c); }
 

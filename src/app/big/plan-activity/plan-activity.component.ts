@@ -186,7 +186,7 @@ export class PlanActivityComponent {
       }))
       this.individualParticipants = [];
       this.data.cohortslist.forEach(cohort =>{
-        cohort.participantidlist.forEach(participantid=>{
+        cohort.participantidlist?.forEach(participantid=>{
           this.individualParticipants.push({
             participantid: participantid,
             cohortid: cohort.docid, 

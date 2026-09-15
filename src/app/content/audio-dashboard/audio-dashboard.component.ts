@@ -31,7 +31,7 @@ import { FormsModule } from '@angular/forms';
     FormsModule,
   ],
   templateUrl: './audio-dashboard.component.html',
-  styleUrls: ['../../content-upload-version2/content-upload-shared.css']
+  styleUrls: ['../../content-upload-version2/content-upload-shared.css', './audio-dashboard.component.css']
 })
 export class AudioDashboardComponent {
 
@@ -70,6 +70,8 @@ export class AudioDashboardComponent {
   dateSortDirection: 'asc' | 'desc' = 'desc';
   tagSelectOpen = false;
   currentlyPlaying: string | null = null;
+  downloadingIds = new Set<string>();
+  downloadProgress: { [id: string]: number } = {};
   private activeAudio: HTMLAudioElement | null = null;
   playerRow: any = null;
   playerProgress = 0;
@@ -347,6 +349,62 @@ export class AudioDashboardComponent {
       maxHeight: '90vh', width: '600px',
       data: { add: true }
     });
+  }
+
+  async downloadAudio(row: any) {
+    if (!row?.url || this.downloadingIds.has(row.id)) return;
+    this.downloadingIds.add(row.id);
+    this.downloadProgress[row.id] = 0;
+    try {
+      const response = await fetch(row.url);
+      if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+      const blob = await this.readBlobWithProgress(response, row.id);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = this.downloadFileName(row, blob.type);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+    } catch (error) {
+      console.error('Audio download failed, opening the file directly instead:', error);
+      window.open(row.url, '_blank');
+    } finally {
+      this.downloadingIds.delete(row.id);
+      delete this.downloadProgress[row.id];
+    }
+  }
+
+  // stream the body so 100MB+ files show live % instead of a frozen button
+  private async readBlobWithProgress(response: Response, rowId: string): Promise<Blob> {
+    const total = Number(response.headers.get('content-length')) || 0;
+    if (!response.body || !total) return response.blob();
+    const reader = response.body.getReader();
+    const chunks: BlobPart[] = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        received += value.byteLength;
+        this.downloadProgress[rowId] = Math.min(99, Math.floor((received / total) * 100));
+      }
+    }
+    return new Blob(chunks, { type: response.headers.get('content-type') || 'audio/mpeg' });
+  }
+
+  private downloadFileName(row: any, mimeType: string): string {
+    const base = String(row.name || 'audio').trim().replace(/[\\/:*?"<>|]+/g, '_') || 'audio';
+    const urlPath = decodeURIComponent(String(row.url).split('?')[0]);
+    const extMatch = urlPath.match(/\.([a-zA-Z0-9]{2,5})$/);
+    if (extMatch) return `${base}.${extMatch[1].toLowerCase()}`;
+    const mimeToExt: { [type: string]: string } = {
+      'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav',
+      'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac', 'audio/ogg': 'ogg', 'audio/flac': 'flac',
+    };
+    return `${base}.${mimeToExt[(mimeType || '').split(';')[0].trim()] || 'mp3'}`;
   }
 
   onaudioedit(id: any, url: any, name: any, description: any, imageUrl: any, tags: any, hlsurl: any) {

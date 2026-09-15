@@ -1,0 +1,661 @@
+<div class="cd-root" [class.dialog-mode]="isDialogMode">
+
+  <!-- BREADCRUMB BAR -->
+  <div class="cd-breadcrumb">
+    <button class="cd-back-btn" (click)="isDialogMode ? closeDialog() : goBack()" [title]="isDialogMode ? 'Close' : 'Back'">
+      <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"/>
+        <polyline points="12 19 5 12 12 5"/>
+      </svg>
+      B!G Cohorts
+    </button>
+    <span class="cd-bc-sep">/</span>
+    <span class="cd-bc-current">{{cohortName || cohort?.['name'] || '—'}}</span>
+    <span class="cd-spacer"></span>
+    <span class="cd-cat-badge" *ngIf="getCategoryLabel()" [class]="getCategoryClass()">
+      {{getCategoryLabel()}}
+    </span>
+    <button class="cd-close-btn" *ngIf="isDialogMode" (click)="closeDialog()" title="Close"> 
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- HEADER -->
+  <div class="cd-header">
+    <h1 class="cd-title">{{cohortName || cohort?.['name'] || '—'}}</h1>
+  
+    <div *ngIf="showQueueSelection()">
+      <mat-form-field appearance="outline" class="cd-queue-select">
+        <mat-label>Select Queue</mat-label>
+        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="loadLiveAssignments()">
+          <mat-option *ngFor="let option of searchableQueueList" [value]="option.docid">{{option.queuename || option.name
+            ||
+            option.id}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+<!-- 
+    <div class="cd-mentor-block">
+      <mat-form-field appearance="outline" class="cd-queue-select">
+        <mat-label>Select Mentors</mat-label>
+        <mat-select [(ngModel)]="selectedMentors" (selectionChange)="toggleMentors($event)" multiple>
+          <mat-option *ngFor="let mentorId of mentorsList" [value]="mentorId">{{mapProfile[mentorId]}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div class="cd-mentor-chips" *ngIf="selectedMentors.length">
+        <span class="cd-mentor-chip" *ngFor="let mentorId of selectedMentors">
+          <span class="cd-mentor-chip-av" [class]="getAvatarColorClass(mentorId)">{{getInitialsForId(mentorId)}}</span>
+          {{mapProfile[mentorId]}}
+        </span>
+      </div>
+    </div> -->
+
+    <button class="cd-owner-btn" [matMenuTriggerFor]="ownerMenu" *ngIf="ownerList.length > 0">
+      {{selectedOwner || 'Owner'}}
+      <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m6 9 6 6 6-6"/>
+      </svg>
+    </button>
+    <mat-menu #ownerMenu="matMenu" class="cd-menu">
+      <button mat-menu-item *ngFor="let o of ownerList" (click)="selectedOwner = o">{{o}}</button>
+    </mat-menu>
+
+    <!-- <button class="cd-repair-btn" (click)="onRepairStudios()" *ngIf="contentTab === 'studios' && selectedQueue" title="Re-pair studios">
+      <mat-icon>refresh</mat-icon> Re-pair
+    </button> -->
+
+    <!-- <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
+      <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
+    </button> -->
+  </div>
+
+  <!-- STATS ROW -->
+  <div class="cd-stats">
+    <div class="cd-stat-card">
+      <div class="cd-stat-val">{{peopleCount}}</div>
+      <div class="cd-stat-key">PEOPLE IN COHORT</div>
+    </div>
+    <div class="cd-stat-card">
+      <div class="cd-stat-val" style="font-size: 23px;">{{mapQueueName[this.selectedQueue] ?? '—'}}</div>
+      <div class="cd-stat-key">Queue</div>
+    </div>
+    <div class="cd-stat-card" >
+      <div class="cd-stat-val">{{getCohortStudios().length || '—'}}</div>
+      <div class="cd-stat-key">STUDIOS PAIRED</div>
+    </div>
+    <!-- <div class="cd-stat-card">
+      <div class="cd-stat-val">{{qDemand}}</div>
+      <div class="cd-stat-key">Q DEMAND</div>
+    </div> -->
+    <!-- <div class="cd-stat-card">
+      <div class="cd-stat-val">{{eventConfirmed}}</div>
+      <div class="cd-stat-key">EVENT CONFIRMED</div>
+    </div> -->
+  </div>
+
+  <!-- TABS -->
+  <div class="cd-tabs">
+    <button class="cd-tab" [class.active]="contentTab === 'studios'" (click)="setTab('studios')" *ngIf="selectedQueue">
+      Studio ({{getCohortStudios().length}})
+    </button>
+    <button class="cd-tab" [class.active]="contentTab === 'participants'" (click)="setTab('participants')">
+      Participants ({{peopleCount}})
+    </button>
+    <button class="cd-tab" [class.active]="contentTab === 'activities'" (click)="setTab('activities')">
+      Activities ({{activitiesCount}})
+    </button>
+    <!-- <button class="cd-tab" [class.active]="contentTab === 'comms'" (click)="setTab('comms')">
+      Comms
+    </button> -->
+    <button class="cd-select-toggle" [class.on]="selectMode" (click)="toggleSelectMode()" *ngIf="contentTab === 'participants'">
+      <mat-icon>{{selectMode ? 'close' : 'check_box_outline_blank'}}</mat-icon>
+      {{selectMode ? 'Cancel' : 'Select'}}
+    </button>
+  </div>
+
+  <!-- BODY: PARTICIPANTS -->
+  <div class="cd-body" *ngIf="contentTab === 'participants'">
+    <div class="cd-participants-grid">
+      <div class="cd-part-card row" *ngFor="let p of participantRows" 
+      [class.checked]="selectMode && selectedParticipantIds.has(p.id)"
+      (click)="selectMode && toggleParticipantSelection(p.id)"
+      >
+        <span class="p-check" *ngIf="selectMode">
+          <mat-icon>check</mat-icon>
+        </span>
+        <div class="cd-part-av" [class]="p.avatarClass">{{p.initials}}</div>
+        <div class="cd-part-info">
+          <div class="cd-part-name">{{p.name}}</div>
+          <!-- <span class="cd-part-role" [class]="p.roleClass">{{p.roleLabel}}</span> -->
+        </div>
+      </div>
+    </div>
+    <div class="cd-empty" *ngIf="!loading && participantRows.length === 0">
+      <mat-icon>people_outline</mat-icon>
+      <p>No participants in this cohort yet.</p>
+    </div>
+  </div>
+
+  <!-- BODY: ACTIVITIES -->
+  <div class="cd-body" *ngIf="contentTab === 'activities'">
+    <div class="cd-activities-list">
+      <div class="cd-activity-row" *ngFor="let a of activities">
+        <mat-icon class="cd-act-ico">assignment</mat-icon>
+        <div class="cd-act-info">
+          <div class="cd-act-title">{{a['title'] || 'Untitled activity'}}</div>
+          <div class="cd-act-meta">{{a['description'] || a['type'] || ''}}</div>
+        </div>
+      </div>
+      <div class="cd-empty" *ngIf="activities.length === 0">
+        <mat-icon>assignment</mat-icon>
+        <p>No activities yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY: STUDIOS -->
+  <div class="cd-body cd-studios-body" *ngIf="contentTab === 'studios' && selectedQueue">
+
+    <!-- Sub-toolbar: filter pills + Re-pair -->
+    <div class="cd-studios-toolbar">
+      <!-- <span class="cd-studios-rule">STUDIOS CANVAS · RULE: 1 EIS PER STUDIO</span> -->
+      <!-- <span class="cd-studios-rule">Seleted Queue : {{mapQueueName[selectedQueue]}}</span> -->
+      <span class="cd-studio-pill"
+        *ngFor="let code of getStudioGroupCodes()"
+        [class.active]="isStudioGroupSelected(code)"
+        (click)="toggleStudioGroupFilter(code)">
+        {{code}}
+      </span>
+      <span class="cd-spacer"></span>
+      <!-- <button class="cd-repair-mini" (click)="onRepairStudios()">
+        <mat-icon>refresh</mat-icon> Re-pair
+      </button> -->
+      <button class="cd-repair-mini" (click)="enableStduioCreateMode()">
+         {{studioCreateMode ? 'Back to Studio' : 'Create Studio'}}
+      </button>
+      <button (click)="createStudioCombination()" class="add-studio-btn" style="text-align:center" *ngIf="studioCreateMode">
+        Add studio
+       </button> 
+      <button class="cd-studios-created" *ngIf="contentTab === 'studios' && selectedQueue && newStudioPairing.length > 0" (click)="assignRoles()">
+      <mat-icon>bolt</mat-icon> {{newStudioPairing.length}} Studios Created
+      </button>
+      <div class="cd-toggle-wrap" *ngIf="!studioCreateMode">
+        <span class="cd-toggle-lbl">Show Disabled Stduio</span>
+        <label class="mw-toggle">
+          <input type="checkbox" [(ngModel)]="showDisabledStudio"/>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Two-column: canvas + unassigned panel -->
+    <div class="cd-studios-layout">
+
+      <!-- Studios canvas -->
+      <div class="cd-studios-canvas">
+
+        <div *ngIf="studioCreateMode" class="studio-create-section">
+          <div>
+            <div class="cd-studios-grid">
+              <div *ngFor="let studio of newStudioPairing; let i = index" (drop)="onStudioDrop($event , i)" (dragover)="onStudioDragOver($event)">
+                <button (click)="removePairing(i)">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+                <div class="cd-role-row" *ngFor="let pid of studio.participants ?? []" (dragstart)="onStduioParticipantDrag($event , pid , i)" draggable="true">
+                  <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                  <div class="cd-role-info">
+                    <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                  </div>
+                </div>
+                <div *ngIf="(studio.participants ?? []).length === 0">
+                  no participants added yet
+                </div>
+        
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>Add Participants</mat-label>
+                  <mat-select [(ngModel)]="studio.participants" multiple (selectionChange)="calculateUnassignedParticipants()">
+                    <mat-option *ngFor="let pid of this.cohort?.['participantidlist'] || [];" [value]="pid" [disabled]="!studio.participants.includes(pid) && !unassignedParticipants.includes(pid)">
+                      {{ mapProfile[pid] }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+        
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>ATC Model</mat-label>
+                  <mat-select [(ngModel)]="studio.atcmodel" multiple>
+                    <mat-option *ngFor="let list of productList" [value]="list.atcmodel">
+                      {{ list.atcmodel }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+        
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <mat-label>Mandatory Activities</mat-label>
+                  <mat-select [(ngModel)]="studio.mandatoryActivity" multiple>
+                    <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
+                      {{ activity.activity }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+        
+                <mat-checkbox *ngIf="loggedinProfileRoles['tester'] || loggedinProfileRoles['developer']"
+                  [(ngModel)]="studio.openViduEnabled">
+                  Let this Studio use OpenVidu to make Call.
+                </mat-checkbox>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <div class="cd-studios-grid" *ngIf="!studioCreateMode">
+          <ng-container *ngFor="let studio of getFilteredStudios(); let i = index">
+
+          <div class="cd-studio-card"
+            [class.live]="isStudioLive(studio)"
+            [class.drag-over]="hoverDropStudioId === (studio?.docid || studio?.id)"
+            [class.warn]="studio['studioin'] && studio['sort'] === 0"
+            *ngIf="(showDisabledStudio || studio['studioin'])"
+            (dragover)="onStudioCardDragOver($event, studio)"
+            (dragleave)="onStudioCardDragLeave($event, studio)"
+            (drop)="onStudioCardDrop($event, studio)"
+            >
+
+            <!-- Card header -->
+            <div class="cd-studio-head">
+              <span class="cd-studio-code">{{getStudioCode(studio, i)}}</span>
+              <span class="cd-spacer"></span>
+
+              <!-- Studio toggle pill (always visible) -->
+              <button class="cd-mini-pill" [class.on]="studio.studioin"
+                (click)="toggleStudio(studio); $event.stopPropagation()"
+                [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
+                <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
+              </button>
+
+              <!-- In/Out toggle pill -->
+              <button class="cd-mini-pill" [class.on]="studio.checkin"
+                (click)="toggleCheckin(studio); $event.stopPropagation()"
+                [matTooltip]="studio.checkin ? 'Checked In' : 'Checked Out'">
+                <mat-icon>{{ studio.checkin ? 'login' : 'logout' }}</mat-icon>
+              </button>
+
+              <span class="cd-studio-group" *ngIf="getStudioGroupCode(studio)" [attr.data-group]="getStudioGroupCode(studio)">
+                {{getStudioGroupCode(studio)}}
+              </span>
+              <span class="cd-studio-dot" [class.live]="isStudioLive(studio)" [title]="isStudioLive(studio) ? 'Live' : 'Idle'"></span>
+            </div>
+
+            <!-- SPECIALIST -->
+            <!-- <ng-container *ngIf="getStudioRoles(studio).specialists.length">
+              <div class="cd-role-label">SPECIALIST</div>
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).specialists"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
+                draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
+                <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                <div class="cd-role-info">
+                  <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                  <div class="cd-role-sub">EIS · SE</div>
+                </div>
+                <span class="cd-role-badge eis">EIS</span>
+                <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
+              </div>
+            </ng-container> -->
+
+            <!-- WORKING WITH -->
+            <ng-container *ngIf="getStudioRoles(studio).workingWith.length">
+              <div class="cd-role-label">Participants</div>
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).workingWith"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''">
+                <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                <div class="cd-role-info">
+                  <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                  <div class="cd-role-sub">{{getStudioParticipantActivity(studio, pid) || 'Participant'}}</div>
+                </div>
+                <span class="cd-role-livedot" *ngIf="isParticipantLive(cohort[cohort['queueref']?.id],pid)" title="Live"></span>
+                <!-- <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button> -->
+              </div>
+            </ng-container>
+
+            <!-- MENTOR -->
+            <!-- <ng-container *ngIf="getStudioRoles(studio).mentors.length">
+              <div class="cd-role-label">MENTOR</div>
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).mentors"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
+                draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
+                <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                <div class="cd-role-info">
+                  <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                  <div class="cd-role-sub">Overseeing this studio</div>
+                </div>
+                <span class="cd-role-badge mentor">MENTOR</span>
+                <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
+              </div>
+            </ng-container> -->
+
+            <!-- SHADOWING -->
+            <!-- <ng-container *ngIf="getStudioRoles(studio).shadowing.length">
+              <div class="cd-role-label">SHADOWING ({{getStudioRoles(studio).shadowing.length}})</div>
+              <div class="cd-role-row" *ngFor="let pid of getStudioRoles(studio).shadowing"
+                [class.cd-foreign]="!isPidInCohort(pid)"
+                [title]="!isPidInCohort(pid) ? 'Not in this cohort' : ''"
+                draggable="true" (dragstart)="onStudioParticipantDragStart($event, pid, studio)">
+                <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+                <div class="cd-role-info">
+                  <div class="cd-role-name">{{getNameForId(pid)}}</div>
+                </div>
+                <span class="cd-role-sub muted">observing</span>
+                <button class="cd-role-remove" (click)="removeParticipantFromStudio(pid, studio, $event)" title="Remove">×</button>
+              </div>
+            </ng-container> -->
+
+            <!-- SESSION LOG -->
+            <div class="cd-session-log">
+              <span class="cd-session-lbl">Expand to edit</span>
+              <span class="cd-session-count" *ngIf="getSessionDoneCount(studio) > 0">{{getSessionDoneCount(studio)}} done</span>
+              <span class="cd-session-count muted" *ngIf="getSessionDoneCount(studio) === 0">0 done</span>
+              <span class="cd-spacer"></span>
+              <button class="cd-session-toggle" (click)="toggleStudioExpanded(studio, $event);$event.stopPropagation()" [class.open]="isStudioExpanded(studio)" title="Show more">
+                <mat-icon>expand_more</mat-icon>
+              </button>
+            </div>
+
+            <!-- ── Advanced controls (collapsed by default) ───────────── -->
+            <div class="cd-studio-advanced" *ngIf="isStudioExpanded(studio)">
+
+              <!-- Delete action only (Studio + In/Out moved to header) -->
+              <div class="cd-actions-row" *ngIf="deleteOption">
+                <button type="button" class="cd-action-pill danger"
+                  (click)="deleteStudio(studio); $event.stopPropagation()" matTooltip="Delete Studio">
+                  <mat-icon>delete</mat-icon>
+                  <span>Delete studio</span>
+                </button>
+              </div>
+
+              <!-- ATC Model chips -->
+              <div class="cd-chip-row">
+                <span class="cd-chip-label">ATC Model</span>
+                <div class="cd-chip-list">
+                  <span class="cd-chip chip-atc" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+                  <span class="cd-chip-empty" *ngIf="!(studio['atcmodel'] && studio['atcmodel'].length)">—</span>
+                </div>
+                <button class="cd-chip-edit" (click)="openAtcEditMode(studio); $event.stopPropagation()" matTooltip="Edit ATC Model">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+
+              <!-- Mandatory Activities chips -->
+              <div class="cd-chip-row">
+                <span class="cd-chip-label">Mandatory</span>
+                <div class="cd-chip-list">
+                  <span class="cd-chip chip-mandatory" *ngFor="let actId of studio['mandatoryactivities'] || []">{{ bigActivityMap[actId]?.activity }}</span>
+                  <span class="cd-chip-empty" *ngIf="!(studio['mandatoryactivities'] && studio['mandatoryactivities'].length)">—</span>
+                </div>
+                <button class="cd-chip-edit" (click)="openMandatoryEditMode(studio); $event.stopPropagation()" matTooltip="Edit Mandatory Activities">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+
+              <!-- Pre-Assigned info -->
+              <div class="cd-preassign-info" *ngIf="studioPreAssign[studio['docid']] && studioPreAssign[studio['docid']].length > 0">
+                <span class="cd-chip-label">Pre-Assigned</span>
+                <div class="cd-preassign-list">
+                  <div class="cd-preassign-row" *ngFor="let token of getUniquePreAssignedTokens(studio['docid'])">
+                    <strong>{{ mapProfile[token['profile_id']] }}</strong> · {{ getStageName(token, studio['docid']) }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pre-Assign Token dropdown -->
+              <div class="cd-preassign-select">
+                <mat-form-field appearance="outline" class="cd-preassign-field">
+                  <mat-label>Pre-Assign Token</mat-label>
+                  <mat-select [(ngModel)]="studioPreAssign[studio['docid']]"
+                    (selectionChange)="updatePreAssigned(studio['docid'], $event.value)" multiple>
+                    <mat-option *ngFor="let token of filterTokenParticipant()" [value]="token">
+                      {{token['profile_name']}} ({{token['tokennumber']}})
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+            </div>
+          </div>
+          </ng-container>
+          <div class="cd-empty" *ngIf="getFilteredStudios().length == 0">
+            <mat-icon>view_quilt</mat-icon>
+            <p>No studios match the current filter.</p>
+          </div>
+        </div>
+        </div>
+
+      
+
+      <!-- Unassigned-to-Studio sidebar -->
+      <aside class="cd-unassigned-panel">
+        <div class="cd-unassigned-head">
+          <span class="cd-unassigned-title">UNASSIGNED TO STUDIO</span>
+          <span class="cd-unassigned-count">{{filterUnassignedParticipants.length}}</span>
+        </div>
+        <div class="cd-unassigned-search">
+          <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="Search participants…" [(ngModel)]="studioUnassignedSearch" (input)="applyUnassignedFilter()" />
+        </div>
+        <div class="cd-unassigned-list" *ngIf="filterUnassignedParticipants.length > 0">
+          <div class="cd-mini-row" *ngFor="let pid of filterUnassignedParticipants"
+            draggable="true" (dragstart)="onParticipantDragStart($event, pid)">
+            <svg class="cd-drag-grip" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="8" cy="6" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="8" cy="18" r="1"/>
+              <circle cx="16" cy="6" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="16" cy="18" r="1"/>
+            </svg>
+            <div class="cd-mini-av" [class]="getAvatarColorClass(pid)">{{getInitialsForId(pid)}}</div>
+            <span class="cd-mini-name">{{getNameForId(pid)}}</span>
+          </div>
+        </div>
+        <div class="cd-unassigned-empty" *ngIf="filterUnassignedParticipants.length === 0">
+          All assigned!
+        </div>
+        <div class="cd-unassigned-hint">
+          Drag into a studio slot
+          <span class="cd-shown">{{filterUnassignedParticipants.length}} shown</span>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- BODY: COMMS -->
+  <div class="cd-body" *ngIf="contentTab === 'comms'">
+    <div class="cd-empty">
+      <mat-icon>chat_bubble_outline</mat-icon>
+      <p>Communication logs for this cohort will appear here.</p>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="cd-loading" *ngIf="loading">
+    <div class="cd-spinner"></div>
+    <span>Loading cohort…</span>
+  </div>
+
+</div>
+
+<!-- Backdrop overlay -->
+<div class="modal-backdrop" *ngIf="editAtcModel" (click)="cancelAtcEdit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <div class="modal-header-leading">
+        <div class="modal-header-icon"><mat-icon>category</mat-icon></div>
+        <div class="modal-header-text">
+          <span class="modal-title">Edit ATC Model</span>
+          <span class="modal-subtitle">Select one or more models for this studio</span>
+        </div>
+      </div>
+      <button class="close-btn" (click)="cancelAtcEdit()" aria-label="Close">&#x2715;</button>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>ATC Model</mat-label>
+        <mat-select [(ngModel)]="editAtcModelData" multiple>
+          <mat-option
+            *ngFor="let list of productList"
+            [value]="list.atcmodel"
+          >
+            {{ list.atcmodel }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <button mat-stroked-button class="btn-ghost" (click)="cancelAtcEdit()">Cancel</button>
+      <button mat-flat-button color="primary" class="btn-primary" (click)="applyAtcEdit()">Apply</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-backdrop" *ngIf="editMandatoryActivities" (click)="cancelMandatoryEdit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-leading">
+        <div class="modal-header-icon"><mat-icon>assignment_turned_in</mat-icon></div>
+        <div class="modal-header-text">
+          <span class="modal-title">Mandatory Activities</span>
+          <span class="modal-subtitle">Choose activities required for this studio</span>
+        </div>
+      </div>
+      <button class="close-btn" (click)="cancelMandatoryEdit()" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Mandatory Activities</mat-label>
+        <mat-select [(ngModel)]="editMandatoryActivitiesData" multiple>
+          <mat-option *ngFor="let activity of filterActivityfunction()" [value]="activity.docid">
+            {{ activity.activity }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <div class="modal-footer">
+      <button mat-stroked-button class="btn-ghost" (click)="cancelMandatoryEdit()">Cancel</button>
+      <button mat-flat-button color="primary" class="btn-primary" (click)="applyMandatoryEdit()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<ng-template #duplicateStudiosModel>
+  <div class="tm-modal" *ngIf="duplicatedStudios">
+    <div class="tm-header">
+      <span class="tm-header__title">Duplicated Studios</span>
+      <button class="tm-header__close" (click)="closeDuplicateStuioModel(false)">✕</button>
+    </div>
+    <div *ngFor="let duplictes of duplicatedStudios | keyvalue">
+      <p>{{$any(duplictes).key}}</p>
+      <div class="tm-notice">
+        <mat-icon class="tm-notice__icon">info</mat-icon>
+        <div class="tm-notice__text">
+          <strong>{{ $any(duplictes).value.length }}</strong>
+          duplicated {{ $any(duplictes).value.length === 1 ? 'studio has' : 'studios have' }} already been created with the
+          same participants.
+          Do you want to proceed and create a new studio on top of {{ $any(duplictes).value.length === 1 ? 'this' : 'these'
+          }}?
+        </div>
+      </div>
+      <div class="tm-card-list">
+        <div class="tm-card" *ngFor="let studio of $any(duplictes).value; let i = index">
+          <div class="tm-card__body">
+            <div class="tm-card__top">
+              <span class="tm-sno">#{{ i + 1 }}</span>
+              <div class="tm-card__identity">
+                <div class="tm-card__name">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    mapProfile[participant] }}<span *ngIf="!last">, </span></ng-container>
+                </div>
+                <div class="tm-card__role">
+                  <ng-container *ngFor="let participant of studio.participants; let last = last">{{
+                    bigActivityMap[studio.participantsactivity[participant]].activity }}<span *ngIf="!last"> ·
+                    </span></ng-container>
+                </div>
+              </div>
+            </div>
+            <div class="tm-card__details">
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">ATC</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag" *ngFor="let atcmodel of studio['atcmodel'] || []">{{ atcmodel }}</span>
+                  <span class="tm-none" *ngIf="!(studio['atcmodel'] || []).length">—</span>
+                </div>
+              </div>
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Mandatory</span>
+                <div class="tm-tag-list">
+                  <span class="tm-tag-activity" *ngFor="let actId of studio['mandatoryactivities'] || []">{{
+                    bigActivityMap[actId].activity }}</span>
+                  <span class="tm-none" *ngIf="!(studio['mandatoryactivities'] || []).length">—</span>
+                </div>
+              </div>
+              <div class="tm-detail-row">
+                <span class="tm-detail-group__label">Stduio</span>
+                <button class="cd-mini-pill" [class.on]="studio.studioin"
+                (click)="toggleStudioInModel(studio); $event.stopPropagation()"
+                [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
+                <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tm-footer">
+      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeDuplicateStuioModel(false)">Cancel</button>
+      <button class="tm-btn tm-btn--proceed" (click)="closeDuplicateStuioModel(true)">Proceed</button>
+    </div>
+  </div>
+</ng-template>
+
+<div class="selectbar" *ngIf="selectMode">
+    <div class="sb-main-row">
+      <span class="selectbar-count"><b>{{selectedParticipantIds.size}}</b>  selected</span>
+      <span class="sb-divider"></span>
+      <button class="sb-btn ghost" (click)="selectAllParticipants()" title="Select / clear all">
+        <mat-icon>select_all</mat-icon> All
+      </button>
+      <ng-container *ngIf="selectedParticipantIds.size > 0">
+        <button class="sb-btn ghost" (click)="sendSelectedNotification(this.cohort)" title="Notify selected cohorts">
+          <mat-icon>notifications</mat-icon>
+        </button>
+        <button class="sb-btn ghost" (click)="sendSelectedEmail(this.cohort)" title="Email selected cohorts">
+          <mat-icon>email</mat-icon>
+        </button>
+        <button class="sb-btn ghost wa" (click)="sendSelectedWhatsapp(this.cohort)" title="WhatsApp selected cohorts">
+          <i class="fa-brands fa-whatsapp"></i>
+        </button>
+      </ng-container>
+      <button class="sb-btn ghost" (click)="toggleSelectMode()" title="Exit select mode">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+    <ng-container *ngIf="selectedParticipantIds.size > 0">
+      <div class="sb-action-row">
+        <button class="sb-btn primary" (click)="sendSelectedRecommendPlayist(this.cohort)"
+          title="recommend playlist selected cohorts">
+          <mat-icon>music_note</mat-icon> Recommend Playlist
+        </button>
+        <!-- <button class="sb-btn primary" (click)="exportSelectedCohorts()">
+          <mat-icon>download</mat-icon> Export ({{selectedCohortIds.size}})
+        </button> -->
+      </div>
+    </ng-container>
+  </div>

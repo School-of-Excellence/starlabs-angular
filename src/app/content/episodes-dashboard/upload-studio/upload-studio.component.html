@@ -1,0 +1,256 @@
+<div class="studio">
+
+  <!-- header -->
+  <div class="st-head">
+    <button class="backbtn" (click)="goBack()" title="Back to Episodes">
+      <mat-icon>arrow_back</mat-icon>
+      <span class="lock" *ngIf="hasActiveUploads()"><mat-icon>lock</mat-icon></span>
+    </button>
+    <div>
+      <div class="crumb">Episodes <span>›</span> <b>{{ isEditSession ? 'Edit Episode' : 'Upload Studio' }}</b></div>
+      <h1 class="pg">{{ isEditSession ? 'Edit Episode' : 'Upload Studio' }}</h1>
+      <p class="pg-sub" *ngIf="!isEditSession">Upload multiple episodes in parallel with live speed and time-remaining tracking.</p>
+      <p class="pg-sub" *ngIf="isEditSession">Change metadata or replace files — only newly picked files are re-uploaded.</p>
+    </div>
+  </div>
+
+  <!-- lock banner -->
+  <div class="lockbar" *ngIf="hasActiveUploads()">
+    <span class="ldot"></span>
+    <b>Uploads in progress — screen locked.</b>
+    <span>Navigating away or closing the tab is blocked until every upload completes.</span>
+  </div>
+
+  <!-- mission control -->
+  <div class="mission" [class.done]="allDone" *ngIf="jobs.length">
+    <div class="ringwrap">
+      <div class="ring">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <circle class="track" cx="35" cy="35" r="29" fill="none" stroke-width="6"/>
+          <circle class="fill" cx="35" cy="35" r="29" fill="none" stroke-width="6"
+            [attr.stroke-dasharray]="ringCircumference"
+            [attr.stroke-dashoffset]="ringOffset"/>
+        </svg>
+        <div class="pct">{{ aggPct | number:'1.0-0' }}%</div>
+      </div>
+      <div>
+        <div class="m-big" *ngIf="allDone">All uploads complete</div>
+        <div class="m-big" *ngIf="!allDone && uploadingCount">{{ uploadingCount }} uploading in parallel</div>
+        <div class="m-big" *ngIf="!allDone && !uploadingCount">{{ jobs.length }} episode{{ jobs.length > 1 ? 's' : '' }} staged</div>
+        <div class="m-sub">
+          {{ completeCount }} of {{ jobs.length }} complete
+          <ng-container *ngIf="queuedCount"> · {{ queuedCount }} queued</ng-container>
+          <ng-container *ngIf="failedCount"> · {{ failedCount }} failed</ng-container>
+        </div>
+      </div>
+    </div>
+
+    <div class="m-div"></div>
+    <div class="metric">
+      <div class="k"><mat-icon>north</mat-icon> Network speed</div>
+      <div class="v">{{ fmtSpeed(aggSpeed) }}<small>MB/s</small></div>
+      <canvas #spark class="spark" width="264" height="64"></canvas>
+    </div>
+
+    <div class="m-div"></div>
+    <div class="metric">
+      <div class="k">Time remaining</div>
+      <div class="v">{{ fmtEta(aggEtaSec) }}</div>
+      <div class="m-sub">based on live speed</div>
+    </div>
+
+    <div class="m-div"></div>
+    <div class="metric">
+      <div class="k">Transferred</div>
+      <div class="v-sm">{{ fmtBytes(aggDone) }}</div>
+      <div class="m-sub">of {{ fmtBytes(aggTotal) }}</div>
+    </div>
+
+    <div class="m-actions">
+      <button class="btn btn-ghost" *ngIf="hasActiveUploads()" (click)="togglePauseAll()">
+        <mat-icon>{{ pausedAll ? 'play_arrow' : 'pause' }}</mat-icon>
+        {{ pausedAll ? 'Resume all' : 'Pause all' }}
+      </button>
+      <button class="btn btn-primary" *ngIf="startableJobs.length" (click)="startAll()">
+        <mat-icon>play_arrow</mat-icon>
+        {{ startLabel }}
+      </button>
+      <button class="btn btn-primary" *ngIf="allDone" (click)="goBack()">
+        <mat-icon>check</mat-icon>
+        Back to Episodes
+      </button>
+    </div>
+  </div>
+
+  <!-- dropzone -->
+  <div class="drop" [class.slim]="jobs.length" [class.over]="dragOver"
+    (click)="videoPicker.click()"
+    (dragover)="$event.preventDefault(); dragOver = true"
+    (dragleave)="dragOver = false"
+    (drop)="onDrop($event)">
+    <input #videoPicker type="file" accept="video/*" multiple hidden (change)="onVideoPick($event)">
+    <div class="big-ic"><mat-icon>cloud_upload</mat-icon></div>
+    <div>
+      <h3 *ngIf="!jobs.length">Drop videos here <span class="dim">or</span> <span class="hl">browse files</span></h3>
+      <h3 *ngIf="jobs.length">Drop more videos <span class="dim">or</span> <span class="hl">browse files</span></h3>
+      <p>Select multiple files at once — MP4, MOV, MKV · up to 15 GB each · uploads run in parallel<span *ngIf="hasActiveUploads()"> · new files join the running queue</span></p>
+    </div>
+  </div>
+
+  <!-- queue -->
+  <div class="queue-head" *ngIf="jobs.length">
+    <h2>Upload queue</h2>
+    <span class="cnt">{{ jobs.length }} episode{{ jobs.length > 1 ? 's' : '' }} · {{ fmtBytes(aggTotal) }}</span>
+  </div>
+
+  <div class="cards">
+    <div class="card" *ngFor="let job of jobs; trackBy: trackJob" [ngClass]="job.state">
+      <div class="c-main">
+
+        <!-- poster -->
+        <div class="poster">
+          <video *ngIf="job.videoPreviewSafe" [src]="job.videoPreviewSafe" preload="metadata" muted></video>
+          <video *ngIf="!job.videoPreviewSafe && job.sourceDoc?.videoUrl" [src]="job.sourceDoc.videoUrl" preload="metadata" muted></video>
+          <span class="st"><span class="pill" [ngClass]="'pl-' + job.state">
+            <span class="dot" *ngIf="job.state === 'uploading' || job.state === 'finalizing' || job.state === 'queued'"></span>
+            {{ stateLabel(job) }}<ng-container *ngIf="job.state === 'complete'"> ✓</ng-container>
+          </span></span>
+          <span class="dur" *ngIf="job.duration">{{ job.duration }}</span>
+        </div>
+
+        <!-- meta -->
+        <div class="c-meta">
+          <div class="file-row">
+            <mat-icon>videocam</mat-icon>
+            <span class="fn">{{ job.videoFile?.file?.name || (job.editMode ? 'Existing video (unchanged)' : '') }}</span>
+            <span class="fs" *ngIf="job.videoFile">{{ fmtBytes(job.videoFile.file.size) }}</span>
+            <span class="fs" *ngIf="!job.videoFile && job.editMode">{{ job.sourceDoc?.videoSize }}</span>
+            <label class="achip replace" *ngIf="job.editMode && job.state !== 'complete' && job.state !== 'finalizing'">
+              <input type="file" accept="video/*" hidden (change)="replaceVideo(job, $event)">
+              <mat-icon>swap_horiz</mat-icon> Replace video
+            </label>
+          </div>
+
+          <div class="fields">
+            <div class="fld">
+              <input [(ngModel)]="job.title" placeholder="Episode title *" [disabled]="job.state === 'complete'"
+                [class.missing]="started && !job.title.trim() && job.state === 'ready'">
+            </div>
+            <div class="fld">
+              <input [(ngModel)]="job.reftitle" placeholder="Reference title" [disabled]="job.state === 'complete'">
+            </div>
+            <div class="fld full">
+              <input [(ngModel)]="job.description" placeholder="Description — editable while the video uploads" [disabled]="job.state === 'complete'">
+            </div>
+            <div class="fld">
+              <input [(ngModel)]="job.duration" placeholder="Duration (auto-detected)" [disabled]="job.state === 'complete'">
+            </div>
+          </div>
+
+          <div class="attach">
+            <!-- thumbnail -->
+            <label class="achip" [class.has]="job.hasMedia('image')">
+              <input type="file" accept="image/*" hidden (change)="addSidecar(job, 'image', $event)" [disabled]="job.state === 'complete'">
+              <mat-icon>{{ job.hasMedia('image') ? 'check' : 'image' }}</mat-icon>
+              {{ job.hasMedia('image') ? 'Thumbnail' : 'Thumbnail — add' }}
+            </label>
+            <!-- screenshot -->
+            <label class="achip" [class.has]="job.hasMedia('screenshot')">
+              <input type="file" accept="image/*" hidden (change)="addSidecar(job, 'screenshot', $event)" [disabled]="job.state === 'complete'">
+              <mat-icon>{{ job.hasMedia('screenshot') ? 'check' : 'screenshot_monitor' }}</mat-icon>
+              {{ job.hasMedia('screenshot') ? 'Screenshot' : 'Screenshot — add' }}
+            </label>
+            <!-- srt -->
+            <label class="achip" [class.has]="job.hasMedia('srt')">
+              <input type="file" accept=".srt" hidden (change)="addSidecar(job, 'srt', $event)" [disabled]="job.state === 'complete'">
+              <mat-icon>{{ job.hasMedia('srt') ? 'check' : 'subtitles' }}</mat-icon>
+              {{ job.hasMedia('srt') ? 'SRT' : 'SRT — add' }}
+              <mat-icon class="chip-x" *ngIf="job.hasMedia('srt') && job.state !== 'complete' && job.state !== 'finalizing'"
+                (click)="$event.preventDefault(); $event.stopPropagation(); removeSidecar(job, 'srt')">close</mat-icon>
+            </label>
+            <!-- tags -->
+            <span class="achip tag" *ngFor="let tag of job.tags; let i = index" (click)="removeTag(job, i)">
+              {{ mapTaxonomy[tag] }} <mat-icon *ngIf="job.state !== 'complete'">close</mat-icon>
+            </span>
+            <span class="achip" (click)="job.showTags = !job.showTags">
+              <mat-icon>add_circle_outline</mat-icon> Tags
+            </span>
+          </div>
+
+          <div class="tagpanel" *ngIf="job.showTags && job.state !== 'complete'">
+            <input [(ngModel)]="job.tagSearch" placeholder="Search tags…" class="tagsearch">
+            <div class="tagopts">
+              <span class="achip" *ngFor="let t of filteredTaxonomy(job)" (click)="addTag(job, t.id)">
+                <mat-icon>add</mat-icon>{{ t.name }}
+              </span>
+            </div>
+          </div>
+
+          <div class="thumbstrip" *ngIf="job.imagePreviewUrl || job.screenshotPreviewUrl || job.sourceDoc?.imageUrl || job.sourceDoc?.screenshot">
+            <img *ngIf="job.imagePreviewUrl || job.sourceDoc?.imageUrl" [src]="job.imagePreviewUrl || job.sourceDoc?.imageUrl" alt="thumbnail">
+            <img *ngIf="job.screenshotPreviewUrl || job.sourceDoc?.screenshot" [src]="job.screenshotPreviewUrl || job.sourceDoc?.screenshot" alt="screenshot">
+          </div>
+        </div>
+      </div>
+
+      <!-- telemetry -->
+      <div class="tele">
+        <div class="track"><div class="fillbar" [style.width.%]="job.pct"></div></div>
+        <div class="tele-row">
+          <ng-container [ngSwitch]="job.state">
+
+            <ng-container *ngSwitchCase="'ready'">
+              <span class="t-pct dim">0%</span>
+              <span class="t-note" *ngIf="!job.isMetadataOnlyEdit">Waiting to start · {{ fmtBytes(job.videoFile?.file?.size) }}</span>
+              <span class="t-note" *ngIf="job.isMetadataOnlyEdit">Metadata edit — saving applies instantly, no re-upload needed</span>
+              <div class="t-actions">
+                <button class="sbtn cancel" (click)="removeJob(job)"><mat-icon>close</mat-icon> Remove</button>
+              </div>
+            </ng-container>
+
+            <ng-container *ngSwitchCase="'queued'">
+              <span class="t-pct dim">0%</span>
+              <span class="t-note">Queued — starts automatically when a parallel slot frees</span>
+              <div class="t-actions">
+                <button class="sbtn cancel" (click)="removeJob(job)"><mat-icon>close</mat-icon> Remove</button>
+              </div>
+            </ng-container>
+
+            <ng-container *ngSwitchCase="'complete'">
+              <span class="t-pct ok">100%</span>
+              <span class="t-note ok" *ngIf="job.bytesTotal">Uploaded &amp; saved to the library · {{ fmtBytes(job.bytesTotal) }}</span>
+              <span class="t-note ok" *ngIf="!job.bytesTotal">Changes saved to the library</span>
+              <div class="t-actions"><span class="pill pl-complete">{{ job.editMode ? 'Updated ✓' : 'In library ✓' }}</span></div>
+            </ng-container>
+
+            <ng-container *ngSwitchCase="'failed'">
+              <span class="t-pct err">{{ job.pct | number:'1.0-0' }}%</span>
+              <span class="t-note err">{{ job.errorMsg }}</span>
+              <div class="t-actions">
+                <button class="sbtn retry" (click)="retryJob(job)"><mat-icon>refresh</mat-icon> Retry</button>
+                <button class="sbtn cancel" (click)="removeJob(job)"><mat-icon>close</mat-icon> Remove</button>
+              </div>
+            </ng-container>
+
+            <ng-container *ngSwitchDefault>
+              <span class="t-pct">{{ job.pct | number:'1.0-0' }}%</span>
+              <span class="t-kv"><mat-icon>north</mat-icon><b>{{ fmtSpeed(job.speedEma) }} MB/s</b></span>
+              <span class="t-kv"><mat-icon>schedule</mat-icon>ETA&nbsp;<b>{{ fmtEta(job.etaSec) }}</b></span>
+              <span class="t-kv"><b>{{ fmtBytes(job.bytesDone) }}</b>&nbsp;/ {{ fmtBytes(job.bytesTotal) }}</span>
+              <span class="t-note" *ngIf="job.state === 'finalizing'">Saving episode…</span>
+              <div class="t-actions" *ngIf="job.state !== 'finalizing'">
+                <button class="sbtn" (click)="togglePauseJob(job)">
+                  <mat-icon>{{ job.state === 'paused' ? 'play_arrow' : 'pause' }}</mat-icon>
+                  {{ job.state === 'paused' ? 'Resume' : 'Pause' }}
+                </button>
+                <button class="sbtn cancel" (click)="removeJob(job)"><mat-icon>close</mat-icon> Cancel</button>
+              </div>
+            </ng-container>
+
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

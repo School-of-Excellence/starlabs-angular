@@ -261,6 +261,10 @@
             <mat-icon>error</mat-icon>
             Failed: {{ selectedRecord()?.failed?.length || 0 }}
           </mat-chip>
+          <mat-chip class="stat-chip held" *ngIf="heldParticipants.length > 0">
+            <mat-icon>block</mat-icon>
+            On hold: {{ heldParticipants.length }}
+          </mat-chip>
         </div>
 
         <!-- Participants List -->
@@ -284,6 +288,32 @@
           <div *ngIf="filteredParticipants.length === 0" class="no-participants">
             No participants found.
           </div>
+
+          <!-- ═══════ ON DELIVERY HOLD ═══════ -->
+          <ng-container *ngIf="heldParticipants.length > 0">
+            <div class="held-head">
+              <mat-icon>block</mat-icon>
+              <span>On delivery hold — excluded from this send</span>
+              <span class="held-count">{{ heldParticipants.length }}</span>
+            </div>
+            <div class="held-note">
+              These profiles had <strong>deliveryonhold</strong> set, so no message was sent to them and
+              they have no delivery status.
+            </div>
+            <div class="participant-item held-item" *ngFor="let p of filteredHeldParticipants">
+              <div class="participant-info">
+                <span class="participant-name">{{ p.name }}</span>
+                <span class="participant-phone">{{ p.phone || p.email || p.profileid }}</span>
+              </div>
+              <mat-chip class="status-chip-small held">
+                <mat-icon>block</mat-icon>
+                on hold
+              </mat-chip>
+            </div>
+            <div *ngIf="filteredHeldParticipants.length === 0" class="no-participants">
+              No matching profiles on hold.
+            </div>
+          </ng-container>
         </div>
       </div>
     </div>

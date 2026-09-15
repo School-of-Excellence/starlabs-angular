@@ -8,6 +8,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule, MatDrawer } from '@angular/material/sidenav';
+import { NavDrawerService } from './nav-drawer.service';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
@@ -137,6 +138,7 @@ export class AppComponent implements OnInit, OnDestroy {
     private swUpdate: SwUpdate,
     private snackBar: MatSnackBar,
     private titleService: Title,
+    private navDrawer: NavDrawerService,
   ) {
 
     this.router.events.pipe(
@@ -431,6 +433,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.router.events.pipe(filter(event => event instanceof NavigationEnd)).subscribe(() => {
       this.setTitleFromNavLabel();
     });
+    // Screens that hide the toolbar (and so its hamburger) ask for the drawer through this service.
+    this.navDrawer.toggle$.subscribe(() => this.toggleLeftDrawer());
   }
 
   ngOnDestroy(): void {
@@ -663,6 +667,19 @@ export class AppComponent implements OnInit, OnDestroy {
   //   });
   //   this.unsubscribeFunctions.push(unsubscribeNavItems);
   // }
+
+  /**
+   * Screens that take over the whole window hide the toolbar. `.mainscreen` subtracts the toolbar's
+   * height from 100vh, so it must know too — otherwise the page is left with a strip of empty body
+   * below the screen AND an overall scrollbar, because the routed screen is taller than its container.
+   */
+  get showToolbar(): boolean {
+    const url = this.router.url;
+    return !url.includes('/openmeeting')
+        && !url.includes('arenadesigninsights')
+        && !url.includes('/arena/')
+        && !url.includes('group-chat-screen');
+  }
 
   toggleLeftDrawer(): void {
     if (this.leftDrawer) {

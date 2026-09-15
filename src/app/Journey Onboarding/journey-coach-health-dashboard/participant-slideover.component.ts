@@ -141,10 +141,16 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           </div>
         </div>
         <div class="so-head-actions">
-          <button class="so-flag-btn" type="button" *ngIf="data.needsAttention || addressedLocal"
+          <!-- Always rendered (operator directive, 2026-08-26): the *ngIf used to hide this whenever
+               the participant had no Needs-Attention issue, so coaches saw no control at all and
+               could not tell a permission problem from "nothing to do". Disabled + explained instead. -->
+          <button class="so-flag-btn" type="button"
+                  [disabled]="!data.needsAttention && !addressedLocal"
                   [class.is-addressed]="addressedLocal" [attr.aria-pressed]="addressedLocal"
                   aria-label="Mark addressed" (click)="toggleAddressed()"
-                  [matTooltip]="addressedLocal ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
+                  [matTooltip]="addressedLocal ? 'Addressed — click to re-open'
+                    : (data.needsAttention ? 'Mark addressed (clears Needs Attention until a new issue)'
+                                           : 'Nothing to address — this participant has no active issues')">
             <mat-icon>{{ addressedLocal ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
             <span>{{ addressedLocal ? 'Addressed' : 'Mark addressed' }}</span>
           </button>
@@ -175,7 +181,6 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           <h3 class="so-sec-h">Journey</h3>
           <dl class="so-kv">
             <div><dt>Journey</dt><dd>{{ row.journeyname || '—' }}</dd></div>
-            <div><dt>Status</dt><dd>{{ row.journeystatus || '—' }}</dd></div>
             <div><dt>Product</dt><dd class="cap">{{ row.productType || '—' }}</dd></div>
           </dl>
         </section>
@@ -207,6 +212,20 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
                 {{ row.lastcoachdate ? (row.lastcoachdate | date:'mediumDate') : 'Never' }}
                 <span class="so-sub" *ngIf="row.daysSinceCoach != null">({{ row.daysSinceCoach }}d ago)</span>
               </dd>
+            </div>
+            <!-- Last JOURNEY COACH appointment, kept as its own field rather than folded into
+                 Last touch: attended + in the past. Next JC (booked, still ahead) is separate
+                 again — merging the two is what made the old lastjourneycoachdate field wrong. -->
+            <div>
+              <dt>Last journey coach</dt>
+              <dd class="num">
+                <span *ngIf="apptsLoading" class="so-muted">…</span>
+                <ng-container *ngIf="!apptsLoading">{{ jcLast ? (jcLast | date:'mediumDate') : 'Never' }}</ng-container>
+              </dd>
+            </div>
+            <div *ngIf="jcNext">
+              <dt>Next journey coach</dt>
+              <dd class="num">{{ jcNext | date:'mediumDate' }}</dd>
             </div>
             <div><dt>Going quiet</dt><dd>{{ row.goingQuiet ? 'Yes' : 'No' }}</dd></div>
           </dl>
@@ -809,6 +828,11 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-flag-btn:hover { background: rgba(118,118,128,.2); color: var(--so-ink); }
     .so-flag-btn:active { transform: scale(0.96); }
+    /* Disabled = "nothing to address" (see the always-rendered button above): visible but inert,
+       so a coach can tell the control exists and simply does not apply to this participant. */
+    .so-flag-btn:disabled { opacity: .38; cursor: default; }
+    .so-flag-btn:disabled:hover { background: rgba(118,118,128,.12); color: inherit; }
+    .so-flag-btn:disabled:active { transform: none; }
     .so-flag-btn.is-flagged { color: #c25e00; background: rgba(255,149,0,.16); }
     .so-flag-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
 
@@ -998,6 +1022,31 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.data.onMarkAddressed(this.addressedLocal);
   }
 
+  // Last / next journey-coach appointment, derived from the `appointments` this panel ALREADY
+  // reads (loadAppointments) — no profile_data doc fetch. Deliberately split in two: an ATTENDED
+  // past JC is a real contact, a future booking is not. Merging them is exactly what the old
+  // profile_data.lastjourneycoachdate field did, which is why it could report a date that hadn't
+  // happened yet.
+  jcLast: Date | null = null;
+  jcNext: Date | null = null;
+
+  /** Fill jcLast / jcNext from the raw appointment docs. Called by loadAppointments(). */
+  private deriveJourneyCoachDates(rows: any[]): void {
+    const now = Date.now();
+    let last: number | null = null;
+    let next: number | null = null;
+    for (const d of rows) {
+      if (d['journeycoach'] !== true || d['cancelled'] === true) continue;
+      const dt = this.toDate(d['starttime']) ?? this.toDate(d['date']);
+      if (!dt) continue;
+      const ms = dt.getTime();
+      if (d['attended'] === true && ms <= now) { if (last == null || ms > last) last = ms; }
+      else if (ms > now) { if (next == null || ms < next) next = ms; }
+    }
+    this.jcLast = last != null ? new Date(last) : null;
+    this.jcNext = next != null ? new Date(next) : null;
+  }
+
   ngOnInit(): void {
     // Fire every scoped read in parallel; each owns its own loading flag and degrades
     // independently, so a slow/denied section never blocks the rest of the panel.
@@ -1107,6 +1156,7 @@ export class ParticipantSlideoverComponent implements OnInit {
         where('bookedby', '==', doc(this.firestore, 'profile_data', pid)),
       ));
       const rows = snap.docs.map(d => d.data() as any);
+      this.deriveJourneyCoachDates(rows);   // last attended / next booked JC, from these same docs
       // sort by endtime, most recent first
       rows.sort((a, b) => (this.toDate(b['endtime'])?.getTime() ?? 0) - (this.toDate(a['endtime'])?.getTime() ?? 0));
       // Resolve each DISTINCT appointment-type ref once (there are only a handful of types), so we can
@@ -1338,8 +1388,26 @@ export class ParticipantSlideoverComponent implements OnInit {
 
   /** Header flag toggle: prompt for an optional short note, then delegate (parent owns the write). */
   toggleFlag(): void {
-    const note = (window.prompt(this.row.flagged ? 'Remove flag — optional note:' : 'Flag — optional note:', '') ?? '').trim();
+    const wasFlagged = this.row.flagged;
+    const note = (window.prompt(wasFlagged ? 'Remove flag — optional note:' : 'Flag — optional note:', '') ?? '').trim();
     this.data.onToggleFlag(note);
+    // The timeline is one-shot loaded when the panel opens, so an event written after that never
+    // appears until the panel is reopened. The Log composer already prepends optimistically; this
+    // toggle did not, in EITHER direction — so neither "Flagged" nor "Flag removed" showed up live.
+    // The dashboard writes a 'flag' activity event for both (logActivity(..., 'flag', {flagged})),
+    // so mirror it here. `flagged` is the NEW state, which is what activityLabel() reads to choose
+    // between "Flagged" and "Flag removed".
+    this.data.activity = [{
+      type: 'flag' as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note,
+      outcome: null,
+      state: null,
+      flagged: !wasFlagged,
+      dueDate: null,
+      action: null, fromCoachName: null, toCoachName: null,
+    }, ...(this.data.activity ?? [])];
   }
 
   // ---- Log composer (centered dialog over the side sheet) ----

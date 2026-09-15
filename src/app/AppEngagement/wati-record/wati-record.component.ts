@@ -71,6 +71,8 @@ export class WatiRecordComponent implements OnInit {
   showParticipantsPopup = signal<boolean>(false);
   selectedRecord = signal<any>(null);
   participantSearchText = '';
+  heldParticipants: any[] = [];
+  filteredHeldParticipants: any[] = [];
   filteredParticipants: any[] = [];
   allParticipants: any[] = [];
   
@@ -460,6 +462,8 @@ export class WatiRecordComponent implements OnInit {
     this.participantSearchText = '';
     this.filteredParticipants = [];
     this.allParticipants = [];
+    this.heldParticipants = [];
+    this.filteredHeldParticipants = [];
   }
 
   initializeParticipants(record: any) {
@@ -472,9 +476,21 @@ export class WatiRecordComponent implements OnInit {
     }));
 
     this.filteredParticipants = [...this.allParticipants];
+
+    // Profiles excluded by the delivery-hold filter. They are not in `numbers`, so
+    // they cannot appear in the list above — hence a separate section, not a badge.
+    const held: string[] = record.communicationhold || [];
+    this.heldParticipants = held.map((pid: string) => ({
+      profileid: pid,
+      name: this.mapProfile[pid]?.['name'] || 'Unknown',
+      email: this.mapProfile[pid]?.['email'] || '',
+      phone: this.mapProfile[pid]?.['number'] || ''
+    }));
+    this.filteredHeldParticipants = [...this.heldParticipants];
   }
 
   filterParticipants() {
+    this.filterHeldParticipants();
     if (!this.participantSearchText.trim()) {
       this.filteredParticipants = [...this.allParticipants];
       return;
@@ -485,6 +501,16 @@ export class WatiRecordComponent implements OnInit {
       participant.name.toLowerCase().includes(searchTerm) ||
       participant.phone.includes(searchTerm)
     );
+  }
+
+  private filterHeldParticipants() {
+    const term = this.participantSearchText.toLowerCase().trim();
+    this.filteredHeldParticipants = term
+      ? this.heldParticipants.filter(p =>
+          p.name.toLowerCase().includes(term) ||
+          p.email.toLowerCase().includes(term) ||
+          p.phone.includes(term))
+      : [...this.heldParticipants];
   }
 
   getParticipantStatus(phone: string): string {
