@@ -55,7 +55,7 @@
         <!-- Header -->
         <div class="participants-header">
           <h5 class="participants-title">
-            Participants ({{getStageParticipants(selectedChatStage)['tokenlist']?.length || 0}})
+            Participants ({{(getStageParticipants(selectedChatStage)?.['tokenlist'] || [])?.length || 0}})
           </h5>
           <div data-testid="dqmg-act-6" class="select-all-wrapper" (click)="toggleSelectAll()">
             <div class="custom-checkbox" [class.checked]="areAllSelected()">
@@ -68,7 +68,7 @@
         <!-- Participants List -->
         <div class="participants-list">
           <div [attr.data-testid]="'dqmg-act-7-' + i" 
-            *ngFor="let token of getStageParticipants(selectedChatStage)['tokenlist']; let i = index"
+            *ngFor="let token of (getStageParticipants(selectedChatStage)?.['tokenlist'] || []); let i = index"
             class="participant-item"
             (click)="toggleTokenSelection(token)">
             
@@ -97,7 +97,7 @@
 
           <!-- Empty State -->
           <div 
-            *ngIf="!getStageParticipants(selectedChatStage)['tokenlist']?.length"
+            *ngIf="!(getStageParticipants(selectedChatStage)?.['tokenlist'] || [])?.length"
             class="empty-state">
             <i class="bi bi-person-x"></i>
             <p>No participants found for this stage</p>
@@ -111,7 +111,7 @@
         <h4>{{selectedChatStage}} {{selectedChatStageType}}</h4>
       </section>
       <section>
-        <div *ngFor="let token of getStageParticipants(selectedChatStage)['tokenlist']">
+        <div *ngFor="let token of (getStageParticipants(selectedChatStage)?.['tokenlist'] || [])">
           <div>{{mapProfileData[token.profile_id]?.['name']}}</div>
           <div>{{mapProfileData[token.profile_id]?.['email']}}</div>
           <div>{{mapProfileData[token.profile_id]?.['number']}}</div>
