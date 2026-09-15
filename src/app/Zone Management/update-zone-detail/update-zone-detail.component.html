@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="dialog-header">
     <h2 mat-dialog-title>{{ dialogTitle }}</h2>
-    <button mat-icon-button (click)="onCancel()">
+    <button data-testid="uzd-oncancel" mat-icon-button (click)="onCancel()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -12,20 +12,20 @@
     <!-- Zone Name -->
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Zone Name *</mat-label>
-      <input matInput [(ngModel)]="zoneName" placeholder="e.g., Zone A, Main Hall">
+      <input data-testid="uzd-e-g-zone-a-main-hall" matInput [(ngModel)]="zoneName" placeholder="e.g., Zone A, Main Hall">
     </mat-form-field>
 
     <!-- Start Time -->
     <mat-form-field appearance="outline" class="mt-4 full-width">
       <mat-label>Start Time</mat-label>
-      <input matInput type="datetime-local" [(ngModel)]="startTime">
+      <input data-testid="uzd-input" matInput type="datetime-local" [(ngModel)]="startTime">
       <mat-icon matPrefix>schedule</mat-icon>
     </mat-form-field>
 
     <!-- Coordinator -->
     <mat-form-field appearance="outline" class="mt-4 full-width">
       <mat-label>Coordinator</mat-label>
-      <mat-select [(ngModel)]="selectedCoordinators" multiple>
+      <mat-select data-testid="uzd-mat-select" [(ngModel)]="selectedCoordinators" multiple>
         <mat-option *ngFor="let coordinator of data.teammemberlist" [value]="coordinator['profileid']">
           <span style="display:inline-flex;align-items:center;gap:8px;">
             <app-profile-picture [profileId]="coordinator['profileid']" [name]="coordinator['name']" [size]="24"></app-profile-picture>
@@ -38,7 +38,7 @@
     <!-- Mentor -->
     <mat-form-field appearance="outline" class="mt-4 full-width">
       <mat-label>Mentor</mat-label>
-      <mat-select [(ngModel)]="selectedMentors" multiple>
+      <mat-select data-testid="uzd-mat-select-2" [(ngModel)]="selectedMentors" multiple>
         <mat-option *ngFor="let mentor of data.teammemberlist" [value]="mentor['profileid']">
           <span style="display:inline-flex;align-items:center;gap:8px;">
             <app-profile-picture [profileId]="mentor['profileid']" [name]="mentor['name']" [size]="24"></app-profile-picture>
@@ -51,8 +51,8 @@
 
   <!-- Actions -->
   <mat-dialog-actions>
-    <button mat-button (click)="onCancel()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="onSave()">
+    <button data-testid="uzd-oncancel-2" mat-button (click)="onCancel()">Cancel</button>
+    <button data-testid="uzd-onsave" mat-raised-button color="primary" (click)="onSave()">
       {{ saveButtonText }}
     </button>
   </mat-dialog-actions>

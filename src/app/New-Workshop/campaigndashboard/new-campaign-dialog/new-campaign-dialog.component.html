@@ -1,6 +1,6 @@
 <div class="dialog-header">
   <h2>{{ isEdit ? '✏️ Edit Campaign' : '🆕 New Campaign' }}</h2>
-  <button mat-icon-button class="close-btn" (click)="cancel()" aria-label="Close">
+  <button data-testid="ncd-cancel-1" mat-icon-button class="close-btn" (click)="cancel()" aria-label="Close">
     <mat-icon>close</mat-icon>
   </button>
 </div>
@@ -18,7 +18,7 @@
     <div class="field">
       <label class="field-label">Start Date</label>
       <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-        <input matInput [matDatepicker]="startPicker" [(ngModel)]="startDate" placeholder="dd/mm/yyyy" readonly (click)="startPicker.open()" />
+        <input data-testid="ncd-start-picker-2" matInput [matDatepicker]="startPicker" [(ngModel)]="startDate" placeholder="dd/mm/yyyy" readonly (click)="startPicker.open()" />
         <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
         <mat-datepicker #startPicker></mat-datepicker>
       </mat-form-field>
@@ -27,7 +27,7 @@
     <div class="field">
       <label class="field-label">End Date</label>
       <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
-        <input matInput [matDatepicker]="endPicker" [(ngModel)]="endDate" [min]="startDate" placeholder="dd/mm/yyyy" readonly (click)="endPicker.open()" />
+        <input data-testid="ncd-end-picker-3" matInput [matDatepicker]="endPicker" [(ngModel)]="endDate" [min]="startDate" placeholder="dd/mm/yyyy" readonly (click)="endPicker.open()" />
         <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
         <mat-datepicker #endPicker></mat-datepicker>
       </mat-form-field>
@@ -77,7 +77,7 @@
   <label class="field-label">Channels</label>
   <div class="channels-row">
     @for (channel of channelOptions; track channel) {
-      <mat-checkbox [checked]="isChannelSelected(channel)" (change)="toggleChannel(channel)">
+      <mat-checkbox data-testid="ncd-change-toggle-channel-4" [checked]="isChannelSelected(channel)" (change)="toggleChannel(channel)">
         {{ channel }}
       </mat-checkbox>
     }
@@ -89,14 +89,14 @@
     <mat-form-field appearance="outline" class="grow" subscriptSizing="dynamic">
       <textarea matInput rows="1" [(ngModel)]="noteDraft" placeholder="Add note, task, or follow-up item..."></textarea>
     </mat-form-field>
-    <button type="button" class="add-btn" (click)="addNote()" [disabled]="!noteDraft.trim()">+ Add</button>
+    <button data-testid="ncd-add-note-5" type="button" class="add-btn" (click)="addNote()" [disabled]="!noteDraft.trim()">+ Add</button>
   </div>
   @if (manualNotes.length) {
     <mat-chip-set class="notes-chips">
       @for (note of manualNotes; track $index) {
         <mat-chip (removed)="removeNote($index)">
           {{ note }}
-          <button matChipRemove aria-label="Remove note">
+          <button data-testid="ncd-button-6" matChipRemove aria-label="Remove note">
             <mat-icon>cancel</mat-icon>
           </button>
         </mat-chip>
@@ -123,7 +123,7 @@
       <input matInput [(ngModel)]="assetUrl" placeholder="Paste URL (optional)" />
     </mat-form-field>
 
-    <button type="button" class="add-btn" (click)="addAsset()" [disabled]="!canAddAsset">+ Add</button>
+    <button data-testid="ncd-add-asset-7" type="button" class="add-btn" (click)="addAsset()" [disabled]="!canAddAsset">+ Add</button>
   </div>
   @if (campaignAssets.length) {
     <div class="asset-list">
@@ -132,9 +132,9 @@
           <span class="asset-item-type">{{ asset.type }}</span>
           <span class="asset-item-name">{{ asset.name }}</span>
           @if (asset.url) {
-            <a class="asset-item-url" [href]="asset.url" target="_blank" rel="noopener">{{ asset.url }}</a>
+            <a data-testid="ncd-a-8" class="asset-item-url" [href]="asset.url" target="_blank" rel="noopener">{{ asset.url }}</a>
           }
-          <button mat-icon-button (click)="removeAsset($index)" aria-label="Remove asset">
+          <button data-testid="ncd-remove-asset-9" mat-icon-button (click)="removeAsset($index)" aria-label="Remove asset">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -143,7 +143,7 @@
   }
 
   <!-- Save -->
-  <button type="button" class="create-btn" (click)="save()" [disabled]="isSaving || !canSave">
+  <button data-testid="ncd-save-10" type="button" class="create-btn" (click)="save()" [disabled]="isSaving || !canSave">
     @if (isSaving) {
       <mat-spinner diameter="18" class="save-spinner"></mat-spinner>
     }

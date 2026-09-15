@@ -4,20 +4,20 @@
 <!-- <div mat-dialog-content> -->
 
  <mat-form-field  appearance="outline">
-    <input matInput placeholder="Series" [(ngModel)]="seriesName" [disabled]="isDisabled">
+    <input data-testid="ass-inp-001" matInput placeholder="Series" [(ngModel)]="seriesName" [disabled]="isDisabled">
  </mat-form-field>  
  <br>
   <mat-form-field appearance="outline">
     <mat-label>Tier</mat-label>
-    <mat-select [(ngModel)]="selectedtier" multiple [compareWith]="compareFn">
+    <mat-select data-testid="ass-msel-002" [(ngModel)]="selectedtier" multiple [compareWith]="compareFn">
       <mat-option *ngFor="let data of tier" [value]="data.id">
         {{data.tier}}
       </mat-option>
     </mat-select>
   </mat-form-field>
   <br>
-  <button mat-raised-button color="primary" (click)="onedit(data.id)">Submit</button>&nbsp;&nbsp;
-  <button mat-raised-button color="primary" (click)="onClick()" >Close</button>
+  <button data-testid="ass-btn-003" mat-raised-button color="primary" (click)="onedit(data.id)">Submit</button>&nbsp;&nbsp;
+  <button data-testid="ass-btn-004" mat-raised-button color="primary" (click)="onClick()" >Close</button>
 <!-- </div> -->
 </div>
 
@@ -26,8 +26,8 @@
       <div mat-dialog content style="width: 350px;">
           <h3>Are you sure you want to delete?</h3>
   </div>
-      <button mat-raised-button color="primary" (click)="onClick()">Cancel</button>&nbsp;&nbsp;
-      <button mat-raised-button color="primary" mat-dialog-close (click)=" ondelete(data.id)"> Delete </button>
+      <button data-testid="ass-btn-005" mat-raised-button color="primary" (click)="onClick()">Cancel</button>&nbsp;&nbsp;
+      <button data-testid="ass-btn-006" mat-raised-button color="primary" mat-dialog-close (click)=" ondelete(data.id)"> Delete </button>
   </div>
 </div>
 </div>

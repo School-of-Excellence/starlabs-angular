@@ -18,22 +18,22 @@
         <h1 class="dashboard-title">1st Product Initiation</h1>
       </div>
 
-      <div class="status-item not-started" (click)="onBoxClick('allProduct')">
+      <div data-testid="jpid-div-001" class="status-item not-started" (click)="onBoxClick('allProduct')">
         <span class="status-label">Not Started</span>
         <span class="status-count">{{originalData['alljourneynotstarted'].count}}</span>
       </div>
 
-      <div class="status-item seven-days" (click)="onBoxClick('less30Product')">
+      <div data-testid="jpid-div-002" class="status-item seven-days" (click)="onBoxClick('less30Product')">
         <span class="status-label">Less than 30 Days</span>
         <span class="status-count">{{originalData['lessthan30daysjourneynotstarted'].count}}</span>
       </div>
 
-      <div class="status-item thirty-days" (click)="onBoxClick('more30Product')">
+      <div data-testid="jpid-div-003" class="status-item thirty-days" (click)="onBoxClick('more30Product')">
         <span class="status-label">More than 30 Days</span>
         <span class="status-count">{{originalData['morethan30daysjourneynotstarted'].count}}</span>
       </div>
 
-      <div class="status-item this-month" (click)="onBoxClick('productInitiated')">
+      <div data-testid="jpid-div-004" class="status-item this-month" (click)="onBoxClick('productInitiated')">
         <span class="status-label">Initiated This Month</span>
         <span class="status-count">{{originalData['currentjourneyinitiated'].count}}</span>
       </div>
@@ -53,12 +53,12 @@
               <polyline points="12,6 12,12 16,14"></polyline>
             </svg>
           </div>
-          <div class="metric-info" (click)="onBoxClick('onboarded')" style="cursor: pointer;">
+          <div data-testid="jpid-div-005" class="metric-info" (click)="onBoxClick('onboarded')" style="cursor: pointer;">
             <div class="metric-label">Onboarded</div>
             <div class="metric-value">{{originalData['onboarded'].count}}</div>
           </div>
         </div>
-        <div class="metric-dropdown" [matMenuTriggerFor]="onboardedMenu" (click)="$event.stopPropagation()">
+        <div data-testid="jpid-div-006" class="metric-dropdown" [matMenuTriggerFor]="onboardedMenu" (click)="$event.stopPropagation()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6,9 12,15 18,9"></polyline>
           </svg>
@@ -78,7 +78,7 @@
             <div class="metric-value">{{this.awaitingClearedCount + this.initiatedClearedCount}}</div>
           </div>
         </div>
-        <div class="metric-dropdown" [matMenuTriggerFor]="paymentClearedMenu" (click)="$event.stopPropagation()"
+        <div data-testid="jpid-div-007" class="metric-dropdown" [matMenuTriggerFor]="paymentClearedMenu" (click)="$event.stopPropagation()"
           style="cursor: pointer;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6,9 12,15 18,9"></polyline>
@@ -99,7 +99,7 @@
             <div class="metric-value">0</div>
           </div>
         </div>
-        <div class="metric-dropdown" [matMenuTriggerFor]="initiatedMenu" (click)="$event.stopPropagation()"
+        <div data-testid="jpid-div-008" class="metric-dropdown" [matMenuTriggerFor]="initiatedMenu" (click)="$event.stopPropagation()"
           style="cursor: pointer;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6,9 12,15 18,9"></polyline>
@@ -128,19 +128,19 @@
   <div class="second-column">
     <div class="dashboard-container">
       <div class="toggle-buttons">
-        <button class="toggle-btn" [class.active]="selectedView === 'today'" (click)="selectedView = 'today'">Today</button>
-        <button class="toggle-btn" [class.active]="selectedView === 'month'" (click)="selectedView = 'month'">Month</button>
+        <button data-testid="jpid-btn-009" class="toggle-btn" [class.active]="selectedView === 'today'" (click)="selectedView = 'today'">Today</button>
+        <button data-testid="jpid-btn-010" class="toggle-btn" [class.active]="selectedView === 'month'" (click)="selectedView = 'month'">Month</button>
       </div>
     
       <!-- Today View -->
       <ng-container *ngIf="selectedView === 'today'">
       <div class="status-container">
-        <div class="status-row ready" (click)="onBoxClick('readyForInitiation')">
+        <div data-testid="jpid-div-011" class="status-row ready" (click)="onBoxClick('readyForInitiation')">
           <span class="status-text">Ready for Initiation</span>
           <span class="status-badge green">{{this.awaitingClearedCount}}</span>
         </div>
     
-        <div class="status-row not-cleared" (click)="onBoxClick('paymentNotCleared')">
+        <div data-testid="jpid-div-012" class="status-row not-cleared" (click)="onBoxClick('paymentNotCleared')">
           <span class="status-text">Minimum Payment Not Cleared</span>
           <span class="status-badge red">{{this.awaitingPendingCount}}</span>
         </div>
@@ -202,14 +202,14 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <path d="m21 21-4.35-4.35"></path>
               </svg>
-              <input type="text" class="search-input" placeholder="Search by Name, Mobile, Email..." formControlName="search"
+              <input data-testid="jpid-inp-013" type="text" class="search-input" placeholder="Search by Name, Mobile, Email..." formControlName="search"
               (input)="filterTableData(filterForm.value)" />
             </div>
 
             <div *ngIf="currentTableConfig?.filters?.includes('journey')">
               <mat-form-field appearance="outline">
                 <mat-label>Journey</mat-label>
-                <mat-select placeholder="Select Journey" formControlName="journey"
+                <mat-select data-testid="jpid-msel-014" placeholder="Select Journey" formControlName="journey"
                   (selectionChange)="filterTableData(filterForm.value)" multiple>
                   <mat-option *ngFor="let journey of journeyList" [value]="journey">{{ journey }}</mat-option>
                 </mat-select>
@@ -219,14 +219,14 @@
             <div *ngIf="currentTableConfig?.filters?.includes('journey')">
               <mat-form-field appearance="outline">
                 <mat-label>Status</mat-label>
-                <mat-select placeholder="Select Status" formControlName="status"
+                <mat-select data-testid="jpid-msel-015" placeholder="Select Status" formControlName="status"
                   (selectionChange)="filterTableData(filterForm.value)" >
                   <mat-option *ngFor="let status of statusList" [value]="status">{{ status }}</mat-option>
                 </mat-select>
               </mat-form-field>
             </div>
 
-            <button mat-mini-fab color="primary" (click)="refreshFilter()"><mat-icon>refresh</mat-icon></button>
+            <button data-testid="jpid-btn-016" mat-mini-fab color="primary" (click)="refreshFilter()"><mat-icon>refresh</mat-icon></button>
           </div>
         </form>
       </div>
@@ -236,7 +236,7 @@
         <div class="table-header">
           <h2>{{ currentTableConfig?.title }}</h2>
           <div class="table-actions">
-            <button class="export-btn" (click)="exportTableData()">
+            <button data-testid="jpid-btn-017" class="export-btn" (click)="exportTableData()">
               <span>Export</span>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -244,7 +244,7 @@
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
             </button>
-            <button class="close-btn" (click)="closeTable()">×</button>
+            <button data-testid="jpid-btn-018" class="close-btn" (click)="closeTable()">×</button>
           </div>
         </div>
 
@@ -253,7 +253,7 @@
             <thead>
               <tr>
                 <th>S.No</th>
-                <th *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
+                <th data-testid="jpid-th-019" *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
                   [class.sortable]="isSortable(column)" (click)="isSortable(column) && sortTable(column.key)">
                   <span class="th-content">
                     {{ column.header }}
@@ -276,12 +276,12 @@
                   </span>
 
                   <span *ngIf="column.key === 'addnotes'">
-                    <div (click)="addNotes(row)">
+                    <div data-testid="jpid-div-020" (click)="addNotes(row)">
                       <mat-icon class="edit-icon">edit_note</mat-icon>
                     </div>
                   </span>
 
-                  <span *ngIf="column.key === 'prioritystatus'" class="priority-star" (click)="togglePriority(row, $event)">
+                  <span data-testid="jpid-span-021" *ngIf="column.key === 'prioritystatus'" class="priority-star" (click)="togglePriority(row, $event)">
                     <mat-icon [class.active-star]="isPriority(row)">
                       {{ isPriority(row) ? 'star' : 'star_border' }}
                     </mat-icon>
@@ -292,7 +292,7 @@
                     <div class="notes-container">
                       <div *ngIf="row['generalnotes']?.length > 0">
                         <div>
-                          <span (click)="viewNotes(row,column.key)" class="note-text"
+                          <span data-testid="jpid-span-022" (click)="viewNotes(row,column.key)" class="note-text"
                             matTooltip="{{ row['generalnotes'][row['generalnotes'].length - 1].note }}">
                             {{ row['generalnotes'][row['generalnotes'].length - 1].note | slice:0:20 }}...
                           </span>
@@ -304,7 +304,7 @@
                   <span *ngIf="column.key === 'waitingperiod'">{{ formatCellValue(row, column) }} days </span>
 
                   <ng-container *ngIf="column.key === 'products'">
-                    <a class="view-products-link" [matMenuTriggerFor]="productsMenu" (menuOpened)="loadProductsForMenu(row.profileid)"
+                    <a data-testid="jpid-a-023" class="view-products-link" [matMenuTriggerFor]="productsMenu" (menuOpened)="loadProductsForMenu(row.profileid)"
                       [matMenuTriggerData]="{position: 'center'}">
                       View Products
                     </a>
@@ -315,7 +315,7 @@
                     <div class="notes-container">
                       <div *ngIf="row['salenotes'] && row['salenotes'].length > 0">
                         <div>
-                          <span (click)="viewNotes(row,column.key)" class="note-text" matTooltip="{{ row['salenotes'] }}">
+                          <span data-testid="jpid-span-024" (click)="viewNotes(row,column.key)" class="note-text" matTooltip="{{ row['salenotes'] }}">
                             {{ row['salenotes'] | slice:0:40 }}...
                           </span>
                         </div>
@@ -353,32 +353,32 @@
 
         <div class="pagination">
           <!-- First page button -->
-          <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
+          <button data-testid="jpid-btn-025" class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
             </svg>
           </button>
 
           <!-- Previous button -->
-          <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+          <button data-testid="jpid-btn-026" class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
             Previous
           </button>
 
           <!-- Page numbers -->
           <div class="page-numbers">
-            <button *ngFor="let page of getPageNumbers()" class="page-number" [class.active]="page === currentPage"
+            <button data-testid="jpid-btn-027" *ngFor="let page of getPageNumbers()" class="page-number" [class.active]="page === currentPage"
               (click)="goToPage(page)">
               {{ page }}
             </button>
           </div>
 
           <!-- Next button -->
-          <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+          <button data-testid="jpid-btn-028" class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
             Next
           </button>
 
           <!-- Last page button -->
-          <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page">
+          <button data-testid="jpid-btn-029" class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
             </svg>
@@ -387,7 +387,7 @@
 
         <div class="items-per-page">
           <label>Show:</label>
-          <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+          <select data-testid="jpid-sel-030" [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
             <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
           </select>
           <span>entries</span>
@@ -447,7 +447,7 @@
 </mat-menu>
  
   <mat-menu #productsMenu="matMenu" class="products-menu">
-    <div class="products-menu-container" (click)="$event.stopPropagation()">
+    <div data-testid="jpid-div-031" class="products-menu-container" (click)="$event.stopPropagation()">
       <div class="products-menu-header">
         <h3>Journey Support - {{ selectedProfileName }}</h3>
       </div>

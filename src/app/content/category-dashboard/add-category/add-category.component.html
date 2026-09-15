@@ -6,7 +6,7 @@
         <div mat-dialog-content style="width: 250px;height: 150px;">
             <form #myForm="ngForm">
                 <mat-form-field>
-                    <input type="text" placeholder="Category Name" matInput [(ngModel)]="category"
+                    <input data-testid="adc-inp-001" type="text" placeholder="Category Name" matInput [(ngModel)]="category"
                            ngModel
                            name="name"
                            #name="ngModel"
@@ -18,8 +18,8 @@
                 </mat-form-field>
             </form>
             <div mat-dialog-actions class="btn">
-                <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>
-                <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+                <button data-testid="adc-btn-002"  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>
+                <button data-testid="adc-btn-003"  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
         <div mat-dialog-content style="width: 250px;height: 150px;">
             <form #myForm="ngForm">
                 <mat-form-field>
-                    <input type="text" placeholder="Category Name" matInput [(ngModel)]="category"
+                    <input data-testid="adc-inp-004" type="text" placeholder="Category Name" matInput [(ngModel)]="category"
                            ngModel
                            name="name"
                            required
@@ -43,8 +43,8 @@
                 </mat-form-field>
             </form>
             <div mat-dialog-actions class="btn">
-                <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onEdit(data.id,category)">Edit</button>
-                <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+                <button data-testid="adc-btn-005"  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onEdit(data.id,category)">Edit</button>
+                <button data-testid="adc-btn-006"  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
             </div>
         </div>
     </div>
@@ -54,8 +54,8 @@
             <h3>Are you sure you want to delete?</h3>
         </div>
         <div mat-dialog-actions class="btn">
-            <button  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onDelete(data.id)">Delete</button>
-            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+            <button data-testid="adc-btn-007"  mat-raised-button style="margin-right: 10px;" color="primary" (click)="onDelete(data.id)">Delete</button>
+            <button data-testid="adc-btn-008"  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
         </div>
     </div>
     

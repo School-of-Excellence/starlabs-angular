@@ -9,7 +9,7 @@
       <p class="subtitle" *ngIf="view === 'scoreboard'">Coach caseloads</p>
     </div>
     <div class="jchd-header-controls" *ngIf="!loading && !loadError">
-      <mat-button-toggle-group class="view-toggle" [value]="view" (change)="setView($event.value)"
+      <mat-button-toggle-group data-testid="jchd-matbuttontogglegroup-001" class="view-toggle" [value]="view" (change)="setView($event.value)"
         aria-label="Dashboard view">
         <mat-button-toggle value="summary">Summary</mat-button-toggle>
         <mat-button-toggle value="base">Participants</mat-button-toggle>
@@ -18,7 +18,7 @@
 
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
-        <select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
+        <select data-testid="jchd-sel-002" [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
           <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
@@ -72,39 +72,39 @@
       <div class="ios2-filter" [class.is-disabled]="!summaryFilterReady">
         <span class="fb-label"><mat-icon>tune</mat-icon>Filter</span>
         <div class="fb-seg" role="group" aria-label="Lifecycle">
-          <button type="button" [class.on]="shownLifecycle==='all'" (click)="setSumLifecycle('all')">All</button>
-          <button type="button" [class.on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">Active</button>
-          <button type="button" [class.on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">Non-active</button>
-          <button type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
-          <button type="button" *ngIf="summary.noStatus || shownLifecycle==='nostatus'"
+          <button data-testid="jchd-btn-003" type="button" [class.on]="shownLifecycle==='all'" (click)="setSumLifecycle('all')">All</button>
+          <button data-testid="jchd-btn-004" type="button" [class.on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">Active</button>
+          <button data-testid="jchd-btn-005" type="button" [class.on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">Non-active</button>
+          <button data-testid="jchd-btn-006" type="button" [class.on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">Discontinued</button>
+          <button data-testid="jchd-btn-007" type="button" *ngIf="summary.noStatus || shownLifecycle==='nostatus'"
                   [class.on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')">No status</button>
         </div>
         <div class="fb-journey">
-          <button type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
+          <button data-testid="jchd-btn-008" type="button" class="fb-jbtn" [class.on]="sumJourneys().size > 0" (click)="toggleJourneyMenu()">
             {{ summaryJourneyLabel }}<mat-icon class="fb-jchev">expand_more</mat-icon>
           </button>
-          <div class="fb-menu-backdrop" *ngIf="journeyMenuOpen" (click)="closeJourneyMenu()"></div>
+          <div data-testid="jchd-div-009" class="fb-menu-backdrop" *ngIf="journeyMenuOpen" (click)="closeJourneyMenu()"></div>
           <div class="fb-menu" *ngIf="journeyMenuOpen">
-            <button type="button" class="fb-mitem" [class.on]="sumJourneys().size === 0" (click)="setSumJourney(null)">
+            <button data-testid="jchd-btn-010" type="button" class="fb-mitem" [class.on]="sumJourneys().size === 0" (click)="setSumJourney(null)">
               <mat-icon class="fb-mcheck">{{ sumJourneys().size === 0 ? 'check' : '' }}</mat-icon>
               <span class="fb-mname">All journeys</span>
             </button>
-            <button type="button" class="fb-mitem" *ngFor="let j of journeyView()" [class.on]="isSummaryJourneyOn(j)" (click)="setSumJourney(j)">
+            <button data-testid="jchd-btn-011" type="button" class="fb-mitem" *ngFor="let j of journeyView()" [class.on]="isSummaryJourneyOn(j)" (click)="setSumJourney(j)">
               <mat-icon class="fb-mcheck">{{ isSummaryJourneyOn(j) ? 'check' : '' }}</mat-icon>
               <mat-icon *ngIf="j.group" class="fb-mgico">folder</mat-icon>
               <span class="fb-mname">{{ j.name }}</span><span class="fb-mcount">{{ j.count }}</span>
             </button>
-            <button type="button" class="fb-mdone" (click)="closeJourneyMenu()">Done</button>
+            <button data-testid="jchd-btn-012" type="button" class="fb-mdone" (click)="closeJourneyMenu()">Done</button>
           </div>
         </div>
-        <button type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
+        <button data-testid="jchd-btn-013" type="button" class="fb-clear" *ngIf="summaryFilterActive" (click)="clearSummaryFilter()"><mat-icon>close</mat-icon>Clear</button>
         <span class="fb-count" *ngIf="summaryFilterReady">{{ summaryShownCount }} of {{ summaryScopeTotal }}</span>
         <span class="fb-hint" *ngIf="!summaryFilterReady">Loading base…</span>
       </div>
 
       <!-- Row 1: Needs attention (who needs you) + Your base (lifecycle split) -->
       <div class="ios2-top">
-        <button type="button" class="ios2-card ios2-hero" (click)="goToParticipantsWithLever('needsAttention')">
+        <button data-testid="jchd-btn-014" type="button" class="ios2-card ios2-hero" (click)="goToParticipantsWithLever('needsAttention')">
           <div class="ios2-head">
             <span class="ios2-app ap-red"><mat-icon>priority_high</mat-icon></span>
             <span class="ios2-title">Needs attention</span>
@@ -136,19 +136,19 @@
             <span class="sb-seg sb-nostatus" *ngIf="summary.noStatus" [style.width.%]="summary.noStatus / summary.total * 100"></span>
           </div>
           <div class="sb-segs">
-            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">
+            <button data-testid="jchd-btn-015" type="button" class="sb-tile" [class.is-on]="shownLifecycle==='active'" (click)="setSumLifecycle('active')">
               <span class="sb-num">{{ summary.active }}</span>
               <span class="sb-label"><i class="sb-dot dot-active"></i>Active</span>
             </button>
-            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">
+            <button data-testid="jchd-btn-016" type="button" class="sb-tile" [class.is-on]="shownLifecycle==='nonactive'" (click)="setSumLifecycle('nonactive')">
               <span class="sb-num">{{ summary.nonActive }}</span>
               <span class="sb-label"><i class="sb-dot dot-nonactive"></i>Non-active</span>
             </button>
-            <button type="button" class="sb-tile" [class.is-on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">
+            <button data-testid="jchd-btn-017" type="button" class="sb-tile" [class.is-on]="shownLifecycle==='discontinued'" (click)="setSumLifecycle('discontinued')">
               <span class="sb-num">{{ summary.discontinued }}</span>
               <span class="sb-label"><i class="sb-dot dot-disc"></i>Discontinued</span>
             </button>
-            <button type="button" class="sb-tile" *ngIf="summary.noStatus" [class.is-on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')"
+            <button data-testid="jchd-btn-018" type="button" class="sb-tile" *ngIf="summary.noStatus" [class.is-on]="shownLifecycle==='nostatus'" (click)="setSumLifecycle('nostatus')"
                     matTooltip="Participants whose metadata customerstatus is blank or unrecognised">
               <span class="sb-num">{{ summary.noStatus }}</span>
               <span class="sb-label"><i class="sb-dot dot-nostatus"></i>No status</span>
@@ -160,23 +160,23 @@
       <!-- Row 2: KPI tiles. Unassigned was removed (operator directive, 2026-08-26) — the
            coach selector still offers the Unassigned scope, with its own live count. -->
       <div class="ios2-tiles">
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
+        <button data-testid="jchd-btn-019" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
           <span class="ios2-n">{{ summary.goingQuiet }}</span><span class="ios2-l">Going quiet</span>
         </button>
-        <button type="button" class="ios2-tile" (click)="goToPaymentsLocked()">
+        <button data-testid="jchd-btn-020" type="button" class="ios2-tile" (click)="goToPaymentsLocked()">
           <span class="ios2-app ap-red"><mat-icon>lock</mat-icon></span>
           <span class="ios2-n">{{ summary.paymentsLocked }}</span><span class="ios2-l">Payments locked</span>
         </button>
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('renewalWindow')">
+        <button data-testid="jchd-btn-021" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('renewalWindow')">
           <span class="ios2-app ap-blue"><mat-icon>autorenew</mat-icon></span>
           <span class="ios2-n">{{ summary.renewalsSoon }}</span><span class="ios2-l">Renewing 90d</span>
         </button>
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('tickets')">
+        <button data-testid="jchd-btn-022" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('tickets')">
           <span class="ios2-app ap-teal"><mat-icon>confirmation_number</mat-icon></span>
           <span class="ios2-n">{{ summary.withOpenTickets }}</span><span class="ios2-l">People with tickets</span>
         </button>
-        <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('flagged')">
+        <button data-testid="jchd-btn-023" type="button" class="ios2-tile" (click)="goToParticipantsWithLever('flagged')">
           <span class="ios2-app ap-pink"><mat-icon>flag</mat-icon></span>
           <span class="ios2-n">{{ flaggedCount() }}</span><span class="ios2-l">Flagged</span>
         </button>
@@ -191,19 +191,19 @@
           <span class="fb-hint" *ngIf="!jcPipeline().ready">loading…</span>
         </div>
         <div class="jcp-row">
-          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='today'" (click)="setJcWindow('today')"
+          <button data-testid="jchd-btn-024" type="button" class="jcp-tile" [class.is-on]="jcWindow()==='today'" (click)="setJcWindow('today')"
                   matTooltip="Journey coaches completed since midnight">
             <span class="jcp-num">{{ jcPipeline().today }}</span>
             <span class="jcp-label">JC done today</span>
             <span class="jcp-range">{{ jcRange('today').from | date:'d MMM' }}</span>
           </button>
-          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='week'" (click)="setJcWindow('week')"
+          <button data-testid="jchd-btn-025" type="button" class="jcp-tile" [class.is-on]="jcWindow()==='week'" (click)="setJcWindow('week')"
                   matTooltip="Completed in the last 7 days">
             <span class="jcp-num">{{ jcPipeline().week }}</span>
             <span class="jcp-label">JC done last week</span>
             <span class="jcp-range">{{ jcRange('week').from | date:'d MMM' }} – {{ jcRange('week').to | date:'d MMM' }}</span>
           </button>
-          <button type="button" class="jcp-tile" [class.is-on]="jcWindow()==='month'" (click)="setJcWindow('month')"
+          <button data-testid="jchd-btn-026" type="button" class="jcp-tile" [class.is-on]="jcWindow()==='month'" (click)="setJcWindow('month')"
                   matTooltip="Completed in the last 30 days">
             <span class="jcp-num">{{ jcPipeline().month }}</span>
             <span class="jcp-label">JC done last month</span>
@@ -213,7 +213,7 @@
 
         <!-- The individual sessions behind the selected tile: WHO it was with, and WHEN. -->
         <div class="jcp-list" *ngIf="jcDoneList().length; else noJc">
-          <div class="jcp-item" *ngFor="let j of jcDoneList()" (click)="openJcParticipant(j.profileid)"
+          <div data-testid="jchd-div-027" class="jcp-item" *ngFor="let j of jcDoneList()" (click)="openJcParticipant(j.profileid)"
                matTooltip="Open participant">
             <span class="ios-avatar av-xs" [ngClass]="avatarClass(j.profileid)">{{ initials(j.participant) }}</span>
             <span class="jcp-who">
@@ -255,13 +255,13 @@
           <div class="ios2-head">
             <span class="ios2-app ap-teal"><mat-icon>hub</mat-icon></span>
             <span class="ios2-title">By journey</span>
-            <button type="button" class="jm-manage" (click)="toggleGroupPanel()">
+            <button data-testid="jchd-btn-028" type="button" class="jm-manage" (click)="toggleGroupPanel()">
               <mat-icon>{{ groupPanelOpen ? 'check' : 'create_new_folder' }}</mat-icon>{{ groupPanelOpen ? 'Done' : 'Group journeys' }}
             </button>
           </div>
 
           <div class="jm-chips" *ngIf="journeyView().length; else noJourneys">
-            <button type="button" class="jm-chip" *ngFor="let j of journeyView()" [class.is-group]="j.group"
+            <button data-testid="jchd-btn-029" type="button" class="jm-chip" *ngFor="let j of journeyView()" [class.is-group]="j.group"
                     [class.is-on]="isSummaryJourneyOn(j)"
                     (click)="setSumJourney(j)">
               <mat-icon *ngIf="j.group" class="jm-gicon">folder</mat-icon>
@@ -275,23 +275,23 @@
             <div class="jm-grow" *ngFor="let g of journeyGroups()">
               <span class="jm-gname"><mat-icon>folder</mat-icon>{{ g.name }} <em>{{ g.journeys.length }} journeys</em></span>
               <span class="jm-gactions">
-                <button type="button" (click)="editGroup(g)" matTooltip="Edit"><mat-icon>edit</mat-icon></button>
-                <button type="button" (click)="deleteGroup(g)" matTooltip="Delete"><mat-icon>delete_outline</mat-icon></button>
+                <button data-testid="jchd-btn-030" type="button" (click)="editGroup(g)" matTooltip="Edit"><mat-icon>edit</mat-icon></button>
+                <button data-testid="jchd-btn-031" type="button" (click)="deleteGroup(g)" matTooltip="Delete"><mat-icon>delete_outline</mat-icon></button>
               </span>
             </div>
             <div class="jm-editor">
-              <input class="jm-input" type="text" [(ngModel)]="newGroupName"
+              <input data-testid="jchd-inp-032" class="jm-input" type="text" [(ngModel)]="newGroupName"
                      [placeholder]="editingGroupId ? 'Group name' : 'New group name (e.g. All B!G)'" />
               <div class="jm-pick">
                 <label class="jm-pickitem" *ngFor="let name of pickerJourneys()" [class.locked]="groupOfJourney(name)">
-                  <input type="checkbox" [checked]="isJourneyPicked(name)" [disabled]="!!groupOfJourney(name)" (change)="toggleJourneyInNewGroup(name)" />
+                  <input data-testid="jchd-inp-033" type="checkbox" [checked]="isJourneyPicked(name)" [disabled]="!!groupOfJourney(name)" (change)="toggleJourneyInNewGroup(name)" />
                   <span class="jm-pickname">{{ name }}</span>
                   <em *ngIf="groupOfJourney(name) as og">in {{ og.name }}</em>
                 </label>
               </div>
               <div class="jm-editor-actions">
-                <button type="button" class="jm-save" (click)="saveGroup()">{{ editingGroupId ? 'Update group' : 'Create group' }}</button>
-                <button type="button" class="jm-cancel" *ngIf="editingGroupId" (click)="startNewGroup()">Cancel edit</button>
+                <button data-testid="jchd-btn-034" type="button" class="jm-save" (click)="saveGroup()">{{ editingGroupId ? 'Update group' : 'Create group' }}</button>
+                <button data-testid="jchd-btn-035" type="button" class="jm-cancel" *ngIf="editingGroupId" (click)="startNewGroup()">Cancel edit</button>
               </div>
             </div>
           </div>
@@ -309,7 +309,7 @@
     <div class="jchd-fallback-banner" *ngIf="coachFallback && selectedCoachId === ALL && !coachFallbackDismissed">
       <mat-icon>info</mat-icon>
       <span>Showing all participants — we couldn't match your coach profile. Pick your name above to see just your base.</span>
-      <button mat-icon-button class="jchd-fallback-dismiss" matTooltip="Dismiss"
+      <button data-testid="jchd-btn-036" mat-icon-button class="jchd-fallback-dismiss" matTooltip="Dismiss"
         aria-label="Dismiss notice" (click)="coachFallbackDismissed = true">
         <mat-icon>close</mat-icon>
       </button>
@@ -320,12 +320,12 @@
     <section class="jchd-tray" *ngIf="(selectedCoachId === UNASSIGNED || selectedCoachId === ALL) && selectedCount > 0">
       <div class="jchd-tray-head">
         <strong>{{ selectedCount }}</strong> selected
-        <button type="button" class="jchd-tray-clear" (click)="clearSelection()">Clear all</button>
+        <button data-testid="jchd-btn-037" type="button" class="jchd-tray-clear" (click)="clearSelection()">Clear all</button>
       </div>
       <div class="jchd-tray-chips">
         <span class="jchd-chip" *ngFor="let s of selectedTray">
           <span class="jchd-chip-name">{{ s.name }}</span>
-          <button type="button" class="jchd-chip-x" aria-label="Remove from selection"
+          <button data-testid="jchd-btn-038" type="button" class="jchd-chip-x" aria-label="Remove from selection"
                   (click)="deselect(s.id)">✕</button>
         </span>
       </div>
@@ -338,14 +338,14 @@
       <span class="assign-text" *ngIf="selectedCoachId === ALL"><strong>{{ selectedCount }}</strong> selected · assign or reassign to a coach</span>
       <span class="jchd-assign-spacer"></span>
       <label class="jchd-assign-pick">
-        <select class="jchd-assign-select" [(ngModel)]="assignTargetCoachId" aria-label="Assign to coach">
+        <select data-testid="jchd-sel-039" class="jchd-assign-select" [(ngModel)]="assignTargetCoachId" aria-label="Assign to coach">
           <option value="">Assign to coach</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
         </select>
         <svg class="jchd-assign-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
       </label>
-      <button type="button" class="jchd-btn-primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
+      <button data-testid="jchd-btn-040" type="button" class="jchd-btn-primary" [disabled]="!assignTargetCoachId || selectedCount === 0 || assigning"
         (click)="assignSelected()">
         <mat-icon>how_to_reg</mat-icon> Assign {{ selectedCount }}
       </button>
@@ -354,35 +354,35 @@
 
     <!-- Compact iOS summary strip — tap a card to apply the matching lever filter. -->
     <section class="ios-mini-summary" *ngIf="selectedCoachId !== UNASSIGNED">
-      <button type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
+      <button data-testid="jchd-btn-041" type="button" class="ios-mini-card" [class.is-on]="activeLever==='needsAttention'"
         (click)="setLever(activeLever==='needsAttention' ? 'all' : 'needsAttention')"
         matTooltip="Going quiet · lapsed · not started · renewing · open tickets">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Needs Attention</span>
         <span class="mc-num">{{ needsAttentionCount }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
+      <button data-testid="jchd-btn-042" type="button" class="ios-mini-card" [class.is-on]="kpiActive('goingQuiet')" (click)="kpi('goingQuiet')"
         matTooltip="No coach contact in {{ QUIET_DAYS }}+ days (touchpoints + appointments, base-wide)">
         <span class="mc-label"><span class="mc-dot dot-orange"></span>Going quiet<span class="mc-scope" *ngIf="pagedMode && !contactDataLoaded()"
           matTooltip="Loading activity data — count finalizes in a moment."> loading…</span></span>
         <span class="mc-num">{{ summary.goingQuiet }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
+      <button data-testid="jchd-btn-043" type="button" class="ios-mini-card" [class.is-on]="financeFilters.includes('locked')"
         (click)="financeFilters.includes('locked') ? clearFilters() : goToPaymentsLocked()"
         matTooltip="Participants with locked payments">
         <span class="mc-label"><span class="mc-dot dot-red"></span>Payments locked</span>
         <span class="mc-num">{{ summary.paymentsLocked }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
+      <button data-testid="jchd-btn-044" type="button" class="ios-mini-card" [class.is-on]="kpiActive('renewalsSoon')" (click)="kpi('renewalsSoon')"
         matTooltip="Active subscription ending within the next 90 days">
         <span class="mc-label"><span class="mc-dot dot-blue"></span>Renewing 90d</span>
         <span class="mc-num">{{ summary.renewalsSoon }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
+      <button data-testid="jchd-btn-045" type="button" class="ios-mini-card" [class.is-on]="kpiActive('tickets')" (click)="kpi('tickets')"
               matTooltip="Participants with at least one OPEN support ticket (not a ticket total)">
         <span class="mc-label"><span class="mc-dot dot-teal"></span>People with tickets</span>
         <span class="mc-num">{{ summary.withOpenTickets }}</span>
       </button>
-      <button type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
+      <button data-testid="jchd-btn-046" type="button" class="ios-mini-card" [class.is-on]="kpiActive('flagged')" (click)="kpi('flagged')"
         matTooltip="Flagged participants (visible to all coaches)">
         <span class="mc-label"><span class="mc-dot dot-pink"></span>Flagged</span>
         <span class="mc-num">{{ flaggedCount() }}</span>
@@ -395,14 +395,14 @@
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
         </svg>
-        <input #searchInput type="text" [(ngModel)]="search" (ngModelChange)="applyFilters()"
+        <input data-testid="jchd-inp-047" #searchInput type="text" [(ngModel)]="search" (ngModelChange)="applyFilters()"
           placeholder="Search name or number" aria-label="Search name or number" />
       </label>
 
       <div class="jchd-filter-pills">
         <label class="jchd-pill jchd-pill-select">
           <span class="jchd-pill-label">Journey</span>
-          <select [(ngModel)]="journeyFilter" (ngModelChange)="onTopJourneyChange()" aria-label="Journey">
+          <select data-testid="jchd-sel-048" [(ngModel)]="journeyFilter" (ngModelChange)="onTopJourneyChange()" aria-label="Journey">
             <option value="">All</option>
             <option *ngFor="let j of journeyOptions" [value]="j">{{ j }}</option>
           </select>
@@ -412,7 +412,7 @@
 
         <label class="jchd-pill jchd-pill-select">
           <span class="jchd-pill-label">Status</span>
-          <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" aria-label="Status">
+          <select data-testid="jchd-sel-049" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()" aria-label="Status">
             <!-- Options come from the data (rebuildStatusOptions), not a hardcoded list, so every
                  customerstatus actually in use is selectable and the wording matches what is stored. -->
             <option value="">All</option>
@@ -422,17 +422,17 @@
             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
         </label>
 
-        <button type="button" class="jchd-pill" [class.is-on]="filtersExpanded || hasActiveFilters"
+        <button data-testid="jchd-btn-050" type="button" class="jchd-pill" [class.is-on]="filtersExpanded || hasActiveFilters"
           (click)="filtersExpanded = !filtersExpanded"
           matTooltip="Journey, priority, health, finance, renewal & quiet filters">
           <mat-icon class="jchd-pill-ic">tune</mat-icon> Filters
         </button>
 
-        <button type="button" class="jchd-pill" (click)="exportCsv()" matTooltip="Export the current list as CSV">
+        <button data-testid="jchd-btn-051" type="button" class="jchd-pill" (click)="exportCsv()" matTooltip="Export the current list as CSV">
           <mat-icon class="jchd-pill-ic">download</mat-icon> Export
         </button>
 
-        <button type="button" class="jchd-pill jchd-pill-clear" *ngIf="hasActiveFilters" (click)="clearFilters()"
+        <button data-testid="jchd-btn-052" type="button" class="jchd-pill jchd-pill-clear" *ngIf="hasActiveFilters" (click)="clearFilters()"
           matTooltip="Clear active filters">Clear</button>
       </div>
     </section>
@@ -443,8 +443,8 @@
         <div class="fp-field fp-journey-field">
           <span class="fp-field-label">Journey</span>
           <div class="fp-journey-chips">
-            <button type="button" class="fp-jchip" [class.is-on]="journeyGroupFilter.length === 0" (click)="toggleBaseJourney(null)">All</button>
-            <button type="button" class="fp-jchip" *ngFor="let j of journeyView()" [class.is-group]="j.group" [class.is-on]="baseJourneyOn(j)"
+            <button data-testid="jchd-btn-053" type="button" class="fp-jchip" [class.is-on]="journeyGroupFilter.length === 0" (click)="toggleBaseJourney(null)">All</button>
+            <button data-testid="jchd-btn-054" type="button" class="fp-jchip" *ngFor="let j of journeyView()" [class.is-group]="j.group" [class.is-on]="baseJourneyOn(j)"
               (click)="toggleBaseJourney(j)">
               <mat-icon *ngIf="j.group" class="fp-jgico">folder</mat-icon>{{ j.name }}<span class="fp-jcount">{{ j.count }}</span>
             </button>
@@ -454,7 +454,7 @@
         <label class="fp-field">
           <span class="fp-field-label">Priority band</span>
           <mat-form-field appearance="outline" class="fp-mat">
-            <mat-select [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple
+            <mat-select data-testid="jchd-msel-055" [(ngModel)]="bandFilters" (ngModelChange)="applyFilters()" multiple
               panelClass="jchd-fp-panel" placeholder="Any">
               <mat-option value="High">High</mat-option>
               <mat-option value="Medium">Medium</mat-option>
@@ -466,7 +466,7 @@
         <label class="fp-field">
           <span class="fp-field-label">Coach health</span>
           <mat-form-field appearance="outline" class="fp-mat">
-            <mat-select [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple
+            <mat-select data-testid="jchd-msel-056" [(ngModel)]="healthFilters" (ngModelChange)="applyFilters()" multiple
               panelClass="jchd-fp-panel" placeholder="Any">
               <mat-option *ngFor="let h of healthFilterOptions" [value]="h">{{ healthFilterLabel(h) }}</mat-option>
             </mat-select>
@@ -476,7 +476,7 @@
         <label class="fp-field" *ngIf="financeOptions.length">
           <span class="fp-field-label">Financial status</span>
           <mat-form-field appearance="outline" class="fp-mat">
-            <mat-select [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple
+            <mat-select data-testid="jchd-msel-057" [(ngModel)]="financeFilters" (ngModelChange)="applyFilters()" multiple
               panelClass="jchd-fp-panel" placeholder="Any">
               <mat-option *ngFor="let f of financeOptions" [value]="f">{{ f }}</mat-option>
             </mat-select>
@@ -486,7 +486,7 @@
 
       <div class="fp-toggles">
         <label class="fp-check" matTooltip="Subscription ends within {{ RENEWAL_DAYS }} days">
-          <input type="checkbox" [(ngModel)]="renewalWindowOnly" (ngModelChange)="applyFilters()" />
+          <input data-testid="jchd-inp-058" type="checkbox" [(ngModel)]="renewalWindowOnly" (ngModelChange)="applyFilters()" />
           <span class="fp-check-box" aria-hidden="true">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
@@ -494,7 +494,7 @@
           <span class="fp-check-label">Renewal window</span>
         </label>
         <label class="fp-check" matTooltip="No coach contact in {{ QUIET_DAYS }}+ days">
-          <input type="checkbox" [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()" />
+          <input data-testid="jchd-inp-059" type="checkbox" [(ngModel)]="goingQuietOnly" (ngModelChange)="applyFilters()" />
           <span class="fp-check-box" aria-hidden="true">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
@@ -502,7 +502,7 @@
           <span class="fp-check-label">Going quiet</span>
         </label>
         <label class="fp-check">
-          <input type="checkbox" [(ngModel)]="noEventRequestOnly" (ngModelChange)="applyFilters()" />
+          <input data-testid="jchd-inp-060" type="checkbox" [(ngModel)]="noEventRequestOnly" (ngModelChange)="applyFilters()" />
           <span class="fp-check-box" aria-hidden="true">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
@@ -510,7 +510,7 @@
           <span class="fp-check-label">No recent event request</span>
         </label>
         <span class="fp-spacer"></span>
-        <button type="button" class="jchd-pill jchd-pill-clear fp-clear"
+        <button data-testid="jchd-btn-061" type="button" class="jchd-pill jchd-pill-clear fp-clear"
           [disabled]="!hasActiveFilters" (click)="clearFilters()">
           <mat-icon class="jchd-pill-ic">filter_alt_off</mat-icon> Clear filters
         </button>
@@ -642,10 +642,10 @@
         <!-- Unassigned (assignment) view only: selection checkbox + per-row assign action. -->
         <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>
-            <mat-checkbox [checked]="allVisibleSelected" (change)="toggleSelectAll()"></mat-checkbox>
+            <mat-checkbox data-testid="jchd-matcheckbox-062" [checked]="allVisibleSelected" (change)="toggleSelectAll()"></mat-checkbox>
           </th>
           <td mat-cell *matCellDef="let r">
-            <mat-checkbox [checked]="isSelected(r.profileid)"
+            <mat-checkbox data-testid="jchd-matcheckbox-063" [checked]="isSelected(r.profileid)"
               (click)="$event.stopPropagation()" (change)="toggleSelect(r.profileid, r.name)"></mat-checkbox>
           </td>
         </ng-container>
@@ -653,11 +653,11 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
-            <span class="row-actions" (click)="$event.stopPropagation()">
+            <span data-testid="jchd-span-064" class="row-actions" (click)="$event.stopPropagation()">
               <!-- Always rendered (operator directive, 2026-08-26): previously hidden when the row had
                    no Needs-Attention issue, which read as a missing/broken control. Now it is always
                    visible and simply disabled when there is nothing to address, with a tooltip saying so. -->
-              <button mat-icon-button (click)="markAddressed(r, !isAddressed(r))"
+              <button data-testid="jchd-btn-065" mat-icon-button (click)="markAddressed(r, !isAddressed(r))"
                       [disabled]="!hasAddressableIssue(r) && !isAddressed(r)"
                       [class.is-addressed]="isAddressed(r)"
                       [matTooltip]="isAddressed(r) ? 'Addressed — click to re-open'
@@ -665,19 +665,19 @@
                                                   : 'Nothing to address — this participant has no active issues')">
                 <mat-icon>{{ isAddressed(r) ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
               </button>
-              <button mat-icon-button [matMenuTriggerFor]="assignMenu" matTooltip="Assign coach">
+              <button data-testid="jchd-btn-066" mat-icon-button [matMenuTriggerFor]="assignMenu" matTooltip="Assign coach">
                 <mat-icon>person_add</mat-icon>
               </button>
-              <button mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
+              <button data-testid="jchd-btn-067" mat-icon-button [routerLink]="['/userprofile', r.profileid]" matTooltip="Open profile">
                 <mat-icon>open_in_new</mat-icon>
               </button>
             </span>
             <mat-menu #assignMenu="matMenu">
-              <button mat-menu-item *ngFor="let c of coaches" (click)="assignCoachToRow(r, c.id)">
+              <button data-testid="jchd-btn-068" mat-menu-item *ngFor="let c of coaches" (click)="assignCoachToRow(r, c.id)">
                 <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
                 <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
               </button>
-              <button mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
+              <button data-testid="jchd-btn-069" mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
                       (click)="unassignCoach(r)">
                 <mat-icon>person_remove</mat-icon>
                 <span>Unassign (remove coach)</span>
@@ -689,7 +689,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
         <!-- row tap opens the slide-over (where the dropped intel now lives); the UNASSIGNED
              assignment view uses checkboxes instead, so its rows don't open the panel. -->
-        <tr mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
+        <tr data-testid="jchd-tr-070" mat-row *matRowDef="let row; columns: displayedColumns; let i = index"
             class="jchd-data-row ios-row-t" [ngClass]="bandClass(row.priorityBand)"
             [style.--i]="i"
             [class.no-tap]="selectedCoachId === UNASSIGNED"
@@ -724,14 +724,14 @@
 
       <!-- Mockup #panel-coaches: one .coach-card per coach, all stats from real loaded data. -->
       <div class="coach-list">
-        <div class="coach-card" *ngFor="let card of coachCards(); trackBy: trackByCoachId"
+        <div data-testid="jchd-div-071" class="coach-card" *ngFor="let card of coachCards(); trackBy: trackByCoachId"
              [class.open]="expandedCoachIds.has(card.coachId)"
              (click)="toggleCoachCard(card.coachId)">
           <div class="coach-top">
             <span class="ios-avatar" [ngClass]="avatarClass(card.coachId)">{{ initials(card.coachName) }}</span>
             <div class="coach-id">
               <!-- doc item 9: the NAME opens this coach's participant list -->
-              <button type="button" class="coach-name coach-name-btn"
+              <button data-testid="jchd-btn-072" type="button" class="coach-name coach-name-btn"
                       (click)="$event.stopPropagation(); openCoachBase(card.coachId)"
                       matTooltip="Open this coach's participants">{{ card.coachName }}</button>
               <div class="coach-sub">
@@ -743,19 +743,19 @@
 
           <!-- Every number is clickable: it opens the card and lists exactly those people below. -->
           <div class="stat-row">
-            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'caseload')"
+            <button data-testid="jchd-btn-073" type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'caseload')"
                     (click)="drillCoach(card.coachId,'caseload',$event)">
               <div class="v">{{ card.caseload }}</div><div class="k">Caseload</div></button>
-            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'active')"
+            <button data-testid="jchd-btn-074" type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'active')"
                     (click)="drillCoach(card.coachId,'active',$event)">
               <div class="v">{{ card.activeCaseload }}</div><div class="k">Active</div></button>
-            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'needToday')"
+            <button data-testid="jchd-btn-075" type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'needToday')"
                     (click)="drillCoach(card.coachId,'needToday',$event)">
               <div class="v red">{{ card.needToday }}</div><div class="k">Need today</div></button>
-            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'goingQuiet')"
+            <button data-testid="jchd-btn-076" type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'goingQuiet')"
                     (click)="drillCoach(card.coachId,'goingQuiet',$event)">
               <div class="v orange">{{ card.goingQuiet }}</div><div class="k">Going quiet</div></button>
-            <button type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'flagged')"
+            <button data-testid="jchd-btn-077" type="button" class="stat" [class.is-drill]="isCoachDrill(card.coachId,'flagged')"
                     (click)="drillCoach(card.coachId,'flagged',$event)">
               <div class="v pink">{{ card.flagged }}</div><div class="k">Flagged</div></button>
             <div class="stat"><div class="v green">{{ card.handled }}</div><div class="k">Handled</div></div>
@@ -766,25 +766,25 @@
           <div class="coach-jc">
             <div class="cjc-head">JC pipeline</div>
             <div class="cjc-grid">
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneToday')"
+              <button data-testid="jchd-btn-078" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneToday')"
                       (click)="drillCoach(card.coachId,'doneToday',$event)">
                 <span class="v">{{ card.jc.doneToday }}</span><span class="k">Done today</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneWeek')"
+              <button data-testid="jchd-btn-079" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneWeek')"
                       (click)="drillCoach(card.coachId,'doneWeek',$event)">
                 <span class="v">{{ card.jc.doneWeek }}</span><span class="k">Done last week</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneMonth')"
+              <button data-testid="jchd-btn-080" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'doneMonth')"
                       (click)="drillCoach(card.coachId,'doneMonth',$event)">
                 <span class="v">{{ card.jc.doneMonth }}</span><span class="k">Done last month</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueToday')"
+              <button data-testid="jchd-btn-081" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueToday')"
                       (click)="drillCoach(card.coachId,'dueToday',$event)">
                 <span class="v">{{ card.jc.dueToday }}</span><span class="k">Due today</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueWeek')"
+              <button data-testid="jchd-btn-082" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'dueWeek')"
                       (click)="drillCoach(card.coachId,'dueWeek',$event)">
                 <span class="v">{{ card.jc.dueWeek }}</span><span class="k">Due this week</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'pending')"
+              <button data-testid="jchd-btn-083" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'pending')"
                       (click)="drillCoach(card.coachId,'pending',$event)">
                 <span class="v">{{ card.jc.pending }}</span><span class="k">Pending</span></button>
-              <button type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'overdue')"
+              <button data-testid="jchd-btn-084" type="button" class="cjc" [class.is-drill]="isCoachDrill(card.coachId,'overdue')"
                       (click)="drillCoach(card.coachId,'overdue',$event)">
                 <span class="v red">{{ card.jc.overdue }}</span><span class="k">Overdue</span></button>
             </div>
@@ -804,7 +804,7 @@
               <ng-container *ngIf="d.coachId === card.coachId; else defaultQueue">
                 <div class="eh">{{ coachDrillTitle(d.metric) }}</div>
                 <ng-container *ngIf="coachDrillPeople(card.coachId, d.metric) as people">
-                  <div class="mini-person" *ngFor="let p of people"
+                  <div data-testid="jchd-div-085" class="mini-person" *ngFor="let p of people"
                        (click)="$event.stopPropagation(); openJcParticipant(p.profileid)"
                        [matTooltip]="p.detail">
                     <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
@@ -820,7 +820,7 @@
             <ng-template #defaultQueue>
               <div class="expand-inner">
                 <div class="eh">Needs action — top of queue</div>
-                <div class="mini-person" *ngFor="let p of card.queue"
+                <div data-testid="jchd-div-086" class="mini-person" *ngFor="let p of card.queue"
                      (click)="$event.stopPropagation(); openSlideover(p)" [matTooltip]="p.reason">
                   <span class="ios-avatar av-sm" [ngClass]="avatarClass(p.profileid)">{{ initials(p.name) }}</span>
                   <span class="mp-name">{{ p.name }}</span>
@@ -863,7 +863,7 @@
             <div class="wl-row-top">
               <span class="pri wl-pri" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }} · {{ r.priority }}</span>
               <div class="wl-id">
-                <a class="wl-name name-link" role="button" tabindex="0"
+                <a data-testid="jchd-a-087" class="wl-name name-link" role="button" tabindex="0"
                    (click)="openSlideover(r)" (keydown.enter)="openSlideover(r)" (keydown.space)="openSlideover(r)"
                    matTooltip="Open participant panel">{{ r.name }}</a>
                 <span class="wl-meta">
@@ -893,20 +893,20 @@
           </div>
 
           <div class="wl-actions">
-            <button mat-icon-button class="wl-flag" [class.is-flagged]="r.flagged"
+            <button data-testid="jchd-btn-088" mat-icon-button class="wl-flag" [class.is-flagged]="r.flagged"
               (click)="toggleFlag(r)" [attr.aria-pressed]="r.flagged"
               [matTooltip]="r.flagged ? 'Unflag' : 'Flag'">
               <mat-icon>{{ r.flagged ? 'flag' : 'outlined_flag' }}</mat-icon>
             </button>
-            <button mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
-            <button mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
-            <button mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
+            <button data-testid="jchd-btn-089" mat-stroked-button class="wl-act" (click)="openSlideover(r)" matTooltip="Open participant panel">Details</button>
+            <button data-testid="jchd-btn-090" mat-stroked-button class="wl-act" (click)="logCall(r)">Log call</button>
+            <button data-testid="jchd-btn-091" mat-stroked-button class="wl-act" (click)="setHealthState(r)">Set health</button>
           </div>
         </article>
       </div>
 
       <div class="wl-more" *ngIf="worklistTotal() > 0 && worklistRows().length < worklistTotal()">
-        <button mat-stroked-button (click)="showMoreWorklist()">
+        <button data-testid="jchd-btn-092" mat-stroked-button (click)="showMoreWorklist()">
           Show more ({{ worklistTotal() - worklistRows().length }} remaining)
         </button>
       </div>

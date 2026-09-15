@@ -4,7 +4,7 @@
       <div>
           <mat-form-field style="margin-left: 10px;" appearance="outline" class=" w-50">
               <mat-label>Select Event</mat-label>
-              <mat-select   (selectionChange)="onEventSelected()" [(ngModel)]="selectedevent">
+              <mat-select data-testid="eal-event-select" (selectionChange)="onEventSelected()" [(ngModel)]="selectedevent">
                 <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filter"  [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                 </mat-option>
@@ -16,7 +16,7 @@
       <form [formGroup]="form" [hidden]="!showtable">
         <mat-form-field appearance="outline" class="w-25">
           <mat-label>Select Name</mat-label>
-          <mat-select formControlName="profileid">
+          <mat-select data-testid="eal-filter-profile" formControlName="profileid">
             <mat-option>
               <ngx-mat-select-search [(ngModel)]="filterText"  [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
             </mat-option>
@@ -31,7 +31,7 @@
         </mat-form-field>&nbsp;&nbsp;
         <mat-form-field appearance="outline" class="w-25">
           <mat-label>Select Product</mat-label>
-          <mat-select formControlName="product" multiple>
+          <mat-select data-testid="eal-filter-product" formControlName="product" multiple>
             <mat-option>
               <ngx-mat-select-search [(ngModel)]="filterProduct"  [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
             </mat-option>
@@ -48,7 +48,7 @@
           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
           <mat-date-range-picker #picker></mat-date-range-picker>
         </mat-form-field>&nbsp;&nbsp;
-        <button mat-stroked-button type="button" (click)="onResetForm()">Clear</button>
+        <button mat-stroked-button type="button" data-testid="eal-filter-clear" (click)="onResetForm()">Clear</button>
       </form>
       <p [hidden]="!showtable">Total Log: {{dataSource.filteredData.length}}, Unique Participant: {{uniqueParticipantList.length}}</p>
       <div [hidden]="!showtable">

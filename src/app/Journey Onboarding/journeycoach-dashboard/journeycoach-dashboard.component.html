@@ -18,7 +18,7 @@
   <div class="jcd-toolbar-left">
 
     <!-- Toggle mode button — always visible -->
-    <button class="jcd-mode-toggle" (click)="toggleDate()">
+    <button data-testid="jcd-btn-001" class="jcd-mode-toggle" (click)="toggleDate()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
       </svg>
@@ -27,11 +27,11 @@
 
     <!-- Month picker -->
     <div class="jcd-month-picker" *ngIf="pickerMode === 'month'">
-      <button class="jcd-nav-btn" (click)="backwardMonth()">
+      <button data-testid="jcd-btn-002" class="jcd-nav-btn" (click)="backwardMonth()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <input class="jcd-month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()">
-      <button class="jcd-nav-btn" (click)="forwardMonth()">
+      <input data-testid="jcd-inp-003" class="jcd-month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()">
+      <button data-testid="jcd-btn-004" class="jcd-nav-btn" (click)="forwardMonth()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
@@ -40,8 +40,8 @@
     <div class="jcd-range-picker" *ngIf="pickerMode === 'range'">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <mat-date-range-input [rangePicker]="picker" style="font-size:12px;width:160px">
-        <input matStartDate [(ngModel)]="startDate" placeholder="Start">
-        <input matEndDate [(ngModel)]="endDate" placeholder="End">
+        <input data-testid="jcd-inp-005" matStartDate [(ngModel)]="startDate" placeholder="Start">
+        <input data-testid="jcd-inp-006" matEndDate [(ngModel)]="endDate" placeholder="End">
       </mat-date-range-input>
       <mat-datepicker-toggle [for]="picker" style="color:var(--primary);width:20px;height:20px"></mat-datepicker-toggle>
       <mat-date-range-picker #picker (closed)="fetchData()"></mat-date-range-picker>
@@ -51,23 +51,23 @@
 
     <!-- days Filter -->
 
-   <input class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="texts"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
-    <button class="jcd-filter"  [disabled]="!daysInput" (click)="onDateFilterClick('days')"> + </button>
+   <input data-testid="jcd-inp-007" class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="texts"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
+    <button data-testid="jcd-btn-008" class="jcd-filter"  [disabled]="!daysInput" (click)="onDateFilterClick('days')"> + </button>
 
     <!-- Clear quick filter -->
-    <button class="jcd-clear-filter" *ngIf="selectedDateFilter != null" (click)="onDateFilterClick(null)" title="Clear filter">
+    <button data-testid="jcd-btn-009" class="jcd-clear-filter" *ngIf="selectedDateFilter != null" (click)="onDateFilterClick(null)" title="Clear filter">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
 
     <!-- Calendar button -->
-    <button class="jcd-cal-btn" (click)="openCalendarDialog()">
+    <button data-testid="jcd-btn-010" class="jcd-cal-btn" (click)="openCalendarDialog()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Calendar
     </button>
   </div>
 
   <div class="jcd-toolbar-right">
-    <div class="jcd-love-pill" (click)="openCURADialog()">
+    <div data-testid="jcd-div-011" class="jcd-love-pill" (click)="openCURADialog()">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="#e11d48" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
       <span>Love Factor</span>
       <span class="jcd-love-eq">=</span>
@@ -87,7 +87,7 @@
 <div class="row row-top">
 
   <!-- GROSS SALES -->
-  <div class="card" (click)="onBoxClick('grossSales')" style="cursor:pointer">
+  <div data-testid="jcd-div-012" class="card" (click)="onBoxClick('grossSales')" style="cursor:pointer">
     <div class="card-h"><span class="card-t">Gross Sales</span></div>
     <div class="sales-top">
       <div>
@@ -100,22 +100,22 @@
       </div>
     </div>
     <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="l">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="l">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="l">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">New</div><div data-testid="jcd-div-013" class="v" style="color:var(--success)" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="l">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Upgrades</div><div data-testid="jcd-div-014" class="v" style="color:var(--primary)" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="l">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Add-On</div><div data-testid="jcd-div-015" class="v" style="color:var(--accent)" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="l">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="row-neg">
-      <div class="neg-box neg-cancel" (click)="onCancelledClick($event,'grossCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['grosscancelledsale'].count}}</div><div class="a">&#8377;{{totalGrossCancelled.toLocaleString('en-IN')}}</div></div>
-      <div class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'grossDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['grossdowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToOld.toLocaleString('en-IN')}}</div></div>
-      <div class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'grossDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['grossdowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToNew.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-016" class="neg-box neg-cancel" (click)="onCancelledClick($event,'grossCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['grosscancelledsale'].count}}</div><div class="a">&#8377;{{totalGrossCancelled.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-017" class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'grossDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['grossdowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToOld.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-018" class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'grossDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['grossdowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToNew.toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="avg-row">
-      <div class="avg-pill" style="flex:1" (click)="openDialog('avgToASV')">Avg days to become ASV <strong>{{ originalData['grosssale'].count > 0 ? currentAvgToASV ?? 0 : 'N/A' }}</strong></div>
+      <div data-testid="jcd-div-019" class="avg-pill" style="flex:1" (click)="openDialog('avgToASV')">Avg days to become ASV <strong>{{ originalData['grosssale'].count > 0 ? currentAvgToASV ?? 0 : 'N/A' }}</strong></div>
     </div>
   </div>
 
   <!-- ASSURED SALES -->
-  <div class="card" (click)="onBoxClick('assuredSales')" style="cursor:pointer">
+  <div data-testid="jcd-div-020" class="card" (click)="onBoxClick('assuredSales')" style="cursor:pointer">
     <div class="card-h"><span class="card-t">Assured Sales</span></div>
     <div class="sales-top">
       <div>
@@ -128,17 +128,17 @@
       </div>
     </div>
     <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div class="v" style="color:var(--success)" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div><div class="l">&#8377;{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div class="v" style="color:var(--primary)" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div><div class="l">&#8377; {{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div class="v" style="color:var(--accent)" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div><div class="l">&#8377;{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">New</div><div data-testid="jcd-div-021" class="v" style="color:var(--success)" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div><div class="l">&#8377;{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Upgrades</div><div data-testid="jcd-div-022" class="v" style="color:var(--primary)" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div><div class="l">&#8377; {{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
+      <div class="m-box"><div class="l">Add-On</div><div data-testid="jcd-div-023" class="v" style="color:var(--accent)" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div><div class="l">&#8377;{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="row-neg">
-      <div class="neg-box neg-cancel" (click)="onCancelledClick($event,'assuredCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['assuredcancelledsale'].count}}</div><div class="a">&#8377;{{totalAssuredCancelled.toLocaleString('en-IN')}}</div></div>
-      <div class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'assuredDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['assureddowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToOld.toLocaleString('en-IN')}}</div></div>
-      <div class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'assuredDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['assureddowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToNew.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-024" class="neg-box neg-cancel" (click)="onCancelledClick($event,'assuredCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['assuredcancelledsale'].count}}</div><div class="a">&#8377;{{totalAssuredCancelled.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-025" class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'assuredDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['assureddowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToOld.toLocaleString('en-IN')}}</div></div>
+      <div data-testid="jcd-div-026" class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'assuredDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['assureddowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToNew.toLocaleString('en-IN')}}</div></div>
     </div>
     <div class="avg-row">
-      <div class="avg-pill" style="flex:1" (click)="openDialog('avgGSVToASV')">Avg days from GSV to ASV <strong>{{ originalData['assuredsale'].count > 0 ? currentAvgGSVToASV ?? 0 : 'N/A' }}</strong></div>
+      <div data-testid="jcd-div-027" class="avg-pill" style="flex:1" (click)="openDialog('avgGSVToASV')">Avg days from GSV to ASV <strong>{{ originalData['assuredsale'].count > 0 ? currentAvgGSVToASV ?? 0 : 'N/A' }}</strong></div>
     </div>
   </div>
 
@@ -152,7 +152,7 @@
       {label:'Locked',  count: originalData['lockedstatus'].count,  color:'#6366f1',         key:'lockedStatus'},
       {label:'Fully Paid',count:originalData['fullypaidstatus'].count,color:'var(--teal)',   key:'fullyPaidStatus'}
     ]">
-      <div class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="onBoxClick(ar.key)">
+      <div data-testid="jcd-div-028" class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="onBoxClick(ar.key)">
         <div style="display:flex;justify-content:space-between;width:100%">
           <span class="ar-label">{{ar.label}}</span>
           <span class="badge" [style.background]="ar.color">{{ar.count}}</span>
@@ -168,7 +168,7 @@
   <!-- CUSTOMER TAGS -->
   <div class="card">
     <div class="card-h"><span class="card-t">Customer Tags</span><span class="card-subtitle">{{ activeJourneyCoachTags.length }} tags</span></div>
-    <div *ngFor="let tag of activeJourneyCoachTags" class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="openTagProfilesDialog(tag)">
+    <div data-testid="jcd-div-029" *ngFor="let tag of activeJourneyCoachTags" class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="openTagProfilesDialog(tag)">
       <div style="display:flex;justify-content:space-between;width:100%">
         <span class="ar-label">{{ tag['name'] || tag.id }}</span>
         <span class="badge" style="background:var(--warning)">{{ getProfilesForTag(tag.id).length }}</span>
@@ -184,41 +184,41 @@
   <div class="card">
     <div class="card-h" style="margin-bottom:10px"><span class="card-t">Onboarding Status</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:8px">
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('onboardingScheduled')">
+      <div data-testid="jcd-div-030" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('onboardingScheduled')">
         <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalOnboardingScheduledCount() }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">OB Call</div>
       </div>
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('coachingScheduled')">
+      <div data-testid="jcd-div-031" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('coachingScheduled')">
         <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalCoachingScheduledCount() }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">JC Calls</div>
       </div>
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgAssured')">
+      <div data-testid="jcd-div-032" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgAssured')">
         <div style="font-size:16px;font-weight:800;color:var(--success)">{{ avgAssuredList.length > 0 ? avgAssured.toFixed(2) : 'N/A' }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">Avg OB</div>
       </div>
-      <div style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgPurchase')">
+      <div data-testid="jcd-div-033" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgPurchase')">
         <div style="font-size:16px;font-weight:800;color:var(--warning)">{{ avgPurchaseList.length > 0 ? avgPurchase.toFixed(2) : 'N/A' }}</div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">Avg Purch</div>
       </div>
     </div>
-    <div style="padding:8px 12px;border-radius:var(--radius-xs);background:linear-gradient(135deg,#059669,#10b981);color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" (click)="onBoxClick('onboarded')">
+    <div data-testid="jcd-div-034" style="padding:8px 12px;border-radius:var(--radius-xs);background:linear-gradient(135deg,#059669,#10b981);color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" (click)="onBoxClick('onboarded')">
       <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;opacity:0.9">Onboarded This Month</span>
       <span style="font-size:22px;font-weight:900;line-height:1">{{originalData['onboarded'].count}}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('toBeOnboarded')">
+    <div data-testid="jcd-div-035" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('toBeOnboarded')">
       <span style="color:var(--text-secondary)">To Be Onboarded</span><span style="font-weight:700;color:var(--primary)">{{originalData['all'].count}}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('less7Days')">
+    <div data-testid="jcd-div-036" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('less7Days')">
       <span style="color:var(--text-secondary)">Between 7 Days</span><span style="font-weight:700">{{originalData['last7DaysnotOnboarded'].count}}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('more7Days')">
+    <div data-testid="jcd-div-037" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('more7Days')">
       <span style="color:var(--text-secondary)">7+ Days</span><span style="font-weight:700">{{originalData['last15daysnotOnboarded'].count}}</span>
     </div>
-    <div style="margin-top:8px;padding:7px 12px;border-radius:var(--radius-xs);background:var(--danger-light);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('notAssured')">
+    <div data-testid="jcd-div-038" style="margin-top:8px;padding:7px 12px;border-radius:var(--radius-xs);background:var(--danger-light);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('notAssured')">
       <span style="font-size:12px;font-weight:600;color:var(--danger)">Not Assured</span>
       <span style="font-size:16px;font-weight:900;color:var(--danger)">{{originalData['notassured'].count}}</span>
     </div>
-    <button type="button"
+    <button data-testid="jcd-btn-039" type="button"
             (click)="navigateToOnboardingPipeline()"
             style="margin-top:10px;width:100%;padding:9px 12px;border:none;border-radius:var(--radius-xs);background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 2px rgba(15,23,42,0.08);transition:filter 0.15s">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
@@ -233,7 +233,7 @@
   <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
     <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;">
       <!-- Overall Participants -->
-      <div class="pov-seg pov-primary" (click)="onBoxClick('overallParticipants')" style="padding:22px 28px;background:linear-gradient(135deg,#1e40af 0%,#2563eb 60%,#0ea5e9 100%);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:filter 0.15s;">
+      <div data-testid="jcd-div-040" class="pov-seg pov-primary" (click)="onBoxClick('overallParticipants')" style="padding:22px 28px;background:linear-gradient(135deg,#1e40af 0%,#2563eb 60%,#0ea5e9 100%);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:filter 0.15s;">
         <div>
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:rgba(255,255,255,0.65);margin-bottom:6px">Overall Participants</div>
           <div style="font-size:44px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px">{{originalData['allParticipants'].count}}</div>
@@ -245,43 +245,43 @@
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       </div>
       <!-- Ecosystem -->
-      <div class="pov-seg" (click)="onBoxClick('ecosystem')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
+      <div data-testid="jcd-div-041" class="pov-seg" (click)="onBoxClick('ecosystem')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#065f46">Ecosystem</div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </div>
         <div style="font-size:32px;font-weight:900;color:var(--success);line-height:1;letter-spacing:-0.5px;margin-bottom:12px">{{originalData['ecosystem'].count}}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="padding:8px 10px;background:var(--success-light);border-radius:6px" (click)="onBoxClick('ecosystemActive');$event.stopPropagation()">
+          <div data-testid="jcd-div-042" style="padding:8px 10px;background:var(--success-light);border-radius:6px" (click)="onBoxClick('ecosystemActive');$event.stopPropagation()">
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#065f46;margin-bottom:3px">Active</div>
             <div style="font-size:18px;font-weight:900;color:var(--success);line-height:1">{{originalData['ecosystemActive']?.count || '—'}}</div>
           </div>
-          <div style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('ecosystemNonActive');$event.stopPropagation()">
+          <div data-testid="jcd-div-043" style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('ecosystemNonActive');$event.stopPropagation()">
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:3px">Non Active</div>
             <div style="font-size:18px;font-weight:900;color:var(--warning);line-height:1">{{originalData['ecosystemNonActive']?.count || '—'}}</div>
           </div>
         </div>
       </div>
       <!-- DFU -->
-      <div class="pov-seg" (click)="onBoxClick('dfu')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
+      <div data-testid="jcd-div-044" class="pov-seg" (click)="onBoxClick('dfu')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#1e40af">DFU</div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </div>
         <div style="font-size:32px;font-weight:900;color:var(--primary);line-height:1;letter-spacing:-0.5px;margin-bottom:12px">{{originalData['dfu'].count}}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="padding:8px 10px;background:var(--primary-light);border-radius:6px" (click)="onBoxClick('dfuActive');$event.stopPropagation()">
+          <div data-testid="jcd-div-045" style="padding:8px 10px;background:var(--primary-light);border-radius:6px" (click)="onBoxClick('dfuActive');$event.stopPropagation()">
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#1e40af;margin-bottom:3px">Active</div>
             <div style="font-size:18px;font-weight:900;color:var(--primary);line-height:1">{{originalData['dfuActive']?.count || '—'}}</div>
           </div>
-          <div style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('dfuNonActive');$event.stopPropagation()">
+          <div data-testid="jcd-div-046" style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('dfuNonActive');$event.stopPropagation()">
             <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:3px">Non Active</div>
             <div style="font-size:18px;font-weight:900;color:var(--warning);line-height:1">{{originalData['dfuNonActive']?.count || '—'}}</div>
           </div>
         </div>
       </div>
       <!-- Discontinued -->
-      <div class="pov-seg" (click)="onBoxClick('discontinued')" style="padding:22px 24px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
+      <div data-testid="jcd-div-047" class="pov-seg" (click)="onBoxClick('discontinued')" style="padding:22px 24px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--danger)">Discontinued</div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -305,36 +305,36 @@
     <div style="background:var(--bg);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:11px;font-weight:700;color:var(--text-secondary)">Not Started</span>
-        <span class="badge" style="background:var(--text-muted);cursor:pointer" (click)="onBoxClick('allProduct')">{{originalData['alljourneynotstarted'].count}}</span>
+        <span data-testid="jcd-span-048" class="badge" style="background:var(--text-muted);cursor:pointer" (click)="onBoxClick('allProduct')">{{originalData['alljourneynotstarted'].count}}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less30Product')">
+        <div data-testid="jcd-div-049" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less30Product')">
           <span style="font-size:10px;color:var(--text-muted);font-weight:500">&lt; 30 Days</span>
           <span style="font-size:14px;font-weight:900;color:var(--success)">{{originalData['lessthan30daysjourneynotstarted'].count}}</span>
         </div>
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('more30Product')">
+        <div data-testid="jcd-div-050" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('more30Product')">
           <span style="font-size:10px;color:var(--text-muted);font-weight:500">30+ Days</span>
           <span style="font-size:14px;font-weight:900;color:var(--warning)">{{originalData['morethan30daysjourneynotstarted'].count}}</span>
         </div>
       </div>
     </div>
-    <div style="background:var(--primary-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('productInitiated')">
+    <div data-testid="jcd-div-051" style="background:var(--primary-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('productInitiated')">
       <span style="font-size:11px;font-weight:700;color:var(--primary)">Initiated This Month</span>
       <span class="badge" style="background:var(--accent)">{{originalData['currentjourneyinitiated'].count}}</span>
     </div>
-    <div style="background:#f0fdf4;border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('activeEngagement')">
+    <div data-testid="jcd-div-052" style="background:#f0fdf4;border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('activeEngagement')">
       <span style="font-size:11px;font-weight:700;color:var(--success)">Active Engagement</span>
       <span class="badge" style="background:var(--success)">{{originalData['activeEngagement'].count}}</span>
     </div>
-    <div style="background:var(--teal-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less90Engagement')">
+    <div data-testid="jcd-div-053" style="background:var(--teal-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less90Engagement')">
       <span style="font-size:11px;font-weight:700;color:var(--teal)">Ideal for 60–90 days</span>
       <span class="badge" style="background:var(--teal)">{{originalData['less90Engagement'].count}}</span>
     </div>
-    <div style="background:var(--purple-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less180Engagement')">
+    <div data-testid="jcd-div-054" style="background:var(--purple-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less180Engagement')">
       <span style="font-size:11px;font-weight:700;color:var(--purple)">More than 3 months</span>
       <span class="badge" style="background:var(--purple)">{{originalData['less180Engagement'].count}}</span>
     </div>
-    <div style="background:var(--danger-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all 0.15s" (click)="onBoxClick('more180Engagement')">
+    <div data-testid="jcd-div-055" style="background:var(--danger-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all 0.15s" (click)="onBoxClick('more180Engagement')">
       <div>
         <span style="font-size:11px;font-weight:700;color:var(--danger)">More than 6 months</span>
         <div style="font-size:9px;color:var(--danger);opacity:0.7;margin-top:2px">Tap to view profiles →</div>
@@ -350,19 +350,19 @@
       <span class="card-subtitle">{{subscriptionMatrix.months.length}} months &middot; {{subscriptionMatrix.journeys.length}} journeys &middot; <strong style="color:var(--primary)">{{ getGrandTotal() }} total</strong></span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
-      <div style="text-align:center;padding:8px 4px;background:var(--primary-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('currentMonthEnd')">
+      <div data-testid="jcd-div-056" style="text-align:center;padding:8px 4px;background:var(--primary-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('currentMonthEnd')">
         <div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1">{{originalData['currentMonth'].count}}</div>
         <div style="font-size:10px;color:var(--primary);font-weight:600;margin-top:2px">This Month</div>
       </div>
-      <div style="text-align:center;padding:8px 4px;background:var(--warning-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('nextMonthEnd')">
+      <div data-testid="jcd-div-057" style="text-align:center;padding:8px 4px;background:var(--warning-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('nextMonthEnd')">
         <div style="font-size:22px;font-weight:800;color:var(--warning);line-height:1">{{originalData['nextMonth'].count}}</div>
         <div style="font-size:10px;color:var(--warning);font-weight:600;margin-top:2px">Next Month</div>
       </div>
-      <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('previousMonthEnd')">
+      <div data-testid="jcd-div-058" style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('previousMonthEnd')">
         <div style="font-size:22px;font-weight:800;color:var(--text-muted);line-height:1">{{originalData['lastMonth'].count}}</div>
         <div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-top:2px">Prev Month</div>
       </div>
-      <div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('overallEnd')">
+      <div data-testid="jcd-div-059" style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('overallEnd')">
         <div style="font-size:18px;font-weight:800;color:var(--text);line-height:1">{{originalData['totalMonth'].count}}</div>
         <div style="font-size:10px;color:var(--text-secondary);font-weight:600;margin-top:2px">Total Ended</div>
       </div>
@@ -381,7 +381,7 @@
             <td>{{ j.label }}</td>
             <td class="c" *ngFor="let m of subscriptionMatrix.months">
               <ng-container *ngIf="getCellData(j.id, m.ym) as cell; else sub_empty">
-                <span class="badge" style="background:var(--danger);cursor:pointer;font-size:11px" (click)="openSubDialog(cell.docs, j.label + ' · ' + m.label)">{{ cell.count }}</span>
+                <span data-testid="jcd-span-060" class="badge" style="background:var(--danger);cursor:pointer;font-size:11px" (click)="openSubDialog(cell.docs, j.label + ' · ' + m.label)">{{ cell.count }}</span>
               </ng-container>
               <ng-template #sub_empty>&mdash;</ng-template>
             </td>
@@ -406,20 +406,20 @@
       <span class="card-subtitle"><strong style="color:var(--text)">{{ getJourneyStatusGrandTotal() }}</strong> total</span>
     </div>
     <div class="pills">
-      <span class="pill" [class.active]="journeyTypeFilter==='all'" (click)="journeyTypeFilter='all'">All</span>
-      <span class="pill" [class.active]="journeyTypeFilter==='ecosystem'" (click)="journeyTypeFilter='ecosystem'">Ecosystem</span>
-      <span class="pill" [class.active]="journeyTypeFilter==='dfu'" (click)="journeyTypeFilter='dfu'">DFU</span>
+      <span data-testid="jcd-span-061" class="pill" [class.active]="journeyTypeFilter==='all'" (click)="journeyTypeFilter='all'">All</span>
+      <span data-testid="jcd-span-062" class="pill" [class.active]="journeyTypeFilter==='ecosystem'" (click)="journeyTypeFilter='ecosystem'">Ecosystem</span>
+      <span data-testid="jcd-span-063" class="pill" [class.active]="journeyTypeFilter==='dfu'" (click)="journeyTypeFilter='dfu'">DFU</span>
     </div>
     <div class="pills" style="margin-bottom:6px">
-      <span class="pill" [class.active]="activeStatusTab==='all'" (click)="activeStatusTab='all'">All &middot; {{ getJourneyStatusGrandTotal() }}</span>
-      <span class="pill" [class.active]="activeStatusTab==='active'" (click)="activeStatusTab='active'">Active &middot; {{ getTotalForStatus('active') }}</span>
-      <span class="pill" [class.active]="activeStatusTab==='non active'" (click)="activeStatusTab='non active'">Non Active &middot; {{ getTotalForStatus('non active') }}</span>
-      <span class="pill" [class.active]="activeStatusTab==='discontinued'" (click)="activeStatusTab='discontinued'">Disc. &middot; {{ getTotalForStatus('discontinued') }}</span>
-      <span class="pill" [class.active]="activeStatusTab==='null'" (click)="activeStatusTab='null'">No Status &middot; {{ nullStatusProfiles.length }}</span>
+      <span data-testid="jcd-span-064" class="pill" [class.active]="activeStatusTab==='all'" (click)="activeStatusTab='all'">All &middot; {{ getJourneyStatusGrandTotal() }}</span>
+      <span data-testid="jcd-span-065" class="pill" [class.active]="activeStatusTab==='active'" (click)="activeStatusTab='active'">Active &middot; {{ getTotalForStatus('active') }}</span>
+      <span data-testid="jcd-span-066" class="pill" [class.active]="activeStatusTab==='non active'" (click)="activeStatusTab='non active'">Non Active &middot; {{ getTotalForStatus('non active') }}</span>
+      <span data-testid="jcd-span-067" class="pill" [class.active]="activeStatusTab==='discontinued'" (click)="activeStatusTab='discontinued'">Disc. &middot; {{ getTotalForStatus('discontinued') }}</span>
+      <span data-testid="jcd-span-068" class="pill" [class.active]="activeStatusTab==='null'" (click)="activeStatusTab='null'">No Status &middot; {{ nullStatusProfiles.length }}</span>
     </div>
     <div *ngIf="(activeStatusTab==='null' || activeStatusTab==='all') && nullStatusProfiles.length > 0" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;background:var(--warning-light);padding:5px 10px;border-radius:var(--radius-xs)">
       No customer status assigned &mdash; <strong>{{ nullStatusProfiles.length }} profiles</strong>
-      <a (click)="openJourneyStatusDialog(nullStatusProfiles,'No Status Profiles')" style="color:var(--primary);font-weight:600;text-decoration:none;cursor:pointer;margin-left:4px">View all ›</a>
+      <a data-testid="jcd-a-069" (click)="openJourneyStatusDialog(nullStatusProfiles,'No Status Profiles')" style="color:var(--primary);font-weight:600;text-decoration:none;cursor:pointer;margin-left:4px">View all ›</a>
     </div>
     <div class="scroll-box" *ngIf="activeStatusTab !== 'null' && filteredJourneyStatusMatrix.length > 0">
       <table class="tbl">
@@ -435,15 +435,15 @@
           <tr *ngFor="let j of filteredJourneyStatusMatrix">
             <td>{{ j.journeyName }} <span class="tag" [class.tag-eco]="j.journeyType==='Eco system'" [class.tag-dfu]="j.journeyType==='DFU'">{{ j.journeyType==='Eco system' ? 'Eco' : j.journeyType==='DFU' ? 'DFU' : '' }}</span></td>
             <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">
-              <span *ngIf="j.statuses['active']?.profiles?.length > 0" style="color:var(--success);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['active'].profiles, j.journeyName + ' · Active')">{{ j.statuses['active'].profiles.length }}</span>
+              <span data-testid="jcd-span-070" *ngIf="j.statuses['active']?.profiles?.length > 0" style="color:var(--success);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['active'].profiles, j.journeyName + ' · Active')">{{ j.statuses['active'].profiles.length }}</span>
               <span *ngIf="!j.statuses['active']?.profiles?.length">&mdash;</span>
             </td>
             <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">
-              <span *ngIf="j.statuses['non active']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['non active'].profiles, j.journeyName + ' · Non Active')">{{ j.statuses['non active'].profiles.length }}</span>
+              <span data-testid="jcd-span-071" *ngIf="j.statuses['non active']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['non active'].profiles, j.journeyName + ' · Non Active')">{{ j.statuses['non active'].profiles.length }}</span>
               <span *ngIf="!j.statuses['non active']?.profiles?.length">&mdash;</span>
             </td>
             <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">
-              <span *ngIf="j.statuses['discontinued']?.profiles?.length > 0" style="color:var(--danger);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['discontinued'].profiles, j.journeyName + ' · Discontinued')">{{ j.statuses['discontinued'].profiles.length }}</span>
+              <span data-testid="jcd-span-072" *ngIf="j.statuses['discontinued']?.profiles?.length > 0" style="color:var(--danger);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['discontinued'].profiles, j.journeyName + ' · Discontinued')">{{ j.statuses['discontinued'].profiles.length }}</span>
               <span *ngIf="!j.statuses['discontinued']?.profiles?.length">&mdash;</span>
             </td>
           </tr>
@@ -456,10 +456,10 @@
   <div class="card" style="display:flex;flex-direction:column">
     <div class="card-h">
       <span class="card-t">Modes</span>
-      <a class="card-link" (click)="navigateToModeDashboard()" style="cursor:pointer">Dashboard <mat-icon style="font-size:14px">arrow_forward</mat-icon></a>
+      <a data-testid="jcd-a-073" class="card-link" (click)="navigateToModeDashboard()" style="cursor:pointer">Dashboard <mat-icon style="font-size:14px">arrow_forward</mat-icon></a>
     </div>
     <div class="modes-grid scroll-box" style="flex:1;max-height:460px">
-      <div class="mode-item" *ngFor="let mode of modesList" (click)="openDialog(mode)">
+      <div data-testid="jcd-div-074" class="mode-item" *ngFor="let mode of modesList" (click)="openDialog(mode)">
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px">{{mode}}</span>
         <span class="mode-badge" [style.background]="(modeMap[mode]?.length ?? 0) > 0 ? 'var(--primary)' : 'var(--text-muted)'">{{modeMap[mode]?.length ?? 0}}</span>
       </div>
@@ -476,31 +476,31 @@
       <span class="card-subtitle" style="color:var(--text-muted);font-size:11px">{{ dateRangeHint || 'Select range' }}</span>
     </div>
     <div class="btn-group" style="justify-content:flex-end;margin-top:-32px;margin-bottom:16px">
-      <button class="btn" [class.btn-primary]="filterMode==='months'" (click)="toggleFilterMode('months')">Months</button>
-      <button class="btn" [class.btn-primary]="filterMode==='daterange'" (click)="toggleFilterMode('daterange')">Date Range</button>
-      <button class="btn" [class.btn-primary]="filterMode==='queue'" (click)="toggleFilterMode('queue')">Queue</button>
+      <button data-testid="jcd-btn-075" class="btn" [class.btn-primary]="filterMode==='months'" (click)="toggleFilterMode('months')">Months</button>
+      <button data-testid="jcd-btn-076" class="btn" [class.btn-primary]="filterMode==='daterange'" (click)="toggleFilterMode('daterange')">Date Range</button>
+      <button data-testid="jcd-btn-077" class="btn" [class.btn-primary]="filterMode==='queue'" (click)="toggleFilterMode('queue')">Queue</button>
       <div *ngIf="filterMode==='months'" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-weight:600;background:var(--card)">
         MONTHS
-        <input type="number" [(ngModel)]="numberOfMonths" min="1" max="24" (change)="onMonthsCountChange()" style="width:32px;border:none;outline:none;text-align:center;font-size:12px;font-weight:700;color:var(--primary);background:transparent">
+        <input data-testid="jcd-inp-078" type="number" [(ngModel)]="numberOfMonths" min="1" max="24" (change)="onMonthsCountChange()" style="width:32px;border:none;outline:none;text-align:center;font-size:12px;font-weight:700;color:var(--primary);background:transparent">
         <div style="display:flex;flex-direction:column;line-height:1;cursor:pointer">
-          <span (click)="stepMonths(1)" style="font-size:9px">▲</span>
-          <span (click)="stepMonths(-1)" style="font-size:9px">▼</span>
+          <span data-testid="jcd-span-079" (click)="stepMonths(1)" style="font-size:9px">▲</span>
+          <span data-testid="jcd-span-080" (click)="stepMonths(-1)" style="font-size:9px">▼</span>
         </div>
       </div>
       <mat-form-field appearance="outline" style="height:36px;font-size:12px" *ngIf="filterMode==='daterange'">
         <mat-date-range-input [rangePicker]="rangePicker">
-          <input matStartDate [(ngModel)]="filterStartDate" placeholder="Start" (dateChange)="onDateRangeChange()">
-          <input matEndDate [(ngModel)]="filterEndDate" placeholder="End" (dateChange)="onDateRangeChange()">
+          <input data-testid="jcd-inp-081" matStartDate [(ngModel)]="filterStartDate" placeholder="Start" (dateChange)="onDateRangeChange()">
+          <input data-testid="jcd-inp-082" matEndDate [(ngModel)]="filterEndDate" placeholder="End" (dateChange)="onDateRangeChange()">
         </mat-date-range-input>
         <mat-datepicker-toggle matIconSuffix [for]="rangePicker"></mat-datepicker-toggle>
         <mat-date-range-picker #rangePicker></mat-date-range-picker>
       </mat-form-field>
       <mat-form-field appearance="outline" style="height:36px;font-size:12px" *ngIf="filterMode==='queue'">
-        <mat-select [(ngModel)]="selectedQueueIds" multiple (selectionChange)="onQueueSelectionChange()" placeholder="Select queues">
+        <mat-select data-testid="jcd-msel-083" [(ngModel)]="selectedQueueIds" multiple (selectionChange)="onQueueSelectionChange()" placeholder="Select queues">
           <mat-option *ngFor="let q of queueList" [value]="q.id">{{ q.name }}</mat-option>
         </mat-select>
       </mat-form-field>
-      <button class="btn" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e;font-weight:700" (click)="openCrossoverMetricsDialog()">Crossover Metrics</button>
+      <button data-testid="jcd-btn-084" class="btn" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e;font-weight:700" (click)="openCrossoverMetricsDialog()">Crossover Metrics</button>
     </div>
 
     <div class="eco-grid">
@@ -535,56 +535,56 @@
             <tbody>
               <tr>
                 <td><span style="color:var(--success);font-weight:600">● Happy</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'liked','Ask AH · Happy')">{{ askAHLoveLetterSummary.askAH.liked }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" style="color:var(--success)" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'liked','Love Letter · Happy')">{{ askAHLoveLetterSummary.loveLetter.liked }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Happy · Combined')">{{ askAHLoveLetterSummary.liked }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'likedResolved','Happy · Resolved')">{{ askAHLoveLetterSummary.resolvedLiked || 0 }}</span></td>
+                <td class="c"><span data-testid="jcd-span-085" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'liked','Ask AH · Happy')">{{ askAHLoveLetterSummary.askAH.liked }}</span></td>
+                <td class="c"><span data-testid="jcd-span-086" class="jcd-clickable-num" style="color:var(--success)" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'liked','Love Letter · Happy')">{{ askAHLoveLetterSummary.loveLetter.liked }}</span></td>
+                <td class="c"><span data-testid="jcd-span-087" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Happy · Combined')">{{ askAHLoveLetterSummary.liked }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-088" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'likedResolved','Happy · Resolved')">{{ askAHLoveLetterSummary.resolvedLiked || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--warning);font-weight:600">△ Needs Attention</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'tagged','Ask AH · Needs Attention')">{{ askAHLoveLetterSummary.askAH.tagged }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'tagged','Love Letter · Needs Attention')">{{ askAHLoveLetterSummary.loveLetter.tagged }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" style="color:var(--warning)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'tagged','Needs Attention · Combined')">{{ askAHLoveLetterSummary.tagged }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'taggedResolved','Needs Attention · Resolved')">{{ askAHLoveLetterSummary.resolvedTagged || 0 }}</span></td>
+                <td class="c"><span data-testid="jcd-span-089" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'tagged','Ask AH · Needs Attention')">{{ askAHLoveLetterSummary.askAH.tagged }}</span></td>
+                <td class="c"><span data-testid="jcd-span-090" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'tagged','Love Letter · Needs Attention')">{{ askAHLoveLetterSummary.loveLetter.tagged }}</span></td>
+                <td class="c"><span data-testid="jcd-span-091" class="jcd-clickable-num" style="color:var(--warning)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'tagged','Needs Attention · Combined')">{{ askAHLoveLetterSummary.tagged }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-092" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'taggedResolved','Needs Attention · Resolved')">{{ askAHLoveLetterSummary.resolvedTagged || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--primary);font-weight:600">● Opportunity</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'opportunity','Ask AH · Opportunity')">{{ askAHLoveLetterSummary.askAH.opportunity }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'opportunity','Love Letter · Opportunity')">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunity','Opportunity · Combined')">{{ askAHLoveLetterSummary.opportunity }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunityResolved','Opportunity · Resolved')">{{ askAHLoveLetterSummary.resolvedOpportunity || 0 }}</span></td>
+                <td class="c"><span data-testid="jcd-span-093" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'opportunity','Ask AH · Opportunity')">{{ askAHLoveLetterSummary.askAH.opportunity }}</span></td>
+                <td class="c"><span data-testid="jcd-span-094" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'opportunity','Love Letter · Opportunity')">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</span></td>
+                <td class="c"><span data-testid="jcd-span-095" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunity','Opportunity · Combined')">{{ askAHLoveLetterSummary.opportunity }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-096" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunityResolved','Opportunity · Resolved')">{{ askAHLoveLetterSummary.resolvedOpportunity || 0 }}</span></td>
               </tr>
               <tr>
                 <td><span style="color:var(--danger);font-weight:600">● Critical</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'critical','Ask AH · Critical')">{{ askAHLoveLetterSummary.askAH.critical }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'critical','Love Letter · Critical')">{{ askAHLoveLetterSummary.loveLetter.critical }}</span></td>
-                <td class="c"><span class="jcd-clickable-num" style="color:var(--danger)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'critical','Critical · Combined')">{{ askAHLoveLetterSummary.critical }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalResolved','Critical · Resolved')">{{ askAHLoveLetterSummary.resolvedCritical || 0 }}</span></td>
+                <td class="c"><span data-testid="jcd-span-097" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'critical','Ask AH · Critical')">{{ askAHLoveLetterSummary.askAH.critical }}</span></td>
+                <td class="c"><span data-testid="jcd-span-098" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'critical','Love Letter · Critical')">{{ askAHLoveLetterSummary.loveLetter.critical }}</span></td>
+                <td class="c"><span data-testid="jcd-span-099" class="jcd-clickable-num" style="color:var(--danger)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'critical','Critical · Combined')">{{ askAHLoveLetterSummary.critical }}</span></td>
+                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-100" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalResolved','Critical · Resolved')">{{ askAHLoveLetterSummary.resolvedCritical || 0 }}</span></td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
                 <td><strong>Total Flagged</strong></td>
-                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</strong></td>
-                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</strong></td>
-                <td class="c"><strong class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</strong></td>
-                <td class="c" style="background:#f5f3ff"><strong class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'anyResolved','All Resolved')">{{ askAHLoveLetterSummary.resolvedTotal || 0 }}</strong></td>
+                <td class="c"><strong data-testid="jcd-strong-101" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</strong></td>
+                <td class="c"><strong data-testid="jcd-strong-102" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</strong></td>
+                <td class="c"><strong data-testid="jcd-strong-103" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</strong></td>
+                <td class="c" style="background:#f5f3ff"><strong data-testid="jcd-strong-104" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'anyResolved','All Resolved')">{{ askAHLoveLetterSummary.resolvedTotal || 0 }}</strong></td>
               </tr>
             </tfoot>
           </table>
           <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="padding:12px;background:linear-gradient(135deg,#fce7f3,#fdf2f8);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'unflagged','Unflagged Profiles')">
+            <div data-testid="jcd-div-105" style="padding:12px;background:linear-gradient(135deg,#fce7f3,#fdf2f8);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'unflagged','Unflagged Profiles')">
               <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#be185d;letter-spacing:0.4px;margin-bottom:4px">Unflagged</div>
               <div style="font-size:26px;font-weight:900;color:#be185d;line-height:1">{{ askAHLoveLetterSummary.unflagged }}</div>
               <div style="font-size:10px;color:#be185d;margin-top:3px">No flag assigned</div>
             </div>
-            <div style="padding:12px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Positive Flags · Happy')">
+            <div data-testid="jcd-div-106" style="padding:12px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Positive Flags · Happy')">
               <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#065f46;letter-spacing:0.4px;margin-bottom:4px">Positive Flags</div>
               <div style="font-size:26px;font-weight:900;color:var(--success);line-height:1">{{ askAHLoveLetterSummary.liked }}</div>
               <div style="font-size:10px;color:#065f46;margin-top:3px">Happy responses</div>
             </div>
           </div>
-          <div style="margin-top:8px;padding:10px 14px;background:var(--warning-light);border-radius:var(--radius-xs);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalOrTagged','Critical + Needs Attention')">
+          <div data-testid="jcd-div-107" style="margin-top:8px;padding:10px 14px;background:var(--warning-light);border-radius:var(--radius-xs);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalOrTagged','Critical + Needs Attention')">
             <div>
               <div style="font-size:10px;font-weight:700;color:#92400e">Critical + Needs Attention</div>
               <div style="font-size:10px;color:#92400e;margin-top:2px">Requires immediate response</div>
@@ -604,21 +604,21 @@
           <div class="total-banner">
             <div class="total-top-row">
               <span class="total-title">{{ activeMonthSummary.monthLabel }}</span>
-              <button class="eye-btn" (click)="openAllMonthsDialog()">
+              <button data-testid="jcd-btn-108" class="eye-btn" (click)="openAllMonthsDialog()">
                 <svg class="eye-svg" viewBox="0 0 24 24" fill="none"><path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#9299B0" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="#9299B0" stroke-width="1.8"/></svg>
               </button>
             </div>
             <div class="total-stats">
               <div class="ts"><div class="ts-num total">{{ activeMonthSummary.totalInterims }}</div><div class="ts-lbl">Total</div></div>
-              <div class="ts"><div class="ts-num up" (click)="openProgressedDialog()">{{ activeProgressedCount }}</div><div class="ts-lbl">Progressed</div><div class="ts-bar up" [style.width.%]="progressedPercentage"></div></div>
-              <div class="ts"><div class="ts-num dn" (click)="openRegressedDialog()">{{ activeRegressedCount }}</div><div class="ts-lbl">Regressed</div><div class="ts-bar dn" [style.width.%]="regressedPercentage"></div></div>
-              <div class="ts"><div class="ts-num nc" (click)="openNoChangeDialog()">{{ activeMonthSummary.noChangeCount }}</div><div class="ts-lbl">No change</div><div class="ts-bar nc" [style.width.%]="noChangePercentage"></div></div>
+              <div class="ts"><div data-testid="jcd-div-109" class="ts-num up" (click)="openProgressedDialog()">{{ activeProgressedCount }}</div><div class="ts-lbl">Progressed</div><div class="ts-bar up" [style.width.%]="progressedPercentage"></div></div>
+              <div class="ts"><div data-testid="jcd-div-110" class="ts-num dn" (click)="openRegressedDialog()">{{ activeRegressedCount }}</div><div class="ts-lbl">Regressed</div><div class="ts-bar dn" [style.width.%]="regressedPercentage"></div></div>
+              <div class="ts"><div data-testid="jcd-div-111" class="ts-num nc" (click)="openNoChangeDialog()">{{ activeMonthSummary.noChangeCount }}</div><div class="ts-lbl">No change</div><div class="ts-bar nc" [style.width.%]="noChangePercentage"></div></div>
             </div>
           </div>
           <div class="month-tabs">
-            <div *ngFor="let ms of monthSummaries; let i = index" class="mtab" [class.active]="i===activeMonthIndex" (click)="switchActiveMonth(i)">{{ getTabLabel(ms) }}</div>
+            <div data-testid="jcd-div-112" *ngFor="let ms of monthSummaries; let i = index" class="mtab" [class.active]="i===activeMonthIndex" (click)="switchActiveMonth(i)">{{ getTabLabel(ms) }}</div>
           </div>
-          <div class="nc-banner" (click)="openNoChangeDialog()">
+          <div data-testid="jcd-div-113" class="nc-banner" (click)="openNoChangeDialog()">
             <div class="nc-left"><div class="nc-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div><div class="nc-label">No Change · {{ activeMonthSummary.monthLabel }}</div><div class="nc-pct">{{ noChangePercentage }}% of {{ activeMonthSummary.totalInterims }} · tap to view</div></div></div>
             <div class="nc-num">{{ activeMonthSummary.noChangeCount }}</div>
           </div>
@@ -626,16 +626,16 @@
             <div class="col">
               <div class="col-head"><div class="col-head-title up"><span class="ch-dot up"></span>Progressed · {{ activeProgressedCount }}</div></div>
               <div class="area-head">Areas changed</div>
-              <div *ngFor="let areaKey of AREA_KEYS" class="arow hu" (click)="openAreaDialog('up',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill up" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'up',areaKey),getMaxValue(activeMonthSummary.progressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'up',areaKey) }}</span></div></div>
+              <div data-testid="jcd-div-114" *ngFor="let areaKey of AREA_KEYS" class="arow hu" (click)="openAreaDialog('up',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill up" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'up',areaKey),getMaxValue(activeMonthSummary.progressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'up',areaKey) }}</span></div></div>
               <div class="cat-head">By category</div>
-              <div *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('up',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill up" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'up',category),getMaxValue(activeMonthSummary.progressedData.categoryBreakdown))"></div></div><span class="crow-num up">{{ getCategoryValue(activeMonthSummary,'up',category) }}</span></div></div>
+              <div data-testid="jcd-div-115" *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('up',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill up" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'up',category),getMaxValue(activeMonthSummary.progressedData.categoryBreakdown))"></div></div><span class="crow-num up">{{ getCategoryValue(activeMonthSummary,'up',category) }}</span></div></div>
             </div>
             <div class="col">
               <div class="col-head"><div class="col-head-title dn"><span class="ch-dot dn"></span>Regressed · {{ activeRegressedCount }}</div></div>
               <div class="area-head">Areas changed</div>
-              <div *ngFor="let areaKey of AREA_KEYS" class="arow hd" (click)="openAreaDialog('dn',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill dn" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'dn',areaKey),getMaxValue(activeMonthSummary.regressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'dn',areaKey) }}</span></div></div>
+              <div data-testid="jcd-div-116" *ngFor="let areaKey of AREA_KEYS" class="arow hd" (click)="openAreaDialog('dn',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill dn" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'dn',areaKey),getMaxValue(activeMonthSummary.regressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'dn',areaKey) }}</span></div></div>
               <div class="cat-head">By category</div>
-              <div *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('dn',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill dn" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'dn',category),getMaxValue(activeMonthSummary.regressedData.categoryBreakdown))"></div></div><span class="crow-num dn">{{ getCategoryValue(activeMonthSummary,'dn',category) }}</span></div></div>
+              <div data-testid="jcd-div-117" *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('dn',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill dn" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'dn',category),getMaxValue(activeMonthSummary.regressedData.categoryBreakdown))"></div></div><span class="crow-num dn">{{ getCategoryValue(activeMonthSummary,'dn',category) }}</span></div></div>
             </div>
           </div>
         </div>
@@ -655,7 +655,7 @@
           <thead><tr><th></th><th>Key</th><th class="c">Profiles</th><th class="c">Adjustments</th><th class="c">Percent</th></tr></thead>
           <tbody>
             <div class="hk-table-hd" style="display:none"></div><!-- keep hk classes available -->
-            <tr *ngFor="let k of healthKeyData; let i = index" (click)="openHealthKeyDialog(k.key)" style="cursor:pointer">
+            <tr data-testid="jcd-tr-118" *ngFor="let k of healthKeyData; let i = index" (click)="openHealthKeyDialog(k.key)" style="cursor:pointer">
               <td style="width:24px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%" [style.background]="k.color"></span></td>
               <td>{{ k.key }}</td>
               <td class="c">{{ k.profileCount }}</td>
@@ -686,10 +686,10 @@
               <tbody>
                 <tr *ngFor="let key of evolutionProgressData.keys">
                   <td>{{ key }}</td>
-                  <td class="c"><span *ngIf="getEpBandCount(key,0)>0" style="cursor:pointer;color:var(--success);font-weight:700" (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span><span *ngIf="!getEpBandCount(key,0)">&mdash;</span></td>
-                  <td class="c"><span *ngIf="getEpBandCount(key,1)>0" style="cursor:pointer;color:var(--primary);font-weight:700" (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span><span *ngIf="!getEpBandCount(key,1)">&mdash;</span></td>
-                  <td class="c"><span *ngIf="getEpBandCount(key,2)>0" style="cursor:pointer;color:var(--warning);font-weight:700" (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span><span *ngIf="!getEpBandCount(key,2)">&mdash;</span></td>
-                  <td class="c"><span *ngIf="getEpBandCount(key,3)>0" style="cursor:pointer;color:var(--danger);font-weight:700" (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span><span *ngIf="!getEpBandCount(key,3)">&mdash;</span></td>
+                  <td class="c"><span data-testid="jcd-span-119" *ngIf="getEpBandCount(key,0)>0" style="cursor:pointer;color:var(--success);font-weight:700" (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span><span *ngIf="!getEpBandCount(key,0)">&mdash;</span></td>
+                  <td class="c"><span data-testid="jcd-span-120" *ngIf="getEpBandCount(key,1)>0" style="cursor:pointer;color:var(--primary);font-weight:700" (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span><span *ngIf="!getEpBandCount(key,1)">&mdash;</span></td>
+                  <td class="c"><span data-testid="jcd-span-121" *ngIf="getEpBandCount(key,2)>0" style="cursor:pointer;color:var(--warning);font-weight:700" (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span><span *ngIf="!getEpBandCount(key,2)">&mdash;</span></td>
+                  <td class="c"><span data-testid="jcd-span-122" *ngIf="getEpBandCount(key,3)>0" style="cursor:pointer;color:var(--danger);font-weight:700" (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span><span *ngIf="!getEpBandCount(key,3)">&mdash;</span></td>
                 </tr>
               </tbody>
             </table>
@@ -715,16 +715,16 @@
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px">ATC Status</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <ng-container *ngIf="(totalATC | keyvalue)?.length > 0; else atcEmpty">
-        <div *ngFor="let total of totalATC | keyvalue" style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--success);cursor:pointer" (click)="openEcoDialog(total.value,'Total ATC')">
+        <div data-testid="jcd-div-123" *ngFor="let total of totalATC | keyvalue" style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--success);cursor:pointer" (click)="openEcoDialog(total.value,'Total ATC')">
           <div style="font-size:28px;font-weight:800;color:var(--success)">{{total.key}}</div>
           <div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px">Validated Total ATC</div>
-          <div style="margin-top:6px;padding:4px 8px;background:#fff;border-radius:4px;font-size:11px;color:var(--success);font-weight:600;cursor:pointer" (click)="openEcoDialog(percentageCompleted,'Completed ATC');$event.stopPropagation()">&#10003; {{percentageCompleted.length}} Completed</div>
+          <div data-testid="jcd-div-124" style="margin-top:6px;padding:4px 8px;background:#fff;border-radius:4px;font-size:11px;color:var(--success);font-weight:600;cursor:pointer" (click)="openEcoDialog(percentageCompleted,'Completed ATC');$event.stopPropagation()">&#10003; {{percentageCompleted.length}} Completed</div>
         </div>
       </ng-container>
       <ng-template #atcEmpty>
         <div style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--success)"><div style="font-size:28px;font-weight:800;color:var(--success)">0</div><div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px">Validated Total ATC</div></div>
       </ng-template>
-      <div style="padding:14px;background:var(--warning-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--warning);cursor:pointer" (click)="openEcoDialog(unvalidatedATC,'Unvalidated ATC')">
+      <div data-testid="jcd-div-125" style="padding:14px;background:var(--warning-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--warning);cursor:pointer" (click)="openEcoDialog(unvalidatedATC,'Unvalidated ATC')">
         <div style="font-size:28px;font-weight:800;color:var(--orange)">{{unvalidatedATC.length}}</div>
         <div style="font-size:10px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px">Unvalidated ATC</div>
         <div style="margin-top:6px;padding:4px 8px;background:#fff;border-radius:4px;font-size:11px;color:var(--warning);font-weight:600">&#9711; Awaiting Review</div>
@@ -732,7 +732,7 @@
     </div>
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px">Products <span style="float:right;font-size:13px;font-weight:800;color:var(--text)">{{totalProductCount}}</span></div>
     <div class="scroll-box" style="max-height:140px;margin-bottom:14px">
-      <div *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc" style="display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
+      <div data-testid="jcd-div-126" *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc" style="display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
         <span>{{impact.key}}</span>
         <span class="badge" style="background:var(--primary);min-width:34px">{{impact.value.length}}</span>
       </div>
@@ -743,25 +743,25 @@
   <!-- Total Adjustments -->
   <div class="card">
     <div class="card-h"><span class="card-t">Total Adjustments</span></div>
-    <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:var(--radius-sm);margin-bottom:16px;border:1px solid #bae6fd;cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment',totalAdjustmentsCompletedMap['count'])">
+    <div data-testid="jcd-div-127" style="text-align:center;padding:20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:var(--radius-sm);margin-bottom:16px;border:1px solid #bae6fd;cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment',totalAdjustmentsCompletedMap['count'])">
       <div style="font-size:48px;font-weight:900;color:var(--teal);line-height:1">{{totalAdjustmentsCompletedMap['count']}}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
-        <div style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--success);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware',totalAdjustmentAwareMap['count']);$event.stopPropagation()">
+        <div data-testid="jcd-div-128" style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--success);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware',totalAdjustmentAwareMap['count']);$event.stopPropagation()">
           <div style="font-size:20px;font-weight:800;color:var(--success)">{{totalAdjustmentAwareMap['count']}}</div>
           <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Aware</div>
         </div>
-        <div style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--warning);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware',totalAdjustmentUnAwareMap['count']);$event.stopPropagation()">
+        <div data-testid="jcd-div-129" style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--warning);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware',totalAdjustmentUnAwareMap['count']);$event.stopPropagation()">
           <div style="font-size:20px;font-weight:800;color:var(--warning)">{{totalAdjustmentUnAwareMap['count']}}</div>
           <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Unaware</div>
         </div>
       </div>
     </div>
     <div class="lim-sav-grid">
-      <div style="padding:14px;background:var(--danger-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
+      <div data-testid="jcd-div-130" style="padding:14px;background:var(--danger-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--danger);letter-spacing:0.4px;margin-bottom:4px">Limitation Years</div>
         <div style="font-size:26px;font-weight:800;color:var(--danger)">{{evolutionYearWastedMap['count'] || 0}}</div>
       </div>
-      <div style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
+      <div data-testid="jcd-div-131" style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--success);letter-spacing:0.4px;margin-bottom:4px">Saved Years</div>
         <div style="font-size:26px;font-weight:800;color:var(--success)">{{evolutionYearSavedMap['count'] || 0}}</div>
       </div>
@@ -776,7 +776,7 @@
     </div>
     <div class="scroll-box" style="max-height:400px">
       <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-        <div *ngIf="mapprofile[impact.key] != null"
+        <div data-testid="jcd-div-132" *ngIf="mapprofile[impact.key] != null"
           style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
           (click)="profileNavigation(impact.key)">
 
@@ -812,7 +812,7 @@
         <!-- Search -->
         <div class="jcd-filter-field jcd-filter-search" *ngIf="currentTableConfig?.filters?.includes('search')">
           <svg class="jcd-ff-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input class="jcd-ff-input" type="text" placeholder="Search by Name, Mobile, Email..." formControlName="search" (input)="filterTableData(filterForm.value)" />
+          <input data-testid="jcd-inp-133" class="jcd-ff-input" type="text" placeholder="Search by Name, Mobile, Email..." formControlName="search" (input)="filterTableData(filterForm.value)" />
         </div>
 
         <!-- Purchase Date -->
@@ -820,8 +820,8 @@
           <span class="jcd-ff-label">Purchase Date</span>
           <div class="jcd-ff-date-inner">
             <mat-date-range-input [rangePicker]="picker2" style="font-size:12px;color:#1e293b">
-              <input matStartDate formControlName="purchaseStart" placeholder="Start" />
-              <input matEndDate formControlName="purchaseEnd" placeholder="End" />
+              <input data-testid="jcd-inp-134" matStartDate formControlName="purchaseStart" placeholder="Start" />
+              <input data-testid="jcd-inp-135" matEndDate formControlName="purchaseEnd" placeholder="End" />
             </mat-date-range-input>
             <mat-datepicker-toggle [for]="picker2" class="jcd-date-toggle"></mat-datepicker-toggle>
             <mat-date-range-picker #picker2 (closed)="filterTableData(filterForm.value)"></mat-date-range-picker>
@@ -832,7 +832,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('journey')">
           <span class="jcd-ff-label">Journey</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="journey" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-136" class="jcd-ff-select" formControlName="journey" (change)="filterTableData(filterForm.value)">
               <option value="">All Journeys</option>
               <option *ngFor="let journey of journeyList" [value]="journey">{{ journey }}</option>
             </select>
@@ -844,7 +844,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('journeycoach')">
           <span class="jcd-ff-label">Journey Coach</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="journeycoach" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-137" class="jcd-ff-select" formControlName="journeycoach" (change)="filterTableData(filterForm.value)">
               <option value="">All Coaches</option>
               <option *ngFor="let coach of coachesList" [value]="coach.profile_ref.id">{{ mapprofile[coach.profile_ref.id] }}</option>
             </select>
@@ -856,7 +856,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('assured')">
           <span class="jcd-ff-label">Assured</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="assured" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-138" class="jcd-ff-select" formControlName="assured" (change)="filterTableData(filterForm.value)">
               <option value="">All</option>
               <option *ngFor="let assured of assuredList" [value]="assured">{{ assured.toLocaleUpperCase() }}</option>
             </select>
@@ -868,7 +868,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('status')">
           <span class="jcd-ff-label">Status</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="status" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-139" class="jcd-ff-select" formControlName="status" (change)="filterTableData(filterForm.value)">
               <option value="">All</option>
               <option *ngFor="let status of statusList" [value]="status">{{ status.toLocaleUpperCase() }}</option>
             </select>
@@ -880,7 +880,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('saleType')">
           <span class="jcd-ff-label">Sale Type</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="saleType" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-140" class="jcd-ff-select" formControlName="saleType" (change)="filterTableData(filterForm.value)">
               <option value="">All</option>
               <option *ngFor="let saleType of saleTypeList" [value]="saleType">{{ saleType.toLocaleUpperCase() }}</option>
             </select>
@@ -892,7 +892,7 @@
         <div class="jcd-filter-field" *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
           <span class="jcd-ff-label">Customer Status</span>
           <div class="jcd-ff-select-inner">
-            <select class="jcd-ff-select" formControlName="customerStatus" (change)="filterTableData(filterForm.value)">
+            <select data-testid="jcd-sel-141" class="jcd-ff-select" formControlName="customerStatus" (change)="filterTableData(filterForm.value)">
               <option value="">All</option>
               <option *ngFor="let status of customerStatusList" [value]="status">{{ status }}</option>
             </select>
@@ -901,7 +901,7 @@
         </div>
 
         <!-- Refresh -->
-        <button class="jcd-ff-refresh" type="button" (click)="refreshFilter()" title="Refresh filters">
+        <button data-testid="jcd-btn-142" class="jcd-ff-refresh" type="button" (click)="refreshFilter()" title="Refresh filters">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         </button>
 
@@ -931,11 +931,11 @@
           <span class="jcd-legend-item"><span class="jcd-legend-dot" style="background:#dc3545"></span>Non-Active: <strong style="color:#dc3545">{{getNonactiveCount()}}</strong></span>
           <span class="jcd-legend-item"><span class="jcd-legend-dot" style="background:#9E9E9E"></span>Discontinued: <strong style="color:#9E9E9E">{{getDiscontinuedCount()}}</strong></span>
         </div>
-        <button class="jcd-export-btn" (click)="exportTableData()">
+        <button data-testid="jcd-btn-143" class="jcd-export-btn" (click)="exportTableData()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button>
-        <button class="jcd-close-btn" (click)="closeTable()">
+        <button data-testid="jcd-btn-144" class="jcd-close-btn" (click)="closeTable()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -947,7 +947,7 @@
         <thead>
           <tr>
             <th class="jcd-th jcd-th-sno">S.No</th>
-            <th class="jcd-th" *ngFor="let column of currentTableConfig?.columns"
+            <th data-testid="jcd-th-145" class="jcd-th" *ngFor="let column of currentTableConfig?.columns"
               [style.width]="column.width"
               [class.jcd-th-sort]="isSortable(column)"
               (click)="isSortable(column) && sortTable(column.key)">
@@ -971,7 +971,7 @@
               </span>
 
               <!-- Name — clickable -->
-              <span *ngIf="column.header === 'Name'"
+              <span data-testid="jcd-span-146" *ngIf="column.header === 'Name'"
                 style="display: flex; align-items: center; gap: 8px; cursor: pointer;"
                 (click)="navigatetoprofile(row['profileid'])">
 
@@ -987,7 +987,7 @@
 
               <!-- Schedule button -->
               <span *ngIf="column.key === 'schedule'">
-                <button class="jcd-sched-btn"
+                <button data-testid="jcd-btn-147" class="jcd-sched-btn"
                   [style.background]="row['onboardingscheduled'] ? (row['onboardingscheduled'].toDate() > currentDate ? '#16a34a' : '#dc2626') : (row['onreschedule'] ? '#dc2626' : '#2563eb')"
                   (click)="openSchedule(row,'onboarding')">
                   {{ row['onboardingscheduled'] != null
@@ -1006,7 +1006,7 @@
               <!-- Profile Tags — custom select -->
               <span *ngIf="column.key === 'profiletags'">
                 <div class="jcd-select-wrap jcd-inline-select">
-                  <select class="jcd-select jcd-select-sm"
+                  <select data-testid="jcd-sel-148" class="jcd-select jcd-select-sm"
                     [value]="getJourneyCoachTag(row.profileid)"
                     (change)="updateParticipantTag(row.profileid, $any($event.target).value, getJourneyCoachTag(row.profileid))">
                     <option [value]="null">No tag</option>
@@ -1018,7 +1018,7 @@
 
               <!-- Add Notes -->
               <span *ngIf="column.key === 'addnotes'">
-                <button class="jcd-icon-btn" (click)="addNotes(row)" title="Edit notes">
+                <button data-testid="jcd-btn-149" class="jcd-icon-btn" (click)="addNotes(row)" title="Edit notes">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4z"/></svg>
                 </button>
               </span>
@@ -1026,7 +1026,7 @@
               <!-- Menu button -->
               <span *ngIf="column.key === 'menubutton'">
                 <div class="jcd-menu-wrap">
-                  <button class="jcd-icon-btn" (click)="showParticipantMenu(row,$event)" [matMenuTriggerFor]="participantMenu">
+                  <button data-testid="jcd-btn-150" class="jcd-icon-btn" (click)="showParticipantMenu(row,$event)" [matMenuTriggerFor]="participantMenu">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                   </button>
                   <mat-menu #participantMenu="matMenu">
@@ -1051,7 +1051,7 @@
               <span *ngIf="column.key === 'generalnotes'" #notesContainer
                 (mouseenter)="showPopup(row,$event,notesContainer)" (mouseleave)="hidePopupWithDelay()">
                 <div *ngIf="row['generalnotes']?.length > 0">
-                  <span class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['generalnotes'][row['generalnotes'].length-1].note">
+                  <span data-testid="jcd-span-151" class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['generalnotes'][row['generalnotes'].length-1].note">
                     {{ row['generalnotes'][row['generalnotes'].length-1].note | slice:0:20 }}…
                   </span>
                 </div>
@@ -1061,7 +1061,7 @@
               <span *ngIf="column.key === 'salenotes'" #saleNotesContainer
                 (mouseenter)="showPopup(row,$event,saleNotesContainer)" (mouseleave)="hidePopupWithDelay()">
                 <div *ngIf="row['salenotes'] && row['salenotes'].length > 0">
-                  <span class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['salenotes']">
+                  <span data-testid="jcd-span-152" class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['salenotes']">
                     {{ row['salenotes'] | slice:0:40 }}…
                   </span>
                 </div>
@@ -1069,7 +1069,7 @@
 
               <!-- Mark Onboarded action -->
               <span *ngIf="column.key === 'action'">
-                <button class="jcd-action-btn"
+                <button data-testid="jcd-btn-153" class="jcd-action-btn"
                   [class.jcd-action-btn--active]="!checkMarkOnboarding(row)"
                   [disabled]="checkMarkOnboarding(row)"
                   (click)="markOnboarded(row)">
@@ -1079,8 +1079,8 @@
 
               <!-- Journey plan + Schedule coach -->
               <span *ngIf="column.key === 'journeyplan'" [ngClass]="getColumnClass(row.tentativestart)" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                <button class="jcd-outline-btn" (click)="navigatejourneyplan(row)">Journey Plan</button>
-                <button class="jcd-outline-btn" *ngIf="tableType=='overallParticipants'"
+                <button data-testid="jcd-btn-154" class="jcd-outline-btn" (click)="navigatejourneyplan(row)">Journey Plan</button>
+                <button data-testid="jcd-btn-155" class="jcd-outline-btn" *ngIf="tableType=='overallParticipants'"
                   [style.border-color]="[null,undefined].includes(mapCoachAppointments[row['profileid']]) ? '#2563eb' : '#16a34a'"
                   [style.color]="[null,undefined].includes(mapCoachAppointments[row['profileid']]) ? '#2563eb' : '#16a34a'"
                   (click)="![null,undefined].includes(mapCoachAppointments[row['profileid']]) && mapCoachAppointments[row['profileid']][0]['attended'] ? null : openSchedule(row,'coach')">
@@ -1091,9 +1091,9 @@
               <!-- Mark Coach Complete / Book Again -->
               <span *ngIf="column.key === 'markcoach'">
                 <ng-container *ngIf="mapCoachAppointments[row['profileid']]?.[0] as appointment">
-                  <button class="jcd-action-btn jcd-action-btn--active" *ngIf="!appointment.attended && !appointment.cancelled; else bookAgainTpl" (click)="markJCcomplete(row,appointment)">Mark Complete</button>
+                  <button data-testid="jcd-btn-156" class="jcd-action-btn jcd-action-btn--active" *ngIf="!appointment.attended && !appointment.cancelled; else bookAgainTpl" (click)="markJCcomplete(row,appointment)">Mark Complete</button>
                   <ng-template #bookAgainTpl>
-                    <button class="jcd-outline-btn" (click)="openSchedule(row,'coach')">Book Again</button>
+                    <button data-testid="jcd-btn-157" class="jcd-outline-btn" (click)="openSchedule(row,'coach')">Book Again</button>
                   </ng-template>
                 </ng-container>
               </span>
@@ -1102,7 +1102,7 @@
               <span *ngIf="column.key === 'notes'" #notesContainer2
                 (mouseenter)="showPopup(row,$event,notesContainer2)" (mouseleave)="hidePopupWithDelay()">
                 <div *ngIf="row['notes'] && row['notes'].length > 0">
-                  <span class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['notes']">
+                  <span data-testid="jcd-span-158" class="jcd-note-text" (click)="viewNotes(row,column.key)" [matTooltip]="row['notes']">
                     {{ row['notes'] | slice:0:50 }}…
                   </span>
                 </div>
@@ -1126,20 +1126,20 @@
         Showing {{ (currentPage-1)*itemsPerPage+1 }}–{{ Math.min(currentPage*itemsPerPage, filteredTableData.length) }} of {{ filteredTableData.length }}
       </div>
       <div class="jcd-pagination-btns">
-        <button class="jcd-pg-btn" (click)="firstPage()" [disabled]="currentPage===1" title="First">
+        <button data-testid="jcd-btn-159" class="jcd-pg-btn" (click)="firstPage()" [disabled]="currentPage===1" title="First">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z"/></svg>
         </button>
-        <button class="jcd-pg-btn" (click)="previousPage()" [disabled]="currentPage===1">Prev</button>
-        <button class="jcd-pg-btn jcd-pg-num" *ngFor="let page of getPageNumbers()" [class.jcd-pg-active]="page===currentPage" (click)="goToPage(page)">{{ page }}</button>
-        <button class="jcd-pg-btn" (click)="nextPage()" [disabled]="currentPage===totalPages">Next</button>
-        <button class="jcd-pg-btn" (click)="lastPage()" [disabled]="currentPage===totalPages" title="Last">
+        <button data-testid="jcd-btn-160" class="jcd-pg-btn" (click)="previousPage()" [disabled]="currentPage===1">Prev</button>
+        <button data-testid="jcd-btn-161" class="jcd-pg-btn jcd-pg-num" *ngFor="let page of getPageNumbers()" [class.jcd-pg-active]="page===currentPage" (click)="goToPage(page)">{{ page }}</button>
+        <button data-testid="jcd-btn-162" class="jcd-pg-btn" (click)="nextPage()" [disabled]="currentPage===totalPages">Next</button>
+        <button data-testid="jcd-btn-163" class="jcd-pg-btn" (click)="lastPage()" [disabled]="currentPage===totalPages" title="Last">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z"/></svg>
         </button>
       </div>
       <div class="jcd-pg-size">
         <span>Rows:</span>
         <div class="jcd-select-wrap" style="min-width:70px">
-          <select class="jcd-select jcd-select-sm" [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+          <select data-testid="jcd-sel-164" class="jcd-select jcd-select-sm" [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
             <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{ option }}</option>
           </select>
           <svg class="jcd-select-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1153,12 +1153,12 @@
 
 <!-- ══════ ALL EXISTING DIALOGS (verbatim from original) ══════ -->
 
-<div class="overlay" [class.open]="isDialogOpen" (click)="onDialogOverlayClick($event)">
+<div data-testid="jcd-div-165" class="overlay" [class.open]="isDialogOpen" (click)="onDialogOverlayClick($event)">
   <div class="dialog" *ngIf="dialogContext">
     <ng-container *ngIf="selectedProfile; else listView">
-      <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="dialogContext.statusClass">{{ getInitials(selectedProfile.profileName || selectedProfile.profileId) }}</div><div><div class="dlg-title">{{ selectedProfile.profileName || selectedProfile.profileId }}</div><div class="dlg-sub">{{ selectedProfile.createdDate }} · {{ dialogContext.statusType==='up'?'Progressed':dialogContext.statusType==='dn'?'Regressed':'No change' }}</div></div></div><button class="close-btn" (click)="closeDialog()">✕</button></div>
+      <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="dialogContext.statusClass">{{ getInitials(selectedProfile.profileName || selectedProfile.profileId) }}</div><div><div class="dlg-title">{{ selectedProfile.profileName || selectedProfile.profileId }}</div><div class="dlg-sub">{{ selectedProfile.createdDate }} · {{ dialogContext.statusType==='up'?'Progressed':dialogContext.statusType==='dn'?'Regressed':'No change' }}</div></div></div><button data-testid="jcd-btn-166" class="close-btn" (click)="closeDialog()">✕</button></div>
       <div class="dlg-body">
-        <div class="back-btn" (click)="backToProfileList()">‹ Back to list</div>
+        <div data-testid="jcd-div-167" class="back-btn" (click)="backToProfileList()">‹ Back to list</div>
         <div class="changed-tags" *ngIf="getAllChangedAreas(selectedProfile).length"><span *ngFor="let area of selectedProfile.progressedAreas" class="changed-tag up">{{ area }}</span><span *ngFor="let area of selectedProfile.regressedAreas" class="changed-tag dn">{{ area }}</span></div>
         <div class="sec-lbl">Category breakdown · start → end</div>
         <div *ngFor="let category of CATEGORIES" class="cat-card" [style.border-color]="isCategoryChanged(selectedProfile,category)?(getCategoryChangeType(selectedProfile,category)==='up'?'var(--up-mid)':'var(--dn-mid)'):'var(--border)'">
@@ -1171,20 +1171,20 @@
       </div>
     </ng-container>
     <ng-template #listView>
-      <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="dialogContext.statusClass">{{ dialogContext.statusClass==='up'?'↑':dialogContext.statusClass==='dn'?'↓':'—' }}</div><div><div class="dlg-title">{{ dialogContext.dialogTitle }}</div><div class="dlg-sub">{{ dialogContext.dialogSubtitle }}</div></div></div><div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportDialogData(dialogProfileList, dialogContext.dialogTitle)">
+      <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="dialogContext.statusClass">{{ dialogContext.statusClass==='up'?'↑':dialogContext.statusClass==='dn'?'↓':'—' }}</div><div><div class="dlg-title">{{ dialogContext.dialogTitle }}</div><div class="dlg-sub">{{ dialogContext.dialogSubtitle }}</div></div></div><div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-168" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportDialogData(dialogProfileList, dialogContext.dialogTitle)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeDialog()">✕</button></div></div>
+        </button><button data-testid="jcd-btn-169" class="close-btn" (click)="closeDialog()">✕</button></div></div>
       <div class="dlg-body">
         <div class="sec-lbl" style="margin-bottom:8px;">Click name to view their interim</div>
         <div *ngIf="dialogProfileList.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div>
-        <div *ngFor="let profile of dialogProfileList" class="participant-row" (click)="openProfileDetail(profile)"><div class="par-av" [ngClass]="dialogContext.statusClass">{{ getInitials(profile.profileName || profile.profileId) }}</div><div><div class="par-name">{{ profile.profileName || profile.profileId }}</div></div><div class="par-right"><span class="par-date">{{ profile.createdDate }}</span><span *ngIf="profile.changedCount" class="par-cnt" [ngClass]="getCountBadgeClass(profile.changedCount,dialogContext.statusType||'up')">{{ profile.changedCount==='all'?'ALL':profile.changedCount }}</span><span class="par-arrow">›</span></div></div>
+        <div data-testid="jcd-div-170" *ngFor="let profile of dialogProfileList" class="participant-row" (click)="openProfileDetail(profile)"><div class="par-av" [ngClass]="dialogContext.statusClass">{{ getInitials(profile.profileName || profile.profileId) }}</div><div><div class="par-name">{{ profile.profileName || profile.profileId }}</div></div><div class="par-right"><span class="par-date">{{ profile.createdDate }}</span><span *ngIf="profile.changedCount" class="par-cnt" [ngClass]="getCountBadgeClass(profile.changedCount,dialogContext.statusType||'up')">{{ profile.changedCount==='all'?'ALL':profile.changedCount }}</span><span class="par-arrow">›</span></div></div>
       </div>
     </ng-template>
   </div>
 </div>
 
-<div class="overlay" [class.open]="isHealthDialogOpen" (click)="onHealthDialogOverlayClick($event)">
+<div data-testid="jcd-div-171" class="overlay" [class.open]="isHealthDialogOpen" (click)="onHealthDialogOverlayClick($event)">
   <div class="dialog hd-dialog">
     <!-- Header -->
     <div class="dlg-hd">
@@ -1195,10 +1195,10 @@
           <div class="dlg-sub">{{ healthDialogProfiles.length }} profiles · dominant key</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportHealthDialogData()">
+      <div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-172" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportHealthDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeHealthDialog()">✕</button></div>
+        </button><button data-testid="jcd-btn-173" class="close-btn" (click)="closeHealthDialog()">✕</button></div>
     </div>
 
     <!-- Sticky column headers -->
@@ -1211,7 +1211,7 @@
     <!-- Rows -->
     <div class="dlg-body" style="padding:0">
       <div *ngIf="healthDialogProfiles.length===0" class="jcd-cura-empty">No profiles found</div>
-      <div class="hd-row" *ngFor="let p of healthDialogProfiles" (click)="navigatetoprofile(p.profileId)">
+      <div data-testid="jcd-div-174" class="hd-row" *ngFor="let p of healthDialogProfiles" (click)="navigatetoprofile(p.profileId)">
 
         <!-- Profile cell -->
         <div class="hd-td hd-td-profile">
@@ -1242,41 +1242,41 @@
   </div>
 </div>
 
-<div class="overlay" [class.open]="isSubDialogOpen" (click)="onSubDialogOverlayClick($event)">
+<div data-testid="jcd-div-175" class="overlay" [class.open]="isSubDialogOpen" (click)="onSubDialogOverlayClick($event)">
   <div class="dialog sub-dialog">
-    <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av dn">↓</div><div><div class="dlg-title">{{ subDialogTitle }}</div><div class="dlg-sub">{{ subDialogDocs.length }} participants</div></div></div><div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportSubDialogData()">
+    <div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av dn">↓</div><div><div class="dlg-title">{{ subDialogTitle }}</div><div class="dlg-sub">{{ subDialogDocs.length }} participants</div></div></div><div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-176" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportSubDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeSubDialog()">✕</button></div></div>
+        </button><button data-testid="jcd-btn-177" class="close-btn" (click)="closeSubDialog()">✕</button></div></div>
     <div class="sub-dlg-table-hd"><span class="sub-dlg-col name">Name</span><span class="sub-dlg-col journey">Journey</span><span class="sub-dlg-col status">Status</span><span class="sub-dlg-col enddate">Sub End</span></div>
     <div class="dlg-body">
       <div *ngIf="subDialogDocs.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No participants</div>
-      <div class="sub-dlg-row" *ngFor="let doc of subDialogDocs" (click)="navigatetoprofile(doc['profileid'])"><div class="sub-dlg-col name"><div class="par-av dn" style="flex-shrink:0;">{{ getInitials(mapprofile[doc['profileid']]||doc['profileid']) }}</div><div style="min-width:0;"><div class="par-name">{{ mapprofile[doc['profileid']]||doc['profileid'] }}</div><div class="par-id">{{ doc['profileid'] }}</div></div></div><div class="sub-dlg-col journey"><span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span></div><div class="sub-dlg-col status"><span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">{{ doc['journeystatus'] }}</span></div><div class="sub-dlg-col enddate"><span class="sub-end-badge">{{ getSubEndDate(doc) }}</span></div></div>
+      <div data-testid="jcd-div-178" class="sub-dlg-row" *ngFor="let doc of subDialogDocs" (click)="navigatetoprofile(doc['profileid'])"><div class="sub-dlg-col name"><div class="par-av dn" style="flex-shrink:0;">{{ getInitials(mapprofile[doc['profileid']]||doc['profileid']) }}</div><div style="min-width:0;"><div class="par-name">{{ mapprofile[doc['profileid']]||doc['profileid'] }}</div><div class="par-id">{{ doc['profileid'] }}</div></div></div><div class="sub-dlg-col journey"><span class="sub-journey-pill">{{ getSubJourneyName(doc) }}</span></div><div class="sub-dlg-col status"><span class="sub-status-pill" [ngClass]="getSubStatusClass(doc['journeystatus'])">{{ doc['journeystatus'] }}</span></div><div class="sub-dlg-col enddate"><span class="sub-end-badge">{{ getSubEndDate(doc) }}</span></div></div>
     </div>
   </div>
 </div>
 
-<div class="overlay" [class.open]="isJourneyStatusDialogOpen" (click)="onJourneyStatusOverlayClick($event)">
-  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av nc">JS</div><div><div class="dlg-title">{{ journeyStatusDialogTitle }}</div><div class="dlg-sub">{{ journeyStatusDialogProfiles.length }} profiles</div></div></div><div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportJourneyStatusDialogData()">
+<div data-testid="jcd-div-179" class="overlay" [class.open]="isJourneyStatusDialogOpen" (click)="onJourneyStatusOverlayClick($event)">
+  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av nc">JS</div><div><div class="dlg-title">{{ journeyStatusDialogTitle }}</div><div class="dlg-sub">{{ journeyStatusDialogProfiles.length }} profiles</div></div></div><div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-180" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportJourneyStatusDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeJourneyStatusDialog()">✕</button></div></div>
-    <div class="dlg-body"><div class="participant-row" *ngFor="let p of journeyStatusDialogProfiles" (click)="navigatetoprofile(p['profileid'])"><div class="par-av nc">{{ getInitials(mapprofile[p['profileid']]||p['profileid']) }}</div><div style="flex:1;min-width:0;"><div class="par-name">{{ mapprofile[p['profileid']]||p['profileid'] }}</div><div class="par-id">{{ p['customerstatus']||'No status' }}</div></div><div class="par-right"><span class="js-badge" [ngClass]="getStatusClass(p['customerstatus'])">{{ p['customerstatus']||'null' }}</span><span class="par-arrow">›</span></div></div></div>
+        </button><button data-testid="jcd-btn-181" class="close-btn" (click)="closeJourneyStatusDialog()">✕</button></div></div>
+    <div class="dlg-body"><div data-testid="jcd-div-182" class="participant-row" *ngFor="let p of journeyStatusDialogProfiles" (click)="navigatetoprofile(p['profileid'])"><div class="par-av nc">{{ getInitials(mapprofile[p['profileid']]||p['profileid']) }}</div><div style="flex:1;min-width:0;"><div class="par-name">{{ mapprofile[p['profileid']]||p['profileid'] }}</div><div class="par-id">{{ p['customerstatus']||'No status' }}</div></div><div class="par-right"><span class="js-badge" [ngClass]="getStatusClass(p['customerstatus'])">{{ p['customerstatus']||'null' }}</span><span class="par-arrow">›</span></div></div></div>
   </div>
 </div>
 
-<div class="overlay" [class.open]="isEpDialogOpen" (click)="onEpOverlayClick($event)">
-  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ epDialogTitle.slice(0,2).toUpperCase() }}</div><div><div class="dlg-title">{{ epDialogTitle }}</div><div class="dlg-sub">{{ epDialogSubtitle }}</div></div></div><div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportEpDialogData()">
+<div data-testid="jcd-div-183" class="overlay" [class.open]="isEpDialogOpen" (click)="onEpOverlayClick($event)">
+  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av" [ngClass]="'ep-av-'+epDialogBandIdx">{{ epDialogTitle.slice(0,2).toUpperCase() }}</div><div><div class="dlg-title">{{ epDialogTitle }}</div><div class="dlg-sub">{{ epDialogSubtitle }}</div></div></div><div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-184" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportEpDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeEpDialog()">✕</button></div></div>
-    <div class="dlg-body"><div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div><div *ngIf="epDialogProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div><div *ngFor="let p of epDialogProfiles"><div class="participant-row" [class.ep-row-expanded]="expandedEpProfile===p.profileId" (click)="toggleEpProfileExpand(p.profileId)" [style.border-radius]="expandedEpProfile===p.profileId?'10px 10px 0 0':'10px'"><div style="flex:1;min-width:0;"><div class="par-name">{{ p.profileName }}</div><div class="par-id">{{ p.profileId }}</div></div><div class="par-right"><span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span><span class="par-arrow" style="opacity:1;transition:transform .2s;" [style.transform]="expandedEpProfile===p.profileId?'rotate(90deg)':'rotate(0deg)'">›</span></div></div><div *ngIf="expandedEpProfile===p.profileId" style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;margin-bottom:6px;background:var(--bg);padding:8px 12px;"><div *ngFor="let kd of getProfileAllKeyData(p.profileId)" style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);" class="ep-key-expand-row"><span style="font-size:12px;font-weight:600;color:var(--text2);flex:1;">{{ kd.key }}</span><span style="font-size:12px;color:var(--text3);">{{ kd.count }}</span><span class="ep-pct-pill" [ngClass]="'ep-b'+kd.bandIdx" style="min-width:44px;text-align:center;">{{ kd.pct }}%</span></div><div *ngIf="getProfileAllKeyData(p.profileId).length===0" style="font-size:12px;color:var(--text3);padding:6px 0;">No key data found</div></div></div></div>
+        </button><button data-testid="jcd-btn-185" class="close-btn" (click)="closeEpDialog()">✕</button></div></div>
+    <div class="dlg-body"><div class="sec-lbl" style="margin-bottom:10px;">Profiles in this band</div><div *ngIf="epDialogProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles</div><div *ngFor="let p of epDialogProfiles"><div data-testid="jcd-div-186" class="participant-row" [class.ep-row-expanded]="expandedEpProfile===p.profileId" (click)="toggleEpProfileExpand(p.profileId)" [style.border-radius]="expandedEpProfile===p.profileId?'10px 10px 0 0':'10px'"><div style="flex:1;min-width:0;"><div class="par-name">{{ p.profileName }}</div><div class="par-id">{{ p.profileId }}</div></div><div class="par-right"><span class="ep-pct-pill" [ngClass]="'ep-b'+epDialogBandIdx">{{ p.pct }}%</span><span class="par-arrow" style="opacity:1;transition:transform .2s;" [style.transform]="expandedEpProfile===p.profileId?'rotate(90deg)':'rotate(0deg)'">›</span></div></div><div *ngIf="expandedEpProfile===p.profileId" style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;margin-bottom:6px;background:var(--bg);padding:8px 12px;"><div *ngFor="let kd of getProfileAllKeyData(p.profileId)" style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--border);" class="ep-key-expand-row"><span style="font-size:12px;font-weight:600;color:var(--text2);flex:1;">{{ kd.key }}</span><span style="font-size:12px;color:var(--text3);">{{ kd.count }}</span><span class="ep-pct-pill" [ngClass]="'ep-b'+kd.bandIdx" style="min-width:44px;text-align:center;">{{ kd.pct }}%</span></div><div *ngIf="getProfileAllKeyData(p.profileId).length===0" style="font-size:12px;color:var(--text3);padding:6px 0;">No key data found</div></div></div></div>
   </div>
 </div>
 
 <!-- ══════ ASK AH / LOVE LETTER PROFILES DIALOG ══════ -->
-<div class="overlay" [class.open]="isAskAHDialogOpen" (click)="isAskAHDialogOpen=false">
-  <div class="dialog" style="max-width:600px" (click)="$event.stopPropagation()">
+<div data-testid="jcd-div-187" class="overlay" [class.open]="isAskAHDialogOpen" (click)="isAskAHDialogOpen=false">
+  <div data-testid="jcd-div-188" class="dialog" style="max-width:600px" (click)="$event.stopPropagation()">
 
     <!-- Header -->
     <div class="dlg-hd">
@@ -1288,11 +1288,11 @@
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
-        <button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportAskAHDialogData()">
+        <button data-testid="jcd-btn-189" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportAskAHDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button>
-        <button class="close-btn" (click)="isAskAHDialogOpen=false">✕</button>
+        <button data-testid="jcd-btn-190" class="close-btn" (click)="isAskAHDialogOpen=false">✕</button>
       </div>
     </div>
 
@@ -1300,16 +1300,16 @@
     <div class="ah-filter-bar">
       <div class="ah-filter-group">
         <span class="ah-filter-label">Source</span>
-        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='all'" (click)="askAHSourceFilter='all'">All</button>
-        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='askAH'" (click)="askAHSourceFilter='askAH'">Ask AH</button>
-        <button class="ah-filter-chip ah-filter-chip--love" [class.ah-filter-chip--active]="askAHSourceFilter==='loveLetter'" (click)="askAHSourceFilter='loveLetter'">Love Letter</button>
+        <button data-testid="jcd-btn-191" class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='all'" (click)="askAHSourceFilter='all'">All</button>
+        <button data-testid="jcd-btn-192" class="ah-filter-chip" [class.ah-filter-chip--active]="askAHSourceFilter==='askAH'" (click)="askAHSourceFilter='askAH'">Ask AH</button>
+        <button data-testid="jcd-btn-193" class="ah-filter-chip ah-filter-chip--love" [class.ah-filter-chip--active]="askAHSourceFilter==='loveLetter'" (click)="askAHSourceFilter='loveLetter'">Love Letter</button>
       </div>
       <div class="ah-filter-sep"></div>
       <div class="ah-filter-group">
         <span class="ah-filter-label">Resolved</span>
-        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='all'" (click)="askAHResolvedFilter='all'">All</button>
-        <button class="ah-filter-chip ah-filter-chip--resolved" [class.ah-filter-chip--active]="askAHResolvedFilter==='resolved'" (click)="askAHResolvedFilter='resolved'">Resolved</button>
-        <button class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='unresolved'" (click)="askAHResolvedFilter='unresolved'">Unresolved</button>
+        <button data-testid="jcd-btn-194" class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='all'" (click)="askAHResolvedFilter='all'">All</button>
+        <button data-testid="jcd-btn-195" class="ah-filter-chip ah-filter-chip--resolved" [class.ah-filter-chip--active]="askAHResolvedFilter==='resolved'" (click)="askAHResolvedFilter='resolved'">Resolved</button>
+        <button data-testid="jcd-btn-196" class="ah-filter-chip" [class.ah-filter-chip--active]="askAHResolvedFilter==='unresolved'" (click)="askAHResolvedFilter='unresolved'">Unresolved</button>
       </div>
     </div>
 
@@ -1319,7 +1319,7 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.25"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p>No profiles match the selected filters</p>
       </div>
-      <div class="participant-row" *ngFor="let p of getFilteredAskAHProfiles()" (click)="navigatetoprofile(p.profileid)">
+      <div data-testid="jcd-div-197" class="participant-row" *ngFor="let p of getFilteredAskAHProfiles()" (click)="navigatetoprofile(p.profileid)">
         <div class="par-av nc" style="background:#fce7f3;color:#be185d">{{ getInitials(mapprofile[p.profileid] || p.profileid) }}</div>
         <div style="flex:1;min-width:0">
           <div class="par-name">{{ mapprofile[p.profileid] || p.profileid }}</div>
@@ -1341,19 +1341,19 @@
   </div>
 </div>
 
-<div class="overlay" [class.open]="isTagProfilesDialogOpen" (click)="onTagProfilesOverlayClick($event)">
-  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av nc">{{ selectedTagName.slice(0,2).toUpperCase() }}</div><div><div class="dlg-title">{{ selectedTagName }}</div><div class="dlg-sub">{{ selectedTagProfiles.length }} profiles tagged</div></div></div><div style="display:flex;align-items:center;gap:6px"><button class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportTagDialogData()">
+<div data-testid="jcd-div-198" class="overlay" [class.open]="isTagProfilesDialogOpen" (click)="onTagProfilesOverlayClick($event)">
+  <div class="dialog"><div class="dlg-hd"><div class="dlg-hd-left"><div class="dlg-av nc">{{ selectedTagName.slice(0,2).toUpperCase() }}</div><div><div class="dlg-title">{{ selectedTagName }}</div><div class="dlg-sub">{{ selectedTagProfiles.length }} profiles tagged</div></div></div><div style="display:flex;align-items:center;gap:6px"><button data-testid="jcd-btn-199" class="jcd-dlg-export-btn" (click)="$event.stopPropagation();exportTagDialogData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
-        </button><button class="close-btn" (click)="closeTagProfilesDialog()">✕</button></div></div>
+        </button><button data-testid="jcd-btn-200" class="close-btn" (click)="closeTagProfilesDialog()">✕</button></div></div>
     <div class="dlg-body"><div *ngIf="selectedTagProfiles.length===0" style="font-size:12px;color:var(--text3);padding:8px 0;">No profiles tagged</div><div class="participant-row" *ngFor="let p of selectedTagProfiles"><div class="par-av nc">{{ p.name.slice(0,2).toUpperCase() }}</div><div><div class="par-name">{{ p.name }}</div></div><div class="par-arrow">›</div></div></div>
   </div>
 </div>
 
 <!-- ALL MONTHS DIALOG — commented out
-<div class="overlay" [class.open]="isAllMonthsDialogOpen" (click)="onAllMonthsOverlayClick($event)">
+<div data-testid="jcd-div-201" class="overlay" [class.open]="isAllMonthsDialogOpen" (click)="onAllMonthsOverlayClick($event)">
   <div class="dialog months-dialog">
-    <div class="dlg-hd"><div><div class="dlg-title">All months overview</div><div class="dlg-sub">{{ dateRangeHint }}</div></div><button class="close-btn" (click)="closeAllMonthsDialog()">✕</button></div>
+    <div class="dlg-hd"><div><div class="dlg-title">All months overview</div><div class="dlg-sub">{{ dateRangeHint }}</div></div><button data-testid="jcd-btn-202" class="close-btn" (click)="closeAllMonthsDialog()">✕</button></div>
     <div class="months-totals-row"><div class="months-total-cell"><div class="months-total-num">{{ getOverallTotal() }}</div><div class="months-total-lbl">Total interims</div></div><div class="months-total-cell up"><div class="months-total-num up">{{ getOverallProgressed() }}</div><div class="months-total-lbl">Progressed</div></div><div class="months-total-cell dn"><div class="months-total-num dn">{{ getOverallRegressed() }}</div><div class="months-total-lbl">Regressed</div></div><div class="months-total-cell nc"><div class="months-total-num nc">{{ getOverallNoChange() }}</div><div class="months-total-lbl">No change</div></div></div>
     <div class="months-overall-cats"><div class="moc-section-lbl" style="padding:10px 20px 6px;">Overall by category</div><div class="months-overall-cat-grid"><div class="moc-overall-cat-row" *ngFor="let category of CATEGORIES"><span class="moc-overall-cat-lbl">{{ category }}</span><div class="moc-overall-cat-bars"><div class="moc-overall-bar-wrap"><div class="moc-cat-bar up" [style.width.%]="getBarWidthPercent(getOverallCategoryProgressed(category),getOverallCategoryMax('up'))"></div></div><span class="moc-overall-val up">{{ getOverallCategoryProgressed(category) }}</span><div class="moc-overall-bar-wrap"><div class="moc-cat-bar dn" [style.width.%]="getBarWidthPercent(getOverallCategoryRegressed(category),getOverallCategoryMax('dn'))"></div></div><span class="moc-overall-val dn">{{ getOverallCategoryRegressed(category) }}</span></div></div></div></div>
     <div class="months-cards-body"><div class="month-overview-card" *ngFor="let monthSummary of monthSummaries"><div class="moc-head"><div class="moc-month">{{ monthSummary.monthLabel }}</div><div class="moc-total-badge">{{ monthSummary.totalInterims }}</div></div><div class="moc-stats"><div class="moc-stat"><div class="moc-stat-num up">{{ getTotalProgressed(monthSummary) }}</div><div class="moc-stat-lbl">Up</div></div><div class="moc-stat"><div class="moc-stat-num dn">{{ getTotalRegressed(monthSummary) }}</div><div class="moc-stat-lbl">Down</div></div><div class="moc-stat"><div class="moc-stat-num nc">{{ monthSummary.noChangeCount }}</div><div class="moc-stat-lbl">No change</div></div></div><div class="moc-bars"><div class="moc-bar-track"><div class="moc-bar-fill up" [style.width.%]="getBarWidthPercent(getTotalProgressed(monthSummary),monthSummary.totalInterims)"></div></div><div class="moc-bar-track"><div class="moc-bar-fill dn" [style.width.%]="getBarWidthPercent(getTotalRegressed(monthSummary),monthSummary.totalInterims)"></div></div><div class="moc-bar-track"><div class="moc-bar-fill nc" [style.width.%]="getBarWidthPercent(monthSummary.noChangeCount,monthSummary.totalInterims)"></div></div></div><div class="moc-divider"></div><div class="moc-section-lbl">By category</div><div class="moc-cats"><div class="moc-cat-row" *ngFor="let category of getMonthCategories(monthSummary)"><span class="moc-cat-lbl">{{ category }}</span><div class="moc-cat-bars"><div class="moc-cat-bar-wrap"><div class="moc-cat-bar up" [style.width.%]="getBarWidthPercent(monthSummary.progressedData.categoryBreakdown[category]||0,getMaxValue(monthSummary.progressedData.categoryBreakdown))"></div></div><span class="moc-cat-num up">{{ monthSummary.progressedData.categoryBreakdown[category]||0 }}</span><div class="moc-cat-bar-wrap"><div class="moc-cat-bar dn" [style.width.%]="getBarWidthPercent(monthSummary.regressedData.categoryBreakdown[category]||0,getMaxValue(monthSummary.regressedData.categoryBreakdown))"></div></div><span class="moc-cat-num dn">{{ monthSummary.regressedData.categoryBreakdown[category]||0 }}</span></div></div></div></div></div>
@@ -1365,8 +1365,8 @@ END ALL MONTHS DIALOG -->
 <!-- ══════════════════════════════════════════════════
      CALENDAR OVERLAY MODAL
 ══════════════════════════════════════════════════ -->
-<div class="jcd-modal-backdrop" *ngIf="isCalendarOpen" (click)="closeCalendarModal()">
-  <div class="jcd-modal jcd-modal--cal" (click)="$event.stopPropagation()">
+<div data-testid="jcd-div-203" class="jcd-modal-backdrop" *ngIf="isCalendarOpen" (click)="closeCalendarModal()">
+  <div data-testid="jcd-div-204" class="jcd-modal jcd-modal--cal" (click)="$event.stopPropagation()">
     <!-- Header -->
     <div class="jcd-dlg-header">
       <div class="jcd-dlg-header-left">
@@ -1378,7 +1378,7 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">Select a date to view scheduled calls</div>
         </div>
       </div>
-      <button class="jcd-dlg-close" (click)="closeCalendarModal()">
+      <button data-testid="jcd-btn-205" class="jcd-dlg-close" (click)="closeCalendarModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1450,8 +1450,8 @@ END ALL MONTHS DIALOG -->
 <!-- ══════════════════════════════════════════════════
      CURA OVERLAY MODAL
 ══════════════════════════════════════════════════ -->
-<div class="jcd-modal-backdrop" *ngIf="isCURAOpen" (click)="closeCURAModal()">
-  <div class="jcd-modal jcd-modal--cura" (click)="$event.stopPropagation()">
+<div data-testid="jcd-div-206" class="jcd-modal-backdrop" *ngIf="isCURAOpen" (click)="closeCURAModal()">
+  <div data-testid="jcd-div-207" class="jcd-modal jcd-modal--cura" (click)="$event.stopPropagation()">
     <!-- Header -->
     <div class="jcd-dlg-header">
       <div class="jcd-dlg-header-left">
@@ -1463,23 +1463,23 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">Continuity · Upgrade · Referral · Addon</div>
         </div>
       </div>
-      <button class="jcd-dlg-close" (click)="closeCURAModal()">
+      <button data-testid="jcd-btn-208" class="jcd-dlg-close" (click)="closeCURAModal()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
     <!-- Tabs -->
     <div class="jcd-cura-tabs">
-      <button class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===0" (click)="curaActiveTab=0">
+      <button data-testid="jcd-btn-209" class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===0" (click)="curaActiveTab=0">
         Continuity <span class="jcd-cura-tab-count">{{ originalData['continuitySales']?.count || 0 }}</span>
       </button>
-      <button class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===1" (click)="curaActiveTab=1">
+      <button data-testid="jcd-btn-210" class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===1" (click)="curaActiveTab=1">
         Upgrades <span class="jcd-cura-tab-count">{{ originalData['upgradeSales']?.count || 0 }}</span>
       </button>
-      <button class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===2" (click)="curaActiveTab=2">
+      <button data-testid="jcd-btn-211" class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===2" (click)="curaActiveTab=2">
         Referrals <span class="jcd-cura-tab-count">{{ originalData['referralSales']?.count || 0 }}</span>
       </button>
-      <button class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===3" (click)="curaActiveTab=3">
+      <button data-testid="jcd-btn-212" class="jcd-cura-tab" [class.jcd-cura-tab--active]="curaActiveTab===3" (click)="curaActiveTab=3">
         Add-ons <span class="jcd-cura-tab-count">{{ originalData['addonSales']?.count || 0 }}</span>
       </button>
     </div>
@@ -1518,8 +1518,8 @@ END ALL MONTHS DIALOG -->
 <!-- ══════════════════════════════════════════════════
      MODAL TEMPLATE OVERLAY (openDialog — modes, avg etc.)
 ══════════════════════════════════════════════════ -->
-<div class="jcd-modal-backdrop" *ngIf="isModalOpen && dialogConfig" (click)="closeModalOverlay()">
-  <div class="jcd-modal jcd-modal--table" (click)="$event.stopPropagation()">
+<div data-testid="jcd-div-213" class="jcd-modal-backdrop" *ngIf="isModalOpen && dialogConfig" (click)="closeModalOverlay()">
+  <div data-testid="jcd-div-214" class="jcd-modal jcd-modal--table" (click)="$event.stopPropagation()">
     <!-- Header -->
     <div class="jcd-dlg-header">
       <div class="jcd-dlg-header-left">
@@ -1531,7 +1531,7 @@ END ALL MONTHS DIALOG -->
           <div class="jcd-dlg-sub">{{ dialogConfig.table.data.length }} records</div>
         </div>
       </div>
-      <button class="jcd-dlg-close" (click)="closeModalOverlay()">
+      <button data-testid="jcd-btn-215" class="jcd-dlg-close" (click)="closeModalOverlay()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1564,7 +1564,7 @@ END ALL MONTHS DIALOG -->
     </div>
     <!-- Footer -->
     <div class="jcd-modal-footer">
-      <button class="jcd-outline-btn" (click)="closeModalOverlay()">Close</button>
+      <button data-testid="jcd-btn-216" class="jcd-outline-btn" (click)="closeModalOverlay()">Close</button>
     </div>
   </div>
 </div>

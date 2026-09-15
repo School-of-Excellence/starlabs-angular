@@ -1845,12 +1845,12 @@ export class DynamicQueueManagerComponent {
   }
 
   areAllSelected(): boolean {
-    const tokens = this.getStageParticipants(this.selectedChatStage)['tokenlist'] || [];
+    const tokens = this.getStageParticipants(this.selectedChatStage)?.['tokenlist'] || [];
     return tokens.length > 0 && this.selectedTokens.size === tokens.length;
   }
 
   toggleSelectAll() {
-    const tokens = this.getStageParticipants(this.selectedChatStage)['tokenlist'] || [];
+    const tokens = this.getStageParticipants(this.selectedChatStage)?.['tokenlist'] || [];
     if (this.areAllSelected()) {
       this.selectedTokens.clear();
     } else {

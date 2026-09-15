@@ -7,7 +7,7 @@
       <h1 class="pg">Episodes</h1>
       <p class="pg-sub">Manage uploaded episodes — search, edit metadata, and track processing status.</p>
     </div>
-    <button class="btn btn-primary" (click)="openUploadStudio()">
+    <button data-testid="epd-btn-001" class="btn btn-primary" (click)="openUploadStudio()">
       <mat-icon>cloud_upload</mat-icon>
       Open Upload Studio
     </button>
@@ -41,12 +41,12 @@
   <div class="toolbar">
     <div class="search">
       <mat-icon>search</mat-icon>
-      <input type="text" placeholder="Search by title or reference title…"
+      <input data-testid="epd-inp-002" type="text" placeholder="Search by title or reference title…"
         [(ngModel)]="searchText" (ngModelChange)="refreshFilter()" autocomplete="off">
     </div>
-    <button class="fchip" [class.on]="activeChip === 'all'" (click)="setChip('all')">All</button>
-    <button class="fchip" [class.on]="activeChip === 'hlspending'" (click)="setChip('hlspending')">HLS pending</button>
-    <button class="fchip" [class.on]="activeChip === 'nosrt'" (click)="setChip('nosrt')">Missing SRT</button>
+    <button data-testid="epd-btn-003" class="fchip" [class.on]="activeChip === 'all'" (click)="setChip('all')">All</button>
+    <button data-testid="epd-btn-004" class="fchip" [class.on]="activeChip === 'hlspending'" (click)="setChip('hlspending')">HLS pending</button>
+    <button data-testid="epd-btn-005" class="fchip" [class.on]="activeChip === 'nosrt'" (click)="setChip('nosrt')">Missing SRT</button>
   </div>
 
   <!-- table -->
@@ -113,10 +113,10 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let row">
             <div class="rowact">
-              <button class="abtn" title="Edit" (click)="openEditInStudio(row)">
+              <button data-testid="epd-btn-006" class="abtn" title="Edit" (click)="openEditInStudio(row)">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button class="abtn del" title="Delete"
+              <button data-testid="epd-btn-007" class="abtn del" title="Delete"
                 (click)="openDeleteDialog(row.id, row.srt, row.imageUrl, row.videoUrl, row.screenshot)">
                 <mat-icon>delete_outline</mat-icon>
               </button>

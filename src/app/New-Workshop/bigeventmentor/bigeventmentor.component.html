@@ -7,7 +7,7 @@
       </mat-select>
     </mat-form-field>
 
-    <button mat-raised-button color="primary" *ngIf="selectedEvent && !bigeventmentorExists" (click)="createBigEventMentor()" [disabled]="isCreating" class="create-btn">
+    <button data-testid="big-create-big-event-mentor-1" mat-raised-button color="primary" *ngIf="selectedEvent && !bigeventmentorExists" (click)="createBigEventMentor()" [disabled]="isCreating" class="create-btn">
       {{ isCreating ? 'Creating…' : 'Create' }}
     </button>
 
@@ -37,9 +37,9 @@
       </mat-select>
     </mat-form-field>
 
-    <button mat-icon-button [matMenuTriggerFor]="profileMenu" [disabled]="!selectedProfiles?.length"><mat-icon>more_vert</mat-icon></button>
+    <button data-testid="big-button-2" mat-icon-button [matMenuTriggerFor]="profileMenu" [disabled]="!selectedProfiles?.length"><mat-icon>more_vert</mat-icon></button>
     <mat-menu #profileMenu="matMenu">
-      <button mat-menu-item *ngFor="let col of statusColumns" (click)="assignProfiles(col.key)">
+      <button data-testid="big-assign-profiles-3" mat-menu-item *ngFor="let col of statusColumns" (click)="assignProfiles(col.key)">
         <mat-icon>{{ col.icon }}</mat-icon><span>{{ col.label }}</span>
       </button>
     </mat-menu>
@@ -75,14 +75,14 @@
       </mat-select>
     </mat-form-field>
 
-    <button mat-stroked-button class="clear-filters-btn" *ngIf="selectedStatusFilters.length || selectedLevelFilters.length" (click)="clearFilters()">
+    <button data-testid="big-clear-filters-4" mat-stroked-button class="clear-filters-btn" *ngIf="selectedStatusFilters.length || selectedLevelFilters.length" (click)="clearFilters()">
       <mat-icon>clear</mat-icon> Clear Filters
     </button>
   </div>
 
   <div class="main-content" *ngIf="selectedEvent && bigeventmentorExists">
     <div class="status-section-wrapper">
-      <div class="section-header" (click)="toggleStatusSection()">
+      <div data-testid="big-toggle-status-section-5" class="section-header" (click)="toggleStatusSection()">
         <div class="section-header-left">
           <mat-icon class="expand-icon">{{ statusSectionExpanded ? 'expand_more' : 'chevron_right' }}</mat-icon>
           <span class="section-title">Participant Status</span>
@@ -102,38 +102,38 @@
             <div class="status-column">
               <div class="status-header" [ngClass]="col.headerClass">
                 <div class="header-left">
-                  <mat-checkbox [checked]="isAllSelected(col.key)" [indeterminate]="isPartialSelected(col.key)" (change)="toggleSelectAll(col.key)"></mat-checkbox>
+                  <mat-checkbox data-testid="big-change-toggle-select-all-6" [checked]="isAllSelected(col.key)" [indeterminate]="isPartialSelected(col.key)" (change)="toggleSelectAll(col.key)"></mat-checkbox>
                   <mat-icon>{{ col.icon }}</mat-icon>
                   <span>{{ col.label }}</span>
                   <span class="count">{{ statusData[col.key].length }}</span>
                 </div>
                 <div class="header-actions" *ngIf="selectedItems[col.key]?.length">
-                  <button mat-icon-button [matMenuTriggerFor]="statusMenu" class="action-btn"><mat-icon>more_horiz</mat-icon></button>
+                  <button data-testid="big-button-7" mat-icon-button [matMenuTriggerFor]="statusMenu" class="action-btn"><mat-icon>more_horiz</mat-icon></button>
                   <mat-menu #statusMenu="matMenu">
-                    <button mat-menu-item *ngFor="let target of getOtherStatuses(col.key)" (click)="moveSelected(col.key, target)">
+                    <button data-testid="big-move-selected-8" mat-menu-item *ngFor="let target of getOtherStatuses(col.key)" (click)="moveSelected(col.key, target)">
                       <mat-icon>arrow_forward</mat-icon><span> {{ getStatusLabel(target) }}</span>
                     </button>
                     <ng-container *ngIf="col.key === 'reached'">
                       <mat-divider></mat-divider>
                       <ng-container *ngFor="let level of sortedLevels">
-                        <button mat-menu-item [matMenuTriggerFor]="levelStatusMenu"><mat-icon>school</mat-icon><span> {{ level.level }}</span></button>
+                        <button data-testid="big-button-9" mat-menu-item [matMenuTriggerFor]="levelStatusMenu"><mat-icon>school</mat-icon><span> {{ level.level }}</span></button>
                         <mat-menu #levelStatusMenu="matMenu">
-                          <button mat-menu-item (click)="moveSelectedToLevel('reached', level.docid, 'current')" [disabled]="allSelectedHaveCurrentStatus()">
+                          <button data-testid="big-move-selected-to-level-10" mat-menu-item (click)="moveSelectedToLevel('reached', level.docid, 'current')" [disabled]="allSelectedHaveCurrentStatus()">
                             <mat-icon>tag_faces</mat-icon><span>Current</span>
                           </button>
-                          <button mat-menu-item (click)="moveSelectedToLevel('reached', level.docid, 'planning')"><mat-icon>schedule</mat-icon><span>Planning</span></button>
+                          <button data-testid="big-move-selected-to-level-11" mat-menu-item (click)="moveSelectedToLevel('reached', level.docid, 'planning')"><mat-icon>schedule</mat-icon><span>Planning</span></button>
                         </mat-menu>
                       </ng-container>
                     </ng-container>
                     <mat-divider></mat-divider>
-                    <button mat-menu-item (click)="removeSelected(col.key)" class="danger-item"><mat-icon>delete_outline</mat-icon><span>Remove Selected</span></button>
+                    <button data-testid="big-remove-selected-12" mat-menu-item (click)="removeSelected(col.key)" class="danger-item"><mat-icon>delete_outline</mat-icon><span>Remove Selected</span></button>
                   </mat-menu>
                 </div>
               </div>
               <div class="status-list">
                 <ng-container *ngFor="let id of statusData[col.key]">
                   <div class="participant-item" [class.selected]="isSelected(col.key, id)" [class.has-current]="col.key === 'reached' && profilesWithCurrentStatus.has(id)" [class.disabled]="col.key === 'reached' && !canSelectInReached(id)">
-                    <mat-checkbox *ngIf="col.key !== 'reached' || canSelectInReached(id)" [checked]="isSelected(col.key, id)" (change)="toggleSelect(col.key, id)"></mat-checkbox>
+                    <mat-checkbox data-testid="big-change-toggle-select-13" *ngIf="col.key !== 'reached' || canSelectInReached(id)" [checked]="isSelected(col.key, id)" (change)="toggleSelect(col.key, id)"></mat-checkbox>
                     <span class="checkbox-placeholder" *ngIf="col.key === 'reached' && !canSelectInReached(id)"></span>
                     <span class="avatar" [style.background]="getAvatarColor(id)">{{ getInitial(id) }}</span>
                     <div class="participant-info">
@@ -141,7 +141,7 @@
                       <span class="current-badge" *ngIf="col.key === 'reached' && profilesWithCurrentStatus.has(id)"><mat-icon>tag_faces</mat-icon> Current</span>
                       <span class="completed-badge" *ngIf="col.key === 'reached' && profilesWithCompletedStatus.has(id)"><mat-icon>check_circle</mat-icon> Completed</span>
                     </div>
-                    <button mat-icon-button class="remove-btn" *ngIf="col.key !== 'reached' || canRemoveFromReached(id)" (click)="removeParticipant(col.key, id)"><mat-icon>close</mat-icon></button>
+                    <button data-testid="big-remove-participant-14" mat-icon-button class="remove-btn" *ngIf="col.key !== 'reached' || canRemoveFromReached(id)" (click)="removeParticipant(col.key, id)"><mat-icon>close</mat-icon></button>
                   </div>
                 </ng-container>
                 <div class="empty-state" *ngIf="!statusData[col.key].length"><mat-icon>person_outline</mat-icon><span>No participants</span></div>
@@ -167,44 +167,44 @@
           <div class="status-column level-column">
             <div class="status-header level-header" [ngClass]="'level-header-' + (i % 6)">
               <div class="header-left">
-                <mat-checkbox [checked]="isAllSelectedLevel(level.docid)" [indeterminate]="isPartialSelectedLevel(level.docid)" (change)="toggleSelectAllLevel(level.docid)"></mat-checkbox>
+                <mat-checkbox data-testid="big-change-toggle-select-all-level-15" [checked]="isAllSelectedLevel(level.docid)" [indeterminate]="isPartialSelectedLevel(level.docid)" (change)="toggleSelectAllLevel(level.docid)"></mat-checkbox>
                 <mat-icon>school</mat-icon>
                 <span class="level-title" [matTooltip]="level.level">{{ level.level }}</span>
                 <span class="count">{{ getFilteredLevelParticipants(level.docid).length }}</span>
               </div>
               <div class="header-actions" *ngIf="selectedLevelItems[level.docid]?.length">
-                <button mat-icon-button [matMenuTriggerFor]="levelMenu" class="action-btn"><mat-icon>more_horiz</mat-icon></button>
+                <button data-testid="big-button-16" mat-icon-button [matMenuTriggerFor]="levelMenu" class="action-btn"><mat-icon>more_horiz</mat-icon></button>
                 <mat-menu #levelMenu="matMenu">
                   <ng-container *ngIf="allSelectedHavePlanningStatus(level.docid)">
-                    <button mat-menu-item [matMenuTriggerFor]="sameLevelMenu"><mat-icon>swap_horiz</mat-icon><span> {{ level.level }}</span></button>
+                    <button data-testid="big-button-17" mat-menu-item [matMenuTriggerFor]="sameLevelMenu"><mat-icon>swap_horiz</mat-icon><span> {{ level.level }}</span></button>
                     <mat-menu #sameLevelMenu="matMenu">
-                      <button mat-menu-item (click)="moveLevelToLevel(level.docid, level.docid, 'completed')"><mat-icon>check_circle</mat-icon><span>Completed</span></button>
+                      <button data-testid="big-move-level-to-level-18" mat-menu-item (click)="moveLevelToLevel(level.docid, level.docid, 'completed')"><mat-icon>check_circle</mat-icon><span>Completed</span></button>
                     </mat-menu>
                   </ng-container>
                   <ng-container *ngFor="let targetLevel of getOtherLevels(level.docid)">
-                    <button mat-menu-item [matMenuTriggerFor]="targetLevelMenu"><mat-icon>swap_horiz</mat-icon><span> {{ targetLevel.level }}</span></button>
+                    <button data-testid="big-button-19" mat-menu-item [matMenuTriggerFor]="targetLevelMenu"><mat-icon>swap_horiz</mat-icon><span> {{ targetLevel.level }}</span></button>
                     <mat-menu #targetLevelMenu="matMenu">
-                      <button mat-menu-item *ngIf="!allSelectedHavePlanningStatus(level.docid)" (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'current')"><mat-icon>tag_faces</mat-icon><span>Current</span></button>
-                      <button mat-menu-item (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'planning')"><mat-icon>schedule</mat-icon><span>Planning</span></button>
-                      <button mat-menu-item (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'completed')"><mat-icon>check_circle</mat-icon><span>Completed</span></button>
+                      <button data-testid="big-move-level-to-level-20" mat-menu-item *ngIf="!allSelectedHavePlanningStatus(level.docid)" (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'current')"><mat-icon>tag_faces</mat-icon><span>Current</span></button>
+                      <button data-testid="big-move-level-to-level-21" mat-menu-item (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'planning')"><mat-icon>schedule</mat-icon><span>Planning</span></button>
+                      <button data-testid="big-move-level-to-level-22" mat-menu-item (click)="moveLevelToLevel(level.docid, targetLevel.docid, 'completed')"><mat-icon>check_circle</mat-icon><span>Completed</span></button>
                     </mat-menu>
                   </ng-container>
                   <mat-divider></mat-divider>
-                  <button mat-menu-item (click)="removeLevelSelected(level.docid)" class="danger-item"><mat-icon>delete_outline</mat-icon><span>Remove Selected</span></button>
+                  <button data-testid="big-remove-level-selected-23" mat-menu-item (click)="removeLevelSelected(level.docid)" class="danger-item"><mat-icon>delete_outline</mat-icon><span>Remove Selected</span></button>
                 </mat-menu>
               </div>
             </div>
             <div class="status-list">
               <ng-container *ngFor="let participant of getFilteredLevelParticipants(level.docid)">
                 <div class="participant-item" [class.selected]="isSelectedLevel(level.docid, participant.profileid)" [class.disabled]="!canSelectParticipant(level.docid, participant.profileid, participant.status)">
-                  <mat-checkbox *ngIf="canSelectParticipant(level.docid, participant.profileid, participant.status)" [checked]="isSelectedLevel(level.docid, participant.profileid)" (change)="toggleSelectLevel(level.docid, participant.profileid)"></mat-checkbox>
+                  <mat-checkbox data-testid="big-change-toggle-select-level-24" *ngIf="canSelectParticipant(level.docid, participant.profileid, participant.status)" [checked]="isSelectedLevel(level.docid, participant.profileid)" (change)="toggleSelectLevel(level.docid, participant.profileid)"></mat-checkbox>
                   <span class="checkbox-placeholder" *ngIf="!canSelectParticipant(level.docid, participant.profileid, participant.status)"></span>
                   <span class="avatar" [style.background]="getAvatarColor(participant.profileid)">{{ getInitial(participant.profileid) }}</span>
                   <div class="participant-info">
                     <span class="name">{{ mapparticipant[participant.profileid] || participant.profileid }}</span>
                     <span class="status-badge" [style.color]="getStatusColor(participant.status)"><mat-icon>{{ getStatusIcon(participant.status) }}</mat-icon>{{ participant.status | titlecase }}</span>
                   </div>
-                  <button mat-icon-button class="remove-btn" *ngIf="canRemoveFromLevel(participant.profileid, participant.status)" (click)="removeLevelParticipant(level.docid, participant.profileid)"><mat-icon>close</mat-icon></button>
+                  <button data-testid="big-remove-level-participant-25" mat-icon-button class="remove-btn" *ngIf="canRemoveFromLevel(participant.profileid, participant.status)" (click)="removeLevelParticipant(level.docid, participant.profileid)"><mat-icon>close</mat-icon></button>
                 </div>
               </ng-container>
               <div class="empty-state" *ngIf="!getFilteredLevelParticipants(level.docid).length"><mat-icon>school</mat-icon><span>No participants</span></div>
@@ -216,7 +216,7 @@
     <div class="no-levels-message" *ngIf="filteredLevels.length === 0 && (selectedStatusFilters.length > 0 || selectedLevelFilters.length > 0)">
       <mat-icon>filter_list_off</mat-icon>
       <span>No levels match the selected filters</span>
-      <button mat-stroked-button (click)="clearFilters()">Clear Filters</button>
+      <button data-testid="big-clear-filters-26" mat-stroked-button (click)="clearFilters()">Clear Filters</button>
     </div>
   </div>
 </div>

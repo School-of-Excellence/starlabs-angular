@@ -4,7 +4,7 @@
       <h2 class="resp-title">Responses</h2>
       <p class="resp-subtitle" *ngIf="title">{{ title }}</p>
     </div>
-    <button mat-icon-button type="button" (click)="close()" aria-label="Close">
+    <button data-testid="upc1-close-1" mat-icon-button type="button" (click)="close()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -81,6 +81,6 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-stroked-button type="button" (click)="close()">Close</button>
+    <button data-testid="upc1-close-2" mat-stroked-button type="button" (click)="close()">Close</button>
   </mat-dialog-actions>
 </div>

@@ -3,7 +3,7 @@
     <h4>Add/View Taxonomy</h4>
   </div> -->
   <div class="d-flex justify-content-end mr-4" style="margin-right: 2rem; margin-top: 80px;">
-    <button mat-stroked-button type="button" (click)="onAddTag()">Add</button>
+    <button data-testid="aevt-btn-1" mat-stroked-button type="button" (click)="onAddTag()">Add</button>
   </div>
  <div>
   <mat-form-field>
@@ -26,7 +26,7 @@
       <ng-container matColumnDef="edit">
         <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
         <td mat-cell *matCellDef="let row">
-          <button mat-icon-button (click)="onEdit(row)" type="button">
+          <button data-testid="aevt-btn-2" mat-icon-button (click)="onEdit(row)" type="button">
             <mat-icon>edit</mat-icon>
           </button>
         </td>
