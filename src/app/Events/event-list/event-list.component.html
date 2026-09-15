@@ -2,7 +2,7 @@
   <div>
     <div class="title">Event Lists</div>
     <div class="createeventbtn">
-      <button mat-raised-button class="menuitem fadein" (click)="openEventEditor()">
+      <button mat-raised-button class="menuitem fadein" data-testid="evl-create-event" (click)="openEventEditor()">
         Create New Event
       </button>
     </div>
@@ -13,7 +13,7 @@
         </th>
         <td mat-cell *matCellDef="let event">
           <label>{{event["id"]}}</label>
-          <button *ngIf="event['enddate'].getTime() > currentDate.getTime()" class="text-secondary me-2" mat-icon-button (click)="copyToClipboard(event['docid'])">
+          <button *ngIf="event['enddate'].getTime() > currentDate.getTime()" class="text-secondary me-2" mat-icon-button data-testid="evl-row-copy-id" (click)="copyToClipboard(event['docid'])">
             <mat-icon>content_copy</mat-icon>
           </button>
         </td>
@@ -78,10 +78,10 @@
           <label>More</label>
         </th>
         <td mat-cell *matCellDef="let event">
-          <button mat-icon-button [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
+          <button mat-icon-button data-testid="evl-row-menu" [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item (click)="openEventEditor(event['docid'])">Update Event</button>
-            <button mat-menu-item (click)="onViewEventParticipants(event['docid'])">Manage Participants</button>
+            <button mat-menu-item data-testid="evl-row-update" (click)="openEventEditor(event['docid'])">Update Event</button>
+            <button mat-menu-item data-testid="evl-row-manage-participants" (click)="onViewEventParticipants(event['docid'])">Manage Participants</button>
           </mat-menu>
         </td>
       </ng-container>

@@ -5,7 +5,7 @@
     <div *ngIf="!loading" class="dialog-container">
         <div class="dialog-header">
             <h2 class="title">Support Configure</h2>
-            <button mat-icon-button (click)="dialogRef.close()">
+            <button mat-icon-button data-testid="cfg-close" (click)="dialogRef.close()">
                 <mat-icon>close</mat-icon>
             </button>
         </div>
@@ -17,14 +17,14 @@
                 <div class="section-card negligence-section">
                     <div class="section-header">
                         <span class="section-title">Negligence</span>
-                        <button *ngIf="!negligenceEditMode" mat-stroked-button color="primary" (click)="editNegligence()">
+                        <button *ngIf="!negligenceEditMode" mat-stroked-button color="primary" data-testid="cfg-neg-edit" (click)="editNegligence()">
                             <mat-icon>edit</mat-icon> Edit
                         </button>
                         <div *ngIf="negligenceEditMode" class="action-buttons">
-                            <button mat-stroked-button color="primary" (click)="saveNegligence()">
+                            <button mat-stroked-button color="primary" data-testid="cfg-neg-save" (click)="saveNegligence()">
                                 <mat-icon>save</mat-icon> Save
                             </button>
-                            <button mat-stroked-button color="warn" (click)="cancelNegligence()">
+                            <button mat-stroked-button color="warn" data-testid="cfg-neg-cancel" (click)="cancelNegligence()">
                                 <mat-icon>close</mat-icon> Cancel
                             </button>
                         </div>
@@ -52,7 +52,7 @@
                     <div *ngIf="negligenceEditMode" class="edit-content">
                         <mat-form-field appearance="outline">
                             <mat-label>Validators</mat-label>
-                            <mat-select formControlName="validators" multiple>
+                            <mat-select formControlName="validators" multiple data-testid="cfg-neg-validators">
                                 <mat-option>
                                     <ngx-mat-select-search [(ngModel)]="searchvalidator" [ngModelOptions]="{standalone: true}"
                                         placeholderLabel="Search" [noEntriesFoundLabel]="'No matching records found'"
@@ -72,9 +72,10 @@
                             <mat-chip-grid #chipList2 formControlName="negligencecategories">
                                 <mat-chip-row *ngFor="let item of configurationform.controls['negligencecategories'].value">
                                     {{item}}
-                                    <mat-icon (click)="removeNegligence(item)" matChipRemove>cancel</mat-icon>
+                                    <mat-icon [attr.data-testid]="'cfg-neg-remove-' + item" (click)="removeNegligence(item)" matChipRemove>cancel</mat-icon>
                                 </mat-chip-row>
                                 <input placeholder="Type and press Enter..."
+                                    data-testid="cfg-neg-cat-input"
                                     [matChipInputFor]="chipList2"
                                     [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
                                     [matChipInputAddOnBlur]="true"
@@ -88,7 +89,7 @@
                 <div class="section-card">
                     <div class="section-header">
                         <span class="section-title">Categories</span>
-                        <button mat-stroked-button color="primary" (click)="addNewCategory()"
+                        <button mat-stroked-button color="primary" data-testid="cfg-cat-add" (click)="addNewCategory()"
                             [disabled]="categoryEditIndex !== -1">
                             <mat-icon>add</mat-icon> Add Category
                         </button>
@@ -120,11 +121,11 @@
                                         </div>
                                     </div>
                                     <div class="category-actions">
-                                        <button mat-icon-button color="primary" (click)="editCategory(i)"
+                                        <button mat-icon-button color="primary" [attr.data-testid]="'cfg-cat-edit-' + i" (click)="editCategory(i)"
                                             [disabled]="categoryEditIndex !== -1" matTooltip="Edit">
                                             <mat-icon>edit</mat-icon>
                                         </button>
-                                        <button mat-icon-button color="warn" (click)="deleteCategory(i)"
+                                        <button mat-icon-button color="warn" [attr.data-testid]="'cfg-cat-delete-' + i" (click)="deleteCategory(i)"
                                             [disabled]="categoryEditIndex !== -1" matTooltip="Delete">
                                             <mat-icon>delete</mat-icon>
                                         </button>
@@ -136,7 +137,7 @@
                             <div *ngIf="categoryEditIndex === i" class="category-edit-card">
                                 <div class="edit-form">
                                     <div class="toggle-row">
-                                        <mat-slide-toggle formControlName="show">
+                                        <mat-slide-toggle formControlName="show" [attr.data-testid]="'cfg-cat-show-' + i">
                                             <span *ngIf="item.get('show').value == false" class="status-text disabled">Disabled</span>
                                             <span *ngIf="item.get('show').value == true" class="status-text enabled">Enabled</span>
                                         </mat-slide-toggle>
@@ -145,7 +146,7 @@
                                     <div class="form-row">
                                         <mat-form-field appearance="outline" class="category-input">
                                             <mat-label>Category</mat-label>
-                                            <input matInput placeholder="Enter Category" formControlName="category" required>
+                                            <input matInput placeholder="Enter Category" [attr.data-testid]="'cfg-cat-name-' + i" formControlName="category" required>
                                             <mat-error *ngIf="item.get('category').hasError('required')">
                                                 Category is required
                                             </mat-error>
@@ -153,7 +154,7 @@
 
                                         <mat-form-field appearance="outline" class="assign-input">
                                             <mat-label>Assign To</mat-label>
-                                            <mat-select formControlName="assignto" multiple>
+                                            <mat-select formControlName="assignto" multiple [attr.data-testid]="'cfg-cat-assign-' + i">
                                                 <mat-option>
                                                     <ngx-mat-select-search [(ngModel)]="searchProfile"
                                                         [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
@@ -173,7 +174,7 @@
                                     <mat-form-field appearance="outline" style="width: 100%;">
                                         <mat-label>Description</mat-label>
                                         <textarea matInput placeholder="Enter a description for this category"
-                                            formControlName="description" rows="3"></textarea>
+                                            [attr.data-testid]="'cfg-cat-desc-' + i" formControlName="description" rows="3"></textarea>
                                     </mat-form-field>
 
                                     <!-- Subcategories -->
@@ -183,12 +184,13 @@
                                             class="subcategory-row">
                                             <mat-form-field appearance="outline" class="subcategory-input">
                                                 <mat-label>Subcategory {{j + 1}}</mat-label>
-                                                <input type="text" matInput formControlName="subcategory">
+                                                <input type="text" matInput [attr.data-testid]="'cfg-cat-sub-' + i + '-' + j" formControlName="subcategory">
                                             </mat-form-field>
-                                            <button mat-mini-fab color="primary" type="button" (click)="addSubCategory(i)">
+                                            <button mat-mini-fab color="primary" type="button" [attr.data-testid]="'cfg-cat-subadd-' + i + '-' + j" (click)="addSubCategory(i)">
                                                 <mat-icon>add</mat-icon>
                                             </button>
                                             <button *ngIf="j > 0" mat-mini-fab color="warn" type="button"
+                                                [attr.data-testid]="'cfg-cat-subremove-' + i + '-' + j"
                                                 (click)="removeSubCategory(i, j)">
                                                 <mat-icon>remove</mat-icon>
                                             </button>
@@ -197,14 +199,15 @@
 
                                     <!-- Action Buttons -->
                                     <div class="edit-actions">
-                                        <button mat-stroked-button color="primary" (click)="saveCategory(i)"
+                                        <button mat-stroked-button color="primary" [attr.data-testid]="'cfg-cat-save-' + i" (click)="saveCategory(i)"
                                             [disabled]="item.get('category').hasError('required') || item.get('assignto').hasError('required')">
                                             <mat-icon>save</mat-icon> Save
                                         </button>
-                                        <button mat-stroked-button (click)="cancelCategory(i)">
+                                        <button mat-stroked-button [attr.data-testid]="'cfg-cat-cancel-' + i" (click)="cancelCategory(i)">
                                             <mat-icon>close</mat-icon> Cancel
                                         </button>
                                         <button *ngIf="!isAddingNewCategory" mat-stroked-button color="warn"
+                                            [attr.data-testid]="'cfg-cat-deleteedit-' + i"
                                             (click)="deleteCategory(i)">
                                             <mat-icon>delete</mat-icon> Delete
                                         </button>
@@ -219,14 +222,14 @@
                 <div class="section-card">
                     <div class="section-header">
                         <span class="section-title">Automated Message</span>
-                        <button *ngIf="!automatedMessageEditMode" mat-stroked-button color="primary" (click)="editAutomatedMessage()">
+                        <button *ngIf="!automatedMessageEditMode" mat-stroked-button color="primary" data-testid="cfg-auto-edit" (click)="editAutomatedMessage()">
                             <mat-icon>edit</mat-icon> Edit
                         </button>
                         <div *ngIf="automatedMessageEditMode" class="action-buttons">
-                            <button mat-stroked-button color="primary" (click)="saveAutomatedMessage()">
+                            <button mat-stroked-button color="primary" data-testid="cfg-auto-save" (click)="saveAutomatedMessage()">
                                 <mat-icon>save</mat-icon> Save
                             </button>
-                            <button mat-stroked-button color="warn" (click)="cancelAutomatedMessage()">
+                            <button mat-stroked-button color="warn" data-testid="cfg-auto-cancel" (click)="cancelAutomatedMessage()">
                                 <mat-icon>close</mat-icon> Cancel
                             </button>
                         </div>
@@ -246,20 +249,20 @@
                         <div *ngFor="let element of messages.controls; let j = index" [formGroupName]="j" class="message-row">
                             <mat-form-field appearance="outline" class="message-input">
                                 <mat-label>Message</mat-label>
-                                <textarea matInput placeholder="Enter Message" formControlName="message" required rows="3"></textarea>
+                                <textarea matInput placeholder="Enter Message" [attr.data-testid]="'cfg-auto-msg-' + j" formControlName="message" required rows="3"></textarea>
                                 <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
                             </mat-form-field>
 
                             <mat-form-field appearance="outline" class="index-input">
                                 <mat-label>Index</mat-label>
-                                <input matInput type="number" placeholder="Enter Index" formControlName="index" required>
+                                <input matInput type="number" placeholder="Enter Index" [attr.data-testid]="'cfg-auto-index-' + j" formControlName="index" required>
                                 <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
                             </mat-form-field>
 
-                            <button mat-mini-fab color="primary" type="button" (click)="addMessage()">
+                            <button mat-mini-fab color="primary" type="button" [attr.data-testid]="'cfg-auto-add-' + j" (click)="addMessage()">
                                 <mat-icon>add</mat-icon>
                             </button>
-                            <button mat-mini-fab color="warn" type="button" (click)="removeMessage(j)" [disabled]="messages.length === 1">
+                            <button mat-mini-fab color="warn" type="button" [attr.data-testid]="'cfg-auto-remove-' + j" (click)="removeMessage(j)" [disabled]="messages.length === 1">
                                 <mat-icon>remove</mat-icon>
                             </button>
                         </div>
@@ -273,14 +276,14 @@
                             <span class="section-title">Warning Message</span>
                             <span class="section-subtitle">Sent when client doesn't respond for 4 days</span>
                         </div>
-                        <button *ngIf="!warningMessageEditMode" mat-stroked-button color="primary" (click)="editWarningMessage()">
+                        <button *ngIf="!warningMessageEditMode" mat-stroked-button color="primary" data-testid="cfg-warn-edit" (click)="editWarningMessage()">
                             <mat-icon>edit</mat-icon> Edit
                         </button>
                         <div *ngIf="warningMessageEditMode" class="action-buttons">
-                            <button mat-stroked-button color="primary" (click)="saveWarningMessage()">
+                            <button mat-stroked-button color="primary" data-testid="cfg-warn-save" (click)="saveWarningMessage()">
                                 <mat-icon>save</mat-icon> Save
                             </button>
-                            <button mat-stroked-button color="warn" (click)="cancelWarningMessage()">
+                            <button mat-stroked-button color="warn" data-testid="cfg-warn-cancel" (click)="cancelWarningMessage()">
                                 <mat-icon>close</mat-icon> Cancel
                             </button>
                         </div>
@@ -300,20 +303,20 @@
                         <div *ngFor="let element of warningmessages.controls; let j = index" [formGroupName]="j" class="message-row">
                             <mat-form-field appearance="outline" class="message-input">
                                 <mat-label>Warning Message</mat-label>
-                                <textarea matInput placeholder="Enter warning message" formControlName="message" required rows="3"></textarea>
+                                <textarea matInput placeholder="Enter warning message" [attr.data-testid]="'cfg-warn-msg-' + j" formControlName="message" required rows="3"></textarea>
                                 <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
                             </mat-form-field>
 
                             <mat-form-field appearance="outline" class="index-input">
                                 <mat-label>Index</mat-label>
-                                <input matInput type="number" placeholder="Index" formControlName="index" required>
+                                <input matInput type="number" placeholder="Index" [attr.data-testid]="'cfg-warn-index-' + j" formControlName="index" required>
                                 <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
                             </mat-form-field>
 
-                            <button mat-mini-fab color="primary" type="button" (click)="addWarningMessage()">
+                            <button mat-mini-fab color="primary" type="button" [attr.data-testid]="'cfg-warn-add-' + j" (click)="addWarningMessage()">
                                 <mat-icon>add</mat-icon>
                             </button>
-                            <button mat-mini-fab color="warn" type="button" (click)="removeWarningMessage(j)" [disabled]="warningmessages.length === 1">
+                            <button mat-mini-fab color="warn" type="button" [attr.data-testid]="'cfg-warn-remove-' + j" (click)="removeWarningMessage(j)" [disabled]="warningmessages.length === 1">
                                 <mat-icon>remove</mat-icon>
                             </button>
                         </div>
@@ -327,14 +330,14 @@
                             <span class="section-title">Closing Message</span>
                             <span class="section-subtitle">Sent when ticket is auto-closed after 24 hours</span>
                         </div>
-                        <button *ngIf="!closingMessageEditMode" mat-stroked-button color="primary" (click)="editClosingMessage()">
+                        <button *ngIf="!closingMessageEditMode" mat-stroked-button color="primary" data-testid="cfg-close-edit" (click)="editClosingMessage()">
                             <mat-icon>edit</mat-icon> Edit
                         </button>
                         <div *ngIf="closingMessageEditMode" class="action-buttons">
-                            <button mat-stroked-button color="primary" (click)="saveClosingMessage()">
+                            <button mat-stroked-button color="primary" data-testid="cfg-closemsg-save" (click)="saveClosingMessage()">
                                 <mat-icon>save</mat-icon> Save
                             </button>
-                            <button mat-stroked-button color="warn" (click)="cancelClosingMessage()">
+                            <button mat-stroked-button color="warn" data-testid="cfg-closemsg-cancel" (click)="cancelClosingMessage()">
                                 <mat-icon>close</mat-icon> Cancel
                             </button>
                         </div>
@@ -354,20 +357,20 @@
                         <div *ngFor="let element of closingmessages.controls; let j = index" [formGroupName]="j" class="message-row">
                             <mat-form-field appearance="outline" class="message-input">
                                 <mat-label>Closing Message</mat-label>
-                                <textarea matInput placeholder="Enter closing message" formControlName="message" required rows="3"></textarea>
+                                <textarea matInput placeholder="Enter closing message" [attr.data-testid]="'cfg-close-msg-' + j" formControlName="message" required rows="3"></textarea>
                                 <mat-error *ngIf="element.get('message').hasError('required')">Message is required</mat-error>
                             </mat-form-field>
 
                             <mat-form-field appearance="outline" class="index-input">
                                 <mat-label>Index</mat-label>
-                                <input matInput type="number" placeholder="Index" formControlName="index" required>
+                                <input matInput type="number" placeholder="Index" [attr.data-testid]="'cfg-close-index-' + j" formControlName="index" required>
                                 <mat-error *ngIf="element.get('index').hasError('required')">Index is required</mat-error>
                             </mat-form-field>
 
-                            <button mat-mini-fab color="primary" type="button" (click)="addClosingMessage()">
+                            <button mat-mini-fab color="primary" type="button" [attr.data-testid]="'cfg-close-add-' + j" (click)="addClosingMessage()">
                                 <mat-icon>add</mat-icon>
                             </button>
-                            <button mat-mini-fab color="warn" type="button" (click)="removeClosingMessage(j)" [disabled]="closingmessages.length === 1">
+                            <button mat-mini-fab color="warn" type="button" [attr.data-testid]="'cfg-close-remove-' + j" (click)="removeClosingMessage(j)" [disabled]="closingmessages.length === 1">
                                 <mat-icon>remove</mat-icon>
                             </button>
                         </div>
@@ -385,9 +388,10 @@
                         <mat-chip-grid #chipList formControlName="status">
                             <mat-chip-row *ngFor="let item of configurationform.controls['status'].value">
                                 {{item}}
-                                <mat-icon (click)="remove(item)" matChipRemove>cancel</mat-icon>
+                                <mat-icon [attr.data-testid]="'cfg-status-remove-' + item" (click)="remove(item)" matChipRemove>cancel</mat-icon>
                             </mat-chip-row>
                             <input placeholder="Type and press Enter..."
+                                data-testid="cfg-status-input"
                                 [matChipInputFor]="chipList"
                                 [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
                                 [matChipInputAddOnBlur]="true"
@@ -398,8 +402,8 @@
 
                 <!-- ==================== FOOTER BUTTONS ==================== -->
                 <div class="dialog-footer">
-                    <button mat-stroked-button (click)="dialogRef.close()">Close</button>
-                    <button mat-flat-button color="primary" [disabled]="configurationform.invalid"
+                    <button mat-stroked-button data-testid="cfg-footer-close" (click)="dialogRef.close()">Close</button>
+                    <button mat-flat-button color="primary" data-testid="cfg-submit" [disabled]="configurationform.invalid"
                         (click)="submit(configurationform.value)">
                         Save All Changes
                     </button>

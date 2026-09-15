@@ -20,7 +20,7 @@
               <div class="listening-wave"><span></span><span></span><span></span><span></span></div>
               Listening
             </div>
-            <button
+            <button data-testid="ml-toggle-listening-1"
               class="btn btn-sm"
               [class.btn-danger]="listeningRoom == studio['roomid']"
               [class.btn-outline-primary]="listeningRoom != studio['roomid']"
@@ -29,7 +29,7 @@
               <i class="bi" [class.bi-volume-up-fill]="listeningRoom == studio['roomid']" [class.bi-volume-mute]="listeningRoom != studio['roomid']"></i>
               {{listeningRoom == studio['roomid'] ? "Stop" : "Start"}} Listening
             </button>
-            <button
+            <button data-testid="ml-end-call-2"
               class="btn btn-sm btn-danger border-0"
               (click)="endCall(studio['roomid'])">
               End Room
@@ -109,12 +109,12 @@
     <!-- Error/Success Messages -->
     <div *ngIf="infraError" class="infra-alert infra-error">
       {{ infraError }}
-      <button (click)="infraError = null" class="close-btn">✕</button>
+      <button data-testid="ml-infra-error-3" (click)="infraError = null" class="close-btn">✕</button>
     </div>
     
     <div *ngIf="infraSuccess" class="infra-alert infra-success">
       {{ infraSuccess }}
-      <button (click)="infraSuccess = null" class="close-btn">✕</button>
+      <button data-testid="ml-infra-success-4" (click)="infraSuccess = null" class="close-btn">✕</button>
     </div>
 
     <div class="infra-cards">
@@ -149,14 +149,14 @@
         </div>
 
         <div class="infra-card-actions">
-          <button 
+          <button data-testid="ml-start-master-node-5" 
             (click)="startMasterNode()" 
             [disabled]="!canStartMaster()"
             class="infra-btn btn-start">
             <span *ngIf="!infraActionInProgress">▶️ Start</span>
             <span *ngIf="infraActionInProgress">⏳</span>
           </button>
-          <button 
+          <button data-testid="ml-stop-master-node-6" 
             (click)="stopMasterNode()" 
             [disabled]="!canStopMaster()"
             class="infra-btn btn-stop">
@@ -204,14 +204,14 @@
         </div>
 
         <div class="infra-card-actions">
-          <button 
+          <button data-testid="ml-scale-media-up-7" 
             (click)="scaleMediaUp()" 
             [disabled]="!canScaleUp()"
             class="infra-btn btn-scale">
             <span *ngIf="!infraActionInProgress">➕ Scale Up</span>
             <span *ngIf="infraActionInProgress">⏳</span>
           </button>
-          <button 
+          <button data-testid="ml-scale-media-down-8" 
             (click)="scaleMediaDown()" 
             [disabled]="!canScaleDown()"
             class="infra-btn btn-scale">

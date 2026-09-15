@@ -2,8 +2,8 @@
     <div class="wrap">
         <div class="bar bar1">
             <div class="views" role="group" aria-label="View">
-                <label for="v-cal" [class.active-tab]="activeTab == 'calendar'" (click)="onActiveTabChange('calendar')">Calendar</label>
-                <label for="v-lib" [class.active-tab]="activeTab == 'library'" (click)="onActiveTabChange('library')">Library</label>
+                <label for="v-cal" [class.active-tab]="activeTab == 'calendar'" (click)="onActiveTabChange('calendar')" data-testid="cgp-view-calendar">Calendar</label>
+                <label for="v-lib" [class.active-tab]="activeTab == 'library'" (click)="onActiveTabChange('library')" data-testid="cgp-view-library">Library</label>
             </div>
         </div>
         <div class="bar bar2">
@@ -85,7 +85,7 @@
                                 </div>
                                 <div class="cell-com-wrap">
                                     <div class="cell-com">
-                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)" (click)="onCummunicationClick(comm)">
+                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)" [attr.data-testid]="'cgp-cal-comm-' + comm?.docid" (click)="onCummunicationClick(comm)">
                                             <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
                                         </button>
@@ -111,7 +111,7 @@
                             <span class="ct">{{getEventCommunications(eventId).length}} communications</span>
                         </header>
                         <div class="libg-b">
-                            <details [open]="openedCommunications.includes(comm?.docid)" class="mrow" *ngFor="let comm of getEventCommunications(eventId)" (click)="toggleCommunications(comm?.docid)" [id]="comm?.docid">
+                            <details [open]="openedCommunications.includes(comm?.docid)" class="mrow" *ngFor="let comm of getEventCommunications(eventId)" [attr.data-testid]="'cgp-lib-row-' + comm?.docid" (click)="toggleCommunications(comm?.docid)" [id]="comm?.docid">
                                 <summary class="crow">
                                     <span class="chev">▸</span>
                                     <span class="mwhen ">
@@ -126,11 +126,12 @@
                                     </span>
                                     <button class="comm-btn comm-send-btn"
                                         [class.comm-active]="comm?.docid == selectedCommunication?.docid"
+                                        [attr.data-testid]="'cgp-lib-send-' + comm?.docid"
                                         (click)="onSendCommunication(comm); $event.stopPropagation()">
                                         {{ comm?.docid == selectedCommunication?.docid ? 'Close' : 'Send' }}
                                     </button>
                 
-                                    <button class="comm-btn comm-edit-btn" (click)="onCommunicationEditClick(comm); $event.stopPropagation()"> Edit </button>
+                                    <button class="comm-btn comm-edit-btn" [attr.data-testid]="'cgp-lib-edit-' + comm?.docid" (click)="onCommunicationEditClick(comm); $event.stopPropagation()"> Edit </button>
                                 </summary>
                                 <div class="mopen">
                                     <div class="mcols">
@@ -151,6 +152,7 @@
                                                     </div>
                                                     <div class="email-content" *ngIf="archive?.status === 'send'">
                                                         <button mat-button class="recipient-chip clickable-chip"
+                                                            [attr.data-testid]="'cgp-email-recipients-' + archive?.broadcastname"
                                                             (click)="openParticipantsPopup(archive, 'all'); $event.stopPropagation()"
                                                             matTooltip="Click to view all participants">
                                                             <mat-icon>group</mat-icon>
@@ -180,26 +182,23 @@
                                         
                                             <div *ngFor="let archive of communicationwatilLog[comm?.docid] ?? []" class="wati-preview">
                                                 <div class="wati-notification-title">
-                                                    <a (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
+                                                    <a [attr.data-testid]="'cgp-wati-broadcast-' + archive?.broadcastname" (click)="openBroadcast(record)">{{ archive.broadcastname || 'N/A' }}</a>
                                                     <div class="wati-profile-info">
                                                         <b>Sent By :</b> {{ mapProfile[archive?.createdby]?.name ?? '' }}
                                                     </div>
                                                 </div>
-                                        
-                                                <button mat-button class="wati-count-btn wati-sent-btn"
-                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                
+                                                <button mat-button class="wati-count-btn wati-sent-btn" [attr.data-testid]="'cgp-wati-sent-' + archive?.broadcastname" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>check_circle</mat-icon>
                                                     <span>{{ getSentCount(archive) }}</span>
                                                 </button>
-                                        
-                                                <button mat-button class="wati-count-btn wati-pending-btn"
-                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                
+                                                <button mat-button class="wati-count-btn wati-pending-btn" [attr.data-testid]="'cgp-wati-pending-' + archive?.broadcastname" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>schedule</mat-icon>
                                                     <span>{{ getPendingCount(archive) }}</span>
                                                 </button>
-                                        
-                                                <button mat-button class="wati-count-btn wati-failed-btn"
-                                                    (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
+                
+                                                <button mat-button class="wati-count-btn wati-failed-btn" [attr.data-testid]="'cgp-wati-failed-' + archive?.broadcastname" (click)="openParticipantsPopupWati(archive); $event.stopPropagation()">
                                                     <mat-icon>error</mat-icon>
                                                     <span>{{ getFailedCount(archive) }}</span>
                                                 </button>
@@ -410,8 +409,8 @@
 
 
 <!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->
-<div class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()">
-    <mat-card class="participants-modal" (click)="$event.stopPropagation()">
+<div class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()" data-testid="cgp-partmodal-overlay">
+    <mat-card class="participants-modal" (click)="$event.stopPropagation()" data-testid="cgp-partmodal-card">
         <!-- Modal Header -->
         <mat-card-header class="participants-modal-header">
             <div class="header-left">
@@ -421,7 +420,7 @@
                     <p class="modal-subtitle"> {{selectedArchiveForPopup?.subject || selectedArchiveForPopup?.broadcastname || 'Campaign'}} </p>
                 </div>
             </div>
-            <button mat-icon-button (click)="closeParticipantsModal()" class="close-btn">
+            <button mat-icon-button (click)="closeParticipantsModal()" class="close-btn" data-testid="cgp-partmodal-close">
                 <mat-icon>close</mat-icon>
             </button>
         </mat-card-header>
@@ -432,56 +431,56 @@
             <div class="status-summary-filters">
                 <div class="summary-grid">
                     <div class="summary-item all" [class.active]="isStatusFilterActive('all')"
-                        (click)="toggleStatusFilter('all')" matTooltip="Show all participants">
+                        (click)="toggleStatusFilter('all')" matTooltip="Show all participants" data-testid="cgp-partfilter-all">
                         <mat-icon>people</mat-icon>
                         <span class="count">{{participantStatusCounts.total}}</span>
                         <span class="label">All</span>
                     </div>
                     <div class="summary-item sent" [class.active]="isStatusFilterActive('sent')"
-                        (click)="toggleStatusFilter('sent')" matTooltip="Filter by sent">
+                        (click)="toggleStatusFilter('sent')" matTooltip="Filter by sent" data-testid="cgp-partfilter-sent">
                         <mat-icon>send</mat-icon>
                         <span class="count">{{participantStatusCounts.sent}}</span>
                         <span class="label">Sent</span>
                     </div>
                     <div class="summary-item delivery" [class.active]="isStatusFilterActive('delivery')"
-                        (click)="toggleStatusFilter('delivery')" matTooltip="Filter by delivered">
+                        (click)="toggleStatusFilter('delivery')" matTooltip="Filter by delivered" data-testid="cgp-partfilter-delivery">
                         <mat-icon>check_circle</mat-icon>
                         <span class="count">{{participantStatusCounts.delivery}}</span>
                         <span class="label">Delivered</span>
                     </div>
                     <div class="summary-item open" [class.active]="isStatusFilterActive('open')"
-                        (click)="toggleStatusFilter('open')" matTooltip="Filter by opened">
+                        (click)="toggleStatusFilter('open')" matTooltip="Filter by opened" data-testid="cgp-partfilter-open">
                         <mat-icon>visibility</mat-icon>
                         <span class="count">{{participantStatusCounts.open}}</span>
                         <span class="label">Opened</span>
                     </div>
                     <div class="summary-item click" [class.active]="isStatusFilterActive('click')"
-                        (click)="toggleStatusFilter('click')" matTooltip="Filter by clicked">
+                        (click)="toggleStatusFilter('click')" matTooltip="Filter by clicked" data-testid="cgp-partfilter-click">
                         <mat-icon>mouse</mat-icon>
                         <span class="count">{{participantStatusCounts.click}}</span>
                         <span class="label">Clicked</span>
                     </div>
                     <div class="summary-item bounce" [class.active]="isStatusFilterActive('bounce')"
-                        (click)="toggleStatusFilter('bounce')" matTooltip="Filter by bounced">
+                        (click)="toggleStatusFilter('bounce')" matTooltip="Filter by bounced" data-testid="cgp-partfilter-bounce">
                         <mat-icon>error_outline</mat-icon>
                         <span class="count">{{participantStatusCounts.bounce}}</span>
                         <span class="label">Bounced</span>
                     </div>
                     <div class="summary-item subscriptionchange"
                         [class.active]="isStatusFilterActive('subscriptionchange')"
-                        (click)="toggleStatusFilter('subscriptionchange')" matTooltip="Filter by unsubscribed">
+                        (click)="toggleStatusFilter('subscriptionchange')" matTooltip="Filter by unsubscribed" data-testid="cgp-partfilter-subscriptionchange">
                         <mat-icon>unsubscribe</mat-icon>
                         <span class="count">{{participantStatusCounts.subscriptionchange}}</span>
                         <span class="label">Unsubscribed</span>
                     </div>
                     <div class="summary-item failed" [class.active]="isStatusFilterActive('failed')"
-                        (click)="toggleStatusFilter('failed')" matTooltip="Filter by failed">
+                        (click)="toggleStatusFilter('failed')" matTooltip="Filter by failed" data-testid="cgp-partfilter-failed">
                         <mat-icon>cancel</mat-icon>
                         <span class="count">{{participantStatusCounts.failed}}</span>
                         <span class="label">Failed</span>
                     </div>
                     <div class="summary-item notSent" [class.active]="isStatusFilterActive('notSent')"
-                        (click)="toggleStatusFilter('notSent')" matTooltip="Filter by not sent">
+                        (click)="toggleStatusFilter('notSent')" matTooltip="Filter by not sent" data-testid="cgp-partfilter-notsent">
                         <mat-icon>block</mat-icon>
                         <span class="count">{{participantStatusCounts.notSent}}</span>
                         <span class="label">Not Sent</span>
@@ -494,10 +493,10 @@
                 <mat-form-field appearance="outline" class="search-field">
                     <mat-label>Search participants</mat-label>
                     <input matInput [(ngModel)]="participantSearchFilter" (input)="onParticipantSearchChange()"
-                        placeholder="Search by email, name, or profile ID...">
+                        placeholder="Search by email, name, or profile ID..." data-testid="cgp-partmodal-search">
                     <mat-icon matPrefix>search</mat-icon>
                     <button matSuffix mat-icon-button *ngIf="participantSearchFilter"
-                        (click)="participantSearchFilter=''; onParticipantSearchChange()">
+                        (click)="participantSearchFilter=''; onParticipantSearchChange()" data-testid="cgp-partmodal-search-clear">
                         <mat-icon>clear</mat-icon>
                     </button>
                 </mat-form-field>
@@ -574,7 +573,7 @@
 
         <!-- Modal Actions -->
         <mat-card-actions class="participants-modal-actions" align="end">
-            <button mat-button (click)="closeParticipantsModal()">
+            <button mat-button (click)="closeParticipantsModal()" data-testid="cgp-partmodal-close-footer">
                 <mat-icon>close</mat-icon>
                 Close
             </button>
@@ -588,11 +587,11 @@
 <!-- ==================== END UNIFIED PARTICIPANTS POPUP ==================== -->
 
 <!-- Participants Popup Overlay -->
-<div *ngIf="showParticipantsPopup()" class="wati-participants-overlay" (click)="closeParticipantsPopup()">
-    <div class="wati-participants-popup" (click)="$event.stopPropagation()">
+<div *ngIf="showParticipantsPopup()" class="wati-participants-overlay" (click)="closeParticipantsPopup()" data-testid="cgp-watimodal-overlay">
+    <div class="wati-participants-popup" (click)="$event.stopPropagation()" data-testid="cgp-watimodal-popup">
         <div class="wati-popup-header">
             <h3>Participants - {{ selectedRecord()?.broadcastname || 'Notification' }}</h3>
-            <button mat-icon-button (click)="closeParticipantsPopup()" class="wati-close-btn">
+            <button mat-icon-button (click)="closeParticipantsPopup()" class="wati-close-btn" data-testid="cgp-watimodal-close">
                 <mat-icon>close</mat-icon>
             </button>
         </div>
@@ -602,7 +601,7 @@
             <mat-form-field appearance="outline" class="wati-search-participants">
                 <mat-label>Search Participants</mat-label>
                 <input matInput [(ngModel)]="participantSearchText" (input)="filterParticipants()"
-                    placeholder="Search by name or phone">
+                    placeholder="Search by name or phone" data-testid="cgp-watimodal-search">
                 <mat-icon matSuffix>search</mat-icon>
             </mat-form-field>
 
@@ -630,7 +629,7 @@
             <div class="wati-participants-list">
                 <div *ngFor="let participant of filteredWatiParticipants" class="wati-participant-item">
                     <div class="wati-participant-info">
-                        <a class="wati-participant-name" (click)="openWatiInbox(selectedRecord())">
+                        <a class="wati-participant-name" [attr.data-testid]="'cgp-watimodal-participant-' + participant?.phone" (click)="openWatiInbox(selectedRecord())">
                             {{ mapProfile[participant.name]?.['name'] || 'Unknown' }}
                         </a>
                         <span class="wati-participant-phone">{{ participant.phone }}</span>

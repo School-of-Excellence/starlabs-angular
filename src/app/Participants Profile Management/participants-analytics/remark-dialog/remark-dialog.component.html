@@ -4,7 +4,7 @@
     <textarea  class="textareafield" rows="5" cols="60" [(ngModel)]="list.note"></textarea>
   </div>
   <div class="btnbox">
-    <button mat-stroked-button class="cancelbtn" (click)="cancel()">Cancel</button>
-    <button mat-stroked-button class="submitbtn" (click)="submit()">Submit</button>
+    <button data-testid="rmd-cancel-1" mat-stroked-button class="cancelbtn" (click)="cancel()">Cancel</button>
+    <button data-testid="rmd-submit-2" mat-stroked-button class="submitbtn" (click)="submit()">Submit</button>
   </div>
 </div>

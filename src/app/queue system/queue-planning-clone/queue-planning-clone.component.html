@@ -9,7 +9,7 @@
       <!-- Queue Selection -->
       <mat-form-field appearance="outline" class="queue-select">
         <mat-label>Select Queue</mat-label>
-        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+        <mat-select data-testid="qpcl-sel-1" [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
           <mat-option>
             <ngx-mat-select-search 
               [(ngModel)]="searchQueue" 
@@ -26,7 +26,7 @@
 
     <!-- NEW: Overall Counts Section -->
     <div class="overall-counts-section" *ngIf="selectedQueue && !loading">
-      <div class="overall-count-card queue-tokens-card" (click)="openOverallQueueTokensPanel()">
+      <div data-testid="qpcl-act-2" class="overall-count-card queue-tokens-card" (click)="openOverallQueueTokensPanel()">
         <div class="count-icon">
           <mat-icon>confirmation_number</mat-icon>
         </div>
@@ -36,7 +36,7 @@
         </div>
       </div>
       
-      <div class="overall-count-card segment-participants-card" (click)="openOverallSegmentParticipantsPanel()">
+      <div data-testid="qpcl-act-3" class="overall-count-card segment-participants-card" (click)="openOverallSegmentParticipantsPanel()">
         <div class="count-icon">
           <mat-icon>groups</mat-icon>
         </div>
@@ -73,7 +73,7 @@
                 <div class="stage-column-content">
                   <!-- Slot Cards for this Stage -->
                   <div *ngFor="let slot of getSlotsForStage(stage)" class="slot-card-wrapper">
-                    <div class="slot-card" (click)="openSlotPanel(slot, stage)">
+                    <div [attr.data-testid]="'qpcl-act-4-' + slot" class="slot-card" (click)="openSlotPanel(slot, stage)">
                       <!-- Show Dates with Time in Single Box -->
                       <div class="slot-datetime-box">
                         <div class="datetime-row">
@@ -174,7 +174,7 @@
           </span>
         </h4>
       </span>
-      <button mat-icon-button (click)="closeSlotPanel()" class="close-panel-btn">
+      <button data-testid="qpcl-btn-5" mat-icon-button (click)="closeSlotPanel()" class="close-panel-btn">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -185,7 +185,7 @@
         <div class="filters-grid">
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Segment</mat-label>
-            <mat-select [(ngModel)]="selectedSegmentFilter" (selectionChange)="onSegmentFilterChange()">
+            <mat-select data-testid="qpcl-sel-6" [(ngModel)]="selectedSegmentFilter" (selectionChange)="onSegmentFilterChange()">
               <mat-option value="all">All Segments</mat-option>
               <mat-option *ngFor="let segment of segmentList" [value]="segment['id']">
                 {{ segment['segmentname'] }}
@@ -195,7 +195,7 @@
           
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Stage</mat-label>
-            <mat-select [(ngModel)]="selectedStageFilter" (selectionChange)="onStageFilterChange()">
+            <mat-select data-testid="qpcl-sel-7" [(ngModel)]="selectedStageFilter" (selectionChange)="onStageFilterChange()">
               <mat-option value="all">All Stages</mat-option>
               <mat-option *ngFor="let stage of queueStages" [value]="stage">
                 {{ stage }}
@@ -207,7 +207,7 @@
 
       <!-- NEW: Overall Status Counts (only for overall views when no section active) -->
       <div class="overall-status-counts" *ngIf="(panelViewType === 'overall-queue-tokens' || panelViewType === 'overall-segment-participants')">
-        <div class="status-count-card confirmed-status-card" (click)="showOverallConfirmed()">
+        <div data-testid="qpcl-act-8" class="status-count-card confirmed-status-card" (click)="showOverallConfirmed()">
           <div class="status-icon">
             <mat-icon>check_circle</mat-icon>
           </div>
@@ -219,7 +219,7 @@
           </div>
         </div>
         
-        <div class="status-count-card non-confirmed-status-card" (click)="showOverallNonConfirmed()">
+        <div data-testid="qpcl-act-9" class="status-count-card non-confirmed-status-card" (click)="showOverallNonConfirmed()">
           <div class="status-icon">
             <mat-icon>schedule</mat-icon>
           </div>
@@ -231,7 +231,7 @@
           </div>
         </div>
         
-        <div class="status-count-card deleted-slots-status-card" (click)="showOverallDeletedSlots()">
+        <div data-testid="qpcl-act-10" class="status-count-card deleted-slots-status-card" (click)="showOverallDeletedSlots()">
           <div class="status-icon">
             <mat-icon>delete_forever</mat-icon>
           </div>
@@ -248,7 +248,7 @@
   <div class="stage-filter-section" *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
     <mat-form-field appearance="outline" class="stage-filter">
       <mat-label>Filter by Stage</mat-label>
-      <mat-select [(ngModel)]="selectedStageFilter" >
+      <mat-select data-testid="qpcl-sel-11" [(ngModel)]="selectedStageFilter" >
         <mat-option value="all">All Stages</mat-option>
         <mat-option *ngFor="let stage of queueStages" [value]="stage">
           {{ stage }}
@@ -259,7 +259,7 @@
 
   <!-- Stage Status Counts (only for stage-specific views) -->
   <div class="stage-status-counts" *ngIf="(panelViewType === 'queue-tokens' || panelViewType === 'segment-participants') && !activePanelSection">
-    <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+    <div data-testid="qpcl-act-12" class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
       <div class="status-icon">
         <mat-icon>check_circle</mat-icon>
       </div>
@@ -273,7 +273,7 @@
       </div>
     </div>
     
-    <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+    <div data-testid="qpcl-act-13" class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
       <div class="status-icon">
         <mat-icon>schedule</mat-icon>
       </div>
@@ -290,7 +290,7 @@
 
       <!-- NEW: Confirmed/Non-Confirmed Counts (only for stage-specific views) -->
       <div class="stage-status-counts" *ngIf="panelViewType === 'queue-tokens' || panelViewType === 'segment-participants'">
-        <div class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
+        <div data-testid="qpcl-act-14" class="status-count-card confirmed-status-card" (click)="showConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>check_circle</mat-icon>
           </div>
@@ -304,7 +304,7 @@
           </div>
         </div>
         
-        <div class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
+        <div data-testid="qpcl-act-15" class="status-count-card non-confirmed-status-card" (click)="showNonConfirmedForStage()">
           <div class="status-icon">
             <mat-icon>schedule</mat-icon>
           </div>
@@ -323,7 +323,7 @@
       <ng-container *ngIf="panelViewType === 'slot'">
         <!-- Merged Variations List -->
         <span class="merged-variations-section">
-          <div class="section-header-clickable" (click)="toggleVariationsExpansion()">
+          <div data-testid="qpcl-act-16" class="section-header-clickable" (click)="toggleVariationsExpansion()">
             <span>
               Segments & Variations ({{getSegmentVariationsWithCounts().length}})
             </span>
@@ -352,7 +352,7 @@
 
         <!-- Stage Range Information -->
         <span class="stage-range-info" *ngIf="getStageRangeDetails().hasNonConfirmed">
-          <div class="stage-range-header" (click)="toggleStageRange()">
+          <div data-testid="qpcl-act-17" class="stage-range-header" (click)="toggleStageRange()">
             <mat-icon>route</mat-icon>
             <span>Stage Range for Non-Confirmed Participants</span>
             <mat-icon class="expand-icon" [class.expanded]="isStageRangeExpanded">
@@ -392,7 +392,7 @@
         <!-- Overall Participants Summary -->
         <span class="summary-grids">
           <!-- Confirmed Participants Grid -->
-          <div class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()">
+          <div data-testid="qpcl-act-18" class="summary-card confirmed-card" (click)="showAllConfirmedParticipants()">
             <div class="summary-content-compact">
               <span class="summary-label">Confirmed</span>
               <span class="summary-count">{{ getAllConfirmedCount() }}</span>
@@ -404,7 +404,7 @@
           </div>
 
           <!-- Non-Confirmed Participants Grid -->
-          <div class="summary-card non-confirmed-card" (click)="showAllNonConfirmedParticipants()">
+          <div data-testid="qpcl-act-19" class="summary-card non-confirmed-card" (click)="showAllNonConfirmedParticipants()">
             <div class="summary-content-compact">
               <span class="summary-label">Non-Confirmed</span>
               <span class="summary-count">{{ getAllNonConfirmedCount() }}</span>
@@ -412,7 +412,7 @@
           </div>
 
           <!-- B!G Participants Grid -->
-          <div class="summary-card big-card" (click)="showAllBigParticipants()">
+          <div data-testid="qpcl-act-20" class="summary-card big-card" (click)="showAllBigParticipants()">
             <div class="summary-content-compact">
               <span class="summary-label">B!G Participants</span>
               <span class="summary-count">{{ getAllBigParticipantsCount() }}</span>
@@ -443,7 +443,7 @@
             }} Participants
             ({{ getFilteredParticipantsList().length }})
           </h4>
-          <mat-checkbox [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
+          <mat-checkbox data-testid="qpcl-change-21" [checked]="areAllParticipantsSelected(activePanelSection || 'all')"
             [indeterminate]="areSomeParticipantsSelected(activePanelSection || 'all')"
             (change)="toggleAllParticipants($event.checked, activePanelSection || 'all')">
             <b>Select All</b>
@@ -453,7 +453,7 @@
         <!-- Communication Actions - Moved above Participants Summary -->
         <span *ngIf="getSelectedParticipantsCount(activePanelSection || 'all') != 0">
           <div class="action-buttons-horizontal">
-            <button mat-raised-button class="action-btn-compact notification-btn"
+            <button data-testid="qpcl-btn-22" mat-raised-button class="action-btn-compact notification-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
               (click)="sendNotification()">
               <mat-icon>notifications</mat-icon>
@@ -461,7 +461,7 @@
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
             </button>
         
-            <button mat-raised-button class="action-btn-compact whatsapp-btn"
+            <button data-testid="qpcl-btn-23" mat-raised-button class="action-btn-compact whatsapp-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
               (click)="sendWhatsApp()">
               <mat-icon>chat</mat-icon>
@@ -469,7 +469,7 @@
               <span class="count-bubble">{{ getSelectedParticipantsCount(activePanelSection || 'all') }}</span>
             </button>
         
-            <button mat-raised-button class="action-btn-compact email-btn"
+            <button data-testid="qpcl-btn-24" mat-raised-button class="action-btn-compact email-btn"
               [disabled]="!activePanelSection || getSelectedParticipantsCount(activePanelSection || 'all') === 0"
               (click)="sendEmail()">
               <mat-icon>email</mat-icon>

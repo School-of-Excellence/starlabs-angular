@@ -4,7 +4,7 @@
       <mat-icon class="dialog-title-icon">category</mat-icon>
       {{ categoryName || 'Assign Category' }}
     </h2>
-    <button class="a-btn" mat-dialog-close>
+    <button data-testid="acd-btn-001" class="a-btn" mat-dialog-close>
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -14,11 +14,11 @@
       <label class="label">Category <span class="required">*</span></label>
       <div class="input-box" *ngIf="isCategoryLocked">
         <mat-icon class="ib-icon">category</mat-icon>
-        <input type="text" class="ib-input" [value]="categoryName" disabled />
+        <input data-testid="acd-inp-002" type="text" class="ib-input" [value]="categoryName" disabled />
       </div>
       <div class="input-box" *ngIf="!isCategoryLocked" [class.error]="duplicateError">
         <mat-icon class="ib-icon">category</mat-icon>
-        <input type="text" class="ib-input" placeholder="Type a new category name..."
+        <input data-testid="acd-inp-003" type="text" class="ib-input" placeholder="Type a new category name..."
           [(ngModel)]="newCategoryName" (keyup)="onCategoryNameType()" />
       </div>
       <span class="field-error" *ngIf="duplicateError">This category already exists</span>
@@ -26,7 +26,7 @@
     <br>
     <div class="field-group" *ngIf="isCategoryLocked || newCategoryName.trim()">
       <label class="label">Assign Series</label>
-      <mat-select
+      <mat-select data-testid="acd-msel-004"
         [(ngModel)]="selectedSeriesIds"
         multiple
         class="cat-select"
@@ -34,7 +34,7 @@
         (selectionChange)="onSelectionChange()">
         <div class="cat-search-box">
           <mat-icon class="ib-icon">search</mat-icon>
-          <input type="text" class="ib-input" placeholder="Search series..."
+          <input data-testid="acd-inp-005" type="text" class="ib-input" placeholder="Search series..."
             (keyup)="onSeriesSearch($event)" (keydown)="$event.stopPropagation()" />
         </div>
         <mat-option *ngFor="let s of filteredSeriesList" [value]="s.id">
@@ -55,7 +55,7 @@
           </div>
           <span class="drag-index">{{ i + 1 }}</span>
           <span class="c-name">{{ seriesMap[id]?.seriesName }}</span>
-          <button class="a-btn a-del" (click)="removeSeries(id)" style="margin-left: auto;">
+          <button data-testid="acd-btn-006" class="a-btn a-del" (click)="removeSeries(id)" style="margin-left: auto;">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -68,8 +68,8 @@
 
   </div>
   <div class="dialog-footer">
-    <button class="btn-cancel" mat-dialog-close>Cancel</button>
-    <button class="btn-primary" (click)="onSave()"
+    <button data-testid="acd-btn-007" class="btn-cancel" mat-dialog-close>Cancel</button>
+    <button data-testid="acd-btn-008" class="btn-primary" (click)="onSave()"
       [disabled]="saving || (!isCategoryLocked && !newCategoryName.trim()) || duplicateError">
       <mat-icon *ngIf="!saving">save</mat-icon>
       <mat-icon *ngIf="saving" class="spin-icon">sync</mat-icon>

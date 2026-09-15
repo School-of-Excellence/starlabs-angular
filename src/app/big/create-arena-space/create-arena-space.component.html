@@ -8,16 +8,16 @@
         
         <mat-step label="Create By :" state="edit">
           <mat-radio-group class="radio-button" aria-label="Select an option">
-            <mat-radio-button [value]="'manual'" [checked]="selectedType === 'manual'" (change)="selectOption('manual')">
+            <mat-radio-button data-testid="cas-change-select-option-1" [value]="'manual'" [checked]="selectedType === 'manual'" (change)="selectOption('manual')">
               <b>Manual Creation</b>
             </mat-radio-button>
             <br>
-            <mat-radio-button [value]="'import'" [checked]="selectedType === 'import'" (change)="selectOption('import')">
+            <mat-radio-button data-testid="cas-change-select-option-2" [value]="'import'" [checked]="selectedType === 'import'" (change)="selectOption('import')">
               <b>Import from Sheets</b>
             </mat-radio-button>
           </mat-radio-group>
           <div>
-            <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+            <button data-testid="cas-button-3" class="next-button" mat-stroked-button matStepperNext>Next</button>
           </div>
         </mat-step>
         
@@ -60,8 +60,8 @@
 
             <br><br>
             <div class="d-flex flex-row justify-content-center gap-10" >
-                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
-                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+                <button data-testid="cas-button-4" class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button data-testid="cas-button-5" class="next-button" mat-stroked-button matStepperNext>Next</button>
             </div>
         </mat-step>
 
@@ -179,7 +179,7 @@
 
             <div class="d-flex justify-content-center">
                 <br><br>
-                <button mat-stroked-button type="button" (click)="createArenaManually()">Create Arena Space</button>
+                <button data-testid="cas-create-arena-manually-6" mat-stroked-button type="button" (click)="createArenaManually()">Create Arena Space</button>
             </div>
         </mat-step>
       
@@ -202,15 +202,15 @@
                         <div class="text">
                             <span>Click to upload Excel</span>
                         </div>
-                        <input id="file1" type="file" (change)="onChange($event)" #inputFile>
+                        <input data-testid="cas-change-on-change-7" id="file1" type="file" (change)="onChange($event)" #inputFile>
                     </label>
                 </div>
             </div>
             
             <br><br>
             <div class="d-flex flex-row justify-content-center gap-10" >
-                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
-                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+                <button data-testid="cas-button-8" class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button data-testid="cas-button-9" class="next-button" mat-stroked-button matStepperNext>Next</button>
             </div>
 
         </mat-step>
@@ -224,7 +224,7 @@
                             class="participant-card" 
                             [class.active]="i == showInput"
                              [class.selected]="hasProfile(participant.value)">
-                        <div class="participant-info" (click)="showInput = i;filteredProfile = participant.key">
+                        <div data-testid="cas-show-input-10" class="participant-info" (click)="showInput = i;filteredProfile = participant.key">
                           <div class="participant-label">{{splitByCommaWithNullishCheck(documentlist[0]['Doer Name']).includes(participant.key) ? 'Doer : ' : ''}} {{participant.key | titlecase}}</div>
                           <div class="participant-value">{{participant.value['profile'] || 'Not assigned'}}</div>
                           <div class="participant-value" *ngIf="returnCohorts().length != 0">{{participant.value['cohorts'] || 'Not assigned'}}</div>
@@ -235,7 +235,7 @@
                                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
                               </svg>
                             </div>
-                            <div class="edit-icon" (click)="showInput = -1">
+                            <div data-testid="cas-show-input-11" class="edit-icon" (click)="showInput = -1">
                               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -305,8 +305,8 @@
             </div>
             <br><br>
             <div class="d-flex flex-row justify-content-center gap-10" >
-                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
-                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+                <button data-testid="cas-button-12" class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button data-testid="cas-button-13" class="next-button" mat-stroked-button matStepperNext>Next</button>
             </div>
         </mat-step>
 
@@ -321,7 +321,7 @@
                           [class.active]="i == showInput"
                           [class.selected]="space.value && space.value !== ''">
                         
-                        <div class="participant-info" (click)="showInput = i">
+                        <div data-testid="cas-show-input-14" class="participant-info" (click)="showInput = i">
                           <div class="participant-label">{{space.key | titlecase}}</div>
                           <div class="participant-value">{{space.value || 'Not assigned'}}</div>
                           
@@ -332,7 +332,7 @@
                                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
                               </svg>
                             </div>
-                            <div class="edit-icon" (click)="showInput = -1">
+                            <div data-testid="cas-show-input-15" class="edit-icon" (click)="showInput = -1">
                               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -367,8 +367,8 @@
             </div>
             <br><br>
             <div class="d-flex flex-row justify-content-center gap-10" >
-                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
-                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+                <button data-testid="cas-button-16" class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button data-testid="cas-button-17" class="next-button" mat-stroked-button matStepperNext>Next</button>
             </div>
         </mat-step>
 
@@ -383,7 +383,7 @@
                           [class.active]="i == showInput"
                           [class.selected]="type.value && type.value !== ''">
                         
-                        <div class="participant-info" (click)="showInput = i">
+                        <div data-testid="cas-show-input-18" class="participant-info" (click)="showInput = i">
                           <div class="participant-label">{{type.key | titlecase}}</div>
                           <div class="participant-value">{{type.value || 'Not assigned'}}</div>
                           
@@ -394,7 +394,7 @@
                                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
                               </svg>
                             </div>
-                            <div class="edit-icon" (click)="showInput = -1">
+                            <div data-testid="cas-show-input-19" class="edit-icon" (click)="showInput = -1">
                               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -429,17 +429,17 @@
             </div>
             <br><br>
             <div class="d-flex flex-row justify-content-center" >
-                <button class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
-                <button class="next-button" mat-stroked-button matStepperNext>Next</button>
+                <button data-testid="cas-button-20" class="previous-button" mat-stroked-button matStepperPrevious>Previouse</button>
+                <button data-testid="cas-button-21" class="next-button" mat-stroked-button matStepperNext>Next</button>
             </div>
         </mat-step>
 
         <mat-step *ngIf="selectedType == 'import'" label="View Participants">
             <br>
             <div class="d-flex flex-row justify-content-end ">
-                <button mat-raised-button type="button" style="background-color: rgb(44, 141, 44);color:white" (click)="onUploadAll()">Upload All</button>
+                <button data-testid="cas-on-upload-all-22" mat-raised-button type="button" style="background-color: rgb(44, 141, 44);color:white" (click)="onUploadAll()">Upload All</button>
                 &nbsp;&nbsp;
-                <button mat-raised-button type="button" style="background-color: rgb(33, 92, 160);color:white" (click)="onValidateImportSheet()">Validate Import Sheet</button>
+                <button data-testid="cas-on-validate-import-sheet-23" mat-raised-button type="button" style="background-color: rgb(33, 92, 160);color:white" (click)="onValidateImportSheet()">Validate Import Sheet</button>
             </div>
 
             <div class="pending-container" *ngIf="pendingMap != null">
@@ -453,7 +453,7 @@
                     <div class="pending-item" *ngFor="let item of pendingMap['pendinglist']; let i = index">
                       <div class="item-number">{{i + 1}}</div>
                       <div class="item-content">{{item}}</div>
-                      <button class="item-action" title="View details">
+                      <button data-testid="cas-button-24" class="item-action" title="View details">
                         <i class="fa fa-chevron-right"></i>
                       </button>
                     </div>
@@ -491,9 +491,9 @@
                             </ng-container>
 
                             <td [ngStyle]="data['exist'] ? {'background-color': 'rgb(255 180 188)'} : {}">
-                                <button mat-raised-button type="button" style="background-color: rgb(23, 177, 9);color:white" (click)="uploadData(data, i)">{{data['exist'] ? 'Re-Upload' : 'Upload'}}</button>
+                                <button data-testid="cas-upload-data-25" mat-raised-button type="button" style="background-color: rgb(23, 177, 9);color:white" (click)="uploadData(data, i)">{{data['exist'] ? 'Re-Upload' : 'Upload'}}</button>
                                 &nbsp;&nbsp;
-                                <button mat-raised-button type="button" style="background-color: red;color:white" (click)="removeData(i)">Remove</button>
+                                <button data-testid="cas-remove-data-26" mat-raised-button type="button" style="background-color: red;color:white" (click)="removeData(i)">Remove</button>
                             </td>
                         </tr>
                     </tbody>
@@ -506,24 +506,24 @@
                     </div>
                 
                     <div class="pagination-controls">
-                        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
+                        <button data-testid="cas-prev-page-27" class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
                         
-                        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
+                        <button data-testid="cas-go-to-page-28" class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
                         
                         <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
                         
-                        <button *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
+                        <button data-testid="cas-go-to-page-29" *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
                         
                         <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
                         
-                        <button class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
+                        <button data-testid="cas-go-to-page-30" class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
                         
-                        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+                        <button data-testid="cas-next-page-31" class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
                     </div>
                     
                     <div class="pagination-size">
                         <label for="page-size">Items per page:</label>
-                        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+                        <select data-testid="cas-change-current-page-32" id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
                             <option value="5">5</option>
                             <option value="10">10</option>
                             <option value="25">25</option>
@@ -563,24 +563,24 @@
                     </div>
                 
                     <div class="pagination-controls">
-                        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
+                        <button data-testid="cas-prev-page-33" class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">Previous</button>
                         
-                        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
+                        <button data-testid="cas-go-to-page-34" class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">1</button>
                         
                         <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
                         
-                        <button *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
+                        <button data-testid="cas-go-to-page-35" *ngFor="let page of pageNumbers" class="pagination-button page-number" [class.active]="currentPage === page"(click)="goToPage(page)">{{ page }}</button>
                         
                         <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
                         
-                        <button class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
+                        <button data-testid="cas-go-to-page-36" class="pagination-button page-number" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" (click)="goToPage(totalPages)">{{ totalPages }}</button>
                         
-                        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+                        <button data-testid="cas-next-page-37" class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
                     </div>
                     
                     <div class="pagination-size">
                         <label for="page-size">Items per page:</label>
-                        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+                        <select data-testid="cas-change-current-page-38" id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
                             <option value="5">5</option>
                             <option value="10">10</option>
                             <option value="25">25</option>

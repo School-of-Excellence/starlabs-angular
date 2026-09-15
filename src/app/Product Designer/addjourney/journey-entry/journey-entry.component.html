@@ -84,11 +84,11 @@
     </div>
     <!-- Attachments -->
     <label>Attachments :</label>&nbsp;&nbsp;
-    <input type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
+    <input data-testid="je-change-on-attachment-selected-1" type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
     <div *ngFor="let att of attachments; let i = index" style="display:flex; align-items:center; gap:8px; margin-top:8px">
       <mat-icon>insert_drive_file</mat-icon>
       <span>{{ att.name }}</span>
-      <button mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
+      <button data-testid="je-remove-attachment-2" mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
     </div>
     <div *ngIf="uploadProgress !== null" style="margin-top: 8px;">
       <span>Uploading... {{uploadProgress}}%</span>
@@ -97,8 +97,8 @@
       </div>
     </div>
     <div class="formrow">
-      <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-      <button [disabled]="addJourneyForm.invalid" mat-raised-button color="primary"
+      <button data-testid="je-on-cancel-3" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+      <button data-testid="je-onformsubmit-4" [disabled]="addJourneyForm.invalid" mat-raised-button color="primary"
         (click)="onformsubmit(addJourneyForm.value)">{{submitbutton}}</button>
     </div>
   </div>
@@ -111,7 +111,7 @@
     <h3>Are you sure you want to delete?</h3>
   </div>
   <div mat-dialog-action>
-    <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+    <button data-testid="je-on-cancel-5" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+    <button data-testid="je-ondelete-6" mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
   </div>
 </div>

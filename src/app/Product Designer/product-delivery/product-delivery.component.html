@@ -9,7 +9,7 @@
         </mat-form-field> -->
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="addDelivery()">Map Products & Delivery Activities</button>
+        <button data-testid="pd1-add-delivery-1" class="addbtn" mat-stroked-button (click)="addDelivery()">Map Products & Delivery Activities</button>
       </div>
     </div>
     <table mat-table [dataSource]="productDeliverySource" matSort>
@@ -47,7 +47,7 @@
       <ng-container matColumnDef="action">
         <th mat-header-cell *matHeaderCellDef>Edit</th>
         <td mat-cell *matCellDef="let row">
-          <button class="editbtn" mat-icon-button type="button" (click)="editDelivery(row)">
+          <button data-testid="pd1-edit-delivery-2" class="editbtn" mat-icon-button type="button" (click)="editDelivery(row)">
             <mat-icon> edit</mat-icon>
           </button>
           </td>

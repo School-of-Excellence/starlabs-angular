@@ -5,17 +5,17 @@
   
   <div mat-dialog-content>
     <label for="file">Choose an Image</label><br>
-    <input type="file" (change)="previewImage($event)" accept="image/*"/><br>
+    <input data-testid="eimg-inp-001" type="file" (change)="previewImage($event)" accept="image/*"/><br>
     <img *ngIf="imageUrl" [src]="imageUrl" alt="Preview" style="max-width: 300px; max-height: 300px;"><br>
   </div>
   
   <div mat-dialog-actions class="btn">
-    <button mat-raised-button 
+    <button data-testid="eimg-btn-002" mat-raised-button 
             color="primary" 
             (click)="onedit(data.id, data.imageurl, file)" 
             [disabled]="!file">
       Submit
     </button>&nbsp;&nbsp;&nbsp;&nbsp;
-    <button mat-raised-button color="warn" (click)="onNoClick()">Close</button>
+    <button data-testid="eimg-btn-003" mat-raised-button color="warn" (click)="onNoClick()">Close</button>
   </div>
 </div>
