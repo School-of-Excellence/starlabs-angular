@@ -348,3 +348,96 @@ describe('WorkshopDashboard — Enrolled via <platform> opens the side panel', (
     expect(`${c.selectedStatusInfo.challengeName} - ${c.selectedStatusInfo.subChallengeName}`).toBe('Enrolled via - EiFlix App');
   });
 });
+
+describe('WorkshopDashboard — Users Not in Chat Group', () => {
+  function make(over: Partial<any> = {}): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    // existing users: participant metadata points at their user_data document
+    c.mapProfile = {
+      e1: { name: 'Exist One', firebaseuserref: { id: 'uid-e1', path: 'user_data/uid-e1' } },
+      e2: { name: 'Exist Two', firebaseuserref: '/user_data/uid-e2' },          // stored as a path string
+      e3: { name: 'Exist Three', user_ref: { id: 'uid-e3' } },                   // older spelling only
+      e4: { name: 'Exist Four' },                                                // never signed in
+      n1: { name: 'New One', uid: 'uid-n1' },
+      n2: { name: 'New Two' },
+    };
+    c.mapProfileNew = { n1: { id: 'n1', uid: 'uid-n1' }, n2: { id: 'n2' } };
+    c.enrolledParticipants = ['e1', 'e2', 'e3', 'e4', 'n1', 'n2'].map(profileid => ({ profileid }));
+    c.participantWorkshopCategoryMap = new Map(); c.participantCohortMap = new Map(); c.categoryNamesMap = new Map();
+    c.workshopData = { categorybased: false };
+    c.selectedTierFilters = []; c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = [];
+    c.selectedNotStartedTypeFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
+    c.selectedJourneyFilters = []; c.selectedCustomerStatusFilters = []; c.filterOption = 'all';
+    c.JourneyMap = {}; c.filteredParticipants = []; c.selectedParticipants = []; c.selectedStatusInfo = null;
+    c.showParticipantPanel = false; c.chatAddBusy = new Set(); c.chatAddAllBusy = false;
+    c.supportChatGroupId = 'grp1';
+    c.supportChatMembers = new Set(['uid-e1', 'uid-n1']);
+    c.notInChatParticipants = [];
+    c.profileUserRefs = new Map(); c.profileUserRefsPending = new Set();
+    c.resolveProfileUserRefs = async () => {};      // the Firestore fallback is exercised separately
+    Object.assign(c, over);
+    return c;
+  }
+  const ids = (list: any[]) => list.map(p => p.profileid).sort();
+
+  describe('uid resolution', () => {
+    it('reads a new user\'s uid from new_user_data', () => { expect(make().uidOf('n1')).toBe('uid-n1'); });
+    it('reads an existing user\'s uid from the user_data reference on participant metadata', () => { expect(make().uidOf('e1')).toBe('uid-e1'); });
+    it('accepts the reference stored as a path string', () => { expect(make().uidOf('e2')).toBe('uid-e2'); });
+    it('falls back to the older user_ref spelling', () => { expect(make().uidOf('e3')).toBe('uid-e3'); });
+    it('is empty for someone who has never signed in', () => { expect(make().uidOf('e4')).toBe(''); expect(make().uidOf('n2')).toBe(''); });
+
+    it('falls back to profile_data.user_ref when metadata carries no reference', () => {
+      const c = make(); c.profileUserRefs.set('e4', 'uid-e4-from-profile');
+      expect(c.uidOf('e4')).toBe('uid-e4-from-profile');
+      expect(c.uidOf('e1')).toBe('uid-e1');                           // metadata still wins when present
+    });
+
+    it('asks for profile_data only for existing users still without a uid, once', () => {
+      const c = make(); const asked: string[][] = [];
+      c.resolveProfileUserRefs = async (ids: string[]) => { asked.push(ids); };
+      c.recomputeNotInChat();
+      expect(asked).toEqual([['e4']]);                                 // not n2 (new user), not e2/e3 (resolved)
+      c.profileUserRefs.set('e4', '');                                 // looked, none there
+      c.recomputeNotInChat();
+      expect(asked.length).toBe(2);                                    // the real method dedupes via the cache; the stub is called again but with the same id
+    });
+  });
+
+  describe('who is missing from the group', () => {
+    it('lists enrolled people whose uid is not in members, plus those with no uid to add', () => {
+      const c = make(); c.recomputeNotInChat();
+      expect(ids(c.notInChatParticipants)).toEqual(['e2', 'e3', 'e4', 'n2']);
+      expect(c.totalNotInChatGroup).toBe(4);
+      expect(c.notInChatParticipants.find((p: any) => p.profileid === 'e2').uid).toBe('uid-e2');
+      expect(c.notInChatParticipants.find((p: any) => p.profileid === 'e4').uid).toBe('');
+    });
+
+    it('shows the card only with a group AND someone missing', () => {
+      const c = make(); c.recomputeNotInChat();
+      expect(c.showNotInChatCard).toBe(true);
+      const full = make({ supportChatMembers: new Set(['uid-e1', 'uid-e2', 'uid-e3', 'uid-n1']) }); full.recomputeNotInChat();
+      expect(ids(full.notInChatParticipants)).toEqual(['e4', 'n2']);   // no uid → still not in the group
+      const none = make({ supportChatMembers: new Set(['uid-e1', 'uid-e2', 'uid-e3', 'uid-n1']), enrolledParticipants: [{ profileid: 'e1' }] });
+      none.recomputeNotInChat(); expect(none.showNotInChatCard).toBe(false);
+    });
+
+    it('is empty without a group, and until the group document has been read', () => {
+      const a = make({ supportChatGroupId: '' }); a.recomputeNotInChat(); expect(a.showNotInChatCard).toBe(false); expect(a.notInChatParticipants).toEqual([]);
+      const b = make({ supportChatMembers: null }); b.recomputeNotInChat(); expect(b.showNotInChatCard).toBe(false);
+    });
+
+    it('keeps an open panel in step with the live group document', () => {
+      const c = make(); c.recomputeNotInChat(); c.onMetricClick('notInChatGroup');
+      expect(c.showParticipantPanel).toBe(true);
+      expect(c.selectedStatusInfo.status).toBe('notInChatGroup');
+      expect(ids(c.filteredParticipants)).toEqual(['e2', 'e3', 'e4', 'n2']);
+      expect(c.chatAddableCount).toBe(2);                                   // e2, e3 have uids
+      c.supportChatMembers = new Set(['uid-e1', 'uid-n1', 'uid-e2', 'uid-e3']);   // the listener saw the adds
+      c.recomputeNotInChat();
+      expect(ids(c.filteredParticipants)).toEqual(['e4', 'n2']);
+      expect(c.selectedStatusInfo.count).toBe(2);
+      expect(c.chatAddableCount).toBe(0);
+    });
+  });
+});

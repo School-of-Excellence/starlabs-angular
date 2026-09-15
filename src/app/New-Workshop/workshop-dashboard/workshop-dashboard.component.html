@@ -321,6 +321,19 @@
                 </div>
               </mat-card-content>
             </mat-card>
+            <!-- Only for a workshop with a chat group, and only while someone enrolled is missing from it. -->
+            <mat-card class="metric-card clickable-metric" data-testid="wdash-chat-card" *ngIf="showNotInChatCard"
+                      (click)="onMetricClick('notInChatGroup')" matTooltip="Enrolled people whose login is not yet in the workshop's chat group">
+              <mat-card-content>
+                <div class="metric-content">
+                  <mat-icon class="metric-icon-small"><i class="fa-regular fa-comments"></i></mat-icon>
+                  <div class="metric-details">
+                    <h2 class="metric-value" data-testid="wdash-chat-count">{{ totalNotInChatGroup }}</h2>
+                    <p class="metric-label">Users Not in Chat Group</p>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
           </ng-container>
 
           <!-- Evergreen-only referral cards -->
@@ -1599,6 +1612,13 @@
       </div>
 
       <div class="panel-actions">
+        <button *ngIf="selectedStatusInfo?.status === 'notInChatGroup'" type="button" class="chat-add-all-btn"
+                data-testid="wdash-chat-add-all-btn" (click)="addAllToChatGroup()"
+                [disabled]="chatAddAllBusy || !chatAddableCount"
+                matTooltip="Add everyone listed (who has a login) to the chat group">
+          <mat-icon>group_add</mat-icon>{{ chatAddAllBusy ? 'Adding…' : 'Add all to group' }}
+          <span class="chat-add-all-n" *ngIf="!chatAddAllBusy">{{ chatAddableCount }}</span>
+        </button>
         <button data-testid="wd-send-email-to-selected-paricipant-58" mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
           <i class="fa-solid fa-envelope"></i>
         </button>
@@ -2084,6 +2104,21 @@
                 </span>
               </div>
             </a>
+
+            <!-- Chat group panel: one action per person — add their login to the group, or say why we cannot. -->
+            <div class="chat-row-actions" *ngIf="selectedStatusInfo?.status === 'notInChatGroup'">
+              <button *ngIf="participant.uid || uidOf(participant.profileid); else noUid" type="button" class="chat-add-btn"
+                      data-testid="wdash-chat-add-btn" (click)="addToChatGroup(participant); $event.stopPropagation()"
+                      [disabled]="chatAddBusy.has(participant.profileid)">
+                <mat-icon>person_add</mat-icon>{{ chatAddBusy.has(participant.profileid) ? 'Adding…' : 'Add to group' }}
+              </button>
+              <ng-template #noUid>
+                <span class="chat-no-uid" data-testid="wdash-chat-no-uid"
+                      matTooltip="No login found for this person — neither their participant record nor their profile carries a user reference. They may not have signed up in the app yet.">
+                  <mat-icon>person_off</mat-icon>No login yet
+                </span>
+              </ng-template>
+            </div>
 
             <!-- Evergreen Completed panel: no profile navigation — clicking a
                  participant opens the extend-until date picker instead. -->

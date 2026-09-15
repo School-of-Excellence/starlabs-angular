@@ -199,6 +199,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   statusDisplayMap = new Map<string, string>([
     ['existUsersEnrolled', 'Exist Users Enrolled'],
     ['platform', 'Enrolled via'],
+    ['notInChatGroup', 'Not in Chat Group'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -454,6 +455,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
     this.destroyed = true;
     this.clearSelectedParticipant();
     // Tear down every live Firestore listener (workshop config, enrolled,
@@ -509,6 +511,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (this.destroyed) return;
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
+        this.watchSupportChat(this.workshopData['selectedgroup']);
         this.updateWorkshopDisplayData();
         this.triggerRecalculation();
 
@@ -1239,6 +1242,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       // Overlay only the still-new users: a moved-to-existing person keeps their
       // `participant metadata` (which carries activejourney / customerstatus).
       this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
+      this.recomputeNotInChat();
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1743,6 +1747,25 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         challengeName: 'All Participants',
         subChallengeName: 'Exist Users Enrolled',
         count: existing.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
+      this.selectedEnrollmentStatusFilters = [];
+      this.selectedTierFilters = [];
+      this.selectedCategoryFilters = [];
+      this.selectedNotStartedTypeFilters = [];
+      this.applyFilterSide();
+
+    } else if (metricType === 'notInChatGroup') {
+      const list = this.notInChatParticipants;
+      this.selectedParticipants = list;
+      this.selectedStatusInfo = {
+        status: 'notInChatGroup',
+        challengeName: 'Chat Group',
+        subChallengeName: 'Enrolled but not in the group',
+        count: list.length
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
@@ -2871,6 +2894,162 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   platBarDataLabels: any = { enabled: true, style: { fontSize: '11px', fontWeight: 600 } };
   platBarGrid: any = { borderColor: '#E2E5EE', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } };
   platBarTooltip: any = { y: { formatter: (v: number) => `${v} step${v === 1 ? '' : 's'}` } };
+
+  // ───────────────────────── Support-chat group membership ─────────────────────────
+  // `workshopconfiguration.selectedgroup` names a `supportchat` document whose `members` array holds
+  // Firebase Auth uids. The card lists enrolled people whose uid is missing from that array.
+  supportChatGroupId = '';
+  /** null until the group document has been read once. */
+  supportChatMembers: Set<string> | null = null;
+  private supportChatUnsub: Unsubscribe | null = null;
+  notInChatParticipants: any[] = [];
+  chatAddBusy = new Set<string>();
+  chatAddAllBusy = false;
+
+  /** The card only exists for a workshop with a group, and only while someone is missing from it. */
+  get showNotInChatCard(): boolean { return !!this.supportChatGroupId && this.notInChatParticipants.length > 0; }
+  get totalNotInChatGroup(): number { return this.notInChatParticipants.length; }
+  /** How many of the people shown in the panel can actually be added (have a login uid). */
+  get chatAddableCount(): number { return this.filteredParticipants.filter(p => !!(p.uid || this.uidOf(p.profileid))).length; }
+
+  /** The id segment of a /user_data/{uid} reference, whether stored as a reference or a path string. */
+  private refId(ref: any): string {
+    if (!ref) return '';
+    if (typeof ref === 'string') return ref.split('/').filter(Boolean).pop() || '';
+    return typeof ref.id === 'string' ? ref.id : '';
+  }
+
+  /**
+   * profile_data.user_ref ids for existing users whose participant metadata carries no login reference,
+   * fetched on demand (batched) and cached: '' means "looked, none there".
+   */
+  private profileUserRefs = new Map<string, string>();
+  private profileUserRefsPending = new Set<string>();
+
+  /**
+   * Firebase Auth uid for an enrolled profile. A still-new user carries it on new_user_data.uid. An
+   * existing user's participant metadata points at their user_data document (firebaseuserref, or the
+   * older user_ref spelling); when metadata has neither, profile_data.user_ref — the reference set at
+   * sign-up — is the fallback (fetched by resolveProfileUserRefs).
+   */
+  uidOf(profileid: string): string {
+    if (this.isNewUserProfile(profileid)) {
+      const v = this.mapProfileNew[profileid]?.['uid'];
+      return v === null || v === undefined ? '' : String(v).trim();
+    }
+    const m = this.mapProfile[profileid];
+    return this.refId(m?.['firebaseuserref']) || this.refId(m?.['user_ref']) || this.profileUserRefs.get(profileid) || '';
+  }
+
+  /** Looks up profile_data.user_ref for existing users still without a uid, then recomputes the list. */
+  private async resolveProfileUserRefs(profileIds: string[]): Promise<void> {
+    const todo = profileIds.filter(id => !this.profileUserRefs.has(id) && !this.profileUserRefsPending.has(id));
+    if (!todo.length) return;
+    todo.forEach(id => this.profileUserRefsPending.add(id));
+    try {
+      const BATCH = 30;
+      const reads: Promise<any>[] = [];
+      for (let i = 0; i < todo.length; i += BATCH) {
+        const ids = todo.slice(i, i + BATCH);
+        reads.push(getDocs(query(collection(this.firestoreDefault, 'profile_data'), where('profileid', 'in', ids))));
+      }
+      const found = new Map<string, string>();
+      for (const snap of await Promise.all(reads)) {
+        snap.docs.forEach((d: any) => {
+          const data = d.data() || {};
+          const pid = String(data['profileid'] || d.id);
+          const uid = this.refId(data['user_ref']) || this.refId(data['firebaseuserref']);
+          if (uid) found.set(pid, uid);
+        });
+      }
+      todo.forEach(id => this.profileUserRefs.set(id, found.get(id) || ''));
+    } catch (e) {
+      console.error('Could not read profile_data user references:', e);
+      todo.forEach(id => this.profileUserRefs.set(id, ''));
+    } finally {
+      todo.forEach(id => this.profileUserRefsPending.delete(id));
+    }
+    if (!this.destroyed) this.recomputeNotInChat();
+  }
+
+  /** Follow the workshop's group document live, so the card and panel drop people as they are added. */
+  private watchSupportChat(groupId: any): void {
+    const id = groupId === null || groupId === undefined ? '' : String(groupId).trim();
+    if (id === this.supportChatGroupId && (id === '' || this.supportChatUnsub)) return;
+    if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
+    this.supportChatGroupId = id;
+    this.supportChatMembers = null;
+    this.recomputeNotInChat();
+    if (!id) return;
+    this.supportChatUnsub = onSnapshot(doc(this.firestoreDefault, 'supportchat', id), (snap) => {
+      if (this.destroyed) return;
+      const raw = snap.exists() ? snap.data()?.['members'] : [];
+      this.supportChatMembers = new Set((Array.isArray(raw) ? raw : []).map((u: any) => String(u)));
+      this.recomputeNotInChat();
+    }, (err) => {
+      console.error('Error listening to the support chat group:', err);
+      this.supportChatMembers = new Set();
+      this.recomputeNotInChat();
+    });
+  }
+
+  /** Enrolled people (existing and new) whose uid is not in the group — or who have no uid to add. */
+  recomputeNotInChat(): void {
+    const members = this.supportChatMembers;
+    if (!this.supportChatGroupId || !members) { this.notInChatParticipants = []; }
+    else {
+      this.notInChatParticipants = this.enrolledParticipants
+        .map(p => p.profileid)
+        .filter(id => { const uid = this.uidOf(id); return !uid || !members.has(uid); })
+        .map(id => ({ ...this.buildParticipantEntry(id), uid: this.uidOf(id) }));
+      // Existing users still without a uid: try profile_data.user_ref once, then recompute.
+      const unresolved = this.notInChatParticipants
+        .filter(p => !p.uid && !this.isNewUserProfile(p.profileid))
+        .map(p => p.profileid);
+      if (unresolved.length) void this.resolveProfileUserRefs(unresolved);
+    }
+    // Keep an open panel in step with the live group document.
+    if (this.selectedStatusInfo?.status === 'notInChatGroup') {
+      this.selectedParticipants = this.notInChatParticipants;
+      this.selectedStatusInfo = { ...this.selectedStatusInfo, count: this.notInChatParticipants.length };
+      this.applyFilterSide();
+    }
+  }
+
+  /** Adds one person's uid to the group's members array. The listener then removes them from the list. */
+  async addToChatGroup(participant: any): Promise<void> {
+    const uid = participant?.uid || this.uidOf(participant?.profileid);
+    if (!this.supportChatGroupId || !uid || this.chatAddBusy.has(participant.profileid)) return;
+    this.chatAddBusy.add(participant.profileid);
+    try {
+      await updateDoc(doc(this.firestoreDefault, 'supportchat', this.supportChatGroupId), { members: arrayUnion(uid) });
+      this.snackbarService.show(`${participant.name || 'Participant'} added to the chat group`);
+    } catch (e) {
+      console.error('Could not add to the chat group:', e);
+      this.snackbarService.show('Could not add to the chat group');
+    } finally {
+      this.chatAddBusy.delete(participant.profileid);
+    }
+  }
+
+  /** Adds everyone currently shown in the panel who has a uid, in one write. */
+  async addAllToChatGroup(): Promise<void> {
+    const uids = Array.from(new Set(
+      this.filteredParticipants.map(p => p.uid || this.uidOf(p.profileid)).filter((u: string) => !!u),
+    ));
+    if (!this.supportChatGroupId || !uids.length || this.chatAddAllBusy) return;
+    this.chatAddAllBusy = true;
+    try {
+      await updateDoc(doc(this.firestoreDefault, 'supportchat', this.supportChatGroupId), { members: arrayUnion(...uids) });
+      const skipped = this.filteredParticipants.length - uids.length;
+      this.snackbarService.show(`${uids.length} added to the chat group${skipped ? ` · ${skipped} skipped (no login yet)` : ''}`);
+    } catch (e) {
+      console.error('Could not add to the chat group:', e);
+      this.snackbarService.show('Could not add to the chat group');
+    } finally {
+      this.chatAddAllBusy = false;
+    }
+  }
 
   /**
    * Enrolled via <platform> → the side panel, exactly as a metric card opens it. The list is built
