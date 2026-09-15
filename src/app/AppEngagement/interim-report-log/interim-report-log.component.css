@@ -12,21 +12,6 @@
   overflow: hidden;
 }
 
-.header {
-  flex-shrink: 0;
-  padding: 10px 24px;
-  background: #37474f;
-  color: white;
-  text-align: center;
-}
-
-.heading {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
 .filters-row {
   flex-shrink: 0;
   display: flex;
