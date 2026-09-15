@@ -783,69 +783,6 @@
         </div>
       </section>
 
-      <!-- ═════ Platform usage — where participants enrol from and where each step is done.
-           Reads `platform_name` on the progress document (enrolment) and on every sub-challenge
-           (steps); blank means the web app. Live: recomputed with the progress snapshot. ═════ -->
-      <section class="plat" data-testid="wdash-platform-section">
-        <div class="plat-head">
-          <div>
-            <h2 class="plat-title">Platform Usage</h2>
-            <p class="plat-sub">How participants reach this workshop, and where each step gets done</p>
-          </div>
-        </div>
-
-        <div class="plat-empty" *ngIf="!platformTotalParticipants">
-          <mat-icon>devices</mat-icon>
-          <p>No participant progress yet — the charts fill in as people enrol and complete steps.</p>
-        </div>
-
-        <div class="plat-grid" *ngIf="platformTotalParticipants">
-          <!-- enrolment platform -->
-          <div class="plat-card" data-testid="wdash-platform-enroll-card">
-            <div class="plat-card-hd">
-              <h3>Enrolled via</h3>
-              <span class="plat-n">{{ platformTotalParticipants }} participant{{ platformTotalParticipants === 1 ? '' : 's' }}</span>
-            </div>
-            <div class="plat-donut-row">
-              <apx-chart class="plat-donut"
-                         [series]="platDonutSeries" [labels]="platDonutLabels" [chart]="platDonutChart"
-                         [colors]="platformColors" [legend]="platDonutLegend" [dataLabels]="platDonutDataLabels"
-                         [plotOptions]="platDonutPlot" [stroke]="platDonutStroke" [tooltip]="platDonutTooltip"></apx-chart>
-              <ul class="plat-legend">
-                <li *ngFor="let r of platformEnrollRows; let i = index" data-testid="wdash-platform-enroll-row">
-                  <span class="plat-dot" [style.background]="platformColors[i % platformColors.length]"></span>
-                  <span class="plat-legend-name">{{ r.label }}</span>
-                  <span class="plat-legend-n">{{ r.count }}</span>
-                  <span class="plat-legend-pct">{{ r.pct }}%</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- step platform -->
-          <div class="plat-card" data-testid="wdash-platform-steps-card">
-            <div class="plat-card-hd">
-              <h3>Steps by platform</h3>
-              <span class="plat-n">{{ platformTotalSteps }} step{{ platformTotalSteps === 1 ? '' : 's' }} touched</span>
-            </div>
-            <div class="plat-empty plat-empty-sm" *ngIf="!platformTotalSteps">
-              <p>No step has been started yet.</p>
-            </div>
-            <apx-chart *ngIf="platformTotalSteps" class="plat-bars"
-                       [series]="platBarSeries" [chart]="platBarChart" [xaxis]="platBarXaxis" [yaxis]="platBarYaxis"
-                       [colors]="platBarColors" [plotOptions]="platBarPlot" [legend]="platBarLegend"
-                       [dataLabels]="platBarDataLabels" [grid]="platBarGrid" [tooltip]="platBarTooltip"></apx-chart>
-            <ul class="plat-legend plat-legend-steps" *ngIf="platformTotalSteps">
-              <li *ngFor="let r of platformStepRows" data-testid="wdash-platform-step-row">
-                <span class="plat-legend-name">{{ r.label }}</span>
-                <span class="plat-legend-n"><b>{{ r.completed }}</b> completed</span>
-                <span class="plat-legend-pct">{{ r.inProgress }} in progress</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
       <mat-card class="participants-card" elevation="2">
       <mat-card-header>
         <div style="display: flex; align-items: center; width: 100%;">
@@ -1582,6 +1519,72 @@
     </div>
   </div>
 </section>
+
+      <!-- ═════ Platform usage — where participants enrol from and where each step is done.
+           Reads `platform_name` on the progress document (enrolment) and on every sub-challenge
+           (steps); blank means the web app. Live: recomputed with the progress snapshot. ═════ -->
+      <section class="plat" data-testid="wdash-platform-section">
+        <div class="plat-head">
+          <div>
+            <h2 class="plat-title">Platform Usage</h2>
+            <p class="plat-sub">How participants reach this workshop, and where each step gets done</p>
+          </div>
+        </div>
+
+        <div class="plat-empty" *ngIf="!platformTotalParticipants">
+          <mat-icon>devices</mat-icon>
+          <p>No participant progress yet — the charts fill in as people enrol and complete steps.</p>
+        </div>
+
+        <div class="plat-grid" *ngIf="platformTotalParticipants">
+          <!-- enrolment platform -->
+          <div class="plat-card" data-testid="wdash-platform-enroll-card">
+            <div class="plat-card-hd">
+              <h3>Enrolled via <span class="plat-hint">· click a platform to open its participants</span></h3>
+              <span class="plat-n">{{ platformTotalParticipants }} participant{{ platformTotalParticipants === 1 ? '' : 's' }}</span>
+            </div>
+            <div class="plat-donut-row">
+              <apx-chart class="plat-donut"
+                         [series]="platDonutSeries" [labels]="platDonutLabels" [chart]="platDonutChart"
+                         [colors]="platformColors" [legend]="platDonutLegend" [dataLabels]="platDonutDataLabels"
+                         [plotOptions]="platDonutPlot" [stroke]="platDonutStroke" [tooltip]="platDonutTooltip"></apx-chart>
+              <ul class="plat-legend">
+                <li *ngFor="let r of platformEnrollRows; let i = index" data-testid="wdash-platform-enroll-row"
+                    class="plat-legend-click" role="button" tabindex="0"
+                    (click)="onPlatformClick(r.label)" (keydown.enter)="onPlatformClick(r.label)"
+                    matTooltip="Open everyone enrolled via {{ r.label }}">
+                  <span class="plat-dot" [style.background]="platformColors[i % platformColors.length]"></span>
+                  <span class="plat-legend-name">{{ r.label }}</span>
+                  <span class="plat-legend-n">{{ r.count }}</span>
+                  <span class="plat-legend-pct">{{ r.pct }}%</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- step platform -->
+          <div class="plat-card" data-testid="wdash-platform-steps-card">
+            <div class="plat-card-hd">
+              <h3>Steps by platform</h3>
+              <span class="plat-n">{{ platformTotalSteps }} step{{ platformTotalSteps === 1 ? '' : 's' }} touched</span>
+            </div>
+            <div class="plat-empty plat-empty-sm" *ngIf="!platformTotalSteps">
+              <p>No step has been started yet.</p>
+            </div>
+            <apx-chart *ngIf="platformTotalSteps" class="plat-bars"
+                       [series]="platBarSeries" [chart]="platBarChart" [xaxis]="platBarXaxis" [yaxis]="platBarYaxis"
+                       [colors]="platBarColors" [plotOptions]="platBarPlot" [legend]="platBarLegend"
+                       [dataLabels]="platBarDataLabels" [grid]="platBarGrid" [tooltip]="platBarTooltip"></apx-chart>
+            <ul class="plat-legend plat-legend-steps" *ngIf="platformTotalSteps">
+              <li *ngFor="let r of platformStepRows" data-testid="wdash-platform-step-row">
+                <span class="plat-legend-name">{{ r.label }}</span>
+                <span class="plat-legend-n"><b>{{ r.completed }}</b> completed</span>
+                <span class="plat-legend-pct">{{ r.inProgress }} in progress</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
   <div class="participant-panel" [class.panel-visible]="showParticipantPanel">

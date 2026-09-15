@@ -297,3 +297,54 @@ describe('WorkshopDashboard — platform usage chart data', () => {
     expect(c.platformTotalSteps).toBe(0);
   });
 });
+
+describe('WorkshopDashboard — Enrolled via <platform> opens the side panel', () => {
+  function make(): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.participantWorkshopMap = new Map<string, any>([
+      ['a', { profileid: 'a', platform_name: 'eiflixapp', challenges: [] }],
+      ['b', { profileid: 'b', platform_name: 'Eiflixweb', challenges: [] }],
+      ['c', { profileid: 'c', challenges: [] }],                         // blank → EiFlix Web
+    ]);
+    c.mapProfile = { a: { name: 'App User' }, b: { name: 'Web User' }, c: { name: 'Legacy User' } };
+    c.enrolledParticipants = [{ profileid: 'a' }, { profileid: 'b' }, { profileid: 'c' }];
+    c.participantWorkshopCategoryMap = new Map(); c.participantCohortMap = new Map(); c.categoryNamesMap = new Map();
+    c.workshopData = { categorybased: false };
+    c.selectedTierFilters = []; c.selectedCategoryFilters = []; c.selectedEnrollmentStatusFilters = [];
+    c.selectedNotStartedTypeFilters = []; c.selectedSubscriberCode = []; c.showReferredOnly = false;
+    c.JourneyMap = {}; c.filteredParticipants = []; c.mapProfileNew = {};
+    c.showParticipantPanel = false;
+    return c;
+  }
+  const ids = (list: any[]) => list.map(p => p.profileid).sort();
+
+  it('lists exactly the people whose progress document carries that platform', () => {
+    const c = make(); c.onPlatformClick('EiFlix App');
+    expect(c.showParticipantPanel).toBe(true);
+    expect(ids(c.selectedParticipants)).toEqual(['a']);
+    expect(c.selectedStatusInfo).toEqual({ status: 'platform', challengeName: 'Enrolled via', subChallengeName: 'EiFlix App', count: 1 });
+    expect(ids(c.filteredParticipants)).toEqual(['a']);
+  });
+
+  it('counts a blank platform as the web app, so the panel matches the donut slice', () => {
+    const c = make(); c.onPlatformClick('EiFlix Web');
+    expect(ids(c.selectedParticipants)).toEqual(['b', 'c']);
+    expect(c.selectedStatusInfo.count).toBe(2);
+  });
+
+  it('resets the side filters so a previous panel cannot leak into this one', () => {
+    const c = make(); c.selectedJourneyFilters = ['jA']; c.selectedCustomerStatusFilters = ['active']; c.filterOption = 'completed';
+    c.onPlatformClick('EiFlix Web');
+    expect(c.selectedJourneyFilters).toEqual([]); expect(c.selectedCustomerStatusFilters).toEqual([]); expect(c.filterOption).toBe('all');
+  });
+
+  it('ignores an empty label (a donut click outside any slice)', () => {
+    const c = make(); c.onPlatformClick(''); c.onPlatformClick(undefined as any);
+    expect(c.showParticipantPanel).toBe(false);
+  });
+
+  it('labels the panel header with the platform, not a status code', () => {
+    const c = make(); c.onPlatformClick('EiFlix App');
+    expect(`${c.selectedStatusInfo.challengeName} - ${c.selectedStatusInfo.subChallengeName}`).toBe('Enrolled via - EiFlix App');
+  });
+});

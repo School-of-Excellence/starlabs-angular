@@ -198,6 +198,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   statusDisplayMap = new Map<string, string>([
     ['existUsersEnrolled', 'Exist Users Enrolled'],
+    ['platform', 'Enrolled via'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -2849,7 +2850,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   readonly platformColors = ['#2557C7', '#2E9E5B', '#E0A93E', '#7B5CC9', '#D96A5B', '#4E8FDB'];
   platDonutSeries: number[] = [];
   platDonutLabels: string[] = [];
-  platDonutChart: any = { type: 'donut', height: 240, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false } };
+  platDonutChart: any = {
+    type: 'donut', height: 240, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false },
+    // A slice click opens the same side panel as the legend rows. ApexCharts fires this outside
+    // Angular's zone, hence ngZone.run.
+    events: { dataPointSelection: (_e: any, _ctx: any, cfg: any) => this.ngZone.run(() => this.onPlatformClick(this.platDonutLabels[cfg?.dataPointIndex])) },
+  };
   platDonutLegend: any = { show: false };
   platDonutDataLabels: any = { enabled: false };
   platDonutPlot: any = { pie: { donut: { size: '68%', labels: { show: true, name: { show: true, fontSize: '12px', color: '#8B92A6' }, value: { show: true, fontSize: '22px', fontWeight: 700, color: '#1B2130' }, total: { show: true, label: 'Participants', fontSize: '12px', color: '#8B92A6' } } } } };
@@ -2865,6 +2871,31 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   platBarDataLabels: any = { enabled: true, style: { fontSize: '11px', fontWeight: 600 } };
   platBarGrid: any = { borderColor: '#E2E5EE', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } };
   platBarTooltip: any = { y: { formatter: (v: number) => `${v} step${v === 1 ? '' : 's'}` } };
+
+  /**
+   * Enrolled via <platform> → the side panel, exactly as a metric card opens it. The list is built
+   * from the progress documents, the same source the donut counts, so the panel count always equals
+   * the slice.
+   */
+  onPlatformClick(label: string): void {
+    if (!label) return;
+    const ids: string[] = [];
+    for (const [profileid, pw] of this.participantWorkshopMap) {
+      if (this.platformLabel(pw?.['platform_name']) === label) ids.push(profileid);
+    }
+    const list = ids.map(id => this.buildParticipantEntry(id));
+    this.selectedParticipants = list;
+    this.selectedStatusInfo = { status: 'platform', challengeName: 'Enrolled via', subChallengeName: label, count: list.length };
+    this.showParticipantPanel = true;
+    this.filterOption = 'all';
+    this.selectedJourneyFilters = [];
+    this.selectedCustomerStatusFilters = [];
+    this.selectedEnrollmentStatusFilters = [];
+    this.selectedTierFilters = [];
+    this.selectedCategoryFilters = [];
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
+  }
 
   /**
    * Reads both levels of `platform_name` across every progress document of this workshop: the
