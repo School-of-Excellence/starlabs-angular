@@ -13,6 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { NgApexchartsModule } from 'ng-apexcharts';
 import { MatDialogModule } from '@angular/material/dialog';
 import { RouterModule } from '@angular/router';
 import {
@@ -49,7 +50,7 @@ import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsa
     MatPaginatorModule, MatSortModule, MatChipsModule, MatExpansionModule, MatSnackBarModule,
     MatListModule, MatTooltipModule, MatDialogModule, MatFormFieldModule, MatInputModule,
     RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule,
-    MatDatepickerModule
+    MatDatepickerModule, NgApexchartsModule
   ],
   templateUrl: './workshop-dashboard.component.html',
   styleUrls: ['./workshop-dashboard.component.css']
@@ -1158,6 +1159,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
             subChallengeIndex: subIndex,
             subChallengeName: subChallenge.name || 'Unknown Sub-Challenge',
             subChallengeType: (subChallenge.type || '').charAt(0).toUpperCase() + (subChallenge.type || '').slice(1),
+            platformName: this.platformNameOf(subChallenge),
             statusClass: subStatus,
             statusDisplayName: this.statusDisplayMap.get(subStatus) || 'Unknown Status',
             isCurrentSubChallenge,
@@ -1275,6 +1277,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // enrolled-participants and participant-workshop snapshots so both stay in sync,
   // for evergreen, category-based, and plain workshops alike.
   private recomputeDerivedState() {
+    this.computePlatformStats();
     if (this.workshopData?.categorybased === true) {
       this.participantCohortMap.clear();
       this.participantWorkshopCategoryMap.clear();
@@ -3153,6 +3156,93 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     if (challenge.status === 'completed') return 'completed';
     if (challenge.challenges?.some((sc: any) => sc.status)) return 'inprogress';
     return 'notstarted';
+  }
+
+  /**
+   * Display name for a stored platform value. The web app stamps "Eiflixweb", the mobile app
+   * "eiflixapp"; older rows carry nothing and were all web. Anything else is shown as stored.
+   */
+  platformLabel(raw: any): string {
+    const v = raw === null || raw === undefined ? '' : String(raw).trim();
+    if (!v) return 'EiFlix Web';
+    switch (v.toLowerCase().replace(/[^a-z0-9]/g, '')) {
+      case 'eiflixweb': return 'EiFlix Web';
+      case 'eiflixapp': return 'EiFlix App';
+      default: return v;
+    }
+  }
+
+  /** Where the participant did this step. */
+  platformNameOf(subChallenge: any): string { return this.platformLabel(subChallenge?.platform_name); }
+
+  /** Where the selected participant enrolled from — the platform stored on their progress document itself. */
+  get enrollmentPlatform(): string { return this.platformLabel(this.participantWorkshopData?.['platform_name']); }
+
+  // ── Platform usage (dashboard chart) — recomputed with the live progress snapshot ──
+  /** Participants by the platform on their progress document. */
+  platformEnrollRows: { label: string; count: number; pct: number }[] = [];
+  /** Steps touched (any status) by the platform stamped on the step, split completed / in progress. */
+  platformStepRows: { label: string; completed: number; inProgress: number }[] = [];
+  platformTotalParticipants = 0;
+  platformTotalSteps = 0;
+  readonly platformColors = ['#2557C7', '#2E9E5B', '#E0A93E', '#7B5CC9', '#D96A5B', '#4E8FDB'];
+  platDonutSeries: number[] = [];
+  platDonutLabels: string[] = [];
+  platDonutChart: any = { type: 'donut', height: 240, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false } };
+  platDonutLegend: any = { show: false };
+  platDonutDataLabels: any = { enabled: false };
+  platDonutPlot: any = { pie: { donut: { size: '68%', labels: { show: true, name: { show: true, fontSize: '12px', color: '#8B92A6' }, value: { show: true, fontSize: '22px', fontWeight: 700, color: '#1B2130' }, total: { show: true, label: 'Participants', fontSize: '12px', color: '#8B92A6' } } } } };
+  platDonutStroke: any = { width: 2, colors: ['#fff'] };
+  platDonutTooltip: any = { y: { formatter: (v: number) => `${v} participant${v === 1 ? '' : 's'}` } };
+  platBarSeries: any[] = [];
+  platBarChart: any = { type: 'bar', height: 240, stacked: true, fontFamily: 'inherit', toolbar: { show: false }, animations: { enabled: false } };
+  platBarXaxis: any = { categories: [], labels: { style: { colors: '#8B92A6', fontSize: '11px' } } };
+  platBarYaxis: any = { labels: { style: { colors: '#525A6E', fontSize: '12px', fontWeight: 600 } } };
+  platBarPlot: any = { bar: { horizontal: true, barHeight: '46%', borderRadius: 4 } };
+  platBarColors = ['#2E9E5B', '#E0A93E'];
+  platBarLegend: any = { position: 'top', horizontalAlign: 'left', markers: { size: 6 }, fontSize: '12px' };
+  platBarDataLabels: any = { enabled: true, style: { fontSize: '11px', fontWeight: 600 } };
+  platBarGrid: any = { borderColor: '#E2E5EE', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } };
+  platBarTooltip: any = { y: { formatter: (v: number) => `${v} step${v === 1 ? '' : 's'}` } };
+
+  /**
+   * Reads both levels of `platform_name` across every progress document of this workshop: the
+   * document's own field (how the participant enrolled) and each sub-challenge's (where the step was
+   * done). A step only counts once it has a status — untouched steps have no platform yet.
+   */
+  private computePlatformStats(): void {
+    const enroll = new Map<string, number>();
+    const steps = new Map<string, { completed: number; inProgress: number }>();
+    let totalSteps = 0;
+    for (const pw of this.participantWorkshopMap.values()) {
+      const p = this.platformLabel(pw?.['platform_name']);
+      enroll.set(p, (enroll.get(p) || 0) + 1);
+      for (const ch of (pw?.['challenges'] || [])) {
+        for (const sub of (ch?.['challenges'] || [])) {
+          const status = this.normalizeStatus(sub?.['status']);
+          if (!sub?.['status']) continue;
+          const sp = this.platformLabel(sub?.['platform_name']);
+          const row = steps.get(sp) || { completed: 0, inProgress: 0 };
+          if (status === 'completed') row.completed++; else row.inProgress++;
+          steps.set(sp, row); totalSteps++;
+        }
+      }
+    }
+    this.platformTotalParticipants = this.participantWorkshopMap.size;
+    this.platformTotalSteps = totalSteps;
+    this.platformEnrollRows = Array.from(enroll, ([label, count]) => ({
+      label, count, pct: this.platformTotalParticipants ? Math.round((count / this.platformTotalParticipants) * 100) : 0,
+    })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    this.platformStepRows = Array.from(steps, ([label, r]) => ({ label, ...r }))
+      .sort((a, b) => (b.completed + b.inProgress) - (a.completed + a.inProgress) || a.label.localeCompare(b.label));
+
+    this.platDonutSeries = this.platformEnrollRows.map(r => r.count);
+    this.platDonutLabels = this.platformEnrollRows.map(r => r.label);
+    this.platBarXaxis = { ...this.platBarXaxis, categories: this.platformStepRows.map(r => r.label) };
+    this.platBarSeries = [
+      { name: 'Completed', data: this.platformStepRows.map(r => r.completed) },
+      { name: 'In progress', data: this.platformStepRows.map(r => r.inProgress) },
+    ];
   }
 
   normalizeStatus(status: string | undefined): string {

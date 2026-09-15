@@ -2490,6 +2490,14 @@
   color: var(--pd-ink3); background: var(--pd-wash);
   border: 1px solid var(--pd-line); border-radius: 5px; padding: 1px 6px;
 }
+/* where the step was done — same family as the type pill, tinted so it reads as a place, not a kind */
+.pd-platform-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em;   /* brand casing kept: "EiFlix Web" */
+  color: #2a5a8e; background: #eef3f9;
+  border: 1px solid #d5dfeb; border-radius: 5px; padding: 1px 6px 1px 4px; white-space: nowrap;
+}
+.pd-platform-pill mat-icon { font-size: 12px; width: 12px; height: 12px; color: inherit; }
 
 /* capability action chips */
 .pd-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -2911,3 +2919,35 @@
   .whd-desc { white-space: normal; }
   .whd-actions { width: 100%; justify-content: flex-end; }
 }
+
+/* ═════ Platform usage — same tonal system as the Challenge Progress Overview ═════ */
+.plat {
+  --plat-card: #FFFFFF; --plat-wash: #F0F1F6; --plat-line: #E2E5EE;
+  --plat-ink: #1B2130; --plat-ink2: #525A6E; --plat-ink3: #8B92A6;
+  display: block; margin: 20px 0;
+  font-family: inherit;
+}
+.plat-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; padding: 0 2px; }
+.plat-title { font-size: 17px; font-weight: 750; letter-spacing: -0.01em; color: var(--plat-ink); margin: 0; }
+.plat-sub { font-size: 12px; color: var(--plat-ink3); margin: 3px 0 0; }
+.plat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.plat-card { background: var(--plat-card); border: 1px solid var(--plat-line); border-radius: 12px; padding: 14px 16px 12px; min-width: 0; }
+.plat-card-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.plat-card-hd h3 { font-size: 13px; font-weight: 700; color: var(--plat-ink); margin: 0; letter-spacing: 0; }
+.plat-n { font-size: 11.5px; color: var(--plat-ink3); font-variant-numeric: tabular-nums; }
+.plat-donut-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.plat-donut { flex: 0 0 240px; min-width: 200px; }
+.plat-bars { display: block; }
+.plat-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px; }
+.plat-legend li { display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 8px; font-size: 12.5px; color: var(--plat-ink2); padding: 6px 8px; border-radius: 8px; background: var(--plat-wash); }
+.plat-legend-steps li { grid-template-columns: 1fr auto auto; margin-top: 2px; }
+.plat-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.plat-legend-name { font-weight: 600; color: var(--plat-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plat-legend-n { font-weight: 700; color: var(--plat-ink); font-variant-numeric: tabular-nums; }
+.plat-legend-n b { font-weight: 700; }
+.plat-legend-pct { color: var(--plat-ink3); font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; }
+.plat-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 16px; border: 1px dashed var(--plat-line); border-radius: 12px; color: var(--plat-ink3); text-align: center; background: var(--plat-card); }
+.plat-empty mat-icon { font-size: 30px; width: 30px; height: 30px; }
+.plat-empty p { margin: 0; font-size: 13px; }
+.plat-empty-sm { padding: 18px 12px; border: 0; }
+

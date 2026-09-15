@@ -210,3 +210,90 @@ describe('WorkshopDashboard — Exist Users Enrolled', () => {
     });
   });
 });
+
+describe('WorkshopDashboard — sub-challenge platform name', () => {
+  const c: any = Object.create(WorkshopDashboardComponent.prototype);
+
+  it('shows an unknown platform as stored', () => {
+    expect(c.platformNameOf({ platform_name: 'EiFlix Mobile' })).toBe('EiFlix Mobile');
+  });
+
+  it('maps the app\'s "eiflixapp" to "EiFlix App", whatever the casing', () => {
+    expect(c.platformNameOf({ platform_name: 'eiflixapp' })).toBe('EiFlix App');
+    expect(c.platformNameOf({ platform_name: 'EiFlixApp' })).toBe('EiFlix App');
+    expect(c.platformNameOf({ platform_name: ' EIFLIX-APP ' })).toBe('EiFlix App');
+  });
+
+  it('maps the web app\'s "Eiflixweb" to "EiFlix Web"', () => {
+    expect(c.platformNameOf({ platform_name: 'Eiflixweb' })).toBe('EiFlix Web');
+  });
+
+  it('falls back to EiFlix Web when the field is missing, null or empty', () => {
+    expect(c.platformNameOf({})).toBe('EiFlix Web');
+    expect(c.platformNameOf({ platform_name: null })).toBe('EiFlix Web');
+    expect(c.platformNameOf({ platform_name: '' })).toBe('EiFlix Web');
+    expect(c.platformNameOf({ platform_name: '   ' })).toBe('EiFlix Web');
+    expect(c.platformNameOf(undefined)).toBe('EiFlix Web');
+  });
+
+  it('trims a padded value rather than showing the padding', () => {
+    expect(c.platformNameOf({ platform_name: ' EiFlix TV ' })).toBe('EiFlix TV');
+  });
+});
+
+describe('WorkshopDashboard — platform usage chart data', () => {
+  function make(docs: any[]): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.participantWorkshopMap = new Map(docs.map((d, i) => [d.profileid || `p${i}`, d]));
+    c.platBarXaxis = { categories: [] };
+    c.computePlatformStats();
+    return c;
+  }
+  const sub = (status: string, platform_name?: any) => ({ status, ...(platform_name === undefined ? {} : { platform_name }) });
+
+  it('counts participants by the platform on their progress document, blank meaning the web app', () => {
+    const c = make([
+      { profileid: 'a', platform_name: 'eiflixapp', challenges: [] },
+      { profileid: 'b', platform_name: 'Eiflixweb', challenges: [] },
+      { profileid: 'c', challenges: [] },
+      { profileid: 'd', platform_name: 'eiflixapp', challenges: [] },
+    ]);
+    expect(c.platformTotalParticipants).toBe(4);
+    expect(c.platformEnrollRows).toEqual([
+      { label: 'EiFlix App', count: 2, pct: 50 },
+      { label: 'EiFlix Web', count: 2, pct: 50 },
+    ]);
+    expect(c.platDonutLabels).toEqual(['EiFlix App', 'EiFlix Web']);
+    expect(c.platDonutSeries).toEqual([2, 2]);
+  });
+
+  it('counts only touched steps, by the platform stamped on each step, split completed / in progress', () => {
+    const c = make([
+      { profileid: 'a', challenges: [{ type: 'challenge', challenges: [sub('completed', 'eiflixapp'), sub('inprogress', 'eiflixapp'), sub('')] }] },
+      { profileid: 'b', challenges: [{ type: 'challenge', challenges: [sub('completed'), sub('completed', 'Eiflixweb'), sub('')] }] },
+    ]);
+    expect(c.platformTotalSteps).toBe(4);                       // the two '' rows are untouched
+    expect(c.platformStepRows).toEqual([
+      { label: 'EiFlix App', completed: 1, inProgress: 1 },
+      { label: 'EiFlix Web', completed: 2, inProgress: 0 },
+    ]);
+    expect(c.platBarXaxis.categories).toEqual(['EiFlix App', 'EiFlix Web']);
+    expect(c.platBarSeries).toEqual([
+      { name: 'Completed', data: [1, 2] },
+      { name: 'In progress', data: [1, 0] },
+    ]);
+  });
+
+  it('is empty, not broken, with no progress documents', () => {
+    const c = make([]);
+    expect(c.platformTotalParticipants).toBe(0);
+    expect(c.platformEnrollRows).toEqual([]);
+    expect(c.platformStepRows).toEqual([]);
+  });
+
+  it('tolerates documents without a challenges array or with zoom-call entries that have no sub-steps', () => {
+    const c = make([{ profileid: 'a' }, { profileid: 'b', challenges: [{ type: 'zoomcall' }] }]);
+    expect(c.platformTotalParticipants).toBe(2);
+    expect(c.platformTotalSteps).toBe(0);
+  });
+});
