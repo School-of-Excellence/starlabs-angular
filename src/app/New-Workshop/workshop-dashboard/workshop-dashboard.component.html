@@ -1138,7 +1138,9 @@
 
                     <div class="pd-sub-meta">
                       <span class="pd-type-pill">{{ subChallenge.subChallengeType }}</span>
-                      <span class="pd-platform-pill" data-testid="wdash-sub-platform" matTooltip="Platform the participant used for this step">
+                      <!-- Only a completed step has a platform worth showing; an untouched one would just print the fallback. -->
+                      <span class="pd-platform-pill" data-testid="wdash-sub-platform" *ngIf="subChallenge.statusClass === 'completed'"
+                            matTooltip="Platform the participant completed this step on">
                         <mat-icon>devices</mat-icon>{{ subChallenge.platformName }}
                       </span>
                       <span class="pd-meta-item" *ngIf="subChallenge.startedDate"><mat-icon>schedule</mat-icon> {{ subChallenge.startedDate }}</span>

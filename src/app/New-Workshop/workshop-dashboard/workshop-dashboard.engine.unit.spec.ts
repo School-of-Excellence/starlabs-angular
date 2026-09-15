@@ -49,7 +49,7 @@ import {
   fallbackCurrent,
   filterTableParticipants,
   filteredProgressListForChallenge,
-  formatDate,
+  formatDate, formatDateTime,
   groupProgressStat,
   hasAccessToChallenge,
   headlineMetrics,
@@ -959,6 +959,13 @@ describe('workshop-dashboard.engine', () => {
     it('renders nothing for a missing date', () => {
       expect(formatDate(null)).toBe('');
       expect(formatDate(undefined)).toBe('');
+    });
+
+    it('formatDateTime adds the clock time to the same day format (completed steps are moments)', () => {
+      expect(formatDateTime(new Date(2026, 8, 15, 20, 5))).toBe('15 Sept 2026, 8:05 pm');
+      expect(formatDateTime({ toDate: () => new Date(2026, 8, 15, 9, 0) })).toBe('15 Sept 2026, 9:00 am');
+      expect(formatDateTime(null)).toBe('');
+      expect(formatDateTime('not a date')).toBe('');
     });
 
     it('DEFECT (pinned): a broken timestamp is swallowed into an empty string', () => {

@@ -47,7 +47,7 @@ import {
   accessBasedProgress, areChallengesEqual, averageProgress, bucketByProgress,
   calculateParticipantProgress, canReviewAssignment, challengeCategoryNames, challengeDisplayStatus,
   challengeStatusBuckets, completionRatePct, createCsvContent, evergreenDayDistribution,
-  evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate,
+  evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate, formatDateTime,
   groupProgressStat, hasAccessToChallenge, headlineMetrics, isChallengeVisibleForCategory,
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
   overallProgressLabel, participantTypeClass, participantTypeLabel
@@ -1177,7 +1177,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
             statusDisplayName: this.statusDisplayMap.get(subStatus) || 'Unknown Status',
             isCurrentSubChallenge,
             startedDate: subChallenge.started ? this.formatDate(subChallenge.started) : '',
-            completedDate: subChallenge.completed ? this.formatDate(subChallenge.completed) : '',
+            completedDate: subChallenge.completed ? this.formatDateTime(subChallenge.completed) : '',
             canViewForm: subChallenge.type === 'form' && subChallenge.status === 'completed' && subChallenge.result,
             canViewQuiz: subChallenge.type === 'quiz' && subChallenge.status === 'completed' && (subChallenge.quizResults || subChallenge.result),
             quizResultsCount,
@@ -3185,6 +3185,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.onFormPreview(formData);
   }
   formatDate(timestamp: any): string { return formatDate(timestamp); }
+  formatDateTime(timestamp: any): string { return formatDateTime(timestamp); }
   loadVideoAsks(): void {
     if (!this.participantProgressList || this.participantProgressList.length === 0) {
       this.videoAskList = []; return;
