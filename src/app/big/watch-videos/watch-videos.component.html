@@ -8,7 +8,7 @@
       </div> -->
       <h2 class="vd-title" mat-dialog-title>Assignment videos</h2>
     </div>
-    <button mat-icon-button class="vd-close" (click)="closeDialog()" aria-label="Close">
+    <button data-testid="watchvideos-close-dialog-1" mat-icon-button class="vd-close" (click)="closeDialog()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -84,7 +84,7 @@
           </div>
           <div *ngIf="isVideoWatched(i) || getVideoProgressPercentage(video.id) === 0" class="vd-video-progress-spacer"></div>
 
-          <button class="vd-play-btn"
+          <button data-testid="watchvideos-play-video-2" class="vd-play-btn"
             [class.vd-play-btn--active]="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) === 0"
             [class.vd-play-btn--continue]="canPlayVideo(i) && !isVideoWatched(i) && getVideoProgressPercentage(video.id) > 0"
             [class.vd-play-btn--done]="isVideoWatched(i)"
@@ -115,7 +115,7 @@
       </span>
     </div>
     <div class="vd-footer-btns">
-      <button mat-stroked-button class="vd-btn-secondary" (click)="closeDialog()">Close</button>
+      <button data-testid="watchvideos-close-dialog-3" mat-stroked-button class="vd-btn-secondary" (click)="closeDialog()">Close</button>
       <button mat-flat-button class="vd-btn-primary" [disabled]="!allCompleted" (click)="completeAssignment()" data-testid="watchvideos-complete">
         <mat-icon>check</mat-icon>
         Complete assignment

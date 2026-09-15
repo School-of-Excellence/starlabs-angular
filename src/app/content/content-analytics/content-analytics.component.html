@@ -5,17 +5,17 @@
       <mat-form-field appearance="outline" class="ctrl-field">
         <mat-label>Date range</mat-label>
         <mat-date-range-input [rangePicker]="picker">
-          <input matStartDate [(ngModel)]="startDate" placeholder="Start date">
-          <input matEndDate [(ngModel)]="endDate" placeholder="End date">
+          <input data-testid="ca-inp-001" matStartDate [(ngModel)]="startDate" placeholder="Start date">
+          <input data-testid="ca-inp-002" matEndDate [(ngModel)]="endDate" placeholder="End date">
         </mat-date-range-input>
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
       </mat-form-field>
-      <button mat-stroked-button color="primary" type="button" (click)="filterData()" class="btn-fetch">
+      <button data-testid="ca-btn-003" mat-stroked-button color="primary" type="button" (click)="filterData()" class="btn-fetch">
         <span class="btn-icon"><mat-icon>find_in_page</mat-icon></span>Fetch Data
     </button>
     </div>
-    <button mat-stroked-button type="button" (click)="exportCSV()" class="btn-export">
+    <button data-testid="ca-btn-004" mat-stroked-button type="button" (click)="exportCSV()" class="btn-export">
       <span class="btn-icon"><mat-icon>cloud_download</mat-icon></span>
       Export
     </button>
@@ -28,14 +28,14 @@
 
           <mat-form-field appearance="outline" class="ctrl-field">
             <mat-label>Name</mat-label>
-            <input matInput [(ngModel)]="filterValue.name" (keyup)="onFilter(filterValue)" placeholder="name">
+            <input data-testid="ca-inp-005" matInput [(ngModel)]="filterValue.name" (keyup)="onFilter(filterValue)" placeholder="name">
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="ctrl-field">
             <mat-label>Date range</mat-label>
             <mat-date-range-input [rangePicker]="picker1">
-              <input matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start date">
-              <input matEndDate [(ngModel)]="filterValue.enddate" placeholder="End date"
+              <input data-testid="ca-inp-006" matStartDate [(ngModel)]="filterValue.startdate" placeholder="Start date">
+              <input data-testid="ca-inp-007" matEndDate [(ngModel)]="filterValue.enddate" placeholder="End date"
                   (dateChange)="onFilter(filterValue)">
             </mat-date-range-input>
             <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
@@ -44,44 +44,44 @@
 
           <mat-form-field appearance="outline" class="ctrl-field">
             <mat-label>Screen From</mat-label>
-            <mat-select [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)">
+            <mat-select data-testid="ca-msel-008" [(ngModel)]="filterValue.from" (selectionChange)="onFilter(filterValue)">
               <mat-option *ngFor="let option of fromScreenList" [value]="option">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="ctrl-field ctrl-field-lg">
             <mat-label>Video Name</mat-label>
-            <mat-select [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)" multiple>
+            <mat-select data-testid="ca-msel-009" [(ngModel)]="filterValue.videoname" (selectionChange)="onFilter(filterValue)" multiple>
               <mat-option *ngFor="let option of videoNameList" [value]="option">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="ctrl-field ctrl-field-lg">
             <mat-label>Total time spent (mins ›)</mat-label>
-            <input type="number" matInput [(ngModel)]="filterValue.totaltimespend" (keyup)="onFilter(filterValue)">
+            <input data-testid="ca-inp-010" type="number" matInput [(ngModel)]="filterValue.totaltimespend" (keyup)="onFilter(filterValue)">
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="ctrl-field">
             <mat-label>Platform</mat-label>
-            <mat-select [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)">
+            <mat-select data-testid="ca-msel-011" [(ngModel)]="filterValue.platform_name" (selectionChange)="onFilter(filterValue)">
               <mat-option *ngFor="let option of platformNameList" [value]="option">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
-          <mat-slide-toggle
+          <mat-slide-toggle data-testid="ca-matslidetoggle-012"
             [(ngModel)]="showDuplicatesOnly"
             (change)="onFilter(filterValue)"
             color="warn"
             class="ctrl-toggle-duplicates">
             Duplicates only
           </mat-slide-toggle>
-          <mat-checkbox
+          <mat-checkbox data-testid="ca-matcheckbox-013"
             [(ngModel)]="showNewUsersOnly"
             (change)="onFilter(filterValue)"
             color="primary"
             class="ctrl-check-newusers">
             New users only
           </mat-checkbox>
-          <button mat-stroked-button type="button" (click)="onClearFilterValue()" class="btn-clear">
+          <button data-testid="ca-btn-014" mat-stroked-button type="button" (click)="onClearFilterValue()" class="btn-clear">
             <span class="btn-icon"><mat-icon>clear</mat-icon></span>Clear
         </button>
         </div>
@@ -111,7 +111,7 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let row" style="width:40px;padding:0 4px">
-            <button
+            <button data-testid="ca-btn-015"
               *ngIf="row['isDuplicate']"
               mat-icon-button
               color="warn"
@@ -189,7 +189,7 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)"></tr>
+          <tr data-testid="ca-tr-016" mat-row *matRowDef="let row; columns: displayedColumns" (click)="printLog(row)"></tr>
         </table>
       </div>
       <mat-paginator [pageSizeOptions]="[25,50,100]" aria-label=""></mat-paginator>
@@ -202,12 +202,12 @@
         </div>
         <div class="tier-header-right">
           <div class="tier-toggle-group">
-            <button class="tier-toggle-btn" [class.active]="viewMode === 'series'" (click)="viewMode = 'series'">Series</button>
-            <button class="tier-toggle-btn" [class.active]="viewMode === 'participant'" (click)="viewMode = 'participant'">Participants</button>
+            <button data-testid="ca-btn-017" class="tier-toggle-btn" [class.active]="viewMode === 'series'" (click)="viewMode = 'series'">Series</button>
+            <button data-testid="ca-btn-018" class="tier-toggle-btn" [class.active]="viewMode === 'participant'" (click)="viewMode = 'participant'">Participants</button>
           </div>
           <div class="tier-search-wrap">
             <mat-icon class="tier-search-icon">search</mat-icon>
-            <input class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="tierSearchQuery">
+            <input data-testid="ca-inp-019" class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="tierSearchQuery">
           </div>
         </div>
       </div>
@@ -223,40 +223,40 @@
               <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
               <div class="tier-summary-row">
                 <div class="tier-stat">
-                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'done', 'series')">
+                  <span data-testid="ca-span-020" class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'done', 'series')">
                     {{ tierStats[$any(tier.key)]?.series?.completed }}/{{ tierStats[$any(tier.key)]?.series?.total }}
                   </span>
                   <span class="tier-stat-label">DONE</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'completed', 'series')">
+                  <span data-testid="ca-span-021" class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'completed', 'series')">
                     {{ tierStats[$any(tier.key)]?.series?.completed }}
                   </span>
                   <span class="tier-stat-label">COMPLETED</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'ontrack', 'series')">
+                  <span data-testid="ca-span-022" class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'ontrack', 'series')">
                     {{ tierStats[$any(tier.key)]?.series?.onTrack }}
                   </span>
                   <span class="tier-stat-label">ON TRACK</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'notstarted', 'series')">
+                  <span data-testid="ca-span-023" class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'series', 'notstarted', 'series')">
                     {{ tierStats[$any(tier.key)]?.series?.notStarted }}
                   </span>
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
               <div class="card-view-toggle">
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-024" class="card-tab-btn"
                   [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'"
                   (click)="cardViewMode[$any(tier.key)] = 'series'">Series</button>
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-025" class="card-tab-btn"
                   [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'participant'"
                   (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
               <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'series'">
-                <div class="series-row" *ngFor="let s of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                <div data-testid="ca-div-026" class="series-row" *ngFor="let s of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
@@ -281,7 +281,7 @@
                 </div>
               </div>
               <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'participant'">
-                <div class="series-row" *ngFor="let user of tierParticipantSummary[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                <div data-testid="ca-div-027" class="series-row" *ngFor="let user of tierParticipantSummary[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
                   <span class="series-name">{{ user.key }}</span>
                   <span class="series-fraction"
@@ -303,40 +303,40 @@
               <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
               <div class="tier-summary-row">
                 <div class="tier-stat">
-                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'done', 'participant')">
+                  <span data-testid="ca-span-028" class="tier-stat-val done" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'done', 'participant')">
                     {{ tierStats[$any(tier.key)]?.participant?.completed }}/{{ tierStats[$any(tier.key)]?.participant?.total }}
                   </span>
                   <span class="tier-stat-label">DONE</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'completed', 'participant')">
+                  <span data-testid="ca-span-029" class="tier-stat-val completed" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'completed', 'participant')">
                     {{ tierStats[$any(tier.key)]?.participant?.completed }}
                   </span>
                   <span class="tier-stat-label">COMPLETED</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
+                  <span data-testid="ca-span-030" class="tier-stat-val ontrack" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
                     {{ tierStats[$any(tier.key)]?.participant?.onTrack }}
                   </span>
                   <span class="tier-stat-label">ON TRACK</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
+                  <span data-testid="ca-span-031" class="tier-stat-val notstarted" style="cursor:pointer" (click)="openDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
                     {{ tierStats[$any(tier.key)]?.participant?.notStarted }}
                   </span>
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
               <div class="card-view-toggle">
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-032" class="card-tab-btn"
                   [class.active-card-tab]="cardViewMode[$any(tier.key)] === 'series'"
                   (click)="cardViewMode[$any(tier.key)] = 'series'">Series</button>
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-033" class="card-tab-btn"
                   [class.active-card-tab]="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'"
                   (click)="cardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
               <div class="series-list" *ngIf="!cardViewMode[$any(tier.key)] || cardViewMode[$any(tier.key)] === 'participant'">
-                <div class="series-row" *ngFor="let user of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
+                <div data-testid="ca-div-034" class="series-row" *ngFor="let user of tier.value | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
                   <span class="series-name">{{ user.key }}</span>
                   <span class="series-fraction"
@@ -348,7 +348,7 @@
                 </div>
               </div>
               <div class="series-list" *ngIf="cardViewMode[$any(tier.key)] === 'series'">
-                <div class="series-row" *ngFor="let s of tierCompletionMap[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
+                <div data-testid="ca-div-035" class="series-row" *ngFor="let s of tierCompletionMap[$any(tier.key)] | keyvalue" style="cursor:pointer" (click)="openDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
@@ -380,12 +380,12 @@
         </div>
         <div class="tier-header-right">
           <div class="tier-toggle-group">
-            <button class="tier-toggle-btn" [class.active]="allTierViewMode === 'series'"      (click)="allTierViewMode = 'series'">Series</button>
-            <button class="tier-toggle-btn" [class.active]="allTierViewMode === 'participant'" (click)="allTierViewMode = 'participant'">Participants</button>
+            <button data-testid="ca-btn-036" class="tier-toggle-btn" [class.active]="allTierViewMode === 'series'"      (click)="allTierViewMode = 'series'">Series</button>
+            <button data-testid="ca-btn-037" class="tier-toggle-btn" [class.active]="allTierViewMode === 'participant'" (click)="allTierViewMode = 'participant'">Participants</button>
           </div>
           <div class="tier-search-wrap">
             <mat-icon class="tier-search-icon">search</mat-icon>
-            <input class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="allTierSearchQuery">
+            <input data-testid="ca-inp-038" class="tier-search-input" placeholder="Search tiers..." [(ngModel)]="allTierSearchQuery">
           </div>
         </div>
       </div>
@@ -403,41 +403,41 @@
               <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
               <div class="tier-summary-row">
                 <div class="tier-stat">
-                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'done', 'series')">
+                  <span data-testid="ca-span-039" class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'done', 'series')">
                     {{ allTierStats[$any(tier.key)]?.series?.completed }}/{{ allTierStats[$any(tier.key)]?.series?.total }}
                   </span>
                   <span class="tier-stat-label">DONE</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'completed', 'series')">
+                  <span data-testid="ca-span-040" class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'completed', 'series')">
                     {{ allTierStats[$any(tier.key)]?.series?.completed }}
                   </span>
                   <span class="tier-stat-label">COMPLETED</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'ontrack', 'series')">
+                  <span data-testid="ca-span-041" class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'ontrack', 'series')">
                     {{ allTierStats[$any(tier.key)]?.series?.onTrack }}
                   </span>
                   <span class="tier-stat-label">ON TRACK</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'notstarted', 'series')">
+                  <span data-testid="ca-span-042" class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'series', 'notstarted', 'series')">
                     {{ allTierStats[$any(tier.key)]?.series?.notStarted }}
                   </span>
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
               <div class="card-view-toggle">
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-043" class="card-tab-btn"
                   [class.active-card-tab]="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'series'"
                   (click)="allCardViewMode[$any(tier.key)] = 'series'">Series</button>
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-044" class="card-tab-btn"
                   [class.active-card-tab]="allCardViewMode[$any(tier.key)] === 'participant'"
                   (click)="allCardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
               <!-- Series list -->
               <div class="series-list" *ngIf="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'series'">
-                <div class="series-row" *ngFor="let s of tier.value | keyvalue"
+                <div data-testid="ca-div-045" class="series-row" *ngFor="let s of tier.value | keyvalue"
                   style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="color:#a09a94">
@@ -464,7 +464,7 @@
               </div>
               <!-- Participant list -->
               <div class="series-list" *ngIf="allCardViewMode[$any(tier.key)] === 'participant'">
-                <div class="series-row"
+                <div data-testid="ca-div-046" class="series-row"
                   *ngFor="let user of allTierParticipantSummary[$any(tier.key)] | keyvalue"
                   style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
@@ -490,41 +490,41 @@
               <div class="tier-card-title">{{ tiermap[$any(tier.key)]?.tier }}</div>
               <div class="tier-summary-row">
                 <div class="tier-stat">
-                  <span class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'done', 'participant')">
+                  <span data-testid="ca-span-047" class="tier-stat-val done" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'done', 'participant')">
                     {{ allTierStats[$any(tier.key)]?.participant?.completed }}/{{ allTierStats[$any(tier.key)]?.participant?.total }}
                   </span>
                   <span class="tier-stat-label">DONE</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'completed', 'participant')">
+                  <span data-testid="ca-span-048" class="tier-stat-val completed" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'completed', 'participant')">
                     {{ allTierStats[$any(tier.key)]?.participant?.completed }}
                   </span>
                   <span class="tier-stat-label">COMPLETED</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
+                  <span data-testid="ca-span-049" class="tier-stat-val ontrack" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'ontrack', 'participant')">
                     {{ allTierStats[$any(tier.key)]?.participant?.onTrack }}
                   </span>
                   <span class="tier-stat-label">ON TRACK</span>
                 </div>
                 <div class="tier-stat">
-                  <span class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
+                  <span data-testid="ca-span-050" class="tier-stat-val notstarted" style="cursor:pointer" (click)="openAllDrawer($any(tier.key), 'all', 'notstarted', 'participant')">
                     {{ allTierStats[$any(tier.key)]?.participant?.notStarted }}
                   </span>
                   <span class="tier-stat-label">NOT STARTED</span>
                 </div>
               </div>
               <div class="card-view-toggle">
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-051" class="card-tab-btn"
                   [class.active-card-tab]="allCardViewMode[$any(tier.key)] === 'series'"
                   (click)="allCardViewMode[$any(tier.key)] = 'series'">Series</button>
-                <button class="card-tab-btn"
+                <button data-testid="ca-btn-052" class="card-tab-btn"
                   [class.active-card-tab]="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'participant'"
                   (click)="allCardViewMode[$any(tier.key)] = 'participant'">Participants</button>
               </div>
               <!-- Participant list -->
               <div class="series-list" *ngIf="!allCardViewMode[$any(tier.key)] || allCardViewMode[$any(tier.key)] === 'participant'">
-                <div class="series-row"
+                <div data-testid="ca-div-053" class="series-row"
                   *ngFor="let user of tier.value | keyvalue"
                   style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(user.key), 'all', 'participant')">
                   <div class="participant-avatar" [style.background]="getAvatarColor($any(user.key))">{{ getInitials($any(user.key)) }}</div>
@@ -539,7 +539,7 @@
               </div>
               <!-- Series list -->
               <div class="series-list" *ngIf="allCardViewMode[$any(tier.key)] === 'series'">
-                <div class="series-row"
+                <div data-testid="ca-div-054" class="series-row"
                   *ngFor="let s of allTierCompletionMap[$any(tier.key)] | keyvalue"
                   style="cursor:pointer" (click)="openAllDrawer($any(tier.key), $any(s.key), 'all', 'series')">
                   <div class="series-icon">
@@ -569,7 +569,7 @@
       <div class="journey-layout" *ngIf="journeyWiseData && !tierLoading">
         <div class="journey-sidebar">
           <div class="journey-sidebar-title">All Journeys</div>
-          <div class="journey-sidebar-item"
+          <div data-testid="ca-div-055" class="journey-sidebar-item"
               *ngFor="let j of journeyWiseData | keyvalue"
               [class.journey-sidebar-active]="selectedJourneyId === $any(j.key)"
               (click)="selectJourney($any(j.key))">
@@ -608,17 +608,17 @@
             <div class="journey-panel-toolbar">
               <div class="journey-search-wrap">
                 <mat-icon class="journey-search-icon">search</mat-icon>
-                <input class="journey-search-input" placeholder="Search participants..."
+                <input data-testid="ca-inp-056" class="journey-search-input" placeholder="Search participants..."
                       [(ngModel)]="journeySearchQuery">
               </div>
               <div class="journey-filter-chips">
-                <button class="jchip" [class.jchip-active]="journeyFilter === 'all'" (click)="journeyFilter = 'all'">
+                <button data-testid="ca-btn-057" class="jchip" [class.jchip-active]="journeyFilter === 'all'" (click)="journeyFilter = 'all'">
                   All <span class="jchip-count">{{ jd['total'] }}</span>
                 </button>
-                <button class="jchip jchip-watching" [class.jchip-active]="journeyFilter === 'watching'" (click)="journeyFilter = 'watching'">
+                <button data-testid="ca-btn-058" class="jchip jchip-watching" [class.jchip-active]="journeyFilter === 'watching'" (click)="journeyFilter = 'watching'">
                   Watching <span class="jchip-count">{{ jd['watching'] }}</span>
                 </button>
-                <button class="jchip jchip-notyet" [class.jchip-active]="journeyFilter === 'notyet'" (click)="journeyFilter = 'notyet'">
+                <button data-testid="ca-btn-059" class="jchip jchip-notyet" [class.jchip-active]="journeyFilter === 'notyet'" (click)="journeyFilter = 'notyet'">
                   Not Watching <span class="jchip-count">{{ jd['notYet'] }}</span>
                 </button>
               </div>
@@ -634,7 +634,7 @@
 
             <div class="journey-table-body">
               <ng-container *ngFor="let profile of jd['profile']">
-                <div class="journey-row"
+                <div data-testid="ca-div-060" class="journey-row"
                     (click)="openUserAnalyticsDialog(profile)"
                     *ngIf="journeyProfileVisible(profile)">
 
@@ -705,22 +705,22 @@
 
   </mat-tab-group>
 </div>
-<div class="tier-drawer-overlay" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
+<div data-testid="ca-div-061" class="tier-drawer-overlay" *ngIf="drawerOpen" (click)="closeDrawer()"></div>
 <div class="tier-drawer" [class.drawer-open]="drawerOpen">
   <div class="drawer-header">
     <div class="drawer-header-left">
       <span class="drawer-tier-label">{{ drawerTierName }}</span>
       <span class="drawer-context-label">{{ drawerContextLabel }}</span>
     </div>
-    <button class="drawer-close-btn" (click)="closeDrawer()">
+    <button data-testid="ca-btn-062" class="drawer-close-btn" (click)="closeDrawer()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
 
   <div class="drawer-filter-row">
-    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'all'"       (click)="drawerFilter = 'all'">All</button>
-    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'completed'" (click)="drawerFilter = 'completed'">Completed</button>
-    <button class="drawer-chip" [class.chip-active]="drawerFilter === 'pending'"   (click)="drawerFilter = 'pending'">Not Completed</button>
+    <button data-testid="ca-btn-063" class="drawer-chip" [class.chip-active]="drawerFilter === 'all'"       (click)="drawerFilter = 'all'">All</button>
+    <button data-testid="ca-btn-064" class="drawer-chip" [class.chip-active]="drawerFilter === 'completed'" (click)="drawerFilter = 'completed'">Completed</button>
+    <button data-testid="ca-btn-065" class="drawer-chip" [class.chip-active]="drawerFilter === 'pending'"   (click)="drawerFilter = 'pending'">Not Completed</button>
   </div>
 
   <div class="drawer-count">

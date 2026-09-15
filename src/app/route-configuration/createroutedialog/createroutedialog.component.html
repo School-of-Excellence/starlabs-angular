@@ -4,7 +4,7 @@
 
 <div *ngIf="!loading" style="padding: 24px; border-radius: 8px;">
   <div style="display: flex;justify-content: end;">
-  <button mat-mini-fab color="warn" (click)="close()">
+  <button data-testid="rcd-close" mat-mini-fab color="warn" (click)="close()">
     <mat-icon>close</mat-icon>
   </button>
   </div>
@@ -12,12 +12,12 @@
   <div  style="padding: 10px;" class="child-row">
   <mat-form-field appearance="outline" class="child-input">
     <mat-label>Label</mat-label>
-    <input matInput [(ngModel)]="label" placeholder="Enter label" />
+    <input data-testid="rcd-enter-label" matInput [(ngModel)]="label" placeholder="Enter label" />
   </mat-form-field>
   
   <mat-form-field *ngIf="data?.editData" appearance="outline" class="child-input">
     <mat-label>Sequence</mat-label>
-    <input 
+    <input data-testid="rcd-enter-sequence" 
       matInput 
       [(ngModel)]="orderNumber" 
       placeholder="Enter Sequence" 
@@ -28,7 +28,7 @@
   </mat-form-field>
   <mat-form-field class="child-input" appearance="outline">
     <mat-label>Roles</mat-label>
-    <mat-select multiple [(ngModel)]="selectedRoles" [disabled]="enabled">
+    <mat-select data-testid="rcd-mat-select" multiple [(ngModel)]="selectedRoles" [disabled]="enabled">
       <ng-container *ngFor="let role of roleList">
         <mat-option *ngIf="role !== 'RootAccess'" [value]="role">
           {{ role | uppercase }}
@@ -39,7 +39,7 @@
 
   <mat-form-field appearance="outline" class="child-input">
     <mat-label>Route</mat-label>
-    <input
+    <input data-testid="rcd-example-route"
       matInput
       [(ngModel)]="route"
       placeholder="/example-route"
@@ -49,7 +49,7 @@
 
   <mat-form-field appearance="outline" class="child-input">
     <mat-label>Select Icon</mat-label>
-    <mat-select [(ngModel)]="icon">
+    <mat-select data-testid="rcd-mat-select-2" [(ngModel)]="icon">
       <mat-option *ngFor="let icon of icons" [value]="icon">
         <mat-icon>{{ icon }}</mat-icon> {{ icon }}
       </mat-option>
@@ -57,7 +57,7 @@
   </mat-form-field>
   <mat-form-field appearance="outline" class="child-input">
     <mat-label>Show in Sidenav</mat-label>
-    <mat-select [(ngModel)]="showInSidenav">
+    <mat-select data-testid="rcd-mat-select-3" [(ngModel)]="showInSidenav">
       <mat-option [value]="true">Yes</mat-option>
       <mat-option [value]="false">No</mat-option>
     </mat-select>
@@ -81,17 +81,17 @@
       <div class="child-row">
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Child Label</mat-label>
-          <input matInput [(ngModel)]="child.label" placeholder="Enter label" />
+          <input data-testid="rcd-enter-label-2" matInput [(ngModel)]="child.label" placeholder="Enter label" />
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Child Route</mat-label>
-          <input matInput [(ngModel)]="child.route" placeholder="/child-route" />
+          <input data-testid="rcd-child-route" matInput [(ngModel)]="child.route" placeholder="/child-route" />
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Child Icon</mat-label>
-          <mat-select [(ngModel)]="child.icon">
+          <mat-select data-testid="rcd-mat-select-4" [(ngModel)]="child.icon">
             <mat-option *ngFor="let icon of icons" [value]="icon">
               <mat-icon>{{ icon }}</mat-icon> {{ icon }}
             </mat-option>
@@ -99,24 +99,24 @@
         </mat-form-field>
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Child Roles</mat-label>
-          <mat-select multiple [(ngModel)]="child.roles">
+          <mat-select data-testid="rcd-mat-select-5" multiple [(ngModel)]="child.roles">
             <mat-option *ngFor="let role of roleList;" [value]="role">{{ role | uppercase }}</mat-option>
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline" class="child-input">
           <mat-label>Show Child in Sidenav</mat-label>
-          <mat-select [(ngModel)]="child.showInSidenav">
+          <mat-select data-testid="rcd-mat-select-6" [(ngModel)]="child.showInSidenav">
             <mat-option [value]="true">Yes</mat-option>
             <mat-option [value]="false">No</mat-option>
           </mat-select>
         </mat-form-field>
-        <button mat-icon-button color="warn" (click)="removeChildField(i)">
+        <button data-testid="rcd-removechildfield" mat-icon-button color="warn" (click)="removeChildField(i)">
           <mat-icon>remove</mat-icon>
         </button>
       </div>
     </div>
 
-    <button mat-stroked-button color="primary" (click)="addChildField()">Add Sub Component</button>
+    <button data-testid="rcd-addchildfield" mat-stroked-button color="primary" (click)="addChildField()">Add Sub Component</button>
   </div>
   <div *ngIf="errorMessage" style="color: red; margin-top: 10px;">
     {{ errorMessage }}
@@ -124,10 +124,10 @@
   <br><br>
   <mat-divider></mat-divider>
   <div style="margin-top: 30px; display: flex;justify-content: center;">
-  <button mat-raised-button color="primary" [disabled]="!isMainValid || !ordernumberValid" (click)="save()">
+  <button data-testid="rcd-save" mat-raised-button color="primary" [disabled]="!isMainValid || !ordernumberValid" (click)="save()">
     {{ data?.editData ? 'Update' : 'Save' }}
   </button>&nbsp;&nbsp;&nbsp;
-  <button mat-raised-button color="warn" (click)="close()">
+  <button data-testid="rcd-close-2" mat-raised-button color="warn" (click)="close()">
     {{ 'close'}}
   </button>
   </div>

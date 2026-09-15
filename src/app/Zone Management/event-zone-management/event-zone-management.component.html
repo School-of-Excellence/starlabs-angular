@@ -36,7 +36,7 @@
           
           <mat-form-field appearance="outline" style="width: 400px;">
             <mat-label>Select Event</mat-label>
-            <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
+            <mat-select data-testid="ezm-mat-select" [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
               <mat-option *ngFor="let event of eventList" [value]="event">
                 {{event["name"]}}
               </mat-option>
@@ -59,7 +59,7 @@
               <div class="stat-value">{{ unassignedCohortsCount }}</div>
               <div class="stat-label">Unassigned</div>
             </div>
-            <div class="stat-mini highlight" [class.all-mapped]="isAllMapped" (click)="openUnmappedParticipants()">
+            <div data-testid="ezm-openunmappedparticipants" class="stat-mini highlight" [class.all-mapped]="isAllMapped" (click)="openUnmappedParticipants()">
               <div class="stat-value">{{ participantsMapped }}/{{ totalParticipants }}</div>
               <div class="stat-label">Mapped</div>
             </div>
@@ -86,11 +86,11 @@
             <div class="section-header">
               <h3 class="section-title">Event Zones</h3>
               <div class="section-actions">
-                <button mat-stroked-button color="primary" class="create-zone-btn" (click)="openCreateZoneDialog(null)">
+                <button data-testid="ezm-opencreatezonedialog" mat-stroked-button color="primary" class="create-zone-btn" (click)="openCreateZoneDialog(null)">
                   <mat-icon>add</mat-icon>
                   Create Zone
                 </button>
-                <button
+                <button data-testid="ezm-openparticipantzoneoverlay"
                   mat-stroked-button
                   color="accent"
                   class="view-participant-btn"
@@ -99,7 +99,7 @@
                   View Participant Zone
                 </button>
                 <div class="submit-with-reminder">
-                  <button
+                  <button data-testid="ezm-submitconfiguration"
                     mat-flat-button
                     color="primary"
                     class="submit-btn"
@@ -121,7 +121,7 @@
               <div class="empty-state" *ngIf="eventZoneList.length === 0">
                 <mat-icon>inbox</mat-icon>
                 <p>No zones created yet</p>
-                <button mat-raised-button color="primary">Create First Zone</button>
+                <button data-testid="ezm-button" mat-raised-button color="primary">Create First Zone</button>
               </div>
 
               <!-- Zones Grid -->
@@ -156,10 +156,10 @@
                       </div>
                     </div>
                     <div class="zone-actions">
-                      <button mat-icon-button color="primary" (click)="openCreateZoneDialog(zone)">
+                      <button data-testid="ezm-opencreatezonedialog-2" mat-icon-button color="primary" (click)="openCreateZoneDialog(zone)">
                         <mat-icon>edit</mat-icon>
                       </button>
-                      <mat-slide-toggle color="primary" [checked]="zone['status'] === 'open'" (change)="toggleZoneStatus($event, zone)"></mat-slide-toggle>
+                      <mat-slide-toggle data-testid="ezm-togglezonestatus" color="primary" [checked]="zone['status'] === 'open'" (change)="toggleZoneStatus($event, zone)"></mat-slide-toggle>
                     </div>
                   </div>
 
@@ -174,7 +174,7 @@
                       <div class="cohort-name-item" *ngFor="let cohort of zone['_assignedCohorts']; trackBy: trackByCohortId">
                         <div class="cohort-line-1">
                           <span class="cohort-name">{{ cohort["name"] }}</span>
-                          <button mat-icon-button class="cohort-remove-btn" (click)="removeCohortFromZone(cohort['docid'], zone['docid'])">
+                          <button data-testid="ezm-removecohortfromzone" mat-icon-button class="cohort-remove-btn" (click)="removeCohortFromZone(cohort['docid'], zone['docid'])">
                             <mat-icon>close</mat-icon>
                           </button>
                         </div>
@@ -182,7 +182,7 @@
                           <span class="cohort-badge" [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
                             {{ cohort["cohortCategory"] | uppercase }}
                           </span>
-                          <span class="cohort-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">{{ getCohortParticipantCount(cohort) }} participants</span>
+                          <span data-testid="ezm-event-stoppropagation" class="cohort-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">{{ getCohortParticipantCount(cohort) }} participants</span>
                         </div>
                       </div>
                     </div>
@@ -212,13 +212,13 @@
 
             <!-- Filter Tabs (rendered dynamically from whatever categories exist) -->
             <div class="cohort-filters">
-              <button
+              <button data-testid="ezm-setcohortfilter"
                 class="filter-btn"
                 [class.active]="cohortFilter === 'all'"
                 (click)="setCohortFilter('all')">
                 All
               </button>
-              <button
+              <button data-testid="ezm-setcohortfilter-2"
                 *ngFor="let category of cohortCategories"
                 class="filter-btn"
                 [class.active]="cohortFilter === category"
@@ -231,7 +231,7 @@
             <div class="search-box">
               <mat-form-field appearance="outline" class="w-100">
                 <mat-label>Search cohorts...</mat-label>
-                <input matInput [(ngModel)]="searchTerm" placeholder="Type to search">
+                <input data-testid="ezm-type-to-search" matInput [(ngModel)]="searchTerm" placeholder="Type to search">
                 <mat-icon matPrefix>search</mat-icon>
               </mat-form-field>
             </div>
@@ -240,13 +240,13 @@
             <div class="bulk-actions" *ngIf="hasSelectedCohorts">
               <div class="bulk-actions-content">
                 <span class="selected-count">{{ selectedCount }} cohort(s) selected</span>
-                <button mat-button (click)="clearSelection()">Clear</button>
+                <button data-testid="ezm-clearselection" mat-button (click)="clearSelection()">Clear</button>
               </div>
               
               <!-- Zone Selector for Bulk Assignment -->
               <mat-form-field appearance="outline" class="w-100 mt-2">
                 <mat-label>Assign to Zone</mat-label>
-                <mat-select (selectionChange)="assignSelectedCohortsToZone($event.value)">
+                <mat-select data-testid="ezm-mat-select-2" (selectionChange)="assignSelectedCohortsToZone($event.value)">
                   <mat-option *ngFor="let zone of eventZoneList" [value]="zone['docid']">
                     {{ zone["zonename"] }}
                   </mat-option>
@@ -274,13 +274,13 @@
                   <span class="cohort-category-count">{{ group.cohorts.length }}</span>
                 </div>
 
-                <div
+                <div data-testid="ezm-togglecohortselection"
                   class="cohort-item"
                   *ngFor="let cohort of group.cohorts; trackBy: trackByCohortId"
                   [class.selected]="isCohortSelected(cohort['docid'])"
                   (click)="toggleCohortSelection(cohort['docid'])">
 
-                  <mat-checkbox
+                  <mat-checkbox data-testid="ezm-togglecohortselection-2"
                     [checked]="isCohortSelected(cohort['docid'])"
                     (change)="toggleCohortSelection(cohort['docid'])"
                     (click)="$event.stopPropagation()">
@@ -293,7 +293,7 @@
                   <div class="cohort-item-details">
                     <div class="cohort-item-name">{{ cohort["name"] }}</div>
                     <div class="cohort-item-meta">
-                      <span class="cohort-item-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">
+                      <span data-testid="ezm-event-stoppropagation-2" class="cohort-item-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">
                         {{ getCohortParticipantCount(cohort) }} participants
                       </span>
                     </div>
@@ -323,7 +323,7 @@
   Shows all participants with their zone assignments
   ======================================================================== -->
   <div class="participant-zone-overlay" *ngIf="showParticipantZoneOverlay">
-    <div class="overlay-backdrop" (click)="closeParticipantZoneOverlay()"></div>
+    <div data-testid="ezm-closeparticipantzoneoverlay" class="overlay-backdrop" (click)="closeParticipantZoneOverlay()"></div>
     <div class="overlay-content">
       <!-- Overlay Header -->
       <div class="overlay-header">
@@ -335,7 +335,7 @@
           </div>
         </div>
         <div class="overlay-actions">
-          <button 
+          <button data-testid="ezm-exportparticipantzonestoexcel" 
             mat-raised-button 
             color="primary" 
             class="export-btn"
@@ -344,7 +344,7 @@
             <mat-icon>file_download</mat-icon>
             Export to Excel
           </button>
-          <button mat-icon-button class="close-btn" (click)="closeParticipantZoneOverlay()">
+          <button data-testid="ezm-closeparticipantzoneoverlay-2" mat-icon-button class="close-btn" (click)="closeParticipantZoneOverlay()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -354,9 +354,9 @@
       <div class="overlay-search">
         <mat-form-field appearance="outline" class="w-100">
           <mat-label>Search participants...</mat-label>
-          <input matInput [(ngModel)]="participantZoneSearchTerm" placeholder="Search by name, email, or zone">
+          <input data-testid="ezm-search-by-name-email-or-zone" matInput [(ngModel)]="participantZoneSearchTerm" placeholder="Search by name, email, or zone">
           <mat-icon matPrefix>search</mat-icon>
-          <button mat-icon-button matSuffix *ngIf="participantZoneSearchTerm" (click)="participantZoneSearchTerm = ''">
+          <button data-testid="ezm-button-2" mat-icon-button matSuffix *ngIf="participantZoneSearchTerm" (click)="participantZoneSearchTerm = ''">
             <mat-icon>clear</mat-icon>
           </button>
         </mat-form-field>
@@ -430,7 +430,7 @@
                   {{ participant.addedflow === 'manual' ? 'Manual Assignment' : 'Auto Assignment' }}
                 </span>
 
-                <button class="trail-toggle" (click)="toggleTrail(participant)" [disabled]="participant.trailLoading">
+                <button data-testid="ezm-toggletrail" class="trail-toggle" (click)="toggleTrail(participant)" [disabled]="participant.trailLoading">
                   <mat-icon>{{ participant.trailLoading ? 'hourglass_empty' : (participant.showTrail ? 'expand_less' : 'timeline') }}</mat-icon>
                   {{ participant.trailLoading ? 'Loading...' : (participant.showTrail ? 'Hide Zone Trail' : 'View Zone Trail') }}
                 </button>

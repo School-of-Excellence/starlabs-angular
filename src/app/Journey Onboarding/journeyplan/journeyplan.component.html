@@ -93,7 +93,7 @@
                 </td>
                 <td>
                   <div class="field-select-wrap">
-                    <select [(ngModel)]="row.productref" [disabled]="row.docid != null">
+                    <select data-testid="jpl-sel-001" [(ngModel)]="row.productref" [disabled]="row.docid != null">
                       <option *ngFor="let p of productList" [value]="p.docid">{{ p.product }}</option>
                     </select>
                     <div class="field-caret"></div>
@@ -101,7 +101,7 @@
                 </td>
                 <td>
                   <div class="field-select-wrap">
-                    <select [(ngModel)]="row.packageref" [disabled]="!profileRoles['developer']">
+                    <select data-testid="jpl-sel-002" [(ngModel)]="row.packageref" [disabled]="!profileRoles['developer']">
                       <option *ngFor="let pkg of packageList" [value]="pkg.docid">{{ pkg.package }}</option>
                     </select>
                     <div class="field-caret"></div>
@@ -110,13 +110,13 @@
                 <td>
                   <div class="field-amount-wrap">
                     <span class="rupee-sym">₹</span>
-                    <input type="number" [(ngModel)]="row.minimumpayment" placeholder="0">
+                    <input data-testid="jpl-inp-003" type="number" [(ngModel)]="row.minimumpayment" placeholder="0">
                   </div>
                 </td>
                 <td>
                   <div class="field-amount-wrap">
                     <span class="rupee-sym">₹</span>
-                    <input type="number" [value]="(row['minimumpayment'] - this.totalpaid) >= 0 ? 0 : row['minimumpayment'] - this.totalpaid" placeholder="0">
+                    <input data-testid="jpl-inp-004" type="number" [value]="(row['minimumpayment'] - this.totalpaid) >= 0 ? 0 : row['minimumpayment'] - this.totalpaid" placeholder="0">
                   </div>
                 </td>
                 <!-- Tentative Start: month selector using monthlyPlanData
@@ -124,7 +124,7 @@
                      [(ngModel)]="row.tentativestart" binding unchanged -->
                 <td>
                   <div class="field-select-wrap tentative-month-select">
-                    <select [(ngModel)]="row.tentativestart"
+                    <select data-testid="jpl-sel-005" [(ngModel)]="row.tentativestart"
                       [compareWith]="compareDates">
                       <option [ngValue]="null">— Not set —</option>
                       <option *ngFor="let m of monthlyPlanData" [ngValue]="m.monthstartdate">
@@ -216,7 +216,7 @@
         <mat-card class="month-card">
 
           <!-- Month Header -->
-          <div class="month-header" (click)="toggleMonth(i)">
+          <div data-testid="jpl-div-006" class="month-header" (click)="toggleMonth(i)">
             <div class="month-header-left">
               <span class="month-title">{{ month.display }}</span>
               <ng-container *ngFor="let row of productData.data">
@@ -253,7 +253,7 @@
                 <div class="cat-col-header">
                   <mat-icon class="cat-icon">record_voice_over</mat-icon>
                   <span class="cat-title">Solar Voice</span>
-                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'solarvoice'); $event.stopPropagation()">
+                  <button data-testid="jpl-btn-007" mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'solarvoice'); $event.stopPropagation()">
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
@@ -262,18 +262,18 @@
                   <div class="slot-top-row">
                     <mat-form-field appearance="outline" class="slot-multiselect">
                       <mat-label>Playlists</mat-label>
-                      <mat-select multiple [(ngModel)]="row.playlist">
+                      <mat-select data-testid="jpl-msel-008" multiple [(ngModel)]="row.playlist">
                         <mat-option *ngFor="let p of solarVoicePlaylist" [value]="p.id">{{ p.name }}</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'solarvoice', ri)">
+                    <button data-testid="jpl-btn-009" mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'solarvoice', ri)">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
                   <div class="slot-bottom-row">
                     <mat-form-field appearance="outline" class="slot-day">
                       <mat-label>Day</mat-label>
-                      <mat-select [(ngModel)]="row.preferredday">
+                      <mat-select data-testid="jpl-msel-010" [(ngModel)]="row.preferredday">
                         <mat-option value="all">All Days</mat-option>
                         <mat-option value="weekday">Weekdays</mat-option>
                         <mat-option value="weekend">Weekends</mat-option>
@@ -281,9 +281,9 @@
                     </mat-form-field>
                     <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
                       <mat-label>Time (24h)</mat-label>
-                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                      <input data-testid="jpl-inp-011" matInput type="time" [(ngModel)]="row.preferredtime">
                     </mat-form-field>
-                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                    <mat-checkbox data-testid="jpl-matcheckbox-012" class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
                       All Time
                     </mat-checkbox>
                   </div>
@@ -295,7 +295,7 @@
                 <div class="cat-col-header">
                   <mat-icon class="cat-icon">movie</mat-icon>
                   <span class="cat-title">EiFlix</span>
-                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'eiflix'); $event.stopPropagation()">
+                  <button data-testid="jpl-btn-013" mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'eiflix'); $event.stopPropagation()">
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
@@ -304,18 +304,18 @@
                   <div class="slot-top-row">
                     <mat-form-field appearance="outline" class="slot-multiselect">
                       <mat-label>Series</mat-label>
-                      <mat-select multiple [(ngModel)]="row.playlist">
+                      <mat-select data-testid="jpl-msel-014" multiple [(ngModel)]="row.playlist">
                         <mat-option *ngFor="let s of eiFlixSeriesList" [value]="s.id">{{ s.seriesName }}</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'eiflix', ri)">
+                    <button data-testid="jpl-btn-015" mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'eiflix', ri)">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
                   <div class="slot-bottom-row">
                     <mat-form-field appearance="outline" class="slot-day">
                       <mat-label>Day</mat-label>
-                      <mat-select [(ngModel)]="row.preferredday">
+                      <mat-select data-testid="jpl-msel-016" [(ngModel)]="row.preferredday">
                         <mat-option value="all">All Days</mat-option>
                         <mat-option value="weekday">Weekdays</mat-option>
                         <mat-option value="weekend">Weekends</mat-option>
@@ -323,9 +323,9 @@
                     </mat-form-field>
                     <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
                       <mat-label>Time (24h)</mat-label>
-                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                      <input data-testid="jpl-inp-017" matInput type="time" [(ngModel)]="row.preferredtime">
                     </mat-form-field>
-                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                    <mat-checkbox data-testid="jpl-matcheckbox-018" class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
                       All Day
                     </mat-checkbox>
                   </div>
@@ -337,7 +337,7 @@
                 <div class="cat-col-header">
                   <mat-icon class="cat-icon">library_books</mat-icon>
                   <span class="cat-title">General Content</span>
-                  <button mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'generalcontent'); $event.stopPropagation()">
+                  <button data-testid="jpl-btn-019" mat-mini-fab class="btn-add-slot" (click)="addPlaylistRow(month, 'generalcontent'); $event.stopPropagation()">
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
@@ -346,18 +346,18 @@
                   <div class="slot-top-row">
                     <mat-form-field appearance="outline" class="slot-multiselect">
                       <mat-label>Content</mat-label>
-                      <mat-select multiple [(ngModel)]="row.playlist">
+                      <mat-select data-testid="jpl-msel-020" multiple [(ngModel)]="row.playlist">
                         <mat-option *ngFor="let c of generalContentList" [value]="c.docid">{{ c.title }}</mat-option>
                       </mat-select>
                     </mat-form-field>
-                    <button mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'generalcontent', ri)">
+                    <button data-testid="jpl-btn-021" mat-icon-button class="btn-remove-slot" (click)="removePlaylistRow(month, 'generalcontent', ri)">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
                   <div class="slot-bottom-row">
                     <mat-form-field appearance="outline" class="slot-day">
                       <mat-label>Day</mat-label>
-                      <mat-select [(ngModel)]="row.preferredday">
+                      <mat-select data-testid="jpl-msel-022" [(ngModel)]="row.preferredday">
                         <mat-option value="all">All Days</mat-option>
                         <mat-option value="weekday">Weekdays</mat-option>
                         <mat-option value="weekend">Weekends</mat-option>
@@ -365,9 +365,9 @@
                     </mat-form-field>
                     <mat-form-field appearance="outline" class="slot-time" *ngIf="!row.allTime">
                       <mat-label>Time (24h)</mat-label>
-                      <input matInput type="time" [(ngModel)]="row.preferredtime">
+                      <input data-testid="jpl-inp-023" matInput type="time" [(ngModel)]="row.preferredtime">
                     </mat-form-field>
-                    <mat-checkbox class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
+                    <mat-checkbox data-testid="jpl-matcheckbox-024" class="slot-allday-check" [(ngModel)]="row.allTime" (change)="toggleRowAllTime(row)">
                       All Day
                     </mat-checkbox>
                   </div>
@@ -383,7 +383,7 @@
                 <ng-container *ngIf="(upcomingWorkshop[month.display] || []).length > 0; else noWorkshop">
                   <mat-form-field appearance="outline" class="slot-multiselect" style="margin-top:10px;width:100%">
                     <mat-label>Select Workshops</mat-label>
-                    <mat-select multiple [(ngModel)]="month.data.workshop">
+                    <mat-select data-testid="jpl-msel-025" multiple [(ngModel)]="month.data.workshop">
                       <mat-option *ngFor="let w of (upcomingWorkshop[month.display] || [])" [value]="w.docid">
                         {{ w['detailpage']['title'] }}
                       </mat-option>
@@ -520,7 +520,7 @@
       <div class="onboard-status onboard-ready"
         *ngIf="!participantJourneyData['onboarded'] && participantJourneyData['paymentplan']">
         <span>Ready to onboard this participant</span>
-        <button mat-raised-button (click)="markOnboarded()">
+        <button data-testid="jpl-btn-026" mat-raised-button (click)="markOnboarded()">
           <mat-icon>task_alt</mat-icon> Mark as Onboarded
         </button>
       </div>
@@ -529,7 +529,7 @@
 
   <!-- SINGLE BOTTOM BUTTON — unchanged -->
   <div class="bottom-action-bar">
-    <button mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
+    <button data-testid="jpl-btn-027" mat-raised-button class="btn-update-plan" (click)="updateParticipantPlan()">
       <mat-icon>save</mat-icon>
       Update Participant Plan
     </button>

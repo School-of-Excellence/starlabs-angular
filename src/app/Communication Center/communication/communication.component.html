@@ -13,13 +13,13 @@
     </div>
 
     <mat-nav-list>
-      <a mat-list-item [ngClass]="{'active-link': view === 'dashboard'}" (click)="view = 'dashboard'">
+      <a data-testid="cmm-link" mat-list-item [ngClass]="{'active-link': view === 'dashboard'}" (click)="view = 'dashboard'">
         <mat-icon>dashboard</mat-icon>
         <span>Dashboard</span>
       </a>
 
       <div class="nav-group">
-        <div class="nav-group-header" (click)="toggleTemplatesMenu()">
+        <div data-testid="cmm-toggletemplatesmenu" class="nav-group-header" (click)="toggleTemplatesMenu()">
           <mat-icon>create</mat-icon>
           <span>Create Templates</span>
           <mat-icon class="expand-icon" [@rotateAnimation]="templatesExpanded ? 'expanded' : 'collapsed'">
@@ -28,16 +28,16 @@
         </div>
 
         <div class="sub-menu" [@expandCollapse]="templatesExpanded ? 'expanded' : 'collapsed'">
-          <a mat-list-item [ngClass]="{'active-link': view === 'createemail'}" (click)="view = 'createemail'">
+          <a data-testid="cmm-link-2" mat-list-item [ngClass]="{'active-link': view === 'createemail'}" (click)="view = 'createemail'">
             <mat-icon>email</mat-icon>
             <span>Email</span>
           </a>
-          <a mat-list-item [ngClass]="{'active-link': view === 'createnotification'}"
+          <a data-testid="cmm-link-3" mat-list-item [ngClass]="{'active-link': view === 'createnotification'}"
             (click)="view = 'createnotification'">
             <mat-icon>notifications</mat-icon>
             <span>Notification</span>
           </a>
-          <a mat-list-item [ngClass]="{'active-link': view === 'createinappmessage'}"
+          <a data-testid="cmm-link-4" mat-list-item [ngClass]="{'active-link': view === 'createinappmessage'}"
             (click)="view = 'createinappmessage'">
             <mat-icon>message</mat-icon>
             <span>In App Message</span>
@@ -45,17 +45,17 @@
         </div>
       </div>
 
-      <a mat-list-item [ngClass]="{'active-link': view === 'template'}" (click)="view = 'template'">
+      <a data-testid="cmm-link-5" mat-list-item [ngClass]="{'active-link': view === 'template'}" (click)="view = 'template'">
         <mat-icon>folder</mat-icon>
         <span>Templates</span>
       </a>
 
-      <a mat-list-item [ngClass]="{'active-link': view === 'validators'}" (click)="view = 'validators'">
+      <a data-testid="cmm-link-6" mat-list-item [ngClass]="{'active-link': view === 'validators'}" (click)="view = 'validators'">
         <mat-icon>check_circle</mat-icon>
         <span>Validators</span>
       </a>
 
-      <a mat-list-item [ngClass]="{'active-link': view === 'emailvalidation'}" (click)="view = 'emailvalidation'">
+      <a data-testid="cmm-link-7" mat-list-item [ngClass]="{'active-link': view === 'emailvalidation'}" (click)="view = 'emailvalidation'">
         <mat-icon>verified_user</mat-icon>
         <span>Email Validation</span>
       </a>
@@ -92,8 +92,8 @@
               <mat-form-field appearance="outline" class="neo-datepicker">
                 <mat-label>Time Window</mat-label>
                 <mat-date-range-input [formGroup]="dateform" [rangePicker]="picker">
-                  <input matStartDate formControlName="start" placeholder="From">
-                  <input matEndDate formControlName="end" placeholder="To">
+                  <input data-testid="cmm-start" matStartDate formControlName="start" placeholder="From">
+                  <input data-testid="cmm-end" matEndDate formControlName="end" placeholder="To">
                 </mat-date-range-input>
                 <mat-datepicker-toggle matSuffix [for]="picker">
                   <mat-icon matDatepickerToggleIcon>calendar_today</mat-icon>
@@ -102,11 +102,11 @@
               </mat-form-field>
       
               <div class="date-controls">
-                <button mat-icon-button class="neo-button"
+                <button data-testid="cmm-filter" mat-icon-button class="neo-button"
                   (click)="filter(dateform.get('start')?.value, dateform.get('end')?.value)">
                   <mat-icon>filter_list</mat-icon>
                 </button>
-                <button mat-icon-button class="neo-button" (click)="resetFilter()">
+                <button data-testid="cmm-resetfilter" mat-icon-button class="neo-button" (click)="resetFilter()">
                   <mat-icon>refresh</mat-icon>
                 </button>
               </div>
@@ -118,7 +118,7 @@
         <div class="dashboard-grid">
           <!-- Dashboard Components as 3D Tiles -->
           <div class="dashboard-tiles">
-            <div *ngFor="let item of components; let i = index" class="neo-tile"
+            <div data-testid="cmm-fetchhistory" *ngFor="let item of components; let i = index" class="neo-tile"
               [ngClass]="{'active': selectedTemplateType == item.name, 'tile-animate': true}"
               [style.animation-delay]="i * 0.1 + 's'" (click)="fetchHistory(item)">
               <div class="tile-content">
@@ -152,7 +152,7 @@
                     <div>
                       <mat-form-field appearance="outline" class="search-field">
                         <mat-label>Search Numbers</mat-label>
-                        <input matInput formControlName="search" (input)="myoperatorfilter(myOperatorForm.value)">
+                        <input data-testid="cmm-search" matInput formControlName="search" (input)="myoperatorfilter(myOperatorForm.value)">
                         <mat-icon matSuffix>search</mat-icon>
                       </mat-form-field>
                     </div>
@@ -160,7 +160,7 @@
                     <div>
                       <mat-form-field appearance="outline">
                         <mat-label>Called By</mat-label>
-                        <mat-select formControlName="calledby" (selectionChange)="myoperatorfilter(myOperatorForm.value)"
+                        <mat-select data-testid="cmm-calledby" formControlName="calledby" (selectionChange)="myoperatorfilter(myOperatorForm.value)"
                           multiple>
                           <mat-option>
                             <ngx-mat-select-search [(ngModel)]="filteredCalledBy" [ngModelOptions]="{standalone: true}"
@@ -176,7 +176,7 @@
                     <div>
                       <mat-form-field appearance="outline">
                         <mat-label>Called To</mat-label>
-                        <mat-select formControlName="calledto" (selectionChange)="myoperatorfilter(myOperatorForm.value)"
+                        <mat-select data-testid="cmm-calledto" formControlName="calledto" (selectionChange)="myoperatorfilter(myOperatorForm.value)"
                           multiple>
                           <mat-option>
                             <ngx-mat-select-search [(ngModel)]="filteredCalledTo" [ngModelOptions]="{standalone: true}"
@@ -194,7 +194,7 @@
                         <h4>Call Status</h4>
                         <div class="tag-options">
                           <mat-chip-listbox formControlName="callstatus" multiple>
-                            <mat-chip-option *ngFor="let option of ['Missed', 'Received']" [value]="option" class="custom-chip"
+                            <mat-chip-option data-testid="cmm-togglefilter" *ngFor="let option of ['Missed', 'Received']" [value]="option" class="custom-chip"
                               [selected]="myOperatorForm.get('callstatus')?.value?.includes(option)" (click)="toggleFilter('callstatus', option)"
                               (selectionChange)="myoperatorfilter(myOperatorForm.value)">
                               {{option}}
@@ -207,7 +207,7 @@
                         <h4>Status</h4>
                         <div class="tag-options">
                           <mat-chip-listbox formControlName="status" multiple>
-                            <mat-chip-option *ngFor="let option of ['Busy', 'Answer', 'Cancel']" [value]="option" class="custom-chip"
+                            <mat-chip-option data-testid="cmm-togglefilter-2" *ngFor="let option of ['Busy', 'Answer', 'Cancel']" [value]="option" class="custom-chip"
                               [selected]="myOperatorForm.get('status')?.value?.includes(option)" (click)="toggleFilter('status', option)"
                               (selectionChange)="myoperatorfilter(myOperatorForm.value)" >
                               {{option}}
@@ -250,7 +250,7 @@
                       <td data-label="Duration">{{ item.duration }}</td>
                       <td data-label="Recording">
                         <div class="audio-container">
-                          <button mat-icon-button class="play-button"
+                          <button data-testid="cmm-toggleaudio" mat-icon-button class="play-button"
                             *ngIf='![null, undefined, ""].includes(item.recordingurl)' (click)="toggleAudio(item, i)">
                             <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
                           </button>
@@ -273,11 +273,11 @@
                               </div>
       
                               <div class="playback-controls">
-                                <button mat-icon-button class="volume-button" (click)="toggleMute(audioElement, i)">
+                                <button data-testid="cmm-togglemute" mat-icon-button class="volume-button" (click)="toggleMute(audioElement, i)">
                                   <mat-icon>{{ audioStates[i]?.isMuted ? 'volume_off' : 'volume_up' }}</mat-icon>
                                 </button>
       
-                                <select class="playback-speed" (change)="changePlaybackSpeed($event, audioElement, i)">
+                                <select data-testid="cmm-changeplaybackspeed" class="playback-speed" (change)="changePlaybackSpeed($event, audioElement, i)">
                                   <option value="0.5">0.5x</option>
                                   <option value="0.75">0.75x</option>
                                   <option value="1.0" selected>1.0x</option>
@@ -286,7 +286,7 @@
                                   <option value="2.0">2.0x</option>
                                 </select>
       
-                                <button mat-icon-button class="close-button" (click)="closeAudio(i)">
+                                <button data-testid="cmm-closeaudio" mat-icon-button class="close-button" (click)="closeAudio(i)">
                                   <mat-icon>close</mat-icon>
                                 </button>
                               </div>
@@ -329,12 +329,12 @@
                   <div class="panel-header">
                     <div class="search-control">
                       <mat-icon>search</mat-icon>
-                      <input type="text" placeholder="Search campaigns" (input)="searchBroadcast($event)">
+                      <input data-testid="cmm-search-campaigns" type="text" placeholder="Search campaigns" (input)="searchBroadcast($event)">
                     </div>
                   </div>
       
                   <div class="campaign-list fixed-height">
-                    <div *ngFor="let data of paginatedData" class="campaign-card"
+                    <div data-testid="cmm-assigndata" *ngFor="let data of paginatedData" class="campaign-card"
                       [ngClass]="{'active': selectedLogTemplate['docid'] == data['docid']}" (click)="assignData(data)">
                       <div class="campaign-info">
                         <div class="campaign-name">{{data['broadcastname']}}</div>
@@ -390,7 +390,7 @@
                       </div>
                     </div>
                     <div class="analytics-grid">
-                      <div *ngFor="let data of emailDisplayData | keyvalue" class="analytics-card"
+                      <div data-testid="cmm-fetchlogprofiles" *ngFor="let data of emailDisplayData | keyvalue" class="analytics-card"
                         [ngClass]="{'active': selectedlogtype == data.key, 'highlight': data.value > 0}"
                         (click)="fetchLogProfiles(data.key)">
                         <div class="metric-icon">
@@ -417,7 +417,7 @@
                       <h3>Recipients</h3>
                       <div class="search-control">
                         <mat-icon>search</mat-icon>
-                        <input type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
+                        <input data-testid="cmm-search-recipients" type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
                       </div>
                     </div>
       
@@ -453,13 +453,13 @@
                       <div class="email-client">
                         <div class="email-toolbar">
                           <div class="email-actions">
-                            <button class="email-action-button"><mat-icon>reply</mat-icon></button>
-                            <button class="email-action-button"><mat-icon>reply_all</mat-icon></button>
-                            <button class="email-action-button"><mat-icon>forward</mat-icon></button>
+                            <button data-testid="cmm-button" class="email-action-button"><mat-icon>reply</mat-icon></button>
+                            <button data-testid="cmm-button-2" class="email-action-button"><mat-icon>reply_all</mat-icon></button>
+                            <button data-testid="cmm-button-3" class="email-action-button"><mat-icon>forward</mat-icon></button>
                             <span class="email-action-divider"></span>
-                            <button class="email-action-button"><mat-icon>delete</mat-icon></button>
-                            <button class="email-action-button"><mat-icon>archive</mat-icon></button>
-                            <button class="email-action-button"><mat-icon>label</mat-icon></button>
+                            <button data-testid="cmm-button-4" class="email-action-button"><mat-icon>delete</mat-icon></button>
+                            <button data-testid="cmm-button-5" class="email-action-button"><mat-icon>archive</mat-icon></button>
+                            <button data-testid="cmm-button-6" class="email-action-button"><mat-icon>label</mat-icon></button>
                           </div>
                         </div>
       
@@ -506,12 +506,12 @@
                     <h3>In-App Messages</h3>
                     <div class="search-control">
                       <mat-icon>search</mat-icon>
-                      <input type="text" placeholder="Search messages" (input)="searchBroadcast($event)">
+                      <input data-testid="cmm-search-messages" type="text" placeholder="Search messages" (input)="searchBroadcast($event)">
                     </div>
                   </div>
       
                   <div class="message-list fixed-height" *ngIf="logDisplayData.length != 0">
-                    <div *ngFor="let data of paginatedData" class="message-card"
+                    <div data-testid="cmm-assigndata-2" *ngFor="let data of paginatedData" class="message-card"
                       [ngClass]="{'active': selectedLogTemplate['docid'] == data['docid']}"
                       (click)="assignData(data)">
                       <div class="message-content">
@@ -562,7 +562,7 @@
                         <h3>Recipients</h3>
                         <div class="search-control">
                           <mat-icon>search</mat-icon>
-                          <input type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
+                          <input data-testid="cmm-search-recipients-2" type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
                         </div>
                       </div>
       
@@ -612,8 +612,8 @@
                       <h4 class="inapp-subtitle">{{selectedLogTemplate['subtitle']}}</h4>
                       <p class="inapp-description">{{selectedLogTemplate['description']}}</p>
                       <div class="inapp-actions">
-                        <button class="inapp-button primary">VIEW</button>
-                        <button class="inapp-button secondary">DISMISS</button>
+                        <button data-testid="cmm-button-7" class="inapp-button primary">VIEW</button>
+                        <button data-testid="cmm-button-8" class="inapp-button secondary">DISMISS</button>
                       </div>
                     </div>
                   </div>
@@ -632,12 +632,12 @@
                     <h3>Notifications</h3>
                     <div class="search-control">
                       <mat-icon>search</mat-icon>
-                      <input type="text" placeholder="Search notifications" (input)="searchBroadcast($event)">
+                      <input data-testid="cmm-search-notifications" type="text" placeholder="Search notifications" (input)="searchBroadcast($event)">
                     </div>
                   </div>
       
                   <div class="notification-list fixed-height" *ngIf="logDisplayData.length != 0">
-                    <div *ngFor="let data of paginatedData" class="notification-card"
+                    <div data-testid="cmm-assigndata-3" *ngFor="let data of paginatedData" class="notification-card"
                       [ngClass]="{'active': selectedLogTemplate['docid'] == data['docid']}"
                       (click)="assignData(data)">
                       <div class="notification-info-content">
@@ -688,7 +688,7 @@
                         <h3>Recipients</h3>
                         <div class="search-control">
                           <mat-icon>search</mat-icon>
-                          <input type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
+                          <input data-testid="cmm-search-recipients-3" type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
                         </div>
                       </div>
       
@@ -768,12 +768,12 @@
                     <h3>WhatsApp Messages</h3>
                     <div class="search-control">
                       <mat-icon>search</mat-icon>
-                      <input type="text" placeholder="Search messages" (input)="searchBroadcast($event)">
+                      <input data-testid="cmm-search-messages-2" type="text" placeholder="Search messages" (input)="searchBroadcast($event)">
                     </div>
                   </div>
       
                   <div class="message-list fixed-height" *ngIf="logDisplayData.length != 0">
-                    <div *ngFor="let data of paginatedData" class="message-card"
+                    <div data-testid="cmm-assigndata-4" *ngFor="let data of paginatedData" class="message-card"
                       [ngClass]="{'active': selectedLogTemplate['docid'] == data['docid']}"
                       (click)="assignData(data)">
                       <div class="message-content">
@@ -824,7 +824,7 @@
                         <h3>Recipients</h3>
                         <div class="search-control">
                           <mat-icon>search</mat-icon>
-                          <input type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
+                          <input data-testid="cmm-search-recipients-4" type="text" placeholder="Search recipients" [(ngModel)]="searchParticipants">
                         </div>
                       </div>
       
@@ -900,7 +900,7 @@
             <div class="form-field-container">
               <mat-form-field appearance="outline">
                 <mat-label>Template Name</mat-label>
-                <input matInput placeholder="Enter Template Name" formControlName="templateName"
+                <input data-testid="cmm-templatename" matInput placeholder="Enter Template Name" formControlName="templateName"
                   [readonly]="viewmode === 'edit'" required>
                 <mat-error *ngIf="templateForm.get('templateName').hasError('required')">
                   Template Name Is Required
@@ -914,7 +914,7 @@
             <div class="form-field-container">
               <mat-form-field appearance="outline">
                 <mat-label>Template Alias</mat-label>
-                <input matInput placeholder="Enter Template Alias" formControlName="templateAlias"
+                <input data-testid="cmm-templatealias" matInput placeholder="Enter Template Alias" formControlName="templateAlias"
                   [readonly]="viewmode === 'edit'" required>
                 <mat-error *ngIf="!templateForm.controls['templateAlias'].valid">Template Alias Is Required</mat-error>
                 <mat-hint><b>Only a-z, '-' , '_' , '.' is allowed</b></mat-hint>
@@ -924,19 +924,19 @@
             <div class="form-field-container">
               <mat-form-field appearance="outline">
                 <mat-label>Select Category</mat-label>
-                <mat-select formControlName="templateCategory" required>
+                <mat-select data-testid="cmm-templatecategory" formControlName="templateCategory" required>
                   <mat-option>
                     <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}"
                       [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                       ngDefaultControl></ngx-mat-select-search>
                   </mat-option>
                   <mat-option *ngFor="let option of onSearchCategory()" [value]="option">{{option}}</mat-option>
-                  <mat-option *ngIf="onSearchCategory().length == 0 && searchCategory != ''"
+                  <mat-option data-testid="cmm-addcategory" *ngIf="onSearchCategory().length == 0 && searchCategory != ''"
                     (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                 </mat-select>
                 <mat-error *ngIf="!templateForm.controls['templateCategory'].valid">Category Is Required</mat-error>
               </mat-form-field>
-              <button *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab
+              <button data-testid="cmm-addcategory-2" *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab
                 color="primary" class="add-button" (click)="addCategory()">
                 <mat-icon>add</mat-icon>
               </button>
@@ -945,26 +945,26 @@
             <div class="form-field-container">
               <mat-form-field appearance="outline">
                 <mat-label>Select Sub-Category</mat-label>
-                <mat-select formControlName="templateSubCategory" required>
+                <mat-select data-testid="cmm-templatesubcategory" formControlName="templateSubCategory" required>
                   <mat-option>
                     <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}"
                       [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
                       ngDefaultControl></ngx-mat-select-search>
                   </mat-option>
                   <mat-option *ngFor="let option of onSearchSubCategory()" [value]="option">{{option}}</mat-option>
-                  <mat-option *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''"
+                  <mat-option data-testid="cmm-addsubcategory" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''"
                     (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                 </mat-select>
                 <mat-error *ngIf="!templateForm.controls['templateSubCategory'].valid">Sub-Category Is Required</mat-error>
               </mat-form-field>
-              <button *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab
+              <button data-testid="cmm-addsubcategory-2" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab
                 color="primary" class="add-button" (click)="addSubCategory()">
                 <mat-icon>add</mat-icon>
               </button>
             </div>
             
             <div class="form-field-container action-container">
-              <button mat-mini-fab color="primary" class="reset-button" (click)="resetValues()">
+              <button data-testid="cmm-resetvalues" mat-mini-fab color="primary" class="reset-button" (click)="resetValues()">
                 <mat-icon>refresh</mat-icon>
               </button>
             </div>
@@ -982,9 +982,9 @@
             
             <mat-form-field appearance="outline" class="col-md-12">
               <mat-label>Subject</mat-label>
-              <input matInput placeholder="Enter Subject" [(ngModel)]="templateSubject" required>
+              <input data-testid="cmm-enter-subject" matInput placeholder="Enter Subject" [(ngModel)]="templateSubject" required>
             </mat-form-field>
-            <angular-editor #editor [(ngModel)]="htmlContent" class="col-md-12" (ngModelChange)="onContentChange()" (click)="onEditorClick($event)"
+            <angular-editor data-testid="cmm-oneditorclick" #editor [(ngModel)]="htmlContent" class="col-md-12" (ngModelChange)="onContentChange()" (click)="onEditorClick($event)"
               [config]="editorConfig">
             </angular-editor>
       
@@ -994,13 +994,13 @@
               <div class="button-grid">
                 <div class="form-group">
                   <label for="buttonName" class="form-control-label">Button Name</label>
-                  <input id="buttonName" class="form-control" type="text" [(ngModel)]="buttonName" 
+                  <input data-testid="cmm-buttonname" id="buttonName" class="form-control" type="text" [(ngModel)]="buttonName" 
                     placeholder="Enter button text" required />
                 </div>
                 
                 <div class="form-group">
                   <label for="buttonSize" class="form-control-label">Button Size</label>
-                  <select id="buttonSize" class="form-control" [(ngModel)]="buttonSize" required>
+                  <select data-testid="cmm-buttonsize" id="buttonSize" class="form-control" [(ngModel)]="buttonSize" required>
                     <option value="small">Small</option>
                     <option value="medium" selected>Medium</option>
                     <option value="large">Large</option>
@@ -1009,7 +1009,7 @@
                 
                 <div class="form-group">
                   <label for="buttonAlign" class="form-control-label">Alignment</label>
-                  <select id="buttonAlign" class="form-control" [(ngModel)]="buttonAlign" required>
+                  <select data-testid="cmm-buttonalign" id="buttonAlign" class="form-control" [(ngModel)]="buttonAlign" required>
                     <option value="left">Left</option>
                     <option value="center" selected>Center</option>
                     <option value="right">Right</option>
@@ -1018,12 +1018,12 @@
                 
                 <div class="form-group">
                   <label for="buttonLink" class="form-control-label">Button Link</label>
-                  <input id="buttonLink" class="form-control" type="text" [(ngModel)]="buttonLink" 
+                  <input data-testid="cmm-buttonlink" id="buttonLink" class="form-control" type="text" [(ngModel)]="buttonLink" 
                     placeholder="https://example.com" required />
                 </div>
                 
                 <div class="form-group">
-                  <button [disabled]="validateButton()" 
+                  <button data-testid="cmm-insertbutton" [disabled]="validateButton()" 
                     (click)="insertButton(buttonName,buttonSize,buttonLink,buttonAlign)"
                     class="insert-button">
                     Insert Button
@@ -1038,13 +1038,13 @@
               <div class="image-resize-controls">
                 <div class="form-group">
                   <label for="imageWidth" class="form-control-label">Width</label>
-                  <input id="imageWidth" class="form-control dimension-control" type="number" 
+                  <input data-testid="cmm-imagewidth" id="imageWidth" class="form-control dimension-control" type="number" 
                     [(ngModel)]="selectedImageWidth" (input)="resizeImage('center')" />
                 </div>
                 
                 <div class="form-group">
                   <label for="imageHeight" class="form-control-label">Height</label>
-                  <input id="imageHeight" class="form-control dimension-control" type="number" 
+                  <input data-testid="cmm-imageheight" id="imageHeight" class="form-control dimension-control" type="number" 
                     [(ngModel)]="selectedImageHeight" (input)="resizeImage('center')" />
                 </div>
               </div>
@@ -1054,7 +1054,7 @@
             <div class="notes-section">
               <mat-form-field appearance="outline" class="col-md-12 notes-field">
                 <mat-label><strong>Notes for creating these emails to Participants</strong></mat-label>
-                <textarea matInput name="notes" rows="5" [(ngModel)]="notes" placeholder=""></textarea>
+                <textarea data-testid="cmm-notes" matInput name="notes" rows="5" [(ngModel)]="notes" placeholder=""></textarea>
               </mat-form-field>
             </div>
           </div>
@@ -1066,17 +1066,17 @@
             <div class="preview-header">
               <h4>Preview</h4>
               <div class="preview-actions">
-                <button mat-stroked-button class="create-button" 
+                <button data-testid="cmm-createemailtemplate" mat-stroked-button class="create-button" 
                   (click)="createEMailTemplate(templateForm.value)">
                   Create Template
                 </button>
                 
-                <button mat-icon-button class="device-button" [ngClass]="{'active': previewMode === 'mobile'}" 
+                <button data-testid="cmm-setsize" mat-icon-button class="device-button" [ngClass]="{'active': previewMode === 'mobile'}" 
                   (click)="setSize('mobile')" matTooltip="Mobile Preview">
                   <mat-icon>smartphone</mat-icon>
                 </button>
                 
-                <button mat-icon-button class="device-button" [ngClass]="{'active': previewMode === 'web'}" 
+                <button data-testid="cmm-setsize-2" mat-icon-button class="device-button" [ngClass]="{'active': previewMode === 'web'}" 
                   (click)="setSize('web')" matTooltip="Desktop Preview">
                   <mat-icon>computer</mat-icon>
                 </button>
@@ -1174,33 +1174,33 @@
                 <div class="col-md-6">
                   <mat-form-field appearance="outline" class="w-100">
                     <mat-label>Title</mat-label>
-                    <input matInput [(ngModel)]="title" placeholder="Enter title" />
+                    <input data-testid="cmm-enter-title" matInput [(ngModel)]="title" placeholder="Enter title" />
                   </mat-form-field>
                 </div>
       
                 <div class="col-md-6">
                   <mat-form-field appearance="outline" class="w-100">
                     <mat-label>Landing Page (Deeplink URL)</mat-label>
-                    <input matInput [(ngModel)]="landingPage" placeholder="Enter Deeplink URL" />
+                    <input data-testid="cmm-enter-deeplink-url" matInput [(ngModel)]="landingPage" placeholder="Enter Deeplink URL" />
                   </mat-form-field>
                 </div>
       
                 <div class="col-12">
                   <mat-form-field appearance="outline" class="w-100">
                     <mat-label>Message</mat-label>
-                    <textarea matInput placeholder="Your message..." rows="4" [(ngModel)]="message"></textarea>
+                    <textarea data-testid="cmm-your-message" matInput placeholder="Your message..." rows="4" [(ngModel)]="message"></textarea>
                   </mat-form-field>
                 </div>
       
                 <div class="col-12">
                   <label class="form-label mb-2 fw-medium">Image (Less than 1 MB)</label>
-                  <input class="form-control" type="file" accept=".png,.jpg,.jpeg"
+                  <input data-testid="cmm-importimages" class="form-control" type="file" accept=".png,.jpg,.jpeg"
                     (change)="importImages($event)" />
                 </div>
               </div>
       
               <div class="mt-4 text-center">
-                <button mat-raised-button color="primary" (click)="sendNotification(templateForm?.value)">
+                <button data-testid="cmm-sendnotification" mat-raised-button color="primary" (click)="sendNotification(templateForm?.value)">
                   Create Notification Template
                 </button>
               </div>
@@ -1257,25 +1257,25 @@
           </span>
           <mat-form-field appearance="outline" class="w-100">
             <mat-label>Title</mat-label>
-            <input matInput type="text" [(ngModel)]="bufferDoc.title">
+            <input data-testid="cmm-input" matInput type="text" [(ngModel)]="bufferDoc.title">
           </mat-form-field>
           <br>
           <mat-form-field appearance="outline" class="w-100">
             <mat-label>Sub Title</mat-label>
-            <input matInput type="text" [(ngModel)]="bufferDoc.subtitle">
+            <input data-testid="cmm-input-2" matInput type="text" [(ngModel)]="bufferDoc.subtitle">
           </mat-form-field>
           <br>
           <mat-form-field appearance="outline" class="w-100">
             <mat-label>Message</mat-label>
-            <textarea matInput name="message" rows="5" [(ngModel)]="bufferDoc.message"></textarea>
+            <textarea data-testid="cmm-message" matInput name="message" rows="5" [(ngModel)]="bufferDoc.message"></textarea>
           </mat-form-field>
           <br>
           <mat-form-field appearance="outline" class="w-100">
             <mat-label>Notes for creating these Messages to Participants</mat-label>
-            <textarea matInput name="notes" rows="5" [(ngModel)]="bufferDoc.notes" placeholder=""></textarea>
+            <textarea data-testid="cmm-notes-2" matInput name="notes" rows="5" [(ngModel)]="bufferDoc.notes" placeholder=""></textarea>
           </mat-form-field>
           <div class="d-flex flex-row justify-content-center">
-            <button mat-stroked-button type="button" (click)="createInAppTemplate(templateForm.value)">Submit</button>
+            <button data-testid="cmm-createinapptemplate" mat-stroked-button type="button" (click)="createInAppTemplate(templateForm.value)">Submit</button>
           </div>
         </div>
 
@@ -1296,7 +1296,7 @@
 
       <!-- Templates -->
       <div class="container-fluid" *ngIf="['template'].includes(view)">
-        <button mat-raised-button color="primary" (click)="sendemail()">SEND EMAIL</button>
+        <button data-testid="cmm-sendemail" mat-raised-button color="primary" (click)="sendemail()">SEND EMAIL</button>
         <div class="row">
           <div [ngClass]="displayTemplate ? 'col-md-8' : 'col-md-12'">            
             <!-- Template Stats -->
@@ -1333,14 +1333,14 @@
               
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Search Template</mat-label>
-                          <input matInput type="text" formControlName="templateName"
+                          <input data-testid="cmm-templatename-2" matInput type="text" formControlName="templateName"
                             (keyup)="formfilter(templateFilterForm.value)" placeholder="Search by name">
                           <mat-icon matSuffix>search</mat-icon>
                         </mat-form-field>
               
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Category</mat-label>
-                          <mat-select formControlName="templateCategory" (selectionChange)="formfilter(templateFilterForm.value)">
+                          <mat-select data-testid="cmm-templatecategory-2" formControlName="templateCategory" (selectionChange)="formfilter(templateFilterForm.value)">
                             <mat-option>
                               <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}"
                                 [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -1352,7 +1352,7 @@
 
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Sub-Category</mat-label>
-                          <mat-select formControlName="templateSubCategory"
+                          <mat-select data-testid="cmm-templatesubcategory-2" formControlName="templateSubCategory"
                             (selectionChange)="formfilter(templateFilterForm.value)">
                             <mat-option>
                               <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}"
@@ -1366,16 +1366,16 @@
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Date Range</mat-label>
                           <mat-date-range-input [rangePicker]="picker">
-                            <input matStartDate formControlName="startdate" placeholder="Start date"
+                            <input data-testid="cmm-startdate" matStartDate formControlName="startdate" placeholder="Start date"
                               (dateInput)="formfilter(templateFilterForm.value)">
-                            <input matEndDate formControlName="enddate" placeholder="End date"
+                            <input data-testid="cmm-enddate" matEndDate formControlName="enddate" placeholder="End date"
                               (dateInput)="formfilter(templateFilterForm.value)">
                           </mat-date-range-input>
                           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                           <mat-date-range-picker #picker></mat-date-range-picker>
                         </mat-form-field>
               
-                        <button mat-mini-fab color="primary" class="filter-reset"
+                        <button data-testid="cmm-resetvalues-2" mat-mini-fab color="primary" class="filter-reset"
                           (click)="resetValues()"><mat-icon>refresh</mat-icon></button>
                       </div>
                     </form>
@@ -1401,15 +1401,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-2" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1427,7 +1427,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button validate" 
+                              <button data-testid="cmm-viewtemplate" class="template-view-button validate" 
                                 (click)="viewTemplate(template)">
                                 Validate Template
                               </button>
@@ -1453,15 +1453,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-3" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-4" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-2" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1472,7 +1472,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button validate" 
+                              <button data-testid="cmm-viewtemplate-2" class="template-view-button validate" 
                                 (click)="viewTemplate(template)">
                                 Validate Template
                               </button>
@@ -1498,15 +1498,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-5" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-6" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-3" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1517,7 +1517,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button validate" 
+                              <button data-testid="cmm-viewtemplate-3" class="template-view-button validate" 
                                 (click)="viewTemplate(template)">
                                 Validate Template
                               </button>
@@ -1543,15 +1543,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-7" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-8" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-4" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1562,7 +1562,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button validate" 
+                              <button data-testid="cmm-viewtemplate-4" class="template-view-button validate" 
                                 (click)="viewTemplate(template)">
                                 Validate Template
                               </button>
@@ -1588,15 +1588,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-9" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-10" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-5" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1607,7 +1607,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button validate" 
+                              <button data-testid="cmm-viewtemplate-5" class="template-view-button validate" 
                                 (click)="viewTemplate(template)">
                                 Validate Template
                               </button>
@@ -1632,7 +1632,7 @@
                       <div class="filter-row">
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Template Type</mat-label>
-                          <mat-select formControlName="templateType" (selectionChange)="formfilter(templateFilterForm.value)">
+                          <mat-select data-testid="cmm-templatetype" formControlName="templateType" (selectionChange)="formfilter(templateFilterForm.value)">
                             <mat-option *ngFor="let option of ['email', 'whatsapp', 'inappmessage', 'notification']"
                               [value]="option">{{option.toUpperCase()}}</mat-option>
                           </mat-select>
@@ -1640,14 +1640,14 @@
               
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Search Template</mat-label>
-                          <input matInput type="text" formControlName="templateName"
+                          <input data-testid="cmm-templatename-3" matInput type="text" formControlName="templateName"
                             (keyup)="formfilter(templateFilterForm.value)" placeholder="Search by name">
                           <mat-icon matSuffix>search</mat-icon>
                         </mat-form-field>
               
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Category</mat-label>
-                          <mat-select formControlName="templateCategory" (selectionChange)="formfilter(templateFilterForm.value)">
+                          <mat-select data-testid="cmm-templatecategory-3" formControlName="templateCategory" (selectionChange)="formfilter(templateFilterForm.value)">
                             <mat-option>
                               <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}"
                                 [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -1659,7 +1659,7 @@
 
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Sub-Category</mat-label>
-                          <mat-select formControlName="templateSubCategory"
+                          <mat-select data-testid="cmm-templatesubcategory-3" formControlName="templateSubCategory"
                             (selectionChange)="formfilter(templateFilterForm.value)">
                             <mat-option>
                               <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}"
@@ -1673,16 +1673,16 @@
                         <mat-form-field appearance="outline" class="filter-field">
                           <mat-label>Date Range</mat-label>
                           <mat-date-range-input [rangePicker]="picker">
-                            <input matStartDate formControlName="startdate" placeholder="Start date"
+                            <input data-testid="cmm-startdate-2" matStartDate formControlName="startdate" placeholder="Start date"
                               (dateInput)="formfilter(templateFilterForm.value)">
-                            <input matEndDate formControlName="enddate" placeholder="End date"
+                            <input data-testid="cmm-enddate-2" matEndDate formControlName="enddate" placeholder="End date"
                               (dateInput)="formfilter(templateFilterForm.value)">
                           </mat-date-range-input>
                           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                           <mat-date-range-picker #picker></mat-date-range-picker>
                         </mat-form-field>
               
-                        <button mat-mini-fab color="primary" class="filter-reset"
+                        <button data-testid="cmm-resetvalues-3" mat-mini-fab color="primary" class="filter-reset"
                           (click)="resetValues()"><mat-icon>refresh</mat-icon></button>
                       </div>
                     </form>
@@ -1708,15 +1708,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-11" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-12" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-6" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1734,7 +1734,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button" 
+                              <button data-testid="cmm-viewtemplate-6" class="template-view-button" 
                                 (click)="viewTemplate(template)">
                                 View Template
                               </button>
@@ -1760,15 +1760,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-13" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-14" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-7" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1779,7 +1779,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button" 
+                              <button data-testid="cmm-viewtemplate-7" class="template-view-button" 
                                 (click)="viewTemplate(template)">
                                 View Template
                               </button>
@@ -1805,15 +1805,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-15" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-16" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-8" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1824,7 +1824,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button" 
+                              <button data-testid="cmm-viewtemplate-8" class="template-view-button" 
                                 (click)="viewTemplate(template)">
                                 View Template
                               </button>
@@ -1850,15 +1850,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-17" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-18" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-9" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1869,7 +1869,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button" 
+                              <button data-testid="cmm-viewtemplate-9" class="template-view-button" 
                                 (click)="viewTemplate(template)">
                                 View Template
                               </button>
@@ -1895,15 +1895,15 @@
                             <div class="template-meta">
                               <div class="template-date">{{ template.date?.toDate() | date: 'MMM d, yyyy' }}</div>
                               <div class="template-actions">
-                                <button mat-icon-button matTooltip="Duplicate"
+                                <button data-testid="cmm-modifytemplate-19" mat-icon-button matTooltip="Duplicate"
                                   (click)="modifyTemplate(template, 'duplicate')">
                                   <mat-icon>content_copy</mat-icon>
                                 </button>
-                                <button mat-icon-button matTooltip="Edit"
+                                <button data-testid="cmm-modifytemplate-20" mat-icon-button matTooltip="Edit"
                                   (click)="modifyTemplate(template, 'edit')">
                                   <mat-icon>edit_note</mat-icon>
                                 </button>
-                                <mat-slide-toggle [color]="template.active ? 'primary' : 'warn'"
+                                <mat-slide-toggle data-testid="cmm-toggleactive-10" [color]="template.active ? 'primary' : 'warn'"
                                   (change)="toggleActive(template)" [(ngModel)]="template.active">
                                 </mat-slide-toggle>
                               </div>
@@ -1914,7 +1914,7 @@
                             </div>
                             
                             <div class="template-footer">
-                              <button class="template-view-button" 
+                              <button data-testid="cmm-viewtemplate-10" class="template-view-button" 
                                 (click)="viewTemplate(template)">
                                 View Template
                               </button>
@@ -1933,7 +1933,7 @@
           <div class="col-md-4" *ngIf="displayTemplate">
             <div class="template-preview-container">
               <div class="preview-header">
-                <button mat-icon-button (click)="closeTemplate()"> 
+                <button data-testid="cmm-closetemplate" mat-icon-button (click)="closeTemplate()"> 
                   <mat-icon>close</mat-icon> 
                 </button>
                 <h5 class="mb-0">{{selectedTemplate.type | titlecase}} Preview</h5>
@@ -1996,7 +1996,7 @@
                   </div>
                   
                   <div class="inapp-actions" *ngIf="selectedTemplate.actions?.length > 0">
-                    <button class="inapp-action-button" *ngFor="let action of selectedTemplate.actions">
+                    <button data-testid="cmm-button-9" class="inapp-action-button" *ngFor="let action of selectedTemplate.actions">
                       {{action.text}}
                     </button>
                   </div>
@@ -2030,7 +2030,7 @@
               
               <!-- Template Actions -->
               <div class="template-action-buttons">
-                <button mat-flat-button color="primary" class="action-button" 
+                <button data-testid="cmm-modifytemplate-21" mat-flat-button color="primary" class="action-button" 
                   (click)="modifyTemplate(selectedTemplate, 'edit')">
                   <mat-icon>edit</mat-icon> Edit Template
                 </button>
@@ -2064,7 +2064,7 @@
 
         <mat-form-field appearance="outline" class="col-md-4" *ngIf="['email'].includes(view)">
           <mat-label>Select Template</mat-label>
-          <mat-select (selectionChange)="viewTemplate($event.value)">
+          <mat-select data-testid="cmm-mat-select" (selectionChange)="viewTemplate($event.value)">
             <mat-option *ngFor="let template of templateData.data" [value]="template">
               {{template.templatename}}
             </mat-option>
@@ -2072,7 +2072,7 @@
         </mat-form-field>
 
         <div class="col-auto" *ngIf="['email'].includes(view)">
-          <button mat-stroked-button color="primary" *ngIf="selectedRows.length != 0"
+          <button data-testid="cmm-sendemailtoselectedparicipant" mat-stroked-button color="primary" *ngIf="selectedRows.length != 0"
             (click)="sendEmailToSelectedParicipant()">Send EMail</button>
         </div>
       </div>
@@ -2082,19 +2082,19 @@
         <mat-chip-listbox aria-label="Selected participants" class="mb-3 d-block">
           <mat-chip *ngFor="let profile of selectedRows; let i = index" color="primary" selected class="me-2 mb-2">
             {{ mapProfiles[profile]?.name || 'No Name' }}
-            <mat-icon class="ms-1" (click)="onParticipantRemove(i)" role="button" style="cursor: pointer;">cancel</mat-icon>
+            <mat-icon data-testid="cmm-onparticipantremove" class="ms-1" (click)="onParticipantRemove(i)" role="button" style="cursor: pointer;">cancel</mat-icon>
           </mat-chip>
         </mat-chip-listbox>
       
         <!-- Search Input -->
         <mat-form-field appearance="outline" class="w-100 mb-4">
           <mat-label>Search Participant</mat-label>
-          <input matInput type="text" (keyup)="onParticipantSearch($event)" placeholder="Type to search..." />
+          <input data-testid="cmm-type-to-search" matInput type="text" (keyup)="onParticipantSearch($event)" placeholder="Type to search..." />
         </mat-form-field>
       
         <!-- Search Result List -->
         <mat-chip-listbox aria-label="Search results" class="d-block">
-          <mat-chip *ngFor="let profile of profileData"
+          <mat-chip data-testid="cmm-onparticipantselect" *ngFor="let profile of profileData"
                     [value]="profile['profileid']"
                     color="primary"
                     class="me-2 mb-2"

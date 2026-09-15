@@ -10,11 +10,11 @@
   <div *ngFor="let options of producttodelivery['deliveryoptions'];let i = index">
     <mat-card style="margin: 10px;border:0.1px solid;border-color:darkgrey;padding: 10px;">
       <span style="float: right;">
-        <button mat-icon-button (click)="adddelvieryoption()">
+        <button data-testid="ds-adddelvieryoption-1" mat-icon-button (click)="adddelvieryoption()">
           <mat-icon>add_circle_outline</mat-icon>
         </button>&nbsp;&nbsp;
 
-        <button *ngIf="producttodelivery['deliveryoptions'].length != 1" mat-icon-button (click)="removedeliveryoption(i)">
+        <button data-testid="ds-removedeliveryoption-2" *ngIf="producttodelivery['deliveryoptions'].length != 1" mat-icon-button (click)="removedeliveryoption(i)">
           <mat-icon>remove_circle_outline</mat-icon>
         </button>
       </span>
@@ -42,11 +42,11 @@
             <input type="text" matInput [(ngModel)]="producttodelivery['deliveryoptions'][i]['deliverysequence'][j]['description']" required>
           </mat-form-field>&nbsp;&nbsp;
 
-          <button mat-icon-button (click)="adddelvierysequence(i)">
+          <button data-testid="ds-adddelvierysequence-3" mat-icon-button (click)="adddelvierysequence(i)">
             <mat-icon>add_circle_outline</mat-icon>
           </button>&nbsp;&nbsp;
 
-          <button *ngIf="producttodelivery['deliveryoptions'][i]['deliverysequence'].length != 1" mat-icon-button (click)="removedeliverysequence(i,j)">
+          <button data-testid="ds-removedeliverysequence-4" *ngIf="producttodelivery['deliveryoptions'][i]['deliverysequence'].length != 1" mat-icon-button (click)="removedeliverysequence(i,j)">
             <mat-icon>remove_circle_outline</mat-icon>
           </button>
           
@@ -54,5 +54,5 @@
       </div>
     </mat-card>
   </div>
-  <button  mat-raised-button color="primary" type="submit" (click)="onproducttodeliverysubmit()">Submit</button>
+  <button data-testid="ds-onproducttodeliverysubmit-5"  mat-raised-button color="primary" type="submit" (click)="onproducttodeliverysubmit()">Submit</button>
 </div>

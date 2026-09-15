@@ -35,8 +35,8 @@
   </div>
 
   <div class="btnarea">
-    <button class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
-    <button class="submitbtn" mat-stroked-button (click)="onformsubmit(mapAppointmentRoleForm.value)" [disabled]="loading">
+    <button data-testid="mard-close-1" class="closebtn" mat-stroked-button (click)="close()">Cancel</button> 
+    <button data-testid="mard-onformsubmit-2" class="submitbtn" mat-stroked-button (click)="onformsubmit(mapAppointmentRoleForm.value)" [disabled]="loading">
       Update Role
     </button>
   </div>

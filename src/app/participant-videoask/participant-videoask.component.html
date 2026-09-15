@@ -15,13 +15,13 @@
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Live Event</mat-label>
-            <mat-select formControlName="live" multiple panelClass="filterpanel"
+            <mat-select data-testid="pva-live" formControlName="live" multiple panelClass="filterpanel"
                         placeholder="Any" (closed)="onPanelClosed('live')">
               <mat-select-trigger *ngIf="selectedCount('live')">
                 {{selectedLabel('live', eventTitle)}}
               </mat-select-trigger>
               <div class="panelsearch">
-                <input type="text" placeholder="Type to search"
+                <input data-testid="pva-type-to-search" type="text" placeholder="Type to search"
                        [(ngModel)]="searchText.live" [ngModelOptions]="{standalone: true}"
                        (keydown)="$event.stopPropagation()" (input)="onOptionSearch('live')">
               </div>
@@ -36,13 +36,13 @@
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Queue Event</mat-label>
-            <mat-select formControlName="queue" multiple panelClass="filterpanel"
+            <mat-select data-testid="pva-queue" formControlName="queue" multiple panelClass="filterpanel"
                         placeholder="Any" (closed)="onPanelClosed('queue')">
               <mat-select-trigger *ngIf="selectedCount('queue')">
                 {{selectedLabel('queue', eventTitle)}}
               </mat-select-trigger>
               <div class="panelsearch">
-                <input type="text" placeholder="Type to search"
+                <input data-testid="pva-type-to-search-2" type="text" placeholder="Type to search"
                        [(ngModel)]="searchText.queue" [ngModelOptions]="{standalone: true}"
                        (keydown)="$event.stopPropagation()" (input)="onOptionSearch('queue')">
               </div>
@@ -57,13 +57,13 @@
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Workshop</mat-label>
-            <mat-select formControlName="workshop" multiple panelClass="filterpanel"
+            <mat-select data-testid="pva-workshop" formControlName="workshop" multiple panelClass="filterpanel"
                         placeholder="Any" (closed)="onPanelClosed('workshop')">
               <mat-select-trigger *ngIf="selectedCount('workshop')">
                 {{selectedLabel('workshop', eventTitle)}}
               </mat-select-trigger>
               <div class="panelsearch">
-                <input type="text" placeholder="Type to search"
+                <input data-testid="pva-type-to-search-3" type="text" placeholder="Type to search"
                        [(ngModel)]="searchText.workshop" [ngModelOptions]="{standalone: true}"
                        (keydown)="$event.stopPropagation()" (input)="onOptionSearch('workshop')">
               </div>
@@ -87,13 +87,13 @@
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Participant Name</mat-label>
-            <mat-select formControlName="profileid" multiple panelClass="filterpanel"
+            <mat-select data-testid="pva-profileid" formControlName="profileid" multiple panelClass="filterpanel"
                         placeholder="All participants" (closed)="onPanelClosed('profileid')">
               <mat-select-trigger *ngIf="selectedCount('profileid')">
                 {{selectedLabel('profileid', participantName)}}
               </mat-select-trigger>
               <div class="panelsearch">
-                <input type="text" placeholder="Type to search"
+                <input data-testid="pva-type-to-search-4" type="text" placeholder="Type to search"
                        [(ngModel)]="searchText.profileid" [ngModelOptions]="{standalone: true}"
                        (keydown)="$event.stopPropagation()" (input)="onOptionSearch('profileid')">
               </div>
@@ -108,13 +108,13 @@
 
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Video Ask Template</mat-label>
-            <mat-select formControlName="template" multiple panelClass="filterpanel"
+            <mat-select data-testid="pva-template" formControlName="template" multiple panelClass="filterpanel"
                         placeholder="All templates" (closed)="onPanelClosed('template')">
               <mat-select-trigger *ngIf="selectedCount('template')">
                 {{selectedLabel('template', templateTitle)}}
               </mat-select-trigger>
               <div class="panelsearch">
-                <input type="text" placeholder="Type to search"
+                <input data-testid="pva-type-to-search-5" type="text" placeholder="Type to search"
                        [(ngModel)]="searchText.template" [ngModelOptions]="{standalone: true}"
                        (keydown)="$event.stopPropagation()" (input)="onOptionSearch('template')">
               </div>
@@ -130,8 +130,8 @@
           <mat-form-field appearance="outline" class="filteritem" subscriptSizing="dynamic">
             <mat-label>Date range</mat-label>
             <mat-date-range-input formGroupName="range" [rangePicker]="picker">
-              <input matStartDate formControlName="start" placeholder="Start date">
-              <input matEndDate formControlName="end" placeholder="End date">
+              <input data-testid="pva-start" matStartDate formControlName="start" placeholder="Start date">
+              <input data-testid="pva-end" matEndDate formControlName="end" placeholder="End date">
             </mat-date-range-input>
             <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
             <mat-date-range-picker #picker></mat-date-range-picker>
@@ -149,7 +149,7 @@
       <span class="groupwrap" *ngIf="eventPills().length">
         <ng-container *ngFor="let pill of eventPills(); let i = index">
           <span class="conn" *ngIf="i > 0">or</span>
-          <span class="pill">{{pill.label}}<mat-icon (click)="clearPill(pill)">close</mat-icon></span>
+          <span class="pill">{{pill.label}}<mat-icon data-testid="pva-clearpill" (click)="clearPill(pill)">close</mat-icon></span>
         </ng-container>
       </span>
 
@@ -157,7 +157,7 @@
 
       <ng-container *ngFor="let pill of narrowPills(); let i = index">
         <span class="conn" *ngIf="i > 0">and</span>
-        <span class="pill">{{pill.label}}<mat-icon (click)="clearPill(pill)">close</mat-icon></span>
+        <span class="pill">{{pill.label}}<mat-icon data-testid="pva-clearpill-2" (click)="clearPill(pill)">close</mat-icon></span>
       </ng-container>
     </div>
 
@@ -165,11 +165,11 @@
     <div class="filteractions">
       <div class="actionstack">
         <div class="buttonrow">
-          <button mat-stroked-button type="button"
+          <button data-testid="pva-onresetform" mat-stroked-button type="button"
                   (click)="onResetForm()" [disabled]="bootstrapping || fetching || !activeFilterCount()">
             Clear filters
           </button>
-          <button mat-flat-button color="primary" type="button"
+          <button data-testid="pva-onsearch" mat-flat-button color="primary" type="button"
                   (click)="onSearch()" [disabled]="bootstrapping || fetching">
             <mat-icon>search</mat-icon>&nbsp;Search
           </button>
@@ -204,7 +204,7 @@
     <!-- two independent table-level tag controls -->
     <div class="tagfilter">
       <span class="tagfilterlabel">Tags</span>
-      <mat-button-toggle-group [value]="tagFilter" (change)="onTagFilterChange($event.value)" hideSingleSelectionIndicator>
+      <mat-button-toggle-group data-testid="pva-ontagfilterchange" [value]="tagFilter" (change)="onTagFilterChange($event.value)" hideSingleSelectionIndicator>
         <mat-button-toggle value="all">Both ({{rowCount}})</mat-button-toggle>
         <mat-button-toggle value="tagged">Tagged ({{taggedCount}})</mat-button-toggle>
         <mat-button-toggle value="untagged">Untagged ({{untaggedCount}})</mat-button-toggle>
@@ -214,7 +214,7 @@
     <div class="tagfilter">
       <span class="tagfilterlabel">Filter by tags</span>
       <mat-form-field appearance="outline" class="tagselect" subscriptSizing="dynamic">
-        <mat-select multiple panelClass="filterpanel" placeholder="Any tag"
+        <mat-select data-testid="pva-any-tag" multiple panelClass="filterpanel" placeholder="Any tag"
                     [ngModel]="selectedTags" [ngModelOptions]="{standalone: true}"
                     (ngModelChange)="onSelectedTagsChange($event)">
           <mat-select-trigger *ngIf="selectedTags.length">
@@ -224,7 +224,7 @@
           <mat-option *ngFor="let tag of videoAskTags" [value]="tag.id">{{tag.name}}</mat-option>
         </mat-select>
       </mat-form-field>
-      <button mat-icon-button type="button" *ngIf="selectedTags.length"
+      <button data-testid="pva-clearselectedtags" mat-icon-button type="button" *ngIf="selectedTags.length"
               (click)="clearSelectedTags()" matTooltip="Clear tag filter">
         <mat-icon>close</mat-icon>
       </button>
@@ -261,7 +261,7 @@
         <th mat-header-cell *matHeaderCellDef>Video</th>
         <td mat-cell *matCellDef="let row">
           <ng-container *ngIf="row.fileurl; else novideo">
-            <div *ngIf="!isPlaying(row.docid)" class="videoplaceholder" (click)="playVideo(row)" title="Click to play">
+            <div data-testid="pva-playvideo" *ngIf="!isPlaying(row.docid)" class="videoplaceholder" (click)="playVideo(row)" title="Click to play">
               <mat-icon class="playicon">play_circle_filled</mat-icon>
             </div>
             <video *ngIf="isPlaying(row.docid)" controls autoplay preload="none" width="170" height="300">
@@ -287,7 +287,7 @@
         <td mat-cell *matCellDef="let row">
           <div class="tag-checklist-container">
             <label *ngFor="let tag of videoAskTags" class="tag-checkbox-row">
-              <input type="checkbox"
+              <input data-testid="pva-updatevideoask" type="checkbox"
                      [checked]="row.tags?.includes(tag.id)"
                      (change)="updateVideoAsk(row, tag.id)">
               <span class="checkmark"></span>

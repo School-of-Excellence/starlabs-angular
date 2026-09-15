@@ -10,7 +10,7 @@
       <mat-icon *ngIf="!isOldResult && status !== 'completed' && status !== 'rework'">assignment</mat-icon>
       {{ dialogTitle }}
     </h2>
-    <button mat-icon-button (click)="closeDialog()">
+    <button data-testid="ad-close-dialog-1" mat-icon-button (click)="closeDialog()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -36,7 +36,7 @@
           <div class="result-header">
             <span class="result-number">Submission {{i + 1}}</span>
             <span class="result-type">{{ fileTypeLabel }}</span>
-            <button 
+            <button data-testid="ad-open-in-new-tab-2" 
               mat-raised-button 
               color="primary" 
               (click)="openInNewTab(url)"
@@ -66,7 +66,7 @@
               <div *ngIf="imageLoadStates[i] === 'error'" class="image-error">
                 <mat-icon class="error-icon">broken_image</mat-icon>
                 <p>Failed to load image</p>
-                <button mat-button (click)="openInNewTab(url)">
+                <button data-testid="ad-open-in-new-tab-3" mat-button (click)="openInNewTab(url)">
                   <mat-icon>open_in_new</mat-icon>
                   Try opening in new tab
                 </button>
@@ -154,7 +154,7 @@
             
             <!-- Only show action buttons for editable notes -->
             <div class="note-actions" *ngIf="canPerformActionsValue">
-              <button 
+              <button data-testid="ad-add-note-4" 
                 *ngIf="i === reviewNotesForm.length - 1"
                 mat-mini-fab 
                 color="primary" 
@@ -165,7 +165,7 @@
                 <mat-icon>add</mat-icon>
               </button>
               
-              <button 
+              <button data-testid="ad-remove-note-5" 
                 *ngIf="canRemoveNoteValue"
                 mat-mini-fab 
                 color="warn" 
@@ -189,12 +189,12 @@
 
   <!-- Action buttons - only show when actions can be performed -->
   <mat-dialog-actions class="dialog-actions" *ngIf="canPerformActionsValue">
-    <button mat-button (click)="closeDialog()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="completeAssignment()">
+    <button data-testid="ad-close-dialog-6" mat-button (click)="closeDialog()">Cancel</button>
+    <button data-testid="ad-complete-assignment-7" mat-raised-button color="primary" (click)="completeAssignment()">
       <mat-icon>check_circle</mat-icon>
       Assignment Complete
     </button>
-    <button mat-raised-button color="warn" (click)="reworkAssignment()">
+    <button data-testid="ad-rework-assignment-8" mat-raised-button color="warn" (click)="reworkAssignment()">
       <mat-icon>refresh</mat-icon>
       Rework Required
     </button>
@@ -202,7 +202,7 @@
 
   <!-- Close button for readonly views -->
   <mat-dialog-actions class="dialog-actions" *ngIf="!canPerformActionsValue">
-    <button mat-raised-button color="primary" (click)="closeDialog()">Close</button>
+    <button data-testid="ad-close-dialog-9" mat-raised-button color="primary" (click)="closeDialog()">Close</button>
     <div class="readonly-message" *ngIf="readonlyMessage">
       <mat-icon>info_outline</mat-icon>
       <span>{{ readonlyMessage }}</span>

@@ -9,7 +9,7 @@
     <mat-tab *ngFor="let tab of ticketArray; let i = index">
       <ng-template mat-tab-label><b
           [ngClass]="i == selectedTabIndex ? 'selectedtab' : 'nonselectedtab'">{{tab.label}}</b> <button *ngIf="i != 0"
-          mat-icon-button type="button" (click)="closeTab(i)"> <mat-icon
+          mat-icon-button type="button" [attr.data-testid]="'csdash-tab-close-' + i" (click)="closeTab(i)"> <mat-icon
             style="font-size: 15px;">close</mat-icon></button></ng-template>
       <div *ngIf="loading == false && tab.label == 'Dashboard'">
 
@@ -19,17 +19,17 @@
               <span class="section-title">Total</span>
             </div>
             <div class="button-row">
-              <div class="ticket-button" [ngClass]="clickedFilter == '' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button" data-testid="csdash-filter-total" [ngClass]="clickedFilter == '' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','', true)">
                 <span class="button-label">Total</span>
                 <span class="countFontSize"><b>{{totaltickets}}</b></span>
               </div>
-              <div class="ticket-button" [ngClass]="clickedFilter == 'Open' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button" data-testid="csdash-filter-open" [ngClass]="clickedFilter == 'Open' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','Open', true)">
                 <span class="button-label">Open</span>
                 <span class="countFontSize"><b>{{opentickets}}</b></span>
               </div>
-              <div class="ticket-button" [ngClass]="clickedFilter == 'Closed' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button" data-testid="csdash-filter-closed" [ngClass]="clickedFilter == 'Closed' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','Closed', true)">
                 <span class="button-label">Closed</span>
                 <span class="countFontSize"><b>{{closetickets}}</b></span>
@@ -42,17 +42,17 @@
               <span class="section-title">Open Tickets</span>
             </div>
             <div class="button-row">
-              <div class="ticket-button new-ticket" [ngClass]="clickedFilter == 'New' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button new-ticket" data-testid="csdash-filter-new" [ngClass]="clickedFilter == 'New' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','New', true)">
                 <span class="button-label">New</span>
                 <span class="countFontSize"><b>{{newtickets}}</b></span>
               </div>
-              <div class="ticket-button" [ngClass]="clickedFilter == 'Decision Making' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button" data-testid="csdash-filter-needreply" [ngClass]="clickedFilter == 'Decision Making' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','Decision Making', true)">
                 <span class="button-label">Need to Reply</span>
                 <span class="countFontSize"><b>{{pendingtickets}}</b></span>
               </div>
-              <div class="ticket-button" [ngClass]="clickedFilter == 'Responded' ? 'clicked' : 'notclicked'"
+              <div class="ticket-button" data-testid="csdash-filter-responded" [ngClass]="clickedFilter == 'Responded' ? 'clicked' : 'notclicked'"
                 (click)="filterValues('tickets','Responded', true)">
                 <span class="button-label">Responded</span>
                 <span class="countFontSize"><b>{{respondedtickets}}</b></span>
@@ -67,17 +67,17 @@
                 <span class="section-title">Negligence Review</span>
               </div>
               <div class="button-row">
-                <div class="ticket-button" [ngClass]="clickedFilter == 'flag' ? 'clicked' : 'notclicked'"
+                <div class="ticket-button" data-testid="csdash-filter-flagged" [ngClass]="clickedFilter == 'flag' ? 'clicked' : 'notclicked'"
                   (click)="filterValues('flag','flag', true)">
                   <span class="button-label">Flagged</span>
                   <span class="countFontSize"><b>{{flagtickets}}</b></span>
                 </div>
-                <div class="ticket-button" [ngClass]="clickedFilter == 'reviewpending' ? 'clicked' : 'notclicked'"
+                <div class="ticket-button" data-testid="csdash-filter-reviewpending" [ngClass]="clickedFilter == 'reviewpending' ? 'clicked' : 'notclicked'"
                   (click)="filterValues('priority','reviewpending', true)">
                   <span class="button-label">Pending</span>
                   <span class="countFontSize"><b>{{reviewpending}}</b></span>
                 </div>
-                <div class="ticket-button" [ngClass]="clickedFilter == 'reviewmarked' ? 'clicked' : 'notclicked'"
+                <div class="ticket-button" data-testid="csdash-filter-reviewmarked" [ngClass]="clickedFilter == 'reviewmarked' ? 'clicked' : 'notclicked'"
                   (click)="filterValues('priority','reviewmarked', true)">
                   <span class="button-label">Reviewed</span>
                   <span class="countFontSize"><b>{{reviewmarked}}</b></span>
@@ -92,27 +92,27 @@
               <div class="section-header metrics-header">
                 <span class="section-title metrics-title">Negligence Metrics - Week {{weekNumber}} - {{weekYear}}</span>
                 <mat-form-field class="hidden-datepicker">
-                  <input matInput [matDatepicker]="weekpicker" [(ngModel)]="weekDate"
+                  <input matInput data-testid="csdash-week-date" [matDatepicker]="weekpicker" [(ngModel)]="weekDate"
                     (dateChange)="onDateChange(weekDate)">
                   <mat-datepicker #weekpicker></mat-datepicker>
                 </mat-form-field>
-                <button mat-icon-button class="calendar-button" (click)="weekpicker.open()">
+                <button mat-icon-button class="calendar-button" data-testid="csdash-week-open" (click)="weekpicker.open()">
                   <mat-icon>calendar_month</mat-icon>
                 </button>
               </div>
               <div class="button-row metrics-row">
-                <div class="metrics-button"
+                <div class="metrics-button" data-testid="csdash-metrics-gross"
                   [ngClass]="clickedFilter == 'gross' ? 'metricsclicked' : 'metricsnotclicked'"
                   (click)="filterValues('metrics','gross',true)">
                   <span class="button-label">Gross</span>
                   <span class="countFontSize"><b>{{grosstickets}}</b></span>
                 </div>
-                <div class="metrics-button" [ngClass]="clickedFilter == 'high' ? 'metricsclicked' : 'metricsnotclicked'"
+                <div class="metrics-button" data-testid="csdash-metrics-high" [ngClass]="clickedFilter == 'high' ? 'metricsclicked' : 'metricsnotclicked'"
                   (click)="filterValues('metrics','high',true)">
                   <span class="button-label">High</span>
                   <span class="countFontSize"><b>{{hightickets}}</b></span>
                 </div>
-                <div class="metrics-button"
+                <div class="metrics-button" data-testid="csdash-metrics-moderate"
                   [ngClass]="clickedFilter == 'moderate' ? 'metricsclicked' : 'metricsnotclicked'"
                   (click)="filterValues('metrics','moderate',true)">
                   <span class="button-label">Moderate</span>
@@ -139,7 +139,7 @@
           <div class="details-container">
             <!-- ticket manipulation -->
             <div class="ticket-container">
-              <div class="ticket-item" (click)="allCases()">
+              <div class="ticket-item" data-testid="csdash-view-all" (click)="allCases()">
                 <p
                   [ngStyle]="viewOfCases == 'alltickets' ? {'color':'orange', 'font-weight': 'bold', 'font-size':'17px'} : {}">
                   All Tickets
@@ -148,7 +148,7 @@
 
               <mat-divider></mat-divider>
 
-              <div class="ticket-item" (click)="myCases()">
+              <div class="ticket-item" data-testid="csdash-view-mine" (click)="myCases()">
                 <p
                   [ngStyle]="viewOfCases == 'mytickets' ? {'color':'orange', 'font-weight': 'bold', 'font-size':'17px'} : {}">
                   Assigned to me
@@ -157,7 +157,7 @@
 
               <mat-divider></mat-divider>
 
-              <div class="ticket-item" (click)="raiseIssue(null)">
+              <div class="ticket-item" data-testid="csdash-raise-ticket" (click)="raiseIssue(null)">
                 <div style="display: flex; align-items: center;">
                   <p>Raise a Ticket</p> &nbsp;&nbsp; <mat-icon>add</mat-icon>
                 </div>
@@ -165,30 +165,30 @@
 
               <mat-divider></mat-divider>
 
-              <div class="ticket-item" (click)="openCategorySelector()">
+              <div class="ticket-item" data-testid="csdash-daily-report" (click)="openCategorySelector()">
                 <p>Daily Report</p>
               </div>
 
               <!-- Category Selection Dialog -->
-              <div class="dialog-overlay" *ngIf="showCategoryDialog" (click)="showCategoryDialog = false">
-                <div class="dialog-box" (click)="$event.stopPropagation()">
+              <div class="dialog-overlay" *ngIf="showCategoryDialog" data-testid="csdash-catdialog-overlay" (click)="showCategoryDialog = false">
+                <div class="dialog-box" data-testid="csdash-catdialog-box" (click)="$event.stopPropagation()">
                   <h3>Select Categories for Report</h3>
-              
+
                   <div class="dialog-actions-top">
-                    <button (click)="selectAll()">Select All</button>
-                    <button (click)="deselectAll()">Deselect All</button>
+                    <button data-testid="csdash-cat-selectall" (click)="selectAll()">Select All</button>
+                    <button data-testid="csdash-cat-deselectall" (click)="deselectAll()">Deselect All</button>
                   </div>
-              
+
                   <div class="category-list">
                     <label *ngFor="let category of allCategories" class="category-item">
-                      <input type="checkbox" [checked]="isSelected(category)" (change)="toggleCategory(category)" />
+                      <input type="checkbox" [attr.data-testid]="'csdash-cat-toggle-' + category" [checked]="isSelected(category)" (change)="toggleCategory(category)" />
                       <span>{{ category }}</span>
                     </label>
                   </div>
-              
+
                   <div class="dialog-actions-bottom">
-                    <button class="cancel-btn" (click)="showCategoryDialog = false">Cancel</button>
-                    <button class="download-btn" (click)="downloadReport()">
+                    <button class="cancel-btn" data-testid="csdash-cat-cancel" (click)="showCategoryDialog = false">Cancel</button>
+                    <button class="download-btn" data-testid="csdash-cat-download" (click)="downloadReport()">
                       Download ({{ selectedCategories.length }} selected)
                     </button>
                   </div>
@@ -197,7 +197,7 @@
 
               <mat-divider></mat-divider>
 
-              <div class="ticket-item" (click)="chatConfig()">
+              <div class="ticket-item" data-testid="csdash-add-category" (click)="chatConfig()">
                 <p>Add/Edit Category</p>
               </div>
             </div>
@@ -253,7 +253,7 @@
                   <mat-form-field appearance="outline" class="custom-form-field"
                     [ngClass]="filterform.controls['search'].value && filterform.controls['search'].value.trim() !== ''  ? 'highlight':''">
                     <mat-label>Search</mat-label>
-                    <input matInput formControlName="search" (keyup)="formfilter(filterform.value, true)"
+                    <input matInput data-testid="csdash-filter-search" formControlName="search" (keyup)="formfilter(filterform.value, true)"
                       placeholder="Search" #input>
                     <mat-icon matSuffix>search</mat-icon>
                   </mat-form-field>
@@ -261,7 +261,7 @@
                   <mat-form-field class="custom-form-field" appearance="outline"
                     [ngClass]="filterform.controls['category'].value && filterform.controls['category'].value.length != 0 ? 'highlight': ''">
                     <mat-label>Category</mat-label>
-                    <mat-select formControlName="category" multiple
+                    <mat-select formControlName="category" multiple data-testid="csdash-filter-category"
                       (selectionChange)="formfilter(filterform.value, true)">
                       <mat-option *ngFor="let category of categories;"
                         [value]="category.category">{{category.category}}</mat-option>
@@ -271,7 +271,7 @@
                   <mat-form-field class="custom-form-field" appearance="outline"
                     [ngClass]="filterform.controls['journey'].value && filterform.controls['journey'].value.length != 0? 'highlight': ''">
                     <mat-label>Journey</mat-label>
-                    <mat-select formControlName="journey" multiple
+                    <mat-select formControlName="journey" multiple data-testid="csdash-filter-journey"
                       (selectionChange)="formfilter(filterform.value, true)">
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredJourney" [ngModelOptions]="{standalone: true}"
@@ -286,7 +286,7 @@
                   <mat-form-field class="custom-form-field" appearance="outline"
                     [ngClass]="filterform.controls['assign'].value && filterform.controls['assign'].value.length != 0? 'highlight': ''">
                     <mat-label>Assigned To</mat-label>
-                    <mat-select formControlName="assign" multiple
+                    <mat-select formControlName="assign" multiple data-testid="csdash-filter-assign"
                       (selectionChange)="formfilter(filterform.value, true)">
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone: true}"
@@ -303,7 +303,7 @@
                   <mat-form-field class="custom-form-field" appearance="outline" *ngIf="clickedFilter == 'reviewmarked'"
                     [ngClass]="filterform.controls['reviewedby'].value && filterform.controls['reviewedby'].value.length != 0? 'highlight': ''">
                     <mat-label>Reviewed By</mat-label>
-                    <mat-select formControlName="reviewedby" multiple
+                    <mat-select formControlName="reviewedby" multiple data-testid="csdash-filter-reviewedby"
                       (selectionChange)="formfilter(filterform.value, true)">
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredReviewed" [ngModelOptions]="{standalone: true}"
@@ -336,9 +336,9 @@
                     [ngClass]="filterform.controls['ticketstart'].value !== ''? 'highlight': '' ">
                     <mat-label>Reported Date</mat-label>
                     <mat-date-range-input [rangePicker]="picker">
-                      <input matStartDate formControlName="ticketstart" placeholder="Start date"
+                      <input matStartDate data-testid="csdash-filter-ticketstart" formControlName="ticketstart" placeholder="Start date"
                         (dateInput)="formfilter(filterform.value, true)">
-                      <input matEndDate formControlName="ticketend" placeholder="End date"
+                      <input matEndDate data-testid="csdash-filter-ticketend" formControlName="ticketend" placeholder="End date"
                         (dateInput)="formfilter(filterform.value, true)">
                     </mat-date-range-input>
                     <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
@@ -349,18 +349,18 @@
                     [ngClass]="filterform.controls['closedstart'].value !== ''? 'highlight': '' ">
                     <mat-label>Closed Date</mat-label>
                     <mat-date-range-input [rangePicker]="picker">
-                      <input matStartDate formControlName="closedstart" placeholder="Start date"
+                      <input matStartDate data-testid="csdash-filter-closedstart" formControlName="closedstart" placeholder="Start date"
                         (dateInput)="formfilter(filterform.value, true)">
-                      <input matEndDate formControlName="closedend" placeholder="End date"
+                      <input matEndDate data-testid="csdash-filter-closedend" formControlName="closedend" placeholder="End date"
                         (dateInput)="formfilter(filterform.value, true)">
                     </mat-date-range-input>
                     <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                     <mat-date-range-picker #picker></mat-date-range-picker>
                   </mat-form-field>
 
-                  <button type="button" style="margin-left: 10px;" mat-mini-fab color="primary"
+                  <button type="button" style="margin-left: 10px;" mat-mini-fab color="primary" data-testid="csdash-refresh"
                     (click)="refresh()"><mat-icon>refresh</mat-icon></button>
-                  <button type="button" mat-raised-button class="submitbtn" (click)="exportToExcel()">Export</button>
+                  <button type="button" mat-raised-button class="submitbtn" data-testid="csdash-export" (click)="exportToExcel()">Export</button>
                 </div>
               </form>
             </div>
@@ -372,30 +372,30 @@
               <table class="native-table" *ngIf="tableView == 'open' || tableView == ''">
                 <thead class="table-head">
                   <tr>
-                    <th style="width: 5vw;" (click)="sortcolumn('issueno')"
+                    <th style="width: 5vw;" data-testid="csdash-osort-issueno" (click)="sortcolumn('issueno')"
                       [ngClass]="sortColumn == 'issueno' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Ticket No
                     </th>
-                    <th style="width: 8vw;" (click)="sortcolumn('reporteddate')"
+                    <th style="width: 8vw;" data-testid="csdash-osort-reporteddate" (click)="sortcolumn('reporteddate')"
                       [ngClass]="sortColumn == 'reporteddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
                       Reported Date</th>
-                    <th style="width: 5vw;" (click)="sortcolumn('reportedBy')"
+                    <th style="width: 5vw;" data-testid="csdash-osort-reportedby" (click)="sortcolumn('reportedBy')"
                       [ngClass]="sortColumn == 'reportedBy' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Reported
                       By</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('category')"
+                    <th style="width: 8vw;" data-testid="csdash-osort-category" (click)="sortcolumn('category')"
                       [ngClass]="sortColumn == 'category' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Category
                     </th>
-                    <th style="width: 8vw;" (click)="sortcolumn('name')"
+                    <th style="width: 8vw;" data-testid="csdash-osort-name" (click)="sortcolumn('name')"
                       [ngClass]="sortColumn == 'name' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Client Name
                     </th>
-                    <th style="width: 10vw;" (click)="sortcolumn('journey')"
+                    <th style="width: 10vw;" data-testid="csdash-osort-journey" (click)="sortcolumn('journey')"
                       [ngClass]="sortColumn == 'journey' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Journey
                     </th>
-                    <th style="width: 5vw;" (click)="sortcolumn('active')"
+                    <th style="width: 5vw;" data-testid="csdash-osort-active" (click)="sortcolumn('active')"
                       [ngClass]="sortColumn == 'active' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Active</th>
                     <th style="width: 20vw;">Ticket</th>
                     <th style="width: 15vw;">Notes</th>
                     <th style="width: 10vw;">Severity</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('chatstatus')"
+                    <th style="width: 8vw;" data-testid="csdash-osort-chatstatus" (click)="sortcolumn('chatstatus')"
                       [ngClass]="sortColumn == 'chatstatus' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Chat
                       Status</th>
                     <th style="width: 5vw;">Review</th>
@@ -415,29 +415,29 @@
                         'status-open': element.status?.status.toLowerCase() == 'open',
                         'status-closed': element.status?.status.toLowerCase() == 'closed'
                       }">
-                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">{{element.issueno}}</td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-orow-issueno-' + element.issueno" (click)="messageIssue($event,element, false)">{{element.issueno}}</td>
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-orow-date-' + element.issueno" (click)="messageIssue($event,element, false)">{{
                       element.reporteddate.toDate() | date: 'MMM d,y HH:mm'}}</td>
-                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-orow-reportedby-' + element.issueno" (click)="messageIssue($event,element, false)">
                       <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                           [profileId]="element.reportedBy"
                           [name]="[null,undefined,''].includes(mapProfileData[element.reportedBy]) ? '' : mapProfileData[element.reportedBy]['name']"
                           [size]="28"></app-profile-picture><span>{{[null,undefined,""].includes(mapProfileData[element.reportedBy])
                           ? '' :
                           mapProfileData[element.reportedBy]['name']}}</span></span></td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)">{{element.category}}</td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)"
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-orow-category-' + element.issueno" (click)="messageIssue($event,element, false)">{{element.category}}</td>
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-orow-name-' + element.issueno" (click)="messageIssue($event,element, false)"
                       (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
                       <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                           [profileId]="element.clientid" [name]="element.name"
                           [size]="28"></app-profile-picture><span>{{element.name}}</span></span>
                     </td>
-                    <td style="width: 10vw;" (click)="messageIssue($event,element, false)">{{[null, undefined,
+                    <td style="width: 10vw;" [attr.data-testid]="'csdash-orow-journey-' + element.issueno" (click)="messageIssue($event,element, false)">{{[null, undefined,
                       ""].includes(element.journey) ? "No Journey" : mapJourney[element.journey.id]}}</td>
-                    <td style="width: 5vw;" (click)="messageIssue($event,element, false)">{{element['active']}}</td>
-                    <td style="width: 20vw;" (click)="messageIssue($event,element, false)">
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-orow-active-' + element.issueno" (click)="messageIssue($event,element, false)">{{element['active']}}</td>
+                    <td style="width: 20vw;" [attr.data-testid]="'csdash-orow-issue-' + element.issueno" (click)="messageIssue($event,element, false)">
                       {{element['issue'].substring(0, 35)}}</td>
-                    <td style="width: 15vw;" (click)="messageIssue($event,element, false)">
+                    <td style="width: 15vw;" [attr.data-testid]="'csdash-orow-notes-' + element.issueno" (click)="messageIssue($event,element, false)">
                       <div class="list">
                         <span *ngFor="let notes of element.notes; let i = index">
                           <ng-container *ngIf="i === 0">
@@ -452,7 +452,7 @@
                         {{ element['flagdata'].severity }}
                       </span>
                     </td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element, false)"> {{ ![null,
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-orow-chatstatus-' + element.issueno" (click)="messageIssue($event,element, false)"> {{ ![null,
                       undefined,""].includes(element['chatstatus']) ?
                       element['chatstatus'].toUpperCase() : 'NO CHAT STATUS'}}</td>
 
@@ -460,9 +460,9 @@
 
                     <!-- Review Column -->
                     <td style="width: 5vw;">
-                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                      <button mat-raised-button [attr.data-testid]="'csdash-orow-review-' + element.issueno" (click)="messageIssue($event,element, true)"
                         style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
-                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                      <button mat-raised-button [attr.data-testid]="'csdash-orow-reviewed-' + element.issueno" (click)="messageIssue($event,element, true)"
                         style="background-color: green; color: white;" *ngIf="isIdPresent(element)"><span
                           style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                             [profileId]="getMostRecentTimestampKey(element['review'])"
@@ -473,13 +473,13 @@
                     <!-- Flag Column -->
                     <td style="width: 5vw;">
                       <ng-container *ngIf="![null, undefined, '', false].includes(element['flag']); else noFlag">
-                        <button mat-stroked-button color="warn" (click)="updateFlag(element)">
+                        <button mat-stroked-button color="warn" [attr.data-testid]="'csdash-orow-unflag-' + element.issueno" (click)="updateFlag(element)">
                           Unflag
                         </button>
                       </ng-container>
                       <ng-template #noFlag>
                         <button mat-stroked-button [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger"
-                          (click)="updateFlag(element)">
+                          [attr.data-testid]="'csdash-orow-flag-' + element.issueno" (click)="updateFlag(element)">
                           Flag
                         </button>
                       </ng-template>
@@ -490,18 +490,18 @@
                   <tr>
                     <td colspan="12">
                       <div class="pagination">
-                        <button (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+                        <button data-testid="csdash-open-prevpage" (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
                         <div class="scroll-container" #scrollContainer>
                           <div class="scroll-content">
                             <button *ngFor="let page of [].constructor(totalPages); let i = index"
-                              (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
+                              [attr.data-testid]="'csdash-open-page-' + (i + 1)" (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
                               {{ i + 1 }}
                             </button>
                           </div>
                         </div>
-                        <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+                        <button data-testid="csdash-open-nextpage" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
                         <span style="margin-left: 15px;">Items per page:</span>
-                        <select [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+                        <select data-testid="csdash-open-perpage" [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
                           <option value="10">10</option>
                           <option value="20">20</option>
                           <option value="50">50</option>
@@ -524,34 +524,34 @@
               <table class="native-table" *ngIf="tableView == 'close'">
                 <thead class="table-head">
                   <tr>
-                    <th style="width: 5vw;" (click)="sortcolumn('issueno')"
+                    <th style="width: 5vw;" data-testid="csdash-csort-issueno" (click)="sortcolumn('issueno')"
                       [ngClass]="sortColumn == 'issueno' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Ticket No
                     </th>
-                    <th style="width: 8vw;" (click)="sortcolumn('reporteddate')"
+                    <th style="width: 8vw;" data-testid="csdash-csort-reporteddate" (click)="sortcolumn('reporteddate')"
                       [ngClass]="sortColumn == 'reporteddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
                       Reported Date</th>
-                    <th style="width: 5vw;" (click)="sortcolumn('reportedBy')"
+                    <th style="width: 5vw;" data-testid="csdash-csort-reportedby" (click)="sortcolumn('reportedBy')"
                       [ngClass]="sortColumn == 'reportedBy' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Reported
                       By</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('closeddate')"
+                    <th style="width: 8vw;" data-testid="csdash-csort-closeddate" (click)="sortcolumn('closeddate')"
                       [ngClass]="sortColumn == 'closeddate' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Closed
                       Date</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('name')"
+                    <th style="width: 8vw;" data-testid="csdash-csort-name" (click)="sortcolumn('name')"
                       [ngClass]="sortColumn == 'name' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Client Name
                     </th>
-                    <th style="width: 5vw;" (click)="sortcolumn('closed')"
+                    <th style="width: 5vw;" data-testid="csdash-csort-closed" (click)="sortcolumn('closed')"
                       [ngClass]="sortColumn == 'closed' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Closed
                       Duration</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('category')"
+                    <th style="width: 8vw;" data-testid="csdash-csort-category" (click)="sortcolumn('category')"
                       [ngClass]="sortColumn == 'category' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Category
                     </th>
-                    <th style="width: 10vw;" (click)="sortcolumn('journey')"
+                    <th style="width: 10vw;" data-testid="csdash-csort-journey" (click)="sortcolumn('journey')"
                       [ngClass]="sortColumn == 'journey' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">Journey
                     </th>
                     <th style="width: 20vw;">Ticket</th>
                     <th style="width: 15vw;">Notes</th>
                     <th style="width: 10vw;">severity</th>
-                    <th style="width: 8vw;" (click)="sortcolumn('happinessindex')"
+                    <th style="width: 8vw;" data-testid="csdash-csort-happinessindex" (click)="sortcolumn('happinessindex')"
                       [ngClass]="sortColumn == 'happinessindex' ? sortOrder == 'asc' ? 'ascsort' : 'descsort' : ''">
                       Happiness Index</th>
                     <th style="width: 5vw;">Review</th>
@@ -567,31 +567,31 @@
                 <tbody class="table-body">
                   <tr *ngFor="let element of paginatedData; let idx = index"
                     [ngClass]="{'flagrow': element['flag'], 'websiteticket': !element['flag'] && ['website'].includes(element['ticketfrom'])}">
-                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.issueno}}</td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-crow-issueno-' + element.issueno" (click)="messageIssue($event,element,false)">{{element.issueno}}</td>
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-crow-date-' + element.issueno" (click)="messageIssue($event,element,false)">{{
                       element.reporteddate.toDate() | date: 'MMM d, y HH:mm'}}</td>
-                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-crow-reportedby-' + element.issueno" (click)="messageIssue($event,element,false)">
                       <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                           [profileId]="element.reportedBy"
                           [name]="[null,undefined,''].includes(mapProfileData[element.reportedBy]) ? '' : mapProfileData[element.reportedBy]['name']"
                           [size]="28"></app-profile-picture><span>{{[null,undefined,""].includes(mapProfileData[element.reportedBy])
                           ? '' :
                           mapProfileData[element.reportedBy]['name']}}</span></span></td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.status.date.toDate()
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-crow-closeddate-' + element.issueno" (click)="messageIssue($event,element,false)">{{element.status.date.toDate()
                       | date: 'MMM d, y HH:mm'}}</td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)"
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-crow-name-' + element.issueno" (click)="messageIssue($event,element,false)"
                       (mouseenter)="showPopup(element, $event)" (mouseleave)="hidePopup()" class="clickable">
                       <span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                           [profileId]="element.clientid" [name]="element.name"
                           [size]="28"></app-profile-picture><span>{{element.name}}</span></span>
                     </td>
-                    <td style="width: 5vw;" (click)="messageIssue($event,element,false)">{{element.closed}}</td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{element.category}}</td>
-                    <td style="width: 10vw;" (click)="messageIssue($event,element,false)">{{[null, undefined,
+                    <td style="width: 5vw;" [attr.data-testid]="'csdash-crow-closed-' + element.issueno" (click)="messageIssue($event,element,false)">{{element.closed}}</td>
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-crow-category-' + element.issueno" (click)="messageIssue($event,element,false)">{{element.category}}</td>
+                    <td style="width: 10vw;" [attr.data-testid]="'csdash-crow-journey-' + element.issueno" (click)="messageIssue($event,element,false)">{{[null, undefined,
                       ""].includes(element.journey) ? "No Journey" : mapJourney[element.journey.id]}}</td>
-                    <td style="width: 20vw;" (click)="messageIssue($event,element,false)">
+                    <td style="width: 20vw;" [attr.data-testid]="'csdash-crow-issue-' + element.issueno" (click)="messageIssue($event,element,false)">
                       {{element['issue'].substring(0, 35)}}</td>
-                    <td style="width: 15vw;" (click)="messageIssue($event,element,false)">
+                    <td style="width: 15vw;" [attr.data-testid]="'csdash-crow-notes-' + element.issueno" (click)="messageIssue($event,element,false)">
                       <div class="list">
                         <span *ngFor="let notes of element.notes; let i = index">
                           <ng-container *ngIf="i === element.notes.length - 1">
@@ -605,15 +605,15 @@
                         {{ element['flagdata'].severity }}
                       </span>
                     </td>
-                    <td style="width: 8vw;" (click)="messageIssue($event,element,false)">{{[null,
+                    <td style="width: 8vw;" [attr.data-testid]="'csdash-crow-happiness-' + element.issueno" (click)="messageIssue($event,element,false)">{{[null,
                       undefined,""].includes(element.happinessindex)? 'Unrated' : element.happinessindex}}</td>
 
 
                     <!-- Review Column -->
                     <td style="width: 5vw;">
-                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                      <button mat-raised-button [attr.data-testid]="'csdash-crow-review-' + element.issueno" (click)="messageIssue($event,element, true)"
                         style="background-color: red; color: white;" *ngIf="!isIdPresent(element)">{{'Review'}}</button>
-                      <button mat-raised-button (click)="messageIssue($event,element, true)"
+                      <button mat-raised-button [attr.data-testid]="'csdash-crow-reviewed-' + element.issueno" (click)="messageIssue($event,element, true)"
                         style="background-color: green; color: white;" *ngIf="isIdPresent(element)"><span
                           style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture
                             [profileId]="getMostRecentTimestampKey(element['review'])"
@@ -624,13 +624,13 @@
                     <!-- Flag Column -->
                     <td style="width: 5vw;">
                       <ng-container *ngIf="![null, undefined, '', false].includes(element['flag']); else noFlagClosed">
-                        <button mat-stroked-button color="warn" (click)="updateFlag(element)">
+                        <button mat-stroked-button color="warn" [attr.data-testid]="'csdash-crow-unflag-' + element.issueno" (click)="updateFlag(element)">
                           Unflag
                         </button>
                       </ng-container>
                       <ng-template #noFlagClosed>
                         <button mat-stroked-button [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger"
-                          (click)="updateFlag(element)">
+                          [attr.data-testid]="'csdash-crow-flag-' + element.issueno" (click)="updateFlag(element)">
                           Flag
                         </button>
                       </ng-template>
@@ -641,18 +641,18 @@
                   <tr>
                     <td colspan="13">
                       <div class="pagination">
-                        <button (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+                        <button data-testid="csdash-close-prevpage" (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
                         <div class="scroll-container" #scrollContainer>
                           <div class="scroll-content">
                             <button *ngFor="let page of [].constructor(totalPages); let i = index"
-                              (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
+                              [attr.data-testid]="'csdash-close-page-' + (i + 1)" (click)="setPage(i + 1)" [class.active]="currentPage === (i + 1)">
                               {{ i + 1 }}
                             </button>
                           </div>
                         </div>
-                        <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+                        <button data-testid="csdash-close-nextpage" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
                         <span style="margin-left: 15px;">Items per page:</span>
-                        <select [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+                        <select data-testid="csdash-close-perpage" [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
                           <option value="10">10</option>
                           <option value="20">20</option>
                           <option value="50">50</option>
@@ -676,12 +676,12 @@
                 <div class="flagnegligence">
                   <mat-form-field appearance="outline" class="custom-form-field">
                     <mat-label>Severity</mat-label>
-                    <mat-select [(ngModel)]="flagseverity" (click)="$event.stopPropagation()">
+                    <mat-select data-testid="csdash-flagmenu-severity" [(ngModel)]="flagseverity" (click)="$event.stopPropagation()">
                       <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
                     </mat-select>
                   </mat-form-field>
                   <br>
-                  <button mat-stroked-button color="primary" (click)="updateData(selectedElementForFlag, $event)"
+                  <button mat-stroked-button color="primary" data-testid="csdash-flagmenu-submit" (click)="updateData(selectedElementForFlag, $event)"
                     mat-menu-close>Flag Negligence</button>
                 </div>
               </mat-menu>

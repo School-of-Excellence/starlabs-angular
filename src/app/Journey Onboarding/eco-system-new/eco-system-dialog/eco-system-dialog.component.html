@@ -30,7 +30,7 @@
         <span class="header-subtitle" *ngIf="subHeading">{{ subHeading }}</span>
       </div>
     </div>
-    <button class="close-btn" (click)="closeDialog()">
+    <button data-testid="esd-btn-001" class="close-btn" (click)="closeDialog()">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
@@ -51,7 +51,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
         </svg>
-        <input type="text" placeholder="Search..." [(ngModel)]="searchTerm" (input)="filterItems()"/>
+        <input data-testid="esd-inp-002" type="text" placeholder="Search..." [(ngModel)]="searchTerm" (input)="filterItems()"/>
       </div>
       <div class="result-count">
         <span class="count-badge">{{ filteredData?.length || limitationYearsData?.length || 0 }}</span>
@@ -79,7 +79,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let validatedATC of filteredData; let i = index" (click)="profileNavigation(validatedATC['profileid'])" class="table-row">
+            <tr data-testid="esd-tr-003" *ngFor="let validatedATC of filteredData; let i = index" (click)="profileNavigation(validatedATC['profileid'])" class="table-row">
               <td class="td-sno">{{ i + 1 }}</td>
               <td class="td-name">
                 <div class="name-cell">
@@ -131,7 +131,7 @@
 
 
 <!-- <div class="dialog-header">
-  <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+  <button data-testid="esd-btn-004" mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
     <mat-icon>close</mat-icon>
   </button>
 </div>
@@ -169,7 +169,7 @@
         <span style="margin-left: 5px;">No Change in Sequence, but Metric Value Decreased</span>
       </div>
     </div> <br>
-    <input
+    <input data-testid="esd-inp-005"
       type="text" 
       placeholder="Search..." 
       [(ngModel)]="searchTerm" 
@@ -179,7 +179,7 @@
   </div>
   <div class="scrollable-content">
     <div *ngIf="heading !== 'Limitation Years' && heading !== 'Saved Years' && heading !== 'Total Adjustment' && heading !== 'Un Aware' && heading !== 'Aware'" class="item-container">
-      <div class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
+      <div data-testid="esd-div-006" class="item" *ngFor="let profile of filteredData" (click)="profileNavigation(profile)">
         <div class="profile-name">{{ mapProfile[profile] }}</div>
         <div *ngIf="sectionMetric === 'MetricSection'" class="metrics-container">
           <div class="previous-metrics">
@@ -225,7 +225,7 @@
       </div>
     </div>
     <div *ngIf="heading === 'Limitation Years' || heading === 'Saved Years' || heading === 'Total Adjustment' || heading === 'Un Aware' || heading === 'Aware'" class="item-container">
-      <div class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
+      <div data-testid="esd-div-007" class="item" *ngFor="let profile of limitationYearsData" (click)="profileNavigation(profile.key)">
         {{ mapProfile[profile.key] }} - {{ profile.value }}
       </div>
     </div>  

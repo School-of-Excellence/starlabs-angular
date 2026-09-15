@@ -4,7 +4,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ad Title</mat-label>
-        <input matInput type="text" formControlName="adstitle">
+        <input data-testid="upla-inp-001" matInput type="text" formControlName="adstitle">
         <mat-error *ngIf="playlistads.get('adstitle').hasError('required')">
           Required
         </mat-error>
@@ -12,7 +12,7 @@
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ad Description</mat-label>
-        <textarea matInput type="text" formControlName="adsdescription" rows="4"></textarea>
+        <textarea data-testid="upla-txt-002" matInput type="text" formControlName="adsdescription" rows="4"></textarea>
         <mat-error *ngIf="playlistads.get('adsdescription').hasError('required')">
           Required
         </mat-error>
@@ -20,7 +20,7 @@
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ad Link</mat-label>
-        <input matInput type="text" formControlName="adslink">
+        <input data-testid="upla-inp-003" matInput type="text" formControlName="adslink">
         <mat-error *ngIf="playlistads.get('adslink').hasError('required')">
           Required
         </mat-error>
@@ -28,7 +28,7 @@
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ad Type (Sub Text)</mat-label>
-        <input matInput type="text" formControlName="adstype">
+        <input data-testid="upla-inp-004" matInput type="text" formControlName="adstype">
         <mat-error *ngIf="playlistads.get('adstype').hasError('required')">
           Required
         </mat-error>
@@ -36,18 +36,18 @@
       <br>
         <h5 class="text-left">Ads thumbnail</h5>
         <!-- Remove matInput from file input -->
-        <input type="file" accept="image/*" (change)="importNoteImages($event)" style="margin-bottom: 10px;">
+        <input data-testid="upla-inp-005" type="file" accept="image/*" (change)="importNoteImages($event)" style="margin-bottom: 10px;">
         <div class="row ml-2 mt-2">
         <div class="mr-2 text-center" *ngIf="this.playlistads.get('adsthumbnail').value != null">
             <img [src]="this.playlistads.get('adsthumbnail').value" height="80" width="80">
             <br>
-            <label class="removetext" (click)="removeNoteImage()">Remove</label>
+            <label data-testid="upla-label-006" class="removetext" (click)="removeNoteImage()">Remove</label>
         </div>
         </div>
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ads Trailer</mat-label>
-        <mat-select formControlName="adstrailer">
+        <mat-select data-testid="upla-msel-007" formControlName="adstrailer">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterContentName" [ngModelOptions]="{standalone: true}" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -60,7 +60,7 @@
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Ads Playlist</mat-label>
-        <mat-select formControlName="playlist" multiple>
+        <mat-select data-testid="upla-msel-008" formControlName="playlist" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterContentName" [ngModelOptions]="{standalone: true}" placeholderLabel="Search" noEntriesFoundLabel="No matching records found" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -82,8 +82,8 @@
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Event Date</mat-label>
         <mat-date-range-input [rangePicker]="picker">
-          <input matStartDate (click)="picker.open()" formControlName="startdate">
-          <input matEndDate (click)="picker.open()" formControlName="enddate">
+          <input data-testid="upla-inp-009" matStartDate (click)="picker.open()" formControlName="startdate">
+          <input data-testid="upla-inp-010" matEndDate (click)="picker.open()" formControlName="enddate">
         </mat-date-range-input>
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker touchUi #picker></mat-date-range-picker>
@@ -95,7 +95,7 @@
       <mat-checkbox formControlName="available">Available In App</mat-checkbox>
       <br><br>
     </div>
-    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Playlist'}}</button>
+    <button data-testid="upla-btn-011" mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button data-testid="upla-btn-012" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Playlist'}}</button>
   </form>
 </div>

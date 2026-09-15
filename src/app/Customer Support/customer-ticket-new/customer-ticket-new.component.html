@@ -12,16 +12,17 @@
 </div>
 
 <!-- Tag Dialog (Inline) -->
-<div class="dialog-overlay" *ngIf="showTagDialog" (click)="closeTagDialog()">
-  <div class="dialog-container" (click)="$event.stopPropagation()">
+<div class="dialog-overlay" *ngIf="showTagDialog" data-testid="ctn-tagdialog-overlay" (click)="closeTagDialog()">
+  <div class="dialog-container" data-testid="ctn-tagdialog-box" (click)="$event.stopPropagation()">
     <h2 class="dialog-title">Tag Ticket</h2>
     <div class="dialog-content">
       <form [formGroup]="tagForm" class="tag-form">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Select Date</mat-label>
-          <input 
-            matInput 
-            [matDatepicker]="tagPicker" 
+          <input
+            matInput
+            data-testid="ctn-tag-date"
+            [matDatepicker]="tagPicker"
             formControlName="date"
             [min]="minDate"
             placeholder="Choose a date">
@@ -35,7 +36,7 @@
         <!-- CHANGED: Time input to dropdown select -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Select Time</mat-label>
-          <mat-select formControlName="time" placeholder="Choose a time">
+          <mat-select formControlName="time" data-testid="ctn-tag-time" placeholder="Choose a time">
             <mat-option *ngFor="let time of timeOptions" [value]="time.value">
               {{ time.label }}
             </mat-option>
@@ -47,10 +48,11 @@
       </form>
     </div>
     <div class="dialog-actions">
-      <button mat-button (click)="closeTagDialog()">Cancel</button>
-      <button 
-        mat-raised-button 
-        color="primary" 
+      <button mat-button data-testid="ctn-tagdialog-cancel" (click)="closeTagDialog()">Cancel</button>
+      <button
+        mat-raised-button
+        color="primary"
+        data-testid="ctn-tagdialog-confirm"
         (click)="confirmTag()"
         [disabled]="tagForm.invalid">
         Tag Ticket
@@ -60,17 +62,18 @@
 </div>
 
 <!-- Untag Confirmation Dialog (Inline) -->
-<div class="dialog-overlay" *ngIf="showUntagDialog" (click)="closeUntagDialog()">
-  <div class="dialog-container" (click)="$event.stopPropagation()">
+<div class="dialog-overlay" *ngIf="showUntagDialog" data-testid="ctn-untagdialog-overlay" (click)="closeUntagDialog()">
+  <div class="dialog-container" data-testid="ctn-untagdialog-box" (click)="$event.stopPropagation()">
     <h2 class="dialog-title">Untag Ticket</h2>
     <div class="dialog-content">
       <p class="dialog-message">Are you sure you want to untag this ticket?</p>
     </div>
     <div class="dialog-actions">
-      <button mat-button (click)="closeUntagDialog()">Cancel</button>
-      <button 
-        mat-raised-button 
-        color="warn" 
+      <button mat-button data-testid="ctn-untagdialog-cancel" (click)="closeUntagDialog()">Cancel</button>
+      <button
+        mat-raised-button
+        color="warn"
+        data-testid="ctn-untagdialog-confirm"
         (click)="confirmUntag()">
         Untag
       </button>
@@ -85,7 +88,7 @@
     <mat-tab *ngFor="let tab of ticketArray; let i = index">
       <ng-template mat-tab-label><b [ngClass]="i == selectedTabIndex ? 'selectedtab' : 'nonselectedtab'">{{ tab.label
           }}</b>
-        <button *ngIf="i > 1" mat-icon-button type="button" (click)="closeTab(i)">
+        <button *ngIf="i > 1" mat-icon-button type="button" [attr.data-testid]="'ctn-tab-close-' + i" (click)="closeTab(i)">
           <mat-icon style="font-size: 15px">close</mat-icon>
         </button></ng-template>
       <div *ngIf="tab.label === 'Customer Support Dashboard'">
@@ -99,13 +102,13 @@
             <div class="banner-header">
               <mat-icon class="banner-icon">bookmarks</mat-icon>
               <h2 class="banner-title">Tagged Tickets Overview</h2>
-              <button class="calendar-btn" (click)="openTaggedCalendarDialog()" style="margin-left: auto;">
+              <button class="calendar-btn" data-testid="ctn-open-calendar" (click)="openTaggedCalendarDialog()" style="margin-left: auto;">
                 <mat-icon>calendar_month</mat-icon>
                 <span>Calendar</span>
               </button>
             </div>
             <div class="banner-stats">
-              <div class="stat-card today" (click)="filterTaggedTickets('today')">
+              <div class="stat-card today" data-testid="ctn-tagged-today" (click)="filterTaggedTickets('today')">
                 <div class="stat-icon">
                   <mat-icon>today</mat-icon>
                 </div>
@@ -115,7 +118,7 @@
                 </div>
               </div>
 
-              <div class="stat-card upcoming" (click)="filterTaggedTickets('upcoming')">
+              <div class="stat-card upcoming" data-testid="ctn-tagged-upcoming" (click)="filterTaggedTickets('upcoming')">
                 <div class="stat-icon">
                   <mat-icon>event</mat-icon>
                 </div>
@@ -125,7 +128,7 @@
                 </div>
               </div>
 
-              <div class="stat-card overdue" (click)="filterTaggedTickets('overdue')">
+              <div class="stat-card overdue" data-testid="ctn-tagged-overdue" (click)="filterTaggedTickets('overdue')">
                 <div class="stat-icon">
                   <mat-icon>schedule</mat-icon>
                 </div>
@@ -140,7 +143,7 @@
         <div class="header-container">
           <div class="main-box">
             <h1 class="main-title">Tickets</h1>
-            <button mat-raised-button (click)="raiseIssue(null)">
+            <button mat-raised-button data-testid="ctn-raise-ticket" (click)="raiseIssue(null)">
               Raise Ticket
             </button>
           </div>
@@ -148,6 +151,7 @@
             <p class="filter-label">category</p>
             <mat-chip-listbox class="chip-group" multiple [(ngModel)]="filters.category" [selectable]="true">
               <mat-chip-option *ngFor="let cat of categoryList" [value]="cat.toLowerCase()" [selectable]="true"
+                [attr.data-testid]="'ctn-chip-category-' + cat.toLowerCase()"
                 (click)="applyFilter()" class="chip-option" [selected]="filters.category.includes(cat.toLowerCase())">{{
                 cat }}</mat-chip-option>
             </mat-chip-listbox>
@@ -156,6 +160,7 @@
             <p class="filter-label">Chat Status</p>
             <mat-chip-listbox class="chip-group" multiple [(ngModel)]="filters.chatStatus" [selectable]="true">
               <mat-chip-option *ngFor="let chat of chatStatusList" [value]="chat.toLowerCase()" [selectable]="true"
+                [attr.data-testid]="'ctn-chip-chat-' + chat.toLowerCase()"
                 (click)="applyFilter()" [selected]="filters.chatStatus.includes(chat.toLowerCase())"
                 class="chip-option status-chips">{{ chat }}</mat-chip-option>
             </mat-chip-listbox>
@@ -163,13 +168,13 @@
           <div class="status-chip-container">
             <p class="filter-label">Status</p>
             <mat-chip-listbox class="chip-group" [(ngModel)]="filters.status" [selectable]="true">
-              <mat-chip-option [value]="''" [selectable]="true" [selected]="true" (click)="applyFilter()"
+              <mat-chip-option [value]="''" [selectable]="true" [selected]="true" data-testid="ctn-status-all" (click)="applyFilter()"
                 class="chip-option">All</mat-chip-option>
-              <mat-chip-option [value]="'open'" [selectable]="true" (click)="applyFilter()"
+              <mat-chip-option [value]="'open'" [selectable]="true" data-testid="ctn-status-open" (click)="applyFilter()"
                 class="chip-option">open</mat-chip-option>
-              <mat-chip-option [value]="'closed'" [selectable]="true" (click)="applyFilter()"
+              <mat-chip-option [value]="'closed'" [selectable]="true" data-testid="ctn-status-closed" (click)="applyFilter()"
                 class="chip-option">Closed</mat-chip-option>
-              <mat-chip-option [value]="'tagged'" [selectable]="true" (click)="applyFilter()"
+              <mat-chip-option [value]="'tagged'" [selectable]="true" data-testid="ctn-status-tagged" (click)="applyFilter()"
                 class="chip-option">Tagged</mat-chip-option>
             </mat-chip-listbox>
           </div>
@@ -190,9 +195,10 @@
                   pageIndex * pageSize,
                   (pageIndex + 1) * pageSize
                 )
-              " (click)="messageIssue($event, ticket, false)">
+              " [attr.data-testid]="'ctn-card-' + ticket?.issueno" (click)="messageIssue($event, ticket, false)">
                 <!-- Tag Icon Button -->
                 <button mat-icon-button class="tag-button" [class.tagged]="isTagged(ticket)"
+                  [attr.data-testid]="'ctn-card-tag-' + ticket?.issueno"
                   (click)="handleTagClick($event, ticket)"
                   [title]="isTagged(ticket) ? 'Tagged - Click to untag' : 'Click to tag'">
                   <mat-icon [class.tagged-icon]="isTagged(ticket)">
@@ -211,7 +217,7 @@
                         }}</span>
                     </div>
                     <div>
-                      <button mat-raised-button (click)="messageIssue($event, ticket, true)" style="
+                      <button mat-raised-button [attr.data-testid]="'ctn-card-review-' + ticket?.issueno" (click)="messageIssue($event, ticket, true)" style="
                         background-color: red;
                         color: white;
                         padding-inline: 10px;
@@ -219,7 +225,7 @@
                       " *ngIf="!isIdPresent(ticket)">
                         {{ "Review" }}
                       </button>
-                      <button mat-raised-button (click)="messageIssue($event, ticket, true)" style="
+                      <button mat-raised-button [attr.data-testid]="'ctn-card-reviewed-' + ticket?.issueno" (click)="messageIssue($event, ticket, true)" style="
                         background-color: green;
                         color: white;
                         padding-inline: 10px;
@@ -330,7 +336,7 @@
           <div class="filters-sidebar">
             <div class="filters-header">
               <p class="filters-title">Filters</p>
-              <button type="button" mat-mini-fab color="primary" class="reset-buttom" (click)="resetFilter()">
+              <button type="button" mat-mini-fab color="primary" class="reset-buttom" data-testid="ctn-reset-filter" (click)="resetFilter()">
                 <mat-icon>refresh</mat-icon>
               </button>
             </div>
@@ -341,7 +347,7 @@
                 <p class="field-label">search :</p>
                 <mat-form-field class="input-field" appearance="outline">
                   <mat-label>Search..</mat-label>
-                  <input matInput formControlName="search" (input)="applyFilter()" />
+                  <input matInput data-testid="ctn-filter-search" formControlName="search" (input)="applyFilter()" />
                 </mat-form-field>
               </div>
 
@@ -351,7 +357,7 @@
                 <p class="field-label">journey :</p>
                 <mat-form-field class="input-field" appearance="outline">
                   <mat-label>Journey</mat-label>
-                  <mat-select formControlName="journey" multiple (selectionChange)="applyFilter()">
+                  <mat-select formControlName="journey" multiple data-testid="ctn-filter-journey" (selectionChange)="applyFilter()">
                     <mat-option>
                       <ngx-mat-select-search [(ngModel)]="filteredJourney" [ngModelOptions]="{ standalone: true }"
                         [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -368,7 +374,7 @@
                 <mat-form-field class="example-full-width" appearance="outline" class="input-field">
                   <!-- assigned to filter -->
                   <mat-label>Assigned To</mat-label>
-                  <mat-select formControlName="assignto" multiple (selectionChange)="applyFilter()">
+                  <mat-select formControlName="assignto" multiple data-testid="ctn-filter-assignto" (selectionChange)="applyFilter()">
                     <mat-option>
                       <ngx-mat-select-search [(ngModel)]="filteredAssign" [ngModelOptions]="{ standalone: true }"
                         [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -389,8 +395,8 @@
                 <mat-form-field class="input-field" appearance="outline">
                   <mat-label>Enter a date range</mat-label>
                   <mat-date-range-input [rangePicker]="picker">
-                    <input matStartDate formControlName="startDate" placeholder="Start date" readonly />
-                    <input matEndDate formControlName="endDate" placeholder="End date" readonly />
+                    <input matStartDate data-testid="ctn-filter-startdate" formControlName="startDate" placeholder="Start date" readonly />
+                    <input matEndDate data-testid="ctn-filter-enddate" formControlName="endDate" placeholder="End date" readonly />
                   </mat-date-range-input>
                   <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
                   <mat-date-range-picker #picker (closed)="applyFilter()"></mat-date-range-picker>
@@ -403,7 +409,7 @@
                 <p class="field-label">priority :</p>
                 <mat-form-field class="input-field" appearance="outline">
                   <mat-label>Priority</mat-label>
-                  <mat-select formControlName="priority">
+                  <mat-select formControlName="priority" data-testid="ctn-filter-priority">
                     <mat-option>--</mat-option>
                     <mat-option [value]="'Low'">Low</mat-option>
                     <mat-option [value]="'Medium'">Medium</mat-option>
@@ -443,7 +449,7 @@
   <div class="calendar-dialog-content">
     <div class="calendar-header">
       <h2>Tagged Tickets Calendar</h2>
-      <button mat-icon-button (click)="closeTaggedCalendarDialog()">
+      <button mat-icon-button data-testid="ctn-calendar-close" (click)="closeTaggedCalendarDialog()">
         <mat-icon>close</mat-icon>
       </button>
     </div>

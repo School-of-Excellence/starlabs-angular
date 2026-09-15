@@ -8,8 +8,8 @@
       <mat-label class="pt-4">Create Evolution Level : </mat-label>&nbsp;&nbsp;&nbsp;&nbsp;
       <app-text [form]="form" controlName="startpoint" label="Start Point"></app-text>&nbsp;&nbsp;&nbsp;&nbsp;
       <app-text [form]="form" controlName="endpoint" label="End Point"></app-text>&nbsp;&nbsp;&nbsp;&nbsp;
-      <button style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>&nbsp;&nbsp;
-      <button style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onRemove()" [disabled]="form.value['docid'] === null">Remove</button>
+      <button data-testid="can-on-submit-1" style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>&nbsp;&nbsp;
+      <button data-testid="can-on-remove-2" style="height:40px;margin-top:10px;" mat-stroked-button type="button" (click)="onRemove()" [disabled]="form.value['docid'] === null">Remove</button>
     </form>
   </div>
   <!-- list -->

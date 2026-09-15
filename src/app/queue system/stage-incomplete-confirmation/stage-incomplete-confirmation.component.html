@@ -3,7 +3,7 @@
   <!-- Header -->
   <header class="mbq__head">
     <h2 class="mbq__title">Send {{ participantName }} back to queue</h2>
-    <button type="button" class="mbq__close" (click)="cancel()" aria-label="Close">&#10005;</button>
+    <button data-testid="sicf-btn-1" type="button" class="mbq__close" (click)="cancel()" aria-label="Close">&#10005;</button>
   </header>
 
   <p class="mbq__sub">
@@ -12,7 +12,7 @@
 
   <!-- Assignment choice -->
   <div class="mbq__options">
-    <button type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === true"
+    <button data-testid="sicf-btn-2" type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === true"
             (click)="result.preassign = true">
       <span class="mbq__radio"></span>
       <span class="mbq__opt-text">
@@ -21,7 +21,7 @@
       </span>
     </button>
 
-    <button type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === false"
+    <button data-testid="sicf-btn-3" type="button" class="mbq__opt" [class.mbq__opt--on]="result.preassign === false"
             (click)="result.preassign = false">
       <span class="mbq__radio"></span>
       <span class="mbq__opt-text">
@@ -38,8 +38,8 @@
 
   <!-- Actions -->
   <footer class="mbq__foot">
-    <button type="button" class="mbq__cancel" (click)="cancel()">Cancel</button>
-    <button type="button" class="mbq__submit" [disabled]="reasonControl.invalid" (click)="onsubmit()">
+    <button data-testid="sicf-btn-4" type="button" class="mbq__cancel" (click)="cancel()">Cancel</button>
+    <button data-testid="sicf-btn-5" type="button" class="mbq__submit" [disabled]="reasonControl.invalid" (click)="onsubmit()">
       Submit move-back
     </button>
   </footer>

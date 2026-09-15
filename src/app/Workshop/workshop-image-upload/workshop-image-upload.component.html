@@ -3,7 +3,7 @@
     <div>
       <mat-form-field  appearance="fill" class="ml-2">
         <mat-label>Filter</mat-label>
-        <input matInput  placeholder="Filter by name" #input  (keyup)="ApplyFilter($event)">
+        <input data-testid="wiu-filter-by-name" matInput  placeholder="Filter by name" #input  (keyup)="ApplyFilter($event)">
       </mat-form-field> 
       <div>
         <table mat-table matSort [dataSource]="dataSource" class="mat-elevation-z8">
@@ -63,13 +63,13 @@
           <ng-container matColumnDef="copyimageurl">
             <th mat-header-cell *matHeaderCellDef>Copy Image Url</th>
             <td mat-cell *matCellDef="let row">
-              <button mat-icon-button [cdkCopyToClipboard]="row.imageUrl"><mat-icon>content_copy</mat-icon></button>
+              <button data-testid="wiu-button" mat-icon-button [cdkCopyToClipboard]="row.imageUrl"><mat-icon>content_copy</mat-icon></button>
             </td>
           </ng-container>
     
           <ng-container matColumnDef="Edit">
             <th mat-header-cell *matHeaderCellDef> Edit </th>
-            <td mat-cell *matCellDef="let row"><button type="button" mat-mini-fab color="primary" (click)="openEditDialog(row,'Upload New Image')"><mat-icon>edit</mat-icon></button></td>
+            <td mat-cell *matCellDef="let row"><button data-testid="wiu-openeditdialog" type="button" mat-mini-fab color="primary" (click)="openEditDialog(row,'Upload New Image')"><mat-icon>edit</mat-icon></button></td>
           </ng-container>
         
           <!-- <ng-container matColumnDef="Delete">
@@ -116,7 +116,7 @@
        <div class="m-1">
         <mat-form-field appearance="outline">
           <mat-label>Ratio</mat-label>
-          <mat-select [(ngModel)]="uploadEpisodeDoc.ratio">
+          <mat-select data-testid="wiu-mat-select" [(ngModel)]="uploadEpisodeDoc.ratio">
             <mat-option *ngFor="let option of ['w16h9','w9h16','w4h5','w5h4','w1h1','w4h3']" [value]="option">{{option}}</mat-option>
           </mat-select>
         </mat-form-field>
@@ -125,7 +125,7 @@
        <div class="m-1">
         <mat-form-field appearance="outline">
           <mat-label>Type</mat-label>
-          <mat-select [(ngModel)]="uploadEpisodeDoc.type">
+          <mat-select data-testid="wiu-mat-select-2" [(ngModel)]="uploadEpisodeDoc.type">
             <mat-option *ngFor="let option of ['image','icon','thumbnail']" [value]="option">{{option}}</mat-option>
           </mat-select>
         </mat-form-field>
@@ -134,12 +134,12 @@
       <div class="m-1">
         <mat-form-field appearance="outline">
           <mat-label>Description</mat-label>
-          <input matInput type="text" placeholder="description" [(ngModel)]="uploadEpisodeDoc.description" required >
+          <input data-testid="wiu-description" matInput type="text" placeholder="description" [(ngModel)]="uploadEpisodeDoc.description" required >
         </mat-form-field>
       </div>
       <div class="d-flex flex-column m-1">
         <label>Choose a thumbnail/image/icon : </label>
-        <input *ngIf="![null,undefined].includes(uploadEpisodeDoc.ratio)" type="file" #thumbnailref accept="image/*" (change)="previewImage($event)">
+        <input data-testid="wiu-previewimage" *ngIf="![null,undefined].includes(uploadEpisodeDoc.ratio)" type="file" #thumbnailref accept="image/*" (change)="previewImage($event)">
         <img *ngIf="uploadEpisodeDoc.previewImageUrl != undefined || uploadEpisodeDoc.imageUrl != undefined" [src]="uploadEpisodeDoc.previewImageUrl != undefined ? uploadEpisodeDoc.previewImageUrl : uploadEpisodeDoc.imageUrl" controls style="width:200px;height:300px;margin-top:10px">
       </div>
       <!-- <div class="d-flex flex-column m-1">
@@ -158,7 +158,7 @@
         <video  *ngIf="uploadEpisodeDoc.previewVideoUrl != undefined || uploadEpisodeDoc.videoUrl != undefined"  [src]="uploadEpisodeDoc.previewVideoUrl != null ? sanitize(uploadEpisodeDoc.previewVideoUrl) : uploadEpisodeDoc.videoUrl" controls style="width:300px;height:300px;margin-top:10px;"></video>
       </div> -->
       <div style="margin-top:10%;margin-left:5%">
-        <button mat-stroked-button type="button" [disabled] = 'showFileSizeError == true' (click)="onSubmit()">Upload</button>&nbsp;&nbsp;
+        <button data-testid="wiu-onsubmit" mat-stroked-button type="button" [disabled] = 'showFileSizeError == true' (click)="onSubmit()">Upload</button>&nbsp;&nbsp;
       </div>
     </div>
     <table class="table">
@@ -203,7 +203,7 @@
             <!-- <button *ngIf="!task.submitted" mat-stroked-button type="button" (click)="saveDataToFirestore(i)" 
             [disabled]="((task.uploadingVideoPercentage | async) ? (task.uploadingVideoPercentage | async) != 100 : false)|| ((task.uploadingImagePercentage | async) ? (task.uploadingImagePercentage | async) != 100 :false)">Submit</button>&nbsp;&nbsp; -->
             <!-- <mat-icon *ngIf="task.submitted">check</mat-icon>&nbsp;&nbsp; -->
-            <button mat-mini-fab color="primary" (click)="openEditDialog(task,'Upload New Image');task.submitted = false;removeDoc(i);">
+            <button data-testid="wiu-openeditdialog-2" mat-mini-fab color="primary" (click)="openEditDialog(task,'Upload New Image');task.submitted = false;removeDoc(i);">
               <mat-icon>edit</mat-icon>
             </button>&nbsp;&nbsp;
           </td>

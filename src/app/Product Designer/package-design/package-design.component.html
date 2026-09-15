@@ -8,7 +8,7 @@
         </mat-form-field>
       </div>
       <div>
-        <button class="addbtn" mat-stroked-button (click)="createPackageDesign(null)">Add New Package Design</button>
+        <button data-testid="pd-create-package-design-1" class="addbtn" mat-stroked-button (click)="createPackageDesign(null)">Add New Package Design</button>
       </div>
     </div>
     <div class="mat-elevation-z3 tablebox">
@@ -16,7 +16,7 @@
         <ng-container matColumnDef="packagelabel">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Package Label</th>
           <td mat-cell *matCellDef="let row">
-            <span class="designhover" (click)="createPackageDesign(row)">{{row['packagelabel']}}</span>
+            <span data-testid="pd-create-package-design-2" class="designhover" (click)="createPackageDesign(row)">{{row['packagelabel']}}</span>
           </td>
         </ng-container>
         <ng-container matColumnDef="currentjourney">
