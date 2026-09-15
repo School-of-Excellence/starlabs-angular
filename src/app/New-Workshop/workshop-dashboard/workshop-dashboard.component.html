@@ -1643,7 +1643,7 @@
               <mat-icon>sort</mat-icon>
             </button>
             <mat-menu #existFilterMenu="matMenu" data-testid="wdash-exist-filter-menu" class="filter-scroll-menu">
-              <div style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
+              <div data-testid="wdash-exist-filter-body" style="max-height: 320px; overflow-y: auto; overflow-x: hidden;" (click)="$event.stopPropagation()">
 
                 <div style="padding: 8px 16px 4px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6;">
                   Journey Filter
@@ -1690,6 +1690,29 @@
                 </div>
               </div>
             </mat-menu>
+            <!-- The Exist panel's own chips — this block must stay inside the Exist container: the
+                 category-based Total Enrolled chips further down never render for this panel. -->
+            <div *ngIf="selectedJourneyFilters.length > 0 || selectedCustomerStatusFilters.length > 0"
+                style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
+              <mat-chip
+                data-testid="wdash-exist-journey-chip"
+                *ngFor="let journey of selectedJourneyFilters"
+                [removable]="true"
+                (removed)="toggleJourneyFilter(journey)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ JourneyMap[journey] || journey }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+              <mat-chip
+                data-testid="wdash-exist-status-chip"
+                *ngFor="let status of selectedCustomerStatusFilters"
+                [removable]="true"
+                (removed)="toggleCustomerStatusFilter(status)"
+                style="font-size: 11px; min-height: 24px; height: 24px;">
+                {{ status }}
+                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
+              </mat-chip>
+            </div>
           </ng-container>
           <ng-container *ngIf="workshopData?.categorybased === true && selectedStatusInfo?.status === 'totalEnrolled'">
             <button mat-icon-button
@@ -1778,7 +1801,7 @@
             </mat-menu>
 
             <!-- Selected filter chips shown below the button row -->
-            <div *ngIf="selectedCustomerStatusFilters.length > 0 || selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
+            <div *ngIf="selectedJourneyFilters.length > 0 || selectedTierFilters.length > 0 || selectedCategoryFilters.length > 0 || selectedEnrollmentStatusFilters.length > 0"
                 style="display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 2px;">
               <mat-chip
                 *ngFor="let journey of selectedJourneyFilters"
@@ -1786,15 +1809,6 @@
                 (removed)="toggleJourneyFilter(journey)"
                 style="font-size: 11px; min-height: 24px; height: 24px;">
                 {{ JourneyMap[journey] || journey }}
-                <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
-              </mat-chip>
-              <mat-chip
-                data-testid="wdash-exist-status-chip"
-                *ngFor="let status of selectedCustomerStatusFilters"
-                [removable]="true"
-                (removed)="toggleCustomerStatusFilter(status)"
-                style="font-size: 11px; min-height: 24px; height: 24px;">
-                {{ status }}
                 <mat-icon matChipRemove style="font-size: 14px;">cancel</mat-icon>
               </mat-chip>
               <mat-chip

@@ -1,18 +1,18 @@
 # PROGRESS
 
 ## Current state
-- Branch `nanda-development`; last commits: dashboard filter test case, merges of `production` and `development`.
-- **Uncommitted, built green (dev + prod):** the workshop-dashboard **Communication** dialog — `workshop-dashboard/communication/*`, the header button, three dashboard senders now taking an optional recipient list, two `styles.css` rules, 41-case spec. Journal: `specs/journals/2026-09-11-dashboard-communication-dialog.md`.
-- Everything from this run of sessions (workshopconfig v2 hints/guide, EiFlix toggles, schedule/rail/rich-text fixes, enroll diagnostics, popup banner, Exist Users card) is committed but **unverified at runtime** — all behind login.
-- `ng test` is broken repo-wide by five stale stubs (wrong class names in `assigncategorydialog`, `channeltemplates`, `preview-triple-atc` specs; `import 'console'` in two components). New specs were run with a temporarily scoped `tsconfig.spec.json`, restored afterwards.
+- Branch `nanda-development` at `dff7de77` "release workshop dashboard" (Communication dialog, Exist card, fixes — all committed by the operator).
+- **Uncommitted (this repo):** two templates — 8 new `data-testid`s (7 dialog, 1 dashboard) and the Exist panel's chips moved into their own container (they never rendered before). Prod build green; dashboard Karma suites 72/72.
+- **Hub repo cloned** at `../starlabs-e2e-tests` (npm ci done). **Untracked there:** `workshops/workshop-dashboard-communication.spec.ts` — 8 behavioural Playwright tests + an addressable list covering all 48 `wdash-*` hooks. Compiles; adversarially reviewed; NOT run (no Java runtime, no SA secret on this Mac).
+- Release Console: this branch is **Blocked**. Reproduce locally with `node scripts/readiness/readiness.cjs --app ../starlabs-angular --base origin/development --head HEAD --json` in the hub.
 
 ## Last session changes
-- **Communication dialog** (operator request). Answered the question first: the dashboard reads `participant metadata` **only for enrolled ids** (where-in batches of 30); only `new_user_data` is loaded whole. The dialog loads both whole, plus `workshop participant enrolled where workshopref == <workshopconfiguration ref>` and `journey`, merges them one row per person (metadata wins; `movedtoexist: true` = existing; country code spelled differently per collection), and offers audience / enrollment / status / journey / country / has-phone / has-email / search filters with sort, pagination and selection.
-- **Same send buttons, same functions:** `sendEmailToSelectedParicipant`, `sendWatti`, `sendNotificationinBreakthrough` were refactored to accept an optional recipient list (default unchanged), so the dialog and the side panel run identical composer / chunking / archive code.
-- **Bug pass after the operator tried it:** selection was pruned on every filter change (a second search un-ticked the first person) → selection is now independent of the view, with Show selected / Clear selection; search re-scanned and re-sorted everything per keystroke with per-CD getters on top → rows indexed once, 180 ms debounce, one pass per change, counts cached (30k people: 2–25 ms per change). Also fixed: MatSort/MatPaginator never attached (ViewChild inside `*ngIf`) and a nested `<label>` double-toggling the Has phone/email boxes. 41 tests passing; harness render clean.
-- Earlier in the session (committed): Exist Users Enrolled card + filters, `wdash-*` testids, 23-case spec; the CI "no spec references / nothing exercises" findings need e2e specs in the hub repo `starlabs-e2e-tests` (not checked out).
+- Read the gate (`scripts/readiness/lib.cjs`): four checks; the console truncates the drift list to 5. Journal: `specs/journals/2026-09-15-cicd-readiness-workshops-specs.md`.
+- **"Selectors gone" is not ours:** 1,076 hub-spec ids that exist only on `origin/meena-development` (rollout approved). Clears when her branch reaches `development` and is merged here — that merge conflicts in `workshop-dashboard.component.{ts,html}`; keep both sides' hooks.
+- **"Missing test cases" is fixed on our side:** readiness now reports no element flags and no untested new component. Spec follows `workshop-dashboard.spec.ts` (anti-circular oracles, seed people, console guard) and WS-14's guard-free stance for the composers (`disableClose:true` on two of them → dismissed via their own buttons).
+- Bug found by the review and fixed: Exist panel chips were inside the category-based block.
 
 ## Pending
-- Operator: commit the Communication dialog; runtime pass on it and on the earlier unverified screens (list in the journals).
-- e2e specs for `wdash-*` ids in `starlabs-e2e-tests` once it is available locally.
-- Open decisions: hide the 29 dead workshopconfig settings?; re-enable the Guide button (commented out); the three hero-mobile / two workshop-level mobile flags are mostly unread by the Flutter app; the D1 evergreen quirk; the five one-line fixes to unblock `ng test`.
+- Operator: (1) commit + push the two templates here; (2) commit the hub spec and land it on hub `main` (the callers use `e2e_ref: main`); (3) after meena-development merges, merge `development` here and resolve the dashboard conflict; then recheck in the console — expected MATCHED, then the workshops suite runs the new spec for the first time.
+- If that first run fails, the evidence report names the step; likeliest: composer heading text in WDC-07, timing.
+- Still open from before: runtime pass on the Communication dialog; the five stale spec stubs that break `ng test` repo-wide.
