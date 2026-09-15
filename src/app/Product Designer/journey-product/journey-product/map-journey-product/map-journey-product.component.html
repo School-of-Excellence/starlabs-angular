@@ -30,10 +30,10 @@
           <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
           {{mapProduct[order]}}
           <div>
-            <button mat-icon-button (click)="addAgain(order)">
+            <button data-testid="mjp-add-again-1" mat-icon-button (click)="addAgain(order)">
               <mat-icon>add_circle_outline</mat-icon>
             </button>
-            <button mat-icon-button (click)="remove(i)">
+            <button data-testid="mjp-remove-2" mat-icon-button (click)="remove(i)">
               <mat-icon>remove_circle_outline</mat-icon>
             </button>
           </div>
@@ -41,8 +41,8 @@
       </div>
   
       <div class="btnarea">
-        <button type="button" class="closebtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
-        <button type="submit" class="bookbtn" mat-stroked-button (click)="updateJourneyProduct()" [disabled]="loading">{{loading ? 'Loading' : 'Submit'}}</button>
+        <button data-testid="mjp-close-3" type="button" class="closebtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+        <button data-testid="mjp-update-journey-product-4" type="submit" class="bookbtn" mat-stroked-button (click)="updateJourneyProduct()" [disabled]="loading">{{loading ? 'Loading' : 'Submit'}}</button>
       </div>
     </form>
 </div>

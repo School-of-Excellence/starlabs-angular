@@ -8,7 +8,7 @@
       <div class="p-3">
         <div class="ms-2 mb-1 fs-6 fw-semibold d-flex justify-content-start align-items-center">
           OpenVidu Rooms
-          <button mat-icon-button (click)="createNewRoom()">
+          <button data-testid="or-create-new-room-1" mat-icon-button (click)="createNewRoom()">
             <mat-icon>add</mat-icon>
           </button>
         </div>
@@ -26,7 +26,7 @@
         <div class="list-group">
           <div class="mb-2" *ngIf="liveRooms.length > 0">
             <div class="fw-semibold m-2 text-secondary">Live Rooms</div>
-            <button 
+            <button data-testid="or-select-room-2" 
               *ngFor="let room of liveRooms"
               type="button"
               class="list-group-item list-group-item-action"
@@ -50,7 +50,7 @@
 
           <div *ngIf="rooms.length > 0">
             <div class="fw-semibold m-2 text-secondary">Closed Rooms</div>
-            <button 
+            <button data-testid="or-select-room-3" 
               *ngFor="let room of rooms"
               type="button"
               class="list-group-item list-group-item-action"
@@ -74,16 +74,7 @@
         </div>
 
         <div *ngIf="selectedRoom">
-          <div class="ms-2 mb-3 d-flex justify-content-between align-items-center">
-            <span class="fs-6 fw-semibold">{{ selectedRoom.title }} - Recordings</span>
-            <button
-              *ngIf="isLiveRoom(selectedRoom)"
-              mat-flat-button
-              color="primary"
-              (click)="joinRoom(selectedRoom)">
-              Join Call Now
-            </button>
-          </div>
+          <div class="ms-2 mb-3 fs-6 fw-semibold">{{ selectedRoom.title }} - Recordings</div>
 
           <div *ngIf="eventsLoading" class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
@@ -113,7 +104,7 @@
                   <td>{{ formatFileSize(event.payload.egressInfo.file.size) }}</td>
                   <td>{{ formatStartedAt(event.payload.egressInfo.file.startedAt) }}</td>
                   <td>
-                    <button 
+                    <button data-testid="or-get-video-url-4" 
                       class="btn btn-primary btn-sm"
                       (click)="getVideoURL(event)">
                       Play

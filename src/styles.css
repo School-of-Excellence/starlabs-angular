@@ -235,6 +235,21 @@ body {
   color: #fff;
 }
 
+/* Workshop dashboard — the Communication dialog (edge-to-edge header/footer). */
+.wdash-comm-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0;
+}
+.wdash-comm-dialog .mat-mdc-dialog-container,
+.wdash-comm-dialog .mdc-dialog__content {
+  padding: 0 !important;
+}
+/* its filter menus render in the CDK overlay, outside the component */
+.cm-menu.mat-mdc-menu-panel { border-radius: 10px; border: 1px solid #e3e8ef; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.cm-menu .mat-mdc-checkbox { display: block; }
+.cm-menu .mdc-form-field { width: 100%; padding: 2px 10px; }
+
 /* Workshop configuration — the configuration guide behind the "i" button. */
 .wc2-help-dialog .mat-mdc-dialog-surface {
   border-radius: 14px !important;
@@ -393,49 +408,6 @@ body:has(#zmmtg-root) { background: #000; }
 }
 .update-snackbar .mat-mdc-snack-bar-label,
 .update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; flex: 0 0 auto; }
-
-/* ============================================================
-   Call device menus (audio/video) — rendered in the global CDK
-   overlay, so they must be styled here (not in the component).
-   Black background, bold white headings, clean white text.
-   ============================================================ */
-.device-menu.mat-mdc-menu-panel {
-  background: #000 !important;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  min-width: 260px;
-  padding: 4px 0;
-}
-.device-menu .mat-mdc-menu-item {
-  color: #fff !important;
-  min-height: 40px;
-}
-.device-menu .mat-mdc-menu-item .mat-mdc-menu-item-text,
-.device-menu .mat-mdc-menu-item span {
-  color: #fff !important;
-  font-size: 14px;
-}
-.device-menu .mat-mdc-menu-item:hover:not([disabled]) {
-  background: #1e1e1e !important;
-}
-.device-menu .mat-mdc-menu-item .mat-icon {
-  color: #4caf50 !important;   /* the ✓ check */
-  margin-right: 8px;
-}
-/* Section headings: bolder, brighter, non-clickable */
-.device-menu .device-menu-header.mat-mdc-menu-item {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: #fff !important;
-  opacity: 1;
-  pointer-events: none;
-  min-height: 34px;
-}
-.device-menu .device-menu-header.mat-mdc-menu-item .mat-mdc-menu-item-text {
-  color: #fff !important;
-  font-weight: 700;
-}
 
 /* EiFlix operations dashboard — modal scroll lock (class-based so it beats
    the body { overflow: auto !important } rule above; works on iOS Safari). */

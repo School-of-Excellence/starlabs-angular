@@ -17,20 +17,74 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { PlanningDataService } from './planning-data.service';
 import { AuthguardService } from '../../../authguard.service';
-
-interface PhaseStageRow { queueid: string; stagename: string; }
-type Col = 'c_a' | 'c_na' | 'c_d' | 'n_a' | 'n_na' | 'n_d';
-interface Cells { c_a: number; c_na: number; c_d: number; n_a: number; n_na: number; n_d: number; total: number; }
-interface MatrixLine { key: string; label: string; kind: 'stage' | 'slot' | 'rate'; cells: Cells; stages: PhaseStageRow[]; }
-interface MatrixRow { phase: any; pct: number; target: number | null; status: 'ontrack' | 'risk' | 'behind' | 'none'; pop: number; lines: MatrixLine[]; }
-interface CardDef { key: string; label: string; value: number; desc?: string; }
-interface DrillRow { name: string; phone: string; status: string; confirmed: boolean; inQueue: boolean; }
-interface CellDrillRow { name: string; phone: string; queueName: string; stage: string; status: string; confirmed: boolean; slot: string; }
-interface CellRef { phaseDocid: string; lineKey: string; col: Col | 'total'; label: string; }
-/** A phase as stored inside a saved filter (self-contained snapshot). */
-interface FilterPhase { phasename: string; targetPct: number | null; rows: { [key: string]: PhaseStageRow[] }; }
-/** A saved filter = a named bundle of {queue selection, event selection, phases}. */
-interface PlanningFilter { docid: string; title: string; queueIds: string[]; eventIds: string[]; phases: FilterPhase[]; created?: any; updated?: any; }
+// The planning arithmetic lives in planning.engine.ts — no Angular / Firestore / rxjs there, so the
+// cards, matrix, bands and drill tables can be unit-tested without this component. See its header.
+import {
+  ALL_COLS,
+  CONFIRMED_COLS,
+  CardDef,
+  Cells,
+  Col,
+  CellDrillRow,
+  CellRef,
+  DrillRow,
+  FilterPhase,
+  MatrixContext,
+  MatrixLine,
+  MatrixRow,
+  NOT_CONFIRMED_COLS,
+  PAGE_SIZE,
+  PhaseStageRow,
+  PlanningFilter,
+  RING_CIRCUMFERENCE,
+  ROW_DEFS,
+  RowDef,
+  buildDrillRows,
+  buildMatrix,
+  cellIds,
+  clampPage,
+  clampTargetPct,
+  cloneRows,
+  cohortMembersUnion,
+  colKey,
+  colLabel,
+  comparePhaseStage,
+  completedSetForStage,
+  computeCards,
+  computeChanges,
+  confirmedSlotSetForStage,
+  countdownLabel,
+  daysToEvent,
+  drillIds,
+  eventNameFor,
+  filterCellDrillRows,
+  filterDrillRows,
+  formatSlot,
+  getRowStages,
+  holderIdsFrom,
+  isDfuOngoing,
+  journeyIdsFor,
+  nextPage,
+  pageCount,
+  pageSlice,
+  participantQueueStage,
+  participantSlot,
+  passesParticipantFilters,
+  phaseStatusLabel,
+  pickEventDate,
+  potentialIds,
+  prevPage,
+  queueStages,
+  rangeEnd,
+  rangeStart,
+  ringDash,
+  signature,
+  statusLabel,
+  toDate,
+  toggleFilterToken,
+  tokensForQueue,
+  type2Ids,
+} from './planning.engine';
 
 @Component({
   selector: 'app-planning-tab',
@@ -107,10 +161,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   onCohortsChange(ids: string[]): void {
     this.selectedCohorts = ids || [];
-    this.selectedCohortMembers = new Set<string>();
-    for (const c of this.cohortList) {
-      if (this.selectedCohorts.includes(c.id)) c.members.forEach(m => this.selectedCohortMembers.add(m));
-    }
+    this.selectedCohortMembers = cohortMembersUnion(this.cohortList, this.selectedCohorts);
     this.selectedCardKey = null; this.drillList = [];
     this.recomputeView();
   }
@@ -139,43 +190,19 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   /** DFU ongoing = holds a Priority-Mode product (mirrors dynamic-queue-manager-clone). */
-  private isDfuOngoing(id: string): boolean {
-    const active = this.participantMeta?.[id]?.['activeproduct'] || [];
-    return Array.isArray(active) && active.some((pid: string) => this.priorityProductIds.has(pid));
-  }
-  /**
-   * The participant's journey id(s), chosen by customer status — mirrors journeycoach-dashboard's
-   * mapCustomerStatusVariable: active→activejourney, non active→lastcompletedjourney,
-   * discontinued→lastsubscribedjourney. Fields hold journey IDs (scalar or array).
-   */
-  private journeyIdsFor(id: string): string[] {
-    const meta = this.participantMeta?.[id];
-    if (!meta) return [];
-    const status = (this.statusMap.get(id) || '').toLowerCase();
-    const field = status === 'active' ? 'activejourney'
-      : status === 'discontinued' ? 'lastsubscribedjourney'
-      : 'lastcompletedjourney';
-    const v = meta[field];
-    if (v == null) return [];
-    return Array.isArray(v) ? v.flat().filter(Boolean).map(String) : [String(v)];
-  }
   private passesParticipantFilters(id: string): boolean {
-    const journeyActive = this.selectedJourneys.length > 0;
-    const cohortActive = this.selectedCohorts.length > 0;
-    if (!journeyActive && !this.dfuOn && !cohortActive) return true;
-    const journeyMatch = journeyActive && this.journeyIdsFor(id).some(j => this.selectedJourneys.includes(j));
-    const dfuMatch = this.dfuOn && this.isDfuOngoing(id);
-    const cohortMatch = cohortActive && this.selectedCohortMembers.has(id);
-    if (this.filterMode === 'only') {
-      // keep only participants who match EVERY active filter
-      if (journeyActive && !journeyMatch) return false;
-      if (this.dfuOn && !dfuMatch) return false;
-      if (cohortActive && !cohortMatch) return false;
-      return true;
-    }
-    // 'remove': drop participants who match ANY active filter
-    if (journeyMatch || dfuMatch || cohortMatch) return false;
-    return true;
+    return passesParticipantFilters(
+      id,
+      {
+        selectedJourneys: this.selectedJourneys,
+        dfuOn: this.dfuOn,
+        selectedCohorts: this.selectedCohorts,
+        selectedCohortMembers: this.selectedCohortMembers,
+        filterMode: this.filterMode,
+      },
+      journeyIdsFor(this.participantMeta?.[id], this.statusMap.get(id) || ''),
+      isDfuOngoing(this.participantMeta?.[id], this.priorityProductIds),
+    );
   }
 
   /**
@@ -229,50 +256,30 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   /** Stable string signature of the current working state (queues + events + phases). */
   private currentSignature(): string {
-    return this.signature([...this.selectedQueueList], [...this.selectedEventIds],
-      this.planningPhases.map(p => ({ phasename: p['phasename'], targetPct: p['targetPct'] ?? null, rows: p['rows'] || {} })));
+    return signature([...this.selectedQueueList], [...this.selectedEventIds],
+      this.planningPhases.map(p => ({ phasename: p['phasename'], targetPct: p['targetPct'] ?? null, rows: p['rows'] || {} })),
+      this.rowDefs);
   }
   private filterSignature(f: PlanningFilter): string {
-    return this.signature(f.queueIds || [], f.eventIds || [], f.phases || []);
-  }
-  private signature(queueIds: string[], eventIds: string[], phases: FilterPhase[]): string {
-    const stageRowKeys = this.rowDefs.filter(rd => rd.kind !== 'rate').map(rd => rd.key);
-    return JSON.stringify({
-      q: [...queueIds].sort(),
-      e: [...eventIds].sort(),
-      p: phases.map(p => ({
-        n: p.phasename, t: p.targetPct ?? null,
-        r: stageRowKeys.map(k => (p.rows?.[k] || []).map(s => `${s.queueid}|${s.stagename}`).sort())
-      }))
-    });
+    return signature(f.queueIds || [], f.eventIds || [], f.phases || [], this.rowDefs);
   }
 
   /** Phase roll-up: 'all' = clear every member stage. */
   phaseRollupRule: 'all' | 'any' = 'all';
 
   // Column groups (Confirmed / Not confirmed × Active / Non-Active / Discontinued)
-  readonly confirmedCols: { k: Col; label: string }[] = [
-    { k: 'c_a', label: 'Active' }, { k: 'c_na', label: 'Non Active' }, { k: 'c_d', label: 'Discontinued' }
-  ];
-  readonly notConfirmedCols: { k: Col; label: string }[] = [
-    { k: 'n_a', label: 'Active' }, { k: 'n_na', label: 'Non Active' }, { k: 'n_d', label: 'Discontinued' }
-  ];
-  get allCols(): { k: Col; label: string }[] { return [...this.confirmedCols, ...this.notConfirmedCols]; }
+  readonly confirmedCols: readonly { k: Col; label: string }[] = CONFIRMED_COLS;
+  readonly notConfirmedCols: readonly { k: Col; label: string }[] = NOT_CONFIRMED_COLS;
+  get allCols(): readonly { k: Col; label: string }[] { return ALL_COLS; }
 
   /**
    * Readiness rows (Categories), in the order the Planning table renders them.
    * 'rate' rows are derived percentages (not stage-configurable, not drillable).
    */
-  readonly rowDefs: { key: string; label: string; kind: 'stage' | 'slot' | 'rate' }[] = [
-    { key: 'notComplete', label: 'Not Completed', kind: 'stage' },
-    { key: 'slotConfirmed', label: 'Slot Confirmed', kind: 'slot' },
-    { key: 'confRate', label: 'Confir. rate', kind: 'rate' },
-    { key: 'slotNotConfirmed', label: 'Not Confirmed', kind: 'slot' },
-    { key: 'complete', label: 'Completed', kind: 'stage' }
-  ];
+  readonly rowDefs: readonly RowDef[] = ROW_DEFS;
 
   getRowStages(phase: any, key: string): PhaseStageRow[] {
-    return (phase?.['rows']?.[key] || []) as PhaseStageRow[];
+    return getRowStages(phase, key);
   }
 
   setRowStages(phase: any, key: string, stages: PhaseStageRow[]): void {
@@ -310,7 +317,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   cellDrillRows: CellDrillRow[] = [];
 
   // Client-side pagination for both drill tables
-  readonly pageSize = 15;
+  readonly pageSize = PAGE_SIZE;
   drillPage = 0;
   cellPage = 0;
 
@@ -320,52 +327,35 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   drillFilters = new Set<string>();
   cellFilters = new Set<string>();
 
-  private statusKey(status: string): 'a' | 'na' | 'd' {
-    const s = (status || '').toLowerCase();
-    return s === 'active' ? 'a' : s === 'discontinued' ? 'd' : 'na';
-  }
-  /** active tokens are "dim:value"; within a dimension OR, across dimensions AND; empty = pass all. */
-  private passesFilters(active: Set<string>, dims: Record<string, string>): boolean {
-    if (!active.size) return true;
-    const byDim: Record<string, string[]> = {};
-    active.forEach(t => { const d = t.split(':')[0]; (byDim[d] = byDim[d] || []).push(t); });
-    return Object.keys(byDim).every(d => byDim[d].includes(d + ':' + dims[d]));
-  }
   get filteredDrill(): DrillRow[] {
-    const q = this.drillSearch.trim().toLowerCase();
-    return this.drillList.filter(r =>
-      (!q || String(r.name ?? '').toLowerCase().includes(q) || String(r.phone ?? '').toLowerCase().includes(q)) &&
-      this.passesFilters(this.drillFilters, { conf: r.confirmed ? 'yes' : 'no', st: this.statusKey(r.status), inq: r.inQueue ? 'in' : 'out' }));
+    return filterDrillRows(this.drillList, this.drillSearch, this.drillFilters);
   }
   get filteredCellDrill(): CellDrillRow[] {
-    const q = this.cellSearch.trim().toLowerCase();
-    return this.cellDrillRows.filter(r =>
-      (!q || String(r.name ?? '').toLowerCase().includes(q) || String(r.phone ?? '').toLowerCase().includes(q)) &&
-      this.passesFilters(this.cellFilters, { conf: r.confirmed ? 'yes' : 'no', st: this.statusKey(r.status), slot: (r.slot && r.slot !== '—') ? 'has' : 'none' }));
+    return filterCellDrillRows(this.cellDrillRows, this.cellSearch, this.cellFilters);
   }
-  toggleDrillFilter(t: string): void { this.drillFilters.has(t) ? this.drillFilters.delete(t) : this.drillFilters.add(t); this.drillPage = 0; }
-  toggleCellFilter(t: string): void { this.cellFilters.has(t) ? this.cellFilters.delete(t) : this.cellFilters.add(t); this.cellPage = 0; }
+  toggleDrillFilter(t: string): void { this.drillFilters = toggleFilterToken(this.drillFilters, t); this.drillPage = 0; }
+  toggleCellFilter(t: string): void { this.cellFilters = toggleFilterToken(this.cellFilters, t); this.cellPage = 0; }
   isDrillFilter(t: string): boolean { return this.drillFilters.has(t); }
   isCellFilter(t: string): boolean { return this.cellFilters.has(t); }
   onDrillSearch(): void { this.drillPage = 0; }
   onCellSearch(): void { this.cellPage = 0; }
 
-  get drillPageCount(): number { return Math.max(1, Math.ceil(this.filteredDrill.length / this.pageSize)); }
-  get cellPageCount(): number { return Math.max(1, Math.ceil(this.filteredCellDrill.length / this.pageSize)); }
-  get pagedDrill(): DrillRow[] { const s = this.drillPage * this.pageSize; return this.filteredDrill.slice(s, s + this.pageSize); }
-  get pagedCellDrill(): CellDrillRow[] { const s = this.cellPage * this.pageSize; return this.filteredCellDrill.slice(s, s + this.pageSize); }
-  get drillRangeStart(): number { return this.filteredDrill.length ? this.drillPage * this.pageSize + 1 : 0; }
-  get drillRangeEnd(): number { return Math.min(this.filteredDrill.length, (this.drillPage + 1) * this.pageSize); }
-  get cellRangeStart(): number { return this.filteredCellDrill.length ? this.cellPage * this.pageSize + 1 : 0; }
-  get cellRangeEnd(): number { return Math.min(this.filteredCellDrill.length, (this.cellPage + 1) * this.pageSize); }
-  prevDrillPage(): void { this.drillPage = Math.max(0, this.drillPage - 1); }
-  nextDrillPage(): void { this.drillPage = Math.min(this.drillPageCount - 1, this.drillPage + 1); }
-  prevCellPage(): void { this.cellPage = Math.max(0, this.cellPage - 1); }
-  nextCellPage(): void { this.cellPage = Math.min(this.cellPageCount - 1, this.cellPage + 1); }
-  private clampDrillPage(): void { this.drillPage = Math.min(this.drillPage, this.drillPageCount - 1); }
-  private clampCellPage(): void { this.cellPage = Math.min(this.cellPage, this.cellPageCount - 1); }
+  get drillPageCount(): number { return pageCount(this.filteredDrill.length, this.pageSize); }
+  get cellPageCount(): number { return pageCount(this.filteredCellDrill.length, this.pageSize); }
+  get pagedDrill(): DrillRow[] { return pageSlice(this.filteredDrill, this.drillPage, this.pageSize); }
+  get pagedCellDrill(): CellDrillRow[] { return pageSlice(this.filteredCellDrill, this.cellPage, this.pageSize); }
+  get drillRangeStart(): number { return rangeStart(this.filteredDrill.length, this.drillPage, this.pageSize); }
+  get drillRangeEnd(): number { return rangeEnd(this.filteredDrill.length, this.drillPage, this.pageSize); }
+  get cellRangeStart(): number { return rangeStart(this.filteredCellDrill.length, this.cellPage, this.pageSize); }
+  get cellRangeEnd(): number { return rangeEnd(this.filteredCellDrill.length, this.cellPage, this.pageSize); }
+  prevDrillPage(): void { this.drillPage = prevPage(this.drillPage); }
+  nextDrillPage(): void { this.drillPage = nextPage(this.drillPage, this.filteredDrill.length, this.pageSize); }
+  prevCellPage(): void { this.cellPage = prevPage(this.cellPage); }
+  nextCellPage(): void { this.cellPage = nextPage(this.cellPage, this.filteredCellDrill.length, this.pageSize); }
+  private clampDrillPage(): void { this.drillPage = clampPage(this.drillPage, this.filteredDrill.length, this.pageSize); }
+  private clampCellPage(): void { this.cellPage = clampPage(this.cellPage, this.filteredCellDrill.length, this.pageSize); }
 
-  readonly ringCircumference = 163;
+  readonly ringCircumference = RING_CIRCUMFERENCE;
   private phasesSub?: Subscription;
 
   constructor(
@@ -542,11 +532,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   /** All token holders across the planning scope — unfiltered (for status loading). */
   private rawQueueHolderIds(): Set<string> {
-    const s = new Set<string>();
-    for (const q of this.scope) {
-      this.tokensForQueue(q).forEach(t => { if (t['profile_id']) s.add(t['profile_id']); });
-    }
-    return s;
+    return holderIdsFrom(this.scope.map(q => this.tokensForQueue(q)));
   }
 
   /**
@@ -555,7 +541,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
    * correct immediately rather than settling after mapData lands.
    */
   private queueStages(queueId: string): string[] {
-    return (this.mapQueue?.[queueId]?.['stages'] || this.mapData?.[queueId]?.['stages'] || []) as string[];
+    return queueStages(this.mapQueue, this.mapData, queueId);
   }
 
   /** Holders after applying the journey filter + DFU-ongoing omit — used by every number/list. */
@@ -604,37 +590,28 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   /** The Potential set (product owners not already approved/requested for the event). */
   private potentialIds(): string[] {
-    return [...this.ownerSet].filter(o => !this.approvedSet.has(o) && !this.requestedSet.has(o));
+    return potentialIds(this.ownerSet, this.approvedSet, this.requestedSet);
   }
 
   /** Type #2 = Potential ∩ (in queue-planning segment) ∩ (NOT in queue_token). */
   private type2Ids(): string[] {
-    if (!this.planningSegmentMembers.size) return [];
-    const holders = this.rawQueueHolderIds();
-    return this.potentialIds().filter(id => this.planningSegmentMembers.has(id) && !holders.has(id));
+    return type2Ids(this.potentialIds(), this.planningSegmentMembers, this.rawQueueHolderIds());
   }
 
-  private statusBucket(id: string): 'a' | 'na' | 'd' {
-    const raw = this.statusMap.get(id) || '';
-    return raw === 'active' ? 'a' : raw === 'discontinued' ? 'd' : 'na';
-  }
+  /** The already-lowercased customer status the engine's bucket/label rules read. */
+  private statusOf = (id: string): string => this.statusMap.get(id) || '';
 
   private colKey(id: string, confirmed: boolean): Col {
-    return `${confirmed ? 'c' : 'n'}_${this.statusBucket(id)}` as Col;
+    return colKey(this.statusOf(id), confirmed);
   }
 
   statusLabel(id: string): string {
-    const raw = this.statusMap.get(id) || '';
-    if (raw === 'active') return 'Active';
-    if (raw === 'discontinued') return 'Discontinued';
-    if (!raw) return '—';
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
+    return statusLabel(this.statusOf(id));
   }
 
   // ---------- Cards ----------
 
   private computeCards(): void {
-    const ap = this.approvedSet;
     // Every "in queue" card counts DISTINCT PEOPLE (deduped by profileid), so the set
     // is deterministic across machines and the cards reconcile with each other AND with
     // their own drill-downs (drillIds() already returns distinct holders). A person who
@@ -642,21 +619,12 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     // person here, not N. Token-based counting (one row per token) double-counted them,
     // which is why "Confirmed + in queue" + "Confirmed + not in queue" overshot
     // "Confirmed for the event".
-    const holders = this.queueHolderIds(); // distinct in-queue people (journey/DFU/cohort filtered)
-    const confInQueue = [...holders].filter(id => ap.has(id)).length;
-    const notConfInQueue = holders.size - confInQueue;
-    const confNotInQueue = [...ap].filter(id => !holders.has(id)).length;
-    // Identities that now hold: confInQueue + confNotInQueue = confEvent (ap.size),
-    // and confInQueue + notConfInQueue = inQueue (holders.size).
-    this.cards = [
-      { key: 'confEvent', label: 'Confirmed for the event', value: ap.size, desc: 'Approved/attended event requests' },
-      { key: 'inQueue', label: 'Total in the queue', value: holders.size, desc: 'Distinct people in the selected queue' },
-      { key: 'confInQueue', label: 'Confirmed + in queue', value: confInQueue, desc: 'Event-confirmed AND in the queue' },
-      { key: 'confNotInQueue', label: 'Confirmed + not in queue', value: confNotInQueue, desc: 'Event-confirmed but not in the queue' },
-      { key: 'notConfInQueue', label: 'Not confirmed + in queue', value: notConfInQueue, desc: 'In queue but not event-confirmed' },
-      { key: 'potential', label: 'Potential', value: this.potentialTotal, desc: 'Own the product, not yet in the event' },
-      { key: 'type2', label: 'Eligible · not in queue', value: this.type2Ids().length, desc: 'Potential in a queue segment, not in queue' }
-    ];
+    this.cards = computeCards({
+      holders: this.queueHolderIds(), // distinct in-queue people (journey/DFU/cohort filtered)
+      approved: this.approvedSet,
+      potentialTotal: this.potentialTotal,
+      type2Count: this.type2Ids().length,
+    });
   }
 
   // ---------- Token / completion helpers ----------
@@ -664,40 +632,29 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   private tokensForQueue(queueId: string): any[] {
     // The single "in queue" definition used by EVERY planning number (matches Total in the queue
     // and dynamic-queue-manager-clone): Active + not-deleted + currentstage is a real queue stage.
-    const stages = this.queueStages(queueId);
-    return (this.queueTokens || []).filter(t =>
-      t?.['queueref']?.id === queueId &&
-      [null, undefined, false].includes(t?.['delete']) &&
-      String(t?.['tokenstatus'] ?? '').toLowerCase() === 'active' &&
-      (!stages.length || stages.includes(t?.['currentstage'])));
+    return tokensForQueue(this.queueTokens, queueId, this.queueStages(queueId));
   }
 
   private confirmedSlotSetForStage(queueId: string, stageName: string): Set<string> {
-    const out = new Set<string>();
-    const now = Date.now();
-    this.tokensForQueue(queueId).forEach(t => {
-      const pid = t['profile_id'];
-      if (!pid) return;
-      const slot = (t['selectedstageslot'] || {})[stageName];
-      if (!slot || !slot['slotconfirmation']) return;
-      // Only count a confirmed slot whose end time is still in the future (upcoming, not past).
-      const end = this.toDate(slot['enddate']);
-      if (end && end.getTime() > now) out.add(pid);
-    });
-    return out;
+    return confirmedSlotSetForStage(this.tokensForQueue(queueId), stageName);
   }
 
   private completedSetForStage(queueId: string, stageName: string): Set<string> {
-    const out = new Set<string>();
-    const map = this.allCompletedStageCount?.[queueId]?.[stageName];
-    if (!map) return out;
-    Object.keys(map).forEach(k => {
-      (map[k] || []).forEach((d: any) => {
-        const pid = d['participantid'] || d['profile_id'];
-        if (pid) out.add(pid);
-      });
-    });
-    return out;
+    return completedSetForStage(this.allCompletedStageCount, queueId, stageName);
+  }
+
+  /** The engine's view of this component's data — everything the matrix builder needs. */
+  private matrixContext(holders: string[]): MatrixContext {
+    return {
+      holders,
+      scope: this.scope,
+      approved: this.approvedSet,
+      statusOf: this.statusOf,
+      completedSetFor: (q, s) => this.completedSetForStage(q, s),
+      confirmedSlotSetFor: (q, s) => this.confirmedSlotSetForStage(q, s),
+      rollupRule: this.phaseRollupRule,
+      rowDefs: this.rowDefs,
+    };
   }
 
   memberStagesInScope(phase: any): PhaseStageRow[] {
@@ -711,90 +668,26 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   // ---------- Matrix ----------
 
   private rebuildMatrix(): void {
-    const holders = [...this.queueHolderIds()];
-    const scope = this.scope;
-    this.matrixRows = (this.planningPhases || []).map(phase => {
-      const z = (): Cells => ({ c_a: 0, c_na: 0, c_d: 0, n_a: 0, n_na: 0, n_d: 0, total: 0 });
-      const lines: MatrixLine[] = this.rowDefs.map(rd => {
-        const cells = z();
-        if (rd.kind !== 'rate') {
-          const stages = this.getRowStages(phase, rd.key).filter(s => scope.includes(s.queueid));
-          for (const id of holders) {
-            if (!this.rowMatches(rd, stages, id)) continue;
-            const col = this.colKey(id, this.approvedSet.has(id));
-            cells[col]++; cells.total++;
-          }
-        }
-        return { key: rd.key, label: rd.label, kind: rd.kind, cells, stages: this.getRowStages(phase, rd.key) };
-      });
-      // Confirmation rate = Slot Confirmed ÷ Not Completed, per column (0 when the denominator is 0).
-      const rateLine = lines.find(l => l.kind === 'rate');
-      const notCompCells = lines.find(l => l.key === 'notComplete')?.cells;
-      const slotConfCells = lines.find(l => l.key === 'slotConfirmed')?.cells;
-      if (rateLine && notCompCells && slotConfCells) {
-        (['c_a', 'c_na', 'c_d', 'n_a', 'n_na', 'n_d', 'total'] as (Col | 'total')[]).forEach(k => {
-          rateLine.cells[k] = notCompCells[k] > 0 ? Math.round((slotConfCells[k] / notCompCells[k]) * 100) : 0;
-        });
-      }
-      const completeLine = lines.find(l => l.key === 'complete');
-      const pct = holders.length > 0 && completeLine ? Math.round((completeLine.cells.total / holders.length) * 100) : 0;
-      const rawTarget = phase['targetPct'];
-      const target = (rawTarget === null || rawTarget === undefined || rawTarget === '') ? null : Number(rawTarget);
-      const status: MatrixRow['status'] = target == null ? 'none' : pct >= target ? 'ontrack' : pct >= target - 10 ? 'risk' : 'behind';
-      return { phase, pct, target, status, pop: holders.length, lines } as MatrixRow;
-    });
-  }
-
-  /** Does a queue participant match a readiness row's predicate over that row's configured stages? */
-  private rowMatches(rd: { key: string; kind: 'stage' | 'slot' | 'rate' }, stages: PhaseStageRow[], id: string): boolean {
-    if (!stages.length) return false;
-    const all = (sets: Set<string>[]) =>
-      this.phaseRollupRule === 'any' ? sets.some(s => s.has(id)) : sets.every(s => s.has(id));
-    if (rd.kind === 'stage') {
-      const done = all(stages.map(s => this.completedSetForStage(s.queueid, s.stagename)));
-      return rd.key === 'complete' ? done : !done;
-    }
-    const conf = all(stages.map(s => this.confirmedSlotSetForStage(s.queueid, s.stagename)));
-    return rd.key === 'slotConfirmed' ? conf : !conf;
+    this.matrixRows = buildMatrix(this.planningPhases, this.matrixContext([...this.queueHolderIds()]));
   }
 
   ringDash(pct: number): string {
-    return `${Math.round(this.ringCircumference * pct / 100)} ${this.ringCircumference}`;
+    return ringDash(pct, this.ringCircumference);
   }
 
   get eventDate(): Date | null {
-    const dates = (this.eventList || [])
-      .filter(e => this.selectedEventIds.includes(e['id']))
-      .map(e => this.toDate(e['start_date']))
-      .filter((d): d is Date => !!d)
-      .sort((a, b) => a.getTime() - b.getTime());
-    if (!dates.length) return null;
-    const now = Date.now();
-    return dates.find(d => d.getTime() >= now) || dates[dates.length - 1];
+    return pickEventDate(this.eventList, this.selectedEventIds);
   }
   get eventName(): string {
-    const sel = (this.eventList || []).filter(e => this.selectedEventIds.includes(e['id']));
-    if (!sel.length) return '';
-    if (sel.length === 1) return sel[0]['name'] || '';
-    const d = this.eventDate;
-    const match = d ? sel.find(e => { const ed = this.toDate(e['start_date']); return !!ed && ed.getTime() === d.getTime(); }) : null;
-    return (match || sel[0])['name'] || (sel.length + ' events');
+    return eventNameFor(this.eventList, this.selectedEventIds);
   }
   get daysToEvent(): number | null {
-    const d = this.eventDate; if (!d) return null;
-    const a = new Date(d); a.setHours(0, 0, 0, 0);
-    const b = new Date(); b.setHours(0, 0, 0, 0);
-    return Math.round((a.getTime() - b.getTime()) / 86400000);
+    return daysToEvent(this.eventDate);
   }
   get countdownLabel(): string {
-    const n = this.daysToEvent; if (n == null) return '';
-    if (n > 1) return 'in ' + n + ' days';
-    if (n === 1) return 'tomorrow';
-    if (n === 0) return 'today';
-    if (n === -1) return 'yesterday';
-    return Math.abs(n) + ' days ago';
+    return countdownLabel(this.daysToEvent);
   }
-  phaseStatusLabel(s: string): string { return s === 'ontrack' ? 'On track' : s === 'risk' ? 'At risk' : s === 'behind' ? 'Behind' : ''; }
+  phaseStatusLabel(s: string): string { return phaseStatusLabel(s); }
 
   // ---------- Card drill-down ----------
 
@@ -811,31 +704,20 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private drillIds(): string[] {
-    const holders = this.queueHolderIds();
-    const ap = this.approvedSet;
-    switch (this.selectedCardKey) {
-      case 'confEvent': return [...ap];
-      case 'inQueue': return [...holders];
-      case 'confInQueue': return [...holders].filter(id => ap.has(id));
-      case 'confNotInQueue': return [...ap].filter(id => !holders.has(id));
-      case 'notConfInQueue': return [...holders].filter(id => !ap.has(id));
-      case 'potential': return this.potentialIds();
-      case 'type2': return this.type2Ids();
-      default: return [];
-    }
+    return drillIds(this.selectedCardKey, {
+      holders: this.queueHolderIds(),
+      approved: this.approvedSet,
+      potential: this.potentialIds(),
+      type2: this.type2Ids(),
+    });
   }
 
   private refreshDrill(): void {
     if (!this.selectedCardKey) { this.drillList = []; return; }
-    const holders = this.queueHolderIds();
-    const ap = this.approvedSet;
-    this.drillList = this.drillIds().map(id => ({
-      name: this.mapProfile?.[id] || id,
-      phone: this.mapNumber?.[id] || '',
-      status: this.statusLabel(id),
-      confirmed: ap.has(id),
-      inQueue: holders.has(id)
-    })).sort((a, b) => a.name.localeCompare(b.name));
+    this.drillList = buildDrillRows(
+      this.drillIds(), this.mapProfile, this.mapNumber,
+      this.approvedSet, this.queueHolderIds(), this.statusOf,
+    );
     this.clampDrillPage();
   }
 
@@ -868,19 +750,11 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   closeCell(): void { this.selectedCell = null; this.cellDrillRows = []; this.cellSearch = ''; this.cellFilters.clear(); }
 
   colLabel(col: Col | 'total'): string {
-    if (col === 'total') return 'Total';
-    const c = this.allCols.find(x => x.k === col);
-    return `${col.startsWith('c_') ? 'Confirmed' : 'Not confirmed'} · ${c?.label || col}`;
+    return colLabel(col);
   }
 
   private cellIds(phase: any, lineKey: string, col: Col | 'total'): string[] {
-    const rd = this.rowDefs.find(r => r.key === lineKey);
-    if (!rd) return [];
-    const stages = this.getRowStages(phase, lineKey).filter(s => this.scope.includes(s.queueid));
-    return [...this.queueHolderIds()].filter(id => {
-      if (!this.rowMatches(rd, stages, id)) return false;
-      return col === 'total' || this.colKey(id, this.approvedSet.has(id)) === col;
-    });
+    return cellIds(phase, lineKey, col, this.matrixContext([...this.queueHolderIds()]));
   }
 
   /**
@@ -889,18 +763,9 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
    * configured stages belong to, so the drill agrees with why the cell matched.
    */
   private participantQueueStage(id: string, preferQueueIds?: Set<string>): { queueName: string; stage: string } {
-    const lookup = (queues: string[]) => {
-      for (const q of queues) {
-        const tok = this.tokensForQueue(q).find(t => t['profile_id'] === id);
-        if (tok) return { queueName: this.queueName(q), stage: tok['currentstage'] || '—' };
-      }
-      return null;
-    };
-    if (preferQueueIds && preferQueueIds.size) {
-      const preferred = lookup(this.scope.filter(q => preferQueueIds.has(q)));
-      if (preferred) return preferred;
-    }
-    return lookup(this.scope) || { queueName: '—', stage: '—' };
+    return participantQueueStage(
+      id, this.scope, q => this.tokensForQueue(q), q => this.queueName(q), preferQueueIds,
+    );
   }
 
   /** Whether the currently-open cell belongs to a slot row (drives the "Selected slot" column). */
@@ -930,32 +795,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
 
   /** The slot a participant picked for this row's configured slot stage(s): first stage with a dated slot. */
   private participantSlot(id: string, stages: PhaseStageRow[]): string {
-    for (const s of stages) {
-      const tok = this.tokensForQueue(s.queueid).find(t => t['profile_id'] === id);
-      const slot = tok?.['selectedstageslot']?.[s.stagename];
-      const label = this.formatSlot(slot);
-      if (label) return label;
-    }
-    return '—';
-  }
-
-  private formatSlot(slot: any): string {
-    const start = this.toDate(slot?.['startdate']);
-    if (!start) return '';
-    const date = start.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-    const startTime = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    const end = this.toDate(slot?.['enddate']);
-    const endTime = end ? end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
-    return endTime ? `${date}, ${startTime}–${endTime}` : `${date}, ${startTime}`;
-  }
-
-  /** Coerce a Firestore Timestamp / Date / parseable value to a Date. */
-  private toDate(v: any): Date | null {
-    if (!v) return null;
-    if (typeof v?.toDate === 'function') return v.toDate();
-    if (v instanceof Date) return v;
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? null : d;
+    return participantSlot(id, stages, q => this.tokensForQueue(q));
   }
 
   private refreshCellDrill(): void {
@@ -984,9 +824,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private cloneRows(rows: { [key: string]: PhaseStageRow[] } | undefined): { [key: string]: PhaseStageRow[] } {
-    const out: { [key: string]: PhaseStageRow[] } = {};
-    Object.keys(rows || {}).forEach(k => out[k] = (rows![k] || []).map(s => ({ queueid: s.queueid, stagename: s.stagename })));
-    return out;
+    return cloneRows(rows);
   }
 
   /** Apply a saved filter: restore queues (→ Board loads data), events and phases, then recompute. */
@@ -1087,68 +925,17 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     return (this.eventList || []).find(e => e['id'] === id)?.['name'] || id;
   }
 
-  private readonly rowLabel = (k: string) => this.rowDefs.find(rd => rd.key === k)?.label || k;
-  private stageNames(arr: PhaseStageRow[]): string[] { return (arr || []).map(s => s.stagename); }
-
-  /** Every configured line of a phase, e.g. `Not Completed: StageA, StageB`. */
-  private phaseDetailLines(name: string, targetPct: any, rows: any, prefix = ''): string[] {
-    const out: string[] = [];
-    const t = targetPct ?? null;
-    out.push(`${prefix}Phase "${name}"${t != null ? ` · target ${t}%` : ''}`);
-    for (const rd of this.rowDefs) {
-      if (rd.kind === 'rate') continue;
-      const stages = this.stageNames((rows || {})[rd.key] || []);
-      if (stages.length) out.push(`${prefix}   ${this.rowLabel(rd.key)}: ${stages.join(', ')}`);
-    }
-    return out;
-  }
-
   /** FULL list of what is being saved (new) or what changed vs the applied filter (update). */
   private computeChanges(active: PlanningFilter | null): string[] {
-    // NEW filter — list everything that will be saved, in full.
-    if (!active) {
-      const out: string[] = [];
-      out.push(`Queues: ${this.selectedQueueList.length ? this.selectedQueueList.map(q => this.queueName(q)).join(', ') : '—'}`);
-      out.push(`Events: ${this.selectedEventIds.length ? this.selectedEventIds.map(e => this.eventLabel(e)).join(', ') : '—'}`);
-      out.push(`Phases: ${this.planningPhases.length}`);
-      for (const p of this.planningPhases) out.push(...this.phaseDetailLines(p['phasename'], p['targetPct'], p['rows'], '  '));
-      return out;
-    }
-    // UPDATE — every difference, spelled out.
-    const lines: string[] = [];
-    if (active.title !== (this.saveTitle || '').trim() && (this.saveTitle || '').trim()) {
-      lines.push(`Title: "${active.title}" → "${(this.saveTitle || '').trim()}"`);
-    }
-    const diffSet = (oldArr: string[], curArr: string[], label: string, name: (x: string) => string) => {
-      const oldS = new Set(oldArr), curS = new Set(curArr);
-      const added = curArr.filter(x => !oldS.has(x)).map(name);
-      const removed = oldArr.filter(x => !curS.has(x)).map(name);
-      if (added.length) lines.push(`${label} added: ${added.join(', ')}`);
-      if (removed.length) lines.push(`${label} removed: ${removed.join(', ')}`);
-    };
-    diffSet(active.queueIds || [], this.selectedQueueList, 'Queue', q => this.queueName(q));
-    diffSet(active.eventIds || [], this.selectedEventIds, 'Event', e => this.eventLabel(e));
-    const oldByName = new Map((active.phases || []).map(p => [p.phasename, p]));
-    const curByName = new Map(this.planningPhases.map(p => [p['phasename'], p]));
-    for (const [name, cur] of curByName) {
-      const old = oldByName.get(name);
-      if (!old) { lines.push(...this.phaseDetailLines(name, cur['targetPct'], cur['rows'], 'Added ')); continue; }
-      const oldT = old.targetPct ?? null, newT = cur['targetPct'] ?? null;
-      if (oldT !== newT) lines.push(`"${name}" target: ${oldT ?? '—'}% → ${newT ?? '—'}%`);
-      for (const rd of this.rowDefs) {
-        if (rd.kind === 'rate') continue;
-        const oldStages = this.stageNames(old.rows?.[rd.key] || []);
-        const curStages = this.stageNames((cur['rows'] || {})[rd.key] || []);
-        const oldS = new Set(oldStages), curS = new Set(curStages);
-        const added = curStages.filter(s => !oldS.has(s));
-        const removed = oldStages.filter(s => !curS.has(s));
-        if (added.length) lines.push(`"${name}" · ${this.rowLabel(rd.key)} +${added.join(', ')}`);
-        if (removed.length) lines.push(`"${name}" · ${this.rowLabel(rd.key)} −${removed.join(', ')}`);
-      }
-    }
-    for (const name of oldByName.keys()) if (!curByName.has(name)) lines.push(`Phase removed: "${name}"`);
-    if (!lines.length) lines.push('No changes');
-    return lines;
+    return computeChanges(active, {
+      saveTitle: this.saveTitle,
+      queueIds: this.selectedQueueList,
+      eventIds: this.selectedEventIds,
+      phases: this.planningPhases,
+      queueNameOf: q => this.queueName(q),
+      eventNameOf: e => this.eventLabel(e),
+      rowDefs: this.rowDefs,
+    });
   }
 
   private async loadStageOptions(): Promise<void> {
@@ -1167,7 +954,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   comparePhaseStage(a: any, b: any): boolean {
-    return a && b ? `${a.queueid}${a.stagename}` === `${b.queueid}${b.stagename}` : a === b;
+    return comparePhaseStage(a, b);
   }
 
   openAddPhase(): void {
@@ -1188,7 +975,7 @@ export class PlanningTabComponent implements OnInit, OnChanges, OnDestroy {
     if (!this.phaseForm.valid) return;
     const name = this.phaseForm.value.phasename;
     const t = this.phaseForm.value.targetPct;
-    const targetPct = (t === null || t === undefined || t === '') ? null : Math.max(0, Math.min(100, Number(t)));
+    const targetPct = clampTargetPct(t);
     if (this.isEditMode && this.editingPhase) {
       this.editingPhase['phasename'] = name;
       this.editingPhase['targetPct'] = targetPct;

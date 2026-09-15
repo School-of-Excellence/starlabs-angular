@@ -82,7 +82,7 @@
 
     <div class="file-upload">
       <label for="fileInput">Product Image:</label>
-      <input
+      <input data-testid="apw-change-on-file-selected-1"
         type="file"
         id="fileInput"
         accept="image/*"
@@ -94,8 +94,8 @@
 </div>
 
 <div mat-dialog-actions align="end">
-  <button mat-stroked-button color="warn" (click)="closeDialog()">Cancel</button>
-  <button
+  <button data-testid="apw-close-dialog-2" mat-stroked-button color="warn" (click)="closeDialog()">Cancel</button>
+  <button data-testid="apw-save-product-3"
     mat-flat-button
     color="primary"
     (click)="saveProduct()"

@@ -7,9 +7,10 @@
         <mat-chip-grid #chipList0 multiple >
           <mat-chip-row *ngFor="let profileid of form.get('profileid').value;let i = index" >
             {{mapparticipant[profileid]}}
-            <mat-icon matChipRemove (click)="onRemove('profileid',i)">cancel</mat-icon>
+            <mat-icon matChipRemove data-testid="vad-name-chip-remove" (click)="onRemove('profileid',i)">cancel</mat-icon>
           </mat-chip-row>
-          <input 
+          <input
+            data-testid="vad-name-input"
             placeholder="add type reference..."
             [matAutocomplete]="auto"
             [matChipInputFor]="chipList0"
@@ -28,9 +29,10 @@
           <mat-chip-row 
             *ngFor="let docid of form.get('template').value;let i = index" >
             {{mapVideoAsk[docid]}}
-            <mat-icon matChipRemove (click)="onRemove('template',i)">cancel</mat-icon>
+            <mat-icon matChipRemove data-testid="vad-template-chip-remove" (click)="onRemove('template',i)">cancel</mat-icon>
           </mat-chip-row>
-          <input 
+          <input
+            data-testid="vad-template-input"
             [matAutocomplete]="auto2"
             [matChipInputFor]="chipList2"
             (keyup)="onTextSearch($event,'template')"
@@ -48,9 +50,10 @@
         <mat-chip-grid #chipList1 multiple >
           <mat-chip-row *ngFor="let docid of form.get('event').value;let i = index" >
             {{mapEvents[docid] != undefined ? mapEvents[docid]['name'] : mapWorkshop[docid] != undefined ? mapWorkshop[docid]['title'] : mapQueue[docid] != undefined ? mapQueue[docid]['queuename'] : ""}}
-            <mat-icon matChipRemove (click)="onRemove('event',i)">cancel</mat-icon>
+            <mat-icon matChipRemove data-testid="vad-event-chip-remove" (click)="onRemove('event',i)">cancel</mat-icon>
           </mat-chip-row>
-          <input 
+          <input
+            data-testid="vad-event-input"
             placeholder="add type reference..."
             [matAutocomplete]="auto1"
             [matChipInputFor]="chipList1"
@@ -68,17 +71,17 @@
       <mat-form-field *ngIf="!snippetView" appearance="fill" class="ml-4">
         <mat-label>Enter a date range</mat-label>
         <mat-date-range-input formGroupName="range" [rangePicker]="picker">
-          <input matStartDate formControlName="start" placeholder="Start date">
-          <input matEndDate formControlName="end" placeholder="End date">
+          <input matStartDate data-testid="vad-date-start" formControlName="start" placeholder="Start date">
+          <input matEndDate data-testid="vad-date-end" formControlName="end" placeholder="End date">
         </mat-date-range-input>
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
       </mat-form-field>&nbsp;&nbsp;
 
-      <button mat-stroked-button type="button" (click)="onResetForm()">Clear</button>&nbsp;&nbsp;
+      <button mat-stroked-button type="button" data-testid="vad-filter-clear" (click)="onResetForm()">Clear</button>&nbsp;&nbsp;
     </form>
     <div class="d-flex flex-row">
-      <mat-slide-toggle [(ngModel)]="snippetView" (change)="changeToSnippetView()">Snippet View</mat-slide-toggle>&nbsp;&nbsp;&nbsp;&nbsp;
+      <mat-slide-toggle [(ngModel)]="snippetView" data-testid="vad-snippet-toggle" (change)="changeToSnippetView()">Snippet View</mat-slide-toggle>&nbsp;&nbsp;&nbsp;&nbsp;
       <h4>Filtered Video : {{dataSource.filteredData.length}}</h4>
     </div>    
     <div class="body mat-elevation-z2">
@@ -159,8 +162,9 @@
           <td mat-cell *matCellDef="let row">
             <div class="tag-checklist-container">
               <label *ngFor="let tag of videoAskTags" class="tag-checkbox-row">
-                <input 
-                  type="checkbox" 
+                <input
+                  data-testid="vad-tag-check"
+                  type="checkbox"
                   [checked]="row.tags?.includes(tag.id)"
                   (change)="updateVideoAdk(row, tag.id)">
                 <span class="checkmark"></span>

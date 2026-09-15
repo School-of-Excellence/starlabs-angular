@@ -11,7 +11,7 @@
         {{ users.length }} {{ users.length === 1 ? 'participant' : 'participants' }}
       </p>
     </div>
-    <button mat-icon-button type="button" class="ext-close" (click)="close()" aria-label="Close">
+    <button data-testid="et-close-1" mat-icon-button type="button" class="ext-close" (click)="close()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -37,7 +37,7 @@
           {{ isActive(u) ? 'Active until' : 'Expired' }}
           {{ latestEntry(u)?.extenduntill | date: 'MMM d, y' }}
         </span>
-        <button mat-stroked-button type="button" class="ext-again-btn"
+        <button data-testid="et-toggle-extend-2" mat-stroked-button type="button" class="ext-again-btn"
                 (click)="toggleExtend(u.profileid)" [disabled]="saving">
           <mat-icon>more_time</mat-icon>
           {{ extendFor === u.profileid ? 'Close' : 'Extend again' }}
@@ -47,12 +47,12 @@
       <div class="ext-extend-box" *ngIf="extendFor === u.profileid">
         <mat-form-field appearance="outline" subscriptSizing="dynamic" class="ext-extend-field">
           <mat-label>Extend until</mat-label>
-          <input matInput [matDatepicker]="extAgainPicker" [min]="minDateFor(u)" [(ngModel)]="extendDate"
+          <input data-testid="et-ext-again-picker-3" matInput [matDatepicker]="extAgainPicker" [min]="minDateFor(u)" [(ngModel)]="extendDate"
                  readonly (click)="extAgainPicker.open()" />
           <mat-datepicker-toggle matIconSuffix [for]="extAgainPicker"></mat-datepicker-toggle>
           <mat-datepicker #extAgainPicker></mat-datepicker>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="button"
+        <button data-testid="et-confirm-extend-4" mat-flat-button color="primary" type="button"
                 (click)="confirmExtend(u)" [disabled]="!extendDate || saving">
           <mat-spinner diameter="16" *ngIf="saving"></mat-spinner>
           <span *ngIf="!saving">Extend</span>

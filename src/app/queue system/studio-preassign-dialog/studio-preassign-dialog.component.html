@@ -13,12 +13,12 @@
   <div class="filter-section p-3">
     <mat-form-field appearance="outline" class="participant-search-field">
       <mat-label>Search Participants</mat-label>
-      <input matInput 
+      <input data-testid="spad-inp-1" matInput 
              [(ngModel)]="participantFilter" 
              (ngModelChange)="onParticipantFilterChange($event)"
              placeholder="Type participant name...">
       <mat-icon matPrefix>search</mat-icon>
-      <button *ngIf="participantFilter" 
+      <button data-testid="spad-btn-2" *ngIf="participantFilter" 
               matSuffix 
               mat-icon-button 
               aria-label="Clear" 
@@ -45,7 +45,7 @@
           <div class="w-100 mt-1">
             <mat-form-field appearance="outline" class="w-100">
               <mat-label>Pre-Assign Token</mat-label>
-              <mat-select [(ngModel)]="studioPreAssign[studio['docid']]"
+              <mat-select data-testid="spad-sel-3" [(ngModel)]="studioPreAssign[studio['docid']]"
                 (selectionChange)="updatePreAssigned(studio['docid'], $event.value)" multiple>
                 <mat-option>
                   <ngx-mat-select-search [(ngModel)]="filterText" 
@@ -120,6 +120,6 @@
 
   <!-- Dialog Actions -->
   <div class="dialog-actions p-3 border-top">
-    <button mat-button mat-dialog-close (click)="dialogRef.close()">Close</button>
+    <button data-testid="spad-btn-4" mat-button mat-dialog-close (click)="dialogRef.close()">Close</button>
   </div>
 </div>

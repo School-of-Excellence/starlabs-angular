@@ -12,9 +12,9 @@
         </div>
 
         <div *ngIf="templateData['templatevalidated'] == false" class="row justify-content-center">
-            <button mat-raised-button type="button" style="color:green" (click)="onSubmit()">Approve</button>
+            <button data-testid="vtd-onsubmit" mat-raised-button type="button" style="color:green" (click)="onSubmit()">Approve</button>
             &nbsp;&nbsp;
-            <button mat-raised-button type="button" style="color: red;" (click)="onDialogCancel()">Reject</button>
+            <button data-testid="vtd-ondialogcancel" mat-raised-button type="button" style="color: red;" (click)="onDialogCancel()">Reject</button>
         </div>
         <div *ngIf="templateData['templatevalidated'] == true" class="row justify-content-center">
             <h5 style="color: green;"><b>Approved</b></h5>
