@@ -48,7 +48,7 @@ export class AssignQueueStudioComponent {
     if(dialogdata != null){
       this.title = dialogdata["title"] ?? this.title
       this.mapActivity = dialogdata["mapactivity"]
-      this.mapProfile = dialogdata["mapprofile"]
+      this.mapProfile = dialogdata["mapprofile"] ?? {}
       Object.keys(this.mapProfile).forEach(key=>{
         this.profileList.push({
           name: this.mapProfile[key],
