@@ -5,7 +5,7 @@
       <h2>Enrollment diagnostics</h2>
       <p>Why a profile can or cannot enroll in <strong>{{ workshopTitle || 'this workshop' }}</strong>.</p>
     </div>
-    <button mat-icon-button (click)="dialogRef.close()" aria-label="Close">
+    <button data-testid="ed2-dialog-ref-1" mat-icon-button (click)="dialogRef.close()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -24,7 +24,7 @@
       <mat-radio-button value="new">New user</mat-radio-button>
     </mat-radio-group>
 
-    <button mat-flat-button color="primary" class="ed-check" (click)="check()" [disabled]="running">
+    <button data-testid="ed2-check-2" mat-flat-button color="primary" class="ed-check" (click)="check()" [disabled]="running">
       <mat-icon *ngIf="!running">search</mat-icon>
       <mat-spinner *ngIf="running" diameter="18" class="ed-spin"></mat-spinner>
       {{ running ? 'Checking…' : 'Check' }}
@@ -43,7 +43,7 @@
   </div>
 
   <div class="ed-cands" *ngIf="candidates.length">
-    <button type="button" class="ed-cand" *ngFor="let c of candidates" (click)="useCandidate(c.pid)">
+    <button data-testid="ed2-use-candidate-3" type="button" class="ed-cand" *ngFor="let c of candidates" (click)="useCandidate(c.pid)">
       <mat-icon>person_search</mat-icon>
       <span class="ed-cand-main">
         <span class="ed-cand-name">{{ c.name }}</span>

@@ -4,11 +4,11 @@
       <div class="actionitem">
         <mat-form-field appearance="outline">
           <mat-label>Filter</mat-label>
-          <input matInput (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off">
+          <input data-testid="hs-inp-001" matInput (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off">
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="updateStory(null)">Add New Health Story</button>
+        <button data-testid="hs-btn-002" class="addbtn" mat-stroked-button (click)="updateStory(null)">Add New Health Story</button>
       </div>
     </div>
     <table mat-table [dataSource]="dataSource" matSort>
@@ -31,7 +31,7 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Images</th>
         <td mat-cell *matCellDef="let row">
           <div class="imagebox">
-            <img class="mr-1" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" height="80" width="80">
+            <img data-testid="hs-img-003" class="mr-1" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" height="80" width="80">
           </div>
         </td>
       </ng-container>
@@ -39,7 +39,7 @@
       <ng-container matColumnDef="action">
         <th mat-header-cell *matHeaderCellDef>Edit</th>
         <td mat-cell *matCellDef="let row;">
-          <button class="deletebtn" mat-icon-button type="button" (click)="updateStory(row)">
+          <button data-testid="hs-btn-004" class="deletebtn" mat-icon-button type="button" (click)="updateStory(row)">
             <mat-icon>edit</mat-icon>
           </button>
         </td>
@@ -62,7 +62,7 @@
       <h1 class="dash-title">Health Stories</h1>
       <p class="dash-sub">Manage health story content</p>
     </div>
-    <button class="btn-primary" (click)="updateStory(null)">
+    <button data-testid="hs-btn-005" class="btn-primary" (click)="updateStory(null)">
       <mat-icon>add</mat-icon>
       <span>New Story</span>
     </button>
@@ -72,7 +72,7 @@
   <div class="filters-row">
     <div class="input-box search-box">
       <mat-icon class="ib-icon">search</mat-icon>
-      <input type="text" class="ib-input" placeholder="Search stories..."
+      <input data-testid="hs-inp-006" type="text" class="ib-input" placeholder="Search stories..."
         (keyup)="filterTable(inputFilter.value)" #inputFilter autocomplete="off" />
     </div>
   </div>
@@ -99,7 +99,7 @@
           <th mat-header-cell *matHeaderCellDef>Images</th>
           <td mat-cell *matCellDef="let row">
             <div class="ad-variants" *ngIf="row.images?.length">
-              <img class="ad-img" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" />
+              <img data-testid="hs-img-007" class="ad-img" *ngFor="let image of row.images" [src]="image" (click)="openImage(image)" />
             </div>
             <span class="c-size" *ngIf="!row.images?.length">—</span>
           </td>
@@ -119,7 +119,7 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef class="col-act">Edit</th>
           <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-edit" (click)="updateStory(row)">
+            <button data-testid="hs-btn-008" class="a-btn a-edit" (click)="updateStory(row)">
               <mat-icon>edit</mat-icon>
             </button>
           </td>

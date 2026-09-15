@@ -9,7 +9,7 @@
         <p class="page-subtitle">Manage banners shown across web and app</p>
       </div>
     </div>
-    <button mat-icon-button (click)="closeDialog()" class="close-btn">
+    <button data-testid="eb-close-dialog-1" mat-icon-button (click)="closeDialog()" class="close-btn">
       <mat-icon>close</mat-icon>
     </button>
   </header>
@@ -131,7 +131,7 @@
                     </span>
                     <label class="media-action">
                       <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
-                      <input type="file" accept="image/*" hidden (change)="onImageSelected($event)">
+                      <input data-testid="eb-change-on-image-selected-2" type="file" accept="image/*" hidden (change)="onImageSelected($event)">
                     </label>
                   </div>
                   <div class="media-preview media-preview-wide">
@@ -150,7 +150,7 @@
                     </span>
                     <label class="media-action">
                       <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
-                      <input type="file" accept="image/*" hidden (change)="onImageSelectedApp($event)">
+                      <input data-testid="eb-change-on-image-selected-app-3" type="file" accept="image/*" hidden (change)="onImageSelectedApp($event)">
                     </label>
                   </div>
                   <div class="media-preview media-preview-square">
@@ -169,7 +169,7 @@
                     </span>
                     <label class="media-action">
                       <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload
-                      <input type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
+                      <input data-testid="eb-change-on-video-selected-4" type="file" accept="video/*" hidden (change)="onVideoSelected($event)">
                     </label>
                   </div>
                   <div class="media-preview media-preview-wide">
@@ -184,10 +184,10 @@
             </div>
           </section>
           <div class="form-actions">
-            <button mat-stroked-button type="button" (click)="resetForm()" [disabled]="isUploading">
+            <button data-testid="eb-reset-form-5" mat-stroked-button type="button" (click)="resetForm()" [disabled]="isUploading">
               Reset
             </button>
-            <button mat-flat-button color="primary"
+            <button data-testid="eb-submit-6" mat-flat-button color="primary"
                     type="button"
                     (click)="submit()"
                     [disabled]="isUploading"
@@ -225,7 +225,7 @@
                    [(ngModel)]="searchText"
                    (keyup)="applyFilter()"
                    placeholder="Search banners by title, description...">
-            <button *ngIf="searchText" matSuffix mat-icon-button (click)="clearSearch()" type="button">
+            <button data-testid="eb-clear-search-7" *ngIf="searchText" matSuffix mat-icon-button (click)="clearSearch()" type="button">
               <mat-icon>close</mat-icon>
             </button>
           </mat-form-field>
@@ -303,7 +303,7 @@
               <th mat-header-cell *matHeaderCellDef class="col-actions">Actions</th>
               <td mat-cell *matCellDef="let element; let i = index" class="col-actions">
                 <div class="action-group">
-                  <button mat-icon-button
+                  <button data-testid="eb-open-video-8" mat-icon-button
                           class="action-btn action-play"
                           matTooltip="Preview Video"
                           (click)="openVideo(element.videoUrl)">
@@ -316,7 +316,7 @@
                     <div class="platform-toggle"
                          [matTooltip]="(element.enable ? 'Disable' : 'Enable') + ' on Web'">
                       <i class="fa-solid fa-desktop platform-toggle-icon"></i>
-                      <mat-slide-toggle
+                      <mat-slide-toggle data-testid="eb-change-toggle-platform-9"
                         class="action-toggle"
                         [checked]="element.enable"
                         (change)="togglePlatform(element, 'web')">
@@ -325,7 +325,7 @@
                     <div class="platform-toggle"
                          [matTooltip]="(element.enableapp ? 'Disable' : 'Enable') + ' on Mobile'">
                       <i class="fa-solid fa-mobile-screen platform-toggle-icon"></i>
-                      <mat-slide-toggle
+                      <mat-slide-toggle data-testid="eb-change-toggle-platform-10"
                         class="action-toggle"
                         [checked]="element.enableapp"
                         (change)="togglePlatform(element, 'app')">
@@ -335,14 +335,14 @@
 
                   <div class="action-divider"></div>
 
-                  <button mat-icon-button
+                  <button data-testid="eb-edit-banner-11" mat-icon-button
                           class="action-btn action-edit"
                           matTooltip="Edit"
                           (click)="editBanner(element, i)">
                     <mat-icon>edit</mat-icon>
                   </button>
 
-                  <button mat-icon-button
+                  <button data-testid="eb-delete-banner-12" mat-icon-button
                           class="action-btn action-delete"
                           matTooltip="Delete"
                           (click)="deleteBanner(element, i)">

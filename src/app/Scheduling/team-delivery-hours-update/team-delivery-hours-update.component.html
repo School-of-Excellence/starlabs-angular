@@ -22,19 +22,19 @@
         <ul *ngIf="!loading && allowTimesheet && selectedSpecialist != null">
           <label class="dayname">
             <b>{{day.displayname}}</b>
-            <mat-checkbox class="ml-2" (change)="updateWeekOff(day.id, $event.checked)" [checked]="specialistWeekOffDays.includes(day.id)">Mark myself Unavailable</mat-checkbox>
+            <mat-checkbox data-testid="tdhu-change-update-week-off-1" class="ml-2" (change)="updateWeekOff(day.id, $event.checked)" [checked]="specialistWeekOffDays.includes(day.id)">Mark myself Unavailable</mat-checkbox>
           </label>
           <li *ngFor="let slot of slots(day.id).controls; let i = index" [formGroupName]="i">
             <mat-form-field class="fieldbox" appearance="outline">
               <mat-label>Start Time</mat-label>
-              <input matInput type="time" formControlName="starttime" (change)="onStartDateChange(day.id, i)" required>
+              <input data-testid="tdhu-change-on-start-date-change-2" matInput type="time" formControlName="starttime" (change)="onStartDateChange(day.id, i)" required>
               <mat-error *ngIf="weekForm.get(day.id)['controls'][i].get('starttime').hasError('required')">
                 Starttime <strong>Required</strong>
               </mat-error>
             </mat-form-field>
             <mat-form-field class="fieldbox" appearance="outline">
               <mat-label>End Time</mat-label>
-              <input matInput type="time" formControlName="endtime" (change)="onEndDateChange(day.id, i)" required>
+              <input data-testid="tdhu-change-on-end-date-change-3" matInput type="time" formControlName="endtime" (change)="onEndDateChange(day.id, i)" required>
               <mat-error *ngIf="weekForm.get(day.id)['controls'][i].get('endtime').hasError('required')">
                 Endtime <strong>Required</strong>
               </mat-error>
@@ -42,10 +42,10 @@
                 30Mins Time Difference Required
               </mat-error>
             </mat-form-field>
-            <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeSlot(day.id, i)">
+            <button data-testid="tdhu-remove-slot-4" class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeSlot(day.id, i)">
               <mat-icon class="icon">remove</mat-icon>
             </button>
-            <button class="addremovebtn" *ngIf="i+1 == slots(day.id).controls.length" mat-icon-button type="button" (click)="addSlot(day.id)">
+            <button data-testid="tdhu-add-slot-5" class="addremovebtn" *ngIf="i+1 == slots(day.id).controls.length" mat-icon-button type="button" (click)="addSlot(day.id)">
               <mat-icon class="icon">add</mat-icon>
             </button>
           </li>
@@ -60,8 +60,8 @@
         <b>Note:</b> Your current timezone is {{timezone.name}} ({{timezone.hour < 0 ? "" : "+"}}{{timezone.hour}}:{{timezone.minute}})
       </div>
       <div class="actionbox">
-        <button class="closebtn" type="button" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
-        <button class="submitbtn" type="submit" mat-stroked-button [disabled]="!weekForm.valid || loading">{{loading ? "Loading...." : "Add Availability"}}</button>
+        <button data-testid="tdhu-close-6" class="closebtn" type="button" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+        <button data-testid="tdhu-button-7" class="submitbtn" type="submit" mat-stroked-button [disabled]="!weekForm.valid || loading">{{loading ? "Loading...." : "Add Availability"}}</button>
       </div>
     </form>
   </div>

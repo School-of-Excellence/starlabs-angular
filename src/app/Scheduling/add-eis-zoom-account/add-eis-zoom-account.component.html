@@ -73,8 +73,8 @@
       </div>
     </div>
     <div class="formdialog">
-      <button class="closebtn" mat-stroked-button type="submit" (click)="close()">Close</button>
-      <button [disabled]="eisForm.invalid" class="submitbtn" mat-stroked-button type="submit" (click)="submit()">Submit</button>
+      <button data-testid="aeza-close-1" class="closebtn" mat-stroked-button type="submit" (click)="close()">Close</button>
+      <button data-testid="aeza-submit-2" [disabled]="eisForm.invalid" class="submitbtn" mat-stroked-button type="submit" (click)="submit()">Submit</button>
     </div>
   </div>
 </div>

@@ -7,7 +7,7 @@
     <div *ngIf="!loading">
         <header class="header">
             <h1 class="title">{{ (capturedData['edit'] ? "Edit" : "Create") + " Event"}}</h1>
-            <button mat-icon-button class="close-button" mat-dialog-close>
+            <button mat-icon-button class="close-button" data-testid="ued-close" mat-dialog-close>
                 <mat-icon>close</mat-icon>
             </button>
         </header>
@@ -18,7 +18,7 @@
               
                     <mat-form-field class="inputfields">
                         <mat-label>Event Name</mat-label>
-                        <input matInput formControlName="eventname" (input)="!capturedData['edit'] ? generateToken() : null">
+                        <input matInput data-testid="ued-eventname" formControlName="eventname" (input)="!capturedData['edit'] ? generateToken() : null">
                         <mat-error *ngIf="eventform.get('eventname').hasError('required')">
                         Event Name <strong>Required</strong>
                         </mat-error>
@@ -27,7 +27,7 @@
                 
                     <mat-form-field class="inputfields">
                         <mat-label>ATC Model</mat-label>
-                        <mat-select formControlName="atcmodel">
+                        <mat-select data-testid="ued-atcmodel" formControlName="atcmodel">
                             <mat-option *ngFor="let member of atcModelList" [value]="member.atcmodel">{{member.atcmodel | uppercase}}</mat-option>
                         </mat-select>
                         <mat-error *ngIf="eventform.get('atcmodel').hasError('required')">
@@ -39,8 +39,8 @@
                     <mat-form-field class="inputfields">
                         <mat-label>Event Date</mat-label>
                         <mat-date-range-input [rangePicker]="picker">
-                        <input matStartDate (click)="picker.open()" formControlName="startdate">
-                        <input matEndDate (click)="picker.open()" formControlName="enddate">
+                        <input matStartDate data-testid="ued-startdate" (click)="picker.open()" formControlName="startdate">
+                        <input matEndDate data-testid="ued-enddate" (click)="picker.open()" formControlName="enddate">
                         </mat-date-range-input>
                         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                         <mat-date-range-picker touchUi #picker></mat-date-range-picker>
@@ -52,7 +52,7 @@
                 
                     <mat-form-field class="inputfields">
                         <mat-label>Event Address</mat-label>
-                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="1" cdkAutosizeMaxRows="4" formControlName="address"></textarea>
+                        <textarea matInput data-testid="ued-address" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="1" cdkAutosizeMaxRows="4" formControlName="address"></textarea>
                         <mat-error *ngIf="eventform.get('address').hasError('required')">
                         Address <strong>Required</strong>
                         </mat-error>
@@ -61,7 +61,7 @@
                 
                     <mat-form-field class="inputfields">
                         <mat-label>Event Venue</mat-label>
-                        <mat-select formControlName="venue" (selectionChange)="!capturedData['edit'] ? generateToken() : null">
+                        <mat-select data-testid="ued-venue" formControlName="venue" (selectionChange)="!capturedData['edit'] ? generateToken() : null">
                         <mat-option *ngFor="let place of venueList" [value]="place.location">{{place.location}}</mat-option>
                         </mat-select>
                         <mat-error *ngIf="eventform.get('venue').hasError('required')">
@@ -72,7 +72,7 @@
                 
                     <mat-form-field class="inputfields">
                         <mat-label>Hosts</mat-label>
-                        <mat-select formControlName="hosts" multiple>
+                        <mat-select data-testid="ued-hosts" formControlName="hosts" multiple>
                         <mat-option *ngFor="let member of ahmemberList" [value]="member.profile">{{member.name}}</mat-option>
                         </mat-select>
                         <mat-error *ngIf="eventform.get('hosts').hasError('required')">
@@ -83,7 +83,7 @@
                 
                     <mat-form-field class="inputfields">
                         <mat-label>Last Registration Date</mat-label>
-                        <input matInput formControlName="lastregistrationdate" [matDatepicker]="lrd">
+                        <input matInput data-testid="ued-lastregdate" formControlName="lastregistrationdate" [matDatepicker]="lrd">
                         <mat-datepicker-toggle matSuffix [for]="lrd"></mat-datepicker-toggle>
                         <mat-datepicker #lrd></mat-datepicker>
                         <mat-error *ngIf="eventform.get('lastregistrationdate').hasError('required')">
@@ -93,7 +93,7 @@
                     <br>
                     <mat-form-field class="inputfields">
                         <mat-label>Event Description</mat-label>
-                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="description"></textarea>
+                        <textarea matInput data-testid="ued-description" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="description"></textarea>
                         <mat-error *ngIf="eventform.get('description').hasError('required')">
                         Description <strong>Required</strong>
                         </mat-error>
@@ -101,7 +101,7 @@
                     <br>
                     <mat-form-field class="inputfields">
                         <mat-label>B!G Event Description</mat-label>
-                        <textarea matInput cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="bigdescription"></textarea>
+                        <textarea matInput data-testid="ued-bigdescription" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMinRows="2" cdkAutosizeMaxRows="4" formControlName="bigdescription"></textarea>
                         <mat-error *ngIf="eventform.get('bigdescription').hasError('required')">
                         B!G Event Description <strong>Required</strong>
                         </mat-error>
@@ -112,11 +112,11 @@
                         <div *ngFor="let control of productsArray.controls;let i = index" [formGroupName]="i">
                             <mat-form-field class="inputfields me-2">
                                 <mat-label>Event Display Name</mat-label>
-                                <input matInput formControlName="title">
+                                <input matInput data-testid="ued-product-title" formControlName="title">
                             </mat-form-field>
                             <mat-form-field class="inputfields">
                                 <mat-label>Eligible Product</mat-label>
-                                <mat-select [compareWith]="compareFn" formControlName="productref">
+                                <mat-select data-testid="ued-product-ref" [compareWith]="compareFn" formControlName="productref">
                                     <mat-option *ngFor="let product of productsList" [value]="product.ref">{{product.product}}</mat-option>
                                 </mat-select>
                             </mat-form-field>
@@ -124,16 +124,16 @@
                             <mat-form-field class="inputfields">
                                 <mat-label>Event Date</mat-label>
                                 <mat-date-range-input [rangePicker]="picker">
-                                <input matStartDate (click)="picker.open()" formControlName="startdate">
-                                <input matEndDate (click)="picker.open()" formControlName="enddate">
+                                <input matStartDate data-testid="ued-product-startdate" (click)="picker.open()" formControlName="startdate">
+                                <input matEndDate data-testid="ued-product-enddate" (click)="picker.open()" formControlName="enddate">
                                 </mat-date-range-input>
                                 <mat-datepicker-toggle matSuffix [for]="picker" ></mat-datepicker-toggle>
                                 <mat-date-range-picker touchUi #picker></mat-date-range-picker>
                             </mat-form-field>
                             &nbsp;&nbsp;
-                            <mat-checkbox formControlName="heroevent" class="me-2">Hero Event</mat-checkbox>
-                            <mat-slide-toggle *ngIf="control.value['deliveryref'] != null" formControlName="delete">{{control.value['delete'] ? "Deleted" : "Delete"}}</mat-slide-toggle>
-                            <button *ngIf="control.value['deliveryref'] == null" class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)"><mat-icon>close</mat-icon></button>
+                            <mat-checkbox formControlName="heroevent" data-testid="ued-product-hero" class="me-2">Hero Event</mat-checkbox>
+                            <mat-slide-toggle *ngIf="control.value['deliveryref'] != null" data-testid="ued-product-delete-toggle" formControlName="delete">{{control.value['delete'] ? "Deleted" : "Delete"}}</mat-slide-toggle>
+                            <button *ngIf="control.value['deliveryref'] == null" class="buttons" mat-icon-button type="button" data-testid="ued-product-remove" (click)="removeproductsArray(i)"><mat-icon>close</mat-icon></button>
                             
                             <!-- <div class="mt-2 mb-2" style="display: inline-block; vertical-align: top;">
                                 <label style="display: block; margin-bottom: 5px;">Arena Event Image:</label>
@@ -162,8 +162,9 @@
                                 </label>
                                 
                                 <div class="file-input-wrapper">
-                                    <input #productFileUpload type="file" accept="image/png, image/jpeg, image/jpg" 
-                                        (change)="uploadProductImage($event, i)" 
+                                    <input #productFileUpload type="file" accept="image/png, image/jpeg, image/jpg"
+                                        data-testid="ued-product-image-upload"
+                                        (change)="uploadProductImage($event, i)"
                                         [id]="'productFileUpload-' + i">
                                     <label [for]="'productFileUpload-' + i" 
                                         class="file-input-button" 
@@ -178,7 +179,7 @@
                                         <img [src]="productImages[i]?.previewurl || productImages[i]?.url" alt="Arena Event Image">
                                         <!-- <span class="image-badge">Arena Image</span> -->
                                     </div>
-                                    <button mat-stroked-button type="button" class="remove-image-btn" (click)="onProductImageRemove(i)">
+                                    <button mat-stroked-button type="button" class="remove-image-btn" data-testid="ued-product-image-remove" (click)="onProductImageRemove(i)">
                                         <mat-icon>delete</mat-icon>
                                         Remove Image
                                     </button>
@@ -189,7 +190,7 @@
                             <!-- <button *ngIf="productsArray.controls.length - 1 == i" class="buttons me-2" mat-icon-button type="button" (click)="addproductsArray()"><mat-icon>add</mat-icon></button> -->
                             <!-- <button class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)" [disabled]="control.value['delete']"><mat-icon>remove</mat-icon></button> -->
                         </div>
-                        <button class="buttons mt-2" mat-stroked-button (click)="addproductsArray()">Add New Arena Events</button>
+                        <button class="buttons mt-2" mat-stroked-button data-testid="ued-add-arena-event" (click)="addproductsArray()">Add New Arena Events</button>
 
                         <div class="mt-3" *ngFor="let delivery of eventform.value['products']">
                             <span *ngIf="delivery['productref'] != undefined">
@@ -234,9 +235,9 @@
                         >
                     </app-auto-complete-with-chip>
                     <br>
-                    <mat-checkbox formControlName="notifyparticipants">Notify Participants</mat-checkbox>
+                    <mat-checkbox formControlName="notifyparticipants" data-testid="ued-notify-participants">Notify Participants</mat-checkbox>
                     <br>
-                    <mat-checkbox formControlName="addtocalendar">Add to Calendar</mat-checkbox>
+                    <mat-checkbox formControlName="addtocalendar" data-testid="ued-add-to-calendar">Add to Calendar</mat-checkbox>
                     <br>
                     <div class="loadingarea" *ngIf="loading">
                         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
@@ -258,8 +259,9 @@
                         </label>
                         
                         <div class="file-input-wrapper">
-                            <input #fileupload type="file" accept="image/png, image/jpeg, image/jpg" 
-                                (change)="uploadImage($event)" 
+                            <input #fileupload type="file" accept="image/png, image/jpeg, image/jpg"
+                                data-testid="ued-event-image-upload"
+                                (change)="uploadImage($event)"
                                 id="eventFileUpload">
                             <label for="eventFileUpload" 
                                 class="file-input-button" 
@@ -274,7 +276,7 @@
                                 <img [src]="eventimage.previewurl || eventimage.url" alt="Event Display Image">
                                 <span class="image-badge">Event Image</span>
                             </div>
-                            <button mat-stroked-button type="button" class="remove-image-btn" (click)="onImageRemove()">
+                            <button mat-stroked-button type="button" class="remove-image-btn" data-testid="ued-event-image-remove" (click)="onImageRemove()">
                                 <mat-icon>delete</mat-icon>
                                 Remove Image
                             </button>
@@ -282,7 +284,7 @@
                     </div>
             
                     <div class="d-flex justify-content-center">
-                        <button class="buttons submtbtn" *ngIf="!loading" mat-stroked-button type="submit" [disabled]="loading" (click)="saveEventDetail(eventform.getRawValue())">{{(capturedData['edit'] ? "Update" : "Create")}} Event Data</button>
+                        <button class="buttons submtbtn" *ngIf="!loading" mat-stroked-button type="submit" data-testid="ued-save" [disabled]="loading" (click)="saveEventDetail(eventform.getRawValue())">{{(capturedData['edit'] ? "Update" : "Create")}} Event Data</button>
                     </div>
                 </div>
             </div>

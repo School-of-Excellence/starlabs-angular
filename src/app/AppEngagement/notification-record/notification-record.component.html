@@ -16,7 +16,7 @@
           <mat-form-field appearance="outline" class="date-field">
             <!-- <mat-icon matPrefix>calendar_today</mat-icon> -->
             <mat-label>Start Date</mat-label>
-            <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="startPicker" [(ngModel)]="startDate">
+            <input data-testid="aenr-inp-1" matInput placeholder="DD/MM/YYYY" [matDatepicker]="startPicker" [(ngModel)]="startDate">
             <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
             <mat-datepicker #startPicker (dateChange)="onDateChange()"></mat-datepicker>
           </mat-form-field>
@@ -25,12 +25,12 @@
           
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>End Date</mat-label>
-            <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="endPicker" [(ngModel)]="endDate">
+            <input data-testid="aenr-inp-2" matInput placeholder="DD/MM/YYYY" [matDatepicker]="endPicker" [(ngModel)]="endDate">
             <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
             <mat-datepicker #endPicker (dateChange)="onDateChange()"></mat-datepicker>
           </mat-form-field>
         </div>
-        <button mat-raised-button style="margin-bottom: 20px;" (click)="onDateChange()" [disabled]="!startDate && !endDate">
+        <button data-testid="aenr-btn-3" mat-raised-button style="margin-bottom: 20px;" (click)="onDateChange()" [disabled]="!startDate && !endDate">
           <mat-icon>date_range</mat-icon>
           Fetch Notification Record
         </button>
@@ -48,11 +48,11 @@
 
         <mat-form-field appearance="outline" class="search-field">
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search..." [(ngModel)]="searchText" (input)="onSearchChange()">
+          <input data-testid="aenr-inp-4" matInput placeholder="Search..." [(ngModel)]="searchText" (input)="onSearchChange()">
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="filter-dropdown">
-          <mat-select placeholder="Notification Type" [(value)]="selectedNotificationType" (selectionChange)="onNotificationTypeFilterChange()">
+          <mat-select data-testid="aenr-sel-5" placeholder="Notification Type" [(value)]="selectedNotificationType" (selectionChange)="onNotificationTypeFilterChange()">
             <mat-option value="">All Types</mat-option>
             <mat-option *ngFor="let type of notificationTypes" [value]="type">{{type}}</mat-option>
           </mat-select>
@@ -60,7 +60,7 @@
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="filter-dropdown">
-          <mat-select placeholder="Notification Status" [(value)]="selectedNotificationStatus" (selectionChange)="onNotificationStatusFilterChange()">
+          <mat-select data-testid="aenr-sel-6" placeholder="Notification Status" [(value)]="selectedNotificationStatus" (selectionChange)="onNotificationStatusFilterChange()">
             <mat-option value="">All Statuses</mat-option>
             <mat-option *ngFor="let status of notificationStatuses" [value]="status">{{status}}</mat-option>
           </mat-select>
@@ -69,13 +69,13 @@
 
         <mat-form-field appearance="outline" class="filter-dropdown search-person">
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput 
+          <input data-testid="aenr-inp-7" matInput 
               placeholder="Search by Person name" 
               [(ngModel)]="searchPersonName"
               (input)="onPersonNameFilterChange()">
         </mat-form-field>
 
-        <button mat-raised-button color="accent" style="margin-bottom: 20px;" (click)="clearFilters()">
+        <button data-testid="aenr-btn-8" mat-raised-button color="accent" style="margin-bottom: 20px;" (click)="clearFilters()">
           Clear Filters
         </button>
       </div>
@@ -202,7 +202,7 @@
           <ng-container matColumnDef="sentTo">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Sent to</th>
             <td mat-cell *matCellDef="let element">
-              <button mat-flat-button  (click)="openRecipientsDialog(element)">
+              <button data-testid="aenr-btn-9" mat-flat-button  (click)="openRecipientsDialog(element)">
                 <mat-icon style="padding: 5px;">group</mat-icon>
                 <span style="color: green;">✓ {{element.profilesuccess?.length || 0}} </span>
                 <span style="color: red;">✗ {{element.profilefailed?.length || 0}} </span>
@@ -232,13 +232,13 @@
       </div>
 
       <!-- Recipients Dialog -->
-      <div *ngIf="showRecipientsDialog" class="recipients-overlay" (click)="closeRecipientsDialog()">
-        <div class="recipients-dialog" (click)="$event.stopPropagation()">
+      <div data-testid="aenr-act-10" *ngIf="showRecipientsDialog" class="recipients-overlay" (click)="closeRecipientsDialog()">
+        <div data-testid="aenr-act-11" class="recipients-dialog" (click)="$event.stopPropagation()">
           <div class="dialog-header">
             <h3>Recipient Details</h3>
             <div class="header-actions">
               <!-- Load All Logs Button (shown when not all logs loaded) -->
-              <button mat-stroked-button 
+              <button data-testid="aenr-btn-12" mat-stroked-button 
                       *ngIf="!allLogsLoaded"
                       color="accent"
                       (click)="loadAllLogsForExport()" 
@@ -248,7 +248,7 @@
               </button>
 
               <!-- Export Button -->
-              <button mat-raised-button 
+              <button data-testid="aenr-btn-13" mat-raised-button 
                       color="primary" 
                       (click)="exportRecipientsToExcel()" 
                       [disabled]="!allLogsLoaded || isExporting"
@@ -257,7 +257,7 @@
                 {{isExporting ? 'Exporting...' : 'Export'}}
               </button>
 
-              <button mat-icon-button (click)="closeRecipientsDialog()">
+              <button data-testid="aenr-btn-14" mat-icon-button (click)="closeRecipientsDialog()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -278,7 +278,7 @@
 
             <!-- Tab Buttons -->
             <div class="tab-buttons">
-              <button mat-flat-button 
+              <button data-testid="aenr-btn-15" mat-flat-button 
                       [class.active-tab]="selectedTab === 'success'"
                       [color]="selectedTab === 'success' ? 'primary' : ''"
                       (click)="switchTab('success')"
@@ -286,7 +286,7 @@
                 <mat-icon>check_circle</mat-icon>
                 Success ({{filteredSuccessRecipients.length}})
               </button>
-              <button mat-flat-button 
+              <button data-testid="aenr-btn-16" mat-flat-button 
                       [class.active-tab]="selectedTab === 'failed'"
                       [color]="selectedTab === 'failed' ? 'warn' : ''"
                       (click)="switchTab('failed')"
@@ -294,7 +294,7 @@
                 <mat-icon>error</mat-icon>
                 Failed ({{filteredFailedRecipients.length}})
               </button>
-              <button mat-flat-button
+              <button data-testid="aenr-btn-17" mat-flat-button
                       *ngIf="heldRecipients.length > 0"
                       [class.active-tab]="selectedTab === 'held'"
                       (click)="switchTab('held')"
@@ -308,7 +308,7 @@
             <!-- Search input -->
             <mat-form-field appearance="outline" class="search-recipients">
               <mat-icon matPrefix>search</mat-icon>
-              <input matInput placeholder="Search by name..." [(ngModel)]="recipientSearchText" (input)="filterRecipients()">
+              <input data-testid="aenr-inp-18" matInput placeholder="Search by name..." [(ngModel)]="recipientSearchText" (input)="filterRecipients()">
             </mat-form-field>
 
             <!-- Loading indicator -->

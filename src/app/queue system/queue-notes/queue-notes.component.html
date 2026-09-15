@@ -29,7 +29,7 @@
                 <span class="note-author" *ngIf="note.stage">Note added stage {{note.stage}}</span>
               </div>
             </div>
-            <button mat-icon-button color="warn" (click)="removeNote(i)" class="note-remove-btn">
+            <button [attr.data-testid]="'qnot-btn-1-' + i" mat-icon-button color="warn" (click)="removeNote(i)" class="note-remove-btn">
               <mat-icon>delete</mat-icon>
             </button>
           </div>
@@ -43,7 +43,7 @@
             [formControl]="newNoteCtrl" 
             rows="3"
             (keydown)="onKeydown($event)"></textarea>
-          <button 
+          <button data-testid="qnot-btn-2" 
             mat-icon-button 
             matSuffix 
             color="primary" 
@@ -106,7 +106,7 @@
             <span class="available-tags-title">Available Tags</span>
           </div>
           <div class="available-tags">
-            <button 
+            <button [attr.data-testid]="'qnot-btn-3-' + tag" 
               *ngFor="let tag of allTags.slice(0, 15)" 
               mat-stroked-button 
               class="tag-button"
@@ -126,7 +126,7 @@
   
     <!-- Actions -->
     <div class="dialog-actions">
-      <button mat-button class="cancel-button" (click)="cancel()">Cancel</button>
-      <button mat-raised-button color="primary" class="save-button" (click)="save()">Save</button>
+      <button data-testid="qnot-btn-4" mat-button class="cancel-button" (click)="cancel()">Cancel</button>
+      <button data-testid="qnot-btn-5" mat-raised-button color="primary" class="save-button" (click)="save()">Save</button>
     </div>
   </div>

@@ -1,6 +1,6 @@
 <header class="header color-teal">
   <h1 class="title">Notification</h1>
-  <button mat-icon-button mat-dialog-close class="close-button">
+  <button data-testid="dbn-button" mat-icon-button mat-dialog-close class="close-button">
     <mat-icon style="color:white">close</mat-icon>
   </button>
 </header>
@@ -8,9 +8,9 @@
 <div class="mainscreen">
 
   <div class="row justify-content-center">
-    <button mat-raised-button (click)="view = 'select'" [ngStyle]="view == 'select' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Template Message</button>
+    <button data-testid="dbn-button-2" mat-raised-button (click)="view = 'select'" [ngStyle]="view == 'select' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Template Message</button>
       &nbsp;&nbsp;&nbsp;
-    <button mat-raised-button (click)="view = 'create'" [ngStyle]="view == 'create' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Type & Send</button>
+    <button data-testid="dbn-button-3" mat-raised-button (click)="view = 'create'" [ngStyle]="view == 'create' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Type & Send</button>
   </div>
 
   <div *ngIf="view == 'create'">
@@ -56,31 +56,31 @@
           <div class="d-flex flex-row" class="col-md-3">
               <mat-form-field appearance="outline" class="w-100">
                   <mat-label>Select Category</mat-label>
-                  <mat-select formControlName="templateCategory" required>
+                  <mat-select data-testid="dbn-templatecategory" formControlName="templateCategory" required>
                       <mat-option>
                           <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                       </mat-option>
                       <mat-option *ngFor="let option of onSearchCategory()" [value]="option">{{option}}</mat-option>
-                      <mat-option *ngIf="onSearchCategory().length == 0 && searchCategory != '' " (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                      <mat-option data-testid="dbn-addcategory" *ngIf="onSearchCategory().length == 0 && searchCategory != '' " (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                   </mat-select>
                   <mat-error *ngIf="!templateForm.controls['templateCategory'].valid">Template Category Is Required</mat-error>
               </mat-form-field>
-              <button  *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addCategory()"><mat-icon>add</mat-icon></button>
+              <button data-testid="dbn-addcategory-2"  *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addCategory()"><mat-icon>add</mat-icon></button>
           </div>
 
           <div class="d-flex flex-row" class="col-md-3">
               <mat-form-field appearance="outline" class="w-100">
                   <mat-label>Select Sub-Category</mat-label>
-                  <mat-select formControlName="templateSubCategory" required>
+                  <mat-select data-testid="dbn-templatesubcategory" formControlName="templateSubCategory" required>
                       <mat-option>
                           <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                       </mat-option>
                       <mat-option *ngFor="let option of onSearchSubCategory()" [value]="option">{{option}}</mat-option>
-                      <mat-option *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                      <mat-option data-testid="dbn-addsubcategory" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                   </mat-select>
                   <mat-error *ngIf="!templateForm.controls['templateSubCategory'].valid">Template Sub Category Is Required</mat-error>
               </mat-form-field>
-              <button *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addSubCategory()"><mat-icon>add</mat-icon></button>
+              <button data-testid="dbn-addsubcategory-2" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addSubCategory()"><mat-icon>add</mat-icon></button>
           </div>
         </div>
       </div>
@@ -90,21 +90,21 @@
       <div class="row">
         <mat-form-field appearance="outline" class="col-md-6">
           <mat-label>Title</mat-label>
-          <input matInput [(ngModel)]="title">
+          <input data-testid="dbn-input" matInput [(ngModel)]="title">
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="col-md-6">
           <mat-label>Subtitle</mat-label>
-          <input matInput [(ngModel)]="subtitle">
+          <input data-testid="dbn-input-2" matInput [(ngModel)]="subtitle">
         </mat-form-field>
       </div>
 
-      <textarea class="textbox" rows="10" cols="50" placeholder="You Message....." [(ngModel)]="message"></textarea>
+      <textarea data-testid="dbn-you-message" class="textbox" rows="10" cols="50" placeholder="You Message....." [(ngModel)]="message"></textarea>
 
       <div class="row">
         <mat-form-field appearance="outline" class="col-md-6">
           <mat-label>Landing Page (Deeplink URL)</mat-label>
-          <input matInput [(ngModel)]="landingPage">
+          <input data-testid="dbn-input-3" matInput [(ngModel)]="landingPage">
         </mat-form-field>
 
         <div>
@@ -116,7 +116,7 @@
 
       <div *ngIf="!sticky">
         <label>Image (Less than 1 MB)</label><br>
-        <input type="file" multiple="false" accept=".png,.jpg,.jpeg" (change)="importImages($event)">
+        <input data-testid="dbn-importimages" type="file" multiple="false" accept=".png,.jpg,.jpeg" (change)="importImages($event)">
       </div>
     </div>
   </div>
@@ -130,12 +130,12 @@
 
     <mat-form-field appearance="outline" class="col-md-12">
       <mat-label>Broadcast Name</mat-label>
-      <input matInput type="text" [(ngModel)]="broadcastname">
+      <input data-testid="dbn-input-4" matInput type="text" [(ngModel)]="broadcastname">
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="col-md-12"  *ngIf="templateArray.length != 0">
       <mat-label>Select Template</mat-label>
-      <mat-select (selectionChange)="onTemplateChange($event)">
+      <mat-select data-testid="dbn-mat-select" (selectionChange)="onTemplateChange($event)">
           <mat-option *ngFor="let template of templateArray" [value]="template">
               {{template.templatename}}
           </mat-option>
@@ -160,6 +160,6 @@
   </div>
 
   <div class="d-flex flex-row justify-content-center" *ngIf="!sendValidation()">
-    <button mat-raised-button class="sendButton" type="button" [disabled]="sendValidation()" (click)="sendNotification(templateForm.value)">Send Notification</button>
+    <button data-testid="dbn-sendnotification" mat-raised-button class="sendButton" type="button" [disabled]="sendValidation()" (click)="sendNotification(templateForm.value)">Send Notification</button>
   </div>
 </div>

@@ -7,7 +7,7 @@
   <div class="dialog-container">
     <!-- Add New Config Button -->
     <div class="header-actions">
-      <button mat-raised-button [color]="showAddForm ? 'warn' : 'primary'" (click)="toggleAddForm()">
+      <button data-testid="wcd-toggle-add-1" mat-raised-button [color]="showAddForm ? 'warn' : 'primary'" (click)="toggleAddForm()">
         <mat-icon>{{ showAddForm ? 'close' : 'add' }}</mat-icon>
         {{ showAddForm ? 'Cancel' : 'Add New WATI' }}
       </button>
@@ -44,7 +44,7 @@
             </mat-form-field>
           </div>
           <div class="form-actions">
-            <button mat-raised-button color="primary" (click)="addConfig()" [disabled]="loading">
+            <button data-testid="wcd-add-config-2" mat-raised-button color="primary" (click)="addConfig()" [disabled]="loading">
               <mat-icon>save</mat-icon> Save Configuration
             </button>
           </div>
@@ -108,7 +108,7 @@
             } @else {
               <div class="token-cell">
                 <span class="token-text">{{ isTokenVisible(config.serverid) ? truncateText(config.watitoken, 20) : maskToken() }}</span>
-                <button mat-icon-button class="visibility-btn" (click)="toggleTokenVisibility(config.serverid)" [matTooltip]="isTokenVisible(config.serverid) ? 'Hide token' : 'Show token'">
+                <button [attr.data-testid]="'wcd-token-toggle-' + config.serverid" mat-icon-button class="visibility-btn" (click)="toggleTokenVisibility(config.serverid)" [matTooltip]="isTokenVisible(config.serverid) ? 'Hide token' : 'Show token'">
                   <mat-icon>{{ isTokenVisible(config.serverid) ? 'visibility_off' : 'visibility' }}</mat-icon>
                 </button>
               </div>
@@ -121,17 +121,17 @@
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let config">
             @if (editingServerId === config.serverid) {
-              <button mat-icon-button color="primary" (click)="saveEdit()" [disabled]="loading" matTooltip="Save">
+              <button [attr.data-testid]="'wcd-save-edit-' + config.serverid" mat-icon-button color="primary" (click)="saveEdit()" [disabled]="loading" matTooltip="Save">
                 <mat-icon>check</mat-icon>
               </button>
-              <button mat-icon-button (click)="cancelEdit()" matTooltip="Cancel">
+              <button [attr.data-testid]="'wcd-cancel-edit-' + config.serverid" mat-icon-button (click)="cancelEdit()" matTooltip="Cancel">
                 <mat-icon>close</mat-icon>
               </button>
             } @else {
-              <button mat-icon-button color="primary" (click)="editConfig(config)" matTooltip="Edit">
+              <button [attr.data-testid]="'wcd-edit-' + config.serverid" mat-icon-button color="primary" (click)="editConfig(config)" matTooltip="Edit">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button color="warn" (click)="deleteConfig(config)" matTooltip="Delete">
+              <button [attr.data-testid]="'wcd-delete-' + config.serverid" mat-icon-button color="warn" (click)="deleteConfig(config)" matTooltip="Delete">
                 <mat-icon>delete</mat-icon>
               </button>
             }
@@ -160,5 +160,5 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button (click)="closeDialog()">Close</button>
+  <button data-testid="wcd-close-3" mat-button (click)="closeDialog()">Close</button>
 </mat-dialog-actions>

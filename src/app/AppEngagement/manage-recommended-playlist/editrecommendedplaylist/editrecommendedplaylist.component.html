@@ -6,24 +6,24 @@
   <form [formGroup]="form" class="edit-form">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Title</mat-label>
-      <input matInput formControlName="title" />
+      <input data-testid="erp-inp-1" matInput formControlName="title" />
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Description</mat-label>
-      <textarea matInput formControlName="description" rows="3"></textarea>
+      <textarea data-testid="erp-txt-2" matInput formControlName="description" rows="3"></textarea>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Expire Date</mat-label>
-      <input matInput [matDatepicker]="picker" formControlName="expiredate" />
+      <input data-testid="erp-inp-3" matInput [matDatepicker]="picker" formControlName="expiredate" />
       <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
       <mat-datepicker #picker></mat-datepicker>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Recommended By</mat-label>
-      <input matInput formControlName="createdby" readonly />
+      <input data-testid="erp-inp-4" matInput formControlName="createdby" readonly />
     </mat-form-field>
 
     <div class="section">
@@ -31,12 +31,12 @@
       <div class="chips">
         <span class="chip" *ngFor="let id of eiflix">
           {{ mapPlaylist[id] || id }}
-          <button class="x" (click)="eiflix = remove(eiflix, id)" type="button">&times;</button>
+          <button [attr.data-testid]="'erp-btn-5-' + id" class="x" (click)="eiflix = remove(eiflix, id)" type="button">&times;</button>
         </span>
       </div>
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Add EiFlix</mat-label>
-        <mat-select multiple [(ngModel)]="eiflix" [ngModelOptions]="{standalone: true}">
+        <mat-select data-testid="erp-sel-6" multiple [(ngModel)]="eiflix" [ngModelOptions]="{standalone: true}">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="searchEiflix" [ngModelOptions]="{standalone: true}"
               placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
@@ -51,12 +51,12 @@
       <div class="chips">
         <span class="chip" *ngFor="let id of generalcontent">
           {{ mapPlaylist[id] || id }}
-          <button class="x" (click)="generalcontent = remove(generalcontent, id)" type="button">&times;</button>
+          <button [attr.data-testid]="'erp-btn-7-' + id" class="x" (click)="generalcontent = remove(generalcontent, id)" type="button">&times;</button>
         </span>
       </div>
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Add General Content</mat-label>
-        <mat-select multiple [(ngModel)]="generalcontent" [ngModelOptions]="{standalone: true}">
+        <mat-select data-testid="erp-sel-8" multiple [(ngModel)]="generalcontent" [ngModelOptions]="{standalone: true}">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="searchGeneralcontent" [ngModelOptions]="{standalone: true}"
               placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
@@ -71,12 +71,12 @@
       <div class="chips">
         <span class="chip" *ngFor="let id of solarvoice">
           {{ mapPlaylist[id] || id }}
-          <button class="x" (click)="solarvoice = remove(solarvoice, id)" type="button">&times;</button>
+          <button [attr.data-testid]="'erp-btn-9-' + id" class="x" (click)="solarvoice = remove(solarvoice, id)" type="button">&times;</button>
         </span>
       </div>
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Add Solar Voice</mat-label>
-        <mat-select multiple [(ngModel)]="solarvoice" [ngModelOptions]="{standalone: true}">
+        <mat-select data-testid="erp-sel-10" multiple [(ngModel)]="solarvoice" [ngModelOptions]="{standalone: true}">
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="searchSolarvoice" [ngModelOptions]="{standalone: true}"
               placeholderLabel="Search..." noEntriesFoundLabel="No results"></ngx-mat-select-search>
@@ -89,8 +89,8 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button (click)="close()" [disabled]="saving">Cancel</button>
-  <button mat-raised-button color="primary" (click)="save()" [disabled]="saving">
+  <button data-testid="erp-btn-11" mat-button (click)="close()" [disabled]="saving">Cancel</button>
+  <button data-testid="erp-btn-12" mat-raised-button color="primary" (click)="save()" [disabled]="saving">
     {{ saving ? 'Saving...' : 'Update' }}
   </button>
 </mat-dialog-actions>

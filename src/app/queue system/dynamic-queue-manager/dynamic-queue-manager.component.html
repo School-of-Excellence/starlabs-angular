@@ -6,14 +6,14 @@
         <mat-icon>people_outline</mat-icon>
         <b>{{selectedChatStage}} {{selectedChatStageType}}</b>
       </h3>
-      <button mat-icon-button (click)="snav.close()" class="close-panel-btn">
+      <button data-testid="dqmg-btn-1" mat-icon-button (click)="snav.close()" class="close-panel-btn">
         <mat-icon>close</mat-icon>
       </button>
     </div>
     <main *ngIf="selectedChatStage != null" class="communication-container">
       <!-- Communication Buttons -->
       <section class="communication-buttons">
-        <button 
+        <button data-testid="dqmg-btn-2" 
           class="comm-btn whatsapp-btn"
           [class.active]="selectedCommType === 'whatsapp'"
           (click)="selectCommType('whatsapp')"
@@ -21,7 +21,7 @@
           <i class="bi bi-whatsapp"></i>
           Whatsapp ({{getSelectedTokens().length}})
         </button>
-        <button 
+        <button data-testid="dqmg-btn-3" 
           class="comm-btn email-btn"
           [class.active]="selectedCommType === 'email'"
           (click)="selectCommType('email')"
@@ -29,7 +29,7 @@
           <i class="bi bi-envelope"></i>
           Email ({{getSelectedTokens().length}})
         </button>
-        <button 
+        <button data-testid="dqmg-btn-4" 
           class="comm-btn notification-btn"
           [class.active]="selectedCommType === 'notification'"
           (click)="selectCommType('notification')"
@@ -41,7 +41,7 @@
 
       <!-- Send Button -->
       <section class="send-button-section" *ngIf="selectedCommType">
-        <button 
+        <button data-testid="dqmg-btn-5" 
           class="send-btn"
           (click)="sendCommunication()"
           [disabled]="getSelectedTokens().length === 0">
@@ -55,9 +55,9 @@
         <!-- Header -->
         <div class="participants-header">
           <h5 class="participants-title">
-            Participants ({{getStageParticipants(selectedChatStage)['tokenlist']?.length || 0}})
+            Participants ({{(getStageParticipants(selectedChatStage)?.['tokenlist'] || [])?.length || 0}})
           </h5>
-          <div class="select-all-wrapper" (click)="toggleSelectAll()">
+          <div data-testid="dqmg-act-6" class="select-all-wrapper" (click)="toggleSelectAll()">
             <div class="custom-checkbox" [class.checked]="areAllSelected()">
               <i class="bi bi-check" *ngIf="areAllSelected()"></i>
             </div>
@@ -67,8 +67,8 @@
 
         <!-- Participants List -->
         <div class="participants-list">
-          <div 
-            *ngFor="let token of getStageParticipants(selectedChatStage)['tokenlist']; let i = index"
+          <div [attr.data-testid]="'dqmg-act-7-' + i" 
+            *ngFor="let token of (getStageParticipants(selectedChatStage)?.['tokenlist'] || []); let i = index"
             class="participant-item"
             (click)="toggleTokenSelection(token)">
             
@@ -97,7 +97,7 @@
 
           <!-- Empty State -->
           <div 
-            *ngIf="!getStageParticipants(selectedChatStage)['tokenlist']?.length"
+            *ngIf="!(getStageParticipants(selectedChatStage)?.['tokenlist'] || [])?.length"
             class="empty-state">
             <i class="bi bi-person-x"></i>
             <p>No participants found for this stage</p>
@@ -111,7 +111,7 @@
         <h4>{{selectedChatStage}} {{selectedChatStageType}}</h4>
       </section>
       <section>
-        <div *ngFor="let token of getStageParticipants(selectedChatStage)['tokenlist']">
+        <div *ngFor="let token of (getStageParticipants(selectedChatStage)?.['tokenlist'] || [])">
           <div>{{mapProfileData[token.profile_id]?.['name']}}</div>
           <div>{{mapProfileData[token.profile_id]?.['email']}}</div>
           <div>{{mapProfileData[token.profile_id]?.['number']}}</div>
@@ -157,7 +157,7 @@
           <div class="talktext d-flex justify-content-start flex-column">
             <span class="d-flex justify-content-between">
               <p>{{pinnedChat['message']}}</p>
-              <button mat-icon-button type="button"><mat-icon
+              <button [attr.data-testid]="'dqmg-btn-8-' + pinnedChat" mat-icon-button type="button"><mat-icon [attr.data-testid]="'dqmg-act-9-' + pinnedChat"
                   (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)" style="vertical-align:top;"
                   [ngClass]="pinnedChat['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
             </span>
@@ -176,7 +176,7 @@
             <div class="talk-bubble round" style="float:right;">
               <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
                 <span class="d-flex justify-content-between">
-                  <button mat-icon-button type="button"><mat-icon
+                  <button [attr.data-testid]="'dqmg-btn-10-' + list" mat-icon-button type="button"><mat-icon [attr.data-testid]="'dqmg-act-11-' + list"
                       (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;"
                       [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                   <p>{{list['message']}}</p>
@@ -192,7 +192,7 @@
               <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
                 <span class="d-flex justify-content-between">
                   <p>{{mapProfileData[list['senderprofileid']]?.['name']}}</p>
-                  <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
+                  <button [attr.data-testid]="'dqmg-btn-12-' + list" mat-icon-button type="button"><mat-icon style="vertical-align:top;"
                       [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                 </span>
                 <span>
@@ -223,7 +223,7 @@
           <!-- harish -->
           <mat-form-field class="w-100" appearance="outline">
             <mat-label>Select Queue</mat-label>
-            <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
+            <mat-select data-testid="dqmg-sel-13" [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="searchQueue" [ngModelOptions]="{standalone: true}"
                   placeholderLabel="Columns" [placeholderLabel]="'Search'"
@@ -246,18 +246,18 @@
 
         <div class="col-sm">
           <div *ngIf="selectedQueue != null" class="text-end">
-            <button mat-icon-button type="button" (click)="togglescroll = 'vertical'"><mat-icon aria-hidden="false"
+            <button data-testid="dqmg-btn-14" mat-icon-button type="button" (click)="togglescroll = 'vertical'"><mat-icon aria-hidden="false"
                 [ngClass]="togglescroll === 'vertical'?'forestgreen':null">swap_vertical_circle</mat-icon></button>
-            <button mat-icon-button type="button" (click)="togglescroll = 'horizontal'"><mat-icon aria-hidden="false"
+            <button data-testid="dqmg-btn-15" mat-icon-button type="button" (click)="togglescroll = 'horizontal'"><mat-icon aria-hidden="false"
                 [ngClass]="togglescroll === 'horizontal'?'forestgreen':null">swap_horizontal_circle</mat-icon></button>
-            <button mat-button [matMenuTriggerFor]="menu">Menu</button>
+            <button data-testid="dqmg-btn-16" mat-button [matMenuTriggerFor]="menu">Menu</button>
             <mat-menu #menu="matMenu">
-              <button mat-menu-item (click)="onBulkInvite()">Bulk Invitation</button>
-              <button mat-menu-item (click)="exportCSV()">Export CSV</button>
+              <button data-testid="dqmg-btn-17" mat-menu-item (click)="onBulkInvite()">Bulk Invitation</button>
+              <button data-testid="dqmg-btn-18" mat-menu-item (click)="exportCSV()">Export CSV</button>
             </mat-menu>
             <!-- <button mat-stroked-button type="button" (click)="onBulkInvite()">Bulk Invitation</button>&nbsp;&nbsp; -->
             <!-- <button class="btn btn-success" (click)="exportCSV()">Export CSV</button> -->
-            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
+            <button data-testid="dqmg-btn-19" style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
               (click)="selectedChatStage = 'queueadmin';snav.open()">Admin Stage</button>
             <!-- <button mat-icon-button (click)="snav.toggle()">
                 <mat-icon>chat</mat-icon>
@@ -271,7 +271,7 @@
           <div *ngIf="liveQueueList.length != 0" class="border ps-2 pt-1">
             <div class="fw-bold mb-2 h5">Live Queue</div>
             <span *ngFor="let live of liveQueueList">
-              <button mat-stroked-button class="me-2 mb-2"
+              <button [attr.data-testid]="'dqmg-btn-20-' + live" mat-stroked-button class="me-2 mb-2"
                 [ngClass]="{'selectedqueue': selectedQueue != null && selectedQueue['docid'] === live['docid']}"
                 (click)="selectedQueue = live; onQueueSelect()">
                 {{live["queuename"]}}
@@ -321,12 +321,12 @@
               <span>
                 <span>{{column.stagename}}</span> <span *ngIf="column.type != null">&nbsp;({{column.type}})</span> -
                 <span>{{column.tokenlist.length}}</span>
-                <button class="m-2 text-secondary" 
+                <button [attr.data-testid]="'dqmg-btn-21-' + i" class="m-2 text-secondary" 
                   mat-icon-button
                   (click)="selectedChatStage = column.stagename;selectedChatStageType = column.type != null ? ' - ' + column.type : '';snav.open();selectedStageType = column.type;">
                   <mat-icon>message</mat-icon>
                 </button>
-                <button *ngIf="roles['developer']" class="text-secondary" mat-icon-button
+                <button [attr.data-testid]="'dqmg-btn-22-' + i" *ngIf="roles['developer']" class="text-secondary" mat-icon-button
                   (click)="completeQueue(column.tokenlist, column.stagename)"><mat-icon>cloud_done</mat-icon></button>
               </span><br>
               <!-- <span *ngIf="column.type === 'Waiting'">
@@ -338,7 +338,7 @@
                 *ngFor="let token of column.tokenlist">
                 <div class="token-content" >
                   <!-- <div class="move-button-container"> -->
-                  <button style="float: right;" mat-icon-button [matMenuTriggerFor]="moveMenu"
+                  <button [attr.data-testid]="'dqmg-btn-23-' + token" style="float: right;" mat-icon-button [matMenuTriggerFor]="moveMenu"
                     [disabled]="['locked','defaulted'].includes(participantMetaDataMap[token['profile_id']]?.['financialstatus']) && (selectedQueue.stageproperty[column['stagename']] || {})['checkfinance'] == true"  
                     aria-label="Move token to another stage"
                     (click)="checkAvailablestages(token, column.stagename, column.type)">
@@ -348,10 +348,10 @@
                   <!-- Searchable Move Menu -->
                   <mat-menu #moveMenu="matMenu" class="searchable-menu">
                     <!-- Search Input -->
-                    <div mat-menu-item class="search-container" (click)="$event.stopPropagation()">
+                    <div [attr.data-testid]="'dqmg-act-24-' + token" mat-menu-item class="search-container" (click)="$event.stopPropagation()">
                       <mat-form-field appearance="outline" class="search-field">
                         <mat-label>Search stages...</mat-label>
-                        <input matInput [(ngModel)]="stageSearchTerm" (input)="filterStages()"
+                        <input [attr.data-testid]="'dqmg-inp-25-' + token" matInput [(ngModel)]="stageSearchTerm" (input)="filterStages()"
                           placeholder="Type to search stages" #searchInput>
                         <mat-icon matSuffix>search</mat-icon>
                       </mat-form-field>
@@ -362,7 +362,7 @@
 
                     <!-- Filtered Stage Options -->
                     <div class="stage-options-container">
-                      <button mat-menu-item *ngFor="let targetColumn of filteredAvailableStages"
+                      <button [attr.data-testid]="'dqmg-btn-26-' + targetColumn" mat-menu-item *ngFor="let targetColumn of filteredAvailableStages"
                         [disabled]="targetColumn.stagename === column.stagename"
                         (click)="moveTokenToStage(token, column.stagename, column.type, targetColumn.stagename, targetColumn.markascompleted)">
                         <span class="stage-name-no-wrap">{{targetColumn.stagename}}</span>
@@ -378,34 +378,34 @@
 
                     <!-- Clear search button -->
                     <mat-divider *ngIf="stageSearchTerm"></mat-divider>
-                    <button *ngIf="stageSearchTerm" mat-menu-item (click)="clearSearch()" class="clear-search">
+                    <button [attr.data-testid]="'dqmg-btn-27-' + token" *ngIf="stageSearchTerm" mat-menu-item (click)="clearSearch()" class="clear-search">
                       <mat-icon>clear</mat-icon>
                       <span>Clear search</span>
                     </button>
                   </mat-menu>
 
                   <!-- Other Menu (unchanged) -->
-                  <button style="float: right;margin-top: 30px;margin-right: -40px;" mat-icon-button
+                  <button [attr.data-testid]="'dqmg-btn-28-' + token" style="float: right;margin-top: 30px;margin-right: -40px;" mat-icon-button
                     [matMenuTriggerFor]="menu" aria-label="More options">
                     <mat-icon>menu</mat-icon>
                   </button>
 
                   <mat-menu #menu="matMenu" class="token-actions-menu">
                     <!-- Pre-Assign -->
-                    <button mat-menu-item (click)="openPreAssignDialog(token)">
+                    <button [attr.data-testid]="'dqmg-btn-29-' + token" mat-menu-item (click)="openPreAssignDialog(token)">
                       <mat-icon>assignment_ind</mat-icon>
                       <span>Pre-Assign Token</span>
                     </button>
 
                     <!-- Add Notes & Tags -->
-                    <button mat-menu-item *ngIf="!hasNotesOrTags(token)" (click)="openNotesTagsDialog(token)"
+                    <button [attr.data-testid]="'dqmg-btn-30-' + token" mat-menu-item *ngIf="!hasNotesOrTags(token)" (click)="openNotesTagsDialog(token)"
                       matTooltip="Add notes and tags to this token">
                       <mat-icon>note_add</mat-icon>
                       <span>Add Notes & Tags</span>
                     </button>
 
                     <!-- View Notes & Tags (if exists) -->
-                    <button mat-menu-item *ngIf="hasNotesOrTags(token)" (click)="openNotesTagsDialog(token)"
+                    <button [attr.data-testid]="'dqmg-btn-31-' + token" mat-menu-item *ngIf="hasNotesOrTags(token)" (click)="openNotesTagsDialog(token)"
                       matTooltip="View or edit notes and tags">
                       <mat-icon>description</mat-icon>
                       <span>View Notes & Tags</span>
@@ -414,8 +414,8 @@
                     <mat-divider></mat-divider>
 
                     <!-- Mark as Unattended -->
-                    <div mat-menu-item class="checkbox-menu-item" (click)="$event.stopPropagation()">
-                      <mat-checkbox [checked]="token.tokenstatus === 'inActive'"
+                    <div [attr.data-testid]="'dqmg-act-32-' + token" mat-menu-item class="checkbox-menu-item" (click)="$event.stopPropagation()">
+                      <mat-checkbox [attr.data-testid]="'dqmg-change-33-' + token" [checked]="token.tokenstatus === 'inActive'"
                         (change)="onCheckboxChange($event, token)" color="warn">
                         Mark as unattended
                       </mat-checkbox>
@@ -424,7 +424,7 @@
                     <mat-divider></mat-divider>
 
                     <!-- Update Variation -->
-                    <button mat-menu-item [matMenuTriggerFor]="variationMenu">
+                    <button [attr.data-testid]="'dqmg-btn-34-' + token" mat-menu-item [matMenuTriggerFor]="variationMenu">
                       <mat-icon>swap_horiz</mat-icon>
                       <span>Update Variation</span>
                       <mat-icon class="submenu-icon">chevron_right</mat-icon>
@@ -432,9 +432,9 @@
                   </mat-menu>
 
                   <mat-menu #variationMenu="matMenu" class="searchable-menu">
-                    <mat-form-field appearance="outline" (click)="$event.stopPropagation()">
+                    <mat-form-field [attr.data-testid]="'dqmg-act-35-' + token" appearance="outline" (click)="$event.stopPropagation()">
                       <mat-label>Select Variation</mat-label>
-                      <mat-select (selectionChange)="updateVariation(token, $event.value)">
+                      <mat-select [attr.data-testid]="'dqmg-sel-36-' + token" (selectionChange)="updateVariation(token, $event.value)">
                         <mat-option *ngFor="let variation of variationList"
                           [value]="variation.id">{{variation['variationname']}}</mat-option>
                       </mat-select>
@@ -443,7 +443,7 @@
 
                   <!-- </div> -->
                   <span class="label">Token Number:</span> {{token.tokennumber}}
-                  <span *ngIf="i==0 && deleteOption" style="margin-left: 10px;"
+                  <span [attr.data-testid]="'dqmg-act-37-' + token" *ngIf="i==0 && deleteOption" style="margin-left: 10px;"
                     (click)="deleteParticipant(token)"><mat-icon>delete</mat-icon></span>
                   <br>
                   <span class="label">Name:</span> {{mapProfileData[token.profile_id]?.['name']}}
@@ -479,7 +479,7 @@
                   </div>
                   <div>
                     <span class="label">Audio Video Test:&nbsp;</span>
-                    <span class="textbtn" (click)="avTest(token)">{{token["avtest"] != null && token["avtest"] !=
+                    <span [attr.data-testid]="'dqmg-act-38-' + token" class="textbtn" (click)="avTest(token)">{{token["avtest"] != null && token["avtest"] !=
                       undefined ? token["avtest"] : 'Test Now'}}</span>
                   </div>
 
@@ -505,7 +505,7 @@
 
                   <div class="notes-tags-indicators" *ngIf="hasNotesOrTags(token)">
                     <!-- Notes indicator -->
-                    <div *ngIf="token.notes || (token.notesList && token.notesList.length > 0)" class="notes-indicator"
+                    <div [attr.data-testid]="'dqmg-act-39-' + token" *ngIf="token.notes || (token.notesList && token.notesList.length > 0)" class="notes-indicator"
                       (click)="openNotesTagsDialog(token)">
                       <mat-icon>event_note</mat-icon>
                       <div class="notes-preview">
@@ -524,7 +524,7 @@
                     </div>
 
                     <!-- Tags indicator -->
-                    <div *ngIf="token.tags && token.tags.length > 0" class="tags-indicator"
+                    <div [attr.data-testid]="'dqmg-act-40-' + token" *ngIf="token.tags && token.tags.length > 0" class="tags-indicator"
                       (click)="openNotesTagsDialog(token)">
                       <mat-icon>local_offer</mat-icon>
                       <div class="tags-preview">
@@ -555,7 +555,7 @@
                     </div> -->
                   <!-- Stage Log -->
                   <div class="stage-log-container">
-                    <div class="stage-log-toggle" (click)="toggleStageLog(token)">
+                    <div [attr.data-testid]="'dqmg-act-41-' + token" class="stage-log-toggle" (click)="toggleStageLog(token)">
                       <mat-icon>history</mat-icon>
                       <span>View Stage Log</span>
                     </div>

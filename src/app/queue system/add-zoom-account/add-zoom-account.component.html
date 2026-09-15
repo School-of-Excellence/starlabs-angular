@@ -4,7 +4,7 @@
       <div>
         <mat-form-field class="inputfields" appearance="outline">
           <mat-label>Email</mat-label>
-          <input matInput type="text" formControlName="email">
+          <input data-testid="azac-inp-1" matInput type="text" formControlName="email">
           <mat-error *ngIf="zoomaccountForm.get('email').hasError('required')">
             Required
           </mat-error>
@@ -12,7 +12,7 @@
         <br>
         <mat-form-field class="inputfields" appearance="outline">
           <mat-label>First Name</mat-label>
-          <input matInput type="text" formControlName="firstname">
+          <input data-testid="azac-inp-2" matInput type="text" formControlName="firstname">
           <mat-error *ngIf="zoomaccountForm.get('firstname').hasError('required')">
             Required
           </mat-error>
@@ -20,7 +20,7 @@
         <br>
         <mat-form-field class="inputfields" appearance="outline">
           <mat-label>Last Name</mat-label>
-          <input matInput type="text" formControlName="lastname">
+          <input data-testid="azac-inp-3" matInput type="text" formControlName="lastname">
           <mat-error *ngIf="zoomaccountForm.get('lastname').hasError('required')">
             Required
           </mat-error>
@@ -28,7 +28,7 @@
         <br>
         <mat-form-field class="inputfields" appearance="outline">
           <mat-label>Account Type</mat-label>
-          <mat-select formControlName="accounttype">
+          <mat-select data-testid="azac-sel-4" formControlName="accounttype">
             <mat-option *ngFor="let option of ['Basic', 'Licensed']" [value]="option.toLowerCase()">{{option}}</mat-option>
           </mat-select>
           <mat-error *ngIf="zoomaccountForm.get('accounttype').hasError('required')">
@@ -39,7 +39,7 @@
         <!-- <mat-checkbox formControlName="inuse">This Account is currently in Use</mat-checkbox>
         <br><br> -->
       </div>
-      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update'}}</button>
+      <button data-testid="azac-btn-5" mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+      <button data-testid="azac-btn-6" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update'}}</button>
     </form>
   </div>

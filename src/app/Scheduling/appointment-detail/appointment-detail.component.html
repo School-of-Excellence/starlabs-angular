@@ -22,8 +22,8 @@
     <label *ngIf="metaData['attended']" class="successnote">*This Appointment has happened successfully!</label>
   </div>
   <div class="btnarea">
-    <button class="cancelbtn" *ngIf="enableCancel" mat-stroked-button (click)="cancel()">Cancel Appointment</button>
-    <button class="statusbtn" *ngIf="enableStatus" mat-stroked-button (click)="updateStatus()">Update Status</button>
-    <button class="closebtn" mat-stroked-button (click)="close()">Close</button>
+    <button data-testid="ad-cancel-1" class="cancelbtn" *ngIf="enableCancel" mat-stroked-button (click)="cancel()">Cancel Appointment</button>
+    <button data-testid="ad-update-status-2" class="statusbtn" *ngIf="enableStatus" mat-stroked-button (click)="updateStatus()">Update Status</button>
+    <button data-testid="ad-close-3" class="closebtn" mat-stroked-button (click)="close()">Close</button>
   </div>
 </div>
