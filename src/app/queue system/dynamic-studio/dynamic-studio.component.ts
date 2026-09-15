@@ -1055,7 +1055,16 @@ export class DynamicStudioComponent {
 
   assignStudio(invitation){
     console.log(invitation)
-    var token = this.stageTokenList.filter(e => e["stagename"] == invitation["stage"])[0]["tokenlist"].find(e => e["profile_id"] == invitation["profileid"])
+    // Robustness fix (2026-09-15): the prior form
+    //   this.stageTokenList.filter(e => e["stagename"] == invitation["stage"])[0]["tokenlist"].find(...)
+    // threw "Cannot read properties of undefined (reading 'tokenlist')" whenever the invitation's `stage`
+    // was not a currently-rendered stage column in THIS specialist's board (filter → [] → [0] undefined).
+    // That threw synchronously INSIDE assignStudio, before this.dialog.open(...), so on a participant's
+    // real-time approval the Assign-Queue-Studio dialog never opened. The token belongs to the participant
+    // (profile_id); the stage is incidental — find it across all rendered stages, null-safe.
+    var token = (this.stageTokenList || [])
+      .flatMap(s => s?.["tokenlist"] ?? [])
+      .find(e => e?.["profile_id"] == invitation["profileid"])
     console.log(token)
     var assignStudio = this.dialog.open(AssignQueueStudioComponent, {
       data: {
