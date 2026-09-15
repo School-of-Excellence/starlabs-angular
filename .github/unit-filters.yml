@@ -32,7 +32,6 @@ _all:
   - 'angular.json'
   - 'package.json'
   - 'tsconfig*.json'
-  - 'karma.ci.conf.js'
 
 queue:
   - 'src/app/queue system/**'

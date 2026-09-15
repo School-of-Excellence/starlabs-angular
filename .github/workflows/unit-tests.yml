@@ -120,7 +120,6 @@ jobs:
             exit 0
           fi
           npx ng test --watch=false \
-            --karma-config=karma.ci.conf.js \
             --ts-config=tsconfig.unit.json \
             --code-coverage \
             ${{ steps.sel.outputs.inc }}
