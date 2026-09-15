@@ -1,15 +1,31 @@
-import { Component, DestroyRef, ElementRef, Input, OnChanges, ViewEncapsulation, afterNextRender, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Input, OnChanges, ViewChild, ViewEncapsulation, afterNextRender, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { Firestore, QueryConstraint, Timestamp, collection, getDocs, query, where } from '@angular/fire/firestore';
+import { MatCalendarCellClassFunction, MatDateRangePicker, MatDatepickerModule } from '@angular/material/datepicker';
+import {
+  Firestore, QueryConstraint, Timestamp, arrayUnion, collection, doc, getCountFromServer, getDocs, query, serverTimestamp,
+  updateDoc, where,
+} from '@angular/fire/firestore';
 import { CROSSOVER_AREAS, EVO_RESULT_OF, mountInterimReportDashboard } from './interim-report-dashboard.script';
+
+/** love letter / ask AH tag → the same boolean + details fields the Love Letter / Ask A&H tabs write */
+const TAG_FIELD: Record<string, [string, string]> = {
+  happy: ['liked', 'likedetails'],
+  attention: ['tagged', 'tagdetails'],
+  opportunity: ['opportunity', 'opportunitydetails'],
+  critical: ['critical', 'criticaldetails'],
+  resolved: ['resolved', 'resolveddetails'],
+};
+const TAG_COLLECTION = { love: 'love letter', ask: 'ask AH' } as const;
+type TagKind = keyof typeof TAG_COLLECTION;
+
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const toDate = (t: any): Date | null => t?.toDate?.() ?? (t instanceof Date ? t : null);
 
 // STARLABS Interim Report Dashboard, extracted from the design file.
 // ShadowDom keeps the design's page-level CSS isolated from the rest of the app.
-// Summary strip, Crossover Meter and Evolution Progress read Firestore (see
-// specs/plans/2026-09-11-interim-dashboard-crossover.md and 2026-09-12-interim-dashboard-evolution.md);
-// Love Letter and Asks still show the design's mock data.
+// Every section reads Firestore (plans in specs/plans/2026-09-1*-interim-dashboard-*.md);
+// love letter / ask AH tags and notes are written here too (2026-09-15-interim-dashboard-tagging.md).
 @Component({
   selector: 'app-interim-report-dashboard',
   imports: [ReactiveFormsModule, MatDatepickerModule],
@@ -20,8 +36,12 @@ import { CROSSOVER_AREAS, EVO_RESULT_OF, mountInterimReportDashboard } from './i
 export class InterimReportDashboardComponent implements OnChanges {
   /** profile_data keyed by doc id — the Log tab's mapProfiles, so names are not fetched twice */
   @Input() profiles: Record<string, any> = {};
+  /** the signed-in profile — recorded on tags and notes, as the Love Letter / Ask A&H tabs do */
+  @Input() profileId: string | null = null;
 
-  /** the DATE filter — one Material range picker; defaults to today */
+  @ViewChild('rangePicker') rangePicker?: MatDateRangePicker<Date>;
+
+  /** the DATE filter — one Material range picker; defaults to the current month */
   range = new FormGroup({
     start: new FormControl<Date | null>(null),
     end: new FormControl<Date | null>(null),
@@ -29,6 +49,16 @@ export class InterimReportDashboardComponent implements OnChanges {
 
   private firestore = inject(Firestore);
   private dashboard: { refresh(): void } | null = null;
+
+  /** days with at least one interimreport log (the calendar dots), loaded a month at a time */
+  private reportDays = new Set<string>();
+  private monthsLoaded = new Set<string>();
+
+  dateClass: MatCalendarCellClassFunction<Date> = (date, view) => {
+    if (view !== 'month') return '';
+    this.loadMonth(date);
+    return this.reportDays.has(dayKey(date)) ? 'irl-has-report' : '';
+  };
 
   constructor() {
     this.range.setValue(this.defaultRange());
@@ -43,6 +73,8 @@ export class InterimReportDashboardComponent implements OnChanges {
         load: (from, to) => this.loadPool(from, to),
         getRange: () => ({ from: this.range.value.start ?? null, to: this.range.value.end ?? null }),
         resetRange: () => this.range.setValue(this.defaultRange()),
+        setTag: (kind, d, key, on) => this.setTag(kind, d, key, on),
+        addNote: (kind, d, text) => this.addNote(kind, d, text),
       });
     });
   }
@@ -51,11 +83,65 @@ export class InterimReportDashboardComponent implements OnChanges {
     this.dashboard?.refresh();
   }
 
-  /** opens (and Clear resets) on today only — the query covers 00:00 to 23:59:59.999 */
+  /** opens (and Clear resets) on the current month — the query covers the 1st 00:00 to the last day 23:59:59.999 */
   private defaultRange(): { start: Date; end: Date } {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return { start: today, end: new Date(today) };
+    const now = new Date();
+    return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
+  }
+
+  /** count interimreport log docs created in [from, to) — an aggregation, so no documents are downloaded */
+  private countLogs(from: Date, to: Date): Promise<number> {
+    return getCountFromServer(query(collection(this.firestore, 'interimreport log'),
+      where('createdon', '>=', Timestamp.fromDate(from)), where('createdon', '<', Timestamp.fromDate(to))))
+      .then(snap => snap.data().count);
+  }
+
+  /** find the month's days with an interimreport log once, then repaint the open calendar so the dots show.
+   *  One count for the month (1 read); only if it is non-zero, one count per day (1 read each). */
+  private loadMonth(date: Date): void {
+    const y = date.getFullYear(), m = date.getMonth(), key = `${y}-${m}`;
+    if (this.monthsLoaded.has(key)) return;
+    this.monthsLoaded.add(key);
+    this.countLogs(new Date(y, m, 1), new Date(y, m + 1, 1))
+      .then(total => !total ? [] : Promise.all(
+        Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) =>
+          this.countLogs(new Date(y, m, i + 1), new Date(y, m, i + 2))
+            .then(n => { if (n) this.reportDays.add(dayKey(new Date(y, m, i + 1))); }))))
+      .then(days => {
+        // MatCalendar re-runs dateClass on updateTodaysDate(); the open calendar is only reachable through the picker
+        if (days.length) (this.rangePicker as any)?._componentRef?.instance?._calendar?.updateTodaysDate();
+      })
+      .catch(() => this.monthsLoaded.delete(key));
+  }
+
+  /** toggle one tag on a love letter / ask AH doc — local first so the dashboard repaints at once */
+  private async setTag(kind: TagKind, d: any, key: string, on: boolean): Promise<void> {
+    const [flag, details] = TAG_FIELD[key];
+    const prev = { [flag]: d[flag], [details]: d[details] };
+    d[flag] = on;
+    d[details] = on ? { user: this.profileId, time: new Date() } : null;
+    try {
+      await updateDoc(doc(this.firestore, TAG_COLLECTION[kind], d._id), {
+        [flag]: on,
+        [details]: on ? { user: this.profileId, time: serverTimestamp() } : null,
+      });
+    } catch (err) {
+      Object.assign(d, prev);
+      throw err;
+    }
+  }
+
+  /** append a note — same {notes, user, time} shape the Love Letter / Ask A&H notes panel writes */
+  private async addNote(kind: TagKind, d: any, text: string): Promise<void> {
+    const note = { notes: text, user: this.profileId, time: Timestamp.now() };
+    const prev = d['notes'];
+    d['notes'] = [...(Array.isArray(prev) ? prev : []), note];
+    try {
+      await updateDoc(doc(this.firestore, TAG_COLLECTION[kind], d._id), { notes: arrayUnion(note) });
+    } catch (err) {
+      d['notes'] = prev;
+      throw err;
+    }
   }
 
   /** one member per interimreport log created in the range, with its latest crossover + evolution record */
@@ -80,7 +166,7 @@ export class InterimReportDashboardComponent implements OnChanges {
       { cross: cross.get(d.id), evo: evo.get(d.id), love: love.get(d.id), ask: ask.get(d.id) }, i));
   }
 
-  /** latest doc (by `created`) per interimlogid — `in` takes at most 30 values per query */
+  /** latest doc (by `created`) per interimlogid, with its doc id as `_id` — `in` takes at most 30 values per query */
   private async latestByLog(collectionName: string, ids: string[]): Promise<Map<string, any>> {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
@@ -89,7 +175,7 @@ export class InterimReportDashboardComponent implements OnChanges {
     const latest = new Map<string, any>();
     const millis = (t: any) => (t?.toMillis ? t.toMillis() : 0);
     snaps.forEach(snap => snap.docs.forEach(d => {
-      const x = d.data();
+      const x = { ...d.data(), _id: d.id };
       const prev = latest.get(x['interimlogid']);
       if (!prev || millis(x['created']) >= millis(prev['created'])) latest.set(x['interimlogid'], x);
     }));
@@ -100,24 +186,34 @@ export class InterimReportDashboardComponent implements OnChanges {
     const profiles = () => this.profiles || {};
     const crossDoc = docs.cross, evoDoc = docs.evo;
 
-    // love letter / ask AH tags — the same booleans the Love Letter / Ask A&H tabs toggle (read-only here)
+    // love letter / ask AH tags — getters over the raw doc, so a tag set from the dashboard shows at once
     const tagsOf = (d: any) => ({
-      happy: d['liked'] === true,
-      attention: d['tagged'] === true,
-      opportunity: d['opportunity'] === true,
-      critical: d['critical'] === true,
-      resolved: d['resolved'] === true,
-      resolvedOn: (d['resolveddetails']?.['time']?.toDate?.() ?? null) as Date | null,
+      get happy() { return d['liked'] === true; },
+      get attention() { return d['tagged'] === true; },
+      get opportunity() { return d['opportunity'] === true; },
+      get critical() { return d['critical'] === true; },
+      get resolved() { return d['resolved'] === true; },
+      get resolvedOn(): Date | null { return toDate(d['resolveddetails']?.['time']); },
       get resolvedBy(): string | null {
         const id = d['resolveddetails']?.['user'];
         return id ? (profiles()[id]?.['name'] || '—') : null;
       },
     });
+    // notes, oldest first — {notes, user, time} as the Love Letter / Ask A&H tabs store them
+    const notesOf = (d: any) => (Array.isArray(d['notes']) ? d['notes'] : []).map((n: any) => ({
+      text: String(n?.['notes'] ?? ''),
+      by: profiles()[n?.['user']]?.['name'] || '—',
+      on: toDate(n?.['time']),
+    }));
     const loveText = String(docs.love?.['loveletter'] ?? '').trim();
-    const love = loveText ? { text: loveText, tags: tagsOf(docs.love) } : null;
+    const love = loveText
+      ? { text: loveText, doc: docs.love, tags: tagsOf(docs.love), get notes() { return notesOf(docs.love); } }
+      : null;
     const ahText = String(docs.ask?.['askah'] ?? '').trim();
     const instText = String(docs.ask?.['installationaskah'] ?? '').trim();
-    const asks = ahText || instText ? { ah: ahText || null, inst: instText || null, tags: tagsOf(docs.ask) } : null;
+    const asks = ahText || instText
+      ? { ah: ahText || null, inst: instText || null, doc: docs.ask, tags: tagsOf(docs.ask), get notes() { return notesOf(docs.ask); } }
+      : null;
     const reports: string[] = Array.isArray(log['reports']) ? log['reports'] : [];
     const metric = crossDoc?.['metric'] || {};
     const cross: Record<string, number | null> = {};

@@ -428,3 +428,20 @@ body.eod-scroll-lock .toolbar {
   background: rgba(0, 0, 0, .78);
   backdrop-filter: blur(8px);
 }
+
+/* Interim Report Dashboard date picker — a dot under days that have an interimreport log.
+   The calendar renders in the overlay (outside the dashboard's shadow root), so this lives here. */
+.mat-calendar-body-cell.irl-has-report .mat-calendar-body-cell-content::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #2F5FDB;
+}
+.mat-calendar-body-cell.irl-has-report .mat-calendar-body-selected::after {
+  background: currentColor;
+}

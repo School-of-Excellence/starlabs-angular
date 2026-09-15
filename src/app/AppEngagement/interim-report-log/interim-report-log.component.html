@@ -301,7 +301,7 @@
     <!-- Interim Report Dashboard (lazy: only rendered when the tab is opened) -->
     <mat-tab label="Interim Report Dashboard">
       <ng-template matTabContent>
-        <app-interim-report-dashboard [profiles]="mapProfiles"></app-interim-report-dashboard>
+        <app-interim-report-dashboard [profiles]="mapProfiles" [profileId]="loggedInProfileId"></app-interim-report-dashboard>
       </ng-template>
     </mat-tab>
   </mat-tab-group>

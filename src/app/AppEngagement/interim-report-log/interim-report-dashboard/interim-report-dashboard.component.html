@@ -9,7 +9,7 @@
             <input matEndDate formControlName="end" placeholder="End date" aria-label="End date">
           </mat-date-range-input>
           <mat-datepicker-toggle class="dtoggle" [for]="rangePicker"></mat-datepicker-toggle>
-          <mat-date-range-picker #rangePicker></mat-date-range-picker></div>
+          <mat-date-range-picker #rangePicker [dateClass]="dateClass"></mat-date-range-picker></div>
         <div class="f"><span class="k">JOURNEY</span><select id="fJourney"></select></div>
         <div class="f"><span class="k">EVENT ATTENDED</span><select id="fEvent"></select></div>
         <div class="f"><span class="k">PARTICIPANT</span>

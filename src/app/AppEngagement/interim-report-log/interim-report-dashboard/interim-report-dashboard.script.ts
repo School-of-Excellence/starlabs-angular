@@ -1,8 +1,8 @@
 // @ts-nocheck — dashboard script ported from interim-report-dashboard (8).html.
 // DOM lookups and listeners are scoped to the component shadow root instead of `document`.
-// Real data (plan specs/plans/2026-09-11-interim-dashboard-crossover.md): the summary strip and
-// the Crossover Meter read the pool `api.load()` returns (interimreport log + interim crossover).
-// Evolution Progress, Love Letter, Asks and By participant still use the file's seeded mock data.
+// Real data (plans specs/plans/2026-09-1*-interim-dashboard-*.md): every section reads the pool
+// `api.load()` returns. Love letter / ask AH tags, resolved and notes are written via api.setTag / api.addNote.
+// The seeded mock data below is only left for the design's unused helpers.
 
 // the life areas stored in interim crossover.metric / participant AEL.crossovermetric
 export const CROSSOVER_AREAS = ['Business', 'Career', 'Family', 'Health', 'Personal Genius'];
@@ -19,6 +19,10 @@ export interface InterimDashboardApi {
   getRange(): { from: Date | null; to: Date | null };
   /** back to the default range; the component re-renders through refresh() */
   resetRange(): void;
+  /** toggle a tag on a love letter ('love') / ask AH ('ask') doc — mutates `doc` at once, reverts on failure */
+  setTag(kind: 'love' | 'ask', doc: any, key: string, on: boolean): Promise<void>;
+  /** append a note to a love letter / ask AH doc — mutates `doc.notes` at once, reverts on failure */
+  addNote(kind: 'love' | 'ask', doc: any, text: string): Promise<void>;
 }
 
 export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashboardApi): { refresh(): void } {
@@ -427,9 +431,6 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       ? tagList(t).map(f => `<span class="pill ${FLAG_TONE[f]}">${f}</span>`).join(' ')
       : '<span class="pill grey">Untagged</span>')
     + (t.resolved ? ' <span class="pill teal">Resolved</span>' : '');
-  const resolvedLine = t => t.resolved
-    ? `<div class="rn" style="margin-top:8px">Resolved${t.resolvedBy ? ` by <b>${escHtml(t.resolvedBy)}</b>` : ''}${
-        t.resolvedOn ? ' · ' + fmtDate(t.resolvedOn) : ''}</div>` : '';
 
   /* ============================================================
      HELPERS
@@ -508,7 +509,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       : !REAL.length
       ? `<div class="empty">No interim reports in this date range. Widen the range to see the overview.</div>`
       : !realPool().length
-      ? `<div class="empty">No members match these filters. Clear a filter to see the overview.</div>`
+      ? `<div class="empty">No participants match these filters. Clear a filter to see the overview.</div>`
       : bodyHTML(sendById('range'));
   }
 
@@ -526,7 +527,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const nNot = X.filter(p => !p.opened && !p.submitted).length;   // the three cards add up to Members sent
     return `
       <div class="strip${range ? ' four' : ''}">
-        <button class="st" data-strip="${s.id}|all"><div class="l">Members sent</div>
+        <button class="st" data-strip="${s.id}|all"><div class="l">Participants sent</div>
           <div class="n">${X.length}</div><div class="s">interim reports in this range</div></button>
         <button class="st g" data-strip="${s.id}|submitted"><div class="l">Submitted</div>
           <div class="n">${nSub}</div>
@@ -602,16 +603,15 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     </div>
 
     <div class="sec" data-c="2">
-      <div class="sec-head"><span class="no">2</span><h3>Evolution Progress</h3>
-        <span class="note">a member shows in every answer they gave · click a number to see who is in it</span></div>
+      <div class="sec-head"><span class="no">2</span><h3>Evolution Progress</h3></div>
       <div class="sec-in">
         ${evoGrid(s, X)}
         <div class="ystrip">
           <button class="yst" data-strip="${s.id}|years">
             <div class="l">Total years saved</div>
             <div class="n">${totalYears.toFixed(1)}</div>
-            <div class="s">reported by ${timeP.length} members</div></button>
-          <div class="yst flat"><div class="l">Average per member</div>
+            <div class="s">reported by ${timeP.length} participant${timeP.length === 1 ? '' : 's'}</div></button>
+          <div class="yst flat"><div class="l">Average per participant</div>
             <div class="n">${timeP.length ? (totalYears / timeP.length).toFixed(1) : '—'}</div>
             <div class="s">years, across their own adjustments</div></div>
           <div class="yst flat"><div class="l">Hours reclaimed</div>
@@ -622,8 +622,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     </div>
 
     <div class="sec" data-c="3">
-      <div class="sec-head"><span class="no">3</span><h3>Love Letter</h3>
-        <span class="note">click a number to read them · tags are changed in the Love Letter tab</span></div>
+      <div class="sec-head"><span class="no">3</span><h3>Love Letter</h3></div>
       <div class="sec-in">
         <div class="big-split">
           <div class="big-num"><button data-letters="${s.id}|all">${wrote.length}</button>
@@ -643,8 +642,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     </div>
 
     <div class="sec" data-c="4">
-      <div class="sec-head"><span class="no">4</span><h3>Installation Ask &amp; Ask A&amp;H</h3>
-        <span class="note">two separate asks · click a number to read them</span></div>
+      <div class="sec-head"><span class="no">4</span><h3>Installation Ask &amp; Ask A&amp;H</h3></div>
       <div class="sec-in">
         <div class="ask2">
           <div class="askbox inst"><span class="k">INSTALLATION ASK</span>
@@ -680,16 +678,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     <div class="egrid-wrap"><table class="egrid">
       <thead><tr><th class="a">Answer given</th>
         ${EBANDS.map(b => `<th>${b.sub}<span>${b.label}</span></th>`).join('')}
-        <th class="t">Members</th></tr></thead>
+        <th class="t">Participants</th></tr></thead>
       <tbody>${RES_KEYS.map(k => `
         <tr><td class="a"><span class="d" style="background:${RES_HEX[k]}"></span>${RESULTS[k][0]}</td>
           ${EBANDS.map(b => `<td><button class="ecell" style="${shade(k, cells[k + b.k])}"
             data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
           <td class="t">${rowTot(k)}</td></tr>`).join('')}
       </tbody>
-      <tfoot><tr><td class="a">All members</td>
-        ${EBANDS.map(() => '<td></td>').join('')}
-        <td class="t">${rep.length}</td></tr></tfoot>
     </table></div>
   `;
   }
@@ -715,9 +710,6 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           <button class="escb amber" data-letters="${s.id}|esc:Open">
             <div class="l">Open</div><div class="n">${both.length - done.length}</div>
             <div class="s">not resolved yet</div></button>
-          <div class="escb blue" title="Placeholder — not tracked yet">
-            <div class="l">In progress</div><div class="n">—</div>
-            <div class="s">not tracked yet</div></div>
           <button class="escb green" data-letters="${s.id}|esc:Resolved">
             <div class="l">Resolved</div><div class="n">${done.length}</div>
             <div class="s">marked resolved</div></button>
@@ -747,7 +739,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
             <div class="xb-b">${M.length
               ? tableHTML(AREA_COLS, M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })))
                 + (M.length > 8 ? `<button class="xb-all" data-strip="${key}">See all ${M.length}</button>` : '')
-              : '<div class="none-note">No members here.</div>'}</div>
+              : '<div class="none-note">No participants here.</div>'}</div>
           </div>`;
         }).join('')}
       </div>`;
@@ -780,7 +772,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
             <span>▶</span></button>
         </div>
         <div class="lvlp-more">
-          <div class="lvlp-sub">MOVED TO · click a row for the members</div>
+          <div class="lvlp-sub">MOVED TO · click a row for the participants</div>
           <div class="lvlp-list">${byLevel.map(({ to, n }) => `
             <button data-lvlto="${s.id}|${encodeURIComponent(to)}">
               <span class="tx">${escHtml(to)}</span>
@@ -881,20 +873,19 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
         ${(() => { const why = {}; p.adjs.forEach(a => { if(a.res === 'none' && a.nc) why[a.nc] = (why[a.nc] || 0) + 1; });
           const e = Object.entries(why);
           return e.length ? `<div class="pnc"><span class="k">WHY NO CHANGE</span>${e.map(([o, n]) =>
-            `<span class="c"><b>${n}</b>${escHtml(o)}</span>`).join('')}</div>` : ''; })()}
-        <div class="conf">The adjustment text is confidential to the participant and is not shown here.</div>`}
+            `<span class="c"><b>${n}</b>${escHtml(o)}</span>`).join('')}</div>` : ''; })()}`}
     </div>
 
     <div class="dsec"><h4><span class="n">3</span>Love Letter</h4>
       ${p.love ? `<div class="pletter"><p>${escHtml(p.love.text)}</p>
-          <div style="margin-top:8px">${tagPills(p.love.tags)}</div>${resolvedLine(p.love.tags)}</div>`
+          ${tagEditor('love', p)}</div>`
         : `<div class="none-note">${(p.reports || []).includes('loveletter') ? 'Skipped — no love letter written' : 'Not done yet'}.</div>`}
     </div>
 
     <div class="dsec"><h4><span class="n">4</span>Installation Ask &amp; Ask A&amp;H</h4>
       ${p.asks ? `${p.asks.inst ? `<div class="pask inst"><div class="k">INSTALLATION ASK</div><p>${escHtml(p.asks.inst)}</p></div>` : ''}
           ${p.asks.ah ? `<div class="pask ah"><div class="k">ASK A&amp;H</div><p>${escHtml(p.asks.ah)}</p></div>` : ''}
-          <div>${tagPills(p.asks.tags)}</div>${resolvedLine(p.asks.tags)}`
+          ${tagEditor('ask', p)}`
         : `<div class="none-note">${(p.reports || []).includes('askah') ? 'No questions asked' : 'Not done yet'}.</div>`}
     </div>`;
   }
@@ -993,7 +984,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      cols: [{ h, g }] where g groups columns under a shared heading.
      rows: [{ p, cells:[html] }]. A filter adds chips with a count on each. */
   function openTable(s, title, cols, rows, o = {}){
-    const unit = o.unit || 'member';
+    const unit = o.unit || 'participant';
     openModal(title, `${rows.length} ${unit}${rows.length === 1 ? '' : 's'} · ${s.date} · ${s.event}`,
       'table', rows, { send:s, cols, filter:o.filter || null, fval:o.fval || '' });
   }
@@ -1057,7 +1048,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* real: true → the list is drawn from the real pool (interimreport log + interim crossover) */
   const STRIPS = {
-    all:          { t:'Members sent',                        f:p => true, real:true },
+    all:          { t:'Participants sent',                       f:p => true, real:true },
     opened:       { t:'Opened the report',                   f:p => p.opened },
     ongoing:      { t:'Ongoing · started, not submitted yet', f:p => p.opened && !p.submitted, real:true },
     submitted:    { t:'Submitted the report',                f:p => p.submitted, real:true },
@@ -1122,7 +1113,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       .sort((x, y) => shareOf(y, k) - shareOf(x, k))
       .map(p => ({ p, cells:[
         `<span class="mt-v">${shareOf(p, k)}%</span> <span class="mt-u">of their ATC</span>`,
-        `<span class="mt-v">${answeredOf(p)}/${p.adjs.length}</span> <span class="mt-u">answered</span>`] }));
+        // the adjustments behind that percentage — how many they answered this way, out of the ones they answered
+        `<span class="mt-v">${countOf(p, k)}</span> <span class="mt-u">of</span> <span class="mt-v">${answeredOf(p)}</span> <span class="mt-u">adjustment${answeredOf(p) === 1 ? '' : 's'}</span>`] }));
     openTable(s, `${RESULTS[k][0]} · ${b.sub} of their ATC`,
       [{ h:RESULTS[k][0] }, { h:'Adjustments' }], rows);
   }
@@ -1177,37 +1169,35 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       $('moBody').innerHTML = bar + (rows.length
         ? tableHTML(cols, rows.slice(0, cap))
           + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
-        : `<div class="more">No members here.</div>`);
+        : `<div class="more">No participants here.</div>`);
       return;
     }
 
     if(mo.mode === 'letters'){
-      // real letters, tags shown read-only
+      // real letters — tags, resolved and notes are set right here (tagEditor)
       const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || p.love.text.toLowerCase().includes(f));
       $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
         <div class="letter">
           <div class="lh"><span class="av">${initials(p.nm)}</span>
-            <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span>
-            <span style="margin-left:auto">${tagPills(p.love.tags)}</span></div>
+            <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span></div>
           <p>${escHtml(p.love.text)}</p>
-          ${resolvedLine(p.love.tags)}
+          ${tagEditor('love', p)}
         </div>`).join('')
         + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
         : `<div class="more">No letters match.</div>`;
       return;
     }
 
-    // real asks — the question text and the ask AH doc's tags; no reply box (placeholder)
+    // real asks — the question text; tags / resolved / notes belong to the ask AH doc (shared by both asks)
     const kind = mo.meta.kind;
     const textOf = p => (kind === 'inst' ? p.asks.inst : p.asks.ah) || '';
     const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || textOf(p).toLowerCase().includes(f));
     $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
       <div class="letter">
         <div class="lh"><span class="av" style="background:var(--${kind === 'inst' ? 'teal' : 'purple'}-soft);color:var(--${kind === 'inst' ? 'teal' : 'purple'})">${initials(p.nm)}</span>
-          <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span>
-          <span style="margin-left:auto">${tagPills(p.asks.tags)}</span></div>
+          <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span></div>
         <p>${escHtml(textOf(p))}</p>
-        ${resolvedLine(p.asks.tags)}</div>`).join('')
+        ${tagEditor('ask', p)}</div>`).join('')
       + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
       : `<div class="more">Nothing here.</div>`;
   }
@@ -1257,6 +1247,25 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       xb.setAttribute('aria-expanded', XOPEN.has(key));
       return;
     }
+
+    /* love letter / ask AH — tag, resolve, notes (written to Firestore by the component) */
+    const stg = e.target.closest('[data-settag]');
+    if(stg){ const [kind, uid, k] = stg.dataset.settag.split('|'); toggleTag(kind, uid, k); return; }
+    const rsa = e.target.closest('[data-resask]');
+    if(rsa){ RES_ASK.add(rsa.dataset.resask); repaintViews(); return; }
+    const rsn = e.target.closest('[data-resno]');
+    if(rsn){ RES_ASK.delete(rsn.dataset.resno); repaintViews(); return; }
+    const nb = e.target.closest('[data-notes]');
+    if(nb){ const key = nb.dataset.notes, inModal = !!nb.closest('#ov');
+      NOTE_OPEN.has(key) ? NOTE_OPEN.delete(key) : NOTE_OPEN.add(key);
+      repaintViews();
+      // focus the box where the click was (the same record may also be rendered in the other view)
+      const t = NOTE_OPEN.has(key) && [...root.querySelectorAll(`[data-notetext="${key}"]`)]
+        .find(x => !!x.closest('#ov') === inModal);
+      if(t) t.focus();
+      return; }
+    const an = e.target.closest('[data-addnote]');
+    if(an){ const [kind, uid] = an.dataset.addnote.split('|'); saveNote(kind, uid, an); return; }
 
     /* filter a member table (level changes by area) */
     const mtf = e.target.closest('[data-mtf]');
@@ -1375,28 +1384,105 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* one place to repaint whatever is on screen after the team changes something */
   function repaintViews(){
-    ['range', ...SENDS.map(x => x.id)].forEach(id => {
-      const stepEl = $('v-step-' + id);
-      if(!stepEl) return;
-      stepEl.innerHTML = stepView(sendById(id), peopleFor(id));
-      const peopleEl = $('v-people-' + id);
+    const s = realSend();
+    const stepEl = $('v-step-' + s.id);
+    if(stepEl){
+      stepEl.innerHTML = stepView(s, []);
+      const peopleEl = $('v-people-' + s.id);
       if(peopleEl && peopleEl.innerHTML){
         const open = [...peopleEl.querySelectorAll('.prow.open')].map(el => el.id);
-        const box = $('psearch-' + id);
-        peopleEl.innerHTML = peopleView(sendById(id), box ? box.value : '');
+        const box = $('psearch-' + s.id);
+        const top = root.host.scrollTop;
+        peopleEl.innerHTML = peopleView(s, box ? box.value : '');
         open.forEach(x => $(x) && $(x).classList.add('open'));
+        root.host.scrollTop = top;
       }
-    });
+    }
+    // an open list keeps its rows (a letter untagged here stays in view) and its scroll position
     if($('ov').classList.contains('show')){
-      const id = mo.send.id;
-      if(mo.mode === 'letters') openLetters(id, mo.meta.flag, { tagF: mo.meta.tagF,
-        q: $('moSearch').value, top: root.querySelector('.mo-body').scrollTop });
-      else if(mo.mode === 'asks') openAsks(id, mo.meta.kind, mo.meta.filter);
-      else paintModal($('moSearch').value);
+      const body = root.querySelector('.mo-body'), top = body.scrollTop;
+      paintModal($('moSearch').value);
+      body.scrollTop = top;
     }
   }
 
+  /* ---------- love letter / ask AH: tags, resolved, notes ---------- */
+  const TAG_BTNS = [['happy','Happy'], ['attention','Needs Attention'], ['opportunity','Opportunity'], ['critical','Critical']];
+  const NOTE_OPEN = new Set();     // `${kind}|${uid}` with the notes panel open
+  const NOTE_DRAFT = {};           // unsent note text, kept across repaints
+  const BUSY = new Set();          // writes in flight, so a double click does not toggle twice
+  const RES_ASK = new Set();       // `${kind}|${uid}` showing the Resolve / Reopen confirmation
+  const recOf = (kind, p) => kind === 'love' ? p.love : p.asks;
+  const realById = uid => (REAL || []).find(p => p.uid === uid);
+  const fmtWhen = d => d ? `${fmtDate(d)}, ${fmtTime(`${d.getHours()}:${d.getMinutes()}`)}` : '';
+
+  /* tags on one row; Resolved is its own status row and asks for a confirmation before it writes */
+  function tagEditor(kind, p){
+    const r = recOf(kind, p), t = r.tags, key = `${kind}|${p.uid}`, open = NOTE_OPEN.has(key);
+    const what = kind === 'love' ? 'love letter' : 'ask';
+    return `
+      <div class="tagbar">
+        <div class="tagger"><span class="lbl">TAG</span>
+          ${TAG_BTNS.map(([k, label]) => `<button class="tg${t[k] ? ' on' : ''}" data-f="${label}"
+            data-settag="${key}|${k}" aria-pressed="${!!t[k]}">${label}</button>`).join('')}
+          <button class="nbtn${open ? ' on' : ''}" data-notes="${key}" aria-expanded="${open}">Notes <b>${r.notes.length}</b></button>
+        </div>
+        <div class="resbar"><span class="lbl">STATUS</span>
+          ${t.resolved
+            ? `<span class="pill teal">✓ Resolved</span><span class="rn">${t.resolvedBy ? `by <b>${escHtml(t.resolvedBy)}</b>` : ''}${
+                t.resolvedOn ? ' · ' + fmtDate(t.resolvedOn) : ''}</span>`
+            : '<span class="pill grey">Not resolved</span>'}
+          ${RES_ASK.has(key)
+            ? `<span class="rconf" role="alertdialog">${t.resolved ? `Reopen this ${what}?` : `Mark this ${what} as resolved?`}
+                <button class="rno" data-resno="${key}">Cancel</button>
+                <button class="ryes${t.resolved ? ' reopen' : ''}" data-settag="${key}|resolved">${t.resolved ? 'Yes, reopen' : 'Yes, mark resolved'}</button></span>`
+            : `<button class="rask" data-resask="${key}">${t.resolved ? 'Reopen' : 'Mark resolved'}</button>`}
+        </div>
+        ${open ? notesBox(kind, p) : ''}
+      </div>`;
+  }
+
+  function notesBox(kind, p){
+    const key = `${kind}|${p.uid}`, list = [...recOf(kind, p).notes].reverse();   // newest first
+    return `
+      <div class="nbox">
+        <textarea data-notetext="${key}" placeholder="Add a note…">${escHtml(NOTE_DRAFT[key] || '')}</textarea>
+        <div class="nact"><button class="nsave" data-addnote="${key}">Save note</button></div>
+        ${list.length ? `<ol class="nlist">${list.map(n => `
+          <li><div class="nh"><b>${escHtml(n.by)}</b><span>${fmtWhen(n.on)}</span></div>
+            <p>${escHtml(n.text)}</p></li>`).join('')}</ol>`
+          : '<div class="cn-empty">No notes yet.</div>'}
+      </div>`;
+  }
+
+  function toggleTag(kind, uid, k){
+    const p = realById(uid), r = p && recOf(kind, p), bk = `${kind}|${uid}|${k}`;
+    if(!r || BUSY.has(bk)) return;
+    BUSY.add(bk);
+    if(k === 'resolved') RES_ASK.delete(`${kind}|${uid}`);   // confirmed — close the prompt
+    const write = api.setTag(kind, r.doc, k, !r.tags[k]);   // the doc changes now; the write follows
+    repaintViews();
+    write.catch(err => alert('Could not save the tag: ' + ((err && err.message) || err)))
+      .finally(() => { BUSY.delete(bk); repaintViews(); });
+  }
+
+  // `btn` is the Save button clicked — the same record can be open in the list and in By participant,
+  // so read the textarea beside it, not the first one in the page
+  function saveNote(kind, uid, btn){
+    const p = realById(uid), r = p && recOf(kind, p), key = `${kind}|${uid}`;
+    const box = btn.closest('.nbox').querySelector('textarea');
+    const text = (box && box.value || '').trim();
+    if(!r || !text){ if(box) box.focus(); return; }
+    NOTE_DRAFT[key] = '';
+    const write = api.addNote(kind, r.doc, text);
+    repaintViews();
+    write.catch(err => { NOTE_DRAFT[key] = text; repaintViews();
+      alert('Could not save the note: ' + ((err && err.message) || err)); });
+  }
+
   root.addEventListener('input', e => {
+    const nt = e.target.closest('[data-notetext]');
+    if(nt){ NOTE_DRAFT[nt.dataset.notetext] = nt.value; return; }
     const ef = e.target.closest('[data-escfield]');
     if(ef){ const [uid, key] = ef.dataset.escfield.split('|');
       if(PERSON[uid].esc) PERSON[uid].esc[key] = ef.value; return; }
