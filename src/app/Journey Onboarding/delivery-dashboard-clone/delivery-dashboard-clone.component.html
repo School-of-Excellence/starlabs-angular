@@ -1710,17 +1710,20 @@
                     <span *ngIf="header.type === 'mapped' && header.key !== 'checkbox' && header.key !== 'priority'"
                       [ngClass]="{'pm-participant-name': header.mapValue === 'name'}">{{
                       mapMetaData[participant[header.key]]?.[header.mapValue] || 'N/A' }}</span>
+                    <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
+                      [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
+                      participant[header.key] }} DAYS</span>
+                    <span *ngIf="header.key === 'actualstuckdays'" class="pm-days-badge"
+                      [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
+                      participant[header.key] != null ? (participant[header.key] + ' DAYS') : 'N/A' }}</span>
                     <span *ngIf="header.type === 'date' && header.key !== 'checkbox'" class="pm-date-text">{{
                       participant[header.key]?.toDate ? (participant[header.key].toDate() | date: header.format) :
                       (participant[header.key] | date: header.format) }}</span>
                     <span
                       *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
                       participant[header.key] || 'N/A' }}</span>
-                    <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
-                      [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
-                      participant[header.key] }} DAYS</span>
                     <span *ngIf="header.key === 'addnotes'">
-                      <div data-testid="ddc-div-117" (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
+                      <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
                     </span>
                     <span *ngIf="header.key === 'generalnotes'" #notesContainer
                       (mouseenter)="showPopup(participant, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
