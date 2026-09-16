@@ -315,6 +315,12 @@
         <mat-spinner diameter="40"></mat-spinner>
       </div>
 
+      <div class="export-row" *ngIf="!loading && records.length > 0">
+        <button mat-stroked-button (click)="exportRecords()" data-testid="irl-export-records">
+          <mat-icon>download</mat-icon> Export
+        </button>
+      </div>
+
       <table mat-table [dataSource]="records" *ngIf="!loading && records.length > 0">
         <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>

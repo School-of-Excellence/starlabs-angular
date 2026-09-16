@@ -23,6 +23,16 @@ export interface InterimDashboardApi {
   setTag(kind: 'love' | 'ask', doc: any, key: string, on: boolean): Promise<void>;
   /** append a note to a love letter / ask AH doc — mutates `doc.notes` at once, reverts on failure */
   addNote(kind: 'love' | 'ask', doc: any, text: string): Promise<void>;
+  /** the JOURNEY dropdown — `journey` collection, id + name */
+  journeys(): { id: string; name: string }[];
+  /** the EVENT ATTENDED dropdown — `event collection`, id + name + date label */
+  events(): { id: string; name: string; on: string }[];
+  /** profileids that attended one event (status 'attended'), cached by the component */
+  attendees(eventId: string): Promise<Set<string>>;
+  /** write one list to an .xlsx file */
+  exportXlsx(name: string, headers: string[], rows: (string | number)[][]): void;
+  /** open that participant's profile screen in a new browser tab */
+  openProfile(profileid: string): void;
 }
 
 export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashboardApi): { refresh(): void } {
@@ -365,16 +375,65 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
 
   function sendsInRange(){
-    const ev = $('fEvent').value, { from, to } = rangeDates();
-    return SENDS.filter(s => (!ev || s.event === ev)
-      && (!from || dateOf(s) >= from) && (!to || dateOf(s) <= to));
+    const { from, to } = rangeDates();   // the EVENT filter is a real one now; it does not narrow the mock sends
+    return SENDS.filter(s => (!from || dateOf(s) >= from) && (!to || dateOf(s) <= to));
   }
 
   const nameQ = () => ($('fWho') ? $('fWho').value.trim().toLowerCase() : '');
 
   /* journey */
   const JOURNEYS = ['uP!', 'LYL', 'B!G'];
-  const journeyQ = () => ($('fJourney') ? $('fJourney').value : '');
+  const journeyQ = () => '';   // the mock pool has no journey filter any more; the real one uses JOURNEY
+
+  /* ---------- JOURNEY / EVENT ATTENDED (real filters) ----------
+     JOURNEY is a journey doc id, matched against the participant's
+     activejourney / lastcompletedjourney / lastsubscribedjourney.
+     EVENT is an event doc id; EVENT_SET holds the profileids that attended it. */
+  let JOURNEY = '', EVENT = '', EVENT_SET = null, EVENT_ERR = '';
+  let OPEN_SEL = '';              // which filter dropdown is open: 'journey' | 'event' | ''
+  const SEL = {
+    journey: { all:'All journeys', box:'fJourneyBox', btn:'fJourneyBtn', panel:'fJourneyPanel',
+               list:'fJourneyList', search:'fJourneySearch', items:() => api.journeys(),
+               get:() => JOURNEY, set:v => { JOURNEY = v; } },
+    event:   { all:'All events', box:'fEventBox', btn:'fEventBtn', panel:'fEventPanel',
+               list:'fEventList', search:'fEventSearch', items:() => api.events(),
+               get:() => EVENT, set:v => { EVENT = v; EVENT_SET = null; EVENT_ERR = ''; if(v) loadAttendees(v); } }
+  };
+  const selName = (kind, id) => (SEL[kind].items().find(x => x.id === id) || {}).name || '';
+
+  function loadAttendees(id){
+    api.attendees(id)
+      .then(set => { if(EVENT === id){ EVENT_SET = set; renderAll(); } })
+      .catch(err => { if(EVENT === id){ EVENT_ERR = String((err && err.message) || err); renderAll(); } });
+  }
+
+  /* the dropdown: a search box over the collection's rows, and the count of matching participants */
+  function paintSel(kind){
+    const s = SEL[kind], id = s.get(), box = $(s.box);
+    if(!box) return;
+    const open = OPEN_SEL === kind;
+    box.classList.toggle('open', open);
+    const btn = $(s.btn);
+    btn.setAttribute('aria-expanded', open);
+    const n = id ? realPool().length : 0;
+    // event: how many of everyone who attended it are in this range; journey: just the matches
+    const cnt = kind === 'event'
+      ? (EVENT_SET ? `${n} of ${EVENT_SET.size} attended` : 'loading…')
+      : `${n} participant${n === 1 ? '' : 's'}`;
+    btn.innerHTML = id
+      ? `<span class="sv">${escHtml(selName(kind, id) || id)}</span>
+         <span class="cnt">${cnt}</span>
+         <span class="clr" data-selclear="${kind}" title="Clear">×</span>`
+      : `${s.all}<span class="ch">▾</span>`;
+    const q = ($(s.search).value || '').trim().toLowerCase();
+    const rows = s.items().filter(x => !q || x.name.toLowerCase().includes(q));
+    $(s.list).innerHTML = (rows.length
+      ? [{ id:'', name:s.all }, ...rows].map(x => `
+          <button class="selopt${x.id === id ? ' on' : ''}" data-selopt="${kind}|${x.id}">
+            <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`).join('')
+      : `<div class="selnone">${s.items().length ? 'No match.' : 'Loading…'}</div>`);
+  }
+  const paintSels = () => { paintSel('journey'); paintSel('event'); };
 
   /* the pooled, filtered set behind the overview — 'range' is the whole selection */
   function peopleFor(id){
@@ -414,10 +473,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       .catch(err => { if(key === realKey){ realErr = String((err && err.message) || err); REAL = []; renderAll(); } });
   }
   const realPool = () => { const q = nameQ();
-    return (REAL || []).filter(p => !q || p.nm.toLowerCase().includes(q)); };
+    return (REAL || []).filter(p => (!q || p.nm.toLowerCase().includes(q))
+      && (!JOURNEY || p.journeyId === JOURNEY)
+      && (!EVENT || !!(EVENT_SET && EVENT_SET.has(p.profileid)))); };
   /* every section (Crossover, By participant, their lists) leaves out Not started members —
      only ongoing or submitted reports. The summary strip still counts everyone. */
   const sectionPool = () => realPool().filter(p => p.opened || p.submitted);
+  /* the Crossover Meter counts only participants who have a crossover record (operator rule) */
+  const crossPool = () => sectionPool().filter(p => !!p.hasCross);
   const realSend = () => ({ id:'range', date:rangeLabel(), event:'Interim reports' });
   /* what each member has done, straight from interimreport log.reports */
   const STEP_KEYS = ['crossover', 'evolutionprogress', 'loveletter', 'askah'];
@@ -436,6 +499,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      HELPERS
      ============================================================ */
   const $ = id => root.getElementById(id);
+  /* a participant's name opens their profile in a new tab (real rows only — the mock pool has no profileid) */
+  const nameLink = p => p.profileid
+    ? `<b class="pname" data-profile="${p.profileid}" role="link" tabindex="0"
+        title="Open ${escHtml(p.nm)}'s profile in a new tab">${escHtml(p.nm)}</b>`
+    : `<b>${escHtml(p.nm)}</b>`;
   const sum = a => a.reduce((s, x) => s + x, 0);
   const initials = n => n.split(' ').map(w => w[0]).join('').slice(0, 2);
   function shade(n, max){
@@ -506,11 +574,16 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       ? `<div class="empty">Loading interim reports…</div>`
       : realErr
       ? `<div class="empty">Could not load interim reports: ${escHtml(realErr)}</div>`
+      : EVENT && EVENT_ERR
+      ? `<div class="empty">Could not load who attended this event: ${escHtml(EVENT_ERR)}</div>`
+      : EVENT && !EVENT_SET
+      ? `<div class="empty">Loading who attended ${escHtml(selName('event', EVENT) || 'this event')}…</div>`
       : !REAL.length
       ? `<div class="empty">No interim reports in this date range. Widen the range to see the overview.</div>`
       : !realPool().length
       ? `<div class="empty">No participants match these filters. Clear a filter to see the overview.</div>`
       : bodyHTML(sendById('range'));
+    paintSels();
   }
 
   /* ============================================================
@@ -552,9 +625,10 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* ---------- BY STEP ---------- */
   function stepView(s, P){
-    // 1 crossover matrix — real pool (interim crossover); P stays the mock pool for 2–4
+    // 1 crossover matrix — only participants who have a crossover record
     const X = sectionPool();
-    const matrix = AREAS.map(a => ({ a, v: XBANDS.map(b => X.filter(p => b.f(p.cross[a])).length) }));
+    const XC = crossPool();
+    const matrix = AREAS.map(a => ({ a, v: XBANDS.map(b => XC.filter(p => b.f(p.cross[a])).length) }));
 
     // 2 evolution — the adjustment itself is confidential, so only the outcome is rolled up
     const evoN = {}; RES_KEYS.concat('na').forEach(k => evoN[k] = 0);
@@ -587,7 +661,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           <span class="ch">▶</span></button>
         <span class="note">click a number to see who is in it</span></div>
       <div class="sec-in">
-        ${xBucketPanel(s, X)}
+        ${xBucketPanel(s, XC)}
         <div class="mx-wrap"><table class="mx">
           <thead><tr><th class="a">Life area</th>
             ${XBANDS.map(b => `<th>${b.label}${b.sub ? `<small>${b.sub}</small>` : ''}</th>`).join('')}</tr></thead>
@@ -598,7 +672,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
                 data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button></td>`).join('')}</tr>`;
           }).join('')}</tbody>
         </table></div>
-        ${levelChangePanel(s, X)}
+        ${levelChangePanel(s, XC)}
       </div>
     </div>
 
@@ -794,6 +868,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     <div class="ptools">
       <input id="psearch-${s.id}" placeholder="Search participant…" value="${escHtml(q)}">
       <div class="f" style="height:38px">Showing <b style="margin-left:5px">${show.length} of ${rows.length}</b></div>
+      <button class="pexp" data-pexport="${s.id}" title="Export these participants to Excel">⤓ Export</button>
     </div>
     <div class="pt">
       <div class="pt-head">
@@ -829,7 +904,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     <div class="prow" id="pr-${p.uid}">
       <button class="prow-head" data-person="${p.uid}">
         <span class="who"><span class="av">${initials(p.nm)}</span>
-          <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span></span>
+          <span>${nameLink(p)}<small>${p.sub || ''}</small></span></span>
         <span><span class="pill grey">${p.journey}</span></span>
         <span class="lv">${AREAS.map(a =>
           `<i style="${lvlColor(p.cross[a])}" title="${a}">${p.cross[a] ?? '–'}</i>`).join('')}</span>
@@ -1006,7 +1081,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const firstOfGroup = cols.map((c, i) => c.g && (i === 0 || cols[i - 1].g !== c.g));
     return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map(r => `
       <tr><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
-          <span><b>${r.p.nm}</b><small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
+          <span>${nameLink(r.p)}<small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
         <td><span class="pill grey">${r.p.journey}</span></td>
         ${r.cells.map((c, i) => `<td${firstOfGroup[i] ? ' class="first"' : ''}>${c}</td>`).join('')}</tr>`).join('')}
     </tbody></table></div>`;
@@ -1057,7 +1132,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     noletter:     { t:'Submitted without a letter',          f:p => p.submitted && !p.letter },
     noask:        { t:'Submitted without asking',            f:p => p.submitted && !p.instAsk && !p.ahAsk },
     ...Object.fromEntries(XBUCKETS.map(x =>
-      [x.key, { t:x.label, f:x.f, cols:AREA_COLS, c:areaCells, real:true, section:true }])),
+      [x.key, { t:x.label, f:x.f, cols:AREA_COLS, c:areaCells, real:true, section:true, cross:true }])),
     years:        { t:'Years saved', f:p => hoursPerDayOf(p) > 0, real:true, section:true,
                     cols:[{ h:'Years saved' }, { h:'Hours per day' }],
                     c:p => [`<span class="mt-v">${yearsOf(p).toFixed(1)}</span> <span class="mt-u">years</span>`,
@@ -1071,7 +1146,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(!d) return;
     const s = d.real ? realSend() : sendById(sendId);
     const c = d.c || (d.real ? realStatusCells : statusCells);
-    let rows = (d.section ? sectionPool() : d.real ? realPool() : peopleFor(sendId)).filter(d.f).map(p => ({ p, cells:c(p) }));
+    let rows = (d.cross ? crossPool() : d.section ? sectionPool() : d.real ? realPool() : peopleFor(sendId))
+      .filter(d.f).map(p => ({ p, cells:c(p) }));
     if(d.srt) rows = rows.sort(d.srt);
     openTable(s, d.t, d.cols || STATUS_COLS, rows);
   }
@@ -1079,7 +1155,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   /* a crossover cell — the members in that band for that area (0 = not progressed) */
   function openCross(sendId, area, bk){
     const s = realSend(), b = XBANDS.find(x => x.k === bk), blank = bk === 'b0';
-    const rows = sectionPool().filter(p => b.f(p.cross[area]))
+    const rows = crossPool().filter(p => b.f(p.cross[area]))
       .sort((x, y) => (y.cross[area] || 0) - (x.cross[area] || 0))
       .map(p => ({ p, cells:[
         blank && p.cross[area] !== 0 ? `<span class="mt-u">${whyBlank(p)}</span>`
@@ -1101,7 +1177,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   /* a "moved to" row — every change that landed on that level */
   function openLevels(sendId, to){
     const s = realSend();
-    const rows = sectionPool().flatMap(p => p.levelChanges.filter(c => c.to === to).map(c => ({ p, c })));
+    const rows = crossPool().flatMap(p => p.levelChanges.filter(c => c.to === to).map(c => ({ p, c })));
     openTable(s, `Moved to ${escHtml(to)}`, LVL_COLS, rows.map(lvlRow),
       { unit:'change', filter:AREA_FILTER });
   }
@@ -1120,7 +1196,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
 
   function openLevelArea(sendId, area){
-    const s = realSend(), P = sectionPool();
+    const s = realSend(), P = crossPool();
     const rows = [];
     P.forEach(p => p.levelChanges.forEach(c => rows.push({ p, c })));
     openTable(s, 'Upgraded their level', LVL_COLS, rows.map(lvlRow),
@@ -1179,7 +1255,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
         <div class="letter">
           <div class="lh"><span class="av">${initials(p.nm)}</span>
-            <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span></div>
+            <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
           <p>${escHtml(p.love.text)}</p>
           ${tagEditor('love', p)}
         </div>`).join('')
@@ -1195,7 +1271,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
       <div class="letter">
         <div class="lh"><span class="av" style="background:var(--${kind === 'inst' ? 'teal' : 'purple'}-soft);color:var(--${kind === 'inst' ? 'teal' : 'purple'})">${initials(p.nm)}</span>
-          <span><b>${escHtml(p.nm)}</b><small>${p.sub || ''}</small></span></div>
+          <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
         <p>${escHtml(textOf(p))}</p>
         ${tagEditor('ask', p)}</div>`).join('')
       + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
@@ -1203,9 +1279,77 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
 
   /* ============================================================
+     EXPORT — every list on the screen writes the rows it is showing
+     ============================================================ */
+  const plain = h => String(h == null ? '' : h).replace(/<[^>]*>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  const notesCol = rec => rec.notes.map(n => `${n.by}${n.on ? ' (' + fmtDate(n.on) + ')' : ''}: ${n.text}`).join(' | ');
+  const tagsCol = t => tagList(t).join(', ') || 'Untagged';
+
+  function exportModal(){
+    if(!mo.mode) return;
+    const title = plain($('moTitle').innerHTML);
+    if(mo.mode === 'table'){
+      const { cols, filter } = mo.meta, fv = filter ? mo.meta.fval : '';
+      const rows = mo.rows.filter(r => !fv || filter.of(r) === fv);
+      api.exportXlsx(title, ['Name', 'Journey', ...cols.map(c => (c.g ? c.g + ' — ' : '') + c.h)],
+        rows.map(r => [r.p.nm, r.p.journey, ...r.cells.map(plain)]));
+      return;
+    }
+    const letters = mo.mode === 'letters', kind = mo.meta.kind;
+    const rec = p => letters ? p.love : p.asks;
+    api.exportXlsx(title,
+      ['Name', 'Journey', 'Sent', letters ? 'Love letter' : 'Question', 'Tags', 'Resolved', 'Resolved by', 'Resolved on', 'Notes'],
+      mo.rows.map(p => { const r = rec(p), t = r.tags;
+        return [p.nm, p.journey, p.sub, letters ? r.text : (kind === 'inst' ? r.inst : r.ah) || '',
+          tagsCol(t), t.resolved ? 'Yes' : 'No', t.resolvedBy || '', t.resolvedOn ? fmtDate(t.resolvedOn) : '', notesCol(r)]; }));
+  }
+
+  /* By participant — one row per interim report, everything the table and its detail show */
+  function exportPeople(){
+    const box = $('psearch-range'), f = (box ? box.value : '').trim().toLowerCase();
+    const rows = sectionPool().filter(p => !f || p.nm.toLowerCase().includes(f));
+    api.exportXlsx('Participants',
+      ['Name', 'Journey', 'Sent', 'Status', ...AREAS.map(a => `Crossover ${a}`), 'Levels upgraded',
+        'Adjustments answered', 'Years saved', 'Hrs per day', 'Love letter', 'Love letter tags',
+        'Installation ask', 'Ask A&H', 'Ask tags'],
+      rows.map(p => [p.nm, p.journey, p.sub,
+        p.submitted ? 'Submitted' : p.opened ? 'Ongoing' : 'Not started',
+        ...AREAS.map(a => p.cross[a] ?? ''),
+        p.levelChanges.map(c => `${c.area}: ${c.from} → ${c.to}`).join(' | '),
+        p.adjs.length ? `${answeredOf(p)}/${p.adjs.length}` : '',
+        p.adjs.length ? yearsOf(p).toFixed(1) : '', p.adjs.length ? hoursPerDayOf(p).toFixed(1) : '',
+        p.love ? p.love.text : '', p.love ? tagsCol(p.love.tags) : '',
+        p.asks && p.asks.inst ? p.asks.inst : '', p.asks && p.asks.ah ? p.asks.ah : '',
+        p.asks ? tagsCol(p.asks.tags) : '']));
+  }
+
+  /* ============================================================
      INTERACTION
      ============================================================ */
   root.addEventListener('click', e => {
+    /* a participant's name → their profile, in a new tab (before the row-expand handler) */
+    const pn = e.target.closest('[data-profile]');
+    if(pn){ e.preventDefault(); e.stopPropagation(); api.openProfile(pn.dataset.profile); return; }
+
+    /* JOURNEY / EVENT dropdowns and the export buttons */
+    const sclr = e.target.closest('[data-selclear]');
+    if(sclr){ SEL[sclr.dataset.selclear].set(''); OPEN_SEL = ''; renderAll(); return; }
+    const sopt = e.target.closest('[data-selopt]');
+    if(sopt){ const [kind, id] = sopt.dataset.selopt.split('|'); SEL[kind].set(id); OPEN_SEL = ''; renderAll(); return; }
+    const sbtn = e.target.closest('.selbtn');
+    if(sbtn){
+      const kind = sbtn.id === 'fJourneyBtn' ? 'journey' : 'event';
+      OPEN_SEL = OPEN_SEL === kind ? '' : kind;
+      paintSels();
+      if(OPEN_SEL){ const s = $(SEL[kind].search); s.value = ''; paintSel(kind); s.focus(); }
+      return;
+    }
+    if(OPEN_SEL && !e.target.closest('.fsel')){ OPEN_SEL = ''; paintSels(); }
+    if(e.target.id === 'moExport') return exportModal();
+    if(e.target.closest('[data-pexport]')) return exportPeople();
+
     /* new log dialog */
     const lgt = e.target.closest('[data-lgtab]');
     if(lgt){ keepLogText(); LG.tab = lgt.dataset.lgtab; paintLog(); return; }
@@ -1481,6 +1625,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
 
   root.addEventListener('input', e => {
+    if(e.target.id === 'fJourneySearch') return paintSel('journey');
+    if(e.target.id === 'fEventSearch') return paintSel('event');
     const nt = e.target.closest('[data-notetext]');
     if(nt){ NOTE_DRAFT[nt.dataset.notetext] = nt.value; return; }
     const ef = e.target.closest('[data-escfield]');
@@ -1502,6 +1648,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   });
 
   root.addEventListener('keydown', e => {
+    // the name is a link, so it answers to Enter / Space as well as a click
+    if((e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[data-profile]')){
+      e.preventDefault();
+      return api.openProfile(e.target.closest('[data-profile]').dataset.profile);
+    }
     if(e.key !== 'Escape') return;
     if($('lg').classList.contains('show')) return closeLog();
     $('ov').classList.remove('show');
@@ -1559,11 +1710,10 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
 
   /* the date range is the component's Material range picker — it calls refresh() on change */
-  $('fJourney').addEventListener('change', renderAll);
-  $('fEvent').addEventListener('change', renderAll);
   $('fClear').addEventListener('click', () => {
-    $('fJourney').value = '';
-    $('fEvent').value = ''; $('fWho').value = '';
+    SEL.journey.set(''); SEL.event.set('');
+    $('fWho').value = '';
+    OPEN_SEL = '';
     api.resetRange();
     renderAll();
   });
@@ -1583,11 +1733,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   });
 
   /* ---------- boot ---------- */
-  $('fJourney').innerHTML = '<option value="">All journeys</option>' +
-    JOURNEYS.map(j => `<option value="${j}">${j}</option>`).join('');
-  $('fEvent').innerHTML = '<option value="">All events</option>' +
-    [...new Set(SENDS.map(s => s.event))].map(e => `<option>${e}</option>`).join('');
-  renderAll();
+  renderAll();   // also paints the JOURNEY / EVENT dropdowns (empty until api.journeys/events arrive)
 
   // the component calls this when the participant names arrive after the first paint
   return { refresh: renderAll };

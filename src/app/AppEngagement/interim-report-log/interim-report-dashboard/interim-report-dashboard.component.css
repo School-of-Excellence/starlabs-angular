@@ -656,6 +656,44 @@ dialog.ov::backdrop, dialog.lg::backdrop{ background:transparent; }
 
 /* love letter / ask AH — tag, resolve, notes (written from the dashboard) */
 .tagbar{ margin-top:10px; }
+/* a participant's name opens their profile in a new tab */
+.pname{ cursor:pointer; text-decoration:underline; text-decoration-color:transparent;
+  text-underline-offset:2px; transition:text-decoration-color .12s, color .12s; }
+.pname:hover, .pname:focus-visible{ color:var(--indigo); text-decoration-color:currentColor; }
+
+/* JOURNEY / EVENT — a searchable dropdown in the filter pill */
+.f.fsel{ position:relative; gap:0; }
+.selbtn{ display:flex; align-items:center; gap:7px; height:34px; padding:0 4px; font:inherit; font-size:12.5px;
+  font-weight:600; color:var(--ink); background:none; max-width:270px; }
+.selbtn .ch{ font-size:9px; color:var(--ink-mute); }
+.selbtn .sv{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:170px; }
+.selbtn .cnt{ font-size:10px; font-weight:700; color:var(--blue); background:var(--blue-soft);
+  border-radius:999px; padding:2px 7px; white-space:nowrap; }
+.selbtn .clr{ font-size:14px; color:var(--ink-mute); padding:0 2px; }
+.selbtn .clr:hover{ color:var(--red); }
+.selpanel{ display:none; position:absolute; z-index:40; top:calc(100% + 6px); left:0; width:320px;
+  background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px rgba(16,32,48,.14);
+  padding:9px; }
+.fsel.open .selpanel{ display:block; }
+.selsearch{ width:100%; height:32px; padding:0 10px; border:1px solid var(--line); border-radius:7px;
+  font:inherit; font-size:12px; outline:none; }
+.selsearch:focus{ border-color:var(--blue); }
+.sellist{ max-height:260px; overflow-y:auto; margin-top:7px; display:flex; flex-direction:column; gap:1px; }
+.selopt{ display:flex; align-items:baseline; gap:8px; width:100%; text-align:left; padding:7px 9px;
+  border-radius:6px; font-size:12px; color:var(--ink); }
+.selopt:hover{ background:#F6F8F9; }
+.selopt.on{ background:var(--blue-soft); color:var(--blue); font-weight:700; }
+.selopt small{ margin-left:auto; font-size:10.5px; color:var(--ink-mute); white-space:nowrap; }
+.selnone{ padding:10px; font-size:11.5px; color:var(--ink-mute); }
+
+/* Export */
+.moexp, .pexp{ height:30px; padding:0 13px; border-radius:7px; font-size:11.5px; font-weight:700;
+  border:1px solid var(--line); color:var(--ink-soft); background:#fff; white-space:nowrap; }
+.moexp:hover, .pexp:hover{ border-color:var(--indigo); color:var(--indigo); }
+.moexp{ margin-left:auto; }
+.mo-head .moexp + .x{ margin-left:10px; }
+.pexp{ height:38px; }
+
 /* Resolved — its own row, confirmed before it writes */
 .resbar{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:8px; padding-top:8px;
   border-top:1px dashed var(--line); }

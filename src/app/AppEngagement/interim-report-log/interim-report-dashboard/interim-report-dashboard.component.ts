@@ -3,9 +3,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCalendarCellClassFunction, MatDateRangePicker, MatDatepickerModule } from '@angular/material/datepicker';
 import {
-  Firestore, QueryConstraint, Timestamp, arrayUnion, collection, doc, getCountFromServer, getDocs, query, serverTimestamp,
-  updateDoc, where,
+  Firestore, QueryConstraint, Timestamp, arrayUnion, collection, doc, documentId, getCountFromServer, getDocs, query,
+  serverTimestamp, updateDoc, where,
 } from '@angular/fire/firestore';
+import * as XLSX from 'xlsx';
 import { CROSSOVER_AREAS, EVO_RESULT_OF, mountInterimReportDashboard } from './interim-report-dashboard.script';
 
 /** love letter / ask AH tag → the same boolean + details fields the Love Letter / Ask A&H tabs write */
@@ -54,6 +55,13 @@ export class InterimReportDashboardComponent implements OnChanges {
   private reportDays = new Set<string>();
   private monthsLoaded = new Set<string>();
 
+  /** JOURNEY / EVENT filter sources — read once when the dashboard mounts */
+  private journeys: { id: string; name: string }[] = [];
+  private events: { id: string; name: string; on: string }[] = [];
+  private journeyName = new Map<string, string>();
+  private attendeeCache = new Map<string, Set<string>>();
+  private filtersReady: Promise<void> = Promise.resolve();
+
   dateClass: MatCalendarCellClassFunction<Date> = (date, view) => {
     if (view !== 'month') return '';
     this.loadMonth(date);
@@ -69,8 +77,14 @@ export class InterimReportDashboardComponent implements OnChanges {
 
     const host: HTMLElement = inject(ElementRef).nativeElement;
     afterNextRender(() => {
+      this.filtersReady = this.loadFilters();
       this.dashboard = mountInterimReportDashboard(host.shadowRoot, {
         load: (from, to) => this.loadPool(from, to),
+        journeys: () => this.journeys,
+        events: () => this.events,
+        attendees: id => this.attendees(id),
+        openProfile: profileid => { if (profileid) window.open(`/userprofile/${profileid}`, '_blank'); },
+        exportXlsx: (name, headers, rows) => this.exportXlsx(name, headers, rows),
         getRange: () => ({ from: this.range.value.start ?? null, to: this.range.value.end ?? null }),
         resetRange: () => this.range.setValue(this.defaultRange()),
         setTag: (kind, d, key, on) => this.setTag(kind, d, key, on),
@@ -87,6 +101,72 @@ export class InterimReportDashboardComponent implements OnChanges {
   private defaultRange(): { start: Date; end: Date } {
     const now = new Date();
     return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
+  }
+
+  /** the JOURNEY and EVENT dropdowns — one read of each collection per dashboard mount */
+  private async loadFilters(): Promise<void> {
+    const [jSnap, eSnap] = await Promise.all([
+      getDocs(collection(this.firestore, 'journey')),
+      getDocs(collection(this.firestore, 'event collection')),
+    ]);
+    this.journeys = jSnap.docs.map(d => {
+      const x = d.data() as any;
+      const name = String(x['journey'] ?? x['name'] ?? '').trim() || d.id;
+      this.journeyName.set(d.id, name);
+      return { id: d.id, name };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    this.events = eSnap.docs.map(d => {
+      const x = d.data() as any;
+      const start = toDate(x['start_date'] ?? x['startdate'] ?? x['eventdate']);
+      return {
+        id: d.id,
+        name: String(x['name'] ?? x['eventname'] ?? '').trim() || d.id,
+        on: start ? start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+        _t: start ? start.getTime() : 0,
+      } as any;
+    }).sort((a: any, b: any) => b._t - a._t);   // newest event first
+    this.dashboard?.refresh();
+  }
+
+  /** profileids that attended one event — `event participation request` by eventref + status, cached */
+  private async attendees(eventId: string): Promise<Set<string>> {
+    const hit = this.attendeeCache.get(eventId);
+    if (hit) return hit;
+    const snap = await getDocs(query(collection(this.firestore, 'event participation request'),
+      where('eventref', '==', doc(this.firestore, 'event collection', eventId)),
+      where('status', '==', 'attended')));
+    const ids = new Set<string>(snap.docs.map(d => String(d.data()['profileid'] ?? '')).filter(Boolean));
+    this.attendeeCache.set(eventId, ids);
+    return ids;
+  }
+
+  /** the journey each participant belongs to — activejourney, else lastcompletedjourney, else lastsubscribedjourney */
+  private async journeysOf(profileIds: string[]): Promise<Map<string, { id: string; name: string }>> {
+    const ids = [...new Set(profileIds.filter(Boolean))];
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    const snaps = await Promise.all(chunks.map(chunk =>
+      getDocs(query(collection(this.firestore, 'participant metadata'), where(documentId(), 'in', chunk)))));
+    const out = new Map<string, { id: string; name: string }>();
+    snaps.forEach(snap => snap.docs.forEach(d => {
+      const m = d.data() as any;
+      const jid = [m['activejourney'], m['lastcompletedjourney'], m['lastsubscribedjourney']]
+        .find(v => typeof v === 'string' && v.trim());
+      if (jid) out.set(d.id, { id: jid, name: this.journeyName.get(jid) || jid });
+    }));
+    return out;
+  }
+
+  /** every list on the dashboard exports through here */
+  private exportXlsx(name: string, headers: string[], rows: (string | number)[][]): void {
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map((h, i) =>
+      ({ wch: Math.min(60, Math.max(12, ...[h, ...rows.map(r => String(r[i] ?? ''))].map(v => String(v).length + 2))) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Export');
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `${(name.replace(/[^\w\- ]+/g, '').trim() || 'interim-report')} ${stamp}.xlsx`);
   }
 
   /** count interimreport log docs created in [from, to) — an aggregation, so no documents are downloaded */
@@ -155,6 +235,8 @@ export class InterimReportDashboardComponent implements OnChanges {
     }
     const logs = await getDocs(query(collection(this.firestore, 'interimreport log'), ...constraints));
     const ids = logs.docs.map(d => d.id);
+    await this.filtersReady;   // journey names are needed to label each participant's journey
+    const journeys = await this.journeysOf(logs.docs.map(d => d.data()['profileid']));
 
     const [cross, evo, love, ask] = await Promise.all([
       this.latestByLog('interim crossover', ids),
@@ -162,8 +244,10 @@ export class InterimReportDashboardComponent implements OnChanges {
       this.latestByLog('love letter', ids),
       this.latestByLog('ask AH', ids),
     ]);
-    return logs.docs.map((d, i) => this.toMember(d.id, d.data(),
-      { cross: cross.get(d.id), evo: evo.get(d.id), love: love.get(d.id), ask: ask.get(d.id) }, i));
+    return logs.docs.map((d, i) => this.toMember(d.id, d.data(), {
+      cross: cross.get(d.id), evo: evo.get(d.id), love: love.get(d.id), ask: ask.get(d.id),
+      journey: journeys.get(d.data()['profileid']),
+    }, i));
   }
 
   /** latest doc (by `created`) per interimlogid, with its doc id as `_id` — `in` takes at most 30 values per query */
@@ -182,7 +266,8 @@ export class InterimReportDashboardComponent implements OnChanges {
     return latest;
   }
 
-  private toMember(logId: string, log: any, docs: { cross?: any; evo?: any; love?: any; ask?: any }, i: number) {
+  private toMember(logId: string, log: any,
+    docs: { cross?: any; evo?: any; love?: any; ask?: any; journey?: { id: string; name: string } }, i: number) {
     const profiles = () => this.profiles || {};
     const crossDoc = docs.cross, evoDoc = docs.evo;
 
@@ -251,7 +336,8 @@ export class InterimReportDashboardComponent implements OnChanges {
       profileid: log['profileid'],
       get nm(): string { return profiles()[log['profileid']]?.['name'] || '—'; },
       sub: created ? `Sent ${created.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : '',
-      journey: '—',
+      journeyId: docs.journey?.id ?? null,
+      journey: docs.journey?.name ?? '—',
       reports,
       submitted: log['status'] === 'completed',
       opened: reports.length > 0,

@@ -10,8 +10,20 @@
           </mat-date-range-input>
           <mat-datepicker-toggle class="dtoggle" [for]="rangePicker"></mat-datepicker-toggle>
           <mat-date-range-picker #rangePicker [dateClass]="dateClass"></mat-date-range-picker></div>
-        <div class="f"><span class="k">JOURNEY</span><select id="fJourney"></select></div>
-        <div class="f"><span class="k">EVENT ATTENDED</span><select id="fEvent"></select></div>
+        <div class="f fsel" id="fJourneyBox"><span class="k">JOURNEY</span>
+          <button class="selbtn" id="fJourneyBtn" aria-haspopup="listbox" aria-expanded="false">All journeys</button>
+          <div class="selpanel" id="fJourneyPanel" role="listbox">
+            <input class="selsearch" id="fJourneySearch" placeholder="Search journey…" aria-label="Search journey">
+            <div class="sellist" id="fJourneyList"></div>
+          </div>
+        </div>
+        <div class="f fsel" id="fEventBox"><span class="k">EVENT ATTENDED</span>
+          <button class="selbtn" id="fEventBtn" aria-haspopup="listbox" aria-expanded="false">All events</button>
+          <div class="selpanel" id="fEventPanel" role="listbox">
+            <input class="selsearch" id="fEventSearch" placeholder="Search event…" aria-label="Search event">
+            <div class="sellist" id="fEventList"></div>
+          </div>
+        </div>
         <div class="f"><span class="k">PARTICIPANT</span>
           <input id="fWho" data-testid="ird-filter-participant" placeholder="Search a name…"></div>
         <button class="f clearf" id="fClear" data-testid="ird-filter-clear">Clear</button>
@@ -27,6 +39,7 @@
     <div class="mo">
       <div class="mo-head">
         <div><h3 id="moTitle"></h3><div class="sub" id="moSub"></div></div>
+        <button class="moexp" id="moExport" title="Export this list to Excel">⤓ Export</button>
         <button class="x" id="moX" data-testid="ird-modal-close">&times;</button>
       </div>
       <div class="mo-body">
