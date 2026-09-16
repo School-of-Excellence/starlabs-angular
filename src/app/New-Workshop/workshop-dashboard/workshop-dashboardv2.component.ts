@@ -35,6 +35,18 @@ import { SnackbarService } from '../../shared/snackbar.service';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsapp-progress-dialog.component';
+// Pure rules — extracted 2026-09-10; see workshop-dashboard.engine.ts for what moved and why.
+// The same engine backs workshop-dashboardv2.component.ts: the rules were byte-identical in both.
+import {
+  CategoryContext,
+  accessBasedProgress, areChallengesEqual, averageProgress, bucketByProgress,
+  calculateParticipantProgress, canReviewAssignment, challengeCategoryNames, challengeDisplayStatus,
+  challengeStatusBuckets, completionRatePct, createCsvContent, evergreenDayDistribution,
+  evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate,
+  groupProgressStat, hasAccessToChallenge, headlineMetrics, isChallengeVisibleForCategory,
+  moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
+  overallProgressLabel, participantTypeClass, participantTypeLabel
+} from './workshop-dashboard.engine';
 
 @Component({
   selector: 'app-workshop-dashboardv2',
@@ -1193,133 +1205,20 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     });
   }
 
+  /** Cache first, then delegate: the progress + cursor rules are pure — see workshop-dashboard.engine.ts.
+   *  areChallengesEqual is the cache key (statuses only); everything else is the engine's. */
   calculateParticipantProgress(profileId: string, challenges: any[]) {
     const cached = this.participantDataCache.get(profileId);
-    if (cached && this.areChallengesEqual(cached.challenges, challenges)) {
+    if (cached && areChallengesEqual(cached.challenges, challenges)) {
       return cached.progress;
     }
-
-    let currentChallengeIndex = 0;
-    let currentSubChallengeIndex = 0;
-    let completedChallenges = 0;
-    let totalChallenges = 0;
-    let foundCurrent = false;
-
-    for (let i = 0; i < challenges.length; i++) {
-      const challenge = challenges[i];
-      const workshopChallenge = this.workshopData?.challenges?.[i];
-
-      if (challenge.type === 'challenge' && challenge.challenges) {
-        totalChallenges += challenge.challenges.length;
-
-        for (let j = 0; j < challenge.challenges.length; j++) {
-          const subChallenge = challenge.challenges[j];
-          if (subChallenge.status === 'completed') {
-            completedChallenges++;
-          } else if (!foundCurrent && this.shouldSetAsCurrent(challenges, i, j)) {
-            currentChallengeIndex = i;
-            currentSubChallengeIndex = j;
-            foundCurrent = true;
-          }
-        }
-      } else if (challenge.type === 'zoomcall' && !foundCurrent) {
-        if (this.shouldSetZoomCallAsCurrent(challenges, i, workshopChallenge)) {
-          currentChallengeIndex = i;
-          currentSubChallengeIndex = 0;
-          foundCurrent = true;
-        }
-      }
-    }
-
-    if (!foundCurrent && challenges.length > 0) {
-      this.setFallbackCurrent(challenges, (index, subIndex) => {
-        currentChallengeIndex = index;
-        currentSubChallengeIndex = subIndex;
-      });
-    }
-
-    const progressPercentage = totalChallenges > 0 ? (completedChallenges / totalChallenges) * 100 : 0;
-
-    return {
-      profileid: profileId,
-      challenges,
-      currentChallengeIndex,
-      currentSubChallengeIndex,
-      completedChallenges,
-      totalChallenges,
-      progressPercentage
-    };
-  }
-
-  private areChallengesEqual(challenges1: any[], challenges2: any[]): boolean {
-    if (!challenges1 || !challenges2) return false;
-    if (challenges1.length !== challenges2.length) return false;
-    for (let i = 0; i < challenges1.length; i++) {
-      const c1 = challenges1[i];
-      const c2 = challenges2[i];
-      if (c1?.status !== c2?.status) return false;
-      if (c1?.challenges && c2?.challenges) {
-        if (c1.challenges.length !== c2.challenges.length) return false;
-        for (let j = 0; j < c1.challenges.length; j++) {
-          if (c1.challenges[j]?.status !== c2.challenges[j]?.status) return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  shouldSetAsCurrent(challenges: any[], i: number, j: number): boolean {
-    if (j === 0) {
-      return i === 0 || this.isPreviousChallengeCompleted(challenges, i);
-    } else {
-      return challenges[i].challenges![j - 1].status === 'completed';
-    }
-  }
-
-  shouldSetZoomCallAsCurrent(challenges: any[], i: number, workshopChallenge: any): boolean {
-    if (i === 0 || this.isPreviousChallengeCompleted(challenges, i)) {
-      return workshopChallenge?.status !== 'completed';
-    }
-    return false;
-  }
-
-  setFallbackCurrent(challenges: any[], callback: (index: number, subIndex: number) => void) {
-    for (let i = challenges.length - 1; i >= 0; i--) {
-      if (challenges[i].type === 'challenge' && challenges[i].challenges) {
-        callback(i, challenges[i].challenges!.length - 1);
-        break;
-      } else if (challenges[i].type === 'zoomcall') {
-        callback(i, 0);
-        break;
-      }
-    }
-  }
-
-  isPreviousChallengeCompleted(challenges: any[], currentIndex: number): boolean {
-    if (currentIndex <= 0) return true;
-    const previousChallenge = challenges[currentIndex - 1];
-    const workshopPreviousChallenge = this.workshopData?.challenges?.[currentIndex - 1];
-    return previousChallenge.type === 'zoomcall'
-      ? workshopPreviousChallenge?.status === 'completed'
-      : previousChallenge.status === 'completed';
+    return calculateParticipantProgress(profileId, challenges, this.workshopData?.challenges || []);
   }
 
   updateMetrics() {
-    const totalEnrolledParticipants = this.enrolledParticipants.map(p => p.profileid);
-    const totalStartedParticipants = this.enrolledParticipants
-      .filter(p => p.status === 'enrolled').map(p => p.profileid);
-    const notStartedParticipants = this.enrolledParticipants
-      .filter(p => p.status === 'enrollednotstarted').map(p => p.profileid);
-    const activeParticipants = this.participantProgressList
-      .filter(p => p.progressPercentage > 0).map(p => p.profileid);
-    const completedParticipants = this.participantProgressList
-      .filter(p => p.progressPercentage === 100).map(p => p.profileid);
-
-    this.metrics.set('totalEnrolled', totalEnrolledParticipants);
-    this.metrics.set('totalStarted', totalStartedParticipants);
-    this.metrics.set('notStarted', notStartedParticipants);
-    this.metrics.set('activeParticipants', activeParticipants);
-    this.metrics.set('completedParticipants', completedParticipants);
+    // The five headline lists are a rule — see workshop-dashboard.engine.ts (headlineMetrics).
+    const headline = headlineMetrics(this.enrolledParticipants, this.participantProgressList);
+    Object.keys(headline).forEach(k => this.metrics.set(k, headline[k]));
 
     if (this.workshopData?.categorybased === true) {
       this.updateCategoryWiseEnrolled();
@@ -1339,52 +1238,15 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
   // Buckets enrolled participants by their current workshop day, based on enrollmentdate.
   // day = floor((now - enrollmentdate) / 24h) + 1 (exact to the second). Days beyond
   // workshopDays fall into the "Completed" bucket.
+  // Buckets enrolled participants by their current workshop day, based on enrollmentdate.
+  // day = floor((now - enrollmentdate) / 24h) + 1 (exact to the second). Days beyond
+  // workshopDays fall into the "Completed" bucket. Rule: workshop-dashboard.engine.ts.
   computeEvergreenDayDistribution() {
-    const days = this.evergreenWorkshopDays;
-    if (this.workshopData?.evergreenWorkshop !== true || days <= 0) {
-      this.evergreenDayDistribution = [];
-      this.evergreenCompletedBucket = { day: -1, count: 0, profileIds: [], completed: true };
-      this.evergreenDayTotal = 0;
-      return;
-    }
-
-    const DAY_MS = 24 * 60 * 60 * 1000;
-    const now = Date.now();
-
-    const buckets: { day: number; count: number; profileIds: string[] }[] = [];
-    for (let i = 1; i <= days; i++) buckets.push({ day: i, count: 0, profileIds: [] });
-    const completed = { day: -1, count: 0, profileIds: [] as string[], completed: true };
-    let total = 0;
-
-    for (const p of this.enrolledParticipants) {
-      const enrolledMs = this.toMillis(p.enrollmentdate);
-      if (enrolledMs == null) continue;
-      total++;
-      let day = Math.floor((now - enrolledMs) / DAY_MS) + 1;
-      if (day < 1) day = 1; // guard against clock skew / future-dated enrollment
-      if (day > days) {
-        completed.count++;
-        completed.profileIds.push(p.profileid);
-      } else {
-        const b = buckets[day - 1];
-        b.count++;
-        b.profileIds.push(p.profileid);
-      }
-    }
-
-    this.evergreenDayDistribution = buckets;
-    this.evergreenCompletedBucket = completed;
-    this.evergreenDayTotal = total;
-  }
-
-  private toMillis(ts: any): number | null {
-    if (!ts) return null;
-    if (typeof ts.toMillis === 'function') return ts.toMillis();
-    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
-    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
-    if (ts instanceof Date) return ts.getTime();
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? null : d.getTime();
+    const on = this.workshopData?.evergreenWorkshop === true;
+    const dist = evergreenDayDistribution(on ? this.enrolledParticipants : [], on ? this.evergreenWorkshopDays : 0);
+    this.evergreenDayDistribution = dist.buckets;
+    this.evergreenCompletedBucket = dist.completed as any;
+    this.evergreenDayTotal = dist.total;
   }
 
   async loadCategoryNames() {
@@ -1467,81 +1329,18 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     this.loadChallengeForms();
   }
 
+  /** Per-status participant lists behind every clickable count — see workshop-dashboard.engine.ts
+   *  (challengeStatusBuckets), including why notstartedcurrent is a SUBSET of notstarted. */
   calculateChallengeStats(challenge: any, challengeIndex: number, challengeStats: any, progressList?: any[]) {
     const participants = progressList || this.participantProgressList;
-    const statusMap = new Map<string, string[]>([
-      ['completed', []], ['inprogress', []], ['notstarted', []], ['notstartedcurrent', []]
-    ]);
-
-    challenge.challenges?.forEach((subChallenge: any, subIndex: number) => {
-      const subStats = {
-        subChallengeIndex: subIndex,
-        subChallengeName: subChallenge.name,
-        type: subChallenge.type,
-        participantsByStatus: new Map([
-          ['completed', []], ['inprogress', []], ['inreview', []],
-          ['rework', []], ['readyformobile', []], ['notstarted', []], ['notstartedcurrent', []]
-        ])
-      };
-
-      participants.forEach(participant => {
-        const participantSubChallenge = participant.challenges[challengeIndex]?.challenges?.[subIndex];
-        const status = this.normalizeStatus(participantSubChallenge?.status);
-        subStats.participantsByStatus.get(status)?.push(participant.profileid);
-        if (status === 'notstarted') {
-          const isReadyToStart = this.isParticipantReadyForSubChallenge(participant, challengeIndex, subIndex);
-          if (isReadyToStart) {
-            subStats.participantsByStatus.get('notstartedcurrent')?.push(participant.profileid);
-          }
-        }
-      });
-      challengeStats.subChallengeStats.push(subStats);
-    });
-
-    participants.forEach(participant => {
-      const participantStatus = this.getParticipantChallengeStatus(participant, challengeIndex);
-      statusMap.get(participantStatus)?.push(participant.profileid);
-      if (participantStatus === 'notstarted') {
-        const isReadyToStart = this.isParticipantReadyForChallenge(participant, challengeIndex);
-        if (isReadyToStart) {
-          statusMap.get('notstartedcurrent')?.push(participant.profileid);
-        }
-      }
-    });
-
-    challengeStats.participantsByStatus = statusMap;
+    const buckets = challengeStatusBuckets(participants, challenge, challengeIndex, this.workshopData?.challenges || []);
+    challengeStats.subChallengeStats.push(...buckets.subChallengeStats);
+    challengeStats.participantsByStatus = buckets.participantsByStatus;
   }
 
+  // Zoom-call challenges produce NO statistics at all. Left exactly as found — see the pinned
+  // defect in workshop-dashboard.engine.unit.spec.ts.
   calculateZoomCallStats(challenge: any, challengeIndex: number, challengeStats: any, progressList?: any[]) {
-  }
-
-  private isParticipantReadyForChallenge(participant: any, challengeIndex: number): boolean {
-    if (challengeIndex === 0) return true;
-    let previousNonZoomIndex = -1;
-    for (let i = challengeIndex - 1; i >= 0; i--) {
-      const workshopChallenge = this.workshopData?.challenges?.[i];
-      if (workshopChallenge?.type !== 'zoomcall') { previousNonZoomIndex = i; break; }
-    }
-    if (previousNonZoomIndex === -1) return true;
-    const previousStatus = this.getParticipantChallengeStatus(participant, previousNonZoomIndex);
-    return previousStatus === 'completed';
-  }
-
-  private isParticipantReadyForSubChallenge(participant: any, challengeIndex: number, subChallengeIndex: number): boolean {
-    if (subChallengeIndex === 0) {
-      if (challengeIndex === 0) return true;
-      let previousNonZoomIndex = -1;
-      for (let i = challengeIndex - 1; i >= 0; i--) {
-        const workshopChallenge = this.workshopData?.challenges?.[i];
-        if (workshopChallenge?.type !== 'zoomcall') { previousNonZoomIndex = i; break; }
-      }
-      if (previousNonZoomIndex === -1) return true;
-      const previousStatus = this.getParticipantChallengeStatus(participant, previousNonZoomIndex);
-      return previousStatus === 'completed';
-    }
-    const challenge = participant.challenges[challengeIndex];
-    if (!challenge?.challenges) return false;
-    return challenge.challenges[subChallengeIndex - 1]?.status === 'completed';
   }
 
   get totalNewUsersEnrolled(): number {
@@ -1562,64 +1361,19 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
   get shareClicked() { return this.shareClickedProfileIds.length; }
   get shareClaimed() { return this.shareClaimedProfileIds.length; }
-  get evergreenWorkshopDays(): number {
-    return Number(this.workshopData?.evergreenWorkshopMeta?.workshopDays) || 0;
-  }
+  get evergreenWorkshopDays(): number { return evergreenWorkshopDays(this.workshopData?.evergreenWorkshopMeta); }
   get completionRate() {
-    const total = this.totalEnrolled;
-    const completed = this.metrics.get('completedParticipants')?.length || 0;
-    return total > 0 ? (completed / total) * 100 : 0;
+    return completionRatePct(this.metrics.get('completedParticipants')?.length || 0, this.totalEnrolled);
   }
-  get averageProgress() {
-    return this.participantProgressList.length > 0
-      ? this.participantProgressList.reduce((sum, p) => sum + p.progressPercentage, 0) / this.participantProgressList.length
-      : 0;
-  }
+  get averageProgress() { return averageProgress(this.participantProgressList); }
 
+  /** The table's three stacked filters are a rule — see workshop-dashboard.engine.ts. */
   getFilteredTableParticipants(): any[] {
-    if (this.workshopData?.categorybased !== true) return this.participantProgressList;
-
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
-    let list = this.participantProgressList;
-
-    if (this.selectedCategoryFilter === 'cohort') {
-      list = list.filter(p => this.participantCohortMap.get(p.profileid) === true);
-    } else if (this.selectedCategoryFilter === 'facilitator') {
-      list = list.filter(p => facilitatorProfiles.includes(p.profileid));
-    } else if (this.selectedCategoryFilter !== 'all') {
-      list = list.filter(p => {
-        if (this.participantCohortMap.get(p.profileid) === true) return true;
-        if (facilitatorProfiles.includes(p.profileid)) return true;
-        return this.participantWorkshopCategoryMap.get(p.profileid) === this.selectedCategoryFilter;
-      });
-    }
-
-    if (this.tableTypeFilter !== 'all') {
-      list = list.filter(p => {
-        if (this.tableTypeFilter === 'facilitator') return facilitatorProfiles.includes(p.profileid);
-        if (this.tableTypeFilter === 'cohort') return this.participantCohortMap.get(p.profileid) === true;
-        if (this.tableTypeFilter.startsWith('cat_')) {
-          const catId = this.tableTypeFilter.slice(4);
-          return !facilitatorProfiles.includes(p.profileid) &&
-            !this.participantCohortMap.get(p.profileid) &&
-            this.participantWorkshopCategoryMap.get(p.profileid) === catId;
-        }
-        return true;
-      });
-    }
-
-    if (this.tableStatusFilter !== 'all') {
-      list = list.filter(p => {
-        const progress = this.calculateAccessBasedProgress(p);
-        const pct = progress.progressPercentage;
-        if (this.tableStatusFilter === 'completed') return pct === 100;
-        if (this.tableStatusFilter === 'active') return pct > 0 && pct < 100;
-        if (this.tableStatusFilter === 'notstarted') return pct === 0;
-        return true;
-      });
-    }
-
-    return list;
+    return filterTableParticipants(this.participantProgressList, {
+      selectedCategoryFilter: this.selectedCategoryFilter,
+      tableTypeFilter: this.tableTypeFilter,
+      tableStatusFilter: this.tableStatusFilter
+    }, this.categoryContext());
   }
 
   onTableTypeFilterChange() { this.updateDataSource(this.getFilteredTableParticipants()); }
@@ -1965,11 +1719,7 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     }
   }
 
-  getOldResultTooltip(oldResult: any): string {
-    return oldResult.isQuestionAssignment
-      ? `Click to view previous question assignment from ${oldResult.date}`
-      : `Click to view previous form submission from ${oldResult.date}`;
-  }
+  getOldResultTooltip(oldResult: any): string { return oldResultTooltip(oldResult); }
 
   viewQuestionAssignment(displaySubChallenge: any, challengeIndex: number, subChallengeIndex: number): void {
     try {
@@ -2112,17 +1862,11 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
   }
 
   getButtonText(participant: any): string {
-    if (participant.progressPercentage === 100) return 'Completed';
-    const currentChallenge = this.workshopData?.challenges[participant.currentChallengeIndex];
-    if (currentChallenge?.type === 'zoomcall') return 'Zoom Call';
-    return 'Move Next';
+    return moveButtonText(participant, this.workshopData?.challenges[participant.currentChallengeIndex]);
   }
 
   getButtonTooltip(participant: any): string {
-    if (participant.progressPercentage === 100) return 'Workshop completed';
-    const currentChallenge = this.workshopData?.challenges[participant.currentChallengeIndex];
-    if (currentChallenge?.type === 'zoomcall') return 'Zoom call challenges cannot be moved manually';
-    return 'Move to next challenge';
+    return moveButtonTooltip(participant, this.workshopData?.challenges[participant.currentChallengeIndex]);
   }
 
   updateChallengeProgress(currentChallenge: any, participant: any, workshopChallenge: any, now: any) {
@@ -2146,15 +1890,7 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     }
   }
 
-  canReviewAssignment(participant: any): boolean {
-    try {
-      const currentChallenge = participant.challenges[participant.currentChallengeIndex];
-      const currentSubChallenge = currentChallenge?.challenges?.[participant.currentSubChallengeIndex];
-      return currentSubChallenge?.type === 'assignment' &&
-        currentSubChallenge?.reviewassignemnt === true &&
-        currentSubChallenge?.status === 'inreview';
-    } catch (error) { return false; }
-  }
+  canReviewAssignment(participant: any): boolean { return canReviewAssignment(participant); }
 
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value;
@@ -2348,62 +2084,22 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
 
 
 
+  /** Which participants a challenge's statistics are computed over — see workshop-dashboard.engine.ts. */
   getFilteredParticipantProgressList(challengeIndex?: number): any[] {
-    if (this.workshopData?.categorybased !== true) return this.participantProgressList;
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
-
-    if (this.selectedCategoryFilter === 'cohort')
-      return this.participantProgressList.filter(p => this.participantCohortMap.get(p.profileid) === true);
-    if (this.selectedCategoryFilter === 'facilitator')
-      return this.participantProgressList.filter(p => facilitatorProfiles.includes(p.profileid));
-    if (this.selectedCategoryFilter !== 'all') {
-      return this.participantProgressList.filter(p => {
-        if (this.participantCohortMap.get(p.profileid) === true) return true;
-        if (facilitatorProfiles.includes(p.profileid)) return true;
-        return this.participantWorkshopCategoryMap.get(p.profileid) === this.selectedCategoryFilter;
-      });
-    }
-
-    if (challengeIndex !== undefined && challengeIndex !== null) {
-      const challenge = this.workshopData?.challenges?.[challengeIndex];
-      const challengeCatIds: string[] = challenge?.workshopcategory || [];
-      const isFacilitatorOnly = challenge?.facilitatoronly === true;
-      if (isFacilitatorOnly)
-        return this.participantProgressList.filter(p => facilitatorProfiles.includes(p.profileid));
-      if (challengeCatIds.length > 0) {
-        return this.participantProgressList.filter(p => {
-          if (this.participantCohortMap.get(p.profileid) === true) return true;
-          if (facilitatorProfiles.includes(p.profileid)) return true;
-          const participantCat = this.participantWorkshopCategoryMap.get(p.profileid);
-          return participantCat && challengeCatIds.includes(participantCat);
-        });
-      }
-      return this.participantProgressList.filter(p => {
-        if (this.participantCohortMap.get(p.profileid) === true) return true;
-        if (facilitatorProfiles.includes(p.profileid)) return true;
-        return false;
-      });
-    }
-
-    return this.participantProgressList;
+    return filteredProgressListForChallenge(
+      this.participantProgressList, challengeIndex, this.selectedCategoryFilter, this.categoryContext()
+    );
   }
 
   getChallengeCategoryNames(challengeIndex: number): string {
-    const challenge = this.workshopData?.challenges?.[challengeIndex];
-    const catIds: string[] = challenge?.workshopcategory || [];
-    if (catIds.length === 0) return '';
-    return catIds.map((id: string) => this.categoryNamesMap.get(id) || 'Unknown').join(', ');
+    return challengeCategoryNames(
+      this.workshopData?.challenges?.[challengeIndex]?.workshopcategory || [],
+      (id: string) => this.categoryNamesMap.get(id)
+    );
   }
 
   isChallengeVisibleForCategory(challengeIndex: number): boolean {
-    if (this.selectedCategoryFilter === 'all' || this.selectedCategoryFilter === 'cohort' || this.workshopData?.categorybased !== true) return true;
-    if (this.selectedCategoryFilter === 'facilitator') {
-      const challenge = this.workshopData?.challenges?.[challengeIndex];
-      return challenge?.facilitatoronly === true;
-    }
-    const challenge = this.workshopData?.challenges?.[challengeIndex];
-    const catIds: string[] = challenge?.workshopcategory || [];
-    return catIds.includes(this.selectedCategoryFilter);
+    return isChallengeVisibleForCategory(challengeIndex, this.selectedCategoryFilter, this.categoryContext());
   }
 
   onCohortClick() {
@@ -2433,66 +2129,32 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     this.applyFilterSide();
   }
 
+  /** Everything the category-based access rules need, gathered once per call. */
+  private categoryContext(): CategoryContext {
+    return {
+      categoryBased: this.workshopData?.categorybased === true,
+      facilitatorProfiles: this.workshopData?.facilitatorprofiles || [],
+      workshopChallenges: this.workshopData?.challenges || [],
+      isCohort: (id: string) => this.participantCohortMap.get(id) === true,
+      categoryOf: (id: string) => this.participantWorkshopCategoryMap.get(id)
+    };
+  }
+
   getParticipantTypeLabel(profileid: string): string {
-    if (this.workshopData?.categorybased !== true) return '';
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
-    if (facilitatorProfiles.includes(profileid)) return 'Facilitator';
-    if (this.participantCohortMap.get(profileid) === true) return 'Above Diagnostics';
-    const catId = this.participantWorkshopCategoryMap.get(profileid);
-    if (catId) return this.categoryNamesMap.get(catId) || 'Category';
-    return 'N/A';
+    return participantTypeLabel(profileid, this.categoryContext(), (id: string) => this.categoryNamesMap.get(id));
   }
 
   getParticipantTypeClass(profileid: string): string {
-    if (this.workshopData?.categorybased !== true) return '';
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
-    if (facilitatorProfiles.includes(profileid)) return 'type-facilitator';
-    if (this.participantCohortMap.get(profileid) === true) return 'type-cohort';
-    return 'type-category';
+    return participantTypeClass(profileid, this.categoryContext());
   }
 
   doesParticipantHaveAccessToChallenge(profileid: string, challengeIndex: number): boolean {
-    if (this.workshopData?.categorybased !== true) return true;
-    const challenge = this.workshopData?.challenges?.[challengeIndex];
-    if (!challenge) return true;
-
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
-    const isFacilitator = facilitatorProfiles.includes(profileid);
-    const isCohort = this.participantCohortMap.get(profileid) === true;
-    const isFacilitatorOnly = challenge.facilitatoronly === true;
-    const challengeCatIds: string[] = challenge.workshopcategory || [];
-
-    if (isFacilitatorOnly) return isFacilitator;
-    if (isCohort || isFacilitator) return true;
-    if (challengeCatIds.length > 0) {
-      const participantCat = this.participantWorkshopCategoryMap.get(profileid);
-      return participantCat ? challengeCatIds.includes(participantCat) : false;
-    }
-    return false;
+    return hasAccessToChallenge(profileid, challengeIndex, this.categoryContext());
   }
 
+  /** Progress over only the challenges this participant can see — see workshop-dashboard.engine.ts. */
   calculateAccessBasedProgress(participant: any): { completedChallenges: number; totalChallenges: number; progressPercentage: number } {
-    if (this.workshopData?.categorybased !== true) {
-      return {
-        completedChallenges: participant.completedChallenges,
-        totalChallenges: participant.totalChallenges,
-        progressPercentage: participant.progressPercentage
-      };
-    }
-    let completedChallenges = 0;
-    let totalChallenges = 0;
-    for (let i = 0; i < (participant.challenges || []).length; i++) {
-      if (!this.doesParticipantHaveAccessToChallenge(participant.profileid, i)) continue;
-      const challenge = participant.challenges[i];
-      if (challenge.type === 'challenge' && challenge.challenges) {
-        totalChallenges += challenge.challenges.length;
-        for (let j = 0; j < challenge.challenges.length; j++) {
-          if (challenge.challenges[j].status === 'completed') completedChallenges++;
-        }
-      }
-    }
-    const progressPercentage = totalChallenges > 0 ? (completedChallenges / totalChallenges) * 100 : 0;
-    return { completedChallenges, totalChallenges, progressPercentage };
+    return accessBasedProgress(participant, this.categoryContext());
   }
 
   getAccessBasedProgressForProfile(profileid: string): number {
@@ -2504,77 +2166,46 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
   updateCategoryBasedMetrics() {
     if (this.workshopData?.categorybased !== true) return;
 
-    const facilitatorProfiles: string[] = this.workshopData?.facilitatorprofiles || [];
+    const ctx = this.categoryContext();
     const categoryIds: string[] = this.workshopData?.categoriesforthisworkshop || [];
-    const getProgress = (p: any) => this.calculateAccessBasedProgress(p);
+    const getProgress = (p: any) => accessBasedProgress(p, ctx).progressPercentage;
 
-    let totalProgress = 0;
-    let totalCompletedCount = 0;
-    const totalActiveIds: string[] = [];
-    const totalCompletedIds: string[] = [];
-    const totalNotStartedIds: string[] = [];
-
-    this.participantProgressList.forEach(p => {
-      const prog = getProgress(p);
-      totalProgress += prog.progressPercentage;
-      if (prog.progressPercentage === 100) { totalCompletedCount++; totalCompletedIds.push(p.profileid); }
-      else if (prog.progressPercentage > 0) { totalActiveIds.push(p.profileid); }
-      else { totalNotStartedIds.push(p.profileid); }
-    });
-
-    const startedProfileIds = this.participantProgressList.map(p => p.profileid);
-    this.enrolledParticipants.filter(p => p.status === 'enrollednotstarted' && !startedProfileIds.includes(p.profileid))
-      .forEach(p => totalNotStartedIds.push(p.profileid));
+    // Bucketing and the averages are rules — see workshop-dashboard.engine.ts.
+    const overall = bucketByProgress(this.participantProgressList, getProgress);
+    const totalNotStartedIds = [
+      ...overall.notStartedIds,
+      ...neverStartedIds(this.enrolledParticipants, this.participantProgressList)
+    ];
 
     const totalParticipants = this.participantProgressList.length;
-    this.categoryBasedMetrics.overallAvgProgress = totalParticipants > 0 ? totalProgress / totalParticipants : 0;
-    this.categoryBasedMetrics.overallCompletionRate = totalParticipants > 0 ? (totalCompletedCount / totalParticipants) * 100 : 0;
-    this.categoryBasedMetrics.totalActive = totalActiveIds.length;
-    this.categoryBasedMetrics.totalActiveProfileIds = totalActiveIds;
-    this.categoryBasedMetrics.totalCompleted = totalCompletedIds.length;
-    this.categoryBasedMetrics.totalCompletedProfileIds = totalCompletedIds;
+    this.categoryBasedMetrics.overallAvgProgress = totalParticipants > 0 ? overall.totalProgress / totalParticipants : 0;
+    this.categoryBasedMetrics.overallCompletionRate = completionRatePct(overall.completedCount, totalParticipants);
+    this.categoryBasedMetrics.totalActive = overall.activeIds.length;
+    this.categoryBasedMetrics.totalActiveProfileIds = overall.activeIds;
+    this.categoryBasedMetrics.totalCompleted = overall.completedIds.length;
+    this.categoryBasedMetrics.totalCompletedProfileIds = overall.completedIds;
     this.categoryBasedMetrics.totalNotStarted = totalNotStartedIds.length;
     this.categoryBasedMetrics.totalNotStartedProfileIds = totalNotStartedIds;
 
     this.categoryBasedMetrics.categoryProgress = categoryIds.map(catId => {
-      const catParticipants = this.participantProgressList.filter(
-        p => this.participantWorkshopCategoryMap.get(p.profileid) === catId
-      );
-      let catProgress = 0; let catCompleted = 0;
-      catParticipants.forEach(p => {
-        const prog = getProgress(p);
-        catProgress += prog.progressPercentage;
-        if (prog.progressPercentage === 100) catCompleted++;
-      });
+      const catParticipants = this.participantProgressList.filter(p => ctx.categoryOf(p.profileid) === catId);
+      const stat = groupProgressStat(catParticipants, getProgress);
       return {
         categoryId: catId, categoryName: this.categoryNamesMap.get(catId) || 'Unknown',
-        avgProgress: catParticipants.length > 0 ? catProgress / catParticipants.length : 0,
-        completionRate: catParticipants.length > 0 ? (catCompleted / catParticipants.length) * 100 : 0,
-        completedCount: catCompleted, totalCount: catParticipants.length
+        avgProgress: stat.avgProgress, completionRate: stat.completionRate,
+        completedCount: stat.completedCount, totalCount: stat.totalCount
       };
     });
 
-    const cohortParticipants = this.participantProgressList.filter(p => this.participantCohortMap.get(p.profileid) === true);
-    let cohortProgress = 0; let cohortCompleted = 0;
-    cohortParticipants.forEach(p => {
-      const prog = getProgress(p);
-      cohortProgress += prog.progressPercentage;
-      if (prog.progressPercentage === 100) cohortCompleted++;
-    });
-    this.categoryBasedMetrics.cohortAvgProgress = cohortParticipants.length > 0 ? cohortProgress / cohortParticipants.length : 0;
-    this.categoryBasedMetrics.cohortCompletionRate = cohortParticipants.length > 0 ? (cohortCompleted / cohortParticipants.length) * 100 : 0;
-    this.categoryBasedMetrics.cohortCompletedCount = cohortCompleted;
+    const cohort = groupProgressStat(this.participantProgressList.filter(p => ctx.isCohort(p.profileid)), getProgress);
+    this.categoryBasedMetrics.cohortAvgProgress = cohort.avgProgress;
+    this.categoryBasedMetrics.cohortCompletionRate = cohort.completionRate;
+    this.categoryBasedMetrics.cohortCompletedCount = cohort.completedCount;
 
-    const facParticipants = this.participantProgressList.filter(p => facilitatorProfiles.includes(p.profileid));
-    let facProgress = 0; let facCompleted = 0;
-    facParticipants.forEach(p => {
-      const prog = getProgress(p);
-      facProgress += prog.progressPercentage;
-      if (prog.progressPercentage === 100) facCompleted++;
-    });
-    this.categoryBasedMetrics.facilitatorAvgProgress = facParticipants.length > 0 ? facProgress / facParticipants.length : 0;
-    this.categoryBasedMetrics.facilitatorCompletionRate = facParticipants.length > 0 ? (facCompleted / facParticipants.length) * 100 : 0;
-    this.categoryBasedMetrics.facilitatorCompletedCount = facCompleted;
+    const fac = groupProgressStat(this.participantProgressList.filter(p => ctx.facilitatorProfiles.includes(p.profileid)), getProgress);
+    this.categoryBasedMetrics.facilitatorAvgProgress = fac.avgProgress;
+    this.categoryBasedMetrics.facilitatorCompletionRate = fac.completionRate;
+    this.categoryBasedMetrics.facilitatorCompletedCount = fac.completedCount;
   }
 
   onCategoryBasedMetricClick(type: string, categoryId?: string) {
@@ -2649,34 +2280,10 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     this.applyFilterSide();
   }
 
-  getParticipantChallengeStatus(participant: any, challengeIndex: number): string {
-    const challenge = participant.challenges[challengeIndex];
-    const workshopChallenge = this.workshopData?.challenges?.[challengeIndex];
-    if (!challenge) return 'notstarted';
-    if (challenge.type === 'zoomcall') return workshopChallenge?.status === 'completed' ? 'completed' : 'notstarted';
-    if (challenge.status === 'completed') return 'completed';
-    if (challenge.challenges?.some((sc: any) => sc.status)) return 'inprogress';
-    return 'notstarted';
-  }
-
-  normalizeStatus(status: string | undefined): string {
-    if (!status) return 'notstarted';
-    const statusMap = new Map([
-      ['completed', 'completed'], ['inreview', 'inreview'], ['rework', 'rework'],
-      ['readyformobile', 'readyformobile'], ['ready', 'inprogress'], ['ongoing', 'inprogress']
-    ]);
-    return statusMap.get(status.toLowerCase()) || 'notstarted';
-  }
+  normalizeStatus(status: string | undefined): string { return normalizeSubChallengeStatus(status); }
 
   calculateChallengeDisplayStatus(challenge: any, challengeIndex: number): string {
-    if (!challenge) return 'notstarted';
-    if (challenge.type === 'zoomcall') {
-      const workshopChallenge = this.workshopData?.challenges?.[challengeIndex];
-      return workshopChallenge?.status === 'completed' ? 'completed' : 'notstarted';
-    }
-    if (challenge.status === 'completed') return 'completed';
-    if (challenge.challenges?.some((sc: any) => sc.status && sc.status !== 'notstarted')) return 'inprogress';
-    return 'notstarted';
+    return challengeDisplayStatus(challenge, this.workshopData?.challenges?.[challengeIndex]);
   }
 
   exportParticipantsToCSV() {
@@ -2716,11 +2323,7 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
       }
       const enrollmentDate = enrolledParticipant.enrollmentdate ? this.formatDate(enrolledParticipant.enrollmentdate) : 'N/A';
       const workshopStartedDate = enrolledParticipant.workshopStartedAt ? this.formatDate(enrolledParticipant.workshopStartedAt) : 'Not Started';
-      let overallStatus = 'Not Started';
-      if (participantProgress) {
-        if (participantProgress.progressPercentage === 100) overallStatus = 'Completed';
-        else if (participantProgress.progressPercentage > 0) overallStatus = 'In Progress';
-      }
+      const overallStatus = overallProgressLabel(participantProgress?.progressPercentage);
       csvData.push({
         'Participant Name': participantName, 'Workshop Title': workshopTitle,
         'Enrollment Status': enrolledParticipant.status, 'Overall Progress Status': overallStatus,
@@ -2736,19 +2339,7 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     return csvData;
   }
 
-  private createCSVContent(data: any[]): string {
-    if (data.length === 0) return '';
-    const headers = Object.keys(data[0]);
-    const csvHeaders = headers.join(',');
-    const csvRows = data.map(row => headers.map(header => {
-      const value = row[header];
-      if (typeof value === 'string' && (value.includes(',') || value.includes('\n') || value.includes('"'))) {
-        return `"${value.replace(/"/g, '""')}"`;
-      }
-      return value;
-    }).join(','));
-    return [csvHeaders, ...csvRows].join('\n');
-  }
+  private createCSVContent(data: any[]): string { return createCsvContent(data); }
 
   private downloadCSV(csvContent: string, filename: string) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2936,11 +2527,5 @@ export class WorkshopDashboardV2Component implements OnInit, OnDestroy {
     }
     this.onFormPreview(formData);
   }
-  formatDate(timestamp: any): string {
-    if (!timestamp) return '';
-    try {
-      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch { return ''; }
-  }
+  formatDate(timestamp: any): string { return formatDate(timestamp); }
 }

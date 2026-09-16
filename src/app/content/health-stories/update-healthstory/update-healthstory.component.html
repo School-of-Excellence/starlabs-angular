@@ -4,7 +4,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Subject (Brief)</mat-label>
-        <textarea matInput type="text" formControlName="subject" rows="6"></textarea>
+        <textarea data-testid="uhs-txt-001" matInput type="text" formControlName="subject" rows="6"></textarea>
         <mat-error *ngIf="healthStoryForm.get('subject').hasError('required')">
           Required
         </mat-error>
@@ -12,26 +12,26 @@
       <br>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Description (Continuous)</mat-label>
-        <textarea matInput type="text" formControlName="description" rows="6"></textarea>
+        <textarea data-testid="uhs-txt-002" matInput type="text" formControlName="description" rows="6"></textarea>
         <mat-error *ngIf="healthStoryForm.get('description').hasError('required')">
           Required
         </mat-error>
       </mat-form-field>
       <br>
       <h5 class="text-left">Images</h5>
-      <input type="file" accept="image/*" (change)="importImages($event)" multiple>
+      <input data-testid="uhs-inp-003" type="file" accept="image/*" (change)="importImages($event)" multiple>
       <div class="row ml-2 mt-2">
         <div class="mr-2 text-center" *ngFor="let image of this.healthStoryForm.get('images').value; let i = index">
           <img [src]="image" height="80" width="80">
           <br>
-          <label class="removetext" (click)="removeImage(i)">Remove</label>
+          <label data-testid="uhs-label-004" class="removetext" (click)="removeImage(i)">Remove</label>
         </div>
       </div>
       <mat-checkbox formControlName="delete">Delete this Story</mat-checkbox>
       <br><br>
     </div>
-    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Health Story'}}</button>
+    <button data-testid="uhs-btn-005" mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button data-testid="uhs-btn-006" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Health Story'}}</button>
   </form>
 </div> -->
 <!-- UPDATE HEALTH STORY DIALOG -->
@@ -44,7 +44,7 @@
       <h2 class="dialog-title">Update Health Story</h2>
       <p class="dialog-sub">Edit story content and images</p>
     </div>
-    <button class="dialog-close" (click)="close()" [disabled]="loading">
+    <button data-testid="uhs-btn-007" class="dialog-close" (click)="close()" [disabled]="loading">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -56,7 +56,7 @@
       <div class="field-group">
         <label class="label">Subject <span class="required">*</span></label>
         <div class="input-box textarea-box" [class.error]="healthStoryForm.get('subject')?.touched && healthStoryForm.get('subject')?.hasError('required')">
-          <textarea class="ib-input ib-textarea" placeholder="Enter a brief subject..." formControlName="subject" rows="4"></textarea>
+          <textarea data-testid="uhs-txt-008" class="ib-input ib-textarea" placeholder="Enter a brief subject..." formControlName="subject" rows="4"></textarea>
         </div>
         <span class="field-error" *ngIf="healthStoryForm.get('subject')?.touched && healthStoryForm.get('subject')?.hasError('required')">Subject is required</span>
       </div>
@@ -65,7 +65,7 @@
       <div class="field-group">
         <label class="label">Description <span class="required">*</span></label>
         <div class="input-box textarea-box" [class.error]="healthStoryForm.get('description')?.touched && healthStoryForm.get('description')?.hasError('required')">
-          <textarea class="ib-input ib-textarea" placeholder="Enter continuous description..." formControlName="description" rows="5"></textarea>
+          <textarea data-testid="uhs-txt-009" class="ib-input ib-textarea" placeholder="Enter continuous description..." formControlName="description" rows="5"></textarea>
         </div>
         <span class="field-error" *ngIf="healthStoryForm.get('description')?.touched && healthStoryForm.get('description')?.hasError('required')">Description is required</span>
       </div>
@@ -73,8 +73,8 @@
       <!-- Images -->
       <div class="field-group">
         <label class="label">Images</label>
-        <div class="upload-zone" (click)="storyImgInput.click()">
-          <input #storyImgInput type="file" accept="image/*" (change)="importImages($event)" multiple hidden />
+        <div data-testid="uhs-div-010" class="upload-zone" (click)="storyImgInput.click()">
+          <input data-testid="uhs-inp-011" #storyImgInput type="file" accept="image/*" (change)="importImages($event)" multiple hidden />
           <div class="upload-zone-content">
             <mat-icon class="upload-icon">add_photo_alternate</mat-icon>
             <span class="upload-text">Click to upload images</span>
@@ -86,7 +86,7 @@
         <div class="story-images" *ngIf="healthStoryForm.get('images')?.value?.length">
           <div class="story-img-card" *ngFor="let image of healthStoryForm.get('images').value; let i = index">
             <img class="story-img" [src]="image" />
-            <button class="img-remove-overlay" type="button" (click)="removeImage(i)">
+            <button data-testid="uhs-btn-012" class="img-remove-overlay" type="button" (click)="removeImage(i)">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -104,8 +104,8 @@
   </mat-dialog-content>
 
   <mat-dialog-actions class="dialog-footer">
-    <button class="btn-cancel" type="button" (click)="close()" [disabled]="loading">Cancel</button>
-    <button class="btn-primary" type="button" (click)="submit()" [disabled]="loading">
+    <button data-testid="uhs-btn-013" class="btn-cancel" type="button" (click)="close()" [disabled]="loading">Cancel</button>
+    <button data-testid="uhs-btn-014" class="btn-primary" type="button" (click)="submit()" [disabled]="loading">
       <mat-icon>{{ loading ? 'hourglass_empty' : 'save' }}</mat-icon>
       {{ loading ? 'Updating...' : 'Update Story' }}
     </button>

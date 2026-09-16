@@ -4,17 +4,17 @@
     <div class="header-left">
       <div class="filter-left">
 
-        <div class="filter-dropdown" (click)="marathonDropdownOpen = !marathonDropdownOpen; eventDropdownOpen = false; queueDropdownOpen = false; $event.stopPropagation()">
+        <div data-testid="bcc-marathon-dropdown-open-1" class="filter-dropdown" (click)="marathonDropdownOpen = !marathonDropdownOpen; eventDropdownOpen = false; queueDropdownOpen = false; $event.stopPropagation()">
           <span class="filter-text">{{mapMarathon[selectedMarathon]?.['title'] || 'Select Marathon'}}</span>
           <mat-icon class="filter-arrow">arrow_drop_down</mat-icon>
-          <div class="dropdown-menu searchable" *ngIf="marathonDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-event-2" class="dropdown-menu searchable" *ngIf="marathonDropdownOpen" (click)="$event.stopPropagation()">
             <div class="dropdown-search">
               <mat-icon class="dropdown-search-icon">search</mat-icon>
-              <input type="text" placeholder="Search marathon..." [(ngModel)]="marathonSearchQuery"
+              <input data-testid="bcc-event-3" type="text" placeholder="Search marathon..." [(ngModel)]="marathonSearchQuery"
                 (input)="onMarathonSearch()" (click)="$event.stopPropagation()">
             </div>
             <div class="dropdown-list">
-              <div class="dropdown-item queue-item" *ngFor="let option of marathonList"
+              <div data-testid="bcc-toggle-marathon-selection-4" class="dropdown-item queue-item" *ngFor="let option of marathonList"
                 [class.selected]="selectedMarathonEvent.includes(option.id || option.docid)"
                 (click)="toggleMarathonSelection(option.docid); $event.stopPropagation()">
                 <mat-icon class="checkbox-icon">{{selectedMarathon.includes(option.id || option.docid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -25,19 +25,19 @@
         </div>
 
         <!-- Event Dropdown with Search - Ongoing First -->
-        <div class="filter-dropdown" (click)="eventDropdownOpen = !eventDropdownOpen; marathonDropdownOpen = false; queueDropdownOpen = false; $event.stopPropagation()">
+        <div data-testid="bcc-event-dropdown-open-5" class="filter-dropdown" (click)="eventDropdownOpen = !eventDropdownOpen; marathonDropdownOpen = false; queueDropdownOpen = false; $event.stopPropagation()">
           <span class="filter-text">{{getSelectedEventNames()}}</span>
           <mat-icon class="filter-arrow">arrow_drop_down</mat-icon>
-          <div class="dropdown-menu searchable" *ngIf="eventDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-event-6" class="dropdown-menu searchable" *ngIf="eventDropdownOpen" (click)="$event.stopPropagation()">
             <div class="dropdown-search">
               <mat-icon class="dropdown-search-icon">search</mat-icon>
-              <input type="text" placeholder="Search event..." [(ngModel)]="eventSearchQuery" (input)="onEventSearch()" (click)="$event.stopPropagation()">
+              <input data-testid="bcc-event-7" type="text" placeholder="Search event..." [(ngModel)]="eventSearchQuery" (input)="onEventSearch()" (click)="$event.stopPropagation()">
             </div>
             <div class="dropdown-actions" *ngIf="selectedAcceleratorEvent.length > 0">
-              <button class="clear-btn" (click)="clearEventSelection(); $event.stopPropagation()">Clear All</button>
+              <button data-testid="bcc-clear-event-selection-8" class="clear-btn" (click)="clearEventSelection(); $event.stopPropagation()">Clear All</button>
             </div>
             <div class="dropdown-list">
-              <div class="dropdown-item" *ngFor="let option of searchableEventList"
+              <div data-testid="bcc-toggle-event-selection-9" class="dropdown-item" *ngFor="let option of searchableEventList"
                 [class.selected]="selectedAcceleratorEvent.includes(option.ref.id)"
                 [class.ongoing]="isEventOngoing(option)"
                 (click)="toggleEventSelection(option.ref.id); $event.stopPropagation()">
@@ -53,17 +53,17 @@
         </div>
 
         <!-- Queue Dropdown with Search - Ongoing First -->
-        <div class="filter-dropdown"
+        <div data-testid="bcc-queue-dropdown-open-10" class="filter-dropdown"
           (click)="queueDropdownOpen = !queueDropdownOpen; marathonDropdownOpen = false; eventDropdownOpen = false; onQueueDropdownOpen(); $event.stopPropagation()">
           <span class="filter-text">{{getSelectedQueueNames()}}</span>
           <mat-icon class="filter-arrow">arrow_drop_down</mat-icon>
-          <div class="dropdown-menu searchable" *ngIf="queueDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-event-11" class="dropdown-menu searchable" *ngIf="queueDropdownOpen" (click)="$event.stopPropagation()">
             <div class="dropdown-search">
               <mat-icon class="dropdown-search-icon">search</mat-icon>
-              <input type="text" placeholder="Search queue..." [(ngModel)]="queueSearchQuery" (input)="onQueueSearch()" (click)="$event.stopPropagation()">
+              <input data-testid="bcc-event-12" type="text" placeholder="Search queue..." [(ngModel)]="queueSearchQuery" (input)="onQueueSearch()" (click)="$event.stopPropagation()">
             </div>
             <div class="dropdown-actions" *ngIf="selectedQueueEvent.length > 0">
-              <button class="clear-btn" (click)="clearQueueSelection(); $event.stopPropagation()">Clear All</button>
+              <button data-testid="bcc-clear-queue-selection-13" class="clear-btn" (click)="clearQueueSelection(); $event.stopPropagation()">Clear All</button>
             </div>
             <div class="dropdown-list">
               <!-- <div class="dropdown-item" *ngFor="let option of searchableQueueList"
@@ -71,7 +71,7 @@
                 [class.ongoing]="isQueueOngoing(option)"
                 (click)="toggleQueueSelection(option.id || option.docid); $event.stopPropagation()">
                 <mat-icon class="checkbox-icon">{{selectedQueueEvent.includes(option.id || option.docid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon> -->
-                <div class="dropdown-item" *ngFor="let option of searchableQueueList"
+                <div data-testid="bcc-toggle-queue-selection-14" class="dropdown-item" *ngFor="let option of searchableQueueList"
                   [class.selected]="selectedQueueEvent.includes(option.docid)"
                   [class.ongoing]="isQueueOngoing(option)"
                   (click)="toggleQueueSelection(option.docid); $event.stopPropagation()">
@@ -88,15 +88,15 @@
         
         <div class="sort-options">
           <span class="sort-label">Sort:</span>
-          <button class="sort-btn" [class.active]="sortBy === 'date'" (click)="setSorting('date')" title="Sort by Created Date">
+          <button data-testid="bcc-set-sorting-15" class="sort-btn" [class.active]="sortBy === 'date'" (click)="setSorting('date')" title="Sort by Created Date">
             <mat-icon>calendar_today</mat-icon>
             Date
           </button>
-          <button class="sort-btn" [class.active]="sortBy === 'name'" (click)="setSorting('name')" title="Sort by Name">
+          <button data-testid="bcc-set-sorting-16" class="sort-btn" [class.active]="sortBy === 'name'" (click)="setSorting('name')" title="Sort by Name">
             <mat-icon>sort_by_alpha</mat-icon>
             Name
           </button>
-          <button class="sort-order-btn" (click)="toggleSortOrder()"
+          <button data-testid="bcc-toggle-sort-order-17" class="sort-order-btn" (click)="toggleSortOrder()"
             [title]="sortOrder === 'asc' ? 'Oldest First' : 'Newest First'">
             <mat-icon>{{sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}}</mat-icon>
             <span class="sort-order-label">{{sortOrder === 'asc' ? 'ASC' : 'DESC'}}</span>
@@ -105,11 +105,11 @@
 
         <!-- View Cohorts -->
         <div class="view-mode-toggle">
-          <button class="view-btn" [class.active]="contentview === 'participants'"
+          <button data-testid="bcc-change-over-all-view-18" class="view-btn" [class.active]="contentview === 'participants'"
             (click)="changeOverAllView('participants')" title="Horizontal Scroll">
             <mat-icon>groups</mat-icon>
           </button>
-          <button class="view-btn" [class.active]="contentview === 'activities'"
+          <button data-testid="bcc-change-over-all-view-19" class="view-btn" [class.active]="contentview === 'activities'"
             (click)="changeOverAllView('activities')" title="Vertical Grid (5 per row)">
             <mat-icon>gamepad</mat-icon>
           </button>
@@ -117,33 +117,33 @@
 
         <!-- View Mode Toggle -->
         <div class="view-mode-toggle">
-          <button class="view-btn" [class.active]="viewMode === 'horizontal'" (click)="setViewMode('horizontal')" title="Horizontal Scroll">
+          <button data-testid="bcc-set-view-mode-20" class="view-btn" [class.active]="viewMode === 'horizontal'" (click)="setViewMode('horizontal')" title="Horizontal Scroll">
             <mat-icon>view_column</mat-icon>
           </button>
-          <button class="view-btn" [class.active]="viewMode === 'vertical'" (click)="setViewMode('vertical')" title="Vertical Grid (5 per row)">
+          <button data-testid="bcc-set-view-mode-21" class="view-btn" [class.active]="viewMode === 'vertical'" (click)="setViewMode('vertical')" title="Vertical Grid (5 per row)">
             <mat-icon>view_module</mat-icon>
           </button>
         </div>
       </div>
       <!-- Grouping Options -->
       <div class="grouping-options">
-        <label class="group-option" (click)="setGroupBy('levels')">
+        <label data-testid="bcc-set-group-by-22" class="group-option" (click)="setGroupBy('levels')">
           <span class="option-dot" [class.active]="groupBy === 'levels'"></span>
           <span class="option-text">Group as Levels</span>
         </label>
-        <label class="group-option" (click)="setGroupBy('daterange')">
+        <label data-testid="bcc-set-group-by-23" class="group-option" (click)="setGroupBy('daterange')">
           <span class="option-dot" [class.active]="groupBy === 'daterange'"></span>
           <span class="option-text">Group as Date range</span>
         </label>
-        <label class="group-option" (click)="toggleTemporaryOnly()">
+        <label data-testid="bcc-toggle-temporary-only-24" class="group-option" (click)="toggleTemporaryOnly()">
           <mat-icon class="temp-checkbox">{{showTemporaryOnly ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
           <span class="option-text" [class.muted]="!showTemporaryOnly">Show Temporary Cohorts only</span>
         </label>
-        <label class="group-option" (click)="toggleExpiredCohorts()">
+        <label data-testid="bcc-toggle-expired-cohorts-25" class="group-option" (click)="toggleExpiredCohorts()">
           <mat-icon class="temp-checkbox">{{showExpiredCohorts ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
           <span class="option-text" [class.muted]="!showExpiredCohorts">Show Expired/Non-Active Cohorts</span>
         </label>
-        <label class="group-option" *ngIf="groupBy !== 'none'" (click)="setGroupBy('none')">
+        <label data-testid="bcc-set-group-by-26" class="group-option" *ngIf="groupBy !== 'none'" (click)="setGroupBy('none')">
           <mat-icon class="clear-group-icon">close</mat-icon>
           <span class="option-text clear-text">Clear Grouping</span>
         </label>
@@ -162,13 +162,13 @@
             <mat-icon class="search-icon">folder</mat-icon>
             <input type="text" placeholder="Search cohorts..." class="search-input"
               [(ngModel)]="cohortSearchQuery" (input)="onCohortSearch()">
-            <mat-icon class="clear-search" *ngIf="cohortSearchQuery" (click)="clearCohortSearch()">close</mat-icon>
+            <mat-icon data-testid="bcc-clear-cohort-search-27" class="clear-search" *ngIf="cohortSearchQuery" (click)="clearCohortSearch()">close</mat-icon>
           </div>
           <div class="search-box" [class.has-value]="participantSearchQuery">
             <mat-icon class="search-icon">person_search</mat-icon>
             <input type="text" placeholder="Search participants..." class="search-input"
               [(ngModel)]="participantSearchQuery" (input)="onParticipantSearch()">
-            <mat-icon class="clear-search" *ngIf="participantSearchQuery" (click)="clearParticipantSearch()">close</mat-icon>
+            <mat-icon data-testid="bcc-clear-participant-search-28" class="clear-search" *ngIf="participantSearchQuery" (click)="clearParticipantSearch()">close</mat-icon>
           </div>
         </div>
       </div>
@@ -181,7 +181,7 @@
     <!-- Secondary Filter Bar -->
     <div class="secondary-filter-bar">
       <!-- Status Filter -->
-      <div class="filter-tab"
+      <div data-testid="bcc-status-dropdown-open-29" class="filter-tab"
         (click)="statusDropdownOpen = !statusDropdownOpen; categoryDropdownOpen = false; typeDropdownOpen = false; taggingDropdownOpen = false; $event.stopPropagation()">
         <span class="tab-label">
           <span class="selected-value">{{statusFilter === 'all' ? 'All' : (statusFilter === 'active' ? 'Active' : 'Non-Active')}}</span>
@@ -192,16 +192,16 @@
           </span>
         </span>
         <mat-icon class="tab-arrow">arrow_drop_down</mat-icon>
-        <div class="tab-dropdown" *ngIf="statusDropdownOpen" (click)="$event.stopPropagation()">
-          <div class="tab-dropdown-item" [class.active]="statusFilter === 'all'" (click)="setStatusFilter('all')">
+        <div data-testid="bcc-event-30" class="tab-dropdown" *ngIf="statusDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-set-status-filter-31" class="tab-dropdown-item" [class.active]="statusFilter === 'all'" (click)="setStatusFilter('all')">
             <mat-icon *ngIf="statusFilter === 'all'">check</mat-icon>
             All
           </div>
-          <div class="tab-dropdown-item" [class.active]="statusFilter === 'active'" (click)="setStatusFilter('active')">
+          <div data-testid="bcc-set-status-filter-32" class="tab-dropdown-item" [class.active]="statusFilter === 'active'" (click)="setStatusFilter('active')">
             <mat-icon *ngIf="statusFilter === 'active'">check</mat-icon>
             Active
           </div>
-          <div class="tab-dropdown-item" [class.active]="statusFilter === 'nonactive'"
+          <div data-testid="bcc-set-status-filter-33" class="tab-dropdown-item" [class.active]="statusFilter === 'nonactive'"
             (click)="setStatusFilter('nonactive')">
             <mat-icon *ngIf="statusFilter === 'nonactive'">check</mat-icon>
             Non Active
@@ -210,7 +210,7 @@
       </div>
 
       <!-- Category Filter -->
-      <div class="filter-tab"
+      <div data-testid="bcc-category-dropdown-open-34" class="filter-tab"
         (click)="categoryDropdownOpen = !categoryDropdownOpen; statusDropdownOpen = false; typeDropdownOpen = false; taggingDropdownOpen = false; $event.stopPropagation()">
         <span class="tab-label">
           <span class="selected-value">{{categoryFilter === 'all' ? 'All' : (categoryFilter === 'studio' ? 'Studio-Group' : 'Readiness')}}</span>
@@ -223,26 +223,26 @@
           </span>
         </span>
         <mat-icon class="tab-arrow">arrow_drop_down</mat-icon>
-        <div class="tab-dropdown" *ngIf="categoryDropdownOpen" (click)="$event.stopPropagation()">
-          <div class="tab-dropdown-item" [class.active]="categoryFilter === 'all'" (click)="setCategoryFilter('all')">
+        <div data-testid="bcc-event-35" class="tab-dropdown" *ngIf="categoryDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-set-category-filter-36" class="tab-dropdown-item" [class.active]="categoryFilter === 'all'" (click)="setCategoryFilter('all')">
             <mat-icon *ngIf="categoryFilter === 'all'">check</mat-icon>
             All
           </div>
-          <div class="tab-dropdown-item" [class.active]="categoryFilter === 'readiness'"
+          <div data-testid="bcc-set-category-filter-37" class="tab-dropdown-item" [class.active]="categoryFilter === 'readiness'"
             (click)="setCategoryFilter('readiness')">
             <mat-icon *ngIf="categoryFilter === 'readiness'">check</mat-icon>
             Readiness
           </div>
-          <div class="tab-dropdown-item" [class.active]="categoryFilter === 'studio'"
+          <div data-testid="bcc-set-category-filter-38" class="tab-dropdown-item" [class.active]="categoryFilter === 'studio'"
             (click)="setCategoryFilter('studio')">
             <mat-icon *ngIf="categoryFilter === 'studio'">check</mat-icon>
             Studio Group
           </div>
-          <div class="tab-dropdown-item" [class.active]="categoryFilter === 'educational'" (click)="setCategoryFilter('educational')">
+          <div data-testid="bcc-set-category-filter-39" class="tab-dropdown-item" [class.active]="categoryFilter === 'educational'" (click)="setCategoryFilter('educational')">
             <mat-icon *ngIf="categoryFilter === 'educational'">check</mat-icon>
             Educational Group
           </div>
-          <div class="tab-dropdown-item" [class.active]="categoryFilter === 'operational'" (click)="setCategoryFilter('operational')">
+          <div data-testid="bcc-set-category-filter-40" class="tab-dropdown-item" [class.active]="categoryFilter === 'operational'" (click)="setCategoryFilter('operational')">
             <mat-icon *ngIf="categoryFilter === 'operational'">check</mat-icon>
             Operational Group
           </div>
@@ -250,7 +250,7 @@
       </div>
 
       <!-- Type Filter -->
-      <div class="filter-tab"
+      <div data-testid="bcc-type-dropdown-open-41" class="filter-tab"
         (click)="typeDropdownOpen = !typeDropdownOpen; statusDropdownOpen = false; categoryDropdownOpen = false; taggingDropdownOpen = false; $event.stopPropagation()">
         <span class="tab-label">
           <span class="selected-value">{{typeFilter === 'all' ? 'All' : (typeFilter === 'general' ? 'General' : 'Event')}}</span>
@@ -261,16 +261,16 @@
           </span>
         </span>
         <mat-icon class="tab-arrow">arrow_drop_down</mat-icon>
-        <div class="tab-dropdown" *ngIf="typeDropdownOpen" (click)="$event.stopPropagation()">
-          <div class="tab-dropdown-item" [class.active]="typeFilter === 'all'" (click)="setTypeFilter('all')">
+        <div data-testid="bcc-event-42" class="tab-dropdown" *ngIf="typeDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="bcc-set-type-filter-43" class="tab-dropdown-item" [class.active]="typeFilter === 'all'" (click)="setTypeFilter('all')">
             <mat-icon *ngIf="typeFilter === 'all'">check</mat-icon>
             All
           </div>
-          <div class="tab-dropdown-item" [class.active]="typeFilter === 'general'" (click)="setTypeFilter('general')">
+          <div data-testid="bcc-set-type-filter-44" class="tab-dropdown-item" [class.active]="typeFilter === 'general'" (click)="setTypeFilter('general')">
             <mat-icon *ngIf="typeFilter === 'general'">check</mat-icon>
             General
           </div>
-          <div class="tab-dropdown-item" [class.active]="typeFilter === 'event'" (click)="setTypeFilter('event')">
+          <div data-testid="bcc-set-type-filter-45" class="tab-dropdown-item" [class.active]="typeFilter === 'event'" (click)="setTypeFilter('event')">
             <mat-icon *ngIf="typeFilter === 'event'">check</mat-icon>
             Event
           </div>
@@ -278,24 +278,24 @@
       </div>
 
       <!-- Tagging Filter with Search -->
-      <div class="filter-tab"
+      <div data-testid="bcc-tagging-dropdown-open-46" class="filter-tab"
         (click)="taggingDropdownOpen = !taggingDropdownOpen; statusDropdownOpen = false; categoryDropdownOpen = false; typeDropdownOpen = false; $event.stopPropagation()">
         <span class="tab-label" [class.has-selection]="selectedTags.length > 0">
           {{getSelectedTagNames()}}
         </span>
         <mat-icon class="tab-arrow">arrow_drop_down</mat-icon>
-        <div class="tab-dropdown tagging" *ngIf="taggingDropdownOpen" (click)="$event.stopPropagation()">
+        <div data-testid="bcc-event-47" class="tab-dropdown tagging" *ngIf="taggingDropdownOpen" (click)="$event.stopPropagation()">
           <div class="dropdown-search">
             <mat-icon class="dropdown-search-icon">search</mat-icon>
-            <input type="text" placeholder="Search tags..." [(ngModel)]="tagSearchQuery" (input)="onTagSearch()"
+            <input data-testid="bcc-event-48" type="text" placeholder="Search tags..." [(ngModel)]="tagSearchQuery" (input)="onTagSearch()"
               (click)="$event.stopPropagation()">
           </div>
           <div class="tab-dropdown-header" *ngIf="selectedTags.length > 0">
             <span>{{selectedTags.length}} selected</span>
-            <button class="clear-tags-btn" (click)="clearTagSelection(); $event.stopPropagation()">Clear</button>
+            <button data-testid="bcc-clear-tag-selection-49" class="clear-tags-btn" (click)="clearTagSelection(); $event.stopPropagation()">Clear</button>
           </div>
           <div class="dropdown-list">
-            <div class="tab-dropdown-item" *ngFor="let tag of filteredTagsList"
+            <div data-testid="bcc-toggle-tag-selection-50" class="tab-dropdown-item" *ngFor="let tag of filteredTagsList"
               [class.active]="selectedTags.includes(tag.id)"
               (click)="toggleTagSelection(tag.id); $event.stopPropagation()">
               <mat-icon class="checkbox-icon">{{selectedTags.includes(tag.id) ? 'check_box' :
@@ -311,16 +311,16 @@
     </div>
 
     <div class="filter-right">
-      <button class="filter-btn export" (click)="exportCohortsData()" title="Export to Excel">
+      <button data-testid="bcc-export-cohorts-data-51" class="filter-btn export" (click)="exportCohortsData()" title="Export to Excel">
         <mat-icon>download</mat-icon> Export
       </button>
       <div class="filter-actions">
-        <button class="action-btn coral" (click)="showUnassignedParticipants()">
+        <button data-testid="bcc-show-unassigned-participants-52" class="action-btn coral" (click)="showUnassignedParticipants()">
           Unassigned Participants - {{getUnassignedCount()}}
         </button>
-        <button class="action-btn green" (click)="openProgressionReport()">Progression Report</button>
+        <button data-testid="bcc-open-progression-report-53" class="action-btn green" (click)="openProgressionReport()">Progression Report</button>
       </div>
-      <button class="filter-btn primary" (click)="onCreateCohort()">+ Create Cohorts</button>
+      <button data-testid="bcc-on-create-cohort-54" class="filter-btn primary" (click)="onCreateCohort()">+ Create Cohorts</button>
     </div>
   </div>
 
@@ -329,9 +329,9 @@
     <span class="selected-label">Filtered by tags:</span>
     <div class="selected-tag-chip" *ngFor="let tagId of selectedTags">
       {{getTagName(tagId)}}
-      <mat-icon class="remove-tag" (click)="toggleTagSelection(tagId)">close</mat-icon>
+      <mat-icon data-testid="bcc-toggle-tag-selection-55" class="remove-tag" (click)="toggleTagSelection(tagId)">close</mat-icon>
     </div>
-    <button class="clear-all-tags" (click)="clearTagSelection()">Clear all</button>
+    <button data-testid="bcc-clear-tag-selection-56" class="clear-all-tags" (click)="clearTagSelection()">Clear all</button>
   </div>
 
   <!-- Grouped Content -->
@@ -359,8 +359,8 @@
                   <mat-icon>person</mat-icon>
                   {{getMatchingParticipantCount(cohorts)}} match
                 </span>
-                <mat-icon class="card-action-icon" (click)="onEditCohort(cohorts)">edit</mat-icon>
-                <mat-icon class="card-action-icon delete" (click)="deleteCohort(cohorts)">delete</mat-icon>
+                <mat-icon data-testid="bcc-on-edit-cohort-57" class="card-action-icon" (click)="onEditCohort(cohorts)">edit</mat-icon>
+                <mat-icon data-testid="bcc-delete-cohort-58" class="card-action-icon delete" (click)="deleteCohort(cohorts)">delete</mat-icon>
               </div>
             </div>
 
@@ -429,12 +429,12 @@
           <div class="card-content">
             <!-- View Toggle Buttons with Counts -->
             <div class="view-toggle">
-              <button class="toggle-btn" [class.active]="cohorts['contentview'] === 'activities'"
+              <button data-testid="bcc-cohorts-59" class="toggle-btn" [class.active]="cohorts['contentview'] === 'activities'"
                 (click)="cohorts['contentview'] = 'activities'">
                 <mat-icon>assignment</mat-icon>
                 Activities ({{getActivitiesCount(cohorts['docid'])}})
               </button>
-              <button class="toggle-btn" [class.active]="cohorts['contentview'] === 'participants'"
+              <button data-testid="bcc-cohorts-60" class="toggle-btn" [class.active]="cohorts['contentview'] === 'participants'"
                 (click)="cohorts['contentview'] = 'participants'">
                 <mat-icon>people</mat-icon>
                 Participants
@@ -460,7 +460,7 @@
                 <div *ngIf="mapBigAssignment[$any(assignment.key)]" class="activity-details">
                   <div class="activity-header-row">
                     <span class="activity-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</span>
-                    <button class="edit-btn"
+                    <button data-testid="bcc-on-edit-assignment-61" class="edit-btn"
                       *ngIf="mapBigAssignment[$any(assignment.key)]['cohortsref']?.id === cohorts['docid']"
                       (click)="onEditAssignment(cohorts, mapBigAssignment[$any(assignment.key)])">
                       <mat-icon>edit</mat-icon>
@@ -474,11 +474,11 @@
                     <span>completed: <strong>{{mapCompletedAssignments[$any(assignment.key)]?.length ||0}}/{{$any(assignment.value).length || 0}}</strong></span>
                   </div>
                   <div class="activity-buttons">
-                    <button *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata']?.['start_url']" class="mini-btn"
+                    <button data-testid="bcc-on-start-metting-62" *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata']?.['start_url']" class="mini-btn"
                       (click)="onStartMetting($any(assignment.key))">
                       <mat-icon>videocam</mat-icon> Start Meeting
                     </button>
-                    <button class="mini-btn" (click)="onValidateParticipantAssignment($any(assignment.key), cohorts['docid'])">
+                    <button data-testid="bcc-on-validate-participant-assignment-63" class="mini-btn" (click)="onValidateParticipantAssignment($any(assignment.key), cohorts['docid'])">
                       <mat-icon>verified_user</mat-icon> Validate
                     </button>
                   </div>
@@ -530,23 +530,23 @@
                     </span>
 
                     <!-- Move Menu Button -->
-                    <button class="move-btn" [matMenuTriggerFor]="moveMenu" (menuOpened)="onMoveMenuOpen(cohorts.docid)"
+                    <button data-testid="bcc-button-64" class="move-btn" [matMenuTriggerFor]="moveMenu" (menuOpened)="onMoveMenuOpen(cohorts.docid)"
                       title="Move to another cohort">
                       <mat-icon>swap_horiz</mat-icon>
                     </button>
 
                     <!-- Move Menu -->
                     <mat-menu #moveMenu="matMenu" class="move-participant-menu">
-                      <div class="move-menu-header" (click)="$event.stopPropagation()">
+                      <div data-testid="bcc-event-65" class="move-menu-header" (click)="$event.stopPropagation()">
                         <span class="move-menu-title">Move to Cohort</span>
                       </div>
-                      <div class="move-menu-search" (click)="$event.stopPropagation()">
+                      <div data-testid="bcc-event-66" class="move-menu-search" (click)="$event.stopPropagation()">
                         <mat-icon>search</mat-icon>
-                        <input type="text" placeholder="Search cohorts..." [(ngModel)]="moveMenuSearchQuery"
+                        <input data-testid="bcc-event-67" type="text" placeholder="Search cohorts..." [(ngModel)]="moveMenuSearchQuery"
                           (input)="onMoveMenuSearch($event, cohorts.docid)" (click)="$event.stopPropagation()">
                       </div>
                       <div class="move-menu-list">
-                        <button mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
+                        <button data-testid="bcc-move-participant-to-cohort-68" mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
                           (click)="moveParticipantToCohort(participant, cohorts, targetCohort)"
                           [disabled]="isMovingParticipant">
                           <div class="move-menu-item">
@@ -569,19 +569,19 @@
           </div>
 
           <div class="card-footer">
-            <button class="footer-btn" (click)="openCohortChat(cohorts)">
+            <button data-testid="bcc-open-cohort-chat-69" class="footer-btn" (click)="openCohortChat(cohorts)">
               <mat-icon>chat</mat-icon> Chat
             </button>
-            <button class="footer-btn" (click)="sendCohortNotification(cohorts)">
+            <button data-testid="bcc-send-cohort-notification-70" class="footer-btn" (click)="sendCohortNotification(cohorts)">
               <mat-icon>notifications</mat-icon>
             </button>
-            <button class="footer-btn" (click)="sendCohortEmail(cohorts)">
+            <button data-testid="bcc-send-cohort-email-71" class="footer-btn" (click)="sendCohortEmail(cohorts)">
               <mat-icon>email</mat-icon>
             </button>
-            <button class="footer-btn" (click)="sendCohortWhatsapp(cohorts)">
+            <button data-testid="bcc-send-cohort-whatsapp-72" class="footer-btn" (click)="sendCohortWhatsapp(cohorts)">
               <i class="fa-brands fa-whatsapp"></i>
             </button>
-            <button class="footer-btn add" (click)="onCreateAssignment(cohorts)"> + Add Activity </button>
+            <button data-testid="bcc-on-create-assignment-73" class="footer-btn add" (click)="onCreateAssignment(cohorts)"> + Add Activity </button>
           </div>
         </div>
       </div>
@@ -589,14 +589,14 @@
   </div>
 
   <!-- Progression Report Dialog -->
-  <div class="dialog-overlay" *ngIf="showProgressionDialog" (click)="closeProgressionDialog()">
-    <div class="progression-dialog" (click)="$event.stopPropagation()">
+  <div data-testid="bcc-close-progression-dialog-74" class="dialog-overlay" *ngIf="showProgressionDialog" (click)="closeProgressionDialog()">
+    <div data-testid="bcc-event-75" class="progression-dialog" (click)="$event.stopPropagation()">
       <div class="dialog-header">
         <h2 class="dialog-title">
           <mat-icon>timeline</mat-icon>
           Progression Report
         </h2>
-        <button class="close-btn" (click)="closeProgressionDialog()">
+        <button data-testid="bcc-close-progression-dialog-76" class="close-btn" (click)="closeProgressionDialog()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -678,7 +678,7 @@
         <span class="footer-stats">
           {{filteredProgressionProfiles.length}} participant(s) • {{progressionData.length}} total activities
         </span>
-        <button class="close-dialog-btn" (click)="closeProgressionDialog()">Close</button>
+        <button data-testid="bcc-close-progression-dialog-77" class="close-dialog-btn" (click)="closeProgressionDialog()">Close</button>
       </div>
     </div>
   </div>
@@ -688,7 +688,7 @@
     <mat-icon>folder_open</mat-icon>
     <h3>No cohorts found</h3>
     <p>Try adjusting your filters or create a new cohort</p>
-    <button class="create-btn" (click)="onCreateCohort()">+ Create Cohort</button>
+    <button data-testid="bcc-on-create-cohort-78" class="create-btn" (click)="onCreateCohort()">+ Create Cohort</button>
   </div>
 </div>
 

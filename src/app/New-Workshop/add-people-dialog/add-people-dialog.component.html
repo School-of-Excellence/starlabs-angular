@@ -17,10 +17,10 @@
   </mat-dialog-content>
   
   <mat-dialog-actions align="end">
-    <button mat-button (click)="onCancel()" [disabled]="isValidating">
+    <button data-testid="apd-on-cancel-1" mat-button (click)="onCancel()" [disabled]="isValidating">
       Cancel
     </button>
-    <button 
+    <button data-testid="apd-on-group-name-submit-2" 
       mat-raised-button 
       color="primary"
       (click)="onGroupNameSubmit()"
@@ -35,12 +35,12 @@
 <div *ngIf="showAddPeopleDialog" class="add-people-container">
   <!-- Toolbar with search -->
   <mat-toolbar color="primary" *ngIf="!searchMode">
-    <button mat-icon-button (click)="onCancel()">
+    <button data-testid="apd-on-cancel-3" mat-icon-button (click)="onCancel()">
       <mat-icon>arrow_back</mat-icon>
     </button>
     <span class="toolbar-title">Add People</span>
     <span class="spacer"></span>
-    <button mat-icon-button (click)="toggleSearch()">
+    <button data-testid="apd-toggle-search-4" mat-icon-button (click)="toggleSearch()">
       <mat-icon>search</mat-icon>
     </button>
   </mat-toolbar>
@@ -53,7 +53,7 @@
         placeholder="Search"
         class="search-input">
     </mat-form-field>
-    <button mat-icon-button (click)="toggleSearch()">
+    <button data-testid="apd-toggle-search-5" mat-icon-button (click)="toggleSearch()">
       <mat-icon>close</mat-icon>
     </button>
   </mat-toolbar>
@@ -92,7 +92,7 @@
     </div>
 
     <div *ngIf="!isLoading" class="members-list">
-      <div 
+      <div data-testid="apd-toggle-member-6" 
         *ngFor="let profile of filteredProfiles" 
         class="member-item"
         (click)="toggleMember(profile)">
@@ -112,7 +112,7 @@
   </mat-dialog-content>
 
   <!-- Floating Action Button -->
-  <button 
+  <button data-testid="apd-on-submit-7" 
     mat-fab 
     color="primary"
     class="fab-button"

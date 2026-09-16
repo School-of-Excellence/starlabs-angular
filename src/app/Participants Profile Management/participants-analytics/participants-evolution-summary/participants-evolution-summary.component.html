@@ -4,7 +4,7 @@
   <span class="example-spacer"></span>
   <h4>Participant Evolution Summary</h4>
   <span class="example-spacer"></span>
-  <button mat-stroked-button type="button" (click)="exportCSV()">Export</button>
+  <button mat-stroked-button type="button" data-testid="pes-export" (click)="exportCSV()">Export</button>
 </div>
 <div class="mat-elevation-z8 m-4">
   <table mat-table [dataSource]="dataSource" matSort>

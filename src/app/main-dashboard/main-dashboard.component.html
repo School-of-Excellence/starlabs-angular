@@ -6,7 +6,7 @@
 
   <div class="cards-grid">
     <div *ngFor="let item of authguard.favouriteDashboard; trackBy: trackByAction">
-      <mat-card 
+      <mat-card data-testid="eisd-navigatetoroute" 
         class="favorite-card" 
         matRipple
         [matRippleColor]="'rgba(35, 76, 88, 0.12)'"

@@ -23,6 +23,7 @@
           <button
             class="nav-btn"
             aria-label="Previous month"
+            data-testid="cts-month-prev"
             (click)="backwardMonth()"
           >
             <mat-icon>chevron_left</mat-icon>
@@ -30,6 +31,7 @@
           <input
             class="month-input"
             type="month"
+            data-testid="cts-month-input"
             [(ngModel)]="monthyear"
             (change)="updateDate()"
           />
@@ -37,6 +39,7 @@
           <button
             class="nav-btn"
             aria-label="Next month"
+            data-testid="cts-month-next"
             (click)="forwardMonth()"
           >
             <mat-icon>chevron_right</mat-icon>
@@ -47,8 +50,8 @@
         <div *ngIf="pickerMode === 'range'" class="range-picker">
           <mat-form-field appearance="outline" class="compact-field">
             <mat-date-range-input [rangePicker]="picker">
-              <input matStartDate [(ngModel)]="startDate" placeholder="Start" />
-              <input matEndDate [(ngModel)]="endDate" placeholder="End" />
+              <input matStartDate data-testid="cts-range-start" [(ngModel)]="startDate" placeholder="Start" />
+              <input matEndDate data-testid="cts-range-end" [(ngModel)]="endDate" placeholder="End" />
             </mat-date-range-input>
             <mat-datepicker-toggle
               matIconSuffix
@@ -61,7 +64,7 @@
           </mat-form-field>
         </div>
         <!-- Simple Toggle Button -->
-        <button class="toggle-btn" (click)="toggleDate()">
+        <button class="toggle-btn" data-testid="cts-toggle-date" (click)="toggleDate()">
           <mat-icon>{{
             pickerMode === "month" ? "date_range" : "calendar_view_month"
           }}</mat-icon>
@@ -160,6 +163,7 @@
             <td
               class="number new"
               style="text-align: center"
+              [attr.data-testid]="'cts-cell-new-' + card + '-' + cat"
               (click)="onTabChange('events & process', 'new', card)"
             >
               {{ getCategoryTotal([card], [categoryMap[cat]], ["new"]) }}
@@ -167,6 +171,7 @@
             <td
               class="number responded"
               style="text-align: center"
+              [attr.data-testid]="'cts-cell-responded-' + card + '-' + cat"
               (click)="onTabChange('events & process', 'responded', card)"
             >
               {{ getCategoryTotal([card], [categoryMap[cat]], ["responded"]) }}
@@ -174,6 +179,7 @@
             <td
               class="number reply"
               style="text-align: center"
+              [attr.data-testid]="'cts-cell-reply-' + card + '-' + cat"
               (click)="onTabChange('events & process', 'decision making', card)"
             >
               {{ getCategoryTotal([card], [categoryMap[cat]], ["reply"]) }}
@@ -202,6 +208,7 @@
         <mat-form-field appearance="outline">
           <mat-label>Filter By</mat-label>
           <mat-select
+            data-testid="cts-negfilter-type"
             [(ngModel)]="negFilterType"
             (selectionChange)="onFilterTypeChange()"
           >
@@ -222,11 +229,13 @@
           >
             <input
               matStartDate
+              data-testid="cts-neg-start"
               [(ngModel)]="negFilter.startDate"
               placeholder="Start Date"
             />
             <input
               matEndDate
+              data-testid="cts-neg-end"
               [(ngModel)]="negFilter.endDate"
               placeholder="End Date"
             />
@@ -246,6 +255,7 @@
           <button
             class="nav-btn"
             aria-label="Previous month"
+            data-testid="cts-negmonth-prev"
             (click)="backwardNegMonth()"
           >
             <mat-icon>chevron_left</mat-icon>
@@ -254,6 +264,7 @@
           <input
             class="month-input"
             type="month"
+            data-testid="cts-negmonth-input"
             [(ngModel)]="negFilter.monthyear"
             (change)="updateNegMonth()"
           />
@@ -261,6 +272,7 @@
           <button
             class="nav-btn"
             aria-label="Next month"
+            data-testid="cts-negmonth-next"
             (click)="forwardNegMonth()"
           >
             <mat-icon>chevron_right</mat-icon>
@@ -271,6 +283,7 @@
           <button
             mat-icon-button
             class="week-nav-btn"
+            data-testid="cts-week-prev"
             (click)="goToPreviousWeek()"
           >
             <mat-icon>chevron_left</mat-icon>
@@ -278,7 +291,7 @@
           <span class="week-text"
             >Week {{ negFilter.weekNumber }} - {{ negFilter.weekYear }}</span
           >
-          <button mat-icon-button class="week-nav-btn" (click)="goToNextWeek()">
+          <button mat-icon-button class="week-nav-btn" data-testid="cts-week-next" (click)="goToNextWeek()">
             <mat-icon>chevron_right</mat-icon>
           </button>
         </div>

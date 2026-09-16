@@ -21,7 +21,7 @@
                 </div>
 
                 <div class="menu-grid">
-                    <a *ngFor="let item of menuItems" [ngClass]="selectedScreen == item.label ? 'menu-item selected' : 'menu-item unselected'" (click)="selectedScreen = item.label">
+                    <a [attr.data-testid]="'upo-menu-' + item.label" *ngFor="let item of menuItems" [ngClass]="selectedScreen == item.label ? 'menu-item selected' : 'menu-item unselected'" (click)="selectedScreen = item.label">
                         <mat-icon>{{item.icon}}</mat-icon>
                         <span>{{item.label}}</span>
                     </a>
@@ -96,7 +96,7 @@
                                                         <p style="text-align: center; margin-top: 5px;">{{mapRecordedDate[video].toDate() | date}}</p>
                                                     </div>
                                                 </div>
-                                                <button class="actionButton" (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])">{{buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel']}}</button>
+                                                <button data-testid="upo-evolution-action-1" class="actionButton" (click)="actionButton(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])">{{buttonLable(profileJourneyProduct['queueData'], profileJourneyProduct['currentstage'])['buttonlabel']}}</button>
                                             </div>
                                             <ng-template #noData>
                                                 <p style="text-align: center;">No data available.</p>
@@ -152,7 +152,7 @@
                                                     </div>
                                                     <div class="buttons">
                                                         &nbsp;
-                                                        <button mat-mini-fab class="btn" (click)="sendMessage(stageMessage)"><mat-icon>send</mat-icon></button>
+                                                        <button data-testid="upo-stage-send-2" mat-mini-fab class="btn" (click)="sendMessage(stageMessage)"><mat-icon>send</mat-icon></button>
                                                     </div>
                                                 </div>
                                             </form>
@@ -175,7 +175,7 @@
                                                 &nbsp;&nbsp;
                                                 <span class="badge journey-dates col-md-4">{{ journey.subscriptionstart?.toDate() | date: 'mediumDate'}} - {{journey.subscriptionend?.toDate() | date: 'mediumDate' }}</span>
                                             </div>
-                                            <button mat-icon-button (click)="toggleProductSection(journey)" class="col-md-1">
+                                            <button [attr.data-testid]="'upo-toggle-product-' + i" mat-icon-button (click)="toggleProductSection(journey)" class="col-md-1">
                                                 <mat-icon *ngIf="!journey.showProductSection">keyboard_arrow_down</mat-icon>
                                                 <mat-icon *ngIf="journey.showProductSection">keyboard_arrow_up</mat-icon>
                                             </button>
@@ -282,7 +282,7 @@
                         <div *ngIf="tab.label == 'Support Ticket'">
                             <div class="row">
                                 <div class="col-md-4 scrollable-container">
-                                    <mat-card *ngFor="let ticket of customerticket; let i = index" class="custom-card" appearance="outlined" (click)="fetchTicketMessages(ticket)">
+                                    <mat-card [attr.data-testid]="'upo-ticket-card-' + i" *ngFor="let ticket of customerticket; let i = index" class="custom-card" appearance="outlined" (click)="fetchTicketMessages(ticket)">
                                         <mat-card-header>
                                             <mat-card-title style="font-size: 18px; font-weight: 600;">{{ ticket.issueno }} - {{ ticket.reporteddate.toDate() | date:'mediumDate' }}</mat-card-title>
                                             <mat-card-subtitle style="font-size: 18px; font-weight: 600;">Reported by - <span style="font-weight: bold;color: black;">{{ mapProfile[ticket.reportedBy] }}</span></mat-card-subtitle>
@@ -342,13 +342,13 @@
                                                                 <span *ngIf="chat['message'] == '' && chat['files'].length == 0" style="color: grey;">Loading File...</span>
                                                                 <span *ngIf="chat['files'] != null && chat['files'].length != 0"
                                                                     style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
-                                                                    <span *ngFor="let image of chat['files']">
+                                                                    <span *ngFor="let image of chat['files']; let imgi = index">
                                                                         <span style="margin-left: 5px;margin-top: 5px;">
-                                                                            <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                                                                            <span [attr.data-testid]="'upo-chat-img-' + idx + '-' + imgi" *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
                                                                                 <br>
                                                                                 <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
                                                                             </span>
-                                                                            <span #myvideo *ngIf="image['mediatype']?.includes('video')" (click)="downloadFiles(image['fileurl'])">
+                                                                            <span [attr.data-testid]="'upo-chat-video-' + idx + '-' + imgi" #myvideo *ngIf="image['mediatype']?.includes('video')" (click)="downloadFiles(image['fileurl'])">
                                                                                 <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
                                                                                     <source [src]="image['fileurl']">
                                                                                 </video>
@@ -366,7 +366,7 @@
                                                                                 </span>
                                                                                 <span class="lastmessage" style="width: 12vw; font-size: 14px;">
                                                                                     {{image['filename']}}
-                                                                                    <button mat-icon-button (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
+                                                                                    <button [attr.data-testid]="'upo-chat-download-' + idx + '-' + imgi" mat-icon-button (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
                                                                                 </span>
                                                                             </span>
                                                                         </span>
@@ -404,21 +404,21 @@
                                                 <textarea matInput placeholder="Type your message" [(ngModel)]="ticketMessage" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6"></textarea>
                                             </div>
                                             <div class="buttons">
-                                                <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+                                                <button data-testid="upo-attach-menu-3" mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
                                                 <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
                                                     &nbsp;&nbsp;
-                                                    <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+                                                    <button data-testid="upo-attach-image-4" mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
                                                     &nbsp;&nbsp;
-                                                    <button mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
+                                                    <button data-testid="upo-attach-video-5" mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
                                                     <br>
                                                     &nbsp;&nbsp;
-                                                    <button mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
+                                                    <button data-testid="upo-attach-audio-6" mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
                                                     &nbsp;&nbsp;
-                                                    <button mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+                                                    <button data-testid="upo-attach-files-7" mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
                                                 </mat-menu>
-                                                <input style="display: none;" #fileInput type="file" [accept]="this['filetype']" (click)="onClick($event)" (change)="selectFiles($event)" multiple>
+                                                <input data-testid="upo-file-input-8" style="display: none;" #fileInput type="file" [accept]="this['filetype']" (click)="onClick($event)" (change)="selectFiles($event)" multiple>
                                                 &nbsp;
-                                                <button mat-mini-fab (click)="sendChatMessage(ticketMessage,currentIssueData)"><mat-icon>send</mat-icon></button>
+                                                <button data-testid="upo-ticket-send-9" mat-mini-fab (click)="sendChatMessage(ticketMessage,currentIssueData)"><mat-icon>send</mat-icon></button>
                                             </div>
                                         </div>
 
@@ -455,7 +455,7 @@
                                                         <span class="badge journey-dates">{{  (form['date']?.toDate() | date: 'mediumDate') || 'N/A'}}</span>
                                                     </td>
                                                     <td>
-                                                        <button mat-raised-button class="badge journey-dates" (click)="this['onFormPreview'](form)">view</button>
+                                                        <button [attr.data-testid]="'upo-form-view-' + i" mat-raised-button class="badge journey-dates" (click)="this['onFormPreview'](form)">view</button>
                                                     </td>
                                                 </tr>
                                             </ng-container>
@@ -485,7 +485,7 @@
                                     </thead>
                                     <tbody>
                                         <ng-container *ngFor="let report of participantreports; let i = index">
-                                            <tr style="cursor: pointer;" (click)="this['reportView'](report)">
+                                            <tr [attr.data-testid]="'upo-report-row-' + i" style="cursor: pointer;" (click)="this['reportView'](report)">
                                                 <td>{{ i + 1 }}.</td>
                                                 <td>{{ report['reportlist'] }}</td>
                                                 <td><span>{{report.status}}</span></td>
@@ -536,8 +536,8 @@
 
                                     <ng-container matColumnDef="edit">
                                         <th mat-header-cell *matHeaderCellDef class="edit-column"> Edit </th>
-                                        <td mat-cell *matCellDef="let row" class="edit-column">
-                                            <button [disabled]="this['loggedInProfileId'] !== 'tGE64OoJuurjayW3tJKa' && this['loggedInProfileId'] !== 'l0ApFnXuM5Ac8tpqJQnk'" mat-icon-button (click)="this['editRow'](row)">
+                                        <td mat-cell *matCellDef="let row; let aeli = index" class="edit-column">
+                                            <button [attr.data-testid]="'upo-ael-edit-' + aeli" [disabled]="this['loggedInProfileId'] !== 'tGE64OoJuurjayW3tJKa' && this['loggedInProfileId'] !== 'l0ApFnXuM5Ac8tpqJQnk'" mat-icon-button (click)="this['editRow'](row)">
                                                 <mat-icon>edit</mat-icon>
                                             </button>
                                         </td>

@@ -7,10 +7,10 @@
 
     <mat-form-field appearance="outline">
         <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilter($event)" placeholder="Search Videos" #input>
+        <input data-testid="cu-inp-001" matInput (keyup)="applyFilter($event)" placeholder="Search Videos" #input>
     </mat-form-field>
 
-    <button type="button" style="float:right;color: green;" mat-stroked-button (click)="newContent()"><mat-icon style="color:green;">edit_note</mat-icon> Add New Content </button>
+    <button data-testid="cu-btn-002" type="button" style="float:right;color: green;" mat-stroked-button (click)="newContent()"><mat-icon style="color:green;">edit_note</mat-icon> Add New Content </button>
 
     <div class="mat-elevation-z8">
         <table mat-table [dataSource]="contentData" matSort>
@@ -19,7 +19,7 @@
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>S NO</th>
                 <td mat-cell *matCellDef="let data; let i = index">
                     {{i+1}}
-                    <button class="text-secondary ml-2" mat-icon-button (click)="copyToClipboard(data)">
+                    <button data-testid="cu-btn-003" class="text-secondary ml-2" mat-icon-button (click)="copyToClipboard(data)">
                         <mat-icon>content_copy</mat-icon>
                     </button>
                 </td>
@@ -65,14 +65,14 @@
             <ng-container matColumnDef="edit">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header> EDIT </th>
                 <td mat-cell *matCellDef="let row">
-                    <button type="button" mat-icon-button class="edit" color="legacy" (click)="editContent(row)" ><mat-icon style="color:blue">edit_note</mat-icon></button>
+                    <button data-testid="cu-btn-004" type="button" mat-icon-button class="edit" color="legacy" (click)="editContent(row)" ><mat-icon style="color:blue">edit_note</mat-icon></button>
                 </td>
             </ng-container>
 
             <ng-container matColumnDef="delete">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header> DELETE </th>
                 <td mat-cell *matCellDef="let row">
-                    <button type="button" mat-icon-button class="delete" color="legacy" (click)="deleteContent(row)" ><mat-icon style="color:red;">delete</mat-icon></button>
+                    <button data-testid="cu-btn-005" type="button" mat-icon-button class="delete" color="legacy" (click)="deleteContent(row)" ><mat-icon style="color:red;">delete</mat-icon></button>
                 </td>
             </ng-container>
 
@@ -104,11 +104,11 @@
       <p class="dash-sub">Manage video content library</p>
     </div>
     <div class="actions" style="display:flex; gap:10px;">
-      <button class="btn-primary" (click)="newContent()">
+      <button data-testid="cu-btn-006" class="btn-primary" (click)="newContent()">
       <mat-icon>add</mat-icon>
       <span>New Content</span>
     </button>
-    <button class="btn-primary" (click)="exportToExcel()">
+    <button data-testid="cu-btn-007" class="btn-primary" (click)="exportToExcel()">
       <mat-icon>download</mat-icon>
       <span>Export</span>
     </button>
@@ -119,7 +119,7 @@
   <div class="filters-row">
     <div class="input-box search-box">
       <mat-icon class="ib-icon">search</mat-icon>
-      <input type="text" class="ib-input" placeholder="Search videos..."
+      <input data-testid="cu-inp-008" type="text" class="ib-input" placeholder="Search videos..."
         (keyup)="applyFilter($event)" #input autocomplete="off" />
     </div>
   </div>
@@ -135,7 +135,7 @@
           <td mat-cell *matCellDef="let data; let i = index" class="col-sno">
             <div class="sno-cell">
               <span class="c-date">{{ i + 1 }}</span>
-              <button class="a-btn" (click)="copyToClipboard(data)" title="Copy">
+              <button data-testid="cu-btn-009" class="a-btn" (click)="copyToClipboard(data)" title="Copy">
                 <mat-icon>content_copy</mat-icon>
               </button>
             </div>
@@ -225,7 +225,7 @@
         <ng-container matColumnDef="edit">
           <th mat-header-cell *matHeaderCellDef class="col-act"></th>
           <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-edit" (click)="editContent(row)">
+            <button data-testid="cu-btn-010" class="a-btn a-edit" (click)="editContent(row)">
               <mat-icon>edit</mat-icon>
             </button>
           </td>
@@ -235,7 +235,7 @@
         <!-- <ng-container matColumnDef="delete">
           <th mat-header-cell *matHeaderCellDef class="col-act"></th>
           <td mat-cell *matCellDef="let row" class="col-act">
-            <button class="a-btn a-del" (click)="deleteContent(row)">
+            <button data-testid="cu-btn-011" class="a-btn a-del" (click)="deleteContent(row)">
               <mat-icon>delete_outline</mat-icon>
             </button>
           </td>

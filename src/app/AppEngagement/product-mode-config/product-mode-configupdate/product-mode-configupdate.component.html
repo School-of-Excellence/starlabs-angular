@@ -103,7 +103,7 @@
         <span class="product-label">Product :</span>
         <span class="product-name">{{dialogdata.mapProducts[dialogdata["config"]["productref"].id]['product']}}</span>
       </div>
-      <button class="close-btn" (click)="dialogref.close()">✕</button>
+      <button data-testid="pmcu-btn-1" class="close-btn" (click)="dialogref.close()">✕</button>
     </div>
 
     <!-- Subheader -->
@@ -118,8 +118,8 @@
         <!-- Left Panel - Tips -->
         <div class="left-panel">
           <div class="input-group">
-            <input type="text" [(ngModel)]="tipText" [ngModelOptions]="{standalone: true}" placeholder="Type Your Tips here" class="tips-input">
-            <button class="add-btn" type="button" (click)="onMessageInput()">
+            <input data-testid="pmcu-inp-2" type="text" [(ngModel)]="tipText" [ngModelOptions]="{standalone: true}" placeholder="Type Your Tips here" class="tips-input">
+            <button data-testid="pmcu-btn-3" class="add-btn" type="button" (click)="onMessageInput()">
               <span class="plus-icon">+</span>
               Add
             </button>
@@ -134,7 +134,7 @@
                 <div class="tip-content">
                   <div class="tip-header">
                     <h3 class="tip-title">Tip {{i+1}}</h3>
-                    <button class="delete-btn" type="button" (click)="onMessageDelete(i)">🗑</button>
+                    <button [attr.data-testid]="'pmcu-btn-4-' + i" class="delete-btn" type="button" (click)="onMessageDelete(i)">🗑</button>
                   </div>
                   <p class="tip-text">
                     {{text}}
@@ -149,7 +149,7 @@
         <div class="right-panel">
           <div class="panel-header">
             <h2 class="panel-title">Add New Widget</h2>
-            <button class="add-btn" type="button" (click)="addWidget()">
+            <button data-testid="pmcu-btn-5" class="add-btn" type="button" (click)="addWidget()">
               <span class="plus-icon">+</span>
               Add
             </button>
@@ -162,11 +162,11 @@
                 <div class="widget-card">
                   <div class="widget-header">
                     <h3 class="widget-title">Widget {{i+1}}</h3>
-                    <button class="delete-btn" type="button" (click)="removeWidget(i)">🗑</button>
+                    <button [attr.data-testid]="'pmcu-btn-6-' + i" class="delete-btn" type="button" (click)="removeWidget(i)">🗑</button>
                   </div>
                 
                   <mat-form-field class="widget-mat-field" appearance="outline">
-                  <mat-select formControlName="widgetid" placeholder="Select A Widget">
+                  <mat-select [attr.data-testid]="'pmcu-sel-7-' + i" formControlName="widgetid" placeholder="Select A Widget">
                     <mat-option>
                       <ngx-mat-select-search [(ngModel)]="filteredWidget" [ngModelOptions]="{standalone: true}"
                         [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -184,7 +184,7 @@
                     *ngIf="['adsplaylist', 'solarvoice', 'eiflix', 'generalcontent', 'form'].includes(widgetArray.controls[i].get('widgetid')?.value)">
                     <label class="reference-label">Add Reference</label>
                     <mat-form-field class="widget-mat-field" appearance="outline">
-                      <mat-select formControlName="reference" multiple placeholder="Multiselect your References">
+                      <mat-select [attr.data-testid]="'pmcu-sel-8-' + i" formControlName="reference" multiple placeholder="Multiselect your References">
                         <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredReference" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'"
                           [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -202,7 +202,7 @@
                         <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('dos')?.value" [removable]="true"
                           (removed)="removeActionItems(i, 'dos', item)">
                           {{ item }}
-                          <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                          <button [attr.data-testid]="'pmcu-btn-9-' + item" matChipRemove [attr.aria-label]="'Remove ' + item">
                             <mat-icon>cancel</mat-icon>
                           </button>
                         </mat-chip-row>
@@ -218,7 +218,7 @@
                         <mat-chip-row *ngFor="let item of widgetArray.controls[i].get('donts')?.value" [removable]="true"
                           (removed)="removeActionItems(i, 'donts', item)">
                           {{ item }}
-                          <button matChipRemove [attr.aria-label]="'Remove ' + item">
+                          <button [attr.data-testid]="'pmcu-btn-10-' + item" matChipRemove [attr.aria-label]="'Remove ' + item">
                             <mat-icon>cancel</mat-icon>
                           </button>
                         </mat-chip-row>
@@ -238,27 +238,27 @@
 
     <!-- Footer -->
     <div class="dialog-footer">
-      <button class="preview-btn" type="button" (click)="showPreview = true">
+      <button data-testid="pmcu-btn-11" class="preview-btn" type="button" (click)="showPreview = true">
         <mat-icon>visibility</mat-icon>
         Preview
       </button>
       <div class="footer-actions">
-        <button class="cancel-btn" type="button" (click)="dialogref.close()">Cancel</button>
-        <button class="configure-btn" type="button" (click)="updateConfig(modeconfigForm.value)" [disabled]="!modeconfigForm.valid">Configure</button>
+        <button data-testid="pmcu-btn-12" class="cancel-btn" type="button" (click)="dialogref.close()">Cancel</button>
+        <button data-testid="pmcu-btn-13" class="configure-btn" type="button" (click)="updateConfig(modeconfigForm.value)" [disabled]="!modeconfigForm.valid">Configure</button>
       </div>
     </div>
   </div>
 
   <!-- Preview Modal Overlay -->
-  <div class="preview-modal-overlay" *ngIf="showPreview" (click)="showPreview = false">
-    <div class="preview-modal-container" (click)="$event.stopPropagation()">
+  <div data-testid="pmcu-act-14" class="preview-modal-overlay" *ngIf="showPreview" (click)="showPreview = false">
+    <div data-testid="pmcu-act-15" class="preview-modal-container" (click)="$event.stopPropagation()">
       <!-- Preview Header -->
       <div class="preview-modal-header">
         <div class="preview-header-content">
           <mat-icon class="preview-header-icon">visibility</mat-icon>
           <h2 class="preview-modal-title">Configuration Preview</h2>
         </div>
-        <button class="close-btn" type="button" (click)="showPreview = false">✕</button>
+        <button data-testid="pmcu-btn-16" class="close-btn" type="button" (click)="showPreview = false">✕</button>
       </div>
 
       <!-- Preview Content -->
@@ -346,7 +346,7 @@
 
       <!-- Preview Footer -->
       <div class="preview-modal-footer">
-        <button class="secondary-btn" type="button" (click)="showPreview = false">
+        <button data-testid="pmcu-btn-17" class="secondary-btn" type="button" (click)="showPreview = false">
           Close Preview
         </button>
       </div>

@@ -1,0 +1,58 @@
+<!-- Extracted from interim-report-dashboard (8).html. Behaviour lives in interim-report-dashboard.script.ts -->
+<div class="stage">
+  <div class="wrap">
+    <div class="page-head">
+      <div class="filters">
+        <div class="f fdate"><span class="k">DATE</span>
+          <mat-date-range-input class="drange" [formGroup]="range" [rangePicker]="rangePicker">
+            <input matStartDate formControlName="start" placeholder="Start date" aria-label="Start date">
+            <input matEndDate formControlName="end" placeholder="End date" aria-label="End date">
+          </mat-date-range-input>
+          <mat-datepicker-toggle class="dtoggle" [for]="rangePicker"></mat-datepicker-toggle>
+          <mat-date-range-picker #rangePicker></mat-date-range-picker></div>
+        <div class="f"><span class="k">JOURNEY</span><select id="fJourney" data-testid="ird-filter-journey"></select></div>
+        <div class="f"><span class="k">EVENT ATTENDED</span><select id="fEvent" data-testid="ird-filter-event"></select></div>
+        <div class="f"><span class="k">PARTICIPANT</span>
+          <input id="fWho" data-testid="ird-filter-participant" placeholder="Search a name…"></div>
+        <button class="f clearf" id="fClear" data-testid="ird-filter-clear">Clear</button>
+      </div>
+    </div>
+
+    <div class="ovw" id="overview"></div>
+
+  </div>
+
+  <!-- ══════════ MODAL ══════════ -->
+  <dialog class="ov" id="ov" aria-labelledby="moTitle">
+    <div class="mo">
+      <div class="mo-head">
+        <div><h3 id="moTitle"></h3><div class="sub" id="moSub"></div></div>
+        <button class="x" id="moX" data-testid="ird-modal-close">&times;</button>
+      </div>
+      <div class="mo-body">
+        <input class="mo-search" id="moSearch" data-testid="ird-modal-search" placeholder="Search participant…">
+        <div id="moBody"></div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ══════════ NEW LOG ══════════ -->
+  <dialog class="lg" id="lg" aria-labelledby="lgName">
+    <div class="lg-box">
+      <div class="lg-head">
+        <div><div class="lg-k">NEW LOG</div><h3 id="lgName"></h3></div>
+        <button class="lg-x" id="lgX" aria-label="Close" data-testid="ird-log-close">&times;</button>
+      </div>
+      <div class="lg-tabs" role="tablist">
+        <button role="tab" data-lgtab="Call" data-testid="ird-log-tab-call">Call</button>
+        <button role="tab" data-lgtab="Schedule" data-testid="ird-log-tab-schedule">Schedule</button>
+        <button role="tab" data-lgtab="Note" data-testid="ird-log-tab-note">Note</button>
+      </div>
+      <div id="lgPane"></div>
+      <div class="lg-foot">
+        <button id="lgCancel" data-testid="ird-log-cancel">Cancel</button>
+        <button class="lg-save" id="lgSave" data-testid="ird-log-save">Save</button>
+      </div>
+    </div>
+  </dialog>
+</div>

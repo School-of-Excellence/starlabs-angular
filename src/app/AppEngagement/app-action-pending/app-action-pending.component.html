@@ -9,7 +9,7 @@
         </mat-form-field>
       </div>
       <div class="actionitem">
-        <button class="addbtn" mat-stroked-button (click)="updatePendingAction(null)">Add New</button>
+        <button data-testid="aap-btn-1" class="addbtn" mat-stroked-button (click)="updatePendingAction(null)">Add New</button>
       </div>
     </div>
     <table mat-table [dataSource]="appPendingActionList" matSort>
@@ -84,7 +84,7 @@
       <ng-container matColumnDef="edit">
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let row">
-          <button mat-icon-button color="primary" (click)="updatePendingAction(row)">
+          <button data-testid="aap-btn-2" mat-icon-button color="primary" (click)="updatePendingAction(row)">
               <mat-icon>edit</mat-icon>
           </button>
           </td>

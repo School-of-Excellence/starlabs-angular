@@ -21,20 +21,20 @@
             <div class="tb-filters">
                 <div class="tb-fg">
                     <span class="tb-fl">Journey</span>
-                    <button class="fchip" [class.on]="true">EcoSystem</button>
-                    <button class="fchip" [class.on]="false">DFU</button>
-                    <button class="fchip" [class.on]="false">Gifts</button>
+                    <button data-testid="sdc-btn-001" class="fchip" [class.on]="true">EcoSystem</button>
+                    <button data-testid="sdc-btn-002" class="fchip" [class.on]="false">DFU</button>
+                    <button data-testid="sdc-btn-003" class="fchip" [class.on]="false">Gifts</button>
                 </div>
                 <div class="tb-fg">
                     <span class="tb-fl">Period</span>
-                    <button class="fchip" [class.on]="true">Last 7 Days</button>
-                    <button class="fchip" [class.on]="true">Last 30 Days</button>
+                    <button data-testid="sdc-btn-004" class="fchip" [class.on]="true">Last 7 Days</button>
+                    <button data-testid="sdc-btn-005" class="fchip" [class.on]="true">Last 30 Days</button>
                 </div>
             </div>
         </div>
         <div class="tb-right">
             <span class="tb-date">10/1/2025 → 3/17/2026</span>
-            <button mat-stroked-button class="tb-btn">Switch to Month</button>
+            <button data-testid="sdc-btn-006" mat-stroked-button class="tb-btn">Switch to Month</button>
         </div>
     </mat-toolbar> -->
     <mat-toolbar class="topbar">
@@ -50,20 +50,20 @@
                 <!-- Journey Filter Group -->
                 <div class="tb-fg">
                     <span class="tb-fl">Journey</span>
-                    <button class="fchip" [class.on]="selectedFilter === 'ecosystem'"
+                    <button data-testid="sdc-btn-007" class="fchip" [class.on]="selectedFilter === 'ecosystem'"
                         (click)="onJourneyClick('ecosystem')">EcoSystem</button>
-                    <button class="fchip" [class.on]="selectedFilter === 'dfu'"
+                    <button data-testid="sdc-btn-008" class="fchip" [class.on]="selectedFilter === 'dfu'"
                         (click)="onJourneyClick('dfu')">DFU</button>
-                    <button class="fchip" [class.on]="selectedFilter === 'gifts'"
+                    <button data-testid="sdc-btn-009" class="fchip" [class.on]="selectedFilter === 'gifts'"
                         (click)="onJourneyClick('gifts')">Gifts</button>
                 </div>
 
                 <!-- Assured Date Filter Group -->
                 <div class="tb-fg">
                     <span class="tb-fl">Assured</span>
-                    <button class="fchip" [class.on]="selectedAssuredDateFilter === 'last7days'"
+                    <button data-testid="sdc-btn-010" class="fchip" [class.on]="selectedAssuredDateFilter === 'last7days'"
                         (click)="onAssuredDateFilterClick('last7days')">Last 7 Days</button>
-                    <button class="fchip" [class.on]="selectedAssuredDateFilter === 'last30days'"
+                    <button data-testid="sdc-btn-011" class="fchip" [class.on]="selectedAssuredDateFilter === 'last30days'"
                         (click)="onAssuredDateFilterClick('last30days')">Last 30 Days</button>
                 </div>
 
@@ -74,14 +74,14 @@
         <div class="tb-right" *ngIf="!selectedAssuredDateFilter">
             <!-- Month Picker Mode -->
             <ng-container *ngIf="pickerMode === 'month'">
-                <button class="tb-nav-btn" (click)="goToPreviousMonth()">
+                <button data-testid="sdc-btn-012" class="tb-nav-btn" (click)="goToPreviousMonth()">
                     <mat-icon>chevron_left</mat-icon>
                 </button>
                 <span class="tb-date">
                     <mat-icon class="tb-cal-icon">calendar_month</mat-icon>
                     {{ displayMonth }}
                 </span>
-                <button class="tb-nav-btn" (click)="goToNextMonth()">
+                <button data-testid="sdc-btn-013" class="tb-nav-btn" (click)="goToNextMonth()">
                     <mat-icon>chevron_right</mat-icon>
                 </button>
             </ng-container>
@@ -91,8 +91,8 @@
                 <div class="date-rng-container">
                     <mat-form-field appearance="outline" class="compact-field">
                         <mat-date-range-input [rangePicker]="picker">
-                            <input matStartDate [(ngModel)]="customStartDate" placeholder="Start date">
-                            <input matEndDate [(ngModel)]="customEndDate" placeholder="End date">
+                            <input data-testid="sdc-inp-014" matStartDate [(ngModel)]="customStartDate" placeholder="Start date">
+                            <input data-testid="sdc-inp-015" matEndDate [(ngModel)]="customEndDate" placeholder="End date">
                         </mat-date-range-input>
                         <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
                         <mat-date-range-picker #picker (closed)="onCustomDateChange()"></mat-date-range-picker>
@@ -101,7 +101,7 @@
             </ng-container>
 
             <!-- Toggle Mode Button -->
-            <button mat-stroked-button class="tb-btn" (click)="toggleDateMode()">
+            <button data-testid="sdc-btn-016" mat-stroked-button class="tb-btn" (click)="toggleDateMode()">
                 <mat-icon>{{ pickerMode === 'month' ? 'date_range' : 'calendar_view_month' }}</mat-icon>
                 {{ pickerMode === 'month' ? 'Switch to Range' : 'Switch to Month' }}
             </button>
@@ -112,14 +112,14 @@
                 Filtering by {{ selectedAssuredDateFilter === 'last7days' ? 'Last 7 Days' : 'Last 30 Days' }}
                 · {{ assuredFilterStartDate }} → {{ assuredFilterEndDate }}
             </span>
-            <button class="fchip fchip-clear" (click)="onAssuredDateFilterClick(selectedAssuredDateFilter)">✕
+            <button data-testid="sdc-btn-017" class="fchip fchip-clear" (click)="onAssuredDateFilterClick(selectedAssuredDateFilter)">✕
                 Clear</button>
         </div>
     </mat-toolbar>
 
     <!-- ── SECTION NAV ── -->
     <nav class="secnav">
-        <a *ngFor="let link of navLinks" class="sn-link" [class.active]="activeSection === link.href"
+        <a data-testid="sdc-a-018" *ngFor="let link of navLinks" class="sn-link" [class.active]="activeSection === link.href"
             (click)="scrollTo(link.href)">{{ link.label }}</a>
     </nav>
 
@@ -139,9 +139,9 @@
                     
                         <div class="metric-tab-top">
                             <span class="metric-title">Gross Sales</span>
-                            <div class="metric-radio" (click)="setActiveGrossType('')" ></div>
+                            <div data-testid="sdc-div-019" class="metric-radio" (click)="setActiveGrossType('')" ></div>
                         </div>
-                        <div class="metric-value" (click)="onBoxClick('grossSales');">
+                        <div data-testid="sdc-div-020" class="metric-value" (click)="onBoxClick('grossSales');">
                             {{ metric['gross'].data.length }} + {{ metric.grosspending.length }}
                         </div>
                         <div class="metric-subvalue">
@@ -154,9 +154,9 @@
                     <div class="metric-tab metric-tab--actual" [class.metric-tab--active-actual]="activeGrossType === 'actual'">
                         <div class="metric-tab-top">
                             <span class="metric-title">Actual Gross Sales</span>
-                            <div class="metric-radio" (click)="setActiveGrossType('actual')" ></div>
+                            <div data-testid="sdc-div-021" class="metric-radio" (click)="setActiveGrossType('actual')" ></div>
                         </div>
-                        <div class="metric-value" (click)="onBoxClick('actualGrossSales');">
+                        <div data-testid="sdc-div-022" class="metric-value" (click)="onBoxClick('actualGrossSales');">
                             {{ metric['actualgross'].data.length }}
                         </div>
                         <div class="metric-subvalue">
@@ -174,7 +174,7 @@
                     <div class="metric-breakdown">
     
                         <!-- New -->
-                        <div class="breakdown-item new"
+                        <div data-testid="sdc-div-023" class="breakdown-item new"
                             (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossNewSales' : 'actualNewSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">New</div>
@@ -187,7 +187,7 @@
                         </div>
     
                         <!-- Upgrades -->
-                        <div class="breakdown-item upgrade"
+                        <div data-testid="sdc-div-024" class="breakdown-item upgrade"
                             (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossUpgradeSales' : 'actualUpgradeSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Upgrades</div>
@@ -200,7 +200,7 @@
                         </div>
     
                         <!-- Add-On -->
-                        <div class="breakdown-item addon"
+                        <div data-testid="sdc-div-025" class="breakdown-item addon"
                             (click)="onGrossSplitClick($event, activeGrossType === '' ? 'grossAddonSales' : 'actualAddonSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Add-On</div>
@@ -213,7 +213,7 @@
                         </div>
     
                         <!-- Cancelled -->
-                        <div class="breakdown-item cancelled"
+                        <div data-testid="sdc-div-026" class="breakdown-item cancelled"
                             (click)="onCancelledClick($event, activeGrossType === '' ? 'grossCancelledSales' : 'actualGrossCancelledSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Cancelled</div>
@@ -226,7 +226,7 @@
                         </div>
     
                         <!-- Downgrade To Old -->
-                        <div class="breakdown-item downgrade-old"
+                        <div data-testid="sdc-div-027" class="breakdown-item downgrade-old"
                             (click)="onDowngradeClick($event, activeGrossType === '' ? 'grossDowngradeToOldSales' : 'actualGrossDowngradeToOldSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Downgrade To Old</div>
@@ -239,7 +239,7 @@
                         </div>
     
                         <!-- Downgrade To New -->
-                        <div class="breakdown-item downgrade-new"
+                        <div data-testid="sdc-div-028" class="breakdown-item downgrade-new"
                             (click)="onDowngradeClick($event, activeGrossType === '' ? 'grossDowngradeToNewSales' : 'actualGrossDowngradeToNewSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Downgrade To New</div>
@@ -266,9 +266,9 @@
                     <div class="metric-tab metric-tab--gross" [class.metric-tab--active-gross]="activeAssuredType === ''">
                         <div class="metric-tab-top">
                             <span class="metric-title">Assured Sales</span>
-                            <div class="metric-radio" (click)="setActiveAssuredType('')" ></div>
+                            <div data-testid="sdc-div-029" class="metric-radio" (click)="setActiveAssuredType('')" ></div>
                         </div>
-                        <div class="metric-value" (click)="onBoxClick('assuredSales'); $event.stopPropagation()">
+                        <div data-testid="sdc-div-030" class="metric-value" (click)="onBoxClick('assuredSales'); $event.stopPropagation()">
                             {{ metric['assured'].data.length }}
                         </div>
                         <div class="metric-subvalue">
@@ -281,9 +281,9 @@
                     <div class="metric-tab metric-tab--actual" [class.metric-tab--active-actual]="activeAssuredType === 'actual'">
                         <div class="metric-tab-top">
                             <span class="metric-title">Actual Assured Sales</span>
-                            <div class="metric-radio" (click)="setActiveAssuredType('actual')" ></div>
+                            <div data-testid="sdc-div-031" class="metric-radio" (click)="setActiveAssuredType('actual')" ></div>
                         </div>
-                        <div class="metric-value" (click)="onBoxClick('actualAssuredSales'); $event.stopPropagation()">
+                        <div data-testid="sdc-div-032" class="metric-value" (click)="onBoxClick('actualAssuredSales'); $event.stopPropagation()">
                             {{ metric['actualassured'].data.length }}
                         </div>
                         <div class="metric-subvalue">
@@ -304,7 +304,7 @@
                     <div class="metric-breakdown">
     
                         <!-- New -->
-                        <div class="breakdown-item new"
+                        <div data-testid="sdc-div-033" class="breakdown-item new"
                             (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredNewSales' : 'actualAssuredNewSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">New</div>
@@ -317,7 +317,7 @@
                         </div>
     
                         <!-- Upgrades -->
-                        <div class="breakdown-item upgrade"
+                        <div data-testid="sdc-div-034" class="breakdown-item upgrade"
                             (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredUpgradeSales' : 'actualAssuredUpgradeSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Upgrades</div>
@@ -330,7 +330,7 @@
                         </div>
     
                         <!-- Add-On -->
-                        <div class="breakdown-item addon"
+                        <div data-testid="sdc-div-035" class="breakdown-item addon"
                             (click)="onAssuredSplitClick($event, activeAssuredType === '' ? 'assuredAddonSales' : 'actualAssuredAddonSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Add-On</div>
@@ -343,7 +343,7 @@
                         </div>
     
                         <!-- Cancelled -->
-                        <div class="breakdown-item cancelled"
+                        <div data-testid="sdc-div-036" class="breakdown-item cancelled"
                             (click)="onCancelledClick($event, activeAssuredType === '' ? 'assuredCancelledSales' : 'actualAssuredCancelledSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Cancelled</div>
@@ -356,7 +356,7 @@
                         </div>
     
                         <!-- Downgrade To Old -->
-                        <div class="breakdown-item downgrade-old"
+                        <div data-testid="sdc-div-037" class="breakdown-item downgrade-old"
                             (click)="onDowngradeClick($event, activeAssuredType === '' ? 'assuredDowngradeToOldSales' : 'actualAssuredDowngradeToOldSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Downgrade To Old</div>
@@ -369,7 +369,7 @@
                         </div>
     
                         <!-- Downgrade To New -->
-                        <div class="breakdown-item downgrade-new"
+                        <div data-testid="sdc-div-038" class="breakdown-item downgrade-new"
                             (click)="onDowngradeClick($event, activeAssuredType === '' ? 'assuredDowngradeToNewSales' : 'actualAssuredDowngradeToNewSales')"
                             style="cursor:pointer">
                             <div class="breakdown-label">Downgrade To New</div>
@@ -398,7 +398,7 @@
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <path d="m21 21-4.35-4.35"></path>
                             </svg>
-                            <input type="text" class="search-input" placeholder="Search by Name, Mobile, Email..."
+                            <input data-testid="sdc-inp-039" type="text" class="search-input" placeholder="Search by Name, Mobile, Email..."
                                 formControlName="search" (input)="filterTableData(filterForm.value)" />
                         </div>
 
@@ -406,8 +406,8 @@
                             <mat-form-field appearance="outline" class="date-range-field">
                                 <mat-label class="date-label">Purchase Date</mat-label>
                                 <mat-date-range-input [rangePicker]="picker2" class="date-range-input">
-                                    <input matStartDate formControlName="purchaseStart" placeholder="MM/DD/YYYY" />
-                                    <input matEndDate formControlName="purchaseEnd" placeholder="MM/DD/YYYY" />
+                                    <input data-testid="sdc-inp-040" matStartDate formControlName="purchaseStart" placeholder="MM/DD/YYYY" />
+                                    <input data-testid="sdc-inp-041" matEndDate formControlName="purchaseEnd" placeholder="MM/DD/YYYY" />
                                 </mat-date-range-input>
                                 <mat-datepicker-toggle matSuffix [for]="picker2" class="date-toggle">
                                     <mat-icon matDatepickerToggleIcon>
@@ -428,7 +428,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('journey')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Journey</mat-label>
-                                <mat-select placeholder="Select Journey" formControlName="journey"
+                                <mat-select data-testid="sdc-msel-042" placeholder="Select Journey" formControlName="journey"
                                     (selectionChange)="filterTableData(filterForm.value)" multiple>
                                     <mat-option *ngFor="let journey of journeyList" [value]="journey.id">
                                         {{ journey.name }}
@@ -440,7 +440,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('journeycoach')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Journey Coach</mat-label>
-                                <mat-select placeholder="Select Journey Coach" formControlName="journeycoach"
+                                <mat-select data-testid="sdc-msel-043" placeholder="Select Journey Coach" formControlName="journeycoach"
                                     (selectionChange)="filterTableData(filterForm.value)">
                                     <mat-option *ngFor="let coach of coachesList" [value]="coach.profile_ref.id">{{
                                         mapprofile[coach.profile_ref.id]}}</mat-option>
@@ -451,7 +451,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('assured')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Assured</mat-label>
-                                <mat-select placeholder="FIlter Assured Data" formControlName="assured"
+                                <mat-select data-testid="sdc-msel-044" placeholder="FIlter Assured Data" formControlName="assured"
                                     (selectionChange)="filterTableData(filterForm.value)">
                                     <mat-option *ngFor="let assured of assuredList"
                                         [value]="assured">{{assured.toLocaleUpperCase()}}</mat-option>
@@ -462,7 +462,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('status')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Status</mat-label>
-                                <mat-select placeholder="Filter Status" formControlName="status"
+                                <mat-select data-testid="sdc-msel-045" placeholder="Filter Status" formControlName="status"
                                     (selectionChange)="filterTableData(filterForm.value)">
                                     <mat-option *ngFor="let status of statusList"
                                         [value]="status">{{status.toLocaleUpperCase()}}</mat-option>
@@ -473,7 +473,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('saleType')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Sale Type</mat-label>
-                                <mat-select placeholder="Filter Sale Type" formControlName="saleType"
+                                <mat-select data-testid="sdc-msel-046" placeholder="Filter Sale Type" formControlName="saleType"
                                     (selectionChange)="filterTableData(filterForm.value)">
                                     <mat-option *ngFor="let saleType of saleTypeList"
                                         [value]="saleType">{{saleType.toLocaleUpperCase()}}</mat-option>
@@ -484,7 +484,7 @@
                         <div *ngIf="currentTableConfig?.filters?.includes('customerStatus')">
                             <mat-form-field appearance="outline">
                                 <mat-label>Customer Status</mat-label>
-                                <mat-select placeholder="Filter Customer Status" formControlName="customerStatus"
+                                <mat-select data-testid="sdc-msel-047" placeholder="Filter Customer Status" formControlName="customerStatus"
                                     (selectionChange)="filterTableData(filterForm.value)">
                                     <mat-option *ngFor="let status of customerStatusList"
                                         [value]="status">{{status}}</mat-option>
@@ -492,7 +492,7 @@
                             </mat-form-field>
                         </div>
 
-                        <button mat-mini-fab color="primary"
+                        <button data-testid="sdc-btn-048" mat-mini-fab color="primary"
                             (click)="refreshFilter()"><mat-icon>refresh</mat-icon></button>
                     </div>
                 </form>
@@ -542,7 +542,7 @@
                             </div>
                         </div>
 
-                        <button class="export-btn" (click)="exportTableData()">
+                        <button data-testid="sdc-btn-049" class="export-btn" (click)="exportTableData()">
                             <span>Export</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -550,7 +550,7 @@
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
                             </svg>
                         </button>
-                        <button class="close-btn" (click)="closeTable()">×</button>
+                        <button data-testid="sdc-btn-050" class="close-btn" (click)="closeTable()">×</button>
                     </div>
                 </div>
 
@@ -559,7 +559,7 @@
                         <thead>
                             <tr>
                                 <th>S.No</th>
-                                <th *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
+                                <th data-testid="sdc-th-051" *ngFor="let column of currentTableConfig?.columns" [style.width]="column.width"
                                     [class.sortable]="isSortable(column)"
                                     (click)="isSortable(column) && sortTable(column.key)">
                                     <span class="th-content">
@@ -583,19 +583,19 @@
                                         {{ formatCellValue(row, column) }}
                                     </span>
 
-                                    <span *ngIf="column.header === 'Name'" class="clickable-name"
+                                    <span data-testid="sdc-span-052" *ngIf="column.header === 'Name'" class="clickable-name"
                                         (click)="navigatetoprofile(row['profileid'])">
                                         {{ formatCellValue(row, column) }}
                                     </span>
 
                                     <span *ngIf="column.key === 'addnotes'">
-                                        <div (click)="addNotes(row)">
+                                        <div data-testid="sdc-div-053" (click)="addNotes(row)">
                                             <mat-icon class="edit-icon">edit_note</mat-icon>
                                         </div>
                                     </span>
 
                                     <span *ngIf="column.key === 'menubutton'">
-                                        <div (click)="showParticipantMenu(row, $event)"
+                                        <div data-testid="sdc-div-054" (click)="showParticipantMenu(row, $event)"
                                             [matMenuTriggerFor]="participantMenu">
                                             <mat-icon class="edit-icon">menu</mat-icon>
                                         </div>
@@ -626,7 +626,7 @@
                                         <div class="notes-container">
                                             <div *ngIf="row['generalnotes']?.length > 0">
                                                 <div>
-                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    <span data-testid="sdc-span-055" (click)="viewNotes(row, column.key)" class="note-text"
                                                         matTooltip="{{ row['generalnotes'][row['generalnotes'].length - 1].note }}">
                                                         {{ row['generalnotes'][row['generalnotes'].length - 1].note |
                                                         slice:0:20 }}...
@@ -642,7 +642,7 @@
                                         <div class="notes-container">
                                             <div *ngIf="row['salenotes'] && row['salenotes'].length > 0">
                                                 <div>
-                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    <span data-testid="sdc-span-056" (click)="viewNotes(row, column.key)" class="note-text"
                                                         matTooltip="{{ row['salenotes'] }}">
                                                         {{ row['salenotes'] | slice:0:40 }}...
                                                     </span>
@@ -657,7 +657,7 @@
                                         <div class="notes-container">
                                             <div *ngIf="row['notes'] && row['notes'].length > 0">
                                                 <div>
-                                                    <span (click)="viewNotes(row, column.key)" class="note-text"
+                                                    <span data-testid="sdc-span-057" (click)="viewNotes(row, column.key)" class="note-text"
                                                         matTooltip="{{ row['notes'] }}">
                                                         {{ row['notes'] | slice:0:50 }}...
                                                     </span>
@@ -698,7 +698,7 @@
 
                     <div class="pagination">
                         <!-- First page button -->
-                        <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1"
+                        <button data-testid="sdc-btn-058" class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1"
                             title="First Page">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
@@ -706,25 +706,25 @@
                         </button>
 
                         <!-- Previous button -->
-                        <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+                        <button data-testid="sdc-btn-059" class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
                             Previous
                         </button>
 
                         <!-- Page numbers -->
                         <div class="page-numbers">
-                            <button *ngFor="let page of getPageNumbers()" class="page-number"
+                            <button data-testid="sdc-btn-060" *ngFor="let page of getPageNumbers()" class="page-number"
                                 [class.active]="page === currentPage" (click)="goToPage(page)">
                                 {{ page }}
                             </button>
                         </div>
 
                         <!-- Next button -->
-                        <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                        <button data-testid="sdc-btn-061" class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
                             Next
                         </button>
 
                         <!-- Last page button -->
-                        <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages"
+                        <button data-testid="sdc-btn-062" class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages"
                             title="Last Page">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
@@ -734,7 +734,7 @@
 
                     <div class="items-per-page">
                         <label>Show:</label>
-                        <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+                        <select data-testid="sdc-sel-063" [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
                             <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
                         </select>
                         <span>entries</span>
@@ -758,7 +758,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="preSearch">
+                                <input data-testid="sdc-inp-064" class="search-input" placeholder="Search…" [(ngModel)]="preSearch">
                             </div> -->
                             <span class="panel-badge">{{ preSalesDataSource.data.length }} records</span>
                         </div>
@@ -792,7 +792,7 @@
                                 <!-- Gross Count -->
                                 <ng-container matColumnDef="grossCount">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    <td data-testid="sdc-td-065" mat-cell *matCellDef="let element" class="num nv c-gross"
                                         (click)="onCellClick(element, 'grossCount', true)" style="cursor:pointer;">
                                         {{ element.grossCount }}
                                     </td>
@@ -801,7 +801,7 @@
                                 <!-- Assured Count -->
                                 <ng-container matColumnDef="assuredCount">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    <td data-testid="sdc-td-066" mat-cell *matCellDef="let element" class="num nv c-assured"
                                         (click)="onCellClick(element, 'assuredCount', true)" style="cursor:pointer;">
                                         {{ element.assuredCount }}
                                     </td>
@@ -811,7 +811,7 @@
                                 <ng-container matColumnDef="grossCancelledNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Cancelled
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                    <td data-testid="sdc-td-067" mat-cell *matCellDef="let element" class="num nv c-cancel"
                                         (click)="onCellClick(element, 'grossCancelled', true)" style="cursor:pointer;">
                                         {{ element.grossCancelledNumber }}
                                     </td>
@@ -821,7 +821,7 @@
                                 <ng-container matColumnDef="assuredCancelledNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Cancelled
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                    <td data-testid="sdc-td-068" mat-cell *matCellDef="let element" class="num nv c-cancel"
                                         (click)="onCellClick(element, 'assuredCancelled', true)"
                                         style="cursor:pointer;">
                                         {{ element.assuredCancelledNumber }}
@@ -832,7 +832,7 @@
                                 <ng-container matColumnDef="grossDowngradeNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Downgrade
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                    <td data-testid="sdc-td-069" mat-cell *matCellDef="let element" class="num nv c-down"
                                         (click)="onCellClick(element, 'grossDowngrade', true)" style="cursor:pointer;">
                                         {{ element.grossDowngradeNumber }}
                                     </td>
@@ -842,7 +842,7 @@
                                 <ng-container matColumnDef="assuredDowngradeNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Downgrade
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                    <td data-testid="sdc-td-070" mat-cell *matCellDef="let element" class="num nv c-down"
                                         (click)="onCellClick(element, 'assuredDowngrade', true)"
                                         style="cursor:pointer;">
                                         {{ element.assuredDowngradeNumber }}
@@ -852,7 +852,7 @@
                                 <!-- Actual Gross -->
                                 <ng-container matColumnDef="actualGrossNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Gross</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                    <td data-testid="sdc-td-071" mat-cell *matCellDef="let element" class="num nv c-actual"
                                         (click)="onCellClick(element, 'actualGross', true)" style="cursor:pointer;">
                                         {{ element.actualGrossNumber }}
                                     </td>
@@ -862,7 +862,7 @@
                                 <ng-container matColumnDef="actualAssuredNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Assured
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                    <td data-testid="sdc-td-072" mat-cell *matCellDef="let element" class="num nv c-actual"
                                         (click)="onCellClick(element, 'actualAssured', true)" style="cursor:pointer;">
                                         {{ element.actualAssuredNumber }}
                                     </td>
@@ -878,7 +878,7 @@
                                                     <mat-icon>info</mat-icon>
                                                     Details for {{ element.person }}
                                                 </h4>
-                                                <button class="export-btn" (click)="exportTableData()">
+                                                <button data-testid="sdc-btn-073" class="export-btn" (click)="exportTableData()">
                                                     <span>Export</span>
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                         stroke="currentColor">
@@ -887,7 +887,7 @@
                                                         <line x1="12" y1="15" x2="12" y2="3"></line>
                                                     </svg>
                                                 </button>
-                                                <button mat-icon-button (click)="closeExpandedRow(element, true)"
+                                                <button data-testid="sdc-btn-074" mat-icon-button (click)="closeExpandedRow(element, true)"
                                                     class="close-btn2" title="Close">
                                                     <mat-icon>close</mat-icon>
                                                 </button>
@@ -950,7 +950,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="salSearch">
+                                <input data-testid="sdc-inp-075" class="search-input" placeholder="Search…" [(ngModel)]="salSearch">
                             </div> -->
                             <span class="panel-badge">{{ salesPersonDataSource.data.length }} records</span>
                         </div>
@@ -974,7 +974,7 @@
 
                                 <ng-container matColumnDef="grossCount">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                    <td data-testid="sdc-td-076" mat-cell *matCellDef="let element" class="num nv c-gross"
                                         (click)="onCellClick(element, 'grossCount', false)" style="cursor:pointer;">
                                         {{ element.grossCount }}
                                     </td>
@@ -982,7 +982,7 @@
 
                                 <ng-container matColumnDef="assuredCount">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                    <td data-testid="sdc-td-077" mat-cell *matCellDef="let element" class="num nv c-assured"
                                         (click)="onCellClick(element, 'assuredCount', false)" style="cursor:pointer;">
                                         {{ element.assuredCount }}
                                     </td>
@@ -991,7 +991,7 @@
                                 <ng-container matColumnDef="grossCancelledNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Cancelled
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                    <td data-testid="sdc-td-078" mat-cell *matCellDef="let element" class="num nv c-cancel"
                                         (click)="onCellClick(element, 'grossCancelled', false)" style="cursor:pointer;">
                                         {{ element.grossCancelledNumber }}
                                     </td>
@@ -1000,7 +1000,7 @@
                                 <ng-container matColumnDef="assuredCancelledNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Cancelled
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-cancel"
+                                    <td data-testid="sdc-td-079" mat-cell *matCellDef="let element" class="num nv c-cancel"
                                         (click)="onCellClick(element, 'assuredCancelled', false)"
                                         style="cursor:pointer;">
                                         {{ element.assuredCancelledNumber }}
@@ -1010,7 +1010,7 @@
                                 <ng-container matColumnDef="grossDowngradeNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Downgrade
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                    <td data-testid="sdc-td-080" mat-cell *matCellDef="let element" class="num nv c-down"
                                         (click)="onCellClick(element, 'grossDowngrade', false)" style="cursor:pointer;">
                                         {{ element.grossDowngradeNumber }}
                                     </td>
@@ -1019,7 +1019,7 @@
                                 <ng-container matColumnDef="assuredDowngradeNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Downgrade
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-down"
+                                    <td data-testid="sdc-td-081" mat-cell *matCellDef="let element" class="num nv c-down"
                                         (click)="onCellClick(element, 'assuredDowngrade', false)"
                                         style="cursor:pointer;">
                                         {{ element.assuredDowngradeNumber }}
@@ -1028,7 +1028,7 @@
 
                                 <ng-container matColumnDef="actualGrossNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Gross</th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                    <td data-testid="sdc-td-082" mat-cell *matCellDef="let element" class="num nv c-actual"
                                         (click)="onCellClick(element, 'actualGross', false)" style="cursor:pointer;">
                                         {{ element.actualGrossNumber }}
                                     </td>
@@ -1037,7 +1037,7 @@
                                 <ng-container matColumnDef="actualAssuredNumber">
                                     <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Actual Assured
                                     </th>
-                                    <td mat-cell *matCellDef="let element" class="num nv c-actual"
+                                    <td data-testid="sdc-td-083" mat-cell *matCellDef="let element" class="num nv c-actual"
                                         (click)="onCellClick(element, 'actualAssured', false)" style="cursor:pointer;">
                                         {{ element.actualAssuredNumber }}
                                     </td>
@@ -1052,7 +1052,7 @@
                                                     <mat-icon>info</mat-icon>
                                                     Details for {{ element.person }}
                                                 </h4>
-                                                <button class="export-btn"
+                                                <button data-testid="sdc-btn-084" class="export-btn"
                                                     (click)="exportExpandedData(element.expandedData, element.person, false)">
                                                     <span>Export</span>
                                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -1062,7 +1062,7 @@
                                                         <line x1="12" y1="15" x2="12" y2="3"></line>
                                                     </svg>
                                                 </button>
-                                                <button mat-icon-button (click)="closeExpandedRow(element, false)"
+                                                <button data-testid="sdc-btn-085" mat-icon-button (click)="closeExpandedRow(element, false)"
                                                     class="close-btn2" title="Close">
                                                     <mat-icon>close</mat-icon>
                                                 </button>
@@ -1133,7 +1133,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="nsPreSearch">
+                                <input data-testid="sdc-inp-086" class="search-input" placeholder="Search…" [(ngModel)]="nsPreSearch">
                             </div> -->
                             <span class="panel-badge">{{ newSalesPreSalesDataSource.data.length }} records</span>
                         </div>
@@ -1163,7 +1163,7 @@
 
                             <ng-container matColumnDef="grossCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                <td data-testid="sdc-td-087" mat-cell *matCellDef="let element" class="num nv c-gross"
                                     (click)="onCellClickJourneyType(element, 'grossCount', true, 'new')"
                                     style="cursor:pointer;">
                                     {{ element.grossCount }}
@@ -1172,7 +1172,7 @@
 
                             <ng-container matColumnDef="assuredCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                <td data-testid="sdc-td-088" mat-cell *matCellDef="let element" class="num nv c-assured"
                                     (click)="onCellClickJourneyType(element, 'assuredCount', true, 'new')"
                                     style="cursor:pointer;">
                                     {{ element.assuredCount }}
@@ -1204,7 +1204,7 @@
                                                 <mat-icon>info</mat-icon>
                                                 Details for {{ element.person }}
                                             </h4>
-                                            <button class="export-btn" (click)="exportTableData()">
+                                            <button data-testid="sdc-btn-089" class="export-btn" (click)="exportTableData()">
                                                 <span>Export</span>
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor">
@@ -1213,7 +1213,7 @@
                                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                                 </svg>
                                             </button>
-                                            <button mat-icon-button
+                                            <button data-testid="sdc-btn-090" mat-icon-button
                                                 (click)="closeExpandedRowJourneyType(element, true, 'new')"
                                                 class="close-btn2" title="Close">
                                                 <mat-icon>close</mat-icon>
@@ -1264,7 +1264,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="nsSalSearch">
+                                <input data-testid="sdc-inp-091" class="search-input" placeholder="Search…" [(ngModel)]="nsSalSearch">
                             </div> -->
                             <span class="panel-badge">{{ newSalesSalesPersonDataSource.data.length }} records</span>
                         </div>
@@ -1294,7 +1294,7 @@
 
                             <ng-container matColumnDef="grossCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                <td data-testid="sdc-td-092" mat-cell *matCellDef="let element" class="num nv c-gross"
                                     (click)="onCellClickJourneyType(element, 'grossCount', false, 'new')"
                                     style="cursor:pointer;">
                                     {{ element.grossCount }}
@@ -1303,7 +1303,7 @@
 
                             <ng-container matColumnDef="assuredCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                <td data-testid="sdc-td-093" mat-cell *matCellDef="let element" class="num nv c-assured"
                                     (click)="onCellClickJourneyType(element, 'assuredCount', false, 'new')"
                                     style="cursor:pointer;">
                                     {{ element.assuredCount }}
@@ -1335,7 +1335,7 @@
                                                 <mat-icon>info</mat-icon>
                                                 Details for {{ element.person }}
                                             </h4>
-                                            <button class="export-btn" (click)="exportTableData()">
+                                            <button data-testid="sdc-btn-094" class="export-btn" (click)="exportTableData()">
                                                 <span>Export</span>
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor">
@@ -1344,7 +1344,7 @@
                                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                                 </svg>
                                             </button>
-                                            <button mat-icon-button
+                                            <button data-testid="sdc-btn-095" mat-icon-button
                                                 (click)="closeExpandedRowJourneyType(element, false, 'new')"
                                                 class="close-btn2" title="Close">
                                                 <mat-icon>close</mat-icon>
@@ -1405,7 +1405,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="upPreSearch">
+                                <input data-testid="sdc-inp-096" class="search-input" placeholder="Search…" [(ngModel)]="upPreSearch">
                             </div> -->
                             <span class="panel-badge">{{ upgradePreSalesDataSource.data.length }} records</span>
                         </div>
@@ -1435,7 +1435,7 @@
 
                             <ng-container matColumnDef="grossCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                <td data-testid="sdc-td-097" mat-cell *matCellDef="let element" class="num nv c-gross"
                                     (click)="onCellClickJourneyType(element, 'grossCount', true, 'upgrade')"
                                     style="cursor:pointer;">
                                     {{ element.grossCount }}
@@ -1444,7 +1444,7 @@
 
                             <ng-container matColumnDef="assuredCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                <td data-testid="sdc-td-098" mat-cell *matCellDef="let element" class="num nv c-assured"
                                     (click)="onCellClickJourneyType(element, 'assuredCount', true, 'upgrade')"
                                     style="cursor:pointer;">
                                     {{ element.assuredCount }}
@@ -1473,7 +1473,7 @@
                                         <div class="detail-header">
                                             <h4 class="detail-title"><mat-icon>info</mat-icon>Details for {{
                                                 element.person }}</h4>
-                                            <button class="export-btn" (click)="exportTableData()">
+                                            <button data-testid="sdc-btn-099" class="export-btn" (click)="exportTableData()">
                                                 <span>Export</span>
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor">
@@ -1482,7 +1482,7 @@
                                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                                 </svg>
                                             </button>
-                                            <button mat-icon-button
+                                            <button data-testid="sdc-btn-100" mat-icon-button
                                                 (click)="closeExpandedRowJourneyType(element, true, 'upgrade')"
                                                 class="close-btn2" title="Close">
                                                 <mat-icon>close</mat-icon>
@@ -1533,7 +1533,7 @@
                             <!-- <div class="search-box">
                                 <mat-icon
                                     style="font-size:14px;width:14px;height:14px;color:var(--ink3)">search</mat-icon>
-                                <input class="search-input" placeholder="Search…" [(ngModel)]="upSalSearch">
+                                <input data-testid="sdc-inp-101" class="search-input" placeholder="Search…" [(ngModel)]="upSalSearch">
                             </div> -->
                             <span class="panel-badge">{{ upgradeSalesPersonDataSource.data.length }} records</span>
                         </div>
@@ -1563,7 +1563,7 @@
 
                             <ng-container matColumnDef="grossCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Gross Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-gross"
+                                <td data-testid="sdc-td-102" mat-cell *matCellDef="let element" class="num nv c-gross"
                                     (click)="onCellClickJourneyType(element, 'grossCount', false, 'upgrade')"
                                     style="cursor:pointer;">
                                     {{ element.grossCount }}
@@ -1572,7 +1572,7 @@
 
                             <ng-container matColumnDef="assuredCount">
                                 <th mat-header-cell *matHeaderCellDef mat-sort-header class="num">Assured Count</th>
-                                <td mat-cell *matCellDef="let element" class="num nv c-assured"
+                                <td data-testid="sdc-td-103" mat-cell *matCellDef="let element" class="num nv c-assured"
                                     (click)="onCellClickJourneyType(element, 'assuredCount', false, 'upgrade')"
                                     style="cursor:pointer;">
                                     {{ element.assuredCount }}
@@ -1601,7 +1601,7 @@
                                         <div class="detail-header">
                                             <h4 class="detail-title"><mat-icon>info</mat-icon>Details for {{
                                                 element.person }}</h4>
-                                            <button class="export-btn" (click)="exportTableData()">
+                                            <button data-testid="sdc-btn-104" class="export-btn" (click)="exportTableData()">
                                                 <span>Export</span>
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor">
@@ -1610,7 +1610,7 @@
                                                     <line x1="12" y1="15" x2="12" y2="3"></line>
                                                 </svg>
                                             </button>
-                                            <button mat-icon-button
+                                            <button data-testid="sdc-btn-105" mat-icon-button
                                                 (click)="closeExpandedRowJourneyType(element, false, 'upgrade')"
                                                 class="close-btn2" title="Close">
                                                 <mat-icon>close</mat-icon>
@@ -1716,15 +1716,15 @@
                     </div>
 
                     <div class="sp-dots">
-                        <span class="sp-dot" *ngFor="let p of this.topPreSalesPerson; let i = index"
+                        <span data-testid="sdc-span-106" class="sp-dot" *ngFor="let p of this.topPreSalesPerson; let i = index"
                             [class.active]="slider['pre'].currentPage === i" (click)="goTo('pre', i)">
                         </span>
                     </div>
 
                     <div class="sp-nav">
-                        <button class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage - 1)"
+                        <button data-testid="sdc-btn-107" class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage - 1)"
                             [disabled]="slider['pre'].currentPage === 0">&#8592;</button>
-                        <button class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage + 1)"
+                        <button data-testid="sdc-btn-108" class="sp-arrow" (click)="goTo('pre', slider['pre'].currentPage + 1)"
                             [disabled]="slider['pre'].currentPage >= this.topPreSalesPerson.length - 1">&#8594;</button>
                     </div>
                 </mat-card>
@@ -1788,15 +1788,15 @@
                     </div>
 
                     <div class="sp-dots">
-                        <span class="sp-dot" *ngFor="let p of topSalesPerson; let i = index"
+                        <span data-testid="sdc-span-109" class="sp-dot" *ngFor="let p of topSalesPerson; let i = index"
                             [class.active]="slider['sal'].currentPage === i" (click)="goTo('sal', i)">
                         </span>
                     </div>
 
                     <div class="sp-nav">
-                        <button class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage - 1)"
+                        <button data-testid="sdc-btn-110" class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage - 1)"
                             [disabled]="slider['sal'].currentPage === 0">&#8592;</button>
-                        <button class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage + 1)"
+                        <button data-testid="sdc-btn-111" class="sp-arrow" (click)="goTo('sal', slider['sal'].currentPage + 1)"
                             [disabled]="slider['sal'].currentPage >= topSalesPerson.length - 1">&#8594;</button>
                     </div>
                 </mat-card>
@@ -1858,15 +1858,15 @@
                     </div>
 
                     <div class="sp-dots">
-                        <span class="sp-dot" *ngFor="let p of topSalesPersonPair; let i = index"
+                        <span data-testid="sdc-span-112" class="sp-dot" *ngFor="let p of topSalesPersonPair; let i = index"
                             [class.active]="slider['presalepair'].currentPage === i" (click)="goTo('presalepair', i)">
                         </span>
                     </div>
 
                     <div class="sp-nav">
-                        <button class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage - 1)"
+                        <button data-testid="sdc-btn-113" class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage - 1)"
                             [disabled]="slider['presalepair'].currentPage === 0">&#8592;</button>
-                        <button class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage + 1)"
+                        <button data-testid="sdc-btn-114" class="sp-arrow" (click)="goTo('presalepair', slider['presalepair'].currentPage + 1)"
                             [disabled]="slider['presalepair'].currentPage >= topSalesPersonPair.length - 1">&#8594;</button>
                     </div>
                 </mat-card>
@@ -2042,9 +2042,9 @@
                             <div class="panel-sub">% of gross that became assured</div>
                         </div>
                         <div class="seg-btns">
-                            <button class="seg-btn" [class.on]="assuredChartType === 'pre'"
+                            <button data-testid="sdc-btn-115" class="seg-btn" [class.on]="assuredChartType === 'pre'"
                                 (click)="switchAssuredChart('pre')">Pre-Sales</button>
-                            <button class="seg-btn" [class.on]="assuredChartType === 'sal'"
+                            <button data-testid="sdc-btn-116" class="seg-btn" [class.on]="assuredChartType === 'sal'"
                                 (click)="switchAssuredChart('sal')">Sales</button>
                         </div>
                     </div>
@@ -2074,14 +2074,14 @@
                             Comparison</h3>
 
                         <div style="display: flex; gap: 8px; background: #f5f5f7; padding: 4px; border-radius: 8px;">
-                            <button [class.active]="selectedPersonType === 'presales'"
+                            <button data-testid="sdc-btn-117" [class.active]="selectedPersonType === 'presales'"
                                 (click)="togglePersonType('presales')"
                                 style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
                                 [style.background]="selectedPersonType === 'presales' ? '#007AFF' : 'transparent'"
                                 [style.color]="selectedPersonType === 'presales' ? 'white' : '#86868b'">
                                 Pre-Sales Person
                             </button>
-                            <button [class.active]="selectedPersonType === 'sales'" (click)="togglePersonType('sales')"
+                            <button data-testid="sdc-btn-118" [class.active]="selectedPersonType === 'sales'" (click)="togglePersonType('sales')"
                                 style="padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s;"
                                 [style.background]="selectedPersonType === 'sales' ? '#007AFF' : 'transparent'"
                                 [style.color]="selectedPersonType === 'sales' ? 'white' : '#86868b'">
@@ -2110,9 +2110,9 @@
                         </div>
                         <!-- <span class="panel-badge">132 total</span> -->
                         <div class="seg-btns">
-                            <button class="seg-btn" [class.on]="cancellationChartType === 'pre'"
+                            <button data-testid="sdc-btn-119" class="seg-btn" [class.on]="cancellationChartType === 'pre'"
                                 (click)="switchCancellationChart('pre')">Pre-Sales</button>
-                            <button class="seg-btn" [class.on]="cancellationChartType === 'sal'"
+                            <button data-testid="sdc-btn-120" class="seg-btn" [class.on]="cancellationChartType === 'sal'"
                                 (click)="switchCancellationChart('sal')">Sales</button>
                         </div>
                     </div>
@@ -2162,9 +2162,9 @@
                             <div class="panel-sub">Stacked breakdown per rep</div>
                         </div>
                         <div class="seg-btns">
-                            <button class="seg-btn" [class.on]="stackChartType === 'pre'"
+                            <button data-testid="sdc-btn-121" class="seg-btn" [class.on]="stackChartType === 'pre'"
                                 (click)="switchStackChart('pre')">Pre-Sales</button>
-                            <button class="seg-btn" [class.on]="stackChartType === 'sal'"
+                            <button data-testid="sdc-btn-122" class="seg-btn" [class.on]="stackChartType === 'sal'"
                                 (click)="switchStackChart('sal')">Sales</button>
                         </div>
                     </div>
@@ -2193,11 +2193,11 @@
                 <div style="display:flex;gap:6px;align-items:center">
                     <span style="font-size:11px;color:var(--ink3)">Sort by:</span>
                     <div class="seg-btns">
-                        <button class="seg-btn" [class.on]="pairSortBy === ''" (click)="switchPairSortBy()">Win
+                        <button data-testid="sdc-btn-123" class="seg-btn" [class.on]="pairSortBy === ''" (click)="switchPairSortBy()">Win
                             Rate</button>
-                        <button class="seg-btn" [class.on]="pairSortBy === 'new'"
+                        <button data-testid="sdc-btn-124" class="seg-btn" [class.on]="pairSortBy === 'new'"
                             (click)="switchPairSortBy('new')">New</button>
-                        <button class="seg-btn" [class.on]="pairSortBy === 'upgrades'"
+                        <button data-testid="sdc-btn-125" class="seg-btn" [class.on]="pairSortBy === 'upgrades'"
                             (click)="switchPairSortBy('upgrades')">Upgrades</button>
                     </div>
                 </div>
@@ -2236,14 +2236,14 @@
 
 
                 <div class="sp-nav">
-                    <button class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage - 1)"
+                    <button data-testid="sdc-btn-126" class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage - 1)"
                         [disabled]="slider['pairs'].currentPage === 0">&#8592;</button>
                     <div class="sp-dots">
-                        <span class="sp-dot" *ngFor="let chunk of getTopPairPerformance(); let i = index"
+                        <span data-testid="sdc-span-127" class="sp-dot" *ngFor="let chunk of getTopPairPerformance(); let i = index"
                             [class.active]="slider['pairs'].currentPage === i" (click)="goTo('pairs', i)">
                         </span>
                     </div>
-                    <button class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage + 1)"
+                    <button data-testid="sdc-btn-128" class="sp-arrow" (click)="goTo('pairs', slider['pairs'].currentPage + 1)"
                         [disabled]="slider['pairs'].currentPage >= getTopPairPerformance().length - 1">&#8594;</button>
                 </div>
 
@@ -2256,20 +2256,20 @@
             <div class="sec-head">
                 <div class="range-buttons">
                     <div class="sec-title"><span class="ic">📅</span>Monthly Trends</div>
-                    <button class="range-btn" [class.active]="chosenDuration === 3" (click)="setMonthlyTrendsRange(3)">Last 3 Months</button>
-                    <button class="range-btn" [class.active]="chosenDuration === 6" (click)="setMonthlyTrendsRange(6)">Last 6 Months</button>
-                    <button class="range-btn" [class.active]="chosenDuration === 12" (click)="setMonthlyTrendsRange(12)">Last 12 Months</button>
+                    <button data-testid="sdc-btn-129" class="range-btn" [class.active]="chosenDuration === 3" (click)="setMonthlyTrendsRange(3)">Last 3 Months</button>
+                    <button data-testid="sdc-btn-130" class="range-btn" [class.active]="chosenDuration === 6" (click)="setMonthlyTrendsRange(6)">Last 6 Months</button>
+                    <button data-testid="sdc-btn-131" class="range-btn" [class.active]="chosenDuration === 12" (click)="setMonthlyTrendsRange(12)">Last 12 Months</button>
                     <div class="seg-btns">
-                        <button class="seg-btn" [class.on]="monthlyTrendsType === 'split'" (click)="setMonthlyTrendsType('split')">Split</button>
-                        <button class="seg-btn" [class.on]="monthlyTrendsType === 'combine'" (click)="setMonthlyTrendsType('combine')">Combine</button>
+                        <button data-testid="sdc-btn-132" class="seg-btn" [class.on]="monthlyTrendsType === 'split'" (click)="setMonthlyTrendsType('split')">Split</button>
+                        <button data-testid="sdc-btn-133" class="seg-btn" [class.on]="monthlyTrendsType === 'combine'" (click)="setMonthlyTrendsType('combine')">Combine</button>
                     </div>
                 </div>
                 <div class="monthly-trends-actions">
                     <div class="label">
                         <p>Select Month</p>
-                        <div class="month-picker" (click)="$event.stopPropagation()">
+                        <div data-testid="sdc-div-134" class="month-picker" (click)="$event.stopPropagation()">
 
-                            <div class="trigger" [class.open]="isOpen" [class.has-value]="selectedMonth"
+                            <div data-testid="sdc-div-135" class="trigger" [class.open]="isOpen" [class.has-value]="selectedMonth"
                                 (click)="toggle($event)">
                                 <span>{{ label }}</span>
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -2280,13 +2280,13 @@
 
                             <div class="dropdown" [class.open]="isOpen">
                                 <div class="year-nav">
-                                    <button class="nav-btn" (click)="changeYear(-1)">&#8592;</button>
+                                    <button data-testid="sdc-btn-136" class="nav-btn" (click)="changeYear(-1)">&#8592;</button>
                                     <span class="year-label">{{ currentYear }}</span>
-                                    <button class="nav-btn" (click)="changeYear(1)">&#8594;</button>
+                                    <button data-testid="sdc-btn-137" class="nav-btn" (click)="changeYear(1)">&#8594;</button>
                                 </div>
 
                                 <div class="months-grid">
-                                    <button *ngFor="let month of months; let i = index" class="month-btn"
+                                    <button data-testid="sdc-btn-138" *ngFor="let month of months; let i = index" class="month-btn"
                                         [class.selected]="selectedMonth?.month === i && selectedMonth?.year === currentYear"
                                         [class.today]="i === now.getMonth() && currentYear === now.getFullYear()"
                                         (click)="selectMonth(i)">
@@ -2300,7 +2300,7 @@
                     <div class="label">
                         <p>Select Month Duration</p>
                         <div class="duration-wrapper">
-                            <select (change)="onDurationChange(+$any($event.target).value)">
+                            <select data-testid="sdc-sel-139" (change)="onDurationChange(+$any($event.target).value)">
                                 <option value="" disabled [selected]="!chosenDuration">Select duration</option>
                                 <option *ngFor="let item of monthOptions" [value]="item"
                                     [selected]="chosenDuration === item">
@@ -2310,7 +2310,7 @@
                         </div>
                         <mat-hint>Click to select the Duration</mat-hint>
                     </div>
-                    <button mat-raised-button color="primary" class="fetch-btn" (click)="fetchMonthTrendsData()"> Fetch
+                    <button data-testid="sdc-btn-140" mat-raised-button color="primary" class="fetch-btn" (click)="fetchMonthTrendsData()"> Fetch
                         Data </button>
                 </div>
             </div>
@@ -2323,9 +2323,9 @@
                                     <div class="panel-sub">{{selectedMonthyTrends}}</div>
                                 </div>
                                 <div class="seg-btns">
-                                    <button class="seg-btn" [class.on]="monthlySaleType === ''"
+                                    <button data-testid="sdc-btn-141" class="seg-btn" [class.on]="monthlySaleType === ''"
                                         (click)="switchMonthlySaleType('')">All</button>
-                                    <button class="seg-btn" [class.on]="monthlySaleType === 'actual'"
+                                    <button data-testid="sdc-btn-142" class="seg-btn" [class.on]="monthlySaleType === 'actual'"
                                         (click)="switchMonthlySaleType('actual')">Actual</button>
                                 </div>
                             </div>
@@ -2349,9 +2349,9 @@
                                     <div class="panel-sub">Churn trend over time</div>
                                 </div>
                                 <div class="seg-btns">
-                                    <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
+                                    <button data-testid="sdc-btn-143" class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
                                         (click)="switchMonthlyCancelledSaleType('gross')">Gross</button>
-                                    <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
+                                    <button data-testid="sdc-btn-144" class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
                                         (click)="switchMonthlyCancelledSaleType('assured')">Assured</button>
                                 </div>
                             </div>
@@ -2380,18 +2380,18 @@
                                     <div>
                                         <p class="panel-action-label">Gross VS Assured</p>
                                         <div class="seg-btns">
-                                        <button class="seg-btn" [class.on]="monthlySaleType === ''"
+                                        <button data-testid="sdc-btn-145" class="seg-btn" [class.on]="monthlySaleType === ''"
                                             (click)="switchMonthlySaleType('')">All</button>
-                                        <button class="seg-btn" [class.on]="monthlySaleType === 'actual'"
+                                        <button data-testid="sdc-btn-146" class="seg-btn" [class.on]="monthlySaleType === 'actual'"
                                             (click)="switchMonthlySaleType('actual')">Actual</button>
                                     </div>
                                     </div>
                                     <div>
                                         <p class="panel-action-label">Cancellation</p>
                                         <div class="seg-btns">
-                                        <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
+                                        <button data-testid="sdc-btn-147" class="seg-btn" [class.on]="monthlyCancelledSaleType === 'gross'"
                                             (click)="switchMonthlyCancelledSaleType('gross')">Gross</button>
-                                        <button class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
+                                        <button data-testid="sdc-btn-148" class="seg-btn" [class.on]="monthlyCancelledSaleType === 'assured'"
                                             (click)="switchMonthlyCancelledSaleType('assured')">Assured</button>
                                     </div>
                                     </div>
@@ -2424,4 +2424,4 @@
     </div>
 
     <!-- Scroll to Top -->
-    <!-- <button class="scroll-top" [class.visible]="showScrollTop" (click)="scrollToTop()">↑</button> -->
+    <!-- <button data-testid="sdc-btn-149" class="scroll-top" [class.visible]="showScrollTop" (click)="scrollToTop()">↑</button> -->

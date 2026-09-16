@@ -8,21 +8,21 @@
 
   <!-- KPI DASHBOARD -->
   <div class="kpi-grid" *ngIf="reportLoaded">
-    <div class="kpi"
+    <div data-testid="qeh-activekpifilter-null-applyfilters" class="kpi"
          (click)="activeKpiFilter=null; applyFilters()"
          [class.active]="activeKpiFilter===null">
       <div class="kpi-value">{{ dashboard.total }}</div>
       <div class="kpi-label">Total Tokens</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick" class="kpi"
         (click)="onKpiClick('active')"
         [class.active]="activeKpiFilter==='active'">
       <div class="kpi-value">{{ dashboard.active }}</div>
       <div class="kpi-label">Active Tokens</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-2" class="kpi"
         (click)="onKpiClick('inactive')"
         [class.active]="activeKpiFilter==='inactive'">
       <div class="kpi-value">{{ dashboard.inactive }}</div>
@@ -30,68 +30,68 @@
     </div>
 
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-3" class="kpi"
          (click)="onKpiClick('completed')"
          [class.active]="activeKpiFilter==='completed'">
       <div class="kpi-value">{{ dashboard.completed }}</div>
       <div class="kpi-label">Completed</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-4" class="kpi"
          (click)="onKpiClick('initiated')"
          [class.active]="activeKpiFilter==='initiated'">
       <div class="kpi-value">{{ dashboard.initiated }}</div>
       <div class="kpi-label">Initiated</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-5" class="kpi"
          (click)="onKpiClick('ongoing')"
          [class.active]="activeKpiFilter==='ongoing'">
       <div class="kpi-value">{{ dashboard.ongoing }}</div>
       <div class="kpi-label">Ongoing</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-6" class="kpi"
          (click)="onKpiClick('cancelled')"
          [class.active]="activeKpiFilter==='cancelled'">
       <div class="kpi-value">{{ dashboard.cancelled }}</div>
       <div class="kpi-label">Cancelled</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-7" class="kpi"
          (click)="onKpiClick('shifted')"
          [class.active]="activeKpiFilter==='shifted'">
       <div class="kpi-value">{{ dashboard.shifted }}</div>
       <div class="kpi-label">shifted</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-8" class="kpi"
          (click)="onKpiClick('valid')"
          [class.active]="activeKpiFilter==='valid'">
       <div class="kpi-value">{{ dashboard.total - dashboard.failed }}</div>
       <div class="kpi-label">Valid</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-9" class="kpi"
         (click)="onKpiClick('invalid_reason')"
         [class.active]="activeKpiFilter==='invalid_reason'">
       <div class="kpi-value">{{ invalidByReasonCount }}</div>
       <div class="kpi-label">Invalid by Flow</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-10" class="kpi"
         (click)="onKpiClick('invalid_product')"
         [class.active]="activeKpiFilter==='invalid_product'">
       <div class="kpi-value">{{ invalidByProductCount }}</div>
       <div class="kpi-label">Participantsproduct Missing</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-11" class="kpi"
         (click)="onKpiClick('invalid_event_status')"
         [class.active]="activeKpiFilter==='invalid_event_status'">
       <div class="kpi-value">{{ invalidByEventStatusCount }}</div>
       <div class="kpi-label">Event Participation Status Missing
-        <button
+        <button data-testid="qeh-fixallinvalideventstatus"
           class="btn-fix-all"
           *ngIf="activeKpiFilter === 'invalid_event_status'"
           (click)="fixAllInvalidEventStatus()"
@@ -101,47 +101,47 @@
       </div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onkpiclick-12" class="kpi"
         (click)="onKpiClick('initiated_not_in_queue')"
         [class.active]="activeView === 'initiated_not_in_queue'">
       <div class="kpi-value">{{ dashboard.initiatedNotInQueue }}</div>
       <div class="kpi-label">Initiated — Not In Queue</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onatccountclick" class="kpi"
         (click)="onAtcCountClick('given')"
         [class.active]="activeAtcListType==='given'">
       <div class="kpi-value">{{ atcGivenCount }}</div>
       <div class="kpi-label">ATC Given</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onatccountclick-2" class="kpi"
         (click)="onAtcCountClick('partially_unvalidated')"
         [class.active]="activeAtcListType==='partially_unvalidated'">
       <div class="kpi-value">{{ atcPartiallyUnvalidatedCount }}</div>
       <div class="kpi-label">ATC Partially Unvalidated</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onatccountclick-3" class="kpi"
         (click)="onAtcCountClick('fully_unvalidated')"
         [class.active]="activeAtcListType==='fully_unvalidated'">
       <div class="kpi-value">{{ atcFullyUnvalidatedCount }}</div>
       <div class="kpi-label">ATC Fully Unvalidated</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onatccountclick-4" class="kpi"
         (click)="onAtcCountClick('not_given')"
         [class.active]="activeAtcListType==='not_given'">
       <div class="kpi-value">{{ atcNotGivenCount }}</div>
       <div class="kpi-label">ATC Not Given</div>
     </div>
 
-    <div class="kpi"
+    <div data-testid="qeh-onatccountclick-5" class="kpi"
         (click)="onAtcCountClick('no_queue')"
         [class.active]="activeAtcListType==='no_queue'">
       <div class="kpi-value">{{ atcNoQueueCount }}</div>
       <div class="kpi-label">ATC — No Queue ID
-        <button
+        <button data-testid="qeh-event-stoppropagation"
           class="btn-fix-all"
           *ngIf="activeAtcListType === 'no_queue'"
           (click)="$event.stopPropagation(); fixSelectedNoQueueAtcs()"
@@ -164,14 +164,14 @@
       </p>
 
       <label>Product status to update:</label>
-      <select [(ngModel)]="attendedStatusSelection">
+      <select data-testid="qeh-select" [(ngModel)]="attendedStatusSelection">
         <option value="completed">Completed</option>
         <option value="shifted">Shifted</option>
       </select>
 
       <div class="modal-actions">
-        <button class="btn-cancel" (click)="attendedStatusResolver && attendedStatusResolver(null)">Cancel</button>
-        <button class="btn-confirm" (click)="attendedStatusResolver && attendedStatusResolver(attendedStatusSelection)">Confirm</button>
+        <button data-testid="qeh-attendedstatusresolver-attendedsta" class="btn-cancel" (click)="attendedStatusResolver && attendedStatusResolver(null)">Cancel</button>
+        <button data-testid="qeh-attendedstatusresolver-attendedsta-2" class="btn-confirm" (click)="attendedStatusResolver && attendedStatusResolver(attendedStatusSelection)">Confirm</button>
       </div>
     </div>
   </div>
@@ -181,7 +181,7 @@
     <div class="left-group">
       <!-- Queue Dropdown -->
       <div class="queue-select-container">
-        <input
+        <input data-testid="qeh-select-queue"
           type="text"
           class="queue-input"
           placeholder="Select Queue"
@@ -192,7 +192,7 @@
         />
 
         <div class="queue-dropdown" *ngIf="showQueueDropdown">
-          <div
+          <div data-testid="qeh-selectqueue"
             class="queue-option"
             *ngFor="let q of filteredQueues; trackBy: trackByQueueId"
             (click)="selectQueue(q)">
@@ -206,7 +206,7 @@
       </div>
 
       <!-- Search -->
-      <input
+      <input data-testid="qeh-search"
         type="text"
         class="search-input"
         placeholder="Search..."
@@ -216,13 +216,13 @@
     </div>
 
     <!-- Right side button -->
-    <button class="btn-primary" (click)="exportCSV()" [disabled]="showAtcNameList">
+    <button data-testid="qeh-exportcsv" class="btn-primary" (click)="exportCSV()" [disabled]="showAtcNameList">
       Export CSV
     </button>
 
   </div>
 
-  <button
+  <button data-testid="qeh-bulkmarkunattended"
     *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
     (click)="bulkMarkUnattended()"
     [disabled]="selectedCount === 0"
@@ -231,7 +231,7 @@
     Mark As Unattended ({{ selectedCount }})
   </button>
 
-  <button
+  <button data-testid="qeh-bulkmarkattended"
     *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
     (click)="bulkMarkAttended()"
     [disabled]="selectedCount === 0"
@@ -244,7 +244,7 @@
     <table>
       <thead>
         <tr>
-          <th><input type="checkbox" (change)="toggleSelectAll($event)" /></th>
+          <th><input data-testid="qeh-toggleselectall" type="checkbox" (change)="toggleSelectAll($event)" /></th>
           <th>Participant Name</th>
           <th>Token Number</th>
           <th>Token Status</th>
@@ -252,10 +252,10 @@
           <th class="filter-header">
             <span>Current Stage</span>
             <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
+              <span data-testid="qeh-togglefilter" class="filter-icon" (click)="toggleFilter('stage')">▼</span>
               <div class="filter-dropdown" *ngIf="activeFilter === 'stage'">
-                <div class="filter-option" (click)="selectedStage=''; applyFilters()">All</div>
-                <div class="filter-option" *ngFor="let stage of stageOptions"
+                <div data-testid="qeh-selectedstage-applyfilters" class="filter-option" (click)="selectedStage=''; applyFilters()">All</div>
+                <div data-testid="qeh-selectedstage-stage-value-applyfil" class="filter-option" *ngFor="let stage of stageOptions"
                   (click)="selectedStage=stage.value; applyFilters()">
                   {{ stage.value }} ({{ stage.count }})
                 </div>
@@ -265,10 +265,10 @@
           <th class="filter-header">
             <span>Product Name</span>
             <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleFilter('status')">▼</span>
+              <span data-testid="qeh-togglefilter-2" class="filter-icon" (click)="toggleFilter('status')">▼</span>
               <div class="filter-dropdown" *ngIf="activeFilter === 'status'">
-                <div class="filter-option" (click)="selectedProduct=''; applyFilters()">All</div>
-                <div class="filter-option" *ngFor="let product of productOptions"
+                <div data-testid="qeh-selectedproduct-applyfilters" class="filter-option" (click)="selectedProduct=''; applyFilters()">All</div>
+                <div data-testid="qeh-selectedproduct-product-value-appl" class="filter-option" *ngFor="let product of productOptions"
                   (click)="selectedProduct=product.value; applyFilters()">
                   {{ product.value }} ({{ product.count }})
                 </div>
@@ -278,10 +278,10 @@
           <th class="filter-header">
             <span>Mode</span>
             <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
+              <span data-testid="qeh-togglefilter-3" class="filter-icon" (click)="toggleFilter('mode')">▼</span>
               <div class="filter-dropdown" *ngIf="activeFilter === 'mode'">
-                <div class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">All</div>
-                <div class="filter-option" *ngFor="let mode of integrationModeOptions"
+                <div data-testid="qeh-selectedintegrationmode-applyfilte" class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">All</div>
+                <div data-testid="qeh-selectedintegrationmode-mode-value" class="filter-option" *ngFor="let mode of integrationModeOptions"
                   (click)="selectedIntegrationMode=mode.value; applyFilters()">
                   {{ mode.value }} ({{ mode.count }})
                 </div>
@@ -295,7 +295,7 @@
       </thead>
       <tbody>
         <tr *ngFor="let r of paginatedRecords">
-          <td><input type="checkbox" [(ngModel)]="r.selected" /></td>
+          <td><input data-testid="qeh-input" type="checkbox" [(ngModel)]="r.selected" /></td>
           <td>{{ r.participantName }}</td>
           <td>{{ r.TokenID }}</td>
           <td>{{ r.tokenStatus }}</td>
@@ -323,7 +323,7 @@
       <table>
         <thead>
           <tr>
-            <th><input type="checkbox" (change)="toggleSelectAllInitiated($event)" /></th>
+            <th><input data-testid="qeh-toggleselectallinitiated" type="checkbox" (change)="toggleSelectAllInitiated($event)" /></th>
             <th>Participant Name</th>
             <th>Product Name</th>
             <th>Product Status</th>
@@ -333,7 +333,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let r of paginatedRecords">
-            <td><input type="checkbox" [(ngModel)]="r.selected" /></td>
+            <td><input data-testid="qeh-input-2" type="checkbox" [(ngModel)]="r.selected" /></td>
             <td>{{ r.participantName }}</td>
             <td>{{ r.productName }}</td>
             <td>{{ r.productStatus }}</td>
@@ -362,14 +362,14 @@
           : activeAtcListType === 'fully_unvalidated' ? 'ATC Fully Unvalidated'
           : 'ATC — No Queue ID' }}
       </h3>
-      <button class="btn-primary" (click)="exportAtcListCSV()">
+      <button data-testid="qeh-exportatclistcsv" class="btn-primary" (click)="exportAtcListCSV()">
         Export CSV
       </button>
     </div>
 
     <div *ngIf="activeAtcListType === 'no_queue'" style="margin-bottom:10px;">
       <label>
-        <input type="checkbox" (change)="toggleSelectAllNoQueueAtcs($event)" />
+        <input data-testid="qeh-toggleselectallnoqueueatcs" type="checkbox" (change)="toggleSelectAllNoQueueAtcs($event)" />
         Select All
       </label>
     </div>
@@ -380,10 +380,10 @@
           <th class="filter-header">
             <span>Product Name</span>
             <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleAtcFilter('product')">▼</span>
+              <span data-testid="qeh-toggleatcfilter" class="filter-icon" (click)="toggleAtcFilter('product')">▼</span>
               <div class="filter-dropdown" *ngIf="atcActiveFilter === 'product'">
-                <div class="filter-option" (click)="selectAtcProductFilter('')">All</div>
-                <div class="filter-option" *ngFor="let product of atcProductOptions"
+                <div data-testid="qeh-selectatcproductfilter" class="filter-option" (click)="selectAtcProductFilter('')">All</div>
+                <div data-testid="qeh-selectatcproductfilter-2" class="filter-option" *ngFor="let product of atcProductOptions"
                   (click)="selectAtcProductFilter(product.value)">
                   {{ product.value }} ({{ product.count }})
                 </div>
@@ -394,10 +394,10 @@
           <th class="filter-header">
             <span>Current Stage</span>
             <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleAtcFilter('stage')">▼</span>
+              <span data-testid="qeh-toggleatcfilter-2" class="filter-icon" (click)="toggleAtcFilter('stage')">▼</span>
               <div class="filter-dropdown" *ngIf="atcActiveFilter === 'stage'">
-                <div class="filter-option" (click)="selectAtcStageFilter('')">All</div>
-                <div class="filter-option" *ngFor="let stage of atcStageOptions"
+                <div data-testid="qeh-selectatcstagefilter" class="filter-option" (click)="selectAtcStageFilter('')">All</div>
+                <div data-testid="qeh-selectatcstagefilter-2" class="filter-option" *ngFor="let stage of atcStageOptions"
                   (click)="selectAtcStageFilter(stage.value)">
                   {{ stage.value }} ({{ stage.count }})
                 </div>
@@ -421,7 +421,7 @@
                   <tr *ngFor="let a of profileAtcDetailsMap.get(r.profileid)"
                       [style.background]="a.noQueue ? '#fdecea' : 'transparent'">
                     <td style="padding:6px 10px; width:30px;" *ngIf="activeAtcListType === 'no_queue'">
-                      <input type="checkbox" *ngIf="a.noQueue" [(ngModel)]="a.selected" />
+                      <input data-testid="qeh-input-3" type="checkbox" *ngIf="a.noQueue" [(ngModel)]="a.selected" />
                     </td>
                     <td style="padding:6px 10px;">
                       {{ a.prescriptionDate | date:'medium' }} by {{ a.authorNames }}
@@ -440,13 +440,13 @@
     </table>
 
     <div class="pagination">
-      <button (click)="prevAtcListPage()" [disabled]="atcListCurrentPage === 1">Prev</button>
+      <button data-testid="qeh-prevatclistpage" (click)="prevAtcListPage()" [disabled]="atcListCurrentPage === 1">Prev</button>
       Page {{ atcListCurrentPage }} / {{ atcListTotalPages }}
-      <button (click)="nextAtcListPage()" [disabled]="atcListCurrentPage === atcListTotalPages">Next</button>
+      <button data-testid="qeh-nextatclistpage" (click)="nextAtcListPage()" [disabled]="atcListCurrentPage === atcListTotalPages">Next</button>
 
       <label style="margin-left:16px;">
         Records per page:
-        <select [ngModel]="atcListPageSize" (change)="onAtcListPageSizeChange($event)">
+        <select data-testid="qeh-onatclistpagesizechange" [ngModel]="atcListPageSize" (change)="onAtcListPageSizeChange($event)">
           <option *ngFor="let size of atcListPageSizeOptions" [value]="size">{{ size }}</option>
         </select>
       </label>
@@ -455,7 +455,7 @@
 
   <!-- ATC DETAIL DRILLDOWN -->
   <div class="table-wrapper" *ngIf="showAtcDetailModal">
-    <button (click)="showAtcDetailModal = false">Close</button>
+    <button data-testid="qeh-button" (click)="showAtcDetailModal = false">Close</button>
     <table>
       <thead>
         <tr>
@@ -478,13 +478,13 @@
 
   <!-- PAGINATION — shared for both views -->
   <div class="pagination" *ngIf="reportLoaded && totalPages > 1 && !showAtcNameList">
-    <button (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
+    <button data-testid="qeh-prevpage" (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
-    <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+    <button data-testid="qeh-nextpage" (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
 
     <label style="margin-left:16px;">
       Records per page:
-      <select [ngModel]="pageSize" (change)="onPageSizeChange($event)">
+      <select data-testid="qeh-onpagesizechange" [ngModel]="pageSize" (change)="onPageSizeChange($event)">
         <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
       </select>
     </label>

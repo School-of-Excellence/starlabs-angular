@@ -23,7 +23,7 @@
   <!-- Stats Grid -->
   <div class="stats-grid">
     <!-- Total Revenue -->
-    <div class="stat-card" (click)="openModal('totalRevenue')">
+    <div data-testid="jod-div-001" class="stat-card" (click)="openModal('totalRevenue')">
       <div class="stat-header">
         <span class="stat-label">Total Revenue</span>
         <span class="stat-badge badge-primary"
@@ -104,7 +104,7 @@
             >( {{ currentDate | date : "MMM yyyy" }} )</span
           >
         </div>
-        <button
+        <button data-testid="jod-btn-002"
           class="dashboard-link"
           (click)="navigateToExpensePlanner('home')"
         >
@@ -140,7 +140,7 @@
           <span class="stat-label">Next Month</span>
           <span class="stat-date">( {{ nextMonth | date : "MMM yyyy" }} )</span>
         </div>
-        <button
+        <button data-testid="jod-btn-003"
           class="dashboard-link"
           (click)="navigateToExpensePlanner('next')"
         >
@@ -169,14 +169,14 @@
     <div class="section-header">
       <h2 class="section-title">Activity Overview</h2>
       <div class="time-filters">
-        <button
+        <button data-testid="jod-btn-004"
           class="time-filter"
           [class.active]="timeFrameFilter === 'last7days'"
           (click)="selectTimeFrame('last7days')"
         >
           Last 7 Days
         </button>
-        <button
+        <button data-testid="jod-btn-005"
           class="time-filter"
           [class.active]="timeFrameFilter === 'last30days'"
           (click)="selectTimeFrame('last30days')"
@@ -189,13 +189,13 @@
         >
           <mat-label>Date Range</mat-label>
           <mat-date-range-input [rangePicker]="picker">
-            <input
+            <input data-testid="jod-inp-006"
               matStartDate
               placeholder="Start date"
               [(ngModel)]="salesStartDate"
               (dateChange)="onDateRangeChange()"
             />
-            <input
+            <input data-testid="jod-inp-007"
               matEndDate
               placeholder="End date"
               [(ngModel)]="salesEndDate"
@@ -215,7 +215,7 @@
     <div class="activity-grid">
       <!-- Main Activity List -->
       <div class="activity-list">
-        <div class="activity-item" (click)="openModal('newSales')">
+        <div data-testid="jod-div-008" class="activity-item" (click)="openModal('newSales')">
           <div class="activity-icon icon-primary">{{ newSalesCount }}</div>
           <div class="activity-details">
             <h4>New Sales</h4>
@@ -237,7 +237,7 @@
           </div>
         </div>
 
-        <div class="activity-item" (click)="openModal('upgradeSales')">
+        <div data-testid="jod-div-009" class="activity-item" (click)="openModal('upgradeSales')">
           <div class="activity-icon icon-secondary">{{ upgradesCount }}</div>
           <div class="activity-details">
             <h4>Upgrades</h4>
@@ -259,7 +259,7 @@
           </div>
         </div>
 
-        <div class="activity-item" (click)="openModal('dfuSales')">
+        <div data-testid="jod-div-010" class="activity-item" (click)="openModal('dfuSales')">
           <div class="activity-icon icon-secondary">{{ dfuSalesCount }}</div>
           <div class="activity-details">
             <h4>DFU</h4>
@@ -281,7 +281,7 @@
           </div>
         </div>
 
-        <div
+        <div data-testid="jod-div-011"
           class="activity-item ads-entry"
           (click)="navigateToAdsEntry()"
           matTooltip="Dashboard →"
@@ -340,19 +340,19 @@
       <div class="participants-section">
         <h3 class="participants-title">Active Participants</h3>
         <div class="participants-grid">
-          <div class="participant-item" (click)="openModal('big')">
+          <div data-testid="jod-div-012" class="participant-item" (click)="openModal('big')">
             <span class="participant-label">BIG</span>
             <span class="participant-count">{{ this.bigCount }}</span>
           </div>
-          <div class="participant-item" (click)="openModal('up')">
+          <div data-testid="jod-div-013" class="participant-item" (click)="openModal('up')">
             <span class="participant-label">UP</span>
             <span class="participant-count">{{ this.upCount }}</span>
           </div>
-          <div class="participant-item" (click)="openModal('lyl')">
+          <div data-testid="jod-div-014" class="participant-item" (click)="openModal('lyl')">
             <span class="participant-label">LYL</span>
             <span class="participant-count">{{ this.lylCount }}</span>
           </div>
-          <div class="participant-item" (click)="openModal('cpm')">
+          <div data-testid="jod-div-015" class="participant-item" (click)="openModal('cpm')">
             <span class="participant-label">CPM</span>
             <span class="participant-count">{{ this.cpmCount }}</span>
           </div>
@@ -364,7 +364,7 @@
     <div class="engagement-section">
       <h3 class="engagement-title">Engagement (Last 6 Months)</h3>
       <div class="engagement-grid">
-        <div class="engagement-item" (click)="openModal('journeyCoaching')">
+        <div data-testid="jod-div-016" class="engagement-item" (click)="openModal('journeyCoaching')">
           <span class="engagement-label">Journey Coaching</span>
           <span class="engagement-count">{{ allEngProfileIds['journeyCoaching'].length }}</span>
         </div>
@@ -372,15 +372,15 @@
           <span class="engagement-label">Email</span>
           <span class="engagement-count">0</span>
         </div>
-        <div class="engagement-item" (click)="openModal('app')">
+        <div data-testid="jod-div-017" class="engagement-item" (click)="openModal('app')">
           <span class="engagement-label">App</span>
           <span class="engagement-count">{{ allEngProfileIds['appUser'].length }}</span>
         </div>
-        <div class="engagement-item" (click)="openModal('workshop')">
+        <div data-testid="jod-div-018" class="engagement-item" (click)="openModal('workshop')">
           <span class="engagement-label">Workshop</span>
           <span class="engagement-count">{{ allEngProfileIds['workshop'].length }}</span>
         </div>
-        <div class="engagement-item" (click)="openModal('dfu')">
+        <div data-testid="jod-div-019" class="engagement-item" (click)="openModal('dfu')">
           <span class="engagement-label">DFU</span>
           <span class="engagement-count">{{ allEngProfileIds['dfuProduct'].length }}</span>
         </div>
@@ -389,7 +389,7 @@
           <span class="engagement-count">0</span>
         </div>
       </div>
-      <div class="total-participants" (click)="openModal('activeParticipant')">
+      <div data-testid="jod-div-020" class="total-participants" (click)="openModal('activeParticipant')">
         <div class="engagement-item">
           <span class="engagement-label">Total Active Participants</span>
           <span class="engagement-count"
@@ -398,7 +398,7 @@
           >
         </div>
       </div>
-      <div
+      <div data-testid="jod-div-021"
         class="total-participants"
         (click)="openModal('nonActiveParticipant')"
       >
@@ -487,7 +487,7 @@
         <span class="header-subtitle">{{ dialogConfig.table.data.length }} records</span>
       </div>
 
-      <button mat-icon-button class="close-button" mat-dialog-close>
+      <button data-testid="jod-btn-022" mat-icon-button class="close-button" mat-dialog-close>
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -500,7 +500,7 @@
           <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
         </svg>
 
-        <input type="text" placeholder="Search..." class="search-input">
+        <input data-testid="jod-inp-023" type="text" placeholder="Search..." class="search-input">
       </div> -->
 
       <!-- Table -->
@@ -511,7 +511,7 @@
               <th class="col-index">S.NO</th>
               <th *ngFor="let col of dialogConfig.table.columns" class="col-header">
                 @if (['isActive', 'isNonActive'].includes(col.key)) {
-                  <span (click)="sortParticipants()">{{ col.header }}</span>
+                  <span data-testid="jod-span-024" (click)="sortParticipants()">{{ col.header }}</span>
                 } @else {
                   <span>{{ col.header }}</span>
                 }
@@ -555,8 +555,8 @@
 
     <!-- Footer -->
     <mat-dialog-actions>
-      <button mat-button mat-dialog-close class="btn-close">Close</button>
-      <!-- <button mat-raised-button color="primary" class="btn-export">Export</button> -->
+      <button data-testid="jod-btn-025" mat-button mat-dialog-close class="btn-close">Close</button>
+      <!-- <button data-testid="jod-btn-026" mat-raised-button color="primary" class="btn-export">Export</button> -->
     </mat-dialog-actions>
   </div>
 </ng-template>

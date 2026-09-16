@@ -25,7 +25,7 @@
     </mat-form-field>
   </div>
   <div mat-dialog-action>
-    <button class="text-danger border border-danger" mat-stroked-button (click)="close()">Close</button>
-    <button class="text-light bg-success" [disabled]="assignrolestoeisForm.invalid || loading" mat-stroked-button (click)="onformsubmit(assignrolestoeisForm.value)">Submit</button>
+    <button data-testid="eard-close-1" class="text-danger border border-danger" mat-stroked-button (click)="close()">Close</button>
+    <button data-testid="eard-onformsubmit-2" class="text-light bg-success" [disabled]="assignrolestoeisForm.invalid || loading" mat-stroked-button (click)="onformsubmit(assignrolestoeisForm.value)">Submit</button>
   </div>
 </div>
