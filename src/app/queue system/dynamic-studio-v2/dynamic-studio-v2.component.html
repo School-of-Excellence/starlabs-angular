@@ -15,7 +15,7 @@
     <!-- Other studios you've been invited to join -->
     <div *ngIf="outsideLiveAssignment.length != 0" class="otherstudio">
       <h6 class="secondtitle fs-6 mb-2">Other Studio that you are invited to Join</h6>
-      <button mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId" class="mr-3" (click)="visitOtherStudio(studio)">
+      <button [attr.data-testid]="'dsv2-btn-1-' + i" mat-stroked-button *ngFor="let studio of outsideLiveAssignment; let i = index; trackBy: trackByDocId" class="mr-3" (click)="visitOtherStudio(studio)">
         <span>Studio {{i+1}}:</span>&nbsp;
         <span *ngFor="let participant of studio['pairing']; let j = index; trackBy: trackByDocId">
           <span *ngIf="mapActivity[studio['participantsactivity']?.[participant]] as activity">{{activity}}&nbsp;</span>
@@ -89,9 +89,9 @@
   </ng-container>
 
   <!-- Participant Conversation -->
-  <div class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
-    <button mat-icon-button (click)="toggleChatContainer()">
-      <mat-icon (click)="toggleChatContainer()">chat</mat-icon>
+  <div data-testid="dsv2-act-2" class="chat-container" *ngIf="studiochatList.length != 0" (click)="toggleChatContainer()">
+    <button data-testid="dsv2-btn-3" mat-icon-button (click)="toggleChatContainer()">
+      <mat-icon data-testid="dsv2-act-4" (click)="toggleChatContainer()">chat</mat-icon>
     </button>
   </div>
 
@@ -101,7 +101,7 @@
       <span *ngIf="pendingMessagesCount[participant.docid] && pendingMessagesCount[participant.docid] > 0">
         ({{ pendingMessagesCount[participant.docid] }} unread)
       </span>
-      <button mat-icon-button (click)="getstudiochat(participant)">
+      <button [attr.data-testid]="'dsv2-btn-5-' + i" mat-icon-button (click)="getstudiochat(participant)">
         <mat-icon>chat</mat-icon>
       </button>
       <div *ngIf="selectedParticipant === true && selectedChat && selectedChat.docid === participant.docid">
@@ -143,7 +143,7 @@
         <section>
           <br>
           <form [formGroup]="messageform" (ngSubmit)="sendMessage(messageform.value)">
-            <textarea
+            <textarea [attr.data-testid]="'dsv2-txt-6-' + i"
               name="sms"
               autofocus
               id="message"
@@ -169,7 +169,7 @@
               <div class="wait-token" data-testid="studio-token-card" [attr.data-token]="token.docid">
                 <!-- Avatar + name (left) -->
                 <div class="wait-token__id">
-                  <div class="wait-token__avatar"
+                  <div [attr.data-testid]="'dsv2-act-7-' + token" class="wait-token__avatar"
                        [class.wait-token__avatar--clickable]="mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile"
                        (click)="(mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile) && (expandedImage = (mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile))">
                     <img *ngIf="mapProfileData[token.profile_id]?.profileimg || mapProfileData[token.profile_id]?.profile"
@@ -257,9 +257,9 @@
 
   <!-- Expanded profile image overlay — rendered at top level so it works
        both pre-live (waiting list) and inside the live studio. -->
-  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
-    <div class="preview-panel" (click)="$event.stopPropagation()">
-      <button class="preview-close-btn" (click)="expandedImage = null">✕</button>
+  <div data-testid="dsv2-act-8" class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
+    <div data-testid="dsv2-act-9" class="preview-panel" (click)="$event.stopPropagation()">
+      <button data-testid="dsv2-btn-10" class="preview-close-btn" (click)="expandedImage = null">✕</button>
       <img class="preview-image" [src]="expandedImage" alt="Preview">
     </div>
   </div>
@@ -270,7 +270,7 @@
     <!-- ============================ SIDEBAR (identity + vertical stepper) ============================ -->
     <aside class="ds-side">
       <div class="ds-side-id">
-        <div class="ds-avatar"
+        <div data-testid="dsv2-act-11" class="ds-avatar"
           (click)="(mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile) && (expandedImage = (mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile))">
           <img *ngIf="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
             [src]="mapProfileData[participantProfileId]?.profileimg || mapProfileData[participantProfileId]?.profile"
@@ -307,12 +307,12 @@
 
             <!-- Full-roster overlay (opened from the "View all" chip). -->
             <ng-container *ngIf="specialistsOverlayOpen">
-              <div class="ds-spec-overlay-backdrop" (click)="specialistsOverlayOpen = false"></div>
+              <div data-testid="dsv2-act-12" class="ds-spec-overlay-backdrop" (click)="specialistsOverlayOpen = false"></div>
               <div class="ds-spec-overlay" role="dialog">
                 <div class="ds-spec-overlay__head">
                   <mat-icon class="ic">groups</mat-icon>
                   <span>With · {{ additionalSpecialists.length }}</span>
-                  <button type="button" class="ds-spec-overlay__close" (click)="specialistsOverlayOpen = false" aria-label="Close">&#10005;</button>
+                  <button data-testid="dsv2-btn-13" type="button" class="ds-spec-overlay__close" (click)="specialistsOverlayOpen = false" aria-label="Close">&#10005;</button>
                 </div>
                 <ul class="ds-spec-overlay__list">
                   <li *ngFor="let sp of additionalSpecialists; trackBy: trackByDocId">
@@ -328,7 +328,7 @@
       <div class="ds-side-steps">
         <div class="ds-side-steps__label">Session Steps</div>
         <nav class="ds-vsteplist">
-          <button *ngFor="let step of visibleSteps; let i = index; trackBy: trackByDocId"
+          <button [attr.data-testid]="'dsv2-btn-14-' + i" *ngFor="let step of visibleSteps; let i = index; trackBy: trackByDocId"
                   type="button" class="ds-vstep"
                   [class.active]="step.id === activeStepId"
                   [class.done]="isStepCompleted(step.id)"
@@ -358,7 +358,7 @@
             <div class="ds-waiting-sub">{{ topBarStatus.sub }}</div>
           </div>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" *ngIf="participantInWaitingRoom" (click)="setActiveStep('getstarted')">
+        <button data-testid="dsv2-btn-15" type="button" class="btn btn-primary btn-sm" *ngIf="participantInWaitingRoom" (click)="setActiveStep('getstarted')">
           <mat-icon class="ic">videocam</mat-icon>
           Join Call
         </button>
@@ -368,7 +368,7 @@
           <mat-icon class="ic">person_add</mat-icon>
           Invite More
         </button>
-        <button type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
+        <button data-testid="dsv2-btn-16" type="button" class="btn btn-amber btn-sm" (click)="moveBackToQueue()">
           <mat-icon class="ic">undo</mat-icon>
           Send back to Waiting Again
         </button>
@@ -383,11 +383,11 @@
             <mat-icon class="ic">arrow_forward</mat-icon>
           </button>
           <ng-container *ngIf="nextStageMenuOpen === 'header'">
-            <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+            <div data-testid="dsv2-act-17" class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
             <div class="ds-nextmodal" role="dialog" aria-modal="true">
               <div class="ds-nextmodal__head">
                 <h2 class="ds-nextmodal__title">Move to Next Stage</h2>
-                <button type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
+                <button data-testid="dsv2-btn-18" type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
                   <mat-icon class="ic">close</mat-icon>
                 </button>
               </div>
@@ -469,7 +469,7 @@
           <div class="ds-stagenote__main">
             <span class="ds-stagenote__text"
                   [class.is-clamped]="!isStageNoteExpanded(sn.stage)">{{ sn.note }}</span>
-            <button type="button" class="ds-stagenote__more"
+            <button [attr.data-testid]="'dsv2-btn-19-' + sn" type="button" class="ds-stagenote__more"
                     *ngIf="(sn.note?.length || 0) > 140"
                     (click)="toggleStageNote(sn.stage)">
               {{ isStageNoteExpanded(sn.stage) ? 'Show less' : 'Show more' }}
@@ -506,7 +506,7 @@
                   <div class="form-row__icon"><mat-icon class="ic">description</mat-icon></div>
                   <span class="form-row__name">{{ form['formname'] }}</span>
                 </div>
-                <button type="button" class="btn btn-primary" (click)="viewform(form)">
+                <button [attr.data-testid]="'dsv2-btn-20-' + i" type="button" class="btn btn-primary" (click)="viewform(form)">
                   Open Form
                   <mat-icon class="ic">arrow_forward</mat-icon>
                 </button>
@@ -546,7 +546,7 @@
                   <mat-icon class="ic">favorite_border</mat-icon>
                   Love Letters
                 </div>
-                <button *ngIf="!showLoveLetter" type="button" class="btn btn-ghost btn-sm" (click)="toggleLoveLetter()">
+                <button data-testid="dsv2-btn-21" *ngIf="!showLoveLetter" type="button" class="btn btn-ghost btn-sm" (click)="toggleLoveLetter()">
                   <mat-icon class="ic">favorite_border</mat-icon>
                   Load Love Letters
                 </button>
@@ -719,11 +719,11 @@
                   </div>
                   <div class="zoom-link-row">
                     <mat-icon class="ic zoom-link-row__ic">link</mat-icon>
-                    <a class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
+                    <a data-testid="dsv2-link-22" class="zoom-link-row__url" [href]="liveAssignment['zoomdata']?.start_url" target="_blank" rel="noopener"
                        [title]="liveAssignment['zoomdata']?.start_url">
                       {{ liveAssignment['zoomdata']?.start_url }}
                     </a>
-                    <button type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
+                    <button data-testid="dsv2-btn-23" type="button" class="zoom-link-row__copy" (click)="copyZoomLink(liveAssignment['zoomdata']?.start_url)"
                             matTooltip="Copy link">
                       <mat-icon class="ic">content_copy</mat-icon>
                     </button>
@@ -761,26 +761,26 @@
                   An AI-generated ATC is available for this participant.
                 </div>
                 <div style="display:flex;gap:14px;flex-wrap:wrap;">
-                  <button type="button" class="btn btn-primary btn-lg"
+                  <button data-testid="dsv2-btn-24" type="button" class="btn btn-primary btn-lg"
                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
                     (click)="addATC(true, participantProfileId)">
                     <mat-icon class="ic">check</mat-icon>
                     Prescribe ATC — No Validation
                   </button>
-                  <button type="button" class="btn btn-ghost btn-lg"
+                  <button data-testid="dsv2-btn-25" type="button" class="btn btn-ghost btn-lg"
                     *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
                     (click)="addATC(false, participantProfileId)">
                     <mat-icon class="ic">verified</mat-icon>
                     Prescribe ATC — Requires Validation
                   </button>
-                  <button type="button" class="btn btn-primary btn-lg"
+                  <button data-testid="dsv2-btn-26" type="button" class="btn btn-primary btn-lg"
                     *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addvalidatedatc')"
                     style="background:#9A258F;border-color:#9A258F;"
                     (click)="useAiAtc(true)">
                     <mat-icon class="ic">auto_awesome</mat-icon>
                     Use AI-Generated ATC — No Validation
                   </button>
-                  <button type="button" class="btn btn-ghost btn-lg"
+                  <button data-testid="dsv2-btn-27" type="button" class="btn btn-ghost btn-lg"
                     *ngIf="aiAtcAvailable && ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('addunvalidatedatc')"
                     style="color:#9A258F;border-color:#9A258F;"
                     (click)="useAiAtc(false)">
@@ -819,7 +819,7 @@
                 </div>
               </div>
               <div class="card-pad">
-                <button type="button" class="btn btn-ghost" (click)="assignChangeagent(true)">
+                <button data-testid="dsv2-btn-28" type="button" class="btn btn-ghost" (click)="assignChangeagent(true)">
                   <mat-icon class="ic">open_in_new</mat-icon>
                   Open ATC
                 </button>
@@ -861,7 +861,7 @@
                     <label class="ael-label">{{ i + 1 }}. {{ crossover.key }} <span class="req">*</span></label>
                     <mat-form-field appearance="outline" style="width:100%;">
                       <mat-label>Current Level</mat-label>
-                      <mat-select [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
+                      <mat-select [attr.data-testid]="'dsv2-sel-29-' + i" [(ngModel)]="crossover.value['value']" (selectionChange)="participantAEL['aelStatus'] = 'edited'">
                         <mat-option *ngFor="let option of aelLevelList; trackBy: trackByDocId" [value]="option['startpoint'] + '---' + option['endpoint']">{{option["startpoint"]}} to {{option["endpoint"]}}</mat-option>
                       </mat-select>
                     </mat-form-field>
@@ -893,14 +893,14 @@
 
     <!-- ============================ FOOTER (Back / Step / Next) ============================ -->
     <footer class="ds-footer">
-      <button type="button" class="btn btn-ghost" (click)="goToStep(-1)" [disabled]="activeStepIndex === 0">
+      <button data-testid="dsv2-btn-30" type="button" class="btn btn-ghost" (click)="goToStep(-1)" [disabled]="activeStepIndex === 0">
         <mat-icon class="ic">arrow_back</mat-icon>
         Back
       </button>
       <div class="ds-footer-center">
         Step <b>{{ activeStepIndex + 1 }}</b> of <b>{{ visibleSteps.length }}</b>
       </div>
-      <button type="button" class="btn btn-primary" *ngIf="activeStepIndex !== visibleSteps.length - 1" (click)="goToStep(1)">
+      <button data-testid="dsv2-btn-31" type="button" class="btn btn-primary" *ngIf="activeStepIndex !== visibleSteps.length - 1" (click)="goToStep(1)">
         Next
         <mat-icon class="ic">arrow_forward</mat-icon>
       </button>
@@ -917,11 +917,11 @@
           <mat-icon class="ic">arrow_forward</mat-icon>
         </button>
         <ng-container *ngIf="nextStageMenuOpen === 'footer'">
-          <div class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
+          <div data-testid="dsv2-act-32" class="ds-nextmenu-backdrop" (click)="closeNextStageMenu()"></div>
           <div class="ds-nextmodal" role="dialog" aria-modal="true">
             <div class="ds-nextmodal__head">
               <h2 class="ds-nextmodal__title">Move to Next Stage</h2>
-              <button type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
+              <button data-testid="dsv2-btn-33" type="button" class="ds-nextmodal__x" (click)="closeNextStageMenu()" aria-label="Close">
                 <mat-icon class="ic">close</mat-icon>
               </button>
             </div>
@@ -940,7 +940,7 @@
          moveStage) — relocated into a popup. No backend change. -->
     <ng-template #nextStageItems>
       <!-- Mark for next month review -->
-      <button *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')"
+      <button data-testid="dsv2-btn-34" *ngIf="ongoingQueue['stageproperty'][liveAssignment['stagename']]?.studiowidgets?.includes('movetonextqueue')"
               type="button" class="ds-nextmodal__item"
               [disabled]="nextMonthReviewSaving || nextMonthReviewMarked"
               (click)="movetoNextMonthReview()">
@@ -982,7 +982,7 @@
             <mat-icon class="ic">description</mat-icon>
             {{ formViewerState.title }}
           </span>
-          <button type="button" class="form-dlg__close" mat-dialog-close>
+          <button data-testid="dsv2-btn-35" type="button" class="form-dlg__close" mat-dialog-close>
             <mat-icon class="ic">close</mat-icon>
           </button>
         </header>
@@ -1113,11 +1113,11 @@
         </div>
 
         <div class="atc-card__actions">
-          <button type="button" class="btn btn-soft btn-sm" (click)="viewATCInDialog(atc, kind)">
+          <button data-testid="dsv2-btn-36" type="button" class="btn btn-soft btn-sm" (click)="viewATCInDialog(atc, kind)">
             <mat-icon class="ic">visibility</mat-icon>
             View Full ATC
           </button>
-          <button type="button" class="btn btn-soft btn-sm" *ngIf="isMentor"
+          <button data-testid="dsv2-btn-37" type="button" class="btn btn-soft btn-sm" *ngIf="isMentor"
                   (click)="updateATC(atc.atcid, editColl, '')">
             <mat-icon class="ic">edit</mat-icon>
             Edit ATC
@@ -1203,7 +1203,7 @@
             <mat-icon class="ic">fact_check</mat-icon>
             {{ atcViewerState.title }}
           </span>
-          <button type="button" class="form-dlg__close" mat-dialog-close>
+          <button data-testid="dsv2-btn-38" type="button" class="form-dlg__close" mat-dialog-close>
             <mat-icon class="ic">close</mat-icon>
           </button>
         </header>
@@ -1268,7 +1268,7 @@
         <div class="card-pad" *ngIf="cwATClist.length > 0">
           <div class="atc-assigned" *ngIf="cwATClist.length > 0">
             <div class="atc-assigned__card" *ngFor="let atc of cwATClist; let a = index; trackBy: trackByDocId">
-              <div class="atc-assigned__head" (click)="toggleATC('cw-' + a)">
+              <div [attr.data-testid]="'dsv2-act-39-' + a" class="atc-assigned__head" (click)="toggleATC('cw-' + a)">
                 <span class="atc-assigned__index">{{ (a + 1) < 10 ? '0' + (a + 1) : (a + 1) }}</span>
                 <span class="atc-assigned__date">{{ atc["atcdata"]?.prescription_date?.toDate() | date:'mediumDate' }}</span>
                 <span class="atc-assigned__queue">
@@ -1339,7 +1339,7 @@
         </div>
         <div class="card-pad" *ngIf="tripleATCList.length > 0">
           <div class="triple-atc-grid" *ngIf="tripleATCList.length > 0">
-            <button
+            <button [attr.data-testid]="'dsv2-btn-40-' + i"
               *ngFor="let atc of tripleATCList; let i = index; trackBy: trackByDocId"
               type="button"
               class="triple-atc-card"
@@ -1396,10 +1396,10 @@
         </ul>
       </div>
       <footer class="checkin-conflict__foot">
-        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--ghost" [mat-dialog-close]="false">
+        <button data-testid="dsv2-btn-41" type="button" class="checkin-conflict__btn checkin-conflict__btn--ghost" [mat-dialog-close]="false">
           Cancel
         </button>
-        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
+        <button data-testid="dsv2-btn-42" type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
           <mat-icon class="ic">logout</mat-icon>
           Check out &amp; continue
         </button>
@@ -1438,7 +1438,7 @@
         </ul>
       </div>
       <footer class="checkin-conflict__foot">
-        <button type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
+        <button data-testid="dsv2-btn-43" type="button" class="checkin-conflict__btn checkin-conflict__btn--primary" [mat-dialog-close]="true">
           Got it
         </button>
       </footer>

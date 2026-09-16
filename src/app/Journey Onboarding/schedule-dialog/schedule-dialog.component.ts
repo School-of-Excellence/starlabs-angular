@@ -16,7 +16,6 @@ import { MatCalendar } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
-import { platform } from 'os';
 
 @Component({
   selector: 'app-schedule-dialog',
@@ -197,9 +196,9 @@ export class ScheduleDialogComponent {
     //   data: { type: "spinner", msg: "Getting Appointments..." }
     // });
 
-    this.loading = true;
-    let dataQuery = this.participantjourneyproduct.calltype == 'coach' ? 'journeycoach' : 'onboardingcall';
-    await getDocs(query(collection(this.firestore, "appointmenttype"), where(dataQuery, '==', true))).then(res => {
+      this.loading = true;
+      const dataQuery = this.participantjourneyproduct.calltype == 'coach' ? 'journeycoach' : this.participantjourneyproduct.calltype == 'productonboarding' ? 'productonboarding' : 'onboardingcall';
+      await getDocs(query(collection(this.firestore, "appointmenttype"), where(dataQuery, '==', true))).then(res => {
       for (let i = 0; i < res.docs.length; i++) {
         const element = res.docs[i].data();
         this.appointmenttypes.push({
@@ -621,6 +620,9 @@ export class ScheduleDialogComponent {
 
         if (this.participantjourneyproduct.calltype == 'onboarding') {
           map['onboarding'] = true;
+        } else if (this.participantjourneyproduct.calltype == 'productonboarding') {
+          map['productonboarding'] = true;
+          map['participantproductid'] = this.participantjourneyproduct['participantsproductid'];
         }
 
         try {
@@ -635,6 +637,14 @@ export class ScheduleDialogComponent {
                 onboardedby: hostRef,
                 appointmentid: newDocRef.id, 
                 orientationstatus: "scheduled"
+              }
+            );
+          } else if (this.participantjourneyproduct.calltype == 'productonboarding') {
+            await updateDoc(doc(this.firestore, "participantsproduct", this.participantjourneyproduct['docid']),
+              {
+                productonboardingscheduled: new Date(selectedSlot.start),
+                productonboardedby: hostRef,
+                productonboarding: true,
               }
             );
           }

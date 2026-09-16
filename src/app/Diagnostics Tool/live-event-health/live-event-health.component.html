@@ -2,7 +2,7 @@
   <h2>Live Events Dashboard</h2>
   <mat-form-field appearance="outline" style="width:300px">
     <mat-label>Select or Search Event</mat-label>
-    <input
+    <input data-testid="leh-type-to-search"
       matInput
       [formControl]="eventControl"
       [matAutocomplete]="auto"
@@ -23,25 +23,25 @@
 <div class="kpi-bar">
 
   <!-- TOTAL -->
-<div class="kpi-card" [class.active]="kpiFilter.type === 'total'" (click)="onTotalKpiClick()">
+<div data-testid="leh-ontotalkpiclick" class="kpi-card" [class.active]="kpiFilter.type === 'total'" (click)="onTotalKpiClick()">
   <div class="kpi-label">Total</div>
   <div class="kpi-value">{{ kpiTotal ?? 0}}</div>
 </div>
 
 <!-- VALID -->
-<div class="kpi-card success" [class.active]="kpiFilter.type === 'valid'" (click)="onValidKpiClick(true)">
+<div data-testid="leh-onvalidkpiclick" class="kpi-card success" [class.active]="kpiFilter.type === 'valid'" (click)="onValidKpiClick(true)">
   <div class="kpi-label">Valid</div>
   <div class="kpi-value">{{ kpiValid ?? 0}}</div>
 </div>
 
 <!-- INVALID -->
-<div class="kpi-card danger" [class.active]="kpiFilter.type === 'invalid'" (click)="onValidKpiClick(false)">
+<div data-testid="leh-onvalidkpiclick-2" class="kpi-card danger" [class.active]="kpiFilter.type === 'invalid'" (click)="onValidKpiClick(false)">
   <div class="kpi-label">Invalid</div>
   <div class="kpi-value">{{ kpiInvalid ?? 0}}</div>
 </div>
 
 <!-- EVENT STATUS KPIs -->
-<div
+<div data-testid="leh-oneventstatuskpiclick"
   class="kpi-card neutral"
   [class.active]="kpiFilter.type === 'eventStatus' && kpiFilter.value === k.status"
   *ngFor="let k of eventStatusKpis"
@@ -51,7 +51,7 @@
 </div>
 
 <!-- PRODUCT STATUS KPIs -->
-<div
+<div data-testid="leh-onproductstatuskpiclick"
   class="kpi-card neutral"
   [class.active]="kpiFilter.type === 'productStatus' && kpiFilter.value === k.status"
   *ngFor="let k of productStatusKpis"
@@ -67,15 +67,15 @@
   <div class="toolbar-left">
     <mat-form-field appearance="outline" class="search-field">
       <mat-label>Search</mat-label>
-      <input matInput [formControl]="searchControl" placeholder="Search name, product, status..." />
+      <input data-testid="leh-search-name-product-status" matInput [formControl]="searchControl" placeholder="Search name, product, status..." />
     </mat-form-field>
 
-    <button mat-raised-button class="btn-cancel-selected" (click)="cancelSelected()" [disabled]="!selectedRows.length">
+    <button data-testid="leh-cancelselected" mat-raised-button class="btn-cancel-selected" (click)="cancelSelected()" [disabled]="!selectedRows.length">
       Cancel Selected Product ({{ selectedRows.length }})
     </button>
   </div>
 
-  <button mat-raised-button class="btn-export" (click)="exportToExcel()">Export CSV</button>
+  <button data-testid="leh-exporttoexcel" mat-raised-button class="btn-export" (click)="exportToExcel()">Export CSV</button>
 </div>
 
 <!-- ================= TABLE ================= -->
@@ -87,12 +87,12 @@
 
   <ng-container matColumnDef="select">
   <th mat-header-cell *matHeaderCellDef>
-    <input type="checkbox"
+    <input data-testid="leh-toggleselectall" type="checkbox"
            (change)="toggleSelectAll($event)" />
   </th>
 
   <td mat-cell *matCellDef="let row">
-    <input type="checkbox"
+    <input data-testid="leh-togglerow" type="checkbox"
            [checked]="isSelected(row)"
            (change)="toggleRow(row, $event)" />
   </td>
@@ -115,7 +115,7 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Product</span>
-        <mat-select multiple [formControl]="productFilter" placeholder="All">
+        <mat-select data-testid="leh-all" multiple [formControl]="productFilter" placeholder="All">
           <mat-option *ngFor="let p of productOptionCounts" [value]="p.value">
             {{ p.value }} ({{ p.count }})
           </mat-option>
@@ -130,7 +130,7 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Event Status</span>
-        <mat-select multiple [formControl]="eventStatusFilter" placeholder="All">
+        <mat-select data-testid="leh-all-2" multiple [formControl]="eventStatusFilter" placeholder="All">
           <mat-option *ngFor="let s of eventStatusOptionCounts" [value]="s.value">
             {{ s.value }} ({{ s.count }})
           </mat-option>
@@ -145,7 +145,7 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Product Status</span>
-        <mat-select multiple [formControl]="productStatusFilter" placeholder="All">
+        <mat-select data-testid="leh-all-3" multiple [formControl]="productStatusFilter" placeholder="All">
           <mat-option *ngFor="let s of productStatusOptionCounts" [value]="s.value">
             {{ s.value }} ({{ s.count }})
           </mat-option>
@@ -160,7 +160,7 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Mode</span>
-        <mat-select multiple [formControl]="modeFilter" placeholder="All">
+        <mat-select data-testid="leh-all-4" multiple [formControl]="modeFilter" placeholder="All">
           <mat-option *ngFor="let m of modeOptionCounts" [value]="m.value">
             {{ m.value }} ({{ m.count }})
           </mat-option>

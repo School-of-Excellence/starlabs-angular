@@ -6,19 +6,19 @@
   <div class="d-flex flex-row">
     <mat-form-field appearance="fill" class="w-25">
       <mat-label>Select Workshop</mat-label>
-      <mat-select (selectionChange)="onSelectWorkshop($event.value)">
+      <mat-select data-testid="ped-mat-select" (selectionChange)="onSelectWorkshop($event.value)">
         <mat-option *ngFor="let option of workshop" [value]="option">{{option.title}}</mat-option>
       </mat-select>
     </mat-form-field>&nbsp;&nbsp;
     <span style="flex: 1 1 auto;"></span>
     <span class="mt-2"><h4>Total Participant Enrolled - <span style="color:forestgreen">{{totalParticipantEnrolled()}}</span></h4></span>&nbsp;&nbsp;
-    <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-stroked-button type="button" (click)="showbonus ? showbonus = false : showbonus = true;">Add Bonus To All Participants</button>&nbsp;&nbsp;
-    <button mat-stroked-button type="button" [disabled]="selectedWorkshop === null" (click)="exportCSV()">Export</button>&nbsp;&nbsp;
+    <button data-testid="ped-button" *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-stroked-button type="button" (click)="showbonus ? showbonus = false : showbonus = true;">Add Bonus To All Participants</button>&nbsp;&nbsp;
+    <button data-testid="ped-exportcsv" mat-stroked-button type="button" [disabled]="selectedWorkshop === null" (click)="exportCSV()">Export</button>&nbsp;&nbsp;
   </div>
   <div *ngIf="showbonus" class="d-flex flex-row ms-4">
     <mat-form-field appearance="outline" class="w-25">
       <mat-label>Select Bonus Challenge</mat-label>
-      <mat-select (selectionChange)="onSelectBonusChallenge($event.value)">
+      <mat-select data-testid="ped-mat-select-2" (selectionChange)="onSelectBonusChallenge($event.value)">
         <mat-option *ngFor="let option of bonusChallengeList" [value]="option">{{option.label}}</mat-option>
       </mat-select>
     </mat-form-field>
@@ -35,26 +35,26 @@
       <!-- <span class="material-symbols-outlined" (click)="onMoveProfile(task,tasklist[i+1])">
         move_item
         </span> -->
-        <span ><mat-checkbox [indeterminate]="checkIndeterminate(task)" [checked]="allSelected(task)" (change)="onSelectAllProfile(task,$event)">All</mat-checkbox></span>&nbsp;&nbsp;
+        <span ><mat-checkbox data-testid="ped-onselectallprofile" [indeterminate]="checkIndeterminate(task)" [checked]="allSelected(task)" (change)="onSelectAllProfile(task,$event)">All</mat-checkbox></span>&nbsp;&nbsp;
         <span *ngIf="challengedoc['taskproperty'][task]['type'] === 'livecall'" >
-          <mat-checkbox (change)="markAttendedForSelectedProfile($event)">Atd</mat-checkbox>
+          <mat-checkbox data-testid="ped-markattendedforselectedprofile" (change)="markAttendedForSelectedProfile($event)">Atd</mat-checkbox>
         </span>&nbsp;&nbsp;
-        <span  matRipple style="cursor: pointer;margin-right: 5px;text-decoration: underline;color:forestgreen;" (click)="onMoveProfile(task,tasklist[i+1])">Move</span>
+        <span data-testid="ped-onmoveprofile"  matRipple style="cursor: pointer;margin-right: 5px;text-decoration: underline;color:forestgreen;" (click)="onMoveProfile(task,tasklist[i+1])">Move</span>
     </div>
   </div>
   <div class="example-list">
     <div *ngFor="let profileid of mapTaskToProfileList[task] || []" class="mt-1">
         <span style="padding: 5px 10px 5px 10px;background-color: white;">
-          <mat-checkbox [checked]="this.selectedProfile.includes(profileid)" (change)="onSelectProfile(task,profileid,$event)">
+          <mat-checkbox data-testid="ped-onselectprofile" [checked]="this.selectedProfile.includes(profileid)" (change)="onSelectProfile(task,profileid,$event)">
             <b>{{mapProfileData[profileid]['name']}}</b> &nbsp;&nbsp;
             <!-- <span *ngFor="let item of mapProfileToLivecallAttendance[profileid] || []">
               <span class="material-symbols-outlined" [ngClass]="item?'live':'nolive'">video_chat</span>
             </span>&nbsp;&nbsp; -->
           </mat-checkbox>&nbsp;&nbsp;
-          <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="onParticipantDelete(profileid)">
+          <button data-testid="ped-onparticipantdelete" *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="onParticipantDelete(profileid)">
             <mat-icon>delete</mat-icon>
           </button>
-          <button *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="resetParticipant(profileid)">
+          <button data-testid="ped-resetparticipant" *ngIf="selectedWorkshopAccessAdmin.includes(loggedinprofileid)" mat-icon-button type="button" (click)="resetParticipant(profileid)">
             <mat-icon>undo</mat-icon>
           </button>
         </span>

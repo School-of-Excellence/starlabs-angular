@@ -19,9 +19,9 @@
           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
-        <button *ngIf="dateFilter" class="clearbtn" mat-stroked-button (click)="clearDate()">Clear</button>
-        <button *ngIf="!dateFilter" class="allbtn" mat-stroked-button (click)="getAll()">Get All</button>
-        <button class="exportbtn" mat-stroked-button (click)="exportCSV()">Export csv</button>
+        <button data-testid="roa-clear-date-1" *ngIf="dateFilter" class="clearbtn" mat-stroked-button (click)="clearDate()">Clear</button>
+        <button data-testid="roa-get-all-2" *ngIf="!dateFilter" class="allbtn" mat-stroked-button (click)="getAll()">Get All</button>
+        <button data-testid="roa-export-csv-3" class="exportbtn" mat-stroked-button (click)="exportCSV()">Export csv</button>
       </div>
     </div>
     <div #TABLE>
@@ -88,7 +88,7 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let element">
-            <button style="color: grey;" mat-icon-button (click)="resendEmail(element)">
+            <button data-testid="roa-resend-email-4" style="color: grey;" mat-icon-button (click)="resendEmail(element)">
               <mat-icon>email</mat-icon>
             </button>
           </td>

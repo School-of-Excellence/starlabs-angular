@@ -5,7 +5,7 @@
     <div mat-dialog-content style="width: auto;height: auto;">
        <form #myForm="ngForm" style="margin-bottom: 20px;">
          <mat-form-field>
-            <input type="text" placeholder="Title" matInput [(ngModel)]="title" (keyup)="onSelect()"
+            <input data-testid="aep-inp-001" type="text" placeholder="Title" matInput [(ngModel)]="title" (keyup)="onSelect()"
                    ngModel
                    required
                    name="name"
@@ -16,7 +16,7 @@
                       </mat-hint>
          </mat-form-field>
          <mat-form-field class="description">
-            <input type="text" placeholder="Description" matInput [(ngModel)]="description"
+            <input data-testid="aep-inp-002" type="text" placeholder="Description" matInput [(ngModel)]="description"
                    ngModel
                    required
                    name="Description"
@@ -26,19 +26,19 @@
        </form>
        <div class="file">
         <label for="file">Choose a video</label><br>
-        <input type="file" accept="video/*" (change)="previewVideo($event)">
+        <input data-testid="aep-inp-003" type="file" accept="video/*" (change)="previewVideo($event)">
         <video *ngIf="videoUrl" [src]="videoUrl" controls style="width: 100px;height: 100px;"></video>
        </div>
        <div class="file">
         <label for="file">Choose a thumbnail</label><br>
-        <input type="file" accept="image/*" (change)="previewImage($event)">
+        <input data-testid="aep-inp-004" type="file" accept="image/*" (change)="previewImage($event)">
         <img *ngIf="imageUrl" [src]="imageUrl" controls style="width: 100px;height: 100px;">
        </div>
     </div>
     <div mat-dialog-actions class="btn">
-      <button  mat-raised-button color="primary" [disabled]="myForm.invalid ? true :crossmatch ? true: video == null ? true: image == null ? true : false" (click)="onSubmit()">Add</button>
+      <button data-testid="aep-btn-005"  mat-raised-button color="primary" [disabled]="myForm.invalid ? true :crossmatch ? true: video == null ? true: image == null ? true : false" (click)="onSubmit()">Add</button>
       &nbsp;&nbsp;&nbsp;&nbsp;
-      <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+      <button data-testid="aep-btn-006"  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
     </div>
     <!-- Video Progress Bar -->
     <progress [value]="videoProgress$ | async"></progress>
@@ -55,14 +55,14 @@
     <div mat-dialog-content style="width: auto;height: auto;">
       <form #myForm="ngForm" style="margin-bottom: 20px;">
         <mat-form-field>
-           <input type="text" placeholder="Title" matInput [(ngModel)]="title"
+           <input data-testid="aep-inp-007" type="text" placeholder="Title" matInput [(ngModel)]="title"
                   ngModel
                   required
                   name="name"
                   #name="ngModel">
         </mat-form-field>
         <mat-form-field class="description">
-           <input type="text" placeholder="Description" matInput [(ngModel)]="description"
+           <input data-testid="aep-inp-008" type="text" placeholder="Description" matInput [(ngModel)]="description"
                   ngModel
                   required
                   name="Description"
@@ -71,18 +71,18 @@
       </form>
       <div class="file">
        <label for="file">Choose a video</label><br>
-       <input type="file" accept="video/*" (change)="previewVideo($event)">
+       <input data-testid="aep-inp-009" type="file" accept="video/*" (change)="previewVideo($event)">
        <video *ngIf="videoUrl" [src]="videoUrl" controls style="width: 100px;height: 100px;"></video>
       </div>
       <div class="file">
        <label for="file">Choose a thumbnail</label><br>
-       <input type="file" accept="image/*" (change)="previewImage($event)">
+       <input data-testid="aep-inp-010" type="file" accept="image/*" (change)="previewImage($event)">
        <img *ngIf="imageUrl" [src]="imageUrl" controls style="width: 100px;height: 100px;">
       </div>
    </div>
     <div mat-dialog-actions class="btn">
-      <button  mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
-      <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
+      <button data-testid="aep-btn-011"  mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
+      <button data-testid="aep-btn-012"  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
     </div>
 </div>
 
@@ -91,8 +91,8 @@
         <h3>Are you sure you want to delete?</h3>
     </div>
     <div mat-dialog-actions class="btn">
-        <button  mat-raised-button color="primary" (click)="onDelete(data.id,data.videoUrl,data.imageUrl,data.screenshot)">Delete</button>  &nbsp;&nbsp;&nbsp;&nbsp;
-        <button  mat-raised-button color="primary">Cancel</button>
+        <button data-testid="aep-btn-013"  mat-raised-button color="primary" (click)="onDelete(data.id,data.videoUrl,data.imageUrl,data.screenshot)">Delete</button>  &nbsp;&nbsp;&nbsp;&nbsp;
+        <button data-testid="aep-btn-014"  mat-raised-button color="primary">Cancel</button>
     </div>
 </div>
 

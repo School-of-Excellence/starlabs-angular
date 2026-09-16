@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="header-section">
     <h1 class="page-title">Email Archive Log</h1>
-    <button mat-stroked-button color="primary" (click)="exportData()" [disabled]="isExporting" class="export-btn">
+    <button data-testid="aeer-btn-1" mat-stroked-button color="primary" (click)="exportData()" [disabled]="isExporting" class="export-btn">
       <mat-icon *ngIf="!isExporting">download</mat-icon>
       <mat-spinner diameter="16" *ngIf="isExporting"></mat-spinner>
       Export
@@ -17,9 +17,9 @@
           <!-- Main Search -->
           <mat-form-field appearance="outline" class="search-field">
             <mat-label>Search...</mat-label>
-            <input matInput formControlName="search" placeholder="Search by subject, content...">
+            <input data-testid="aeer-inp-2" matInput formControlName="search" placeholder="Search by subject, content...">
             <mat-icon matPrefix>search</mat-icon>
-            <button matSuffix mat-icon-button *ngIf="filterForm.get('search')?.value"
+            <button data-testid="aeer-btn-3" matSuffix mat-icon-button *ngIf="filterForm.get('search')?.value"
               (click)="filterForm.patchValue({search: ''})">
               <mat-icon>clear</mat-icon>
             </button>
@@ -28,20 +28,20 @@
           <!-- Date Range -->
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>From Date</mat-label>
-            <input matInput [matDatepicker]="fromPicker" formControlName="fromDate">
+            <input data-testid="aeer-inp-4" matInput [matDatepicker]="fromPicker" formControlName="fromDate">
             <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
             <mat-datepicker #fromPicker></mat-datepicker>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>To Date</mat-label>
-            <input matInput [matDatepicker]="toPicker" formControlName="toDate">
+            <input data-testid="aeer-inp-5" matInput [matDatepicker]="toPicker" formControlName="toDate">
             <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
             <mat-datepicker #toPicker></mat-datepicker>
           </mat-form-field>
 
           <!-- Apply Date Filter Button -->
-          <button mat-raised-button color="primary" (click)="applyDateFilter()" 
+          <button data-testid="aeer-btn-6" mat-raised-button color="primary" (click)="applyDateFilter()" 
             [disabled]="isLoading" class="apply-filter-btn">
             <mat-icon *ngIf="!isLoading">filter_list</mat-icon>
             <mat-spinner diameter="16" *ngIf="isLoading"></mat-spinner>
@@ -53,7 +53,7 @@
           <!-- Status Filter -->
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Status</mat-label>
-            <mat-select formControlName="status">
+            <mat-select data-testid="aeer-sel-7" formControlName="status">
               <mat-option *ngFor="let status of statusOptions" [value]="status">
                 {{status}}
               </mat-option>
@@ -64,7 +64,7 @@
           <!-- Category Filter-->
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Category</mat-label>
-            <mat-select [(ngModel)]="selectedCategory" [ngModelOptions]="{standalone: true}"
+            <mat-select data-testid="aeer-sel-8" [(ngModel)]="selectedCategory" [ngModelOptions]="{standalone: true}"
               (selectionChange)="onCategorySelectionChange()">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="categorySearchTerm" [ngModelOptions]="{standalone: true}"
@@ -81,7 +81,7 @@
           <!-- Sub-Category Filter-->
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Sub-Category</mat-label>
-            <mat-select [(ngModel)]="selectedSubCategory" [ngModelOptions]="{standalone: true}"
+            <mat-select data-testid="aeer-sel-9" [(ngModel)]="selectedSubCategory" [ngModelOptions]="{standalone: true}"
               (selectionChange)="onSubCategorySelectionChange()">
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="subCategorySearchTerm" [ngModelOptions]="{standalone: true}"
@@ -96,7 +96,7 @@
           </mat-form-field>
 
           <!-- View Category Participants Button -->
-          <button mat-stroked-button color="accent"
+          <button data-testid="aeer-btn-10" mat-stroked-button color="accent"
             *ngIf="(selectedCategory && selectedCategory !== 'All Categories') || (selectedSubCategory && selectedSubCategory !== 'All Sub-Categories')"
             (click)="openCategorySidebar(selectedCategory, selectedSubCategory)"
             class="view-category-btn">
@@ -107,7 +107,7 @@
           <!-- Profile Autocomplete Filter -->
           <mat-form-field appearance="outline" class="filter-field">
             <mat-label>Filter by Profile</mat-label>
-            <input type="text" 
+            <input data-testid="aeer-inp-11" type="text" 
                    matInput 
                    formControlName="profileFilter"
                    [matAutocomplete]="profileAuto"
@@ -122,7 +122,7 @@
               </mat-option>
             </mat-autocomplete>
             <mat-icon matSuffix>person</mat-icon>
-            <button matSuffix mat-icon-button *ngIf="filterForm.get('profileFilter')?.value" 
+            <button data-testid="aeer-btn-12" matSuffix mat-icon-button *ngIf="filterForm.get('profileFilter')?.value" 
               (click)="filterForm.patchValue({profileFilter: ''}); $event.stopPropagation();">
               <mat-icon>clear</mat-icon>
             </button>
@@ -131,9 +131,9 @@
           <!-- Email Search -->
           <mat-form-field appearance="outline">
             <mat-label>Search by Email</mat-label>
-            <input matInput formControlName="emailSearch" placeholder="Search by recipient email...">
+            <input data-testid="aeer-inp-13" matInput formControlName="emailSearch" placeholder="Search by recipient email...">
             <mat-icon matPrefix>email</mat-icon>
-            <button matSuffix mat-icon-button *ngIf="filterForm.get('emailSearch')?.value" 
+            <button data-testid="aeer-btn-14" matSuffix mat-icon-button *ngIf="filterForm.get('emailSearch')?.value" 
               (click)="filterForm.patchValue({emailSearch: ''})">
               <mat-icon>clear</mat-icon>
             </button>
@@ -142,16 +142,16 @@
           <!-- Profile Search -->
           <mat-form-field appearance="outline">
             <mat-label>Search by Profile</mat-label>
-            <input matInput formControlName="profileSearch" placeholder="Search by profile name or ID...">
+            <input data-testid="aeer-inp-15" matInput formControlName="profileSearch" placeholder="Search by profile name or ID...">
             <mat-icon matPrefix>person_search</mat-icon>
-            <button matSuffix mat-icon-button *ngIf="filterForm.get('profileSearch')?.value" 
+            <button data-testid="aeer-btn-16" matSuffix mat-icon-button *ngIf="filterForm.get('profileSearch')?.value" 
               (click)="filterForm.patchValue({profileSearch: ''})">
               <mat-icon>clear</mat-icon>
             </button>
           </mat-form-field>
 
           <!-- Clear Filters Button -->
-          <button mat-stroked-button color="warn" (click)="clearFilters()" class="clear-filters-btn">
+          <button data-testid="aeer-btn-17" mat-stroked-button color="warn" (click)="clearFilters()" class="clear-filters-btn">
             Clear Filters
           </button>
         </div>
@@ -278,7 +278,7 @@
             </th>
             <td mat-cell *matCellDef="let record" class="email-cell">
               <div class="email-content">
-                <button mat-button class="recipient-chip clickable-chip" 
+                <button data-testid="aeer-btn-18" mat-button class="recipient-chip clickable-chip" 
                   (click)="openParticipantsPopup(record, 'all')"
                   matTooltip="Click to view all participants">
                   <mat-icon>group</mat-icon>
@@ -314,7 +314,7 @@
             <td mat-cell *matCellDef="let record" class="stats-cell">
               <div class="stats-summary">
                 <div class="stat-items">
-                  <button mat-button class="stat-button sent" 
+                  <button data-testid="aeer-btn-19" mat-button class="stat-button sent" 
                     *ngIf="record.statusCounts?.sent > 0"
                     (click)="openParticipantsPopup(record, 'sent')"
                     matTooltip="View sent emails">
@@ -322,7 +322,7 @@
                     <span>{{record.statusCounts?.sent}}</span>
                   </button>
                   
-                  <button mat-button class="stat-button delivered"
+                  <button data-testid="aeer-btn-20" mat-button class="stat-button delivered"
                     *ngIf="record.statusCounts?.delivery > 0"
                     (click)="openParticipantsPopup(record, 'delivery')"
                     matTooltip="View delivered emails">
@@ -330,7 +330,7 @@
                     <span>{{record.statusCounts?.delivery}}</span>
                   </button>
                   
-                  <button mat-button class="stat-button opened"
+                  <button data-testid="aeer-btn-21" mat-button class="stat-button opened"
                     *ngIf="record.statusCounts?.open > 0"
                     (click)="openParticipantsPopup(record, 'open')"
                     matTooltip="View opened emails">
@@ -338,7 +338,7 @@
                     <span>{{record.statusCounts?.open}}</span>
                   </button>
                   
-                  <button mat-button class="stat-button clicked"
+                  <button data-testid="aeer-btn-22" mat-button class="stat-button clicked"
                     *ngIf="record.statusCounts?.click > 0"
                     (click)="openParticipantsPopup(record, 'click')"
                     matTooltip="View clicked emails">
@@ -346,7 +346,7 @@
                     <span>{{record.statusCounts?.click}}</span>
                   </button>
 
-                  <button mat-button class="stat-button bounce"
+                  <button data-testid="aeer-btn-23" mat-button class="stat-button bounce"
                     *ngIf="record.statusCounts?.bounce > 0"
                     (click)="openParticipantsPopup(record, 'bounce')"
                     matTooltip="View bounced emails">
@@ -354,7 +354,7 @@
                     <span>{{record.statusCounts?.bounce}}</span>
                   </button>
                   
-                  <button mat-button class="stat-button subscription"
+                  <button data-testid="aeer-btn-24" mat-button class="stat-button subscription"
                     *ngIf="record.statusCounts?.subscriptionchange > 0"
                     (click)="openParticipantsPopup(record, 'subscriptionchange')"
                     matTooltip="View subscription changes">
@@ -362,7 +362,7 @@
                     <span>{{record.statusCounts?.subscriptionchange}}</span>
                   </button>
 
-                  <button mat-button class="stat-button failed"
+                  <button data-testid="aeer-btn-25" mat-button class="stat-button failed"
                     *ngIf="record.statusCounts?.failed > 0"
                     (click)="openParticipantsPopup(record, 'failed')"
                     matTooltip="View failed emails">
@@ -370,7 +370,7 @@
                     <span>{{record.statusCounts?.failed}}</span>
                   </button>
 
-                  <button mat-button class="stat-button notSent"
+                  <button data-testid="aeer-btn-26" mat-button class="stat-button notSent"
                     *ngIf="record.statusCounts?.notSent > 0"
                     (click)="openParticipantsPopup(record, 'notSent')"
                     matTooltip="View not sent emails">
@@ -431,11 +431,11 @@
           <mat-icon class="empty-icon">inbox</mat-icon>
           <h3>No email archives found</h3>
           <p>No data available. Check your Firestore collection 'email archive' or adjust your date range.</p>
-          <button mat-stroked-button (click)="clearFilters()">
+          <button data-testid="aeer-btn-27" mat-stroked-button (click)="clearFilters()">
             <mat-icon>clear_all</mat-icon>
             Clear Filters
           </button>
-          <button mat-button (click)="debugTableState()" style="margin-left: 8px;">
+          <button data-testid="aeer-btn-28" mat-button (click)="debugTableState()" style="margin-left: 8px;">
             <mat-icon>bug_report</mat-icon>
             Debug Info
           </button>
@@ -446,7 +446,7 @@
           <mat-icon class="empty-icon">search_off</mat-icon>
           <h3>No results found</h3>
           <p>Try adjusting your search criteria or filters. {{dataSource.data.length}} total records available.</p>
-          <button mat-stroked-button (click)="clearFilters()">
+          <button data-testid="aeer-btn-29" mat-stroked-button (click)="clearFilters()">
             <mat-icon>clear_all</mat-icon>
             Clear Filters
           </button>
@@ -465,8 +465,8 @@
   </mat-card>
 
   <!-- ==================== UNIFIED PARTICIPANTS POPUP ==================== -->
-  <div class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()">
-    <mat-card class="participants-modal" (click)="$event.stopPropagation()">
+  <div data-testid="aeer-act-30" class="participants-overlay" *ngIf="showParticipantsModal && selectedArchiveForPopup" (click)="closeParticipantsModal()">
+    <mat-card data-testid="aeer-act-31" class="participants-modal" (click)="$event.stopPropagation()">
       
       <!-- Modal Header -->
       <mat-card-header class="participants-modal-header">
@@ -479,7 +479,7 @@
             </p>
           </div>
         </div>
-        <button mat-icon-button (click)="closeParticipantsModal()" class="close-btn">
+        <button data-testid="aeer-btn-32" mat-icon-button (click)="closeParticipantsModal()" class="close-btn">
           <mat-icon>close</mat-icon>
         </button>
       </mat-card-header>
@@ -489,7 +489,7 @@
         <!-- Status Summary as Filters (Moved to Top) -->
         <div class="status-summary-filters">
           <div class="summary-grid">
-            <div class="summary-item all" 
+            <div data-testid="aeer-act-33" class="summary-item all" 
                  [class.active]="isStatusFilterActive('all')"
                  (click)="toggleStatusFilter('all')"
                  matTooltip="Show all participants">
@@ -497,7 +497,7 @@
               <span class="count">{{participantStatusCounts.total}}</span>
               <span class="label">All</span>
             </div>
-            <div class="summary-item sent" 
+            <div data-testid="aeer-act-34" class="summary-item sent" 
                  [class.active]="isStatusFilterActive('sent')"
                  (click)="toggleStatusFilter('sent')"
                  matTooltip="Filter by sent">
@@ -505,7 +505,7 @@
               <span class="count">{{participantStatusCounts.sent}}</span>
               <span class="label">Sent</span>
             </div>
-            <div class="summary-item delivery" 
+            <div data-testid="aeer-act-35" class="summary-item delivery" 
                  [class.active]="isStatusFilterActive('delivery')"
                  (click)="toggleStatusFilter('delivery')"
                  matTooltip="Filter by delivered">
@@ -513,7 +513,7 @@
               <span class="count">{{participantStatusCounts.delivery}}</span>
               <span class="label">Delivered</span>
             </div>
-            <div class="summary-item open" 
+            <div data-testid="aeer-act-36" class="summary-item open" 
                  [class.active]="isStatusFilterActive('open')"
                  (click)="toggleStatusFilter('open')"
                  matTooltip="Filter by opened">
@@ -521,7 +521,7 @@
               <span class="count">{{participantStatusCounts.open}}</span>
               <span class="label">Opened</span>
             </div>
-            <div class="summary-item click" 
+            <div data-testid="aeer-act-37" class="summary-item click" 
                  [class.active]="isStatusFilterActive('click')"
                  (click)="toggleStatusFilter('click')"
                  matTooltip="Filter by clicked">
@@ -529,7 +529,7 @@
               <span class="count">{{participantStatusCounts.click}}</span>
               <span class="label">Clicked</span>
             </div>
-            <div class="summary-item bounce" 
+            <div data-testid="aeer-act-38" class="summary-item bounce" 
                  [class.active]="isStatusFilterActive('bounce')"
                  (click)="toggleStatusFilter('bounce')"
                  matTooltip="Filter by bounced">
@@ -537,7 +537,7 @@
               <span class="count">{{participantStatusCounts.bounce}}</span>
               <span class="label">Bounced</span>
             </div>
-            <div class="summary-item subscriptionchange" 
+            <div data-testid="aeer-act-39" class="summary-item subscriptionchange" 
                  [class.active]="isStatusFilterActive('subscriptionchange')"
                  (click)="toggleStatusFilter('subscriptionchange')"
                  matTooltip="Filter by unsubscribed">
@@ -545,7 +545,7 @@
               <span class="count">{{participantStatusCounts.subscriptionchange}}</span>
               <span class="label">Unsubscribed</span>
             </div>
-            <div class="summary-item failed" 
+            <div data-testid="aeer-act-40" class="summary-item failed" 
                  [class.active]="isStatusFilterActive('failed')"
                  (click)="toggleStatusFilter('failed')"
                  matTooltip="Filter by failed">
@@ -553,7 +553,7 @@
               <span class="count">{{participantStatusCounts.failed}}</span>
               <span class="label">Failed</span>
             </div>
-            <div class="summary-item notSent" 
+            <div data-testid="aeer-act-41" class="summary-item notSent" 
                  [class.active]="isStatusFilterActive('notSent')"
                  (click)="toggleStatusFilter('notSent')"
                  matTooltip="Filter by not sent">
@@ -568,12 +568,12 @@
         <div class="search-section">
           <mat-form-field appearance="outline" class="search-field">
             <mat-label>Search participants</mat-label>
-            <input matInput 
+            <input data-testid="aeer-inp-42" matInput 
               [(ngModel)]="participantSearchFilter" 
               (input)="onParticipantSearchChange()"
               placeholder="Search by email, name, or profile ID...">
             <mat-icon matPrefix>search</mat-icon>
-            <button matSuffix mat-icon-button *ngIf="participantSearchFilter" 
+            <button data-testid="aeer-btn-43" matSuffix mat-icon-button *ngIf="participantSearchFilter" 
               (click)="participantSearchFilter=''; onParticipantSearchChange()">
               <mat-icon>clear</mat-icon>
             </button>
@@ -650,11 +650,11 @@
 
       <!-- Modal Actions -->
       <mat-card-actions class="participants-modal-actions" align="end">
-        <button mat-button (click)="closeParticipantsModal()">
+        <button data-testid="aeer-btn-44" mat-button (click)="closeParticipantsModal()">
           <mat-icon>close</mat-icon>
           Close
         </button>
-        <button mat-raised-button color="primary" (click)="exportParticipants()">
+        <button data-testid="aeer-btn-45" mat-raised-button color="primary" (click)="exportParticipants()">
           <mat-icon>download</mat-icon>
           Export Participants
         </button>
@@ -662,8 +662,8 @@
     </mat-card>
   </div>
   <!-- ==================== END UNIFIED PARTICIPANTS POPUP ==================== -->
-<div class="cat-dialog-overlay" *ngIf="showCategoryDialog" (click)="closeCategorySidebar()">
-  <div class="cat-dialog" (click)="$event.stopPropagation()">
+<div data-testid="aeer-act-46" class="cat-dialog-overlay" *ngIf="showCategoryDialog" (click)="closeCategorySidebar()">
+  <div data-testid="aeer-act-47" class="cat-dialog" (click)="$event.stopPropagation()">
 
     <!-- Header -->
     <div class="cat-dialog-header">
@@ -678,7 +678,7 @@
             </p>        
           </div>
       </div>
-      <button mat-icon-button (click)="closeCategorySidebar()">
+      <button data-testid="aeer-btn-48" mat-icon-button (click)="closeCategorySidebar()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -719,12 +719,12 @@
       <div class="cat-dialog-search">
         <mat-form-field appearance="outline" style="width:100%">
           <mat-label>Search participants</mat-label>
-          <input matInput
+          <input data-testid="aeer-inp-49" matInput
             [(ngModel)]="categoryParticipantSearch"
             (input)="onCategoryParticipantSearchChange()"
             placeholder="Email, name, template...">
           <mat-icon matPrefix>search</mat-icon>
-          <button matSuffix mat-icon-button
+          <button data-testid="aeer-btn-50" matSuffix mat-icon-button
             *ngIf="categoryParticipantSearch"
             (click)="categoryParticipantSearch=''; onCategoryParticipantSearchChange()">
             <mat-icon>clear</mat-icon>
@@ -798,11 +798,11 @@
 
     <!-- Pagination -->
     <div class="cat-dialog-pagination" *ngIf="categoryTotalPages > 1">
-      <button mat-icon-button (click)="categoryPrevPage()" [disabled]="categoryCurrentPage === 0">
+      <button data-testid="aeer-btn-51" mat-icon-button (click)="categoryPrevPage()" [disabled]="categoryCurrentPage === 0">
         <mat-icon>chevron_left</mat-icon>
       </button>
       <span class="cat-page-info">Page {{ categoryCurrentPage + 1 }} of {{ categoryTotalPages }}</span>
-      <button mat-icon-button (click)="categoryNextPage()" [disabled]="categoryCurrentPage >= categoryTotalPages - 1">
+      <button data-testid="aeer-btn-52" mat-icon-button (click)="categoryNextPage()" [disabled]="categoryCurrentPage >= categoryTotalPages - 1">
         <mat-icon>chevron_right</mat-icon>
       </button>
     </div>

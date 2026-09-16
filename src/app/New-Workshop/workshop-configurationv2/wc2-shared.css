@@ -107,11 +107,17 @@ button.input.pick[disabled] { cursor: not-allowed; background: #f8fafd; color: v
 .to { font-size: 12.5px; color: var(--t3); padding: 0 2px; flex-shrink: 0; }
 /* schedule: registration + workshop windows side by side */
 .windows { gap: 20px; }
-.win { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.win .input { padding: 0 8px; }
-.win .input.date { flex: 1 1 112px; min-width: 104px; }
-.win .input.time { flex: 0 0 84px; width: 84px; }
-.win .input.time .txt { text-align: center; }
+.win { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: wrap; }
+.win .input { padding: 0 8px; gap: 6px; }
+/* Two date+time pairs plus "to" have to fit one ~440px column without wrapping,
+   and "07 Sep 2026" / "00:00" must not clip. Measured, not guessed. */
+.win .input.date { flex: 1 1 116px; min-width: 116px; }
+.win .input.time { flex: 0 0 86px; width: 86px; }
+.win .input.time .txt { text-align: center; font-variant-numeric: tabular-nums; }
+.win .to { flex: 0 0 auto; font-size: 12px; color: var(--t3); padding: 0 2px; }
+/* The two hints under a schedule row: quiet, indented, and clearly a pair. */
+.win-notes { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.win-notes .help { padding-left: 10px; border-left: 2px solid var(--border-light); line-height: 1.5; }
 /* `.hrow`, not `.row`: Bootstrap 5 is loaded globally (angular.json) and its grid rule
    `.row > * { width: 100% }` stretched every child of a `.row` — the header badge, the
    header buttons. Same reason for the --bs-* resets on .btn/.card/.badge/.placeholder below. */
@@ -194,6 +200,13 @@ button.input.pick[disabled] { cursor: not-allowed; background: #f8fafd; color: v
 .rt ::ng-deep .NgxEditor__MenuItem--Icon svg { width: 14px; height: 14px; }
 .rt ::ng-deep .NgxEditor__MenuItem:hover { background: #eef3f9; color: var(--primary); }
 .rt ::ng-deep .NgxEditor__MenuItem--Active, .rt ::ng-deep .NgxEditor__MenuItem.NgxEditor__MenuItem--Active { background: #eef3f9; color: var(--primary); }
+/* The "Normal" button we append to the menu bar (see wc2-editor.ts). */
+.rt ::ng-deep .wc2-normal {
+  height: 26px; padding: 0 9px; margin-left: 2px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--t2); font: inherit; font-size: 12px;
+  font-weight: 600; cursor: pointer;
+}
+.rt ::ng-deep .wc2-normal:hover { background: #eef3f9; color: var(--primary); }
 .rt ::ng-deep .NgxEditor__Seperator { border-left: 1px solid var(--border); height: 18px; margin: 0 4px; }
 .rt ::ng-deep .NgxEditor__Dropdown { height: 26px; min-width: 40px; }
 .rt ::ng-deep .NgxEditor__Dropdown--Text { font-size: 12.5px; font-weight: 600; color: var(--t2); }

@@ -13,23 +13,23 @@
       <br>
       <mat-form-field appearance="outline">
         <mat-label>Total Participant Required</mat-label>
-        <input matInput formControlName="totalinvited" type="number">
+        <input data-testid="cbiv-inp-1" matInput formControlName="totalinvited" type="number">
         <mat-error *ngIf="invitationForm.controls['totalinvited'].hasError('required')">Required</mat-error>
       </mat-form-field>
       <br>
       <mat-form-field appearance="outline">
         <mat-label>Invitation Duration (Mins)</mat-label>
-        <input matInput formControlName="duration" type="number">
+        <input data-testid="cbiv-inp-2" matInput formControlName="duration" type="number">
         <mat-error *ngIf="invitationForm.controls['duration'].hasError('required')">Required</mat-error>
       </mat-form-field>
       <br>
       <mat-form-field appearance="outline">
         <mat-label>Expiry Time</mat-label>
-        <input matInput formControlName="expirydate" type="datetime-local">
+        <input data-testid="cbiv-inp-3" matInput formControlName="expirydate" type="datetime-local">
         <mat-error *ngIf="invitationForm.controls['expirydate'].hasError('required')">Required</mat-error>
       </mat-form-field>
       <div>
-        <button mat-stroked-button class="cancelbtn" type="button" (click)="dialogRef.close(null)" [disabled]="loading">Cancel</button>
+        <button data-testid="cbiv-btn-4" mat-stroked-button class="cancelbtn" type="button" (click)="dialogRef.close(null)" [disabled]="loading">Cancel</button>
         <button mat-stroked-button class="submitbtn" type="submit" [disabled]="invitationForm.invalid || loading" data-testid="bulkinv-submit-btn">{{loading ? 'Sending Invitation...' : 'Send Invitation'}}</button>
       </div>
     </form>

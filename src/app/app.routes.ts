@@ -281,6 +281,7 @@ export const routes: Routes = [
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
   {path: 'email-templates', loadComponent: () => import('./Communication Center/create-email-template/create-email-template.component').then(m => m.CreateEmailTemplateComponent), canActivate:[authGuard]},
   {path: 'communication', loadComponent: () => import('./Communication Center/communication/communication.component').then(m => m.CommunicationComponent), canActivate:[authGuard]},
+  {path: 'communication-grid-planner', loadComponent: () => import('./Communication Center/communication-grid-planner/communication-grid-planner.component').then(m => m.CommunicationGridPlannerComponent), canActivate:[authGuard]},
 
   // New Workshop
   {path: 'create-workshop', loadComponent: () => import('./New-Workshop/create-workshop/create-workshop.component').then(m => m.CreateWorkshopComponent),canActivate:[authGuard]},

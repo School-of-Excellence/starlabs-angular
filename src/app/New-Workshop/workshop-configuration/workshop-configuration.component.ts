@@ -172,7 +172,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
   assignmenteditors: { [key: string]: Editor } = {};
   cpwelcomeeditors: { [key: string]: Editor } = {};
   // Dynamic Enrollment Configuration — one ngx-editor per rich-text control,
-  // keyed by stable block/item uid so editors survive add/remove/reorder.
+  // keyed by stable block/item uid so editors survive add/remove/reorder...
   dynamicEditors: { [key: string]: Editor } = {};
   private deUidCounter = 0;
   // Collapsed block uids (drag-drop provides ordering; no sequence number shown).

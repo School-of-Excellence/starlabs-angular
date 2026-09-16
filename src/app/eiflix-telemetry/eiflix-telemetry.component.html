@@ -5,8 +5,8 @@
       <div><h1>Session Telemetry</h1><div class="sub">{{ collectionName }}</div></div>
     </div>
     <div class="tabs">
-      <button [class.active]="tab === 'overview'" (click)="setTab('overview')">Overview</button>
-      <button [class.active]="tab === 'sessions'" (click)="setTab('sessions')">Sessions</button>
+      <button data-testid="ett-settab" [class.active]="tab === 'overview'" (click)="setTab('overview')">Overview</button>
+      <button data-testid="ett-settab-2" [class.active]="tab === 'sessions'" (click)="setTab('sessions')">Sessions</button>
     </div>
     <div class="right">
       <div class="gstats">
@@ -15,7 +15,7 @@
         <span><b>{{ totalErrors }}</b> errors</span>
         <span><b>{{ users.length }}</b> users</span>
       </div>
-      <button class="loadbtn" (click)="reload()" [disabled]="loading">
+      <button data-testid="ett-reload" class="loadbtn" (click)="reload()" [disabled]="loading">
         <svg viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         {{ loading ? 'Loading…' : 'Reload' }}
       </button>
@@ -27,14 +27,14 @@
     <div class="ovbar">
       <span class="live"><span class="dot"></span>{{ collectionName }} · snapshot</span>
       <div class="seg">
-        <button [class.active]="ovPlat === 'all'" (click)="setOvPlat('all')">all</button>
-        <button [class.active]="ovPlat === 'android'" (click)="setOvPlat('android')">android</button>
-        <button [class.active]="ovPlat === 'ios'" (click)="setOvPlat('ios')">ios</button>
+        <button data-testid="ett-setovplat" [class.active]="ovPlat === 'all'" (click)="setOvPlat('all')">all</button>
+        <button data-testid="ett-setovplat-2" [class.active]="ovPlat === 'android'" (click)="setOvPlat('android')">android</button>
+        <button data-testid="ett-setovplat-3" [class.active]="ovPlat === 'ios'" (click)="setOvPlat('ios')">ios</button>
       </div>
       <div class="seg">
-        <button [class.active]="ovWin === 7" (click)="setOvWin(7)">7d</button>
-        <button [class.active]="ovWin === 30" (click)="setOvWin(30)">30d</button>
-        <button [class.active]="ovWin === 0" (click)="setOvWin(0)">all</button>
+        <button data-testid="ett-setovwin" [class.active]="ovWin === 7" (click)="setOvWin(7)">7d</button>
+        <button data-testid="ett-setovwin-2" [class.active]="ovWin === 30" (click)="setOvWin(30)">30d</button>
+        <button data-testid="ett-setovwin-3" [class.active]="ovWin === 0" (click)="setOvWin(0)">all</button>
       </div>
     </div>
 
@@ -178,12 +178,12 @@
         <div class="feed-ctl">
           <div class="feed-search">
             <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <input [(ngModel)]="feedSearch" (ngModelChange)="onFeedSearch()" placeholder="Search message, type, user, screen…" />
+            <input data-testid="ett-search-message-type-user-screen" [(ngModel)]="feedSearch" (ngModelChange)="onFeedSearch()" placeholder="Search message, type, user, screen…" />
           </div>
           <div class="seg">
-            <button [class.active]="feedLevel === 'all'" (click)="setFeedLevel('all')">all</button>
-            <button [class.active]="feedLevel === 'error'" (click)="setFeedLevel('error')">error</button>
-            <button [class.active]="feedLevel === 'fatal'" (click)="setFeedLevel('fatal')">fatal</button>
+            <button data-testid="ett-setfeedlevel" [class.active]="feedLevel === 'all'" (click)="setFeedLevel('all')">all</button>
+            <button data-testid="ett-setfeedlevel-2" [class.active]="feedLevel === 'error'" (click)="setFeedLevel('error')">error</button>
+            <button data-testid="ett-setfeedlevel-3" [class.active]="feedLevel === 'fatal'" (click)="setFeedLevel('fatal')">fatal</button>
           </div>
         </div>
 
@@ -191,16 +191,16 @@
           <thead>
             <tr>
               <th class="cw"></th>
-              <th class="sortable" (click)="setFeedSort('time')">time <span class="sarr" *ngIf="feedSort === 'time'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
-              <th class="sortable" (click)="setFeedSort('user')">user <span class="sarr" *ngIf="feedSort === 'user'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
-              <th class="sortable" (click)="setFeedSort('type')">type <span class="sarr" *ngIf="feedSort === 'type'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
-              <th class="sortable" (click)="setFeedSort('screen')">screen <span class="sarr" *ngIf="feedSort === 'screen'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th data-testid="ett-setfeedsort" class="sortable" (click)="setFeedSort('time')">time <span class="sarr" *ngIf="feedSort === 'time'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th data-testid="ett-setfeedsort-2" class="sortable" (click)="setFeedSort('user')">user <span class="sarr" *ngIf="feedSort === 'user'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th data-testid="ett-setfeedsort-3" class="sortable" (click)="setFeedSort('type')">type <span class="sarr" *ngIf="feedSort === 'type'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
+              <th data-testid="ett-setfeedsort-4" class="sortable" (click)="setFeedSort('screen')">screen <span class="sarr" *ngIf="feedSort === 'screen'">{{ feedDir === 'asc' ? '▲' : '▼' }}</span></th>
               <th>message</th>
             </tr>
           </thead>
           <tbody>
             <ng-container *ngFor="let r of feedVM.rows">
-              <tr class="frow" [class.exp]="feedExpanded.has(r.id)" (click)="toggleFeedRow(r.id)">
+              <tr data-testid="ett-togglefeedrow" class="frow" [class.exp]="feedExpanded.has(r.id)" (click)="toggleFeedRow(r.id)">
                 <td class="cw"><span class="rchev" [class.open]="feedExpanded.has(r.id)"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
                 <td class="tm">{{ r.time }}<br><span style="color:var(--low)">{{ r.rel }}</span></td>
                 <td><div class="usr"><div class="ava">{{ r.initials }}</div><div>{{ r.name }}<br><span style="font-family:var(--mono);font-size:10px;color:var(--low)">{{ r.platform }}</span></div></div></td>
@@ -236,9 +236,9 @@
         <div class="feed-pg" *ngIf="feedVM.total">
           <span class="pg-info">showing {{ feedVM.from }}–{{ feedVM.to }} of {{ feedVM.total }}</span>
           <div class="pg-btns">
-            <button (click)="feedPrev()" [disabled]="feedVM.page === 0">‹ prev</button>
+            <button data-testid="ett-feedprev" (click)="feedPrev()" [disabled]="feedVM.page === 0">‹ prev</button>
             <span class="pg-cur">page {{ feedVM.page + 1 }} / {{ feedVM.pageCount }}</span>
-            <button (click)="feedNext()" [disabled]="feedVM.page >= feedVM.pageCount - 1">next ›</button>
+            <button data-testid="ett-feednext" (click)="feedNext()" [disabled]="feedVM.page >= feedVM.pageCount - 1">next ›</button>
           </div>
         </div>
       </div>
@@ -252,11 +252,11 @@
         <div class="t">{{ users.length }} users · {{ totalSessions }} sessions · {{ totalLogs }} logs</div>
         <div class="search">
           <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          <input [(ngModel)]="query" placeholder="Find user or device…" />
+          <input data-testid="ett-find-user-or-device" [(ngModel)]="query" placeholder="Find user or device…" />
         </div>
       </div>
       <div class="users">
-        <div class="uitem" *ngFor="let r of railUsers" [class.active]="r.idx === ui" (click)="selectUser(r.idx)">
+        <div data-testid="ett-selectuser" class="uitem" *ngFor="let r of railUsers" [class.active]="r.idx === ui" (click)="selectUser(r.idx)">
           <div class="ava">{{ r.initials }}<span class="stat" [ngClass]="r.sev"></span></div>
           <div class="uinfo"><div class="n">{{ r.name }}</div><div class="s">{{ r.deviceModel }}</div></div>
           <div class="ucount"><b>{{ r.sessionCount }}</b> sess<br>{{ r.totalLogs }} logs</div>
@@ -303,16 +303,16 @@
           <div class="ctl">
             <span class="gl">date range</span>
             <div class="daterow">
-              <input type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="from" (ngModelChange)="recomputeMain()">
+              <input data-testid="ett-input" type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="from" (ngModelChange)="recomputeMain()">
               <span class="arr">→</span>
-              <input type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="to" (ngModelChange)="recomputeMain()">
-              <button class="resetbtn" (click)="resetDates()">reset</button>
+              <input data-testid="ett-input-2" type="date" [min]="selUser?.dateMin" [max]="selUser?.dateMax" [(ngModel)]="to" (ngModelChange)="recomputeMain()">
+              <button data-testid="ett-resetdates" class="resetbtn" (click)="resetDates()">reset</button>
             </div>
           </div>
           <div class="ctl">
             <span class="gl">type</span>
             <div class="chiprow">
-              <button class="chipf" *ngFor="let t of typeChips" [class.active]="fType === t.k" (click)="setType(t.k)">
+              <button data-testid="ett-settype" class="chipf" *ngFor="let t of typeChips" [class.active]="fType === t.k" (click)="setType(t.k)">
                 <span class="dotleg" *ngIf="t.c" [style.background]="t.c"></span>{{ t.label }}<span class="n">{{ m.tC[t.k] || 0 }}</span>
               </button>
             </div>
@@ -320,7 +320,7 @@
           <div class="ctl">
             <span class="gl">level</span>
             <div class="chiprow">
-              <button class="chipf" *ngFor="let lv of levelChips" [class.active]="fLevel === lv.k" (click)="setLevel(lv.k)">
+              <button data-testid="ett-setlevel" class="chipf" *ngFor="let lv of levelChips" [class.active]="fLevel === lv.k" (click)="setLevel(lv.k)">
                 <span class="dotleg" *ngIf="lv.c" [style.background]="lv.c"></span>{{ lv.label }}<span class="n">{{ m.lC[lv.k] || 0 }}</span>
               </button>
             </div>
@@ -330,7 +330,7 @@
 
         <ng-container *ngIf="m.sessions.length; else noSess">
           <div class="sess" *ngFor="let s of m.sessions" [class.open]="s.open">
-            <div class="sess-head" (click)="toggleSession(s.sessionId)">
+            <div data-testid="ett-togglesession" class="sess-head" (click)="toggleSession(s.sessionId)">
               <span class="chev"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
               <div class="sess-when">
                 <div class="rng">{{ s.rng }}<span class="dur">{{ s.dur }}</span></div>

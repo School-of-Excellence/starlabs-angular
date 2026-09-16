@@ -2,7 +2,7 @@
     <mat-progress-bar mode="indeterminate"></mat-progress-bar>
   </div>
 <div *ngIf="!loading" style="padding: 20px;">
-    <button mat-icon-button
+    <button data-testid="lem-close-dialog-1" mat-icon-button
             (click)="closeDialog()"
             [disabled]="disableButton"
             matTooltip="Close"
@@ -40,7 +40,7 @@
         <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
             <td mat-cell *matCellDef="let element">
-                <button mat-fab color="warn" (click)="deleteVideo(element)" matTooltip="delete" aria-label="delete icon">
+                <button data-testid="lem-delete-video-2" mat-fab color="warn" (click)="deleteVideo(element)" matTooltip="delete" aria-label="delete icon">
                     <mat-icon>delete</mat-icon>
                 </button>
             </td>
@@ -51,10 +51,10 @@
       
       <mat-paginator [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons></mat-paginator>
       <div style="display: flex; justify-content: center">
-        <button (click)="makeLive()" [disabled]="disableButton" mat-raised-button class="custom-green-button"> <b>
+        <button data-testid="lem-make-live-3" (click)="makeLive()" [disabled]="disableButton" mat-raised-button class="custom-green-button"> <b>
             {{isMake ? 'Make Live' : 'Update'}}
         </b></button>&nbsp;&nbsp;&nbsp;
-        <button (click)="closeDialog()" mat-raised-button color="warn" [disabled]="disableButton"> <b>close</b></button>
+        <button data-testid="lem-close-dialog-4" (click)="closeDialog()" mat-raised-button color="warn" [disabled]="disableButton"> <b>close</b></button>
         </div>
     <!-- <button (click)="makeLive()" [disabled]="disableButton" mat-raised-button class="custom-green-button" style="width: 100%;"> <b>
     {{isMake ? 'Make Live' : 'Update'}}

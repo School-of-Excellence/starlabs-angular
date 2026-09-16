@@ -27,13 +27,13 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Name</mat-label>
-                    <input matInput formControlName="queuename">
+                    <input data-testid="qcv3-inp-1" matInput formControlName="queuename">
                     <mat-error *ngIf="queueform.controls['queuename'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                   
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Mentor</mat-label>
-                    <mat-select formControlName="queuementor" multiple>
+                    <mat-select data-testid="qcv3-sel-2" formControlName="queuementor" multiple>
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filterprofile" 
                                                [ngModelOptions]="{standalone: true}" 
@@ -53,7 +53,7 @@
     
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Admin</mat-label>
-                    <mat-select formControlName="queueadmin" multiple>
+                    <mat-select data-testid="qcv3-sel-3" formControlName="queueadmin" multiple>
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filterprofile" 
                                                [ngModelOptions]="{standalone: true}" 
@@ -88,8 +88,8 @@
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Start & End date</mat-label>
                     <mat-date-range-input [rangePicker]="picker">
-                      <input matStartDate formControlName="queuestartdate" placeholder="Start date">
-                      <input matEndDate formControlName="queueenddate" placeholder="End date">
+                      <input data-testid="qcv3-inp-4" matStartDate formControlName="queuestartdate" placeholder="Start date">
+                      <input data-testid="qcv3-inp-5" matEndDate formControlName="queueenddate" placeholder="End date">
                     </mat-date-range-input>
                     <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                     <mat-date-range-picker #picker></mat-date-range-picker>
@@ -103,7 +103,7 @@
                   
                   <mat-form-field appearance="outline">
                     <mat-label>Venue</mat-label>
-                    <mat-select formControlName="venue">
+                    <mat-select data-testid="qcv3-sel-6" formControlName="venue">
                       <mat-option *ngFor="let list of venueList" [value]="list.location">
                         {{list.location}}
                       </mat-option>
@@ -113,7 +113,7 @@
 
                   <mat-form-field appearance="outline">
                     <mat-label>Package Eligibility</mat-label>
-                    <mat-select formControlName="packageeligibility" multiple>
+                    <mat-select data-testid="qcv3-sel-7" formControlName="packageeligibility" multiple>
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filterpackageeligibility" 
                                                [ngModelOptions]="{standalone: true}" 
@@ -132,7 +132,7 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Queue Event Description</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="description"></textarea>
+                    <textarea data-testid="qcv3-txt-8" matInput rows="2" class="custom-textarea" formControlName="description"></textarea>
                     <mat-error *ngIf="queueform.controls['description'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -141,7 +141,7 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Queue Intro Event Description</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="introdescription"></textarea>
+                    <textarea data-testid="qcv3-txt-9" matInput rows="2" class="custom-textarea" formControlName="introdescription"></textarea>
                     <mat-error *ngIf="queueform.controls['introdescription'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -170,13 +170,13 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Target Capacity Per Day</mat-label>
-                    <input matInput type="number" formControlName="queuetargetcapacity">
+                    <input data-testid="qcv3-inp-10" matInput type="number" formControlName="queuetargetcapacity">
                     <mat-error *ngIf="queueform.controls['queuetargetcapacity'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                   
                   <mat-form-field appearance="outline">
                     <mat-label>Total Capacity</mat-label>
-                    <input matInput type="number" formControlName="totalcapacity">
+                    <input data-testid="qcv3-inp-11" matInput type="number" formControlName="totalcapacity">
                     <mat-error *ngIf="queueform.controls['totalcapacity'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -184,13 +184,13 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline">
                     <mat-label>Queue Welcome Template</mat-label>
-                    <input matInput formControlName="queuewelcometemplate">
+                    <input data-testid="qcv3-inp-12" matInput formControlName="queuewelcometemplate">
                     <mat-error *ngIf="queueform.controls['queuewelcometemplate'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                   
                   <mat-form-field appearance="outline">
                     <mat-label>Last Registration Date</mat-label>
-                    <input matInput [matDatepicker]="lastRegDatePicker" formControlName="lastregistrationdate">
+                    <input data-testid="qcv3-inp-13" matInput [matDatepicker]="lastRegDatePicker" formControlName="lastregistrationdate">
                     <mat-datepicker-toggle matSuffix [for]="lastRegDatePicker"></mat-datepicker-toggle>
                     <mat-datepicker #lastRegDatePicker></mat-datepicker>
                     <mat-error *ngIf="queueform.controls['lastregistrationdate'].invalid || showErrorMessages">Required</mat-error>
@@ -203,7 +203,7 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Title</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="queuewelcometitle"></textarea>
+                    <textarea data-testid="qcv3-txt-14" matInput rows="2" class="custom-textarea" formControlName="queuewelcometitle"></textarea>
                     <mat-error *ngIf="queueform.controls['queuewelcometitle'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -211,7 +211,7 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Description</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="queuewelcomedescription"></textarea>
+                    <textarea data-testid="qcv3-txt-15" matInput rows="2" class="custom-textarea" formControlName="queuewelcomedescription"></textarea>
                     <mat-error *ngIf="queueform.controls['queuewelcomedescription'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -219,7 +219,7 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Message for Token who are queued</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="queuedmessage"></textarea>
+                    <textarea data-testid="qcv3-txt-16" matInput rows="2" class="custom-textarea" formControlName="queuedmessage"></textarea>
                     <mat-error *ngIf="queueform.controls['queuedmessage'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
@@ -227,15 +227,15 @@
                 <div class="form-row">
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>Message for Token who are Waiting</mat-label>
-                    <textarea matInput rows="2" class="custom-textarea" formControlName="waitingmessage"></textarea>
+                    <textarea data-testid="qcv3-txt-17" matInput rows="2" class="custom-textarea" formControlName="waitingmessage"></textarea>
                     <mat-error *ngIf="queueform.controls['waitingmessage'].invalid || showErrorMessages">Required</mat-error>
                   </mat-form-field>
                 </div>
               </div>
       
               <div class="form-actions">
-                <button mat-stroked-button type="button" (click)="onNoClick()">Back</button>
-                <button mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
+                <button data-testid="qcv3-btn-18" mat-stroked-button type="button" (click)="onNoClick()">Back</button>
+                <button data-testid="qcv3-btn-19" mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
                   Proceed to Product Mapping
                   <mat-icon>arrow_forward</mat-icon>
                 </button>
@@ -252,7 +252,7 @@
               <div class="subform text-center">
                 <h4 class="text-secondary text-center mb-4" style="font-size: 16px;">Map Events to Queue</h4>
                 <mat-form-field appearance="outline" style="width: 350px;padding: 20px;">
-                  <mat-select placeholder="Select Event" formControlName="eventid" multiple>
+                  <mat-select data-testid="qcv3-sel-20" placeholder="Select Event" formControlName="eventid" multiple>
                     <!-- <mat-option>
                       <ngx-mat-select-search [(ngModel)]="filterEvent" placeholderLabel="Search"
                         noEntriesFoundLabel="No matching records found"></ngx-mat-select-search>
@@ -268,11 +268,11 @@
                 <div class="text-left" *ngFor="let control of productsArray.controls;let i = index" [formGroupName]="i">
                  <mat-form-field class="inputfields me-2" appearance="outline">
                     <mat-label>Event Display Name</mat-label>
-                    <input matInput formControlName="title">
+                    <input [attr.data-testid]="'qcv3-inp-21-' + i" matInput formControlName="title">
                   </mat-form-field>
                   <mat-form-field class="inputfields" appearance="outline">
                     <mat-label>Eligible Product</mat-label>
-                    <mat-select [compareWith]="compareFn" matNativeControl  formControlName="productref">
+                    <mat-select [attr.data-testid]="'qcv3-sel-22-' + i" [compareWith]="compareFn" matNativeControl  formControlName="productref">
                       <mat-option *ngFor="let product of productsList" [value]="product.ref">{{product.product}}</mat-option>
                     </mat-select>
                   </mat-form-field>
@@ -281,8 +281,8 @@
                   <mat-form-field class="inputfields" appearance="outline">
                     <mat-label>Event Date</mat-label>
                     <mat-date-range-input [rangePicker]="picker" >
-                      <input matStartDate (click)="picker.open()" formControlName="startdate">
-                      <input matEndDate (click)="picker.open()" formControlName="enddate">
+                      <input [attr.data-testid]="'qcv3-inp-23-' + i" matStartDate (click)="picker.open()" formControlName="startdate">
+                      <input [attr.data-testid]="'qcv3-inp-24-' + i" matEndDate (click)="picker.open()" formControlName="enddate">
                     </mat-date-range-input>
                     <mat-datepicker-toggle matSuffix [for]="picker" ></mat-datepicker-toggle>
                     <mat-date-range-picker touchUi #picker></mat-date-range-picker>
@@ -290,13 +290,13 @@
 
                   <mat-checkbox formControlName="heroevent" class="me-2">Hero Event</mat-checkbox>
                   <mat-slide-toggle *ngIf="control.value['deliveryref'] != null" formControlName="delete">{{control.value['delete'] ? "Deleted" : "Delete"}}</mat-slide-toggle>
-                  <button *ngIf="control.value['deliveryref'] == null" class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)"><mat-icon>close</mat-icon></button>
+                  <button [attr.data-testid]="'qcv3-btn-25-' + i" *ngIf="control.value['deliveryref'] == null" class="buttons" mat-icon-button type="button" (click)="removeproductsArray(i)"><mat-icon>close</mat-icon></button>
                   <!-- &nbsp;&nbsp;
                   <button mat-icon-button type="button" (click)="addproductsArray()"><mat-icon>add</mat-icon></button>
                   &nbsp;&nbsp;
                   <button *ngIf="(productsArray.controls.length - 1) != 0"  mat-icon-button type="button" (click)="removeproductsArray(i)" [disabled]="control.value['delete']"><mat-icon>remove</mat-icon></button> -->
                 </div>
-                <button mat-stroked-button type="button" (click)="addproductsArray()">Add New Arena Events</button>
+                <button data-testid="qcv3-btn-26" mat-stroked-button type="button" (click)="addproductsArray()">Add New Arena Events</button>
               </div>
             </div>
 
@@ -317,7 +317,7 @@
                   class="example-box"
                   cdkDrag>
                   {{stages}}
-                  <button matChipRemove *ngIf="removable" [attr.aria-label]="'remove ' + stages">
+                  <button [attr.data-testid]="'qcv3-btn-27-' + stages" matChipRemove *ngIf="removable" [attr.aria-label]="'remove ' + stages">
                     <mat-icon>cancel</mat-icon>
                   </button>
                 </mat-chip-row>
@@ -336,8 +336,8 @@
             <br>
           
             <div class="form-actions">
-              <button mat-stroked-button type="button" (click)="goback()">Back</button>
-              <button mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
+              <button data-testid="qcv3-btn-28" mat-stroked-button type="button" (click)="goback()">Back</button>
+              <button data-testid="qcv3-btn-29" mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
                 Next Step
                 <mat-icon>arrow_forward</mat-icon>
               </button>
@@ -353,7 +353,7 @@
               <div class="stage-properties-container">
                 <div class="stage-sidebar">
                   <div class="stage-list">
-                    <div *ngFor="let stage of queueform.get('stages').value; let i = index" 
+                    <div [attr.data-testid]="'qcv3-act-30-' + i" *ngFor="let stage of queueform.get('stages').value; let i = index" 
                         [ngClass]="{'stage-item': true, 'completed': i < currentStageIndex, 'active': i === currentStageIndex}"
                         (click)="selectStage(i)">
                       <ng-container *ngIf="i < currentStageIndex">
@@ -375,23 +375,23 @@
                       <ng-container *ngIf="i === currentStageIndex">
                         *<mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Stage</mat-label>
-                          <input matInput type="text" formControlName="stage" readonly>
+                          <input [attr.data-testid]="'qcv3-inp-31-' + i" matInput type="text" formControlName="stage" readonly>
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Self Movable</mat-label>
-                          <mat-select formControlName="selfmovable">
+                          <mat-select [attr.data-testid]="'qcv3-sel-32-' + i" formControlName="selfmovable">
                             <mat-option *ngFor="let value of [true, false]" [value]="value">{{value}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Check Finance Status</mat-label>
-                          <mat-select formControlName="checkfinance">
+                          <mat-select [attr.data-testid]="'qcv3-sel-33-' + i" formControlName="checkfinance">
                             <mat-option *ngFor="let value of [true, false]" [value]="value">{{value}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Action Type</mat-label>
-                          <mat-select formControlName="actiontype">
+                          <mat-select [attr.data-testid]="'qcv3-sel-34-' + i" formControlName="actiontype">
                             <mat-option [value]="null">Not Required</mat-option>
                             <mat-option *ngFor="let value of stageActionTypes" [value]="value.toLowerCase()">{{value}}</mat-option>
                           </mat-select>
@@ -402,18 +402,18 @@
                         </mat-form-field>
                         <mat-form-field class="ml-4" style="margin-right: 10px;" *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'form'" appearance="outline">
                           <mat-label>Select Form Template</mat-label>
-                          <mat-select formControlName="actionresource">
+                          <mat-select [attr.data-testid]="'qcv3-sel-35-' + i" formControlName="actionresource">
                             <mat-option *ngFor="let form of formTemplateList" [value]="form.docid">{{form.formname}}</mat-option>
                           </mat-select>
                         </mat-form-field>
-                        <button class="ml-3"  style="margin-right: 10px;"
+                        <button [attr.data-testid]="'qcv3-btn-36-' + i" class="ml-3"  style="margin-right: 10px;"
                           *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'form' && ![null,undefined].includes(stagePropertyArray.controls[i].get('actionresource').value) && ![null,undefined].includes(data?.docid)" 
                           mat-stroked-button type="button" 
                           (click)="copyText(stagePropertyArray.controls[i].get('actionresource').value)"
                         >Copy Form Web Link</button>
                         <mat-form-field class="ml-4" *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'videoask'" appearance="outline">
                           <mat-label>Select VideoAsk Template</mat-label>
-                          <mat-select formControlName="actionresource" multiple>
+                          <mat-select [attr.data-testid]="'qcv3-sel-37-' + i" formControlName="actionresource" multiple>
                             <mat-option *ngFor="let videoask of videoAskList" [value]="videoask.docid">{{videoask.title}}</mat-option>
                           </mat-select>
                         </mat-form-field>
@@ -436,11 +436,11 @@
                           </section>
                         <mat-form-field class="ml-3" *ngIf="(stagePropertyArray.controls[i].get('actiontype').value == 'link' || stagePropertyArray.controls[i].get('actiontype').value == 'evolutionmapping')" appearance="outline">
                           <mat-label>Paste Link</mat-label>
-                          <input matInput type="text" formControlName="actionresource">
+                          <input [attr.data-testid]="'qcv3-inp-38-' + i" matInput type="text" formControlName="actionresource">
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Call to Action</mat-label>
-                          <input matInput type="text" formControlName="calltoaction">
+                          <input [attr.data-testid]="'qcv3-inp-39-' + i" matInput type="text" formControlName="calltoaction">
                         </mat-form-field>
                         <!-- <mat-form-field class="ml-3" appearance="outline">
                           <mat-label>Message Header</mat-label>
@@ -448,11 +448,11 @@
                         </mat-form-field> -->
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Min. Wating Minutes</mat-label>
-                          <input matInput type="number" formControlName="minwatingminutes">
+                          <input [attr.data-testid]="'qcv3-inp-40-' + i" matInput type="number" formControlName="minwatingminutes">
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 5px;" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Max. Wating Minutes</mat-label>
-                          <input matInput type="number" formControlName="maxwatingminutes">
+                          <input [attr.data-testid]="'qcv3-inp-41-' + i" matInput type="number" formControlName="maxwatingminutes">
                         </mat-form-field>
                         <!-- <mat-form-field class="ml-3" appearance="outline">
                           <mat-label>Banner Message</mat-label>
@@ -460,7 +460,7 @@
                         </mat-form-field> -->
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Stage Description</mat-label>
-                          <input matInput type="text" formControlName="stageexplanation">
+                          <input [attr.data-testid]="'qcv3-inp-42-' + i" matInput type="text" formControlName="stageexplanation">
                         </mat-form-field>
                         <!-- Stage Notes — each note targets a SELECTED stage
                              (need not be this stage). In the studio it shows
@@ -469,7 +469,7 @@
                         <div class="stage-note-block ml-3" style="margin-right:10px; width:100%;" [formArrayName]="'stagenote'">
                           <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                             <span style="font-weight:600; font-size:13px;">Stage Notes</span>
-                            <button mat-stroked-button type="button" color="primary"
+                            <button [attr.data-testid]="'qcv3-btn-43-' + i" mat-stroked-button type="button" color="primary"
                                     (click)="addStageNote(i)">
                               <mat-icon>add</mat-icon> Add Stage Note
                             </button>
@@ -479,16 +479,16 @@
                                style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                             <mat-form-field appearance="outline" style="width:220px;">
                               <mat-label>Stage</mat-label>
-                              <mat-select formControlName="stage">
+                              <mat-select [attr.data-testid]="'qcv3-sel-44-' + ni" formControlName="stage">
                                 <mat-option *ngFor="let st of queueform.get('stages').value" [value]="st">{{ st }}</mat-option>
                               </mat-select>
                             </mat-form-field>
                             <mat-form-field appearance="outline" style="flex:1; min-width:240px;">
                               <mat-label>Note</mat-label>
-                              <input matInput type="text" formControlName="note"
+                              <input [attr.data-testid]="'qcv3-inp-45-' + ni" matInput type="text" formControlName="note"
                                      placeholder="Shown to the specialist in the studio topbar">
                             </mat-form-field>
-                            <button mat-icon-button type="button" color="warn"
+                            <button [attr.data-testid]="'qcv3-btn-46-' + ni" mat-icon-button type="button" color="warn"
                                     (click)="removeStageNote(i, ni)"
                                     title="Delete stage note" aria-label="Delete stage note">
                               <mat-icon>delete</mat-icon>
@@ -497,20 +497,20 @@
                         </div>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Forms To Display</mat-label>
-                          <mat-select formControlName="participantform" multiple>
+                          <mat-select [attr.data-testid]="'qcv3-sel-47-' + i" formControlName="participantform" multiple>
                             <mat-option *ngFor="let form of formTemplateList" [value]="form.docid">{{form.formname}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <!-- New Studio Property -->
                         <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                           <mat-label>Studio Widgets</mat-label>
-                          <mat-select formControlName="studiowidgets" multiple >
+                          <mat-select [attr.data-testid]="'qcv3-sel-48-' + i" formControlName="studiowidgets" multiple >
                             <mat-option *ngFor="let widget of studioWidgetList" [value]="widget.value">{{widget.name}}</mat-option>
                           </mat-select>
                         </mat-form-field>
                         <mat-form-field class="ml-3" style="margin-right: 10px;" *ngIf="stagePropertyArray.controls[i].get('studiowidgets').value.includes('addunvalidatedatc') || stagePropertyArray.controls[i].get('studiowidgets').value.includes('addvalidatedatc')" appearance="outline">
                           <mat-label>CW Happens In</mat-label>
-                          <mat-select formControlName="implementationstages" multiple>
+                          <mat-select [attr.data-testid]="'qcv3-sel-49-' + i" formControlName="implementationstages" multiple>
                             <mat-option *ngFor="let stage of queueform.get('stages').value" [value]="stage">{{stage}}</mat-option>
                           </mat-select>
                         </mat-form-field>
@@ -531,10 +531,10 @@
                               </mat-select> 
                             </mat-form-field>
                           
-                            &nbsp;&nbsp;<button mat-icon-button type="button" (click)="addcompulsoryactivity(i)">
+                            &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-50-' + j" mat-icon-button type="button" (click)="addcompulsoryactivity(i)">
                               <mat-icon>add</mat-icon>
                             </button>
-                            &nbsp;&nbsp;<button mat-icon-button type="button" (click)="removecompulsoryactivity(i,j)">
+                            &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-51-' + j" mat-icon-button type="button" (click)="removecompulsoryactivity(i,j)">
                               <mat-icon>remove</mat-icon>
                             </button>
                           </div>
@@ -575,7 +575,7 @@
                             &nbsp;&nbsp;<button mat-icon-button type="button" (click)="removecompulsoryactivity(i,j)"><mat-icon>remove</mat-icon></button>
                           </div> -->
                           <div *ngIf="getCompulsoryActivityArray(i).controls.length === 0">
-                            &nbsp;&nbsp;<button mat-stroked-button type="button" (click)="addcompulsoryactivity(i)">Add Compulsory Activity</button>
+                            &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-52-' + i" mat-stroked-button type="button" (click)="addcompulsoryactivity(i)">Add Compulsory Activity</button>
                           </div>
                         </div>
                         <br>
@@ -585,18 +585,18 @@
                             <div style="display: flex; align-items: center; flex-wrap: wrap;">
                               <mat-form-field class="ml-3" appearance="outline">
                                 <mat-label>Stage</mat-label>
-                                <mat-select formControlName="stage">
+                                <mat-select [attr.data-testid]="'qcv3-sel-53-' + j" formControlName="stage">
                                   <mat-option *ngFor="let stage of queueform.controls['stages'].value" [value]="stage">{{stage}}</mat-option>
                                 </mat-select>
                               </mat-form-field>
                               <mat-form-field class="ml-3" appearance="outline">
                                 <mat-label>Next Call To Action</mat-label>
-                                <input matInput type="text" formControlName="calltoaction">
+                                <input [attr.data-testid]="'qcv3-inp-54-' + j" matInput type="text" formControlName="calltoaction">
                               </mat-form-field>
                               <mat-form-field class="ml-3" appearance="outline">
                                 <mat-label>Applicable Variations</mat-label>
-                                <mat-select formControlName="variations" multiple (openedChange)="!$event && getNextStageArray(i).controls[j].get('variations').markAsTouched()">
-                                  <div class="mat-option" style="padding: 12px 24px; cursor: pointer;" (click)="onSelectAllVariations(i, j)">
+                                <mat-select [attr.data-testid]="'qcv3-sel-55-' + j" formControlName="variations" multiple (openedChange)="!$event && getNextStageArray(i).controls[j].get('variations').markAsTouched()">
+                                  <div [attr.data-testid]="'qcv3-act-56-' + j" class="mat-option" style="padding: 12px 24px; cursor: pointer;" (click)="onSelectAllVariations(i, j)">
                                     <b>All Variations</b>
                                   </div>
                                   <mat-option *ngFor="let variation of variationArray.controls" [value]="variation.value.docid">
@@ -606,13 +606,13 @@
                                 <mat-error>select at least one variation</mat-error>
                               </mat-form-field>
                               <mat-checkbox class="ml-3" formControlName="markascompleted">Mark as Session Completed</mat-checkbox>
-                              &nbsp;&nbsp;<button mat-icon-button type="button" (click)="addNextStage(i)"><mat-icon>add</mat-icon></button>
-                              &nbsp;&nbsp;<button mat-icon-button type="button" (click)="removeNextStage(i,j)"><mat-icon>remove</mat-icon></button>
+                              &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-57-' + j" mat-icon-button type="button" (click)="addNextStage(i)"><mat-icon>add</mat-icon></button>
+                              &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-58-' + j" mat-icon-button type="button" (click)="removeNextStage(i,j)"><mat-icon>remove</mat-icon></button>
                             </div>
 
                           </div>
                           <div *ngIf="getNextStageArray(i).controls.length === 0">
-                            &nbsp;&nbsp;<button mat-stroked-button type="button" (click)="addNextStage(i)">Add Next Stage & Call to Action</button>
+                            &nbsp;&nbsp;<button [attr.data-testid]="'qcv3-btn-59-' + i" mat-stroked-button type="button" (click)="addNextStage(i)">Add Next Stage & Call to Action</button>
                           </div>
                         </div>
                         <br>
@@ -620,13 +620,13 @@
                           <h5 class="text-secondary text-left mb-3" style="font-size: 16px;">Studio Stage Group</h5>
                           <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                             <mat-label>Mandatory Stages</mat-label>
-                            <mat-select formControlName="mandatorystage" (selectionChange)="updateActivityMapping(i)" multiple>
+                            <mat-select [attr.data-testid]="'qcv3-sel-60-' + i" formControlName="mandatorystage" (selectionChange)="updateActivityMapping(i)" multiple>
                               <mat-option *ngFor="let stage of queueform.controls['stages'].value" [value]="stage">{{stage}}</mat-option>
                             </mat-select>
                           </mat-form-field>
                           <mat-form-field class="ml-3" style="margin-right: 10px;" appearance="outline">
                             <mat-label>Optional Stages</mat-label>
-                            <mat-select formControlName="optionalstage" multiple (selectionChange)="updateActivityMapping(i)">
+                            <mat-select [attr.data-testid]="'qcv3-sel-61-' + i" formControlName="optionalstage" multiple (selectionChange)="updateActivityMapping(i)">
                               <mat-option *ngFor="let stage of queueform.controls['stages'].value" [value]="stage">{{stage}}</mat-option>
                             </mat-select>
                           </mat-form-field>
@@ -634,13 +634,13 @@
                             <div *ngFor="let activity of getActivityMappingArray(i).controls; let k = index" [formGroupName]="k">
                               <mat-form-field class="ml-3" appearance="outline">
                                 <mat-label>Previous Activity</mat-label>
-                                <mat-select formControlName="activity" [disabled]="true">
+                                <mat-select [attr.data-testid]="'qcv3-sel-62-' + k" formControlName="activity" [disabled]="true">
                                   <mat-option *ngFor="let activity of bigactivity" [value]="activity.docid">{{activity.activity}}</mat-option>
                                 </mat-select>
                               </mat-form-field>
                               <mat-form-field class="ml-3" appearance="outline">
                                 <mat-label>Previous Activity</mat-label>
-                                <mat-select formControlName="newactivity">
+                                <mat-select [attr.data-testid]="'qcv3-sel-63-' + k" formControlName="newactivity">
                                   <mat-option *ngFor="let activity of bigactivity" [value]="activity.docid">{{activity.activity}}</mat-option>
                                 </mat-select>
                               </mat-form-field>
@@ -660,8 +660,8 @@
           </div>
           <!-- Footer with navigation buttons -->
           <div class="navigation-footer">
-            <button mat-stroked-button type="button" (click)="goback()">Back</button>
-            <button mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
+            <button data-testid="qcv3-btn-64" mat-stroked-button type="button" (click)="goback()">Back</button>
+            <button data-testid="qcv3-btn-65" mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
               Next Process
               <mat-icon>arrow_forward</mat-icon>
             </button>
@@ -675,7 +675,7 @@
             <div class="stage-properties-container" style="margin-top:10px ;">
               <div class="stage-sidebar">
                 <div class="stage-list">
-                  <div *ngFor="let list of queueform.get('queuevariation')['controls']; let i = index" 
+                  <div [attr.data-testid]="'qcv3-act-66-' + i" *ngFor="let list of queueform.get('queuevariation')['controls']; let i = index" 
                         [ngClass]="{'stage-item': true, 'completed': i < currentStageIndex, 'active': i === currentStageIndex}"
                         (click)="selectStage(i)">
                       <ng-container *ngIf="i < currentStageIndex">
@@ -721,19 +721,19 @@
                         <div class="form-row">
                           <mat-form-field appearance="outline">
                             <mat-label>Variation Name</mat-label>
-                            <input matInput type="text" formControlName="variationname" autocomplete="off">
+                            <input [attr.data-testid]="'qcv3-inp-67-' + i" matInput type="text" formControlName="variationname" autocomplete="off">
                           </mat-form-field>
                           
                           <mat-form-field appearance="outline">
                             <mat-label>Queue Variation Stages</mat-label>
-                            <mat-select formControlName="variation" multiple>
+                            <mat-select [attr.data-testid]="'qcv3-sel-68-' + i" formControlName="variation" multiple>
                               <mat-option *ngFor="let stage of queueform.get('stages').value" [value]="stage">{{stage}}</mat-option>
                             </mat-select>
                           </mat-form-field>
                           
                           <mat-form-field appearance="outline">
                             <mat-label>ATC Model</mat-label>
-                            <mat-select formControlName="atcmodel">
+                            <mat-select [attr.data-testid]="'qcv3-sel-69-' + i" formControlName="atcmodel">
                               <mat-option [value]="null">Clear ATC Model</mat-option>
                               <mat-option *ngFor="let model of atcModelList" [value]="model">{{model}}</mat-option>
                             </mat-select>
@@ -748,10 +748,10 @@
                       
                       <!-- Variation Actions -->
                       <div class="variation-actions" [class.hidden]="editingVariation[i]">
-                        <button mat-icon-button  (click)="editVariation(i)">
+                        <button [attr.data-testid]="'qcv3-btn-70-' + i" mat-icon-button  (click)="editVariation(i)">
                           <mat-icon>edit</mat-icon>
                         </button>
-                        <button mat-icon-button  (click)="removeVariation(i)">
+                        <button [attr.data-testid]="'qcv3-btn-71-' + i" mat-icon-button  (click)="removeVariation(i)">
                           <mat-icon>delete</mat-icon>
                         </button>
                       </div>
@@ -760,7 +760,7 @@
                     </div>
                     
                     <!-- Add New Variation Button -->
-                    <button mat-stroked-button class="add-variation-btn" (click)="addVariation()" [disabled]="queueform.get('stages').value.length == 0">
+                    <button data-testid="qcv3-btn-72" mat-stroked-button class="add-variation-btn" (click)="addVariation()" [disabled]="queueform.get('stages').value.length == 0">
                       <mat-icon>add</mat-icon> Add New Variation
                     </button>
                   </div>
@@ -773,23 +773,23 @@
               <div class="text-left" *ngFor="let list of stageGroupArray.controls; let i = index" [formGroupName]="i">
                 <mat-form-field class="formfield mr-3" appearance="outline">
                   <mat-label>Group name</mat-label>
-                  <input matInput type="text" formControlName="groupname">
+                  <input [attr.data-testid]="'qcv3-inp-73-' + i" matInput type="text" formControlName="groupname">
                 </mat-form-field>
                 <mat-form-field class="formfield mr-3" appearance="outline">
                   <mat-label>Select Stages</mat-label>
-                  <mat-select formControlName="stages" multiple>
+                  <mat-select [attr.data-testid]="'qcv3-sel-74-' + i" formControlName="stages" multiple>
                     <mat-option *ngFor="let stages of queueform.get('stages').value" [value]="stages">{{stages}}</mat-option>
                   </mat-select>
                 </mat-form-field>
-                <button mat-mini-fab  (click)="removeStageGroup(i)" type="button"> <mat-icon>remove</mat-icon></button>
+                <button [attr.data-testid]="'qcv3-btn-75-' + i" mat-mini-fab  (click)="removeStageGroup(i)" type="button"> <mat-icon>remove</mat-icon></button>
               </div>
             </div>
             <div style="display: flex;align-items: center;justify-content: center;margin-top: 10px;">
-              <button type="button" class="btn btn-info" (click)="addStageGroup()" [disabled]="queueform.get('stages').value.length == 0">Create Group Stage</button>
+              <button data-testid="qcv3-btn-76" type="button" class="btn btn-info" (click)="addStageGroup()" [disabled]="queueform.get('stages').value.length == 0">Create Group Stage</button>
             </div>
             <div class="navigation-footer">
-              <button mat-stroked-button type="button" (click)="goback()">Back</button>
-              <button mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
+              <button data-testid="qcv3-btn-77" mat-stroked-button type="button" (click)="goback()">Back</button>
+              <button data-testid="qcv3-btn-78" mat-flat-button color="primary" type="button" (click)="proceedToNextstage()">
                 Next Process
                 <mat-icon>arrow_forward</mat-icon>
               </button>
@@ -931,10 +931,10 @@
           </div>
           
           <div class="navigation-footer">
-            <button mat-stroked-button type="button" (click)="goback()">
+            <button data-testid="qcv3-btn-79" mat-stroked-button type="button" (click)="goback()">
               <mat-icon>arrow_back</mat-icon> Back
             </button>
-            <button mat-flat-button type="button" color="primary" (click)="onsubmit(queueform.getRawValue())">
+            <button data-testid="qcv3-btn-80" mat-flat-button type="button" color="primary" (click)="onsubmit(queueform.getRawValue())">
               <mat-icon>check</mat-icon> Submit
             </button>
           </div>
@@ -949,7 +949,7 @@
   <div class="tm-modal" *ngIf="cohortCreateModelData">
     <div class="tm-header">
       <span class="tm-header__title">Cohorts to create</span>
-      <button class="tm-header__close" (click)="closeCohortModel(false)">✕</button>
+      <button data-testid="qcv3-btn-81" class="tm-header__close" (click)="closeCohortModel(false)">✕</button>
     </div>
     <div *ngFor="let event of cohortCreateModelData | keyvalue">
       <p>{{mapEvents[$any(event).key]?.name}}</p>
@@ -1002,7 +1002,7 @@
                 [matTooltip]="studio.studioin ? 'Studio Enabled' : 'Studio Disabled'">
                 <mat-icon>{{ studio.studioin ? 'meeting_room' : 'no_meeting_room' }}</mat-icon>
               </button> -->
-              <button mat-stroked-button (click)="openCohortDialog($any(event).key , $any(activity).key)" [disabled]="$any(activity).value">
+              <button [attr.data-testid]="'qcv3-btn-82-' + i" mat-stroked-button (click)="openCohortDialog($any(event).key , $any(activity).key)" [disabled]="$any(activity).value">
                 <span *ngIf="!$any(activity).value">
                   <mat-icon>add</mat-icon>
                 create cohort
@@ -1018,7 +1018,7 @@
       </div>
     </div>
     <div class="tm-footer">
-      <button class="tm-bassignRolestn tm-btn--cancel" (click)="closeCohortModel(false)">Cancel</button>
+      <button data-testid="qcv3-btn-83" class="tm-bassignRolestn tm-btn--cancel" (click)="closeCohortModel(false)">Cancel</button>
       <!-- <button class="tm-btn tm-btn--proceed" (click)="closeCohortModel(true)">{{ textToShowInModel() ?'Done' : 'Procceed without cohort'}}</button> -->
     </div>
   </div>

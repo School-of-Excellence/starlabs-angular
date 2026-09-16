@@ -13,7 +13,7 @@
         <span class="header-subtitle">Journey Transition Analysis</span>
       </div>
     </div>
-    <button class="close-btn" (click)="closeDialog()">
+    <button data-testid="jcomd-btn-001" class="close-btn" (click)="closeDialog()">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 6L6 18M6 6l12 12"/>
       </svg>
@@ -36,7 +36,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
-          <input type="text" placeholder="Search category, startpoint, endpoint..." [(ngModel)]="searchTerm" (input)="filterData()"/>
+          <input data-testid="jcomd-inp-002" type="text" placeholder="Search category, startpoint, endpoint..." [(ngModel)]="searchTerm" (input)="filterData()"/>
         </div>
         <div class="toolbar-stats">
           <div class="stat-item">
@@ -78,7 +78,7 @@
                 </td>
               </tr>
               <!-- Category Rows -->
-              <tr *ngFor="let entry of category.value; let i = index" class="data-row" (click)="showProfiles(entry)">
+              <tr data-testid="jcomd-tr-003" *ngFor="let entry of category.value; let i = index" class="data-row" (click)="showProfiles(entry)">
                 <td class="td-category">
                   <span class="category-tag" [ngClass]="getCategoryColor(entry.category)">
                     {{ entry.category }}
@@ -132,7 +132,7 @@
             {{ selectedEntry.category }}: {{ selectedEntry.startpoint }} → {{ selectedEntry.endpoint }}
           </span>
         </div>
-        <button class="panel-close-btn" (click)="closeProfilePanel()">
+        <button data-testid="jcomd-btn-004" class="panel-close-btn" (click)="closeProfilePanel()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
@@ -146,7 +146,7 @@
             <span>{{ selectedEntry.profileIds.length }} Participants</span>
           </div>
           
-          <div class="profile-item" *ngFor="let profileId of selectedEntry.profileIds; let i = index" (click)="navigateToProfile(profileId)">
+          <div data-testid="jcomd-div-005" class="profile-item" *ngFor="let profileId of selectedEntry.profileIds; let i = index" (click)="navigateToProfile(profileId)">
             <div class="profile-sno">{{ i + 1 }}</div>
             <div class="profile-info">
               <span class="profile-id-text">{{ data.mapProfile[profileId] }}</span>

@@ -163,6 +163,10 @@ export class EmailInputComponent {
   /** How many templates to show in grid. Start at 12, expand on "Load more" */
   visibleTemplateCount = 12;
 
+  selectedParticipants = [];
+  communicationPlanner = null;
+  isFirstTime = true;
+
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
   private destroy$ = new Subject<void>();
@@ -185,13 +189,16 @@ export class EmailInputComponent {
       this.templateCategories = d['categories'];
       this.templateSubCategories = d['subcategories'];
     });
+ 
+    this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? []; 
+    this.communicationPlanner = !Array.isArray(this.data) ? this.data?.communicationDoc ?? null  : null;
 
-    if (this.data.length === 0) { this.selectedTabIndex = 1; }
+    if (this.selectedParticipants?.length === 0) { this.selectedTabIndex = 1; }
 
-    if (this.data) {
-      this.bufferDoc.profileid = this.data.map((e: any) => e.profileid);
-      this.bufferDoc.emailid = this.data.map((e: any) => e.email);
-      this.bufferDoc.emailmap = this.data.reduce((acc: any, e: any) => {
+    if (this.selectedParticipants.length > 0) {
+      this.bufferDoc.profileid = this.selectedParticipants.map((e: any) => e.profileid);
+      this.bufferDoc.emailid = this.selectedParticipants.map((e: any) => e.email);
+      this.bufferDoc.emailmap = this.selectedParticipants.reduce((acc: any, e: any) => {
         acc[e.email] = e.profileid; return acc;
       }, {});
 
@@ -257,6 +264,18 @@ export class EmailInputComponent {
         this.templateArray.push(t);
         this.tempTemplateArray.push(t);
       });
+
+      if (this.isFirstTime) {
+        const plannedEmailTemplate = this.communicationPlanner?.emailtemplate?.docid;
+        if (this.communicationPlanner && plannedEmailTemplate) {
+          const template = templates?.filter((temp)=>temp?.docid === plannedEmailTemplate);
+          if (template.length > 0) {
+            this.onTemplateChange(template[0]);
+          }
+        }
+
+        this.isFirstTime = false;
+      }
       this.filteredTemplates = [...this.templateArray];
       this.visibleTemplateCount = 12;
     });
@@ -618,7 +637,7 @@ export class EmailInputComponent {
     this.validEmails = [];
     this.invalidEmails = [];
     const existing = new Set<string>();
-    this.data.forEach((d: any) => {
+    this.selectedParticipants.forEach((d: any) => {
       const e = d?.['email'] || d?.['mail'];
       if (e) existing.add(e.trim().toLowerCase());
     });
@@ -716,7 +735,41 @@ export class EmailInputComponent {
     );
   }
 
+  checkSameDay(date: any) {
+    const plannerDate: Date | null = date?.toDate ? date.toDate() : date instanceof Date ? date : null;
+    const today = new Date();
+    if (!plannerDate) return true;
+    return plannerDate?.getDate() === today?.getDate() &&
+      plannerDate.getMonth() === today.getMonth() &&
+      plannerDate.getFullYear() === today.getFullYear();
+  }
+
+  // surya
+  isValidPlannedCommunication(){
+    if(![null , undefined , ''].includes(this.communicationPlanner)){
+      const plannedEmailTemplate = this.communicationPlanner?.emailtemplate?.docid ?? null;
+      if(!this.checkSameDay(this.communicationPlanner?.date)){
+        const date = this.communicationPlanner?.date?.toDate ? this.communicationPlanner?.date?.toDate() : new Date(this.communicationPlanner?.date);
+        alert(`You can't send email which is planner for ${date.toDateString()} instead you can queue it`);
+        return false
+      }
+
+      if ([null , undefined , ''].includes(plannedEmailTemplate)) {
+        alert(`Please Select Email Template for Titled : ${this.communicationPlanner?.title} in communication grid planner before sending email`);
+        return false;
+      }
+
+      if (this.selectedTemplate && this.selectedTemplate['docid'] !== plannedEmailTemplate) {
+        alert(`You can't send email selected template is invalid`);
+        return false
+      }
+
+    }
+    return true;
+  }
+
   async onSubmit(): Promise<void> {
+    if (!this.isValidPlannedCommunication()) { return }
     if (this.formValidation()) { alert('Please fill in all required fields...'); return; }
     if (confirm('Are you sure to send email to Participants?')) {
       if (!this.applyDeliveryHoldFilter()) return;
@@ -864,7 +917,7 @@ export class EmailInputComponent {
 
   getRecipientCount(): number { return this.bufferDoc.profileid.length; }
 
-  getRecipientList(): any[] { return this.data || []; }
+  getRecipientList(): any[] { return this.selectedParticipants || []; }
 
   // ─── Delivery hold (profile_data.deliveryonhold === true) ────────────────────
   isDeliveryOnHold(profileid: string): boolean {
