@@ -13,23 +13,23 @@
   <div class="header-section">
     <h1 class="main-title">Delivery Dashboard</h1>
     <!-- <div class="header-buttons">
-      <button class="export-btn">Export Report</button>
-      <button class="refresh-btn">Refresh Data</button>
+      <button data-testid="jdd-btn-001" class="export-btn">Export Report</button>
+      <button data-testid="jdd-btn-002" class="refresh-btn">Refresh Data</button>
     </div> -->
   </div>
 
   <div class="filter-buttons">
-    <button class="filter-btn" [class.active]="selectedTimeFilter === 'today'" (click)="onTodayFilterClick()"
+    <button data-testid="jdd-btn-003" class="filter-btn" [class.active]="selectedTimeFilter === 'today'" (click)="onTodayFilterClick()"
       style="pointer-events: auto; z-index: 1000;">
       Today
     </button>
-    <button class="filter-btn" [class.active]="selectedTimeFilter === '7days'" (click)="on7DaysFilterClick()">
+    <button data-testid="jdd-btn-004" class="filter-btn" [class.active]="selectedTimeFilter === '7days'" (click)="on7DaysFilterClick()">
       7 Days
     </button>
-    <button class="filter-btn" [class.active]="selectedTimeFilter === '30days'" (click)="on30DaysFilterClick()">
+    <button data-testid="jdd-btn-005" class="filter-btn" [class.active]="selectedTimeFilter === '30days'" (click)="on30DaysFilterClick()">
       30 Days
     </button>
-    <button class="filter-btn" [class.active]="selectedTimeFilter === 'thismonth'" (click)="onThisMonthFilterClick()">
+    <button data-testid="jdd-btn-006" class="filter-btn" [class.active]="selectedTimeFilter === 'thismonth'" (click)="onThisMonthFilterClick()">
       This Month
     </button>
   </div>
@@ -42,7 +42,7 @@
       <div class="card-label">URGENT: 7+ DAYS STUCK</div>
       <div class="card-number">{{originalData['clearedMoreThan7Days'].count}}</div>
       <div class="card-description">Participants need immediate attention</div>
-      <button class="card-button" (click)="onShow7DaysStuckClick()">TAKE ACTION NOW</button>
+      <button data-testid="jdd-btn-007" class="card-button" (click)="onShow7DaysStuckClick()">TAKE ACTION NOW</button>
     </div>
 
     <!-- Warning Card -->
@@ -50,7 +50,7 @@
       <div class="card-label">WARNING: 30+ DAYS</div>
       <div class="card-number">{{originalData['clearedMoreThan30Days'].count}}</div>
       <div class="card-description">Critical backlog requiring escalation</div>
-      <button class="card-button" (click)="on30DaysStuckClick()">REVIEW CASES</button>
+      <button data-testid="jdd-btn-008" class="card-button" (click)="on30DaysStuckClick()">REVIEW CASES</button>
     </div>
 
     <!-- Success Card -->
@@ -58,7 +58,7 @@
       <div class="card-label">SUCCESS: STARTED TODAY</div>
       <div class="card-number">{{originalData['initiatedToday'].count}}</div>
       <div class="card-description">Participants successfully initiated</div>
-      <button class="card-button" (click)="onInitiatedTodayClick()">VIEW DETAILS</button>
+      <button data-testid="jdd-btn-009" class="card-button" (click)="onInitiatedTodayClick()">VIEW DETAILS</button>
     </div>
 
     <!-- Ready Card -->
@@ -66,7 +66,7 @@
       <div class="card-label">READY: PAYMENT CLEARED</div>
       <div class="card-number">{{originalData['readyForInitiation'].count}}</div>
       <div class="card-description">Eligible for immediate initiation</div>
-      <button class="card-button" (click)="onBulkInitiateClick()">VIEW DETAILS</button>
+      <button data-testid="jdd-btn-010" class="card-button" (click)="onBulkInitiateClick()">VIEW DETAILS</button>
     </div>
   </div>
 </div>
@@ -77,7 +77,7 @@
     <h2 class="journey-title">Product Journey Flow Analysis</h2>
     <div class="product-selector">
       <label>Analyze Product:</label>
-      <select class="product-dropdown" (change)="onProductFilterChange($event)">
+      <select data-testid="jdd-sel-011" class="product-dropdown" (change)="onProductFilterChange($event)">
         <option>All Products Overview</option>
         <option>WISH</option>
         <option>A&H LIGHT</option>
@@ -104,7 +104,7 @@
 
     <div class="month-filter-container">
       <div class="month-filter">
-        <button class="month-nav-btn" (click)="goToPreviousMonth()" title="Previous Month">
+        <button data-testid="jdd-btn-012" class="month-nav-btn" (click)="goToPreviousMonth()" title="Previous Month">
           <mat-icon>chevron_left</mat-icon>
         </button>
 
@@ -113,7 +113,7 @@
           <span class="month-text">{{ displayMonth }}</span>
         </div>
 
-        <button class="month-nav-btn" (click)="goToNextMonth()" title="Next Month">
+        <button data-testid="jdd-btn-013" class="month-nav-btn" (click)="goToNextMonth()" title="Next Month">
           <mat-icon>chevron_right</mat-icon>
         </button>
       </div>
@@ -123,7 +123,7 @@
   <div class="kanban-board">
     <div class="kanban-row">
       <div class="kanban-column green-border">
-        <div class="column-header" (click)="onKanbanColumnClick('currentJourneyInitiated')" style="cursor: pointer;">
+        <div data-testid="jdd-div-014" class="column-header" (click)="onKanbanColumnClick('currentJourneyInitiated')" style="cursor: pointer;">
           <span class="column-name">Initiated</span>
           <span class="column-count">{{originalData['currentJourneyInitiated'].count}}</span>
         </div>
@@ -141,7 +141,7 @@
       </div>
 
       <div class="kanban-column red-border">
-        <div class="column-header" (click)="onKanbanColumnClick('welcomeCall')" style="cursor: pointer;">
+        <div data-testid="jdd-div-015" class="column-header" (click)="onKanbanColumnClick('welcomeCall')" style="cursor: pointer;">
           <span class="column-name">Welcome Call </span>
           <span class="column-count">{{originalData['welcomeCall'].count}}</span>
         </div>
@@ -159,7 +159,7 @@
       </div>
 
       <div class="kanban-column orange-border">
-        <div class="column-header " (click)="onKanbanColumnClick('clarityCall')" style="cursor: pointer;">
+        <div data-testid="jdd-div-016" class="column-header " (click)="onKanbanColumnClick('clarityCall')" style="cursor: pointer;">
           <span class="column-name">Clarity Call</span>
           <span class="column-count">{{originalData['clarityCall'].count}}</span>
         </div>
@@ -177,7 +177,7 @@
       </div>
 
       <div class="kanban-column orange-border">
-        <div class="column-header" (click)="onKanbanColumnClick('diagnostics')" style="cursor: pointer;">
+        <div data-testid="jdd-div-017" class="column-header" (click)="onKanbanColumnClick('diagnostics')" style="cursor: pointer;">
           <span class="column-name">Diagnostics</span>
           <span class="column-count">{{originalData['diagnostics'].count}}</span>
         </div>
@@ -195,7 +195,7 @@
       </div>
 
       <div class="kanban-column orange-border">
-        <div class="column-header" (click)="onKanbanColumnClick('implementation')" style="cursor: pointer;">
+        <div data-testid="jdd-div-018" class="column-header" (click)="onKanbanColumnClick('implementation')" style="cursor: pointer;">
           <span class="column-name">Implementation</span>
           <span class="column-count">{{originalData['implementation'].count}}</span>
         </div>
@@ -215,7 +215,7 @@
 
     <div class="kanban-row">
       <div class="kanban-column orange-border">
-        <div class="column-header " (click)="onKanbanColumnClick('midReviewDiagnostics')" style="cursor: pointer;">
+        <div data-testid="jdd-div-019" class="column-header " (click)="onKanbanColumnClick('midReviewDiagnostics')" style="cursor: pointer;">
           <span class="column-name">Mid Review - Diagnostics</span>
           <span class="column-count">{{originalData['midReviewDiagnostics'].count}}</span>
         </div>
@@ -233,7 +233,7 @@
       </div>
 
       <div class="kanban-column orange-border">
-        <div class="column-header" (click)="onKanbanColumnClick('implementationPhase2')" style="cursor: pointer;">
+        <div data-testid="jdd-div-020" class="column-header" (click)="onKanbanColumnClick('implementationPhase2')" style="cursor: pointer;">
           <span class="column-name">Implementation Phase 2</span>
           <span class="column-count">{{originalData['implementationPhase2'].count}}</span>
         </div>
@@ -251,7 +251,7 @@
       </div>
 
       <div class="kanban-column orange-border">
-        <div class="column-header" (click)="onKanbanColumnClick('finalReview')" style="cursor: pointer;">
+        <div data-testid="jdd-div-021" class="column-header" (click)="onKanbanColumnClick('finalReview')" style="cursor: pointer;">
           <span class="column-name">Final Review</span>
           <span class="column-count">{{originalData['finalReview'].count}}</span>
         </div>
@@ -269,7 +269,7 @@
       </div>
 
       <div class="kanban-column blue-border">
-        <div class="column-header" (click)="onKanbanColumnClick('completed')" style="cursor: pointer;">
+        <div data-testid="jdd-div-022" class="column-header" (click)="onKanbanColumnClick('completed')" style="cursor: pointer;">
           <span class="column-name">Completed</span>
           <span class="column-count">{{originalData['completed'].count}}</span>
         </div>
@@ -287,7 +287,7 @@
       </div>
 
       <div class="kanban-column blue-border">
-        <div class="column-header" (click)="onKanbanColumnClick('needsValidation')" style="cursor: pointer;">
+        <div data-testid="jdd-div-023" class="column-header" (click)="onKanbanColumnClick('needsValidation')" style="cursor: pointer;">
           <span class="column-name">Needs Validation</span>
           <span class="column-count">{{originalData['needsValidation'].count}}</span>
         </div>
@@ -311,8 +311,8 @@
   <div class="management-header">
     <h2 class="management-title">Participant Management & Actions</h2>
     <div class="management-actions">
-      <button class="action-btn primary">Bulk Initiate Ready</button>
-      <button class="action-btn primary" (click)="exportTableData()">Export List</button>
+      <button data-testid="jdd-btn-024" class="action-btn primary">Bulk Initiate Ready</button>
+      <button data-testid="jdd-btn-025" class="action-btn primary" (click)="exportTableData()">Export List</button>
     </div>
   </div>
 
@@ -326,9 +326,9 @@
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.35-4.35"></path>
           </svg>
-          <input type="text" class="search-input" placeholder="Search by name..." formControlName="search"
+          <input data-testid="jdd-inp-026" type="text" class="search-input" placeholder="Search by name..." formControlName="search"
             (input)="filterTableData()" />
-          <button *ngIf="filterForm.value.search" (click)="clearSearch()" class="clear-search-btn-icon"
+          <button data-testid="jdd-btn-027" *ngIf="filterForm.value.search" (click)="clearSearch()" class="clear-search-btn-icon"
             title="Clear search">
             ✕
           </button>
@@ -338,7 +338,7 @@
         <div class="filter-field">
           <mat-form-field appearance="outline">
             <mat-label>Journey</mat-label>
-            <mat-select placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
+            <mat-select data-testid="jdd-msel-028" placeholder="Select Journey" formControlName="journey" (selectionChange)="filterTableData()"
               multiple>
               <mat-option *ngFor="let journey of getUniqueJourneysForCurrentTab()" [value]="journey">{{ journey
                 }}</mat-option>
@@ -351,7 +351,7 @@
           *ngIf="currentTabIndex === 2 || activeFilter === 'todayActivity' || activeFilter === 'last7DaysActivity' || activeFilter === 'last30DaysActivity' || activeFilter === 'thisMonthActivity'">
           <mat-form-field appearance="outline">
             <mat-label>Product</mat-label>
-            <mat-select placeholder="Select Product" formControlName="product" (selectionChange)="filterTableData()"
+            <mat-select data-testid="jdd-msel-029" placeholder="Select Product" formControlName="product" (selectionChange)="filterTableData()"
               multiple>
               <mat-option *ngFor="let product of getUniqueProductsForCurrentTab()" [value]="product">{{ product
                 }}</mat-option>
@@ -360,7 +360,7 @@
         </div>
 
         <!-- Refresh Button -->
-        <button mat-mini-fab color="primary" (click)="refreshFilter()" title="Reset Filters">
+        <button data-testid="jdd-btn-030" mat-mini-fab color="primary" (click)="refreshFilter()" title="Reset Filters">
           <mat-icon>refresh</mat-icon>
         </button>
       </div>
@@ -384,7 +384,7 @@
           {{getFilterDisplayText()}}
           <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
         </span>
-        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+        <button data-testid="jdd-btn-031" class="clear-filter-btn" (click)="clearActiveFilter()">
           Clear Filter
         </button>
       </div>
@@ -395,7 +395,7 @@
             <tr>
               <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                 [style.width]="header.width">
-                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <input data-testid="jdd-inp-032" *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
                 <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
               </th>
             </tr>
@@ -421,7 +421,7 @@
           {{getFilterDisplayText()}}
           <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
         </span>
-        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+        <button data-testid="jdd-btn-033" class="clear-filter-btn" (click)="clearActiveFilter()">
           Clear Filter
         </button>
       </div>
@@ -432,7 +432,7 @@
             <tr>
               <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                 [style.width]="header.width">
-                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <input data-testid="jdd-inp-034" *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
                 <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
               </th>
             </tr>
@@ -466,7 +466,7 @@
           {{getFilterDisplayText()}}
           <span class="filter-count" *ngIf="getActiveFilterCount()"> ({{getActiveFilterCount()}})</span>
         </span>
-        <button class="clear-filter-btn" (click)="clearActiveFilter()">
+        <button data-testid="jdd-btn-035" class="clear-filter-btn" (click)="clearActiveFilter()">
           Clear Filter
         </button>
       </div>
@@ -477,7 +477,7 @@
             <tr>
               <th *ngFor="let header of getCurrentTabHeaders()" [class.checkbox-col]="header.key === 'checkbox'"
                 [style.width]="header.width">
-                <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+                <input data-testid="jdd-inp-036" *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
                 <span *ngIf="header.key !== 'checkbox'">{{header.label}}</span>
               </th>
             </tr>
@@ -496,7 +496,7 @@
         }">
         <td *ngFor="let header of getCurrentTabHeaders()">
           <!-- Checkbox -->
-          <input *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
+          <input data-testid="jdd-inp-037" *ngIf="header.key === 'checkbox'" type="checkbox" class="table-checkbox">
 
           <!-- Priority Badge -->
           <span *ngIf="header.key === 'priority'" class="priority-badge" [ngClass]="{
@@ -535,7 +535,7 @@
           </span>
 
           <span *ngIf="header.key === 'addnotes'">
-            <div (click)="addNotes(participant)">
+            <div data-testid="jdd-div-038" (click)="addNotes(participant)">
               <mat-icon class="edit-icon">edit_note</mat-icon>
             </div>
           </span>
@@ -545,7 +545,7 @@
             <div class="notes-container">
               <div *ngIf="participant['generalnotes']?.length > 0">
                 <div>
-                  <span (click)="viewNotes(participant, header.key)" class="note-text"
+                  <span data-testid="jdd-span-039" (click)="viewNotes(participant, header.key)" class="note-text"
                     matTooltip="{{ participant['generalnotes'][participant['generalnotes'].length - 1].note }}">
                     {{ participant['generalnotes'][participant['generalnotes'].length - 1].note | slice:0:20 }}...
                   </span>
@@ -567,7 +567,7 @@
           </span>
 
           <!-- Action Button -->
-          <button *ngIf="header.key === 'action'" class="action-btn-table" [ngClass]="{
+          <button data-testid="jdd-btn-040" *ngIf="header.key === 'action'" class="action-btn-table" [ngClass]="{
                     'escalate': participant['financialdata'] === 'Pending',
                     'initiate': participant['financialdata'] === 'Cleared'
                 }" (click)="openParticipantPurchase(participant)">
@@ -593,32 +593,32 @@
 
   <div class="pagination">
     <!-- First page button -->
-    <button class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
+    <button data-testid="jdd-btn-041" class="page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
         <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6zM6 6h2v12H6z" />
       </svg>
     </button>
 
     <!-- Previous button -->
-    <button class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
+    <button data-testid="jdd-btn-042" class="page-btn" (click)="previousPage()" [disabled]="currentPage === 1">
       Previous
     </button>
 
     <!-- Page numbers -->
     <div class="page-numbers">
-      <button *ngFor="let page of getPageNumbers()" class="page-number" [class.active]="page === currentPage"
+      <button data-testid="jdd-btn-043" *ngFor="let page of getPageNumbers()" class="page-number" [class.active]="page === currentPage"
         (click)="goToPage(page)">
         {{ page }}
       </button>
     </div>
 
     <!-- Next button -->
-    <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+    <button data-testid="jdd-btn-044" class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
       Next
     </button>
 
     <!-- Last page button -->
-    <button class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page">
+    <button data-testid="jdd-btn-045" class="page-btn" (click)="lastPage()" [disabled]="currentPage === totalPages" title="Last Page">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
         <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6zM16 6h2v12h-2z" />
       </svg>
@@ -627,7 +627,7 @@
 
   <div class="items-per-page">
     <label>Show:</label>
-    <select [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
+    <select data-testid="jdd-sel-046" [(ngModel)]="itemsPerPage" (change)="changeItemsPerPage(itemsPerPage)">
       <option *ngFor="let option of itemsPerPageOptions" [value]="option">{{option}}</option>
     </select>
     <span>entries</span>

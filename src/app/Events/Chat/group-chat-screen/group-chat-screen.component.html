@@ -7,11 +7,11 @@
 
       <div class="wc-tabsrow">
         <!-- The app toolbar is hidden on this screen, so the nav lives here -->
-        <button class="wc-navbtn" (click)="openAppNav()" matTooltip="Open navigation">
+        <button data-testid="gcs-header-nav" class="wc-navbtn" (click)="openAppNav()" matTooltip="Open navigation">
           <mat-icon>menu</mat-icon>
         </button>
         <div class="wc-tabs">
-        <button *ngFor="let t of TABS" class="wc-tab" [class.on]="tab === t.k" (click)="switchTab(t.k)">
+        <button data-testid="gcs-tabs-switch" *ngFor="let t of TABS" class="wc-tab" [class.on]="tab === t.k" (click)="switchTab(t.k)">
           {{ t.label }}
           <span class="wc-tab-count" *ngIf="unread(t.k) > 0">{{ unread(t.k) }}</span>
         </button>
@@ -20,24 +20,24 @@
 
       <!-- Archived splits into deleted groups / deleted channels -->
       <div class="wc-subtabs" *ngIf="tab === 'archived'">
-        <button *ngFor="let t of ARCHIVED_TABS; trackBy: trackByIndex"
+        <button data-testid="gcs-subtabs-archived" *ngFor="let t of ARCHIVED_TABS; trackBy: trackByIndex"
                 [class.on]="archivedSub === t.k" (click)="setArchivedSub(t.k)">{{ t.label }}</button>
       </div>
 
       <div class="wc-searchrow">
         <div class="wc-search">
           <mat-icon>search</mat-icon>
-          <input [ngModel]="search" (ngModelChange)="onSearchChange($event)"
+          <input data-testid="gcs-search-input" [ngModel]="search" (ngModelChange)="onSearchChange($event)"
                  [placeholder]="tab === 'archived' ? 'Search archived' : 'Search'"/>
-          <button class="wc-search-clear" *ngIf="search" (click)="onSearchChange('')" matTooltip="Clear">
+          <button data-testid="gcs-search-clear" class="wc-search-clear" *ngIf="search" (click)="onSearchChange('')" matTooltip="Clear">
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <button class="wc-create" (click)="toggleTheme()"
+        <button data-testid="gcs-header-theme" class="wc-create" (click)="toggleTheme()"
                 [matTooltip]="theme === 'dark' ? 'Switch to light' : 'Switch to dark'">
           <mat-icon>{{ theme === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
         </button>
-        <button class="wc-create" *ngIf="tab !== 'archived'" (click)="openCreate()"
+        <button data-testid="gcs-header-create" class="wc-create" *ngIf="tab !== 'archived'" (click)="openCreate()"
                 [matTooltip]="tab === 'groups' ? 'New group' : 'New channel'">
           <mat-icon>add</mat-icon>
         </button>
@@ -59,7 +59,7 @@
           {{ tab === 'channels' || archivedSub === 'channels' ? 'Channels' : 'Groups' }} · {{ filtered.length }}
         </div>
 
-        <div *ngFor="let c of filtered; trackBy: trackById" class="wc-row" [class.on]="c.id === activeIds[tab]"
+        <div data-testid="gcs-list-row" *ngFor="let c of filtered; trackBy: trackById" class="wc-row" [class.on]="c.id === activeIds[tab]"
              (click)="openItem(c)">
           <div class="wc-row-emoji" [class.channel]="isChannel(c)">
             <img *ngIf="c.photoUrl; else rowEmoji" [src]="c.photoUrl" [alt]="c.name"/>
@@ -74,9 +74,16 @@
               <span class="wc-row-time">{{ timeLabel(c.lastAt) }}</span>
             </div>
             <div class="wc-row-bottom">
-              <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              <!-- An unsent draft is the thing you most need to see from the list — it is the whole
+                   reason drafts are no longer shared between chats. -->
+              <span class="wc-row-preview draft" *ngIf="hasDraft(c.id); else lastMsg">
+                <span class="wc-draft-tag">Draft:</span> {{ draftPreview(c.id) }}
+              </span>
+              <ng-template #lastMsg>
+                <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+              </ng-template>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
-              <button class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
+              <button data-testid="gcs-list-pin" class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
                       [matTooltip]="c.pinned ? 'Unpin chat' : 'Pin chat'">
                 <mat-icon>push_pin</mat-icon>
               </button>
@@ -85,7 +92,7 @@
         </div>
 
         <!-- Channels are paged, not streamed — the old screen loaded them 10 at a time. -->
-        <button class="wc-loadmore" *ngIf="!search && showChannelPaging"
+        <button data-testid="gcs-list-loadmore" class="wc-loadmore" *ngIf="!search && showChannelPaging"
                 (click)="loadMoreChannels()" [disabled]="loadingMoreChannels">
           {{ loadingMoreChannels ? 'Loading…' : 'Load more channels' }}
         </button>
@@ -96,7 +103,7 @@
           </div>
           <div class="wc-empty small" *ngIf="searchingMessages">Searching messages…</div>
 
-          <div class="wc-hit" *ngFor="let hit of messageHits; trackBy: trackByIndex" (click)="openMessageHit(hit)">
+          <div data-testid="gcs-list-hit" class="wc-hit" *ngFor="let hit of messageHits; trackBy: trackByIndex" (click)="openMessageHit(hit)">
             <div class="wc-hit-top">
               <span class="wc-hit-group">{{ hit.group.name }}</span>
               <span class="wc-hit-time">{{ msgTime(hit.msg.at) }}</span>
@@ -132,11 +139,11 @@
 
         <!-- Thread header -->
         <div class="wc-thead">
-          <button class="wc-back" (click)="closeThread()" matTooltip="Back to list">
+          <button data-testid="gcs-thread-back" class="wc-back" (click)="closeThread()" matTooltip="Back to list">
             <mat-icon>arrow_back</mat-icon>
           </button>
-          <div class="wc-thead-main" (click)="showInfo = true; infoMsg = null; person = null" matTooltip="Open group info">
-            <div class="wc-thead-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
+          <div data-testid="gcs-thread-info-open" class="wc-thead-main" (click)="showInfo = true; infoMsg = null; person = null" matTooltip="Open group info">
+            <div data-testid="gcs-thread-photo" class="wc-thead-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
               <img *ngIf="a.photoUrl; else headEmoji" [src]="a.photoUrl" [alt]="a.name"/>
               <ng-template #headEmoji><mat-icon>notifications</mat-icon></ng-template>
             </div>
@@ -153,11 +160,11 @@
             </div>
           </div>
           <span class="wc-archived-pill" *ngIf="tab === 'archived'">ARCHIVED</span>
-          <button class="wc-icon-btn" [class.on]="showMsgSearch" matTooltip="Search messages"
+          <button data-testid="gcs-thread-msgsearch-toggle" class="wc-icon-btn" [class.on]="showMsgSearch" matTooltip="Search messages"
                   (click)="showMsgSearch ? closeMsgSearch() : (showMsgSearch = true)">
             <mat-icon>search</mat-icon>
           </button>
-          <button class="wc-icon-btn" [class.on]="showInfo" matTooltip="Info" (click)="toggleGroupInfo()">
+          <button data-testid="gcs-thread-info-toggle" class="wc-icon-btn" [class.on]="showInfo" matTooltip="Info" (click)="toggleGroupInfo()">
             <mat-icon>info</mat-icon>
           </button>
         </div>
@@ -166,7 +173,7 @@
         <div class="wc-msgsearch" *ngIf="showMsgSearch">
           <div class="wc-msgsearch-input">
             <mat-icon>search</mat-icon>
-            <input [ngModel]="msgSearch" (ngModelChange)="onMsgSearchChange($event)"
+            <input data-testid="gcs-msgsearch-input" [ngModel]="msgSearch" (ngModelChange)="onMsgSearchChange($event)"
                    (keydown.enter)="stepHit(1)" (keydown.shift.enter)="stepHit(-1)"
                    placeholder="Search in messages…"/>
           </div>
@@ -175,22 +182,22 @@
             <span class="wc-hitnav-count" [class.none]="!searchHitCount">
               {{ searchHitCount ? (searchHitIndex + 1) + ' of ' + searchHitCount : 'No results' }}
             </span>
-            <button [disabled]="!searchHitCount" (click)="stepHit(-1)" matTooltip="Previous match">
+            <button data-testid="gcs-msgsearch-prev" [disabled]="!searchHitCount" (click)="stepHit(-1)" matTooltip="Previous match">
               <mat-icon>keyboard_arrow_up</mat-icon>
             </button>
-            <button [disabled]="!searchHitCount" (click)="stepHit(1)" matTooltip="Next match">
+            <button data-testid="gcs-msgsearch-next" [disabled]="!searchHitCount" (click)="stepHit(1)" matTooltip="Next match">
               <mat-icon>keyboard_arrow_down</mat-icon>
             </button>
           </div>
 
           <div class="wc-msgsearch-select">
             <mat-icon>account_circle</mat-icon>
-            <select [(ngModel)]="msgSearchUser">
+            <select data-testid="gcs-msgsearch-sender" [(ngModel)]="msgSearchUser">
               <option value="all">All senders</option>
               <option *ngFor="let s of threadSenders" [value]="s">{{ s }}</option>
             </select>
           </div>
-          <button class="wc-icon-btn" (click)="closeMsgSearch()">
+          <button data-testid="gcs-msgsearch-close" class="wc-icon-btn" (click)="closeMsgSearch()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -198,30 +205,30 @@
         <!-- Pinned strip -->
         <!-- Pinned strip: label + preview, expanding to timestamp · excerpt · Jump (design spec) -->
         <div class="wc-pinned" *ngIf="pinnedMessages.length > 0 && !selectMode">
-          <button class="wc-pinned-head" (click)="pinnedOpen = !pinnedOpen">
+          <button data-testid="gcs-pinned-toggle" class="wc-pinned-head" (click)="pinnedOpen = !pinnedOpen">
             <span class="wc-pinned-count">Pinned {{ pinnedMessages.length }}</span>
             <span class="wc-pinned-preview" *ngIf="!pinnedOpen">{{ lastPinnedPreview }}</span>
             <span class="wc-pinned-toggle">{{ pinnedOpen ? 'Hide' : 'View all' }}</span>
           </button>
           <div class="wc-pinned-list" *ngIf="pinnedOpen">
-            <button class="wc-pinned-item" *ngFor="let pm of pinnedReversed; trackBy: trackById"
+            <button data-testid="gcs-pinned-item" class="wc-pinned-item" *ngFor="let pm of pinnedReversed; trackBy: trackById"
                     (click)="scrollToMessage(pm.id)">
               <span class="wc-pinned-item-time">{{ msgTime(pm.at) }}</span>
               <span class="wc-pinned-item-text">
                 {{ senderLabel(pm) }} · {{ plainPreview(pm.text) || (pm.attachment ? (pm.attachment.name || pm.attachment.type) : '—') }}
               </span>
               <span class="wc-pinned-jump">Jump</span>
-              <span class="wc-pinned-unpin" matTooltip="Unpin" (click)="$event.stopPropagation(); togglePin(pm)">Unpin</span>
+              <span data-testid="gcs-pinned-unpin" class="wc-pinned-unpin" matTooltip="Unpin" (click)="$event.stopPropagation(); togglePin(pm)">Unpin</span>
             </button>
           </div>
         </div>
 
         <!-- Selection bar -->
         <div class="wc-selectbar" *ngIf="selectMode">
-          <button class="wc-icon-btn" (click)="exitSelect()"><mat-icon>close</mat-icon></button>
+          <button data-testid="gcs-select-exit" class="wc-icon-btn" (click)="exitSelect()"><mat-icon>close</mat-icon></button>
           <span class="wc-selectbar-count">{{ selectedIds.length }} selected</span>
-          <button class="wc-ghost-btn" (click)="selectAll()">Select all</button>
-          <button class="wc-danger-btn" [disabled]="!selectedIds.length" (click)="askDeleteSelected()">
+          <button data-testid="gcs-select-all" class="wc-ghost-btn" (click)="selectAll()">Select all</button>
+          <button data-testid="gcs-select-delete" class="wc-danger-btn" [disabled]="!selectedIds.length" (click)="askDeleteSelected()">
             <mat-icon>delete_outline</mat-icon> Delete
           </button>
         </div>
@@ -230,7 +237,7 @@
         <div class="wc-messages" #messagePane>
 
           <!-- Older broadcasts are fetched a page at a time; this sits above the oldest one loaded. -->
-          <button class="wc-loadmore inline" *ngIf="isChannel(a) && hasMoreBroadcasts"
+          <button data-testid="gcs-msg-loadmore-broadcasts" class="wc-loadmore inline" *ngIf="isChannel(a) && hasMoreBroadcasts"
                   (click)="loadMoreBroadcasts()" [disabled]="loadingMoreBroadcasts">
             <mat-icon>history</mat-icon>
             {{ loadingMoreBroadcasts ? 'Loading…' : 'Load earlier broadcasts' }}
@@ -282,7 +289,7 @@
                 <span class="wc-bc-sender">{{ senderLabel(m) }}</span>
                 <span class="wc-bc-time">{{ msgTime(m.at) }}</span>
                 <div class="wc-bc-actions" *ngIf="hoverId === m.id">
-                  <button *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
+                  <button data-testid="gcs-bc-action" *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
                           [matTooltip]="o.label" (click)="handleMenuAction(o.k, m)">
                     <mat-icon>{{ o.icon }}</mat-icon>
                   </button>
@@ -294,7 +301,7 @@
                        [src]="b.headerValue" controls preload="metadata"
                        (play)="onMediaPlay($event)"></video>
                 <ng-template #bcImage>
-                  <img [src]="b.headerValue" alt="" (click)="openImage(b.headerValue!)"/>
+                  <img data-testid="gcs-bc-image" [src]="b.headerValue" alt="" (click)="openImage(b.headerValue!)"/>
                 </ng-template>
               </div>
 
@@ -303,7 +310,7 @@
               <div class="wc-bc-body plain" *ngIf="!b.html && m.text">{{ m.text }}</div>
 
               <div class="wc-bc-files" *ngIf="b.files.length">
-                <button class="wc-bc-file" *ngFor="let f of b.files; trackBy: trackByIndex"
+                <button data-testid="gcs-bc-file" class="wc-bc-file" *ngFor="let f of b.files; trackBy: trackByIndex"
                         (click)="openExternal(f.url)">
                   <span class="wc-bc-file-icon"><mat-icon>{{ fileIconFor(f.url || f.name) }}</mat-icon></span>
                   <span class="wc-bc-file-main">
@@ -315,14 +322,14 @@
               </div>
 
               <div class="wc-bc-links" *ngIf="b.links.length">
-                <a class="wc-bc-link" *ngFor="let l of b.links; trackBy: trackByIndex"
+                <a data-testid="gcs-bc-link" class="wc-bc-link" *ngFor="let l of b.links; trackBy: trackByIndex"
                    [href]="l.url" target="_blank" rel="noreferrer" [title]="l.url">
                   <mat-icon>link</mat-icon><span>{{ l.label }}</span><mat-icon>open_in_new</mat-icon>
                 </a>
               </div>
 
               <div class="wc-bc-ctas" *ngIf="m.buttons?.length">
-                <a *ngFor="let c of m.buttons; trackBy: trackByIndex"
+                <a data-testid="gcs-bc-cta" *ngFor="let c of m.buttons; trackBy: trackByIndex"
                    [href]="c.href" target="_blank" rel="noreferrer" [title]="c.href">
                   <mat-icon>open_in_new</mat-icon><span>{{ c.label }}</span>
                 </a>
@@ -330,7 +337,7 @@
 
               <div class="wc-bc-footer" *ngIf="b.footer">{{ b.footer }}</div>
 
-              <button class="wc-bc-delivery" (click)="openBroadcastInfo(m)">
+              <button data-testid="gcs-bc-delivery" class="wc-bc-delivery" (click)="openBroadcastInfo(m)">
                 <mat-icon>fact_check</mat-icon>
                 <span>Sent {{ b.sentTo.length }}</span>
                 <span class="dot">·</span>
@@ -355,7 +362,7 @@
                   <ng-container *ngTemplateOutlet="richBody; context: { $implicit: parsedOf(m).blocks, light: false }"></ng-container>
                 </div>
                 <div class="wc-ann-ctas" *ngIf="ctasOf(m).length">
-                  <a *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
+                  <a data-testid="gcs-ann-cta" *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
                      rel="noreferrer" [title]="c.href" (click)="$event.stopPropagation()">
                     <mat-icon>open_in_new</mat-icon> {{ c.label }}
                   </a>
@@ -367,23 +374,23 @@
                   </span>
                   <span class="wc-ann-sender">{{ senderLabel(m) }}</span>
                   <div class="wc-reactions" *ngIf="features.react">
-                    <button *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
+                    <button data-testid="gcs-ann-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
                             [class.mine]="r.mine" [title]="r.users.join(', ')" (click)="toggleReaction(m.id, r.emoji)">
                       <span>{{ r.emoji }}</span>{{ r.users.length }}
                     </button>
                   </div>
                 </div>
                 <div class="wc-ann-actions" *ngIf="!selectMode">
-                  <button *ngIf="features.react" matTooltip="React" (click)="toggleReaction(m.id, '👍')">
+                  <button data-testid="gcs-ann-react" *ngIf="features.react" matTooltip="React" (click)="toggleReaction(m.id, '👍')">
                     <mat-icon>add_reaction</mat-icon>
                   </button>
-                  <button *ngIf="m.from === 'team' && features.info" matTooltip="Message info" (click)="openMessageInfo(m)">
+                  <button data-testid="gcs-ann-info" *ngIf="m.from === 'team' && features.info" matTooltip="Message info" (click)="openMessageInfo(m)">
                     <mat-icon>info</mat-icon>
                   </button>
-                  <button [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
+                  <button data-testid="gcs-ann-pin" [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
                     <mat-icon>push_pin</mat-icon>
                   </button>
-                  <button class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
+                  <button data-testid="gcs-ann-delete" class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
                     <mat-icon>delete_outline</mat-icon>
                   </button>
                 </div>
@@ -399,12 +406,12 @@
                    [class.selected]="isSelected(m.id)"
                    (dblclick)="onBubbleDblClick(m)">
 
-                <div class="wc-check" *ngIf="selectMode" [class.on]="isSelected(m.id)" (click)="toggleSelect(m.id)">
+                <div data-testid="gcs-msg-check" class="wc-check" *ngIf="selectMode" [class.on]="isSelected(m.id)" (click)="toggleSelect(m.id)">
                   <mat-icon *ngIf="isSelected(m.id)">check</mat-icon>
                 </div>
 
                 <ng-container *ngIf="features.sender && m.from !== 'team'">
-                  <div class="wc-avatar clickable" *ngIf="m._runStart"
+                  <div data-testid="gcs-msg-avatar" class="wc-avatar clickable" *ngIf="m._runStart"
                        [style.background]="avatarBg(m.senderName)"
                        (click)="openAvatar(m.senderName, $event)" [title]="m.senderName">
                     <img *ngIf="photoOf(m.senderName) as url" [src]="url" [alt]="m.senderName"/>
@@ -417,7 +424,7 @@
 
                   <div class="wc-bubble-wrap">
                     <!-- Sender sits above the card, timestamp below it — the card holds content only. -->
-                    <div class="wc-bubble-sender" *ngIf="features.sender && m.from !== 'team' && m._runStart"
+                    <div data-testid="gcs-msg-sender" class="wc-bubble-sender" *ngIf="features.sender && m.from !== 'team' && m._runStart"
                          (click)="openPerson(m.senderName)">
                       {{ senderLabel(m) }}
                     </div>
@@ -431,7 +438,7 @@
 
                       <!-- Anchored to the card, so it always hugs the message it belongs to -->
                       <div class="wc-hover" *ngIf="hoverId === m.id && !selectMode">
-                        <button *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
+                        <button data-testid="gcs-msg-action" *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
                                 [class.danger]="o.danger" [matTooltip]="o.label"
                                 (click)="handleMenuAction(o.k, m)">
                           <mat-icon>{{ o.icon }}</mat-icon>
@@ -439,14 +446,14 @@
                       </div>
 
                       <div class="wc-picker" *ngIf="pickerId === m.id">
-                        <button *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
+                        <button data-testid="gcs-msg-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
                       </div>
 
                       <div class="wc-bubble-pinned" *ngIf="m.pinned">
                         <mat-icon>push_pin</mat-icon> Pinned
                       </div>
 
-                      <div class="wc-quote" *ngIf="m.replyTo" [class.linked]="m.replyTo.messageId"
+                      <div data-testid="gcs-msg-quote" class="wc-quote" *ngIf="m.replyTo" [class.linked]="m.replyTo.messageId"
                            (click)="jumpToQuoted(m)">
                         <img class="wc-quote-thumb" *ngIf="m.replyTo.thumbUrl" [src]="m.replyTo.thumbUrl" alt=""/>
                         <div class="wc-quote-main">
@@ -458,7 +465,7 @@
                       </div>
 
                       <ng-container *ngFor="let att of attachmentsOf(m); trackBy: trackByIndex">
-                        <img class="wc-att-image" *ngIf="att.type === 'image'"
+                        <img data-testid="gcs-msg-att-image" class="wc-att-image" *ngIf="att.type === 'image'"
                              [src]="att.dataUrl" [alt]="att.name || 'image'"
                              (click)="openImage(att.dataUrl)"/>
 
@@ -469,7 +476,7 @@
                                         [src]="att.dataUrl" [name]="att.name" [light]="isLight(m)">
                         </app-chat-audio>
 
-                        <a class="wc-file" *ngIf="att.type === 'file'" [href]="att.dataUrl" [download]="att.name"
+                        <a data-testid="gcs-msg-att-file" class="wc-file" *ngIf="att.type === 'file'" [href]="att.dataUrl" [download]="att.name"
                            target="_blank" rel="noreferrer">
                           <mat-icon>description</mat-icon>
                           <span class="wc-file-body">
@@ -488,7 +495,7 @@
                            stacked and divided. It stays INSIDE the bubble and cancels the bubble's
                            padding, so it spans edge to edge instead of floating beside it. -->
                       <div class="wc-ctas" *ngIf="ctasOf(m).length" [class.light]="isLight(m)">
-                        <a *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
+                        <a data-testid="gcs-msg-cta" *ngFor="let c of ctasOf(m); trackBy: trackByIndex" [href]="c.href" target="_blank"
                            rel="noreferrer" [title]="c.href" (click)="$event.stopPropagation()">
                           <mat-icon>open_in_new</mat-icon>
                           <span>{{ c.label }}</span>
@@ -506,7 +513,7 @@
                   </div>
 
                   <div class="wc-reactions" *ngIf="features.react">
-                    <button *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
+                    <button data-testid="gcs-msg-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
                             [class.mine]="r.mine" [title]="r.users.join(', ')" (click)="toggleReaction(m.id, r.emoji)">
                       <span>{{ r.emoji }}</span>{{ r.users.length }}
                     </button>
@@ -529,7 +536,7 @@
         <div class="wc-broadcastbar" *ngIf="!features.readOnly && isChannel(a)">
           <mat-icon>campaign</mat-icon>
           <span class="wc-broadcastbar-label">One-way broadcast channel</span>
-          <button class="wc-broadcastbar-cta" *ngIf="canBroadcast" (click)="openAudience()">
+          <button data-testid="gcs-broadcast-send" class="wc-broadcastbar-cta" *ngIf="canBroadcast" (click)="openAudience()">
             <mat-icon>send</mat-icon> Send broadcast
           </button>
           <span class="wc-broadcastbar-note" *ngIf="!canBroadcast">Only channel admins can post here</span>
@@ -553,7 +560,7 @@
                 {{ plainPreview(replyTo.text) || (replyTo.attachment ? '📎 ' + (replyTo.attachment.name || replyTo.attachment.type) : '') }}
               </div>
             </div>
-            <button class="wc-plain-btn" (click)="replyTo = null"><mat-icon>close</mat-icon></button>
+            <button data-testid="gcs-composer-reply-close" class="wc-plain-btn" (click)="replyTo = null"><mat-icon>close</mat-icon></button>
           </div>
         </div>
 
@@ -566,20 +573,20 @@
           <div class="wc-editing">
             <mat-icon>edit</mat-icon>
             <span>Editing message</span>
-            <button class="wc-plain-btn" (click)="editing = null; draft = ''"><mat-icon>close</mat-icon></button>
+            <button data-testid="gcs-composer-edit-close" class="wc-plain-btn" (click)="editing = null; draft = ''"><mat-icon>close</mat-icon></button>
           </div>
         </div>
 
         <!-- Only group admins may post -->
 
         <!-- Formatting toolbar -->
-        <div class="wc-toolbar" *ngIf="!recording && !features.readOnly && canMessage">
-          <button matTooltip="Bold (Ctrl+B)" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
-          <button matTooltip="Italic (Ctrl+I)" (click)="applyFormat('italic')"><mat-icon>format_italic</mat-icon></button>
-          <button matTooltip="Bullet list" (click)="applyFormat('ul')"><mat-icon>format_list_bulleted</mat-icon></button>
-          <button matTooltip="Numbered list" (click)="applyFormat('ol')"><mat-icon>format_list_numbered</mat-icon></button>
+        <div class="wc-toolbar" *ngIf="!recording && !recReview && !features.readOnly && canMessage">
+          <button data-testid="gcs-composer-bold" matTooltip="Bold (Ctrl+B)" (click)="applyFormat('bold')"><mat-icon>format_bold</mat-icon></button>
+          <button data-testid="gcs-composer-italic" matTooltip="Italic (Ctrl+I)" (click)="applyFormat('italic')"><mat-icon>format_italic</mat-icon></button>
+          <button data-testid="gcs-composer-ul" matTooltip="Bullet list" (click)="applyFormat('ul')"><mat-icon>format_list_bulleted</mat-icon></button>
+          <button data-testid="gcs-composer-ol" matTooltip="Numbered list" (click)="applyFormat('ol')"><mat-icon>format_list_numbered</mat-icon></button>
           <div class="wc-toolbar-sep"></div>
-          <button class="wide" matTooltip="Tag a specific person" (click)="startPersonMention()">
+          <button data-testid="gcs-composer-mention" class="wide" matTooltip="Tag a specific person" (click)="startPersonMention()">
             <mat-icon>alternate_email</mat-icon> person
           </button>
           <!-- Announcement composing is parked for now; existing announcement messages still render.
@@ -588,10 +595,10 @@
             <mat-icon>campaign</mat-icon> announcement
           </button>
           -->
-          <button class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
+          <button data-testid="gcs-composer-link" class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
             <mat-icon>link</mat-icon> link
           </button>
-          <span class="wc-toolbar-hint">*bold* · _italic_ · - bullet · 1. number</span>
+          <span class="wc-toolbar-hint">*bold* · _italic_ · • bullet · 1. number</span>
         </div>
 
         <!-- @mention autocomplete -->
@@ -619,12 +626,12 @@
             <div class="wc-linkform-head">
               <mat-icon>link</mat-icon>
               <span>Add a link button</span>
-              <button class="wc-plain-btn" (click)="linkForm = null"><mat-icon>close</mat-icon></button>
+              <button data-testid="gcs-linkform-close" class="wc-plain-btn" (click)="linkForm = null"><mat-icon>close</mat-icon></button>
             </div>
             <div class="wc-linkform-row">
-              <input [(ngModel)]="linkForm.label" placeholder="Button text — e.g. Join Zoom call" (keydown)="onLinkKeydown($event)"/>
-              <input class="grow" [(ngModel)]="linkForm.url" placeholder="https://…" (keydown)="onLinkKeydown($event)"/>
-              <button class="wc-primary-btn sm" [disabled]="!linkForm.label.trim() || !linkForm.url.trim()"
+              <input data-testid="gcs-linkform-label" [(ngModel)]="linkForm.label" placeholder="Button text — e.g. Join Zoom call" (keydown)="onLinkKeydown($event)"/>
+              <input data-testid="gcs-linkform-url" class="grow" [(ngModel)]="linkForm.url" placeholder="https://…" (keydown)="onLinkKeydown($event)"/>
+              <button data-testid="gcs-linkform-insert" class="wc-primary-btn sm" [disabled]="!linkForm.label.trim() || !linkForm.url.trim()"
                       (click)="insertLink(linkForm.label, linkForm.url)">Insert</button>
             </div>
           </div>
@@ -636,7 +643,7 @@
             <div class="wc-preview" *ngFor="let p of pendingFiles; let i = index; trackBy: trackByIndex"
                  [class.audio]="p.type === 'voice'">
               <ng-container *ngIf="p.type !== 'voice'">
-                <button class="wc-preview-thumb" *ngIf="p.type === 'image' || p.type === 'video'"
+                <button data-testid="gcs-preview-thumb" class="wc-preview-thumb" *ngIf="p.type === 'image' || p.type === 'video'"
                         (click)="previewPending(p)" matTooltip="View">
                   <img *ngIf="p.type === 'image'" [src]="p.previewUrl" [alt]="p.name"/>
                   <video *ngIf="p.type === 'video'" [src]="p.previewUrl" muted></video>
@@ -653,7 +660,7 @@
               <app-chat-audio *ngIf="p.type === 'voice'" [src]="p.previewUrl || ''" [name]="p.name" [download]="false">
               </app-chat-audio>
 
-              <button class="wc-preview-x" (click)="removePendingFile(i)" matTooltip="Remove">
+              <button data-testid="gcs-preview-remove" class="wc-preview-x" (click)="removePendingFile(i)" matTooltip="Remove">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -668,36 +675,65 @@
             <span class="wc-pendingbtn" *ngFor="let b of pendingButtons; let i = index; trackBy: trackByIndex">
               <mat-icon>link</mat-icon>
               <span class="wc-pendingbtn-label">{{ b.label }}</span>
-              <button (click)="removePendingButton(i)" matTooltip="Remove button"><mat-icon>close</mat-icon></button>
+              <button data-testid="gcs-pendingbtn-remove" (click)="removePendingButton(i)" matTooltip="Remove button"><mat-icon>close</mat-icon></button>
             </span>
           </div>
         </div>
 
         <!-- Composer -->
         <div class="wc-composer">
-          <ng-container *ngIf="recording; else notRecording">
-            <div class="wc-recording">
-              <span class="wc-rec-dot"></span>
-              <span class="wc-rec-label">Recording… {{ fmtSecs(recSecs) }}</span>
+          <!-- Capturing: pause without losing what is already recorded, or stop to review it. -->
+          <ng-container *ngIf="recording; else maybeReview">
+            <div class="wc-recording" [class.paused]="recPaused">
+              <span class="wc-rec-dot" [class.paused]="recPaused"></span>
+              <span class="wc-rec-label">{{ recPaused ? 'Paused' : 'Recording…' }} {{ fmtSecs(recSecs) }}</span>
               <span class="wc-rec-sub">voice note</span>
             </div>
-            <button class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()"><mat-icon>close</mat-icon></button>
-            <button class="wc-send" matTooltip="Send voice note" (click)="finishRecording()"><mat-icon>send</mat-icon></button>
+            <button data-testid="gcs-rec-cancel" class="wc-rec-cancel" matTooltip="Discard" (click)="cancelRecording()">
+              <mat-icon>close</mat-icon>
+            </button>
+            <button data-testid="gcs-rec-pause" class="wc-rec-btn" *ngIf="!recPaused" matTooltip="Pause" (click)="pauseRecording()">
+              <mat-icon>pause</mat-icon>
+            </button>
+            <button data-testid="gcs-rec-resume" class="wc-rec-btn" *ngIf="recPaused" matTooltip="Resume" (click)="resumeRecording()">
+              <mat-icon>fiber_manual_record</mat-icon>
+            </button>
+            <button data-testid="gcs-rec-stop" class="wc-send" matTooltip="Stop and review" (click)="stopForReview()">
+              <mat-icon>stop</mat-icon>
+            </button>
           </ng-container>
+
+          <!-- Recorded, not sent: play it back, record again, or send. -->
+          <ng-template #maybeReview>
+          <ng-container *ngIf="recReview as rev; else notRecording">
+            <app-chat-audio class="wc-rec-preview" [src]="rev.url" [name]="'Voice note · ' + fmtSecs(rev.secs)"
+                            [download]="false"></app-chat-audio>
+            <button data-testid="gcs-rec-discard" class="wc-rec-cancel" matTooltip="Discard" (click)="discardRecording()">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+            <button data-testid="gcs-rec-rerecord" class="wc-rec-btn" matTooltip="Record again" (click)="reRecord()">
+              <mat-icon>refresh</mat-icon>
+            </button>
+            <button data-testid="gcs-rec-send" class="wc-send" [disabled]="sendingRecording" matTooltip="Send voice note"
+                    (click)="finishRecording()">
+              <mat-icon>{{ sendingRecording ? 'hourglass_empty' : 'send' }}</mat-icon>
+            </button>
+          </ng-container>
+          </ng-template>
 
           <ng-template #notRecording>
             <div class="wc-attach" *ngIf="features.attach">
-              <input #imgInput type="file" accept="image/*" hidden (change)="handleFilePicked($event)"/>
-              <input #vidInput type="file" accept="video/*" hidden (change)="handleFilePicked($event)"/>
-              <input #audInput type="file" accept="audio/*" hidden (change)="handleFilePicked($event)"/>
-              <input #docInput type="file" hidden (change)="handleFilePicked($event)"/>
-              <button class="wc-attach-btn" [class.on]="attachMenu" matTooltip="Attach" (click)="attachMenu = !attachMenu">
+              <input data-testid="gcs-attach-img-input" #imgInput type="file" accept="image/*" hidden (change)="handleFilePicked($event)"/>
+              <input data-testid="gcs-attach-vid-input" #vidInput type="file" accept="video/*" hidden (change)="handleFilePicked($event)"/>
+              <input data-testid="gcs-attach-aud-input" #audInput type="file" accept="audio/*" hidden (change)="handleFilePicked($event)"/>
+              <input data-testid="gcs-attach-doc-input" #docInput type="file" hidden (change)="handleFilePicked($event)"/>
+              <button data-testid="gcs-attach-toggle" class="wc-attach-btn" [class.on]="attachMenu" matTooltip="Attach" (click)="attachMenu = !attachMenu">
                 <mat-icon>attach_file</mat-icon>
               </button>
               <ng-container *ngIf="attachMenu">
-                <div class="wc-scrim" (click)="attachMenu = false"></div>
+                <div data-testid="gcs-attach-scrim" class="wc-scrim" (click)="attachMenu = false"></div>
                 <div class="wc-attach-menu">
-                  <button *ngFor="let o of ATTACH_OPTIONS; trackBy: trackByIndex" (click)="openAttach(o.pick)">
+                  <button data-testid="gcs-attach-option" *ngFor="let o of ATTACH_OPTIONS; trackBy: trackByIndex" (click)="openAttach(o.pick)">
                     <span class="wc-attach-icon" [style.background]="o.bg">
                       <mat-icon [style.color]="o.color">{{ o.icon }}</mat-icon>
                     </span>
@@ -708,16 +744,16 @@
             </div>
 
             <!-- textarea, not input: Shift+Enter must insert a newline, which an input cannot hold -->
-            <textarea #composer class="wc-input" [class.announce]="announceMode" rows="1"
+            <textarea data-testid="gcs-composer-input" #composer class="wc-input" [class.announce]="announceMode" rows="1"
                       [ngModel]="draft" (ngModelChange)="onDraftChange($event)"
                       (keydown)="onComposerKeydown($event)" [placeholder]="composerPlaceholder()"></textarea>
 
-            <button class="wc-send" *ngIf="draft.trim() || pendingFiles.length"
+            <button data-testid="gcs-composer-send" class="wc-send" *ngIf="draft.trim() || pendingFiles.length"
                     [disabled]="uploadingFiles" [matTooltip]="editing ? 'Save edit' : 'Send'"
                     (click)="editing ? saveEdit() : send()">
               <mat-icon>{{ editing ? 'check' : 'send' }}</mat-icon>
             </button>
-            <button class="wc-mic" *ngIf="!draft.trim() && !pendingFiles.length"
+            <button data-testid="gcs-composer-mic" class="wc-mic" *ngIf="!draft.trim() && !pendingFiles.length"
                     matTooltip="Record voice note" (click)="startRecording()">
               <mat-icon>mic</mat-icon>
             </button>
@@ -731,18 +767,18 @@
     <div class="wc-slide" *ngIf="showInfo && active as a">
       <div class="wc-slide-head">
         <span>{{ isChannel(a) ? 'Channel info' : 'Group info' }}</span>
-        <button class="wc-close-btn" (click)="showInfo = false"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-info-close" class="wc-close-btn" (click)="showInfo = false"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-slide-body">
         <div class="wc-slide-hero">
           <div class="wc-slide-photo">
-            <div class="wc-slide-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
+            <div data-testid="gcs-info-photo" class="wc-slide-emoji" [class.clickable]="a.photoUrl" (click)="openGroupPhoto(a, $event)">
               <img *ngIf="a.photoUrl; else slideEmoji" [src]="a.photoUrl" [alt]="a.name"/>
               <ng-template #slideEmoji><mat-icon>{{ isChannel(a) ? 'campaign' : 'notifications' }}</mat-icon></ng-template>
             </div>
             <!-- Admins can replace the picture; it writes group_profile, the field the old screen reads -->
-            <input #groupPhotoInput type="file" accept="image/*" hidden (change)="onGroupPhotoPicked($event)"/>
-            <button class="wc-slide-photobtn" *ngIf="canEditChat" [disabled]="savingGroupPhoto"
+            <input data-testid="gcs-info-photo-input" #groupPhotoInput type="file" accept="image/*" hidden (change)="onGroupPhotoPicked($event)"/>
+            <button data-testid="gcs-info-photo-btn" class="wc-slide-photobtn" *ngIf="canEditChat" [disabled]="savingGroupPhoto"
                     (click)="groupPhotoInput.click()"
                     [matTooltip]="(a.photoUrl ? 'Change ' : 'Add a ') + (isChannel(a) ? 'channel' : 'group') + ' picture'">
               <mat-icon>{{ savingGroupPhoto ? 'hourglass_empty' : 'photo_camera' }}</mat-icon>
@@ -750,34 +786,34 @@
           </div>
           <div class="wc-slide-name" *ngIf="!editingName">
             {{ a.name }}
-            <button class="wc-slide-editbtn" *ngIf="canEditChat" (click)="startEditName()"
+            <button data-testid="gcs-info-rename" class="wc-slide-editbtn" *ngIf="canEditChat" (click)="startEditName()"
                     [matTooltip]="isChannel(a) ? 'Rename channel' : 'Rename group'">
               <mat-icon>edit</mat-icon>
             </button>
           </div>
           <div class="wc-slide-rename" *ngIf="editingName">
-            <input [(ngModel)]="nameDraft" (keydown.enter)="saveGroupName()" (keydown.escape)="cancelEditName()"
+            <input data-testid="gcs-info-name-input" [(ngModel)]="nameDraft" (keydown.enter)="saveGroupName()" (keydown.escape)="cancelEditName()"
                    placeholder="Group name" autofocus/>
-            <button class="wc-icon-btn on" (click)="saveGroupName()" matTooltip="Save"><mat-icon>check</mat-icon></button>
-            <button class="wc-icon-btn" (click)="cancelEditName()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
+            <button data-testid="gcs-info-name-save" class="wc-icon-btn on" (click)="saveGroupName()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+            <button data-testid="gcs-info-name-cancel" class="wc-icon-btn" (click)="cancelEditName()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
           <div class="wc-slide-desc" *ngIf="a.description && !editingDesc">
             {{ a.description }}
-            <button class="wc-slide-editbtn" *ngIf="isChannel(a) && canManageChannel"
+            <button data-testid="gcs-info-desc-edit" class="wc-slide-editbtn" *ngIf="isChannel(a) && canManageChannel"
                     (click)="startEditDesc()" matTooltip="Edit description">
               <mat-icon>edit</mat-icon>
             </button>
           </div>
           <!-- With no description yet there is nothing to hang an edit button off, so offer one -->
-          <button class="wc-slide-adddesc" *ngIf="isChannel(a) && !a.description && !editingDesc && canManageChannel"
+          <button data-testid="gcs-info-desc-add" class="wc-slide-adddesc" *ngIf="isChannel(a) && !a.description && !editingDesc && canManageChannel"
                   (click)="startEditDesc()">
             <mat-icon>add</mat-icon> Add a description
           </button>
           <div class="wc-slide-rename" *ngIf="editingDesc">
-            <input [(ngModel)]="descDraft" (keydown.enter)="saveChannelDesc()" (keydown.escape)="cancelEditDesc()"
+            <input data-testid="gcs-info-desc-input" [(ngModel)]="descDraft" (keydown.enter)="saveChannelDesc()" (keydown.escape)="cancelEditDesc()"
                    placeholder="Channel description"/>
-            <button class="wc-icon-btn on" (click)="saveChannelDesc()" matTooltip="Save"><mat-icon>check</mat-icon></button>
-            <button class="wc-icon-btn" (click)="cancelEditDesc()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
+            <button data-testid="gcs-info-desc-save" class="wc-icon-btn on" (click)="saveChannelDesc()" matTooltip="Save"><mat-icon>check</mat-icon></button>
+            <button data-testid="gcs-info-desc-cancel" class="wc-icon-btn" (click)="cancelEditDesc()" matTooltip="Cancel"><mat-icon>close</mat-icon></button>
           </div>
           <div class="wc-slide-meta" *ngIf="isChannel(a)">One-way broadcast channel</div>
         </div>
@@ -805,12 +841,12 @@
           <div class="wc-block" *ngIf="!isLive(a)">
             <div class="wc-block-title">
               <mat-icon>group</mat-icon> <span class="grow">Team · {{ teamMembers.length + 1 }}</span>
-              <button class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <button data-testid="gcs-info-team-add" class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
             <div class="wc-search plain membersearch">
               <mat-icon>search</mat-icon>
-              <input [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
-              <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+              <input data-testid="gcs-info-team-search" [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
+              <button data-testid="gcs-info-team-search-clear" class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -820,7 +856,7 @@
               <span class="wc-team-pill">ADMIN</span>
             </div>
             <div class="wc-member" *ngFor="let mem of filteredTeam; trackBy: trackByIndex">
-              <div class="wc-member-main" (click)="openPerson(mem.name)">
+              <div data-testid="gcs-info-team-member" class="wc-member-main" (click)="openPerson(mem.name)">
                 <div class="wc-avatar" [style.background]="avatarBg(mem.name)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
@@ -828,7 +864,7 @@
                 <span class="wc-member-name">{{ mem.name }}</span>
                 <span class="wc-role" *ngIf="directory[mem.name]?.role">{{ directory[mem.name].role }}</span>
               </div>
-              <button class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-team-remove" class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -839,14 +875,14 @@
               <mat-icon>account_circle</mat-icon>
               <span class="grow">Participants · {{ memberSearch ? filteredParticipants.length + ' of ' + participantMembers.length : participantMembers.length }}</span>
               <span class="wc-badge purple" *ngIf="groupAdminCount">{{ groupAdminCount }} admin{{ groupAdminCount === 1 ? '' : 's' }}</span>
-              <button class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <button data-testid="gcs-info-participants-add" class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
             <div class="wc-note" *ngIf="participantMembers.length === 0">No participants yet</div>
 
             <div class="wc-search plain membersearch" *ngIf="participantMembers.length">
               <mat-icon>search</mat-icon>
-              <input [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
-              <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+              <input data-testid="gcs-info-participants-search" [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
+              <button data-testid="gcs-info-participants-search-clear" class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -857,8 +893,8 @@
             <!-- Scrolls within itself only when Media/links/docs sits below it — see hasMediaBlock -->
             <div class="wc-memberlist" [class.capped]="hasMediaBlock">
             <div class="wc-member" *ngFor="let mem of filteredParticipants; trackBy: trackByIndex">
-              <div class="wc-member-main" (click)="openPerson(mem.name)">
-                <div class="wc-avatar clickable" [style.background]="avatarBg(mem.name)"
+              <div data-testid="gcs-info-participant-member" class="wc-member-main" (click)="openPerson(mem.name)">
+                <div data-testid="gcs-info-participant-avatar" class="wc-avatar clickable" [style.background]="avatarBg(mem.name)"
                      (click)="openAvatar(mem.name, $event)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
@@ -868,12 +904,12 @@
                 <span class="wc-journey" *ngIf="journeyMeta(mem.journey) as jm"
                       [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
               </div>
-              <button class="wc-admin-btn" *ngIf="canManageAdmins" [class.on]="isGroupAdmin(mem)"
+              <button data-testid="gcs-info-participant-admin" class="wc-admin-btn" *ngIf="canManageAdmins" [class.on]="isGroupAdmin(mem)"
                       [matTooltip]="isGroupAdmin(mem) ? 'Remove as group admin' : 'Make group admin'"
                       (click)="toggleGroupAdmin(mem, $event)">
                 <mat-icon>shield</mat-icon>
               </button>
-              <button class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-participant-remove" class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -886,14 +922,14 @@
           <div class="wc-block-title">
             <mat-icon>group</mat-icon>
             <span class="grow">Recipients · {{ (a.members || []).length }}</span>
-            <button class="wc-add-btn" *ngIf="canManageChannel" (click)="openEditAdmins()">
+            <button data-testid="gcs-info-recipients-admins" class="wc-add-btn" *ngIf="canManageChannel" (click)="openEditAdmins()">
               <mat-icon>shield</mat-icon> Admins
             </button>
           </div>
           <div class="wc-search plain membersearch" *ngIf="(a.members || []).length > 5">
             <mat-icon>search</mat-icon>
-            <input [(ngModel)]="memberSearch" placeholder="Search recipients"/>
-            <button class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
+            <input data-testid="gcs-info-recipients-search" [(ngModel)]="memberSearch" placeholder="Search recipients"/>
+            <button data-testid="gcs-info-recipients-search-clear" class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -917,17 +953,17 @@
         <div class="wc-block" *ngIf="threadAttachments.length || threadLinks.length">
           <div class="wc-block-title">Media, links &amp; docs</div>
           <div class="wc-infotabs">
-            <button [class.on]="infoTab === 'media'" (click)="infoTab = 'media'">Media · {{ threadMediaCount }}</button>
-            <button [class.on]="infoTab === 'docs'" (click)="infoTab = 'docs'">Docs · {{ threadDocs.length }}</button>
-            <button [class.on]="infoTab === 'links'" (click)="infoTab = 'links'">Links · {{ threadLinks.length }}</button>
+            <button data-testid="gcs-info-tab-media" [class.on]="infoTab === 'media'" (click)="infoTab = 'media'">Media · {{ threadMediaCount }}</button>
+            <button data-testid="gcs-info-tab-docs" [class.on]="infoTab === 'docs'" (click)="infoTab = 'docs'">Docs · {{ threadDocs.length }}</button>
+            <button data-testid="gcs-info-tab-links" [class.on]="infoTab === 'links'" (click)="infoTab = 'links'">Links · {{ threadLinks.length }}</button>
           </div>
 
           <ng-container *ngIf="infoTab === 'media'">
             <div class="wc-note" *ngIf="!threadMediaCount">No photos, videos or audio yet</div>
             <div class="wc-media-grid" *ngIf="threadMedia.length">
               <figure class="wc-media-cell" *ngFor="let att of threadMedia; trackBy: trackByIndex">
-                <img *ngIf="att.type === 'image'" [src]="att.dataUrl" [alt]="att.name || 'media'" (click)="openImage(att.dataUrl)"/>
-                <div class="wc-media-video" *ngIf="att.type === 'video'" (click)="openVideo(att.dataUrl)">
+                <img data-testid="gcs-info-media-image" *ngIf="att.type === 'image'" [src]="att.dataUrl" [alt]="att.name || 'media'" (click)="openImage(att.dataUrl)"/>
+                <div data-testid="gcs-info-media-video" class="wc-media-video" *ngIf="att.type === 'video'" (click)="openVideo(att.dataUrl)">
                   <video [src]="att.dataUrl" muted playsinline preload="metadata"></video>
                   <span><mat-icon>play_arrow</mat-icon></span>
                 </div>
@@ -952,7 +988,7 @@
             <div class="wc-note" *ngIf="!threadDocs.length">No documents yet</div>
             <ng-container *ngFor="let att of threadDocs; trackBy: trackByIndex">
               <div class="wc-doc-item" *ngIf="att.type === 'file'">
-                <a class="wc-doc" [href]="att.dataUrl" [download]="att.name" target="_blank" rel="noreferrer">
+                <a data-testid="gcs-info-doc" class="wc-doc" [href]="att.dataUrl" [download]="att.name" target="_blank" rel="noreferrer">
                   <mat-icon class="blue">description</mat-icon>
                   <span class="wc-doc-name">{{ att.name }}</span>
                   <span class="wc-doc-size" *ngIf="att.size">{{ kb(att.size) }}</span>
@@ -969,7 +1005,7 @@
           <ng-container *ngIf="infoTab === 'links'">
             <div class="wc-note" *ngIf="!threadLinks.length">No links shared yet</div>
             <div class="wc-link-row" *ngFor="let l of threadLinks; trackBy: trackByIndex">
-              <a class="wc-link-main" [href]="l.href" target="_blank" rel="noreferrer" [title]="l.href">
+              <a data-testid="gcs-info-link" class="wc-link-main" [href]="l.href" target="_blank" rel="noreferrer" [title]="l.href">
                 <span class="wc-link-icon"><mat-icon>link</mat-icon></span>
                 <span class="wc-link-body">
                   <span class="wc-link-label">{{ l.label }}</span>
@@ -979,7 +1015,7 @@
               <div class="wc-link-meta">
                 <span>{{ l.sender }}</span>
                 <span>{{ msgTime(l.at) }}</span>
-                <button (click)="scrollToMessage(l.mid)" matTooltip="Go to message">
+                <button data-testid="gcs-info-link-goto" (click)="scrollToMessage(l.mid)" matTooltip="Go to message">
                   <mat-icon>subdirectory_arrow_right</mat-icon>
                 </button>
               </div>
@@ -1002,10 +1038,10 @@
       </div>
 
       <div class="wc-slide-foot">
-        <button class="wc-outline-btn" *ngIf="a.archived" (click)="restoreGroup()">
+        <button data-testid="gcs-info-restore" class="wc-outline-btn" *ngIf="a.archived" (click)="restoreGroup()">
           <mat-icon>restore</mat-icon> Restore {{ isChannel(a) ? 'channel' : 'group' }}
         </button>
-        <button class="wc-danger-btn full" *ngIf="!a.archived" (click)="confirmDelete = { group: true }">
+        <button data-testid="gcs-info-delete-group" class="wc-danger-btn full" *ngIf="!a.archived" (click)="confirmDelete = { group: true }">
           <mat-icon>delete_outline</mat-icon> Delete {{ isChannel(a) ? 'channel' : 'group' }}
         </button>
       </div>
@@ -1015,17 +1051,17 @@
     <div class="wc-slide person" *ngIf="person as pp">
       <div class="wc-slide-head">
         <span>{{ pp.doc?.source === 'team' ? 'Team profile' : 'Participant profile' }}</span>
-        <button class="wc-close-btn" (click)="person = null"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-person-close" class="wc-close-btn" (click)="person = null"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-slide-body">
         <div class="wc-profile-hero">
-          <div class="wc-avatar xl ring clickable" [style.background]="avatarBg(pp.name)"
+          <div data-testid="gcs-person-avatar" class="wc-avatar xl ring clickable" [style.background]="avatarBg(pp.name)"
                [style.box-shadow]="'0 0 0 3px var(--panel), 0 0 0 4px var(--line3)'"
                (click)="openAvatar(pp.name, $event)">
             <img *ngIf="photoOf(pp.name) as url" [src]="url" [alt]="pp.name"/>
             <ng-container *ngIf="!photoOf(pp.name)">{{ initials(pp.name) }}</ng-container>
           </div>
-          <button class="wc-profile-name" (click)="openProfileTab(pp.name)"
+          <button data-testid="gcs-person-profile-open" class="wc-profile-name" (click)="openProfileTab(pp.name)"
                   matTooltip="Open profile page in a new tab">
             {{ pp.name }} <mat-icon>open_in_new</mat-icon>
           </button>
@@ -1077,7 +1113,7 @@
           </div>
           <div class="wc-note" *ngIf="personTicketsLoading">Loading tickets…</div>
           <div class="wc-note" *ngIf="!personTicketsLoading && !personTickets.length">No open tickets</div>
-          <div class="wc-card clickable" *ngFor="let t of personTickets; trackBy: trackById"
+          <div data-testid="gcs-person-ticket" class="wc-card clickable" *ngFor="let t of personTickets; trackBy: trackById"
                [style.border-left-color]="t.status && t.status.toLowerCase() === 'open' ? '#D97706' : '#16A34A'"
                (click)="openTicketTab(t)" matTooltip="Open ticket in a new tab">
             <div class="wc-card-head">
@@ -1099,20 +1135,20 @@
     <div class="wc-slide msginfo" *ngIf="broadcastInfo as bm">
       <div class="wc-slide-head">
         <span>Delivery</span>
-        <button class="wc-close-btn" (click)="closeBroadcastInfo()"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-broadcastinfo-close" class="wc-close-btn" (click)="closeBroadcastInfo()"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-slide-body">
         <div class="wc-info-preview">📣 {{ plainPreview(bm.text) || bm._broadcast?.footer || 'Broadcast' }}</div>
         <div class="wc-info-sent">Sent · {{ msgTime(bm.at) }}</div>
 
         <div class="wc-infotabs">
-          <button [class.on]="broadcastTab === 'read'" (click)="broadcastTab = 'read'">
+          <button data-testid="gcs-broadcastinfo-tab-read" [class.on]="broadcastTab === 'read'" (click)="broadcastTab = 'read'">
             Read · {{ broadcastCount(bm, 'read') }}
           </button>
-          <button [class.on]="broadcastTab === 'pending'" (click)="broadcastTab = 'pending'">
+          <button data-testid="gcs-broadcastinfo-tab-pending" [class.on]="broadcastTab === 'pending'" (click)="broadcastTab = 'pending'">
             Pending · {{ broadcastCount(bm, 'pending') }}
           </button>
-          <button [class.on]="broadcastTab === 'sent'" (click)="broadcastTab = 'sent'">
+          <button data-testid="gcs-broadcastinfo-tab-sent" [class.on]="broadcastTab === 'sent'" (click)="broadcastTab = 'sent'">
             Sent · {{ broadcastCount(bm, 'sent') }}
           </button>
         </div>
@@ -1136,7 +1172,7 @@
     <div class="wc-slide msginfo" *ngIf="infoMsg && active as a">
       <div class="wc-slide-head">
         <span>Message info</span>
-        <button class="wc-close-btn" (click)="infoMsg = null"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-msginfo-close" class="wc-close-btn" (click)="infoMsg = null"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-slide-body">
         <div class="wc-info-preview">
@@ -1161,7 +1197,7 @@
           <div class="wc-info-sec-title"><mat-icon>done_all</mat-icon> Read · {{ infoReadBy.length }}</div>
           <div class="wc-note" *ngIf="!infoReadBy.length">Nobody has opened this yet</div>
           <div class="wc-member" *ngFor="let r of infoReadBy; trackBy: trackByIndex">
-            <div class="wc-member-main" (click)="openPerson(r.name)">
+            <div data-testid="gcs-msginfo-read-member" class="wc-member-main" (click)="openPerson(r.name)">
               <div class="wc-avatar" [style.background]="avatarBg(r.name)">
                 <img *ngIf="photoOf(r.name) as url" [src]="url" [alt]="r.name"/>
                 <ng-container *ngIf="!photoOf(r.name)">{{ initials(r.name) }}</ng-container>
@@ -1176,7 +1212,7 @@
           <div class="wc-info-sec-title"><mat-icon>check</mat-icon> Sent · {{ infoSentOnly.length }}</div>
           <div class="wc-note" *ngIf="!infoSentOnly.length">Everyone has read this</div>
           <div class="wc-member" *ngFor="let r of infoSentOnly; trackBy: trackByIndex">
-            <div class="wc-member-main" (click)="openPerson(r.name)">
+            <div data-testid="gcs-msginfo-sent-member" class="wc-member-main" (click)="openPerson(r.name)">
               <div class="wc-avatar" [style.background]="avatarBg(r.name)">
                 <img *ngIf="photoOf(r.name) as url" [src]="url" [alt]="r.name"/>
                 <ng-container *ngIf="!photoOf(r.name)">{{ initials(r.name) }}</ng-container>
@@ -1191,44 +1227,44 @@
   </div>
 
   <!-- ── Lightbox ───────────────────────────────────────────────────── -->
-  <div class="wc-lightbox" *ngIf="lightbox" (click)="lightbox = null" (wheel)="onViewerWheel($event)">
+  <div data-testid="gcs-lightbox-backdrop" class="wc-lightbox" *ngIf="lightbox" (click)="lightbox = null" (wheel)="onViewerWheel($event)">
     <!-- The backdrop closes on click, but a video swallows its own clicks — so an explicit control
          is the only way out of a video preview, and a visible one for images regardless. -->
-    <button class="wc-lightbox-close" (click)="lightbox = null; $event.stopPropagation()"
+    <button data-testid="gcs-lightbox-close" class="wc-lightbox-close" (click)="lightbox = null; $event.stopPropagation()"
             matTooltip="Close (Esc)" aria-label="Close preview">
       <mat-icon>close</mat-icon>
     </button>
 
     <!-- The image keeps its own aspect ratio (contain, never cropped); zoom and rotation are a
          transform layered on top, so the source proportions are never altered. -->
-    <img *ngIf="lightboxKind === 'image'" [src]="lightbox" alt="attachment"
+    <img data-testid="gcs-lightbox-image" *ngIf="lightboxKind === 'image'" [src]="lightbox" alt="attachment"
          [class.portrait]="lightboxIsPortrait" [class.zoomed]="lbScale > 1"
          [style.transform]="lbTransform"
          (mousedown)="startPan($event)" (click)="$event.stopPropagation()"/>
 
-    <video *ngIf="lightboxKind === 'video'" [src]="lightbox" controls autoplay
+    <video data-testid="gcs-lightbox-video" *ngIf="lightboxKind === 'video'" [src]="lightbox" controls autoplay
            (play)="onMediaPlay($event)" (click)="$event.stopPropagation()"></video>
 
-    <div class="wc-viewer-bar" *ngIf="lightboxKind === 'image'" (click)="$event.stopPropagation()">
-      <button (click)="zoomBy(-0.25, $event)" [disabled]="lbScale <= 0.25" matTooltip="Zoom out">
+    <div data-testid="gcs-lightbox-viewer-bar" class="wc-viewer-bar" *ngIf="lightboxKind === 'image'" (click)="$event.stopPropagation()">
+      <button data-testid="gcs-lightbox-zoomout" (click)="zoomBy(-0.25, $event)" [disabled]="lbScale <= 0.25" matTooltip="Zoom out">
         <mat-icon>zoom_out</mat-icon>
       </button>
       <span class="wc-viewer-zoom">{{ (lbScale * 100) | number: '1.0-0' }}%</span>
-      <button (click)="zoomBy(0.25, $event)" [disabled]="lbScale >= 6" matTooltip="Zoom in">
+      <button data-testid="gcs-lightbox-zoomin" (click)="zoomBy(0.25, $event)" [disabled]="lbScale >= 6" matTooltip="Zoom in">
         <mat-icon>zoom_in</mat-icon>
       </button>
       <span class="wc-viewer-sep"></span>
-      <button (click)="rotateBy(-90, $event)" matTooltip="Rotate left">
+      <button data-testid="gcs-lightbox-rotateleft" (click)="rotateBy(-90, $event)" matTooltip="Rotate left">
         <mat-icon>rotate_left</mat-icon>
       </button>
-      <button (click)="rotateBy(90, $event)" matTooltip="Rotate right">
+      <button data-testid="gcs-lightbox-rotateright" (click)="rotateBy(90, $event)" matTooltip="Rotate right">
         <mat-icon>rotate_right</mat-icon>
       </button>
       <span class="wc-viewer-sep"></span>
-      <button (click)="resetView($event)" matTooltip="Reset">
+      <button data-testid="gcs-lightbox-reset" (click)="resetView($event)" matTooltip="Reset">
         <mat-icon>restart_alt</mat-icon>
       </button>
-      <a [href]="lightbox" target="_blank" rel="noreferrer" matTooltip="Open original">
+      <a data-testid="gcs-lightbox-original" [href]="lightbox" target="_blank" rel="noreferrer" matTooltip="Open original">
         <mat-icon>open_in_new</mat-icon>
       </a>
     </div>
@@ -1236,7 +1272,7 @@
 
   <!-- ── Delete confirmation ────────────────────────────────────────── -->
   <ng-container *ngIf="confirmDelete">
-    <div class="wc-overlay" (click)="confirmDelete = null"></div>
+    <div data-testid="gcs-delete-overlay" class="wc-overlay" (click)="confirmDelete = null"></div>
     <div class="wc-dialog sm">
       <div class="wc-dialog-title">
         {{ confirmDelete.group
@@ -1250,24 +1286,24 @@
         </ng-container>
       </div>
       <div class="wc-dialog-foot">
-        <button class="wc-ghost-btn grow" (click)="confirmDelete = null">Cancel</button>
-        <button class="wc-solid-danger grow" (click)="confirmDeleteNow()">Delete</button>
+        <button data-testid="gcs-delete-cancel" class="wc-ghost-btn grow" (click)="confirmDelete = null">Cancel</button>
+        <button data-testid="gcs-delete-confirm" class="wc-solid-danger grow" (click)="confirmDeleteNow()">Delete</button>
       </div>
     </div>
   </ng-container>
 
   <!-- ── Create group / channel ─────────────────────────────────────── -->
   <ng-container *ngIf="createOpen">
-    <div class="wc-overlay" (click)="createOpen = false"></div>
+    <div data-testid="gcs-create-overlay" class="wc-overlay" (click)="createOpen = false"></div>
     <div class="wc-dialog">
       <div class="wc-dialog-head">
         <span>{{ isGroupCreate ? 'New Group' : 'New Channel' }}</span>
-        <button class="wc-close-btn" (click)="createOpen = false"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-create-close" class="wc-close-btn" (click)="createOpen = false"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-dialog-body">
         <div class="wc-field">
           <label>{{ isGroupCreate ? 'Group Name' : 'Channel Name' }} *</label>
-          <input [(ngModel)]="cName" [placeholder]="isGroupCreate ? 'e.g. uP! Chennai Cohort' : 'e.g. A&amp;H Announcements'"/>
+          <input data-testid="gcs-create-name" [(ngModel)]="cName" [placeholder]="isGroupCreate ? 'e.g. uP! Chennai Cohort' : 'e.g. A&amp;H Announcements'"/>
         </div>
         <div class="wc-field">
           <label>Group picture</label>
@@ -1276,16 +1312,16 @@
               <img *ngIf="cImagePreview" [src]="cImagePreview" alt="Group picture"/>
               <mat-icon *ngIf="!cImagePreview">groups</mat-icon>
             </div>
-            <input #groupImageInput type="file" accept="image/*" hidden (change)="onGroupImagePicked($event)"/>
-            <button class="wc-ghost-btn" (click)="groupImageInput.click()">
+            <input data-testid="gcs-create-image-input" #groupImageInput type="file" accept="image/*" hidden (change)="onGroupImagePicked($event)"/>
+            <button data-testid="gcs-create-image-btn" class="wc-ghost-btn" (click)="groupImageInput.click()">
               {{ cImagePreview ? 'Change picture' : 'Upload picture' }}
             </button>
-            <button class="wc-link-btn" *ngIf="cImagePreview" (click)="clearGroupImage()">Remove</button>
+            <button data-testid="gcs-create-image-remove" class="wc-link-btn" *ngIf="cImagePreview" (click)="clearGroupImage()">Remove</button>
           </div>
         </div>
         <div class="wc-field">
           <label>Created under event</label>
-          <select [(ngModel)]="cEventId">
+          <select data-testid="gcs-create-event" [(ngModel)]="cEventId">
             <option value="">— None —</option>
             <option *ngFor="let e of events" [value]="e.id">{{ e.title }}</option>
           </select>
@@ -1299,27 +1335,35 @@
           <div class="wc-pickbar">
             <div class="wc-search plain grow">
               <mat-icon>search</mat-icon>
-              <input [(ngModel)]="cSearch" placeholder="Search by name or email…"/>
-              <button class="wc-search-clear" *ngIf="cSearch" (click)="clearCreateSearch()" matTooltip="Clear">
+              <input data-testid="gcs-create-search" [(ngModel)]="cSearch" placeholder="Search by name or email…"/>
+              <button data-testid="gcs-create-search-clear" class="wc-search-clear" *ngIf="cSearch" (click)="clearCreateSearch()" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
-            <input #membersImport type="file" hidden accept=".xlsx,.xls,.csv"
+            <input data-testid="gcs-create-import-input" #membersImport type="file" hidden accept=".xlsx,.xls,.csv"
                    (change)="onMembersImport($event)"/>
-            <button class="wc-ghost-btn" (click)="membersImport.click()" matTooltip="Import members from a spreadsheet">
+            <button data-testid="gcs-create-import-btn" class="wc-ghost-btn" (click)="membersImport.click()" matTooltip="Import members from a spreadsheet">
               <mat-icon>upload_file</mat-icon> Import
             </button>
-            <button class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
+            <button data-testid="gcs-create-import-sample" class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
               <mat-icon>download</mat-icon>
             </button>
           </div>
 
           <div class="wc-pickbar sub">
-            <button class="wc-link-btn" (click)="selectAllCreateShown()">Select all shown</button>
+            <button data-testid="gcs-create-selectall" class="wc-link-btn" (click)="selectAllCreateShown()">Select all shown</button>
             <span class="grow"></span>
             <span class="wc-pickcount">
-              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es') : createPool.length + ' people' }}
+              {{ cSearch ? createMatchCount + ' match' + (createMatchCount === 1 ? '' : 'es')
+                         : createPool.length + ' with an app account' }}
             </span>
+          </div>
+          <!-- The count looks like a truncation otherwise. Group membership is stored as uids, so a
+               participant who has never signed in cannot be a member — and could not read the chat
+               or be notified if they were. -->
+          <div class="wc-picknote" *ngIf="!cSearch">
+            <mat-icon>info_outline</mat-icon>
+            <span>Only participants with an app account can be added — a chat member is identified by their login.</span>
           </div>
 
           <ng-container *ngIf="importReport?.target === 'create'">
@@ -1331,7 +1375,7 @@
             <div class="wc-note center" *ngIf="createPool.length && !createShown.length">
               Nobody matches “{{ cSearch }}”
             </div>
-            <div class="wc-pickrow" *ngFor="let p of createShown; trackBy: trackById"
+            <div data-testid="gcs-create-person" class="wc-pickrow" *ngFor="let p of createShown; trackBy: trackById"
                  [class.on]="isPicked(p.id)" (click)="togglePerson(p)">
               <div class="wc-check sm" [class.on]="isPicked(p.id)">
                 <mat-icon *ngIf="isPicked(p.id)">check</mat-icon>
@@ -1347,7 +1391,7 @@
               <span class="wc-admin-pill" *ngIf="isCreateAdmin(p.id)">ADMIN</span>
               <span class="wc-journey" *ngIf="journeyMeta(p.journey) as jm"
                     [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
-              <button class="wc-admin-btn" [class.on]="isCreateAdmin(p.id)"
+              <button data-testid="gcs-create-person-admin" class="wc-admin-btn" [class.on]="isCreateAdmin(p.id)"
                       [matTooltip]="isCreateAdmin(p.id) ? 'Remove admin' : 'Mark as group admin'"
                       (click)="toggleCreateAdmin(p, $event)">
                 <mat-icon>shield</mat-icon>
@@ -1357,8 +1401,8 @@
         </div>
       </div>
       <div class="wc-dialog-foot">
-        <button class="wc-ghost-btn grow" (click)="createOpen = false">Cancel</button>
-        <button class="wc-primary-btn grow2" [disabled]="!canSaveCreate" (click)="saveCreate()">
+        <button data-testid="gcs-create-cancel" class="wc-ghost-btn grow" (click)="createOpen = false">Cancel</button>
+        <button data-testid="gcs-create-save" class="wc-primary-btn grow2" [disabled]="!canSaveCreate" (click)="saveCreate()">
           {{ isGroupCreate
               ? 'Create Group' + (cSelected.length ? ' · ' + cSelected.length + ' members' : '')
               : 'Create Channel' }}
@@ -1371,21 +1415,21 @@
        Step one of the send: pick who receives it. Step two (template, variables, the write to
        channelarchive) belongs to ChannelCommunicationComponent and is opened from here. -->
   <ng-container *ngIf="audienceOpen">
-    <div class="wc-overlay" (click)="closeAudience()"></div>
+    <div data-testid="gcs-audience-overlay" class="wc-overlay" (click)="closeAudience()"></div>
     <div class="wc-dialog narrow">
       <div class="wc-dialog-head">
         <mat-icon class="purple">campaign</mat-icon>
         <span class="grow">Send broadcast · {{ active?.name }}</span>
-        <button class="wc-close-btn" (click)="closeAudience()"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-audience-close" class="wc-close-btn" (click)="closeAudience()"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-dialog-sub">
         <div class="wc-search plain">
           <mat-icon>search</mat-icon>
-          <input [(ngModel)]="audienceSearch" placeholder="Search by name or email…"/>
+          <input data-testid="gcs-audience-search" [(ngModel)]="audienceSearch" placeholder="Search by name or email…"/>
         </div>
         <div class="wc-audience-tools">
-          <button class="wc-ghost-btn" (click)="selectAllAudience()">Select all shown</button>
-          <button class="wc-ghost-btn" *ngIf="(active?.members || []).length" (click)="useChannelMembers()">
+          <button data-testid="gcs-audience-selectall" class="wc-ghost-btn" (click)="selectAllAudience()">Select all shown</button>
+          <button data-testid="gcs-audience-existing" class="wc-ghost-btn" *ngIf="(active?.members || []).length" (click)="useChannelMembers()">
             Existing recipients
           </button>
           <span class="grow"></span>
@@ -1394,7 +1438,7 @@
       </div>
       <div class="wc-dialog-body flush">
         <div class="wc-note center" *ngIf="!audienceShown.length">No participants match that search</div>
-        <div class="wc-pickrow rounded" *ngFor="let p of audienceShown; trackBy: trackById"
+        <div data-testid="gcs-audience-person" class="wc-pickrow rounded" *ngFor="let p of audienceShown; trackBy: trackById"
              [class.on]="isAudiencePicked(p.id)" (click)="toggleAudience(p.id)">
           <div class="wc-check sm" [class.on]="isAudiencePicked(p.id)">
             <mat-icon *ngIf="isAudiencePicked(p.id)">check</mat-icon>
@@ -1408,8 +1452,8 @@
         </div>
       </div>
       <div class="wc-dialog-foot">
-        <button class="wc-ghost-btn grow" (click)="closeAudience()">Cancel</button>
-        <button class="wc-primary-btn grow2" [disabled]="!audiencePicked.length" (click)="proceedBroadcast()">
+        <button data-testid="gcs-audience-cancel" class="wc-ghost-btn grow" (click)="closeAudience()">Cancel</button>
+        <button data-testid="gcs-audience-continue" class="wc-primary-btn grow2" [disabled]="!audiencePicked.length" (click)="proceedBroadcast()">
           Continue{{ audiencePicked.length ? ' · ' + audiencePicked.length : '' }}
         </button>
       </div>
@@ -1420,17 +1464,17 @@
        Writes `admins` on the channel doc — the same field ChannelCommunication sets at create time —
        and unions the picks into `members`, since an admin has to be a recipient to appear at all. -->
   <ng-container *ngIf="adminsOpen && active as a">
-    <div class="wc-overlay" (click)="closeEditAdmins()"></div>
+    <div data-testid="gcs-admins-overlay" class="wc-overlay" (click)="closeEditAdmins()"></div>
     <div class="wc-dialog narrow">
       <div class="wc-dialog-head">
         <mat-icon class="purple">shield</mat-icon>
         <span class="grow">Channel admins · {{ a.name }}</span>
-        <button class="wc-close-btn" (click)="closeEditAdmins()"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-admins-close" class="wc-close-btn" (click)="closeEditAdmins()"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-dialog-sub">
         <div class="wc-search plain">
           <mat-icon>search</mat-icon>
-          <input [(ngModel)]="adminSearch" placeholder="Search by name or email…"/>
+          <input data-testid="gcs-admins-search" [(ngModel)]="adminSearch" placeholder="Search by name or email…"/>
         </div>
         <div class="wc-audience-tools">
           <span class="wc-note-inline">Admins can broadcast and edit this channel</span>
@@ -1440,7 +1484,7 @@
       </div>
       <div class="wc-dialog-body flush">
         <div class="wc-note center" *ngIf="!adminShown.length">No participants match that search</div>
-        <div class="wc-pickrow rounded" *ngFor="let p of adminShown; trackBy: trackById"
+        <div data-testid="gcs-admins-person" class="wc-pickrow rounded" *ngFor="let p of adminShown; trackBy: trackById"
              [class.on]="isAdminPicked(p.id)" (click)="toggleAdminPick(p.id)">
           <div class="wc-check sm" [class.on]="isAdminPicked(p.id)">
             <mat-icon *ngIf="isAdminPicked(p.id)">check</mat-icon>
@@ -1454,8 +1498,8 @@
         </div>
       </div>
       <div class="wc-dialog-foot">
-        <button class="wc-ghost-btn grow" (click)="closeEditAdmins()">Cancel</button>
-        <button class="wc-primary-btn grow2" [disabled]="!adminPicked.length || savingAdmins"
+        <button data-testid="gcs-admins-cancel" class="wc-ghost-btn grow" (click)="closeEditAdmins()">Cancel</button>
+        <button data-testid="gcs-admins-save" class="wc-primary-btn grow2" [disabled]="!adminPicked.length || savingAdmins"
                 (click)="saveChannelAdmins()">
           {{ savingAdmins ? 'Saving…' : 'Save admins' }}
         </button>
@@ -1465,33 +1509,34 @@
 
   <!-- ── Add members ────────────────────────────────────────────────── -->
   <ng-container *ngIf="addingMembers && active as a">
-    <div class="wc-overlay" (click)="addingMembers = false"></div>
+    <div data-testid="gcs-addmembers-overlay" class="wc-overlay" (click)="addingMembers = false"></div>
     <div class="wc-dialog narrow">
       <div class="wc-dialog-head">
         <mat-icon class="purple">group</mat-icon>
         <span class="grow">Add people to {{ a.name }}</span>
-        <button class="wc-close-btn" (click)="addingMembers = false"><mat-icon>close</mat-icon></button>
+        <button data-testid="gcs-addmembers-close" class="wc-close-btn" (click)="addingMembers = false"><mat-icon>close</mat-icon></button>
       </div>
       <div class="wc-dialog-sub">
         <div class="wc-pickbar">
           <div class="wc-search plain grow">
             <mat-icon>search</mat-icon>
-            <input [(ngModel)]="aSearch" placeholder="Search by name or email…"/>
-            <button class="wc-search-clear" *ngIf="aSearch" (click)="aSearch = ''" matTooltip="Clear">
+            <input data-testid="gcs-addmembers-search" [(ngModel)]="aSearch" placeholder="Search by name or email…"/>
+            <button data-testid="gcs-addmembers-search-clear" class="wc-search-clear" *ngIf="aSearch" (click)="aSearch = ''" matTooltip="Clear">
               <mat-icon>close</mat-icon>
             </button>
           </div>
           <!-- Same import as the create dialog, filling this picker instead -->
-          <input #addImport type="file" hidden accept=".xlsx,.xls,.csv"
+          <input data-testid="gcs-addmembers-import-input" #addImport type="file" hidden accept=".xlsx,.xls,.csv"
                  (change)="onMembersImport($event, 'add')"/>
-          <button class="wc-ghost-btn" (click)="addImport.click()" matTooltip="Import members from a spreadsheet">
+          <button data-testid="gcs-addmembers-import-btn" class="wc-ghost-btn" (click)="addImport.click()" matTooltip="Import members from a spreadsheet">
             <mat-icon>upload_file</mat-icon> Import
           </button>
-          <button class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
+          <button data-testid="gcs-addmembers-import-sample" class="wc-ghost-btn" (click)="downloadImportSample()" matTooltip="Download the import template">
             <mat-icon>download</mat-icon>
           </button>
         </div>
         <div class="wc-pickbar sub">
+          <span class="wc-pickcount-muted">{{ addPool.length }} with an app account</span>
           <span class="grow"></span>
           <span class="wc-pickcount">{{ aPicked.length }} selected</span>
         </div>
@@ -1504,7 +1549,7 @@
         <div class="wc-note center" *ngIf="addPool.length && !addShown.length">
           Nobody matches “{{ aSearch }}”
         </div>
-        <div class="wc-pickrow rounded" *ngFor="let p of addShown; trackBy: trackById"
+        <div data-testid="gcs-addmembers-person" class="wc-pickrow rounded" *ngFor="let p of addShown; trackBy: trackById"
              [class.on]="isAddPicked(p.id)" (click)="toggleAddPerson(p)">
           <div class="wc-check sm" [class.on]="isAddPicked(p.id)">
             <mat-icon *ngIf="isAddPicked(p.id)">check</mat-icon>
@@ -1520,8 +1565,8 @@
         </div>
       </div>
       <div class="wc-dialog-foot">
-        <button class="wc-ghost-btn grow" (click)="addingMembers = false">Cancel</button>
-        <button class="wc-primary-btn grow2" [disabled]="!aPicked.length" (click)="saveAddMembers()">
+        <button data-testid="gcs-addmembers-cancel" class="wc-ghost-btn grow" (click)="addingMembers = false">Cancel</button>
+        <button data-testid="gcs-addmembers-save" class="wc-primary-btn grow2" [disabled]="!aPicked.length" (click)="saveAddMembers()">
           Add {{ aPicked.length || '' }} {{ aPicked.length === 1 ? 'person' : 'people' }}
         </button>
       </div>
@@ -1546,10 +1591,10 @@
               {{ rep.matched }} matched and selected<ng-container *ngIf="rep.skipped.length">,
               {{ rep.skipped.length }} not found</ng-container>
             </span>
-            <button class="wc-link-btn" *ngIf="rep.skipped.length" (click)="downloadSkipped()">
+            <button data-testid="gcs-import-download" class="wc-link-btn" *ngIf="rep.skipped.length" (click)="downloadSkipped()">
               <mat-icon>download</mat-icon> Download
             </button>
-            <button class="wc-plain-btn" (click)="importReport = null"><mat-icon>close</mat-icon></button>
+            <button data-testid="gcs-import-close" class="wc-plain-btn" (click)="importReport = null"><mat-icon>close</mat-icon></button>
           </div>
           <div class="wc-skiplist" *ngIf="rep.skipped.length">
             <div class="wc-skiprow" *ngFor="let sk of skippedShown; trackBy: trackByIndex">
@@ -1558,7 +1603,7 @@
               <span class="wc-skiprow-why">{{ sk.reason }}</span>
             </div>
           </div>
-          <button class="wc-link-btn" *ngIf="rep.skipped.length > 5"
+          <button data-testid="gcs-import-showall" class="wc-link-btn" *ngIf="rep.skipped.length > 5"
                   (click)="showAllSkipped = !showAllSkipped">
             {{ showAllSkipped ? 'Show fewer' : 'Show all ' + rep.skipped.length }}
           </button>
@@ -1591,7 +1636,7 @@
     <span *ngIf="s.kind === 'text'">{{ s.text }}</span>
     <strong *ngIf="s.kind === 'bold'">{{ s.text }}</strong>
     <em *ngIf="s.kind === 'italic'">{{ s.text }}</em>
-    <a *ngIf="s.kind === 'link'" class="wc-inline-link" [class.light]="light" [href]="s.href" target="_blank"
+    <a data-testid="gcs-richbody-link" *ngIf="s.kind === 'link'" class="wc-inline-link" [class.light]="light" [href]="s.href" target="_blank"
        rel="noreferrer" [title]="s.href" (click)="$event.stopPropagation()">{{ s.text }}</a>
     <span *ngIf="s.kind === 'mention'" class="wc-mention-tag" [class.light]="light">{{ s.text }}</span>
   </ng-container>

@@ -1,7 +1,7 @@
 <div *ngIf="!isloading" class="maincontent">
   <header class="header">
     <h1 class="title">{{selectedProfile['name'] || '...'}} - {{saleData['journeytype'] | uppercase}} Purchase</h1>
-    <button mat-icon-button (click)="onCancel()">
+    <button data-testid="cwp-btn-001" mat-icon-button (click)="onCancel()">
       <mat-icon style="color: white;">close</mat-icon>
     </button>
   </header>
@@ -11,20 +11,20 @@
       <!-- Display Mode -->
       <span *ngIf="purchasedate != null && !isEditingPurchaseDate" class="d-flex align-items-center gap-2">
         <mat-label><strong>Purchase Date : {{purchasedate | date : 'medium'}}</strong></mat-label>
-        <mat-icon (click)="editPurchaseDate()" style="cursor: pointer;" class="text-primary">edit</mat-icon>
+        <mat-icon data-testid="cwp-maticon-002" (click)="editPurchaseDate()" style="cursor: pointer;" class="text-primary">edit</mat-icon>
       </span>
     
       <!-- Edit Mode -->
       <div *ngIf="isEditingPurchaseDate" class="d-flex align-items-center gap-2">
         <mat-form-field appearance="outline">
           <mat-label>Purchase Date</mat-label>
-          <input matInput [matDatepicker]="purchasePicker" [(ngModel)]="tempPurchaseDate">
+          <input data-testid="cwp-inp-003" matInput [matDatepicker]="purchasePicker" [(ngModel)]="tempPurchaseDate">
           <mat-datepicker-toggle matIconSuffix [for]="purchasePicker"></mat-datepicker-toggle>
           <mat-datepicker #purchasePicker></mat-datepicker>
         </mat-form-field>
     
-        <mat-icon (click)="savePurchaseDate()" style="cursor: pointer;" class="text-success">check_circle</mat-icon>
-        <mat-icon (click)="cancelPurchaseDateEdit()" style="cursor: pointer;" class="text-danger">cancel</mat-icon>
+        <mat-icon data-testid="cwp-maticon-004" (click)="savePurchaseDate()" style="cursor: pointer;" class="text-success">check_circle</mat-icon>
+        <mat-icon data-testid="cwp-maticon-005" (click)="cancelPurchaseDateEdit()" style="cursor: pointer;" class="text-danger">cancel</mat-icon>
       </div>
     </div>
 
@@ -126,7 +126,7 @@
               <div class="card-body">
                 <div class="snapshot-gallery">
                   <div class="snapshot-item" *ngFor="let item of saleData['paymentsnapshot']; trackBy: trackByFn">
-                    <div class="image-container" (click)="openFullscreen(item)">
+                    <div data-testid="cwp-div-006" class="image-container" (click)="openFullscreen(item)">
                       <img [src]="item" alt="Payment Snapshot" (error)="handleImageError($event)">
                       <div class="zoom-overlay">
                         <span class="material-icons">zoom_in</span>
@@ -138,13 +138,13 @@
             </div>
 
             <!-- Fullscreen Modal -->
-            <div class="fullscreen-modal" [class.active]="fullscreenActive" (click)="closeFullscreen()">
+            <div data-testid="cwp-div-007" class="fullscreen-modal" [class.active]="fullscreenActive" (click)="closeFullscreen()">
               <div class="fullscreen-container">
                 <img [src]="fullscreenImage" alt="Fullscreen Payment Snapshot" *ngIf="fullscreenImage">
-                <div class="close-button" (click)="closeFullscreen()">
+                <div data-testid="cwp-div-008" class="close-button" (click)="closeFullscreen()">
                   <span class="material-icons">close</span>
                 </div>
-                <div class="download-button" (click)="downloadImage($event)">
+                <div data-testid="cwp-div-009" class="download-button" (click)="downloadImage($event)">
                   <span class="material-icons">download</span>
                 </div>
               </div>
@@ -162,7 +162,7 @@
                 <div class="form-group mb-3">
                   <mat-form-field appearance="outline" class="w-100">
                     <mat-label>Total Purchase Value</mat-label>
-                    <input matInput type="number" [(ngModel)]="totalPurchaseValue">
+                    <input data-testid="cwp-inp-010" matInput type="number" [(ngModel)]="totalPurchaseValue">
                   </mat-form-field>
                 </div>
 
@@ -171,7 +171,7 @@
                     <div class="form-group">
                       <mat-form-field appearance="outline" class="w-100">
                         <mat-label>Initial Payment Balance</mat-label>
-                        <input matInput type="number" [(ngModel)]="initialpaymentbalance">
+                        <input data-testid="cwp-inp-011" matInput type="number" [(ngModel)]="initialpaymentbalance">
                       </mat-form-field>
                     </div>
                   </div>
@@ -179,7 +179,7 @@
                     <div class="form-group">
                       <mat-form-field appearance="outline" class="w-100">
                         <mat-label>Previous Journey Balance</mat-label>
-                        <input matInput type="number" [(ngModel)]="pendingbalanceamount">
+                        <input data-testid="cwp-inp-012" matInput type="number" [(ngModel)]="pendingbalanceamount">
                       </mat-form-field>
                     </div>
                   </div>
@@ -208,7 +208,7 @@
                       <div class="form-group">
                         <mat-form-field appearance="outline" class="w-100">
                           <mat-label>Subscription Start</mat-label>
-                          <input matInput [matDatepicker]="picker" [(ngModel)]="subscriptionStart">
+                          <input data-testid="cwp-inp-013" matInput [matDatepicker]="picker" [(ngModel)]="subscriptionStart">
                           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
                           <mat-datepicker #picker></mat-datepicker>
                         </mat-form-field>
@@ -218,7 +218,7 @@
                       <div class="form-group">
                         <mat-form-field appearance="outline" class="w-100">
                           <mat-label>Subscription End</mat-label>
-                          <input matInput [matDatepicker]="picker1" [(ngModel)]="subscriptionEnd">
+                          <input data-testid="cwp-inp-014" matInput [matDatepicker]="picker1" [(ngModel)]="subscriptionEnd">
                           <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
                           <mat-datepicker #picker1></mat-datepicker>
                         </mat-form-field>
@@ -240,7 +240,7 @@
                 <div class="card-body">
                   <mat-form-field *ngIf="filterParticipant().length != 0" appearance="outline" class="w-100">
                     <mat-label>Watson Participant</mat-label>
-                    <mat-select [(ngModel)]="selectedWatsonParticipant" [compareWith]="compareFn">
+                    <mat-select data-testid="cwp-msel-015" [(ngModel)]="selectedWatsonParticipant" [compareWith]="compareFn">
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filterParticipantName" [placeholderLabel]="'Search'"
                           [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -443,18 +443,18 @@
     </div>
 
     <div class="d-flex flex-row justify-content-center gap-3 mt-4 mb-4">
-      <button mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
+      <button data-testid="cwp-btn-016" mat-stroked-button type="button" (click)="onCancel()">Cancel</button>
 
-      <button *ngIf="!saleData['initialpaymentapproved']" mat-stroked-button type="button" (click)="initialPayment()">
+      <button data-testid="cwp-btn-017" *ngIf="!saleData['initialpaymentapproved']" mat-stroked-button type="button" (click)="initialPayment()">
         Initial Payment Approval
       </button>
 
-      <button *ngIf="saleData['initialpaymentapproved']" mat-stroked-button type="button"
+      <button data-testid="cwp-btn-018" *ngIf="saleData['initialpaymentapproved']" mat-stroked-button type="button"
         class="text-success border-success">
         Initial Payment Approved
       </button>
 
-      <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="submitValidation()" class="btn-primary">
+      <button data-testid="cwp-btn-019" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="submitValidation()" class="btn-primary">
         <span *ngIf="saleData['journeytype'] == 'new'">Approve New Purchase</span>
         <span *ngIf="saleData['journeytype'] == 'upgrade'">Approve Upgrade Purchase</span>
         <span *ngIf="saleData['journeytype'] == 'addons'">Approve Addon Purchase</span>

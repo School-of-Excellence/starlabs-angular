@@ -5,11 +5,11 @@
       <p class="dash-sub">Add new episode with media and tags</p>
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
-      <button class="btn-primary" [disabled]="showFileSizeError" (click)="onSubmit()">
+      <button data-testid="ued-btn-001" class="btn-primary" [disabled]="showFileSizeError" (click)="onSubmit()">
         <mat-icon>cloud_upload</mat-icon>
         <span>Upload</span>
       </button>
-      <button class="a-btn a-del" mat-dialog-close aria-label="Close">
+      <button data-testid="ued-btn-002" class="a-btn a-del" mat-dialog-close aria-label="Close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -21,7 +21,7 @@
           <label class="label">Title <span class="required">*</span></label>
           <div class="input-box">
             <mat-icon class="ib-icon">title</mat-icon>
-            <input type="text" class="ib-input" placeholder="Enter episode title"
+            <input data-testid="ued-inp-003" type="text" class="ib-input" placeholder="Enter episode title"
               [(ngModel)]="uploadEpisodeDoc.title" required />
           </div>
         </div>
@@ -29,7 +29,7 @@
           <label class="label">Reference Title <span class="required">*</span></label>
           <div class="input-box">
             <mat-icon class="ib-icon">title</mat-icon>
-            <input type="text" class="ib-input" placeholder="Enter episode Reference Title"
+            <input data-testid="ued-inp-004" type="text" class="ib-input" placeholder="Enter episode Reference Title"
               [(ngModel)]="uploadEpisodeDoc.reftitle" required />
           </div>
         </div>
@@ -37,7 +37,7 @@
           <label class="label">Description <span class="required">*</span></label>
           <div class="input-box">
             <mat-icon class="ib-icon">description</mat-icon>
-            <input type="text" class="ib-input" placeholder="Enter description"
+            <input data-testid="ued-inp-005" type="text" class="ib-input" placeholder="Enter description"
               [(ngModel)]="uploadEpisodeDoc.description" required />
           </div>
         </div>
@@ -45,7 +45,7 @@
           <label class="label">Duration (in Minutes only, Example 56:45)</label>
           <div class="input-box">
             <mat-icon class="ib-icon">schedule</mat-icon>
-            <input type="text"
+            <input data-testid="ued-inp-006" type="text"
               class="ib-input"
               placeholder="Auto detected or enter manually"
               [(ngModel)]="uploadEpisodeDoc.duration" />
@@ -53,8 +53,8 @@
         </div>
         <div class="field-group">
           <label class="label">Thumbnail</label>
-          <div class="upload-zone" (click)="thumbnailref.click()">
-            <input #thumbnailref type="file" accept="image/*" (change)="previewImage($event)" hidden />
+          <div data-testid="ued-div-007" class="upload-zone" (click)="thumbnailref.click()">
+            <input data-testid="ued-inp-008" #thumbnailref type="file" accept="image/*" (change)="previewImage($event)" hidden />
             <div class="upload-zone-content"
               *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewImageUrl) && [null,undefined].includes(uploadEpisodeDoc.imageUrl)">
               <mat-icon class="upload-icon">image</mat-icon>
@@ -70,8 +70,8 @@
         </div>
         <div class="field-group">
           <label class="label">Screenshot</label>
-          <div class="upload-zone" (click)="screenshotref.click()">
-            <input #screenshotref type="file" accept="image/*" (change)="previewScreenshot($event)" hidden />
+          <div data-testid="ued-div-009" class="upload-zone" (click)="screenshotref.click()">
+            <input data-testid="ued-inp-010" #screenshotref type="file" accept="image/*" (change)="previewScreenshot($event)" hidden />
             <div class="upload-zone-content"
               *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewScreenshotUrl) && [null,undefined].includes(uploadEpisodeDoc.screenshot)">
               <mat-icon class="upload-icon">screenshot_monitor</mat-icon>
@@ -86,8 +86,8 @@
         </div>
         <div class="field-group">
           <label class="label">Subtitle File (.srt)</label>
-          <div class="upload-zone" (click)="srtref.click()">
-            <input #srtref type="file" accept=".srt" (change)="addToDoc($event)" hidden />
+          <div data-testid="ued-div-011" class="upload-zone" (click)="srtref.click()">
+            <input data-testid="ued-inp-012" #srtref type="file" accept=".srt" (change)="addToDoc($event)" hidden />
             <div class="upload-zone-content" *ngIf="!uploadEpisodeDoc.srtFileName && !uploadEpisodeDoc.srt">
               <mat-icon class="upload-icon">subtitles</mat-icon>
               <span class="upload-text">Click to upload SRT</span>
@@ -96,14 +96,14 @@
               <mat-icon class="preview-icon">subtitles</mat-icon>
               <span class="preview-name">{{ uploadEpisodeDoc.srtFileName || getSrtFileNameFromUrl(uploadEpisodeDoc.srt) }}</span>
               <mat-icon class="preview-change">swap_horiz</mat-icon>
-              <mat-icon class="preview-remove" (click)="removeSrt($event)">close</mat-icon>
+              <mat-icon data-testid="ued-maticon-013" class="preview-remove" (click)="removeSrt($event)">close</mat-icon>
             </div>
           </div>
         </div>
         <div class="field-group">
           <label class="label">Video</label>
-          <div class="upload-zone" (click)="videoref.click()">
-            <input #videoref type="file" accept="video/*" (change)="previewVideo($event)" hidden />
+          <div data-testid="ued-div-014" class="upload-zone" (click)="videoref.click()">
+            <input data-testid="ued-inp-015" #videoref type="file" accept="video/*" (change)="previewVideo($event)" hidden />
             <div class="upload-zone-content"
               *ngIf="[null,undefined].includes(uploadEpisodeDoc.previewVideoUrl) && [null,undefined].includes(uploadEpisodeDoc.videoUrl)">
               <mat-icon class="upload-icon">videocam</mat-icon>
@@ -127,15 +127,15 @@
         <div class="selected-tags" *ngIf="uploadEpisodeDoc.tags?.length">
           <span class="chip" *ngFor="let tag of uploadEpisodeDoc.tags; let i = index">
             {{ mapTaxonomy[tag] }}
-            <mat-icon class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
+            <mat-icon data-testid="ued-maticon-016" class="chip-x" (click)="onTagRemove(i)">close</mat-icon>
           </span>
         </div>
         <div class="input-box">
           <mat-icon class="ib-icon">search</mat-icon>
-          <input type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
+          <input data-testid="ued-inp-017" type="text" class="ib-input" placeholder="Search tags..." (keyup)="onTagSearch($event)" />
         </div>
         <div class="available-tags">
-          <span class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
+          <span data-testid="ued-span-018" class="chip chip-outline" *ngFor="let tag of filteredTaxonomyList" (click)="onTagSelect(tag.id)">
             <mat-icon>add_circle_outline</mat-icon>
             {{ tag['name'] }}
           </span>
@@ -162,7 +162,7 @@
             <span class="status-badge active" *ngIf="task.status$ | async">
               {{ getTaskStatus(task, i) }}
             </span>
-            <button class="a-btn a-edit" (click)="editFromQueue(task, i)">
+            <button data-testid="ued-btn-019" class="a-btn a-edit" (click)="editFromQueue(task, i)">
               <mat-icon>edit</mat-icon>
             </button>
           </div>

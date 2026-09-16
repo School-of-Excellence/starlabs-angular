@@ -8,13 +8,13 @@
       <mat-form-field appearance="outline" class="date-range-field">
         <mat-label>Date Range</mat-label>
         <mat-date-range-input [rangePicker]="rangePicker">
-          <input
+          <input data-testid="apdb-start"
             matStartDate
             placeholder="Start"
             [value]="startDate"
             (dateChange)="onDateRangeChange('start', $event)"
           />
-          <input
+          <input data-testid="apdb-end"
             matEndDate
             placeholder="End"
             [value]="endDate"
@@ -53,7 +53,7 @@
       <!-- Appointment Types Row (horizontal) -->
       <div class="product-body">
         <div class="appt-types-row">
-          <div
+          <div data-testid="apdb-toggleappointmenttype"
             class="appt-type-chip"
             *ngFor="let ap of product.appointmentTypes"
             [class.active]="expandedAppointmentTypeId === ap.appointmentTypeId"
@@ -101,7 +101,7 @@
               </div>
 
               <div class="slots-grid">
-                <div
+                <div data-testid="apdb-selectslot"
                   class="slot-card"
                   *ngFor="let s of dayGroup.slots"
                   [class.selected]="isSlotSelected(s)"

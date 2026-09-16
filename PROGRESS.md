@@ -1,49 +1,18 @@
-# PROGRESS — StarLabs (atctranscription)
-
-_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
-· **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
+# PROGRESS
 
 ## Current state
-- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
-  documentation added this session plus one pre-existing, unrelated
-  `group-chat-screen.component.css` edit. Nothing committed, nothing
-  pushed, nothing deployed — operator commits manually (standing directive).
-- **No queue code was changed.** The slot/capacity flow is documented and
-  frozen as a baseline so a planned logic change can be made and reverted
-  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
+- Branch `nanda-development` — pushed by the operator; **uncommitted here:** the completed-only pill + time, and the chat-group card/panel (dashboard .ts/.html/.css, engine .ts + unit spec, exist-users spec, journal, this file). Contains: the Communication dialog + Exist Users card + platform_name work, and the **merge of `meena-development`** (`c7f57bab`: her dashboard engine extraction, `wd-*` hooks across the app, unit-test workflow, support suite caller).
+- Merged tree verified: prod build green; 194/194 unit cases (her engine suite + the three dashboard suites); console readiness script → **MATCHED** (drift 0, no missing test cases).
+- **Hub `starlabs-e2e-tests`** (clone at `../starlabs-e2e-tests`, write access granted 2026-09-15): `workshops/workshop-dashboard-communication.spec.ts` (10 tests, all 55 `wdash-*` hooks) is on org `main` (`93ff70d`, then the WDC-09 extension). The fork `Nandakumar23/starlabs-e2e-tests` still holds the old branch; it can be deleted.
 
-## Last session changes (2026-08-31)
-- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
-  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
-  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
-  paths** across Angular `queue-planner` / `queue-planner-review` and the
-  three Flutter cards, three mermaid flowcharts, a **divergence register
-  D-01…D-10**, six invariants, and the change/revert protocol.
-- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
-  four surprises, an append-only change log (CL-000) and the per-screen +
-  data-side revert playbook.
-- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
-  rendered reference artifact for the operator.
-- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
-  `usedslot = matching-token count` and every planner mutation auto-saves,
-  so it overwrites the counter that the four transactional booking paths
-  maintain — erasing Flutter self-service bookings and B!G pre-placements
-  that have no `queue_token` yet. Paired with D-01 (review offers slots
-  from a *derived* count while the transaction gates on the *stored* one),
-  this is the double-booking root cause.
+## Last session changes
+- **Users Not in Chat Group** card + side panel (add one / add all → `supportchat.members` arrayUnion), live via a group-document listener; uid from `new_user_data.uid` or `participant metadata.firebaseuserref` (journal §12). Second CI run: workshops leg green; content CN-04 was a spec race in the hub (Escape reaching the dialog) — fixed there.
+- Platform pill only on completed steps; completed date now carries the time (`formatDateTime` in the engine). First CI run of the hub spec failed on the CF-owned metadata name → fixed in the hub (journal §11).
+- Platform Usage moved to the bottom of the dashboard; "Enrolled via" rows and donut slices open the side panel with that platform's participants (journal §10).
+- Merge conflicts (dashboard .ts/.html) resolved keeping both sides: moved methods dropped in favour of her engine, my methods and her hooks kept. `amazon-chime-sdk-js` installed `--no-save`; Zoom peers restored after the prune.
+- Readiness gate understood and reproduced locally (`node scripts/readiness/readiness.cjs --app ../starlabs-angular --base origin/development --head HEAD --json`); journal `specs/journals/2026-09-15-cicd-readiness-workshops-specs.md` §1–9.
+- platform_name end to end (label map, pill, hero, Platform Usage charts) — earlier today, see §7–8.
 
 ## Pending
-- **The logic change itself is unspecified** — awaiting the operator's
-  statement of the new rule. Recommended first target: D-02 + D-01
-  (one agreed source of truth for capacity). Follow §7 of the flow doc:
-  delta vs the register → check the six invariants → name the blast radius
-  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
-- Before any write-shape change: export the affected `queue planning`
-  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
-  fields have no history. First run against `starlabs-test` only.
-- Carried from 2026-08-27: operator visual pass of the redesigned
-  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
-  consumers to wire; newusertags backfill; `eiflixcampaign` rules
-  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
-  route guard; episode-delete gaps.
+- Console recheck after the hub lands: expected MATCHED → workshops suite runs the new spec for the first time (never run locally: no Java / no SA on this Mac).
+- Still open: runtime pass on the Communication dialog and the platform charts; the stale spec stubs that break a full `ng test`.

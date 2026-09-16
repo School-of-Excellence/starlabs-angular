@@ -133,7 +133,7 @@
         <div class="card-icon">{{cohorts['name'][0] | uppercase}}</div>
         <div class="card-info">
           <span class="card-title">{{cohorts['name'] | uppercase}}</span>
-          <span class="card-participants" (click)="cohorts['contentview'] == 'participants' ? cohorts['contentview'] = null : cohorts['contentview'] = 'participants'">
+          <span data-testid="bcoh-cohorts-1" class="card-participants" (click)="cohorts['contentview'] == 'participants' ? cohorts['contentview'] = null : cohorts['contentview'] = 'participants'">
             {{cohorts['participantidlist'].length}} Participants
             <mat-icon class="dropdown-icon">arrow_drop_down</mat-icon>
           </span>
@@ -171,18 +171,18 @@
                   <span>completed: <strong>{{(mapCompletedAssignments[$any(assignment.key)] ? mapCompletedAssignments[$any(assignment.key)].length : 0)}} / {{($any(assignment.value).length || 0)}}</strong></span>
                 </div>
               </div>
-              <button mat-icon-button class="edit-btn" *ngIf="mapBigAssignment[$any(assignment.key)]['cohortsref'].id === cohorts['docid']">
-                <mat-icon (click)="onEditAssignment(cohorts,mapBigAssignment[$any(assignment.key)])">edit</mat-icon>
+              <button data-testid="bcoh-button-2" mat-icon-button class="edit-btn" *ngIf="mapBigAssignment[$any(assignment.key)]['cohortsref'].id === cohorts['docid']">
+                <mat-icon data-testid="bcoh-on-edit-assignment-3" (click)="onEditAssignment(cohorts,mapBigAssignment[$any(assignment.key)])">edit</mat-icon>
               </button>
             </div>
             <div class="activity-buttons" *ngIf="mapBigAssignment[$any(assignment.key)]">
-              <button *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata'] != undefined && mapBigAssignment[$any(assignment.key)]['zoomdata']['start_url']" 
+              <button data-testid="bcoh-on-start-metting-4" *ngIf="mapBigAssignment[$any(assignment.key)]['zoomdata'] != undefined && mapBigAssignment[$any(assignment.key)]['zoomdata']['start_url']" 
                 mat-stroked-button 
                 class="action-btn"
                 (click)="onStartMetting($any(assignment.key))">
                 <i class="fa-solid fa-video"></i> Start Meeting
               </button>
-              <button mat-stroked-button class="action-btn" (click)="onValidateParticipantAssignment($any(assignment.key))">
+              <button data-testid="bcoh-on-validate-participant-assignment-5" mat-stroked-button class="action-btn" (click)="onValidateParticipantAssignment($any(assignment.key))">
                 <i class="fa-solid fa-user-check"></i> Validate
               </button>
             </div>
@@ -190,7 +190,7 @@
         </div>
       </div>
 
-      <div class="add-activity" (click)="onCreateAssignment(cohorts)">
+      <div data-testid="bcoh-on-create-assignment-6" class="add-activity" (click)="onCreateAssignment(cohorts)">
         <span class="add-activity-text">+ Add Activity</span>
       </div>
     </div>

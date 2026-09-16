@@ -1,7 +1,7 @@
 <div class="dialog-wrap">
   <div class="dialog-head">
     <h2>{{ isEditMode ? 'Edit Home Series' : 'Add Home Series' }}</h2>
-    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+    <button data-testid="hom-cancel-1" mat-icon-button type="button" (click)="cancel()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -38,13 +38,13 @@
           </div>
 
           <div class="episode-card-head">
-            <button mat-icon-button type="button" class="drag-btn" cdkDragHandle
+            <button data-testid="hom-button-2" mat-icon-button type="button" class="drag-btn" cdkDragHandle
               matTooltip="Drag to reorder" aria-label="Drag to reorder">
               <mat-icon>drag_indicator</mat-icon>
             </button>
             <span class="episode-index">{{ i + 1 }}</span>
             <span class="episode-name">{{ episodeTitle(group.get('episodeId')?.value) }}</span>
-            <button mat-icon-button type="button" class="remove-btn" (click)="removeEpisode(i)"
+            <button data-testid="hom-remove-episode-3" mat-icon-button type="button" class="remove-btn" (click)="removeEpisode(i)"
               matTooltip="Remove episode" aria-label="Remove episode">
               <mat-icon>close</mat-icon>
             </button>
@@ -81,8 +81,8 @@
     </mat-dialog-content>
 
     <mat-dialog-actions align="end" class="dialog-actions">
-      <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving">
+      <button data-testid="hom-cancel-4" mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+      <button data-testid="hom-button-5" mat-flat-button color="primary" type="submit" [disabled]="isSaving">
         <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
         <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Save' }}</span>
       </button>

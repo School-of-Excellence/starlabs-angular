@@ -353,7 +353,7 @@ export class ProfilelistComponent {
     const atcCollection = collection(firestoreATC, 'atc_alpha')
     const appointments = collection(this.firestoreDefault, 'appointments')
     const rolesRef = collection(this.firestoreDefault, "Roles-To-EIS")
-    const profiledataRef = doc(this.firestoreDefault, 'profile_data', profileid)
+    const profiledataRef = doc(firestoreATC, 'profile_data', profileid)
     profileStatus.atcPrescribed = (await getDocs(query(atcCollection, where("author", "array-contains", profiledataRef)))).size != 0
     profileStatus.atcGiven = (await getDocs(query(atcCollection, where("profileid", "==", profileid)))).size != 0
     profileStatus.atcAssigned = (await getDocs(query(atcCollection, where('implementationagent', 'array-contains', profileid)))).size != 0
@@ -389,11 +389,13 @@ export class ProfilelistComponent {
       alert(JSON.stringify(profileStatus))
     }
     else{
-      if(confirm("Sure, Do you want to delete?")){
+      if(confirm("Sure, Do you want to delete ?")){
         const roleRef = doc(this.firestoreDefault, profile["role_ref"]["path"])
-        const profilepathRef = doc(this.firestoreDefault,profilepath)
+        const profilepathRef = doc(this.firestoreDefault, profilepath)
+        const profileMetaRef = doc(this.firestoreDefault, "participant metadata", profileid)
         await deleteDoc(roleRef)
         await deleteDoc(profilepathRef)
+        await deleteDoc(profileMetaRef)
       }
     }
     loadingref.close()

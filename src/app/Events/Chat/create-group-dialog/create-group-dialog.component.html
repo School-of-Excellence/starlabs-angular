@@ -2,7 +2,7 @@
 <div class="create-group-container">
   <!-- Header Section -->
   <div class="header-section">
-    <button type="button" mat-icon-button class="back-button" (click)="close()">
+    <button type="button" mat-icon-button class="back-button" (click)="close()" data-testid="cgd-header-back">
       <mat-icon>arrow_back</mat-icon>
     </button>
     <h1 class="page-title">{{ groupData ? 'Edit Group' : 'Create Group' }}</h1>
@@ -10,18 +10,18 @@
     <button 
       *ngIf="groupData"
       type="button"
-      mat-raised-button 
+      mat-raised-button
       class="delete-button text-light"
-      (click)="hideGroup()">
+      (click)="hideGroup()" data-testid="cgd-header-delete">
       <mat-icon>delete</mat-icon>
       Delete Group
     </button>
     <button 
       type="submit" 
-      mat-raised-button 
+      mat-raised-button
       class="create-button text-light"
       [disabled]="!form.valid"
-      (click)="submit(form.value)">
+      (click)="submit(form.value)" data-testid="cgd-header-submit">
       <mat-icon>{{ groupData ? 'save' : 'group_add' }}</mat-icon>
       {{ groupData ? 'Save Changes' : 'Create Group' }}
     </button>
@@ -39,7 +39,7 @@
         </div>
         
         <div class="image-upload-area">
-          <div class="upload-zone" *ngIf="!getGroupImage() || getGroupImage() === defaultGroupIcon" (click)="fileInput.click()">
+          <div class="upload-zone" *ngIf="!getGroupImage() || getGroupImage() === defaultGroupIcon" (click)="fileInput.click()" data-testid="cgd-image-upload-zone">
             <div class="default-avatar">
               <img [src]="defaultGroupIcon" alt="Default group icon" class="default-icon-preview"/>
             </div>
@@ -54,10 +54,10 @@
               class="preview-image"
               (error)="removeImage()"/>
             <div class="image-overlay">
-              <button mat-mini-fab color="primary" type="button" (click)="fileInput.click()" class="change-btn" matTooltip="Change image">
+              <button mat-mini-fab color="primary" type="button" (click)="fileInput.click()" class="change-btn" matTooltip="Change image" data-testid="cgd-image-change">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-mini-fab color="warn" type="button" (click)="removeImage()" class="remove-btn" matTooltip="Remove image">
+              <button mat-mini-fab color="warn" type="button" (click)="removeImage()" class="remove-btn" matTooltip="Remove image" data-testid="cgd-image-remove">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -65,11 +65,11 @@
           
           <input 
             #fileInput
-            type="file" 
-            accept="image/*" 
-            (change)="importImages($event.target)" 
-            [multiple]="false" 
-            style="display: none"/>
+            type="file"
+            accept="image/*"
+            (change)="importImages($event.target)"
+            [multiple]="false"
+            style="display: none" data-testid="cgd-image-file-input"/>
         </div>
       </div>
 
@@ -82,7 +82,7 @@
         
         <mat-form-field appearance="outline" class="full-width-field">
           <mat-label>Group Name</mat-label>
-          <input type="text" matInput formControlName="groupname" placeholder="Enter group name">
+          <input type="text" matInput formControlName="groupname" placeholder="Enter group name" data-testid="cgd-details-groupname-input">
           <mat-icon matSuffix>group</mat-icon>
           <mat-error *ngIf="form.get('groupname')?.hasError('required')">
             Group name is required
@@ -158,11 +158,11 @@
             <button 
               *ngIf="!isChannelEdit"
               type="button" 
-              mat-raised-button 
+              mat-raised-button
               color="primary"
               (click)="excelInput.click()"
               [disabled]="isImporting"
-              class="import-excel-btn">
+              class="import-excel-btn" data-testid="cgd-members-import-excel">
               <mat-icon *ngIf="!isImporting">upload_file</mat-icon>
               <mat-spinner *ngIf="isImporting" diameter="18"></mat-spinner>
               {{ isImporting ? 'Importing...' : 'Import Excel' }}
@@ -173,10 +173,10 @@
         <!-- Hidden Excel Input -->
         <input 
           #excelInput
-          type="file" 
-          accept=".xlsx,.xls,.csv" 
-          (change)="importFromExcel($event)" 
-          style="display: none"/>
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          (change)="importFromExcel($event)"
+          style="display: none" data-testid="cgd-members-excel-input"/>
 
         <!-- Import Results Alert -->
         <div class="import-results" *ngIf="importResults">
@@ -187,7 +187,7 @@
             <span *ngIf="importResults.notFound.length > 0" class="not-found-count">
               ({{ importResults.notFound.length }} not found)
             </span>
-            <button mat-icon-button (click)="clearImportResults()" matTooltip="Dismiss" class="dismiss-btn">
+            <button mat-icon-button (click)="clearImportResults()" matTooltip="Dismiss" class="dismiss-btn" data-testid="cgd-import-results-dismiss">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -203,7 +203,7 @@
         
         <mat-form-field appearance="outline" class="full-width-field" *ngIf="!isChannelEdit">
           <mat-label>Select Members</mat-label>
-          <mat-select multiple formControlName="members" placeholder="Choose group members" [compareWith]="compareMembers" required>
+          <mat-select multiple formControlName="members" placeholder="Choose group members" [compareWith]="compareMembers" required data-testid="cgd-members-select">
             <mat-option>
               <ngx-mat-select-search 
                 [(ngModel)]="filterprofile" 
@@ -271,10 +271,10 @@
               <p class="member-email">{{ memberLookup[member]?.email || 'No email' }}</p>
             </div>
             <button 
-              mat-icon-button 
-              class="remove-member-btn" 
-              (click)="isChannelEdit ? removeChannelListEntry('members', member) : removeMember(member)"
-              matTooltip="Remove member">
+              mat-icon-button
+              class="remove-member-btn"
+              (click)="removeMember(member)"
+              matTooltip="Remove member" data-testid="cgd-selected-remove-member">
               <mat-icon>close</mat-icon>
             </button>
           </div>

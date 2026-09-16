@@ -1,10 +1,10 @@
 <!-- Full overlay handled by this component -->
-<div class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
-  <div class="overlay-panel" (click)="$event.stopPropagation()">
+<div data-testid="fov-backdrop-1" class="overlay-backdrop" *ngIf="showOverlay" (click)="closeOverlay()">
+  <div data-testid="fov-panel-3" class="overlay-panel" (click)="$event.stopPropagation()">
     <div class="overlay-header">
       <h2>{{ overlayTitle }}</h2>
       <div class="overlay-header-actions">
-        <button mat-icon-button (click)="closeOverlay()">
+        <button data-testid="fov-close-2" mat-icon-button (click)="closeOverlay()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
