@@ -4,9 +4,9 @@ import { AfterViewInit, Component, computed, ElementRef, HostListener, OnDestroy
 import { firstValueFrom, lastValueFrom, Subject, takeUntil } from 'rxjs';
 import { ConnectionQuality, createLocalScreenTracks, LocalAudioTrack, LocalVideoTrack, Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, LocalTrackPublication, VideoQuality, ScreenSharePresets, VideoPreset } from 'livekit-client';
 import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
-import { doc, docData, Firestore } from '@angular/fire/firestore';
+import { doc, docData, getDoc, Firestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
 import { OpenviduVideoElementComponent } from '../../OpenVidu/openvidu-video-element/openvidu-video-element.component';
 import { CommonModule } from '@angular/common';
@@ -24,7 +24,7 @@ import { VideoLayoutService, LayoutMode } from '../../Service/VideoLayout/video-
 // repo because npm deepfilternet3-noise-filter@1.2.1 lacks these. See vendor/.../package.json.
 import { DeepFilterNoiseFilterProcessor } from '../dfn/vendor/deepfilternet3-noise-filter';
 import { DfnStateService } from '../dfn/dfn-state.service';
-import { startJitterController } from '../dfn/jitter-buffer';
+import { startJitterController, setJitterMax, getJitterMax, jitterTargets } from '../dfn/jitter-buffer';
 
 type TrackInfo = {
   trackPublication: RemoteTrackPublication;
@@ -75,6 +75,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   roomDetail: RoomInfo | undefined | null;
   roomSubscription = new Subject<void>();
 
+  // Media backend provider for this room: 'oci' (default) | 'aws' | 'do'.
+  // Resolved from the ?provider= query param (manual testing) or the Firestore room field.
+  provider: 'aws' | 'do' | 'oci' = 'oci';
+
   // Server Subscription
   serverSubscription = new Subject<void>();
 
@@ -84,6 +88,21 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // Fullscreen Enable
   isFullscreen = false;
   @ViewChild('meetingContainer') meetingContainer!: ElementRef;
+  // Hidden video that auto-enters Picture-in-Picture when the user switches tabs (Chrome/Edge
+  // via the autoPictureInPicture attribute; no-op elsewhere). Its source is chosen by priority:
+  // remote screen share → active speaker (holding the last) → name card if their camera is off.
+  @ViewChild('pipVideo') pipVideo?: ElementRef<HTMLVideoElement>;
+  private lastActiveSpeaker: string | null = null;
+  private pipCanvas: HTMLCanvasElement | null = null;
+  private pipVisibilityHandler: (() => void) | null = null;
+  private pipNameCardCache: { name: string; stream: MediaStream } | null = null;
+  /** True while the user has Picture-in-Picture turned on for this call (persists across tab switches). */
+  pipEnabled = false;
+  private pipAttachedTrack: RemoteTrack | LocalVideoTrack | null = null;
+
+  // "Open Journey Plan" (bottom-center) — shown only for journey-coach/onboarding
+  // appointments (twin of the appointment-studio button; opens /journeysupport/<client>).
+  journeyPlanProfileId: string | null = null;
 
   // Permission
   cameraStatus: 'granted' | 'denied' | 'prompt' = 'prompt';
@@ -93,6 +112,18 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   blurLevel: 'none' | 'mid' | 'high' = 'none';
   localParticipantIdentity = '';
 
+  // Diagnostics opt-in (?diag=1 / #diag) — also gates the advanced DFN sliders in the UI.
+  diagEnabled = false;
+
+  // Device selection (Zoom-style menus). Lists refresh on 'devicechange'.
+  mics: MediaDeviceInfo[] = [];
+  cameras: MediaDeviceInfo[] = [];
+  speakers: MediaDeviceInfo[] = [];
+  selectedMicId = '';
+  selectedCameraId = '';
+  selectedSpeakerId = '';
+  private deviceChangeHandler: (() => void) | null = null;
+
   private previewStream: MediaStream | null = null;
 
   // ── DeepFilterNet3 (exact videoconference TrackProcessor architecture) ──────
@@ -100,6 +131,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   private dfnProc: DeepFilterNoiseFilterProcessor | null = null;
   private dfnBroadcastTimer: any = null;
   private jitterStops = new Map<string, () => void>();
+  // Remote CAMERA tracks by participant identity — the jitter controller holds each one to
+  // the audio playout delay for lip-sync (see startJitterController).
+  private remoteVideoTracks = new Map<string, RemoteTrack>();
   // UI state — exact defaults from DfnControls.tsx
   dfnEnabled = (typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4) >= 4; // off on <4-core devices
   dfnAtten = 80;        // attenuation / noiseReductionLevel (0–100)
@@ -112,6 +146,28 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   // Cache active blur processor — avoids recreating the canvas pipeline on every camera re-enable
   private cachedBlurProcessor: any = null;
   private cachedBlurRadius: number = 0;
+
+  // Screen-share sidebar width (px), user-draggable via the divider. Dragging the divider
+  // left widens the sidebar (more participant video), right widens the screen share.
+  screenSidebarWidth = signal<number>(280);
+
+  /** Start a horizontal drag on the screen-share divider to resize the participant sidebar. */
+  startSidebarResize(event: MouseEvent): void {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = this.screenSidebarWidth();
+    const onMove = (e: MouseEvent) => {
+      // Divider moving left (clientX decreases) → wider sidebar. Clamp to sane bounds.
+      const delta = startX - e.clientX;
+      this.screenSidebarWidth.set(Math.min(700, Math.max(180, startWidth + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
 
   // Layout mode computed from participant count and screen share state
   layoutMode = computed<LayoutMode>(() => {
@@ -128,6 +184,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   constructor(
     public firestore: Firestore,
     public route: ActivatedRoute,
+    private router: Router,
     public httpClient: HttpClient,
     public guard: AuthguardService,
     public dialog: MatDialog,
@@ -160,8 +217,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         ).subscribe(data =>{
           if(data && data["active"]){
 
-            // Prepare Call - Only when screen launched first time
-            if(this.roomDetail.title == "") this.checkServer()
+            // Resolve which media backend (cloud) hosts this room's OpenVidu Elastic cluster.
+            // NB: the existing `provider` field means system (openvidu vs livekit-cloud) and is
+            // rewritten to "openvidu" by createOpenViduToken — so the cloud selector uses a SEPARATE
+            // `mediaProvider` field. Priority: ?provider= query param (manual A/B) → mediaProvider → 'oci'.
+            const requestedProvider = (this.route.snapshot.queryParamMap.get("provider") || data["mediaProvider"] || "oci").toString().toLowerCase()
+            this.provider = requestedProvider === "do" ? "do" : requestedProvider === "aws" ? "aws" : "oci"
+
+            console.log("Provider", this.provider)
+
+            // Prepare Call - Only when screen launched first time.
+            // checkServer() is provider-aware: it gates on the matching cloud's status doc
+            // (AWS_System / OCI_System) and shows "server starting…" until the master is
+            // running with ≥1 healthy media node — essential for instant meetings, where the
+            // server was fired moments ago and boots for several minutes. DO has no status
+            // doc yet, so it skips the gate (capacity handled by the 503 retry).
+            if(this.roomDetail.title == ""){
+              if(this.provider === "do") this.prepareParticipant()
+              else this.checkServer()
+            }
 
             this.roomDetail = {
               roomId: id,
@@ -179,9 +253,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           }
         })
 
+        // Journey-plan button gate: room id == appointment docid for appointment sessions.
+        // Non-appointment rooms (live assignment / private) simply have no matching doc.
+        getDoc(doc(this.firestore, "appointments", id)).then(appt => {
+          const a = appt.exists() ? appt.data() : null
+          if (a && (a["journeycoach"] || a["onboarding"]) && a["bookedby"]?.id) {
+            this.journeyPlanProfileId = a["bookedby"].id
+          }
+        }).catch(err => console.log("Journey-plan appointment lookup failed:", err))
+
         this.loading = false
       })
     }
+  }
+
+  /** Bottom-center toolbar button — same target as appointment-studio's Open Journey Plan. */
+  openJourneyPlan(): void {
+    if (!this.journeyPlanProfileId) return
+    const url = this.router.createUrlTree(['/journeysupport', this.journeyPlanProfileId]).toString()
+    window.open(url, '_blank')
   }
 
   ngOnDestroy(): void {
@@ -209,7 +299,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
   }
 
   async checkServer(){
-    this.infraService.getStatus().pipe(takeUntil(this.serverSubscription)).subscribe({
+    // Watch the status doc of the cloud hosting THIS room (poll + event-push keep it fresh).
+    const status$ = this.provider === "oci" ? this.infraService.getOciStatus() : this.infraService.getStatus();
+    status$.pipe(takeUntil(this.serverSubscription)).subscribe({
       next: (serverData) => {
         if (serverData) {
           const masterStatus = serverData["master"]["state"]
@@ -308,17 +400,27 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     room.on(
       RoomEvent.TrackSubscribed,
       (track: RemoteTrack, publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+        // Remember the participant's camera track so the jitter controller can lip-sync it.
+        if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+          this.remoteVideoTracks.set(participant.identity, track);
+        }
+
         // Adaptive jitter buffer on each remote audio track (exact videoconference port).
+        // Pass a live getter for this participant's camera track so video is held to the
+        // same playout delay as audio → lip-synced (camera may subscribe before/after audio).
         if (track.kind === Track.Kind.Audio) {
-          this.jitterStops.set(publication.trackSid, startJitterController(track));
+          this.jitterStops.set(
+            publication.trackSid,
+            startJitterController(track, () => this.remoteVideoTracks.get(participant.identity))
+          );
         }
 
         // A4: Screen share subscription quality based on CPU/network at subscription time
         if (track.kind === Track.Kind.Video && publication.source === Track.Source.ScreenShare) {
           const cpu = this.adaptiveQuality.cpuPressure();
           const net = this.localNetworkQuality();
-          const screenQuality = 
-          cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW : 
+          const screenQuality =
+          cpu === 'critical' || net === ConnectionQuality.Lost ? VideoQuality.LOW :
           cpu === 'serious' || net === ConnectionQuality.Poor ? VideoQuality.MEDIUM : VideoQuality.HIGH; // good conditions → full quality for spotlight view
           publication.setVideoQuality(screenQuality);
           console.log(`🖥️ Screen share sub quality: ${VideoQuality[screenQuality]} (cpu:${cpu} net:${ConnectionQuality[net]})`);
@@ -342,6 +444,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
 
+        this.resolvePipSource(); // new remote video / screen share may change the PiP source
         console.log('Tracked', this.remoteParticipants());
       }
     );
@@ -353,12 +456,17 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         const stop = this.jitterStops.get(publication.trackSid);
         if (stop) { stop(); this.jitterStops.delete(publication.trackSid); }
 
+        if (track.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+          this.remoteVideoTracks.delete(participant.identity);
+        }
+
         this.remoteParticipants.update((prev) => {
           const next = new Map(prev);
           next.delete(publication.trackSid);
           return next;
         });
 
+        this.resolvePipSource(); // a departed track may change the PiP source
         console.log('UnTracked', this.remoteParticipants());
       }
     );
@@ -379,6 +487,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           next.set(participant.identity, quality);
           return next;
         });
+
+        if (quality === ConnectionQuality.Lost && participant.identity !== room.localParticipant.identity) {
+          this.resolvePipSource();
+        }
     });
 
     // Track Muted Participants
@@ -390,6 +502,9 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
         console.log('Audio muted:', participant.identity);
+      } else if (publication.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+        console.log('[pip] remote camera muted:', participant.identity);
+        this.resolvePipSource();
       }
     });
 
@@ -402,6 +517,10 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           return next;
         });
         console.log('Audio unmuted:', participant.identity);
+      } else if (publication.kind === Track.Kind.Video && publication.source === Track.Source.Camera) {
+        // Camera back on — PiP should switch from the name card back to live video.
+        console.log('[pip] remote camera unmuted:', participant.identity);
+        this.resolvePipSource();
       }
     });
 
@@ -411,13 +530,25 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
       console.log("Active Speakers:", speakerID);
       this.activeSpeakers.set(speakerID ?? []); // M1: signal update
+      this.resolvePipSource(); // keep PiP on the current speaker
     });
 
     // Clean up state maps when a participant disconnects — prevents memory leak
     room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-      this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
-      this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(participant.identity); return next; });
-      console.log('Participant disconnected, state cleaned:', participant.identity);
+      const identity = participant.identity;
+      this.remoteParticipantsQuality.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
+      this.remoteParticipantsMute.update(prev => { const next = new Map(prev); next.delete(identity); return next; });
+      this.remoteVideoTracks.delete(identity);
+      this.remoteParticipants.update(prev => {
+        const next = new Map(prev);
+        for (const [sid, info] of prev) {
+          if (info.participantIdentity === identity) next.delete(sid);
+        }
+        return next;
+      });
+      if (this.lastActiveSpeaker === identity) this.lastActiveSpeaker = null;
+      console.log('Participant disconnected, state cleaned:', identity);
+      this.resolvePipSource(); // pick a new target
     });
 
     // Handle unexpected server disconnection (network drop, server kick)
@@ -457,23 +588,59 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.adaptiveQuality.startMonitoring(room);
 
       // Publish the mic (LiveKit-managed), then apply the DeepFilterNet3 TrackProcessor —
-      // the exact videoconference architecture. applyDfnProcessor() also sets the input
-      // constraints (raw input / voiceIsolation off while DFN is on). LiveKit owns the
-      // track lifecycle (mute / device-switch), so no separate raw-stream handling needed.
+      // the exact videoconference architecture. LiveKit owns the track lifecycle
+      // (mute / device-switch), so no separate raw-stream handling needed.
+      //
+      // CAPTURE CONSTRAINTS — the fix (proven 2026-07-06): DFN must receive RAW mic audio.
+      // Chrome's noiseSuppression + AGC pre-GATE the signal (measured: 12% of frames gated to
+      // near-silence, 196 dB quiet-spread) before DFN sees it; DFN then chokes on the pre-gated
+      // signal and deletes speech → the "choppy" voice. Feeding DFN raw audio (as captured by the
+      // offline oracle) is clean. So when DFN is ON, capture with NS/EC/AGC OFF and let DFN be the
+      // sole noise processor; when DFN is OFF, use Chrome's own processing for a clean bare mic.
+      // These constraints must be set at CAPTURE — applyConstraints() on a live track is ignored
+      // by Chrome for NS/EC/AGC.
       await room.localParticipant.setMicrophoneEnabled(true, {
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
+        noiseSuppression: !this.dfnEnabled,
+        echoCancellation: !this.dfnEnabled,
+        autoGainControl: !this.dfnEnabled,
       });
       await this.applyDfnProcessor();
+      this.logMicProcessingState('initial mic set');
       this.startDfnBroadcast();
 
-      // DEV-ONLY: expose this component so the audio A/B test can be driven from the console.
-      // Run:  await __lk.audioDiag()   — once with recording OFF, once with recording ON.
-      if (typeof window !== 'undefined' && !environment.production) {
-        (window as any).__lk = this;
-        console.log('%c[diag] ready — run: await __lk.audioDiag()', 'color:#4caf50;font-weight:bold');
+      // Expose this component so the audio A/B test can be driven from the console:
+      //   await __lk.audioDiag()
+      // Both environment files ship production:true, so the old `!environment.production`
+      // gate never fired and __lk was never attached (diag unreachable on every build).
+      // Attach in non-prod OR opt-in via `?diag=1` (or `#diag`) on the URL — read-only stats,
+      // safe to enable on the deployed test site for the choppiness A/B.
+      if (typeof window !== 'undefined') {
+        const optIn = /(?:[?&]diag=1)|(?:#diag)/.test(window.location.search + window.location.hash);
+        this.diagEnabled = !environment.production || optIn;
+        if (this.diagEnabled) {
+          (window as any).__lk = this;
+          console.log('%c[diag] ready — run: await __lk.audioDiag()', 'color:#4caf50;font-weight:bold');
+        }
       }
+
+      // Populate device menus now that permissions are granted (labels are only exposed
+      // after getUserMedia succeeds) and keep them fresh as devices are plugged/unplugged.
+      await this.refreshDevices();
+      this.deviceChangeHandler = () => void this.refreshDevices();
+      navigator.mediaDevices?.addEventListener?.('devicechange', this.deviceChangeHandler);
+
+      // Default to the built-in system mic on join (not the OS default, which may be a
+      // Bluetooth headset in HFP mode → low-quality/choppy). Only switch if it isn't already.
+      // Label patterns: macOS "MacBook Pro Microphone (Built-in)"; Windows laptops expose
+      // the internal mic as "Microphone Array (…)".
+      const builtInMic = this.mics.find(m => /built[\s-]?in|internal|macbook|microphone array/i.test(m.label));
+      if (builtInMic && builtInMic.deviceId !== this.selectedMicId) {
+        await this.selectMic(builtInMic.deviceId);
+      }
+
+      // Prime the PiP source and arm auto-PiP.
+      this.setupAutoPip();
+      this.resolvePipSource();
 
     } catch (error: any) {
       // Handle connection errors gracefully
@@ -496,16 +663,20 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
           this.httpClient.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
-            participantId
+            participantId,
+            provider: this.provider
           })
         );
       } catch (error: any) {
         if (error.status === 503 && error.error?.code === 'SCALING_IN_PROGRESS') {
           retryCount++;
-          if (retryCount > 3) throw new Error('System at capacity');
+          // Surface the server's actual reason (differs per provider/failure: AWS capacity
+          // gate vs "Media node not ready") instead of a blanket capacity message.
+          const serverMessage = error.error?.message || 'System at capacity';
+          if (retryCount > 3) throw new Error(serverMessage);
 
           const wait = error.error?.retryAfter || 60;
-          console.log(`Scaling... retry in ${wait}s`);
+          console.log(`Token 503 (${this.provider}): ${serverMessage} — retry in ${wait}s`);
           await new Promise(r => setTimeout(r, wait * 1000));
         } else {
           throw error;
@@ -525,6 +696,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // (RoomEvent.Disconnected also calls leaveRoom — without this guard it loops)
     if (this.meetingRoomStatus === 'left' || this.meetingRoomStatus === 'ended') return;
     this.meetingRoomStatus = 'left'; // set immediately so re-entrant Disconnected event is ignored
+    this.clearPip();
 
     const currentRoom = this.room();
     // Remove all listeners BEFORE disconnect so RoomEvent.Disconnected doesn't re-trigger leaveRoom
@@ -535,6 +707,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     if (this.dfnBroadcastTimer) { clearInterval(this.dfnBroadcastTimer); this.dfnBroadcastTimer = null; }
     this.jitterStops.forEach(stop => stop());
     this.jitterStops.clear();
+    this.remoteVideoTracks.clear();
+    this.lastActiveSpeaker = null;
+    if (this.pipVisibilityHandler) {
+      document.removeEventListener('visibilitychange', this.pipVisibilityHandler);
+      this.pipVisibilityHandler = null;
+    }
+    if (this.deviceChangeHandler) {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', this.deviceChangeHandler);
+      this.deviceChangeHandler = null;
+    }
     try { (this.dfnProc as any)?.destroy?.(); } catch (_) {}
     this.dfnProc = null;
     this.dfnState.stop();
@@ -548,8 +730,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     // this.activeSpeakers = []; // M1: was plain array
     this.activeSpeakers.set([]); // M1: signal reset
     this.localParticipantIdentity = '';
-    // this.blurLevel = 'none'; // C6: reset to 'high' to match class default (not 'none')
-    this.blurLevel = 'high';
+    // Reset blur to OFF on leave — matches the class default ('none') and the DFN reference,
+    // which runs no video blur. Background blur (per-frame segmentation) competes for CPU with
+    // the single-threaded DeepFilterNet3 AudioWorklet; auto-forcing 'high' here silently starved
+    // the DFN worklet on rejoin → choppy audio. Blur stays a manual, opt-in choice (blur menu).
+    this.blurLevel = 'none';
     this.meetingRoomStatus = "left"
   }
 
@@ -608,12 +793,43 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * DIAGNOSTIC (validation phase): whenever the mic input is set or changed, report whether
+   * the captured signal is RAW or already PROCESSED. "Processed" here = the browser reports
+   * NS/EC/AGC active on the track (`getSettings()`), which includes the Bluetooth-HFP case
+   * where the device forces its own noise cancellation and the browser reflects NS=true.
+   * NOTE: purely on-device/system DSP the browser doesn't know about (e.g. AirPods onboard NC,
+   * macOS Voice Isolation) is invisible to this API and will still read as RAW.
+   */
+  private logMicProcessingState(context: string): void {
+    try {
+      const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+      const mst = micTrack?.mediaStreamTrack;
+      if (!mst) { console.warn(`[mic-check] (${context}) no local mic track yet`); return; }
+      const s = (mst.getSettings() as any) ?? {};
+      const processed = s.noiseSuppression === true || s.echoCancellation === true || s.autoGainControl === true;
+      console.log(
+        `%c[mic-check] (${context}) "${mst.label}" → ${processed ? 'PROCESSED (browser-level NS/EC/AGC active)' : 'RAW'}`,
+        `font-weight:bold;color:${processed ? '#ff9800' : '#4caf50'}`,
+        {
+          noiseSuppression: s.noiseSuppression,
+          echoCancellation: s.echoCancellation,
+          autoGainControl: s.autoGainControl,
+          voiceIsolation: s.voiceIsolation,
+          sampleRate: s.sampleRate,
+          dfnEnabled: this.dfnEnabled,
+        },
+      );
+    } catch (e) { console.warn(`[mic-check] (${context}) failed:`, e); }
+  }
+
   // ── DeepFilterNet3 control methods (exact DfnControls.tsx behaviour) ─────────
 
   /** Apply or remove the DFN TrackProcessor on the local mic + set input constraints. */
   private async applyDfnProcessor(): Promise<void> {
     const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
     if (!micTrack) return;
+
     try {
       if (this.dfnEnabled) {
         if (!this.dfnProc) {
@@ -646,18 +862,29 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         await micTrack.stopProcessor();
       }
 
-      // Input constraints: when DFN is ON keep the input raw (voiceIsolation off) so we
-      // don't double-process; when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation.
+      // Input constraints: when DFN is ON keep the input RAW (all of Chrome's NS/EC/AGC +
+      // voiceIsolation OFF) so DFN is the sole noise processor and never sees pre-gated audio;
+      // when OFF, enable Chrome's own NS/EC/AGC + voiceIsolation for a clean bare mic.
+      // NOTE: NS/EC/AGC are honoured at CAPTURE (setMicrophoneEnabled above) — Chrome ignores them
+      // via applyConstraints on a live track. This call still carries voiceIsolation, and keeps the
+      // toggle state coherent; the reliable switch is the capture constraints on (re)publish.
       try {
         const mst = micTrack.mediaStreamTrack;
         if (mst) {
+          // Core raw constraints only — NO voiceIsolation (non-standard; it throws
+          // OverconstrainedError on devices like the MacBook mic that CAN still do raw,
+          // which wrongly looked like "can't do raw" and disabled DFN).
           const constraints = this.dfnEnabled
-            ? { voiceIsolation: false }
-            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, voiceIsolation: true };
+            ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
           await mst.applyConstraints(constraints as unknown as MediaTrackConstraints);
         }
-      } catch (ce) {
-        console.warn('DFN applyConstraints (voiceIsolation) not supported', ce);
+      } catch (ce: any) {
+        // Diagnostic-only for now: DFN is NO LONGER auto-disabled when a device can't provide
+        // raw audio (the old Bluetooth-HFP guard). We first want to observe, per device, whether
+        // the input is actually raw or processed — see logMicProcessingState() — and decide the
+        // policy from that evidence.
+        console.warn('[dfn] applyConstraints failed (keeping DFN):', String(ce?.constraint || '') || ce?.name, ce?.message);
       }
     } catch (e) {
       console.error('DFN control error', e);
@@ -685,11 +912,48 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     this.dfnBroadcastTimer = setInterval(() => this.broadcastDfn(), 3000);
   }
 
-  /** Master DFN on/off. */
-  async toggleDfn(): Promise<void> {
-    this.dfnEnabled = !this.dfnEnabled;
-    await this.applyDfnProcessor();
+  /**
+   * Noise-cancellation mode (the Audio-menu two options):
+   *  'builtin' — browser/inbuilt noise + echo cancellation + AGC, DFN off.
+   *  'dfn'     — DeepFilterNet3 on RAW capture (all inbuilt processing off), as designed.
+   * NS/EC/AGC are only honoured at CAPTURE (Chrome ignores applyConstraints on a live track —
+   * proven 2026-07-06), so flipping the mode mid-call must re-acquire the mic via
+   * restartTrack. deviceId must be included: restart() drops the other audio constraints
+   * when no deviceId is present.
+   */
+  async setNcMode(mode: 'builtin' | 'dfn'): Promise<void> {
+    const wantDfn = mode === 'dfn';
+    if (wantDfn === this.dfnEnabled) return;
+    this.dfnEnabled = wantDfn;
+
+    const micTrack = this.getLocalTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (micTrack) {
+      // Going to built-in: detach DFN BEFORE the capture restart.
+      if (!wantDfn && this.dfnProc) {
+        this.dfnProc = null;
+        try { await micTrack.stopProcessor(); } catch (_) {}
+      }
+      const deviceId = this.selectedMicId || micTrack.mediaStreamTrack?.getSettings?.()?.deviceId || undefined;
+      try {
+        await micTrack.restartTrack({
+          deviceId,
+          echoCancellation: !wantDfn,
+          noiseSuppression: !wantDfn,
+          autoGainControl: !wantDfn,
+        });
+      } catch (e) { console.warn('[nc] mic capture restart failed:', e); }
+      // Going to DFN: attach the processor to the fresh raw track.
+      this.dfnProc = null;
+      await this.applyDfnProcessor();
+    }
+
+    this.logMicProcessingState(`nc mode → ${mode}`);
     this.broadcastDfn();
+  }
+
+  /** Master DFN on/off (diag NR-Tune panel) — routes through the same mode switch. */
+  async toggleDfn(): Promise<void> {
+    await this.setNcMode(this.dfnEnabled ? 'builtin' : 'dfn');
   }
 
   onDfnAttenChange(v: number): void {
@@ -743,23 +1007,26 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   async toggleCamera(){
     const room = this.room();
-    if (!room) return;
+    if (!room || room.state !== 'connected') return;
+    try {
+      const isCurrentlyEnabled = room.localParticipant.isCameraEnabled;
 
-    const isCurrentlyEnabled = room.localParticipant.isCameraEnabled;
+      if (isCurrentlyEnabled) {
+        await room.localParticipant.setCameraEnabled(false);
+        console.log('📷 Camera disabled');
+      } else {
+        const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
+        const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
+        await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
 
-    if (isCurrentlyEnabled) {
-      await room.localParticipant.setCameraEnabled(false);
-      console.log('📷 Camera disabled');
-    } else {
-      const cameraConstraints = this.adaptiveQuality.getCameraConstraints(this.adaptiveQuality.currentTier());
-      const publishOptions    = this.adaptiveQuality.getPublishOptions(this.adaptiveQuality.currentTier());
-      await room.localParticipant.setCameraEnabled(true, cameraConstraints, publishOptions);
+        if (this.blurLevel !== 'none') {
+          await this.applyBlur(this.blurLevel);
+        }
 
-      if (this.blurLevel !== 'none') {
-        await this.applyBlur(this.blurLevel);
+        console.log('📷 Camera enabled');
       }
-
-      console.log('📷 Camera enabled');
+    } catch (e: any) {
+      console.warn('[toggleCamera] failed:', e?.name, e?.message);
     }
   }
 
@@ -814,7 +1081,364 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
     return null;
   }
 
+  // ── Picture-in-Picture (auto on tab switch) ───────────────────────────────
+
+  /** identity → display name for remote participants (from the tracked publications). */
+  private remoteNames(): Map<string, string> {
+    const m = new Map<string, string>();
+    this.remoteParticipants().forEach(v => { if (!m.has(v.participantIdentity)) m.set(v.participantIdentity, v.participantName); });
+    return m;
+  }
+
+  /** Arm automatic Picture-in-Picture. Chrome fires the mediaSession 'enterpictureinpicture'
+   *  action when the user leaves a tab that has active camera/mic + a registered handler —
+   *  the documented conferencing auto-PiP path (the bare attribute alone is unreliable). */
+  private setupAutoPip(): void {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+    (el as any).autoPictureInPicture = true;
+    el.disablePictureInPicture = false;
+
+    // ── Auto-PiP eligibility snapshot (diagnosis step 1) ──────────────────────
+    // Logs every capability Chrome needs for automatic PiP on tab switch, so a failed
+    // auto-pop can be pinned to the exact missing prerequisite from the console alone.
+    const chromeVer = (navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/) || [])[1] ?? null;
+    console.log('%c[pip] eligibility snapshot', 'font-weight:bold;color:#03a9f4', {
+      browser: navigator.userAgent,
+      chromeMajorVersion: chromeVer,
+      chromeAutoPipViaMediaSession: chromeVer ? (Number(chromeVer) >= 134 ? 'YES (>=134)' : `NO (Chrome ${chromeVer} < 134)`) : 'not Chrome',
+      pictureInPictureEnabled: (document as any).pictureInPictureEnabled ?? false,
+      requestPictureInPicture: 'requestPictureInPicture' in HTMLVideoElement.prototype,
+      autoPictureInPictureAttr: 'autoPictureInPicture' in HTMLVideoElement.prototype,
+      mediaSession: 'mediaSession' in navigator,
+      documentPiP: 'documentPictureInPicture' in window,
+      isInstalledPwa: window.matchMedia?.('(display-mode: standalone)').matches ?? false,
+    });
+
+    el.addEventListener('enterpictureinpicture', () => { this.pipEnabled = true; console.log('[pip] entered'); });
+    el.addEventListener('leavepictureinpicture', () => { this.pipEnabled = false; console.log('[pip] left'); });
+
+    // Belt-and-suspenders auto-PiP. mediaSession action = the "official" hook; the
+    // visibilitychange handler = the one that actually fires reliably, because Chrome permits
+    // requestPictureInPicture without a fresh gesture WHILE the tab is capturing camera/mic.
+    if ('mediaSession' in navigator && 'setActionHandler' in navigator.mediaSession) {
+      try {
+        // Chrome's auto-PiP eligibility wants an ACTIVE media session, not just a registered
+        // handler. Metadata + playbackState is what marks the session active (the remote
+        // <audio> elements provide the audible playback that anchors it).
+        try {
+          (navigator.mediaSession as any).metadata = new MediaMetadata({
+            title: 'Live meeting',
+            artist: 'StarLabs',
+          });
+        } catch (me) { console.warn('[pip] MediaMetadata failed:', me); }
+        (navigator.mediaSession as any).playbackState = 'playing';
+        navigator.mediaSession.setActionHandler('enterpictureinpicture' as any, () => {
+          console.log('[pip] mediaSession enterpictureinpicture FIRED');
+          this.enterPipAuto();
+        });
+        console.log('[pip] armed A: mediaSession enterpictureinpicture handler registered');
+      } catch (e) {
+        console.warn('[pip] armed A FAILED: enterpictureinpicture action unsupported by this browser', e);
+      }
+    } else {
+      console.warn('[pip] armed A FAILED: no mediaSession API');
+    }
+
+    // NOTE: we do NOT call requestPictureInPicture() from visibilitychange — Chrome rejects it
+    // without a user gesture (confirmed: NotAllowedError). The only gesture-free auto-enter paths
+    // are (A) the mediaSession enterpictureinpicture action above, or the autoPictureInPicture
+    // attribute — both Chrome-internal. This listener only EXITS PiP when returning to the tab.
+    // Persistent PiP: once the user turns PiP on (togglePip), it stays on across tab switches AND
+    // while the tab is focused, until they turn it off or leave the call. We deliberately do NOT
+    // exit on return — re-entering later would need a fresh user gesture Chrome will not grant on
+    // a tab switch (confirmed: NotAllowedError). Chrome's own auto-action (armed above) may
+    // additionally open PiP on tab-hide where it's eligible (installed PWA / production origin).
+    this.pipVisibilityHandler = () => {
+      if (!document.hidden) return;
+      console.log('[pip] tab hidden', { pipOn: this.pipEnabled, inPip: !!(document as any).pictureInPictureElement, hasSource: !!el.srcObject });
+    };
+    document.addEventListener('visibilitychange', this.pipVisibilityHandler);
+  }
+
+  private async waitForPipMetadata(el: HTMLVideoElement, timeoutMs = 2000): Promise<boolean> {
+    if (el.readyState >= 1) return true;
+    return new Promise<boolean>(resolve => {
+      let done = false;
+      const onReady = () => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('loadedmetadata', onReady);
+        resolve(true);
+      };
+      el.addEventListener('loadedmetadata', onReady, { once: true });
+      setTimeout(() => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('loadedmetadata', onReady);
+        resolve(el.readyState >= 1);
+      }, timeoutMs);
+    });
+  }
+
+  /** Attempt to enter PiP automatically (on tab hide). No-op if already in PiP or no source. */
+  private async enterPipAuto(): Promise<void> {
+    const el = this.pipVideo?.nativeElement;
+    if (!el || (document as any).pictureInPictureElement) return;
+    this.resolvePipSource();                            // refresh to the best current source (remote, name card, or our own screen share)
+    if (!el.srcObject) { console.log('[pip] auto skipped — no source to show'); return; }
+    try {
+      await el.play().catch(() => {});
+      const ready = await this.waitForPipMetadata(el);
+      if (!ready) { console.log('[pip] auto skipped — metadata never loaded'); return; }
+      await (el as any).requestPictureInPicture();
+      console.log('[pip] entered (auto)');
+    } catch (e: any) {
+      console.warn('[pip] auto request failed:', e?.name, e?.message);
+    }
+  }
+
+  /** Manual PiP toggle (from the Video menu) — a real user gesture, so requestPictureInPicture
+   *  is always allowed. Also the reliable way to verify PiP works regardless of auto-PiP. */
+  async togglePip(): Promise<void> {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+    if (!('requestPictureInPicture' in HTMLVideoElement.prototype)) {
+      alert('Picture-in-Picture is not supported in this browser (use Chrome, Edge, or Safari).');
+      return;
+    }
+    try {
+      if ((document as any).pictureInPictureElement) {
+        this.pipEnabled = false;
+        await (document as any).exitPictureInPicture();
+        return;
+      }
+      // Prefer the active remote; if alone, pop out your OWN video so PiP still works.
+      this.resolvePipSource();
+      if (!el.srcObject) {
+        const localTrack = this.localParticipant();
+        if (localTrack) this.setPipTrack(localTrack);
+      }
+      if (!el.srcObject) { alert('No video available to show in Picture-in-Picture. Turn your camera on or wait for a participant.'); return; }
+      // Safari: transient user activation does NOT survive awaits — request PiP in the
+      // same task as the click when frames are already there (the normal case, since the
+      // pip video plays continuously). Only fall back to waiting when data isn't ready.
+      el.play().catch(() => {});
+      const ready = await this.waitForPipMetadata(el);
+      if (!ready) {
+        alert('Video is still loading — please try Picture-in-Picture again in a moment.');
+        return;
+      }
+      await (el as any).requestPictureInPicture();
+      this.pipEnabled = true;
+      console.log('[pip] entered (manual)');
+    } catch (e: any) {
+      console.warn('[pip] manual request failed:', e?.name, e?.message);
+      alert('Could not open Picture-in-Picture: ' + (e?.message || e?.name || 'unknown error'));
+    }
+  }
+
+  // reported this participant's connection as Lost.
+  private isRemoteConnectionLost(identity: string): boolean {
+    return this.remoteParticipantsQuality().get(identity) === ConnectionQuality.Lost;
+  }
+
+
+  // True if the given remote participant's camera publication is currently muted (camera off).
+  private isRemoteCameraMuted(identity: string): boolean {
+    const pub = this.returnRemoteParticipantTrack().find(
+      t => t.participantIdentity === identity && t.trackPublication.source === Track.Source.Camera
+    );
+    return pub?.trackPublication.isMuted ?? true; // no publication at all = treat as not-live
+  }
+
+  /** Choose what the PiP window shows and attach it. Safe to call on any relevant change. */
+  private resolvePipSource(): void {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+
+    // 1. A REMOTE screen share wins (scenario 4).
+    const share = this.getActiveScreenShare();
+    if (share && !share.isLocal && share.track) {
+      this.setPipTrack(share.track);
+      return;
+    }
+
+    // 2. Active speaker, remote only, holding the last one when nobody is talking (scenario 3).
+    const speaking = this.activeSpeakers().filter(id => id !== this.localParticipantIdentity);
+    if (speaking[0]) this.lastActiveSpeaker = speaking[0];
+
+    const names = this.remoteNames();
+    let target = this.lastActiveSpeaker && names.has(this.lastActiveSpeaker) ? this.lastActiveSpeaker : null;
+    if (!target) {
+      // Pick a genuinely random remaining participant instead of always the first one in map
+      const remoteIds = Array.from(names.keys());
+      target = remoteIds.length > 0 ? remoteIds[Math.floor(Math.random() * remoteIds.length)] : null;
+    }
+    if (!target) {
+      // No remote yet — keep PiP meaningful (never clearPip() here: that would close a PiP the
+      // user deliberately enabled). Priority: our own screen share → our own camera → a card.
+      const localShareTrack = share && share.isLocal ? share.track : null;
+      const localCam = this.localParticipant();
+      if (localShareTrack) this.setPipTrack(localShareTrack);
+      else if (localCam && (localCam as any).mediaStreamTrack?.readyState === 'live') this.setPipTrack(localCam);
+      else this.setPipStream(this.nameCardStream('Waiting for others…'));
+      return;
+    }
+
+    const camTrack = this.remoteVideoTracks.get(target);
+    const muted = this.isRemoteCameraMuted(target);
+    console.log('[pip] resolve →', { target, hasCamTrack: !!camTrack?.mediaStreamTrack, muted });
+    if (camTrack && !muted) {
+      this.setPipTrack(camTrack);
+    } else {
+      // Camera off → show a name card, same idea as the grid placeholder (scenario 5).
+      this.setPipStream(this.nameCardStream(names.get(target) || target));
+    }
+  }
+
+  private setPipTrack(track: RemoteTrack | LocalVideoTrack): void {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+    if (this.pipAttachedTrack === track && el.srcObject) return;
+
+    if (this.pipAttachedTrack) {
+      try { this.pipAttachedTrack.detach(el); } catch (_) {}
+    }
+    el.srcObject = null;
+    this.pipAttachedTrack = track;
+    track.attach(el); // sets srcObject internally + registers the element with LiveKit
+    el.muted = true;
+    (el as any).autoPictureInPicture = true;
+    el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
+  }
+
+  /** Attach a stream to the hidden PiP video (muted — audio plays via the normal elements). */
+    private setPipStream(stream: MediaStream): void {
+    const el = this.pipVideo?.nativeElement;
+    if (!el) return;
+
+    if (this.pipAttachedTrack) {
+      try { this.pipAttachedTrack.detach(el); } catch (_) {}
+      this.pipAttachedTrack = null;
+    }
+
+    const current = el.srcObject as MediaStream | null;
+    const same = current && current.getVideoTracks()[0]?.id === stream.getVideoTracks()[0]?.id;
+    if (!same) {
+      el.srcObject = stream;
+      el.muted = true;
+      (el as any).autoPictureInPicture = true;
+      el.play().catch(err => { if (err?.name !== 'AbortError') console.warn('[pip] play failed:', err?.name, err?.message); });
+    }
+  }
+
+  /** Render a participant's initials/name onto a canvas and return it as a video stream. */
+  private nameCardStream(name: string): MediaStream {
+    if (this.pipNameCardCache && this.pipNameCardCache.name === name) return this.pipNameCardCache.stream;
+    if (!this.pipCanvas) {
+      this.pipCanvas = document.createElement('canvas');
+      this.pipCanvas.width = 320; this.pipCanvas.height = 180;
+    }
+    const c = this.pipCanvas, ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, c.width, c.height);
+    const initial = (name || '?').trim().charAt(0).toUpperCase();
+    ctx.fillStyle = '#3a3a3a'; ctx.beginPath(); ctx.arc(c.width / 2, 70, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(initial, c.width / 2, 70);
+    ctx.font = '16px sans-serif'; ctx.fillText(name, c.width / 2, 140);
+    // 15 fps (not 1) so the first frame lands promptly — enterPipAuto()/togglePip() wait for it
+    // before requestPictureInPicture(), and a slow first frame would stall or reject the request.
+    const stream = (c as any).captureStream(15);
+    this.pipNameCardCache = { name, stream };
+    return stream;
+  }
+
+  private clearPip(): void {
+    try {
+      if ((document as any).pictureInPictureElement) {
+        (document as any).exitPictureInPicture?.();
+      }
+    } catch {}
+
+    const el = this.pipVideo?.nativeElement;
+    if (el) {
+      if (this.pipAttachedTrack) { try { this.pipAttachedTrack.detach(el); } catch (_) {} }
+      el.srcObject = null;
+    }
+    this.pipAttachedTrack = null;
+    this.pipEnabled = false;
+    this.pipNameCardCache = null;
+  }
+
+  // ── Device selection (mic / speaker / camera) ─────────────────────────────
+
+  /** Enumerate input/output devices and sync the current selections. */
+  async refreshDevices(): Promise<void> {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this.mics     = devices.filter(d => d.kind === 'audioinput');
+      this.cameras  = devices.filter(d => d.kind === 'videoinput');
+      this.speakers = devices.filter(d => d.kind === 'audiooutput');
+
+      const room = this.room();
+      // Reflect what LiveKit currently has active (falls back to the first device's id).
+      this.selectedMicId    = (room?.getActiveDevice?.('audioinput')  as string) || this.selectedMicId    || this.mics[0]?.deviceId    || '';
+      this.selectedCameraId = (room?.getActiveDevice?.('videoinput')  as string) || this.selectedCameraId || this.cameras[0]?.deviceId || '';
+      this.selectedSpeakerId= (room?.getActiveDevice?.('audiooutput') as string) || this.selectedSpeakerId || this.speakers[0]?.deviceId|| '';
+    } catch (e) {
+      console.warn('refreshDevices failed:', e);
+    }
+  }
+
+  async selectMic(deviceId: string): Promise<void> {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
+    try {
+      await room.switchActiveDevice('audioinput', deviceId);
+      this.selectedMicId = deviceId;
+      // switchActiveDevice creates a NEW mic track. dfnProc still references the OLD track's
+      // processor, so applyDfnProcessor() would skip re-attaching → the new device (e.g. a
+      // Bluetooth headset) would publish with Chrome's NS/AGC pre-gating and no DFN → choppy.
+      // Drop the stale processor so applyDfnProcessor re-attaches DFN with RAW capture
+      // (NS/EC/AGC off) to the new track. This is what guarantees raw input on device switch.
+      this.dfnProc = null;
+      await this.applyDfnProcessor();
+      this.logMicProcessingState('mic changed');
+    } catch (e) { console.warn('selectMic failed:', e); }
+  }
+
+  async selectCamera(deviceId: string): Promise<void> {
+    try { await this.room()?.switchActiveDevice('videoinput', deviceId); this.selectedCameraId = deviceId; }
+    catch (e) { console.warn('selectCamera failed:', e); }
+  }
+
+  async selectSpeaker(deviceId: string): Promise<void> {
+    this.selectedSpeakerId = deviceId;
+
+    // LiveKit path — stores room.options.audioOutput so tracks subscribed LATER inherit the
+    // sink, and applies setSinkId to the elements it has in its bookkeeping. (audiooutput
+    // switching uses setSinkId — Chrome/Edge; Safari neither lists outputs nor supports it.)
+    try { await this.room()?.switchActiveDevice('audiooutput', deviceId); }
+    catch (e) { console.warn('[speaker] switchActiveDevice failed:', e); }
+
+    // Direct path — the LiveKit path alone was observed NOT to change the output device in
+    // Chrome, so guarantee every rendered <audio> element follows, and log each element's
+    // resulting sinkId as evidence.
+    const els = Array.from(document.querySelectorAll('audio')) as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void>; sinkId?: string })[];
+    await Promise.all(els.map(async el => {
+      if (typeof el.setSinkId !== 'function') { console.warn('[speaker] setSinkId unsupported on this browser'); return; }
+      try { await el.setSinkId(deviceId); }
+      catch (e) { console.warn(`[speaker] element "${el.id || '?'}" setSinkId failed:`, e); }
+    }));
+    const label = this.speakers.find(s => s.deviceId === deviceId)?.label || deviceId;
+    console.log(`[speaker] output → "${label}"`, els.map(el => ({ element: el.id || '?', sinkId: el.sinkId })));
+  }
+
   async startScreenShare() {
+    const room = this.room();
+    if (!room || room.state !== 'connected') return;
+    try {
     // C2: Screen share resolution + encoding based on current network/CPU tier.
     // Publishing full-HD on a low-tier connection saturates uplink → camera freeze + audio loss.
     const tier = this.adaptiveQuality.currentTier();
@@ -846,9 +1470,22 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
         videoEncoding: screenPreset.encoding,
         simulcast: false, // screen share is single-layer — simulcast not applicable
       });
+
+      // Browser-native "Stop sharing" (the Chrome bar / OS control) ends the capture track
+      // WITHOUT going through our stopScreenShare(), so isLocalScreenSharing stayed true and
+      // the layout froze on a blank screen-share box. Listen for the track's own end and run
+      // the same cleanup — the local equivalent of the remote TrackUnsubscribed handler.
+      track.mediaStreamTrack.addEventListener('ended', () => {
+        console.log("Screen share track ended (browser stop) — resetting layout");
+        this.stopScreenShare();
+      });
     }
     console.log("Screen sharing started");
     this.isLocalScreenSharing.set(true);
+    this.resolvePipSource();
+    } catch (e: any) {
+      console.warn('[startScreenShare] failed:', e?.name, e?.message);
+    }
   }
 
   stopScreenShare() {
@@ -857,8 +1494,11 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       this.room()?.localParticipant.unpublishTrack(pub.track!);
       pub.track?.stop();
       console.log("Screen sharing stopped");
-      this.isLocalScreenSharing.set(false);
     }
+    // Always reset the flag (even if the publication is already gone from a browser-native
+    // stop) so the layout leaves screen-share mode. Idempotent — safe to call twice.
+    this.isLocalScreenSharing.set(false);
+    this.resolvePipSource();
   }
 
   // Recording Control
@@ -878,7 +1518,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       var roomId = this.roomDetail["roomId"]
       const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStartRecording`;
       const response = await lastValueFrom(
-        this.httpClient.post(url, { roomId })
+        this.httpClient.post(url, { roomId, provider: this.provider })
       );
       console.log(response)
     } catch (error) {
@@ -896,7 +1536,7 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       if(egressId){
         const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduStopRecording`;
         const response = await lastValueFrom(
-          this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId })
+          this.httpClient.post(url, { egressId: egressId, roomId: this.roomDetail.roomId, provider: this.provider })
         );
         console.log(response)
       }
@@ -912,7 +1552,16 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
   @HostListener('document:fullscreenchange')
   onFullscreenChange() {
-    this.isFullscreen = !!document.fullscreenElement;
+    const fsEl = document.fullscreenElement as HTMLElement | null;
+    this.isFullscreen = !!fsEl;
+    // CDK menu/overlay panels render in `.cdk-overlay-container` appended to <body>, which is
+    // OUTSIDE a fullscreened sub-element — so mat-menus (audio/video/end-call) were invisible
+    // and unclickable in fullscreen. Relocate the overlay container INTO the fullscreen element
+    // while fullscreen, and back to <body> on exit. This is the real fix (not disabling menus).
+    const overlay = document.querySelector('.cdk-overlay-container') as HTMLElement | null;
+    if (!overlay) return;
+    if (fsEl) fsEl.appendChild(overlay);
+    else document.body.appendChild(overlay);
   }
 
   toggleFullscreen() {
@@ -920,48 +1569,70 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
 
     if (!document.fullscreenElement) {
       elem.requestFullscreen();
-      this.isFullscreen = true;
     } else {
       document.exitFullscreen();
-      this.isFullscreen = false;
     }
+    // isFullscreen is updated by onFullscreenChange (the authoritative event).
   }
 
-  /** Apply background blur at a given level, or remove it. */
+  // Guard against overlapping blur operations (a 2nd click mid-apply stacked processors → freeze).
+  private blurBusy = false;
+
+  /** Apply background blur at a given level, or remove it. No-op if already at that level. */
   async applyBlur(level: 'none' | 'mid' | 'high') {
+    if (level === this.blurLevel) return;   // ignore re-selecting the same option (was re-running)
+    if (this.blurBusy) return;              // ignore clicks while a change is in flight
+    this.blurBusy = true;
+
     const cameraPub = this.getLocalTrackPublication(Track.Source.Camera);
     if (!cameraPub || !cameraPub.videoTrack) {
       console.warn('⚠️ No camera track for blur');
+      this.blurBusy = false;
       return;
     }
-
     const videoTrack = cameraPub.videoTrack;
 
     try {
       if (level === 'none') {
-        await videoTrack.stopProcessor();
-        this.cachedBlurProcessor = null;
-        this.cachedBlurRadius = 0;
+        if (this.cachedBlurProcessor) {
+          await videoTrack.stopProcessor();
+          this.cachedBlurProcessor = null;
+          this.cachedBlurRadius = 0;
+        }
         console.log('🔲 Blur removed');
       } else {
-        const blurRadius = level === 'mid' ? 5 : 10; // Reduced: was 6/15 — lighter per-frame load
-        if (!this.cachedBlurProcessor || this.cachedBlurRadius !== blurRadius) {
-          // Only create + attach processor when radius changes or first time
-          const blur = BackgroundProcessor({ mode: 'background-blur', blurRadius });
+        const blurRadius = level === 'mid' ? 5 : 10;
+        if (this.cachedBlurProcessor) {
+          // REUSE the running pipeline — just change the radius. Creating a NEW processor +
+          // setProcessor on every change stacked multiple segmentation pipelines (each running
+          // per-frame ML), which starved the CPU → freeze on the 2nd/3rd apply. switchTo()
+          // updates in place with no new pipeline.
+          await this.cachedBlurProcessor.switchTo({ mode: 'background-blur', blurRadius });
+          console.log(`🔲 Blur updated: ${level} (radius: ${blurRadius})`);
+        } else {
+          // First time: create once. SELF-HOSTED assets (root cause of the ORIGINAL freeze):
+          // the page runs under COEP require-corp (coi-serviceworker), which blocks the
+          // MediaPipe wasm/model if fetched from a CDN → setProcessor stalls. Serving them
+          // same-origin (like DFN) makes it COEP-immune.
+          const blur = BackgroundProcessor({
+            mode: 'background-blur',
+            blurRadius,
+            assetPaths: {
+              tasksVisionFileSet: '/assets/mediapipe/wasm',
+              modelAssetPath: '/assets/mediapipe/selfie_segmenter.tflite',
+            },
+          });
           await videoTrack.setProcessor(blur);
           this.cachedBlurProcessor = blur;
-          this.cachedBlurRadius = blurRadius;
           console.log(`🔲 Blur applied: ${level} (radius: ${blurRadius})`);
-        } else {
-          // Same radius already active — re-attach cached processor to new track (camera re-enable)
-          await videoTrack.setProcessor(this.cachedBlurProcessor);
-          console.log(`🔲 Blur re-attached: ${level} (radius: ${blurRadius})`);
         }
+        this.cachedBlurRadius = blurRadius;
       }
-
       this.blurLevel = level;
     } catch (error) {
       console.error('🔴 Blur error:', error);
+    } finally {
+      this.blurBusy = false;
     }
   }
 
@@ -1108,6 +1779,12 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
    * Use it for the recording A/B: run with recording OFF, then ON; if conceal/loss/jitter
    * jump when recording starts, the composite egress is starving the media node.
    */
+  /** A/B knob for the audio-playout ceiling. `__lk.jitterMax(600)` restores the old value. */
+  jitterMax(ms?: number): number {
+    if (typeof ms === 'number') setJitterMax(ms);
+    return getJitterMax();
+  }
+
   async audioDiag(windowSec = 6): Promise<any> {
     const room = this.room();
     if (!room) { console.warn('[diag] not connected to a call'); return; }
@@ -1200,14 +1877,36 @@ export class JoinLivekitCallComponent implements AfterViewInit, OnDestroy {
       });
     });
 
+    // Client-side load — correlate CPU pressure / blur with downlink conceal for the
+    // blur-starvation A/B. DeepFilterNet3 runs single-threaded WASM in an AudioWorklet; if the
+    // renderer is starved (heavy blur + simulcast) the worklet underruns → choppy DFN output.
+    let cpuPressure: string = '?';
+    try { cpuPressure = (this.adaptiveQuality as any)?.cpuPressure?.() ?? '?'; } catch (_) {}
+    const client = {
+      blurLevel: this.blurLevel,
+      cpuPressure,
+      hardwareConcurrency: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency ?? '?') : '?',
+      crossOriginIsolated: typeof window !== 'undefined' ? (window as any).crossOriginIsolated : '?',
+    };
+
+    // A/V SYNC A/B: the current audio playout delay per remote track. This is the extra lag
+    // audio carries relative to video (lip-sync drift). Compare the OLD ceiling (600) vs the
+    // NEW (300): run __lk.jitterMax(600), let it settle, audioDiag(); then __lk.jitterMax(300),
+    // settle, audioDiag(). Audio should stay clean (conceal <15 ms/s) while playout — and thus
+    // drift — roughly halves.
+    const playout = { 'JB ceiling ms': getJitterMax(), 'live targets ms': Array.from(jitterTargets.values()) };
+
     console.log('%c[diag] DFN status', 'font-weight:bold;color:#4caf50', dfn);
+    console.log('%c[diag] CLIENT load (blur/CPU — A/B blur off vs on)', 'font-weight:bold;color:#9c27b0', client);
+    console.log('%c[diag] A/V SYNC (audio playout delay — lower = tighter lip-sync)', 'font-weight:bold;color:#e91e63', playout);
     console.log('%c[diag] UPLINK (this mic → SFU) — works solo', 'font-weight:bold;color:#2196f3');
     console.table([uplink]);
     console.log('%c[diag] DOWNLINK (remote talkers → you) — needs a second participant speaking', 'font-weight:bold;color:#ff9800');
     console.table(rows.length ? rows : [{ note: 'no remote audio streams — join a 2nd participant to measure downlink breakup' }]);
     console.log(`[diag] window ${dt.toFixed(1)}s · GOOD: conceal <15 ms/s, loss <1%, jitter <30 ms, rtt <120 ms, pair host/srflx (NOT relay)`);
     console.log('[diag] BAD breakup: conceal >50 ms/s, loss >2%, rtt >250 ms, or pair contains "relay"');
-    return { dfn, uplink, downlink: rows };
+    console.log('[diag] A/B sync: __lk.jitterMax(600) vs __lk.jitterMax(300) — watch "live targets ms" fall while conceal stays low');
+    return { dfn, client, playout, uplink, downlink: rows };
   }
 
   /**
