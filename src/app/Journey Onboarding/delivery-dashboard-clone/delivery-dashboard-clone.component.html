@@ -1723,7 +1723,7 @@
                       *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
                       participant[header.key] || 'N/A' }}</span>
                     <span *ngIf="header.key === 'addnotes'">
-                      <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
+                      <div data-testid="ddc-div-117" (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
                     </span>
                     <span *ngIf="header.key === 'generalnotes'" #notesContainer
                       (mouseenter)="showPopup(participant, $event, notesContainer)" (mouseleave)="hidePopupWithDelay()">
