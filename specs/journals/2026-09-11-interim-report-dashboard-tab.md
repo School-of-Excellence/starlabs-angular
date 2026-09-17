@@ -149,3 +149,32 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
   seeded data, which only ever uses the canonical five.
 - Hub: `modes/interim-report-dashboard.spec.ts` IRD-02 now asserts Health (rated 0) = 1 and Personal
   Genius (never rated) = 0; new IRD-12 covers multi-select. 152 hooks, aligned both ways.
+
+## 2026-09-17 (2) — Resolved irrespective of tags; pick participants → WhatsApp / email / notification
+- **Resolved counts every resolved letter** (operator). It used to be the Journey Coaching set
+  (Needs Attention + Critical) split into Open / Resolved, so a Happy — or untagged — letter that a coach
+  resolved was invisible. Now `done = every letter with tags.resolved`, `Open` stays the JC set that is
+  not resolved, and the card says "marked resolved · any tag". The two no longer add up to the JC total
+  by construction — that is the intent. The `esc:Resolved` list and the "Resolved by" chips follow the
+  same rule, and that list is titled "Resolved letters".
+- **Picking participants for a message.** `PICK` is a Map keyed by **profileid**, so a participant with
+  several interim reports in the range is one recipient (operator choice). Two ways in, as asked:
+  a tick on any Crossover / Evolution grid cell adds everyone behind that count, and a checkbox on each
+  drill-down list row (plus select-all) adds or drops one person. A sticky bar shows "N participants
+  selected" with WhatsApp / Email / App notification / Clear.
+- **The three sends reuse the Log tab's composers** rather than re-implementing them: the dashboard emits
+  `(send)={channel, profileids}`, and the parent's `onDashboardSend` maps profileids → `participant
+  metadata` docs and calls the SAME `sendWatiMessage` / `sendEmailToSelectedParicipant` /
+  `sendNotificationinBreakthrough` the Log tab uses (each now takes an optional profileid list; the
+  default is still the table selection). One `profilesFor()` decides whose metadata the composers get.
+- Verified in the app: bar hidden until a pick; a cell of 1 → "1 participant selected"; a second cell
+  adds (deduplicated); re-ticking removes; Clear hides the bar; all three buttons emit the right channel
+  with the picked profileid and open their composer, each dismissed without sending.
+- **Gotcha that cost the most time:** my new `const pr` (pick row) collided with the existing `const pr`
+  (person row) in the same click handler. The script is `@ts-nocheck`, so `tsc --noEmit` stayed green,
+  esbuild refused the bundle, and `ng serve` kept serving the last good one — the send bar simply never
+  appeared while the grid ticks (built one edit earlier) did. `ng build` named the collision in seconds.
+  The skill now carries this.
+- Hub: IRD-13 (Resolved ignores the JC tags, with a seeded resolved-but-untagged letter as the control)
+  and IRD-14 (a grid cell picks its participants, all three channels offered, Email opens the composer,
+  Clear empties). 161 hooks, aligned both ways.

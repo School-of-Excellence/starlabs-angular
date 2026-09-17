@@ -769,8 +769,28 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${row.position + 1}`;
   }
 
-  sendNotificationinBreakthrough() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  /** The three composers work off `participant metadata` docs. The Log tab passes its table selection
+   *  (the default); the Dashboard tab passes the profileids picked in its grids and lists. */
+  private profilesFor(profileids?: string[]): any[] {
+    const ids = profileids ?? this.selection.selected.map((p: any) => p['profileid'] || '');
+    return ids.map((id: string) => this.mapParticipantMetaData[id || '']).filter(Boolean);
+  }
+
+  /** Dashboard tab → the same WhatsApp / email / app-notification composers, same records. */
+  onDashboardSend(e: { channel: 'whatsapp' | 'email' | 'notification'; profileids: string[] }) {
+    if (!e?.profileids?.length) return;
+    const missing = e.profileids.filter((id) => !this.mapParticipantMetaData[id]);
+    if (missing.length === e.profileids.length) {
+      alert('No participant metadata found for the selected participants');
+      return;
+    }
+    if (e.channel === 'email') this.sendEmailToSelectedParicipant(e.profileids);
+    else if (e.channel === 'whatsapp') this.sendWatiMessage(e.profileids);
+    else this.sendNotificationinBreakthrough(e.profileids);
+  }
+
+  sendNotificationinBreakthrough(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
     console.log(selectedProfiles)
     let dialogRef = this.dialog.open(AhNotificationComponent, {
       data: selectedProfiles,
@@ -822,8 +842,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       }
     })
   }
-  sendEmailToSelectedParicipant() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  sendEmailToSelectedParicipant(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
     let dialogRef = this.dialog.open(EmailInputComponent, {
       data: selectedProfiles,
       minWidth: "600px",
@@ -872,8 +892,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     this._snackBar.open(message, action);
   }
 
-  sendWatiMessage() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  sendWatiMessage(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
 
     let dialogRef = this.dialog.open(WatiInputComponent, {
       data: selectedProfiles,

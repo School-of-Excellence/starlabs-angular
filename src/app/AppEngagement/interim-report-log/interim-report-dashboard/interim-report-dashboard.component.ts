@@ -1,4 +1,7 @@
-import { Component, DestroyRef, ElementRef, Input, OnChanges, ViewChild, ViewEncapsulation, afterNextRender, inject } from '@angular/core';
+import {
+  Component, DestroyRef, ElementRef, EventEmitter, Input, OnChanges, Output, ViewChild, ViewEncapsulation,
+  afterNextRender, inject,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCalendarCellClassFunction, MatDateRangePicker, MatDatepickerModule } from '@angular/material/datepicker';
@@ -39,6 +42,8 @@ export class InterimReportDashboardComponent implements OnChanges {
   @Input() profiles: Record<string, any> = {};
   /** the signed-in profile — recorded on tags and notes, as the Love Letter / Ask A&H tabs do */
   @Input() profileId: string | null = null;
+  /** participants picked in the grids / lists, for the parent's WhatsApp / email / notification composers */
+  @Output() send = new EventEmitter<{ channel: 'whatsapp' | 'email' | 'notification'; profileids: string[] }>();
 
   @ViewChild('rangePicker') rangePicker?: MatDateRangePicker<Date>;
 
@@ -84,6 +89,7 @@ export class InterimReportDashboardComponent implements OnChanges {
         events: () => this.events,
         attendees: id => this.attendees(id),
         openProfile: profileid => { if (profileid) window.open(`/userprofile/${profileid}`, '_blank'); },
+        send: (channel, profileids) => this.send.emit({ channel, profileids }),
         exportXlsx: (name, headers, rows) => this.exportXlsx(name, headers, rows),
         getRange: () => ({ from: this.range.value.start ?? null, to: this.range.value.end ?? null }),
         resetRange: () => this.range.setValue(this.defaultRange()),

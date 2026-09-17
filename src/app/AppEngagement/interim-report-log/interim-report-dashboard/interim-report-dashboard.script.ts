@@ -33,6 +33,8 @@ export interface InterimDashboardApi {
   exportXlsx(name: string, headers: string[], rows: (string | number)[][]): void;
   /** open that participant's profile screen in a new browser tab */
   openProfile(profileid: string): void;
+  /** hand the picked participants to the Log tab's WhatsApp / email / app-notification composers */
+  send(channel: 'whatsapp' | 'email' | 'notification', profileids: string[]): void;
 }
 
 export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashboardApi): { refresh(): void } {
@@ -676,6 +678,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       ? `<div class="empty" data-testid="ird-empty">No participants match these filters. Clear a filter to see the overview.</div>`
       : bodyHTML(sendById('range'));
     paintSels();
+    paintSendBar();
   }
 
   /* ============================================================
@@ -760,9 +763,9 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           <tbody>${matrix.map(m => {
             const max = Math.max(...m.v.slice(1));
             return `<tr><td class="a">${m.a}</td>
-              ${m.v.map((n, i) => `<td><button class="cell${i ? '' : ' free'}"${i ? ` style="${shade(n, max)}"` : ''}
+              ${m.v.map((n, i) => `<td class="xc"><button class="cell${i ? '' : ' free'}"${i ? ` style="${shade(n, max)}"` : ''}
                 ${crossTestId(m.a, XBANDS[i].k)}
-                data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button></td>`).join('')}</tr>`;
+                data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button>${n ? pickBox('cross', m.a, XBANDS[i].k) : ''}</td>`).join('')}</tr>`;
           }).join('')}</tbody>
         </table></div>
         ${levelChangePanel(s, XC)}
@@ -825,6 +828,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     </div>`;
   }
 
+  /** the small tick on a grid cell: adds (or removes) everyone behind that count */
+  function pickBox(kind, a, b){
+    const on = allPicked(cellPeople(kind, a, b));
+    return `<button class="pickbox${on ? ' on' : ''}" data-testid="ird-pick-cell" data-pickcell="${kind}|${a}|${b}"
+      title="Select these participants for a message" aria-pressed="${on}">${on ? '✓' : '+'}</button>`;
+  }
+
   /* one cell per (member, answer they gave): the answer's row × the band of its share of their adjustments */
   function evoGrid(s, P){
     const rep = P.filter(p => answeredOf(p));   // ongoing members who answered count too
@@ -848,8 +858,9 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
         <th class="t">Participants</th></tr></thead>
       <tbody>${RES_KEYS.map(k => `
         <tr><td class="a"><span class="d" style="background:${RES_HEX[k]}"></span>${RESULTS[k][0]}</td>
-          ${EBANDS.map(b => `<td><button class="ecell" style="${shade(k, cells[k + b.k])}"
-            ${EVO_TESTID[k + '|' + b.k]} data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
+          ${EBANDS.map(b => `<td class="xc"><button class="ecell" style="${shade(k, cells[k + b.k])}"
+            ${EVO_TESTID[k + '|' + b.k]} data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button>${
+            cells[k + b.k] ? pickBox('evo', k, b.k) : ''}</td>`).join('')}
           <td class="t">${rowTot(k)}</td></tr>`).join('')}
       </tbody>
     </table></div>
@@ -862,7 +873,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const L = P.filter(p => p.love);
     const att = L.filter(p => p.love.tags.attention), crit = L.filter(p => p.love.tags.critical);
     const both = [...att, ...crit];   // always shown, 0 included, so the panel never looks missing
-    const done = both.filter(p => p.love.tags.resolved);
+    // Resolved counts EVERY resolved letter (operator 2026-09-17) — a letter tagged Happy, Opportunity
+    // or nothing at all can still be resolved, and used to be invisible here. Open stays the Journey
+    // Coaching set (Needs Attention + Critical) that is not resolved yet, so the two no longer add up
+    // to the JC total by construction — that is the point.
+    const done = L.filter(p => p.love.tags.resolved);
+    const openJc = both.filter(p => !p.love.tags.resolved);
     const resolvers = {};
     done.forEach(p => { const who = p.love.tags.resolvedBy || '—'; resolvers[who] = (resolvers[who] || 0) + 1; });
     const rlist = Object.entries(resolvers).sort((a, b) => b[1] - a[1]);
@@ -875,11 +891,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
         </div>
         <div class="escp-row">
           <button class="escb amber" data-testid="ird-esc-open" data-letters="${s.id}|esc:Open">
-            <div class="l">Open</div><div class="n">${both.length - done.length}</div>
+            <div class="l">Open</div><div class="n">${openJc.length}</div>
             <div class="s">not resolved yet</div></button>
           <button class="escb green" data-testid="ird-esc-resolved" data-letters="${s.id}|esc:Resolved">
             <div class="l">Resolved</div><div class="n">${done.length}</div>
-            <div class="s">marked resolved</div></button>
+            <div class="s">marked resolved · any tag</div></button>
         </div>
         ${rlist.length ? `<div class="escp-sub">RESOLVED BY</div>
           <div class="escp-who">${rlist.map(([who, n]) =>
@@ -1164,9 +1180,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      scanner cannot see an interpolated id. */
   const ROW_TESTID = { modal:'data-testid="ird-modal-row"', bucket:'data-testid="ird-xbucket-row"' };
   function tableHTML(cols, rows, where = 'modal'){
+    // the modal lists are pickable (tick a row to add just that participant); the inline bucket
+    // tables are not — they are a preview inside the Areas-changed panel.
+    const pick = where === 'modal';
+    const pkHead = pick ? `<th class="pk"${cols.some(c => c.g) ? ' rowspan="2"' : ''}><input type="checkbox"
+      data-testid="ird-pick-all" data-pickall aria-label="Select everyone in this list"></th>` : '';
     let head;
     if(cols.some(c => c.g)){
-      let r1 = '<th rowspan="2">Name</th><th rowspan="2">Journey</th>', r2 = '';
+      let r1 = pkHead + '<th rowspan="2">Name</th><th rowspan="2">Journey</th>', r2 = '';
       for(let i = 0; i < cols.length;){
         const c = cols[i];
         if(!c.g){ r1 += `<th rowspan="2">${c.h}</th>`; i++; continue; }
@@ -1176,10 +1197,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
         r1 += `<th class="grp" colspan="${j - i}">${c.g}</th>`; i = j;
       }
       head = `<tr>${r1}</tr><tr>${r2}</tr>`;
-    } else head = `<tr><th>Name</th><th>Journey</th>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr>`;
+    } else head = `<tr>${pkHead}<th>Name</th><th>Journey</th>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr>`;
     const firstOfGroup = cols.map((c, i) => c.g && (i === 0 || cols[i - 1].g !== c.g));
     return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map(r => `
-      <tr ${ROW_TESTID[where]}><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
+      <tr ${ROW_TESTID[where]}>${pick ? `<td class="pk"><input type="checkbox" data-testid="ird-pick-row"
+          data-pickrow="${r.p.profileid || ''}"${isPicked(r.p) ? ' checked' : ''}${pickable(r.p) ? '' : ' disabled'}
+          aria-label="Select ${escHtml(r.p.nm)}"></td>` : ''}<td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
           <span>${nameLink(r.p)}<small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
         <td><span class="pill grey">${r.p.journey}</span></td>
         ${r.cells.map((c, i) => `<td${firstOfGroup[i] ? ' class="first"' : ''}>${c}</td>`).join('')}</tr>`).join('')}
@@ -1312,10 +1335,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const jc = p => p.love.tags.attention || p.love.tags.critical;
     const esc = flag.startsWith('esc:') && flag.slice(4);
     const by  = flag.startsWith('by:') && decodeURIComponent(flag.slice(3));
-    const rows = P.filter(p => esc ? (jc(p) && (esc === 'Resolved' ? p.love.tags.resolved : !p.love.tags.resolved))
-      : by ? (jc(p) && p.love.tags.resolved && (p.love.tags.resolvedBy || '—') === by)
+    const rows = P.filter(p => esc ? (esc === 'Resolved' ? p.love.tags.resolved : (jc(p) && !p.love.tags.resolved))
+      : by ? (p.love.tags.resolved && (p.love.tags.resolvedBy || '—') === by)
       : flag === 'all' || (flag === 'untagged' ? !tagList(p.love.tags).length : p.love.tags[TAG_KEY[flag]]));
-    const title = esc ? 'Journey Coaching · ' + esc
+    const title = esc === 'Resolved' ? 'Resolved letters'
+      : esc ? 'Journey Coaching · ' + esc
       : by ? 'Resolved by ' + escHtml(by)
       : flag === 'all' ? 'Love Letters'
       : 'Love Letters · ' + (flag === 'untagged' ? 'Untagged' : flag);
@@ -1435,6 +1459,35 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     /* a participant's name → their profile, in a new tab (before the row-expand handler) */
     const pn = e.target.closest('[data-profile]');
     if(pn){ e.preventDefault(); e.stopPropagation(); api.openProfile(pn.dataset.profile); return; }
+
+    /* picking participants for a message, and the three sends */
+    const pc = e.target.closest('[data-pickcell]');
+    if(pc){
+      const [kind, a, b] = pc.dataset.pickcell.split('|');
+      togglePickList(cellPeople(kind, a, b));
+      repaintViews();
+      return;
+    }
+    const prow = e.target.closest('[data-pickrow]');
+    if(prow){
+      const id = prow.dataset.pickrow;
+      const person = (REAL || []).find(p => p.profileid === id);
+      if(person) PICK.has(id) ? dropPick(person) : addPick(person);
+      repaintViews();
+      return;
+    }
+    if(e.target.closest('[data-pickall]')){
+      togglePickList(mo.rows.map(r => r.p || r).filter(Boolean));
+      repaintViews();
+      return;
+    }
+    if(e.target.closest('[data-pickclear]')){ PICK.clear(); repaintViews(); return; }
+    const snd = e.target.closest('[data-send]');
+    if(snd){
+      if(!PICK.size) return;
+      api.send(snd.dataset.send, [...PICK.keys()]);
+      return;
+    }
 
     /* JOURNEY / EVENT dropdowns and the export buttons */
     const sclr = e.target.closest('[data-selclear]');
@@ -1651,12 +1704,44 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
         root.host.scrollTop = top;
       }
     }
+    paintSendBar();
     // an open list keeps its rows (a letter untagged here stays in view) and its scroll position
     if($('ov').classList.contains('show')){
       const body = root.querySelector('.mo-body'), top = body.scrollTop;
       paintModal($('moSearch').value);
       body.scrollTop = top;
     }
+  }
+
+  /* ============================================================
+     PICK — participants chosen for a WhatsApp / email / app notification.
+     Keyed by PROFILEID, so a participant with several interim reports in the range is one recipient
+     (operator choice). A grid cell adds everyone behind that count; a list row adds one person.
+     ============================================================ */
+  const PICK = new Map();                        // profileid → display name
+  const pickable = p => !!p.profileid;
+  const isPicked = p => PICK.has(p.profileid);
+  const addPick = p => { if(pickable(p)) PICK.set(p.profileid, p.nm); };
+  const dropPick = p => PICK.delete(p.profileid);
+  /** the participants behind one grid cell — the same sets the drill-downs open */
+  function cellPeople(kind, a, b){
+    if(kind === 'cross'){ const band = XBANDS.find(x => x.k === b);
+      return band ? crossPool().filter(p => band.f(p.cross[a])) : []; }
+    return sectionPool().filter(p => countOf(p, a) && bandOf(shareOf(p, a)).k === b);
+  }
+  const allPicked = list => list.length > 0 && list.filter(pickable).every(isPicked);
+  function togglePickList(list){
+    const on = allPicked(list);
+    list.filter(pickable).forEach(p => on ? dropPick(p) : addPick(p));
+  }
+  /** the bar only exists while something is picked; it lives in the template, not the grid markup */
+  function paintSendBar(){
+    const bar = $('sendbar');
+    if(!bar) return;
+    const n = PICK.size;
+    bar.hidden = n === 0;
+    const label = $('pickCount');
+    if(label) label.textContent = `${n} participant${n === 1 ? '' : 's'} selected`;
   }
 
   /* ---------- love letter / ask AH: tags, resolved, notes ---------- */
