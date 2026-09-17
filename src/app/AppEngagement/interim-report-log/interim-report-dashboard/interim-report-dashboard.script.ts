@@ -422,14 +422,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       : `${n} participant${n === 1 ? '' : 's'}`;
     btn.innerHTML = id
       ? `<span class="sv">${escHtml(selName(kind, id) || id)}</span>
-         <span class="cnt" data-testid="ird-${kind}-count">${cnt}</span>
+         <span class="cnt" ${SEL_TESTID[kind].count}>${cnt}</span>
          <span class="clr" data-selclear="${kind}" title="Clear">×</span>`
       : `${s.all}<span class="ch">▾</span>`;
     const q = ($(s.search).value || '').trim().toLowerCase();
     const rows = s.items().filter(x => !q || x.name.toLowerCase().includes(q));
     $(s.list).innerHTML = (rows.length
       ? [{ id:'', name:s.all }, ...rows].map(x => `
-          <button class="selopt${x.id === id ? ' on' : ''}" data-testid="ird-${kind}-option" data-selopt="${kind}|${x.id}">
+          <button class="selopt${x.id === id ? ' on' : ''}" ${SEL_TESTID[kind].option} data-selopt="${kind}|${x.id}">
             <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`).join('')
       : `<div class="selnone">${s.items().length ? 'No match.' : 'Loading…'}</div>`);
   }
@@ -499,8 +499,64 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      HELPERS
      ============================================================ */
   const $ = id => root.getElementById(id);
-  /* e2e hooks: every generated control carries a stable data-testid (ird-*), like the workshop screens */
-  const slug = v => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  /* e2e hooks: every generated control carries a stable data-testid (ird-*), like the workshop screens.
+     The readiness scanner only credits LITERAL ids — its regex drops anything containing `${…}`
+     (starlabs-e2e-tests scripts/readiness/lib.cjs TESTID_REF) — so the generated grids look their id up
+     in these tables instead of interpolating one. Keep a row here for every cell the grids can draw. */
+  const CROSS_TESTID = {
+    'Business|b0': 'data-testid="ird-cross-business-b0"',
+    'Business|b1': 'data-testid="ird-cross-business-b1"',
+    'Business|b2': 'data-testid="ird-cross-business-b2"',
+    'Business|b3': 'data-testid="ird-cross-business-b3"',
+    'Career|b0': 'data-testid="ird-cross-career-b0"',
+    'Career|b1': 'data-testid="ird-cross-career-b1"',
+    'Career|b2': 'data-testid="ird-cross-career-b2"',
+    'Career|b3': 'data-testid="ird-cross-career-b3"',
+    'Family|b0': 'data-testid="ird-cross-family-b0"',
+    'Family|b1': 'data-testid="ird-cross-family-b1"',
+    'Family|b2': 'data-testid="ird-cross-family-b2"',
+    'Family|b3': 'data-testid="ird-cross-family-b3"',
+    'Health|b0': 'data-testid="ird-cross-health-b0"',
+    'Health|b1': 'data-testid="ird-cross-health-b1"',
+    'Health|b2': 'data-testid="ird-cross-health-b2"',
+    'Health|b3': 'data-testid="ird-cross-health-b3"',
+    'Personal Genius|b0': 'data-testid="ird-cross-personal-genius-b0"',
+    'Personal Genius|b1': 'data-testid="ird-cross-personal-genius-b1"',
+    'Personal Genius|b2': 'data-testid="ird-cross-personal-genius-b2"',
+    'Personal Genius|b3': 'data-testid="ird-cross-personal-genius-b3"',
+  };
+  const EVO_TESTID = {
+    'none|q1': 'data-testid="ird-evo-none-q1"',
+    'none|q2': 'data-testid="ird-evo-none-q2"',
+    'none|q3': 'data-testid="ird-evo-none-q3"',
+    'none|q4': 'data-testid="ird-evo-none-q4"',
+    'some|q1': 'data-testid="ird-evo-some-q1"',
+    'some|q2': 'data-testid="ird-evo-some-q2"',
+    'some|q3': 'data-testid="ird-evo-some-q3"',
+    'some|q4': 'data-testid="ird-evo-some-q4"',
+    'lot|q1': 'data-testid="ird-evo-lot-q1"',
+    'lot|q2': 'data-testid="ird-evo-lot-q2"',
+    'lot|q3': 'data-testid="ird-evo-lot-q3"',
+    'lot|q4': 'data-testid="ird-evo-lot-q4"',
+    'lotimp|q1': 'data-testid="ird-evo-lotimp-q1"',
+    'lotimp|q2': 'data-testid="ird-evo-lotimp-q2"',
+    'lotimp|q3': 'data-testid="ird-evo-lotimp-q3"',
+    'lotimp|q4': 'data-testid="ird-evo-lotimp-q4"',
+    'full|q1': 'data-testid="ird-evo-full-q1"',
+    'full|q2': 'data-testid="ird-evo-full-q2"',
+    'full|q3': 'data-testid="ird-evo-full-q3"',
+    'full|q4': 'data-testid="ird-evo-full-q4"',
+  };
+  const XBUCKET_TESTID = { x0:'data-testid="ird-xbucket-x0"', x1:'data-testid="ird-xbucket-x1"', x2:'data-testid="ird-xbucket-x2"',
+    x3:'data-testid="ird-xbucket-x3"', x4:'data-testid="ird-xbucket-x4"', x5:'data-testid="ird-xbucket-x5"' };
+  const TAG_TESTID = { happy:'data-testid="ird-tag-happy"', attention:'data-testid="ird-tag-attention"',
+    opportunity:'data-testid="ird-tag-opportunity"', critical:'data-testid="ird-tag-critical"', resolved:'data-testid="ird-tag-resolved"' };
+  const LETTERS_TESTID = { Happy:'data-testid="ird-letters-happy"', 'Needs Attention':'data-testid="ird-letters-needs-attention"',
+    Opportunity:'data-testid="ird-letters-opportunity"', Critical:'data-testid="ird-letters-critical"' };
+  const SEL_TESTID = {
+    journey: { option:'data-testid="ird-journey-option"', count:'data-testid="ird-journey-count"' },
+    event: { option:'data-testid="ird-event-option"', count:'data-testid="ird-event-count"' },
+  };
   /* a participant's name opens their profile in a new tab (real rows only — the mock pool has no profileid) */
   const nameLink = p => p.profileid
     ? `<b class="pname" data-testid="ird-participant-name" data-profile="${p.profileid}" role="link" tabindex="0"
@@ -671,7 +727,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
             const max = Math.max(...m.v.slice(1));
             return `<tr><td class="a">${m.a}</td>
               ${m.v.map((n, i) => `<td><button class="cell${i ? '' : ' free'}"${i ? ` style="${shade(n, max)}"` : ''}
-                data-testid="ird-cross-${slug(m.a)}-${XBANDS[i].k}"
+                ${CROSS_TESTID[m.a + '|' + XBANDS[i].k]}
                 data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button></td>`).join('')}</tr>`;
           }).join('')}</tbody>
         </table></div>
@@ -710,7 +766,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
                 <button data-testid="ird-letters-untagged" data-letters="${s.id}|untagged" style="color:var(--ink-soft)">${unflagged}</button></div>
               ${FLAGS.map(f => `<div class="flag"><div class="l">
                 <span class="d" style="background:var(--${FLAG_TONE[f]})"></span>${f}</div>
-                <button data-testid="ird-letters-${slug(f)}" data-letters="${s.id}|${f}" style="color:var(--${FLAG_TONE[f]})">${flagCount(f)}</button></div>`).join('')}
+                <button ${LETTERS_TESTID[f]} data-letters="${s.id}|${f}" style="color:var(--${FLAG_TONE[f]})">${flagCount(f)}</button></div>`).join('')}
             </div>
           </div>
         </div>
@@ -759,7 +815,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <tbody>${RES_KEYS.map(k => `
         <tr><td class="a"><span class="d" style="background:${RES_HEX[k]}"></span>${RESULTS[k][0]}</td>
           ${EBANDS.map(b => `<td><button class="ecell" style="${shade(k, cells[k + b.k])}"
-            data-testid="ird-evo-${k}-${b.k}" data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
+            ${EVO_TESTID[k + '|' + b.k]} data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
           <td class="t">${rowTot(k)}</td></tr>`).join('')}
       </tbody>
     </table></div>
@@ -809,7 +865,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           const M = filled.filter(x.f), key = `${s.id}|${x.key}`, open = XOPEN.has(key);
           return `
           <div class="xb ${x.cls}${open ? ' open' : ''}">
-            <button class="xb-h" data-testid="ird-xbucket-${x.key}" data-xb="${key}" aria-expanded="${open}">
+            <button class="xb-h" ${XBUCKET_TESTID[x.key]} data-xb="${key}" aria-expanded="${open}">
               <span class="tx">${x.label}</span>
               <span class="bar"><i style="width:${(M.length / tot * 100).toFixed(1)}%"></i></span>
               <span class="c">${M.length}</span><span class="ch">▶</span></button>
@@ -1571,7 +1627,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <div class="tagbar">
         <div class="tagger"><span class="lbl">TAG</span>
           ${TAG_BTNS.map(([k, label]) => `<button class="tg${t[k] ? ' on' : ''}" data-f="${label}"
-            data-testid="ird-tag-${k}" data-settag="${key}|${k}" aria-pressed="${!!t[k]}">${label}</button>`).join('')}
+            ${TAG_TESTID[k]} data-settag="${key}|${k}" aria-pressed="${!!t[k]}">${label}</button>`).join('')}
           <button class="nbtn${open ? ' on' : ''}" data-testid="ird-notes-toggle" data-notes="${key}" aria-expanded="${open}">Notes <b>${r.notes.length}</b></button>
         </div>
         <div class="resbar" data-testid="ird-status-row"><span class="lbl">STATUS</span>
