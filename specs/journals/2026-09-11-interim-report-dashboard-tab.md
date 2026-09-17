@@ -200,3 +200,25 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
   mistake as the hover-only `+` on the grid. Every row in a multi-select list now carries a real box
   (15px, grey outline, white fill; indigo with ✓ when on), "All journeys" included, so the column reads
   as a checklist. Verified in the app: 16 rows, each with a box that renders at 15×15.
+
+### Sorting on the Ask A&H / Love Letter tables (2026-09-17)
+- Both tabs render through the shared `formTableTemplate`, which was bound straight to the `records`
+  array — no MatSort. It now renders through `recordsDataSource` (a `MatTableDataSource`) with sort
+  headers on Name, Date, Notes and the four tag columns plus Resolved. A `sortingDataAccessor` handles
+  the columns whose value is not on the doc: **name** is joined from `profile_data` via `mapProfiles`,
+  **date** is a Timestamp → millis, the tags are booleans → 0/1, notes → array length.
+- Every path that swaps rows (fetch, page cache, the metric chips) goes through one `setRecords()`, so
+  the sortable source can never drift from `records`.
+- **Two gotchas, both found by testing rather than by reading:**
+  1. The table is rebuilt on every tab switch, so a MatSort captured once goes stale — the wiring is
+     re-attached in `ngAfterViewChecked`.
+  2. More subtly, **both tabs instantiate that template**, so there are two live MatSort directives.
+     `@ViewChild` returned the first (hidden) one, and clicking a header on the visible tab set
+     `aria-sort` but reordered nothing. Now `@ViewChildren` keeps both and the one inside
+     `.mat-mdc-tab-body-active` is attached. Ask A&H passed throughout precisely because it was the
+     first instance — a single-tab check would have called this done.
+- Sorting reorders the rows the current page loaded (server paging is `created desc`, 100 a page), and
+  Firestore could not order by name anyway since the name is not on the doc.
+- The Interim Report Log tab keeps its own MatSort (now `#logSort`), re-verified after the change.
+- Hub: `IRT-SORT` in `modes/interim-report-tabs.spec.ts` sorts the Love Letter tab both ways — the
+  second instance, i.e. the one that was broken.
