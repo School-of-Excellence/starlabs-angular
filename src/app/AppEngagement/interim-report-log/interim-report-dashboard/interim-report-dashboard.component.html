@@ -4,23 +4,23 @@
     <div class="page-head">
       <div class="filters">
         <div class="f fdate"><span class="k">DATE</span>
-          <mat-date-range-input class="drange" [formGroup]="range" [rangePicker]="rangePicker">
+          <mat-date-range-input class="drange" data-testid="ird-daterange" [formGroup]="range" [rangePicker]="rangePicker">
             <input matStartDate formControlName="start" placeholder="Start date" aria-label="Start date">
             <input matEndDate formControlName="end" placeholder="End date" aria-label="End date">
           </mat-date-range-input>
           <mat-datepicker-toggle class="dtoggle" [for]="rangePicker"></mat-datepicker-toggle>
           <mat-date-range-picker #rangePicker [dateClass]="dateClass"></mat-date-range-picker></div>
         <div class="f fsel" id="fJourneyBox"><span class="k">JOURNEY</span>
-          <button class="selbtn" id="fJourneyBtn" aria-haspopup="listbox" aria-expanded="false">All journeys</button>
-          <div class="selpanel" id="fJourneyPanel" role="listbox">
-            <input class="selsearch" id="fJourneySearch" placeholder="Search journey…" aria-label="Search journey">
+          <button class="selbtn" id="fJourneyBtn" data-testid="ird-filter-journey" aria-haspopup="listbox" aria-expanded="false">All journeys</button>
+          <div class="selpanel" id="fJourneyPanel" data-testid="ird-journey-panel" role="listbox">
+            <input class="selsearch" id="fJourneySearch" data-testid="ird-journey-search" placeholder="Search journey…" aria-label="Search journey">
             <div class="sellist" id="fJourneyList"></div>
           </div>
         </div>
         <div class="f fsel" id="fEventBox"><span class="k">EVENT ATTENDED</span>
-          <button class="selbtn" id="fEventBtn" aria-haspopup="listbox" aria-expanded="false">All events</button>
-          <div class="selpanel" id="fEventPanel" role="listbox">
-            <input class="selsearch" id="fEventSearch" placeholder="Search event…" aria-label="Search event">
+          <button class="selbtn" id="fEventBtn" data-testid="ird-filter-event" aria-haspopup="listbox" aria-expanded="false">All events</button>
+          <div class="selpanel" id="fEventPanel" data-testid="ird-event-panel" role="listbox">
+            <input class="selsearch" id="fEventSearch" data-testid="ird-event-search" placeholder="Search event…" aria-label="Search event">
             <div class="sellist" id="fEventList"></div>
           </div>
         </div>
@@ -39,7 +39,7 @@
     <div class="mo">
       <div class="mo-head">
         <div><h3 id="moTitle"></h3><div class="sub" id="moSub"></div></div>
-        <button class="moexp" id="moExport" title="Export this list to Excel">⤓ Export</button>
+        <button class="moexp" id="moExport" data-testid="ird-modal-export" title="Export this list to Excel">⤓ Export</button>
         <button class="x" id="moX" data-testid="ird-modal-close">&times;</button>
       </div>
       <div class="mo-body">

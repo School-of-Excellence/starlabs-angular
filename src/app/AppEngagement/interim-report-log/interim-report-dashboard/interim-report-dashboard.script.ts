@@ -422,14 +422,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       : `${n} participant${n === 1 ? '' : 's'}`;
     btn.innerHTML = id
       ? `<span class="sv">${escHtml(selName(kind, id) || id)}</span>
-         <span class="cnt">${cnt}</span>
+         <span class="cnt" data-testid="ird-${kind}-count">${cnt}</span>
          <span class="clr" data-selclear="${kind}" title="Clear">×</span>`
       : `${s.all}<span class="ch">▾</span>`;
     const q = ($(s.search).value || '').trim().toLowerCase();
     const rows = s.items().filter(x => !q || x.name.toLowerCase().includes(q));
     $(s.list).innerHTML = (rows.length
       ? [{ id:'', name:s.all }, ...rows].map(x => `
-          <button class="selopt${x.id === id ? ' on' : ''}" data-selopt="${kind}|${x.id}">
+          <button class="selopt${x.id === id ? ' on' : ''}" data-testid="ird-${kind}-option" data-selopt="${kind}|${x.id}">
             <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`).join('')
       : `<div class="selnone">${s.items().length ? 'No match.' : 'Loading…'}</div>`);
   }
@@ -499,9 +499,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      HELPERS
      ============================================================ */
   const $ = id => root.getElementById(id);
+  /* e2e hooks: every generated control carries a stable data-testid (ird-*), like the workshop screens */
+  const slug = v => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   /* a participant's name opens their profile in a new tab (real rows only — the mock pool has no profileid) */
   const nameLink = p => p.profileid
-    ? `<b class="pname" data-profile="${p.profileid}" role="link" tabindex="0"
+    ? `<b class="pname" data-testid="ird-participant-name" data-profile="${p.profileid}" role="link" tabindex="0"
         title="Open ${escHtml(p.nm)}'s profile in a new tab">${escHtml(p.nm)}</b>`
     : `<b>${escHtml(p.nm)}</b>`;
   const sum = a => a.reduce((s, x) => s + x, 0);
@@ -571,17 +573,17 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   function renderAll(){
     ensureReal();
     $('overview').innerHTML = REAL === null
-      ? `<div class="empty">Loading interim reports…</div>`
+      ? `<div class="empty" data-testid="ird-empty">Loading interim reports…</div>`
       : realErr
-      ? `<div class="empty">Could not load interim reports: ${escHtml(realErr)}</div>`
+      ? `<div class="empty" data-testid="ird-empty">Could not load interim reports: ${escHtml(realErr)}</div>`
       : EVENT && EVENT_ERR
-      ? `<div class="empty">Could not load who attended this event: ${escHtml(EVENT_ERR)}</div>`
+      ? `<div class="empty" data-testid="ird-empty">Could not load who attended this event: ${escHtml(EVENT_ERR)}</div>`
       : EVENT && !EVENT_SET
-      ? `<div class="empty">Loading who attended ${escHtml(selName('event', EVENT) || 'this event')}…</div>`
+      ? `<div class="empty" data-testid="ird-empty">Loading who attended ${escHtml(selName('event', EVENT) || 'this event')}…</div>`
       : !REAL.length
-      ? `<div class="empty">No interim reports in this date range. Widen the range to see the overview.</div>`
+      ? `<div class="empty" data-testid="ird-empty">No interim reports in this date range. Widen the range to see the overview.</div>`
       : !realPool().length
-      ? `<div class="empty">No participants match these filters. Clear a filter to see the overview.</div>`
+      ? `<div class="empty" data-testid="ird-empty">No participants match these filters. Clear a filter to see the overview.</div>`
       : bodyHTML(sendById('range'));
     paintSels();
   }
@@ -600,15 +602,15 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const nNot = X.filter(p => !p.opened && !p.submitted).length;   // the three cards add up to Members sent
     return `
       <div class="strip${range ? ' four' : ''}">
-        <button class="st" data-strip="${s.id}|all"><div class="l">Participants sent</div>
+        <button class="st" data-testid="ird-strip-all" data-strip="${s.id}|all"><div class="l">Participants sent</div>
           <div class="n">${X.length}</div><div class="s">interim reports in this range</div></button>
-        <button class="st g" data-strip="${s.id}|submitted"><div class="l">Submitted</div>
+        <button class="st g" data-testid="ird-strip-submitted" data-strip="${s.id}|submitted"><div class="l">Submitted</div>
           <div class="n">${nSub}</div>
           <div class="s">${pct(nSub)}% completion</div></button>
-        <button class="st b" data-strip="${s.id}|ongoing"><div class="l">Ongoing</div>
+        <button class="st b" data-testid="ird-strip-ongoing" data-strip="${s.id}|ongoing"><div class="l">Ongoing</div>
           <div class="n">${nOn}</div>
           <div class="s">${pct(nOn)}% · started, not submitted yet</div></button>
-        <button class="st a" data-strip="${s.id}|notstarted"><div class="l">Not started</div>
+        <button class="st a" data-testid="ird-strip-notstarted" data-strip="${s.id}|notstarted"><div class="l">Not started</div>
           <div class="n">${nNot}</div>
           <div class="s">${pct(nNot)}% · no step saved yet</div></button>
         ${range ? '' : `<div class="st flat"><div class="l">Sent on</div>
@@ -616,8 +618,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           <div class="s">${s.status === 'Open' ? 'still accepting responses' : 'closed'}</div></div>`}
       </div>
       <div class="vswitch">
-        <button class="${VIEW === 'step' ? 'on' : ''}" data-view="${s.id}|step">By step</button>
-        <button class="${VIEW === 'people' ? 'on' : ''}" data-view="${s.id}|people">By participant</button>
+        <button class="${VIEW === 'step' ? 'on' : ''}" data-testid="ird-view-step" data-view="${s.id}|step">By step</button>
+        <button class="${VIEW === 'people' ? 'on' : ''}" data-testid="ird-view-people" data-view="${s.id}|people">By participant</button>
       </div>
       <div class="view${VIEW === 'step' ? ' on' : ''}" id="v-step-${s.id}">${stepView(s, P)}</div>
       <div class="view${VIEW === 'people' ? ' on' : ''}" id="v-people-${s.id}">${VIEW === 'people' ? peopleView(s) : ''}</div>`;
@@ -656,7 +658,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     return `
     <div class="sec" data-c="1">
       <div class="sec-head"><span class="no">1</span><h3>Crossover Meter</h3>
-        <button class="xtog" data-xpanel="${s.id}" aria-expanded="${XPANEL.has(s.id)}"
+        <button class="xtog" data-testid="ird-xpanel-toggle" data-xpanel="${s.id}" aria-expanded="${XPANEL.has(s.id)}"
           title="An area counts as changed at 8 or more">Areas changed
           <span class="ch">▶</span></button>
         <span class="note">click a number to see who is in it</span></div>
@@ -669,6 +671,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
             const max = Math.max(...m.v.slice(1));
             return `<tr><td class="a">${m.a}</td>
               ${m.v.map((n, i) => `<td><button class="cell${i ? '' : ' free'}"${i ? ` style="${shade(n, max)}"` : ''}
+                data-testid="ird-cross-${slug(m.a)}-${XBANDS[i].k}"
                 data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button></td>`).join('')}</tr>`;
           }).join('')}</tbody>
         </table></div>
@@ -681,7 +684,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <div class="sec-in">
         ${evoGrid(s, X)}
         <div class="ystrip">
-          <button class="yst" data-strip="${s.id}|years">
+          <button class="yst" data-testid="ird-strip-years" data-strip="${s.id}|years">
             <div class="l">Total years saved</div>
             <div class="n">${totalYears.toFixed(1)}</div>
             <div class="s">reported by ${timeP.length} participant${timeP.length === 1 ? '' : 's'}</div></button>
@@ -699,15 +702,15 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <div class="sec-head"><span class="no">3</span><h3>Love Letter</h3></div>
       <div class="sec-in">
         <div class="big-split">
-          <div class="big-num"><button data-letters="${s.id}|all">${wrote.length}</button>
+          <div class="big-num"><button data-testid="ird-letters-all" data-letters="${s.id}|all">${wrote.length}</button>
             <div class="l">wrote a love letter</div></div>
           <div>
             <div class="flag-row">
               <div class="flag"><div class="l"><span class="d" style="background:#C9CED1"></span>Untagged</div>
-                <button data-letters="${s.id}|untagged" style="color:var(--ink-soft)">${unflagged}</button></div>
+                <button data-testid="ird-letters-untagged" data-letters="${s.id}|untagged" style="color:var(--ink-soft)">${unflagged}</button></div>
               ${FLAGS.map(f => `<div class="flag"><div class="l">
                 <span class="d" style="background:var(--${FLAG_TONE[f]})"></span>${f}</div>
-                <button data-letters="${s.id}|${f}" style="color:var(--${FLAG_TONE[f]})">${flagCount(f)}</button></div>`).join('')}
+                <button data-testid="ird-letters-${slug(f)}" data-letters="${s.id}|${f}" style="color:var(--${FLAG_TONE[f]})">${flagCount(f)}</button></div>`).join('')}
             </div>
           </div>
         </div>
@@ -720,11 +723,11 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <div class="sec-in">
         <div class="ask2">
           <div class="askbox inst"><span class="k">INSTALLATION ASK</span>
-            <button class="n" data-asks="${s.id}|inst">${inst}</button>
+            <button class="n" data-testid="ird-asks-inst" data-asks="${s.id}|inst">${inst}</button>
             <div class="rstat" title="Placeholder — replies are not written from the dashboard yet">
               <b>—</b> replied · <b>—</b> waiting</div></div>
           <div class="askbox ah"><span class="k">ASK A&amp;H</span>
-            <button class="n" data-asks="${s.id}|ah">${ah}</button>
+            <button class="n" data-testid="ird-asks-ah" data-asks="${s.id}|ah">${ah}</button>
             <div class="rstat" title="Placeholder — replies are not written from the dashboard yet">
               <b>—</b> replied · <b>—</b> waiting</div></div>
         </div>
@@ -756,7 +759,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <tbody>${RES_KEYS.map(k => `
         <tr><td class="a"><span class="d" style="background:${RES_HEX[k]}"></span>${RESULTS[k][0]}</td>
           ${EBANDS.map(b => `<td><button class="ecell" style="${shade(k, cells[k + b.k])}"
-            data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
+            data-testid="ird-evo-${k}-${b.k}" data-ecell="${s.id}|${k}|${b.k}">${cells[k + b.k]}</button></td>`).join('')}
           <td class="t">${rowTot(k)}</td></tr>`).join('')}
       </tbody>
     </table></div>
@@ -777,20 +780,20 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     return `
       <div class="escp">
         <div class="escp-head">
-          <div class="escp-tot"><b>${both.length}</b><span>SENT TO JOURNEY COACHING</span></div>
+          <div class="escp-tot" data-testid="ird-jc-total"><b>${both.length}</b><span>SENT TO JOURNEY COACHING</span></div>
           <span style="margin-left:auto;font-size:11px;color:var(--ink-mute)">Needs Attention ${att.length} + Critical ${crit.length}</span>
         </div>
         <div class="escp-row">
-          <button class="escb amber" data-letters="${s.id}|esc:Open">
+          <button class="escb amber" data-testid="ird-esc-open" data-letters="${s.id}|esc:Open">
             <div class="l">Open</div><div class="n">${both.length - done.length}</div>
             <div class="s">not resolved yet</div></button>
-          <button class="escb green" data-letters="${s.id}|esc:Resolved">
+          <button class="escb green" data-testid="ird-esc-resolved" data-letters="${s.id}|esc:Resolved">
             <div class="l">Resolved</div><div class="n">${done.length}</div>
             <div class="s">marked resolved</div></button>
         </div>
         ${rlist.length ? `<div class="escp-sub">RESOLVED BY</div>
           <div class="escp-who">${rlist.map(([who, n]) =>
-            `<button data-letters="${s.id}|by:${encodeURIComponent(who)}">${escHtml(who)}<b>${n}</b></button>`).join('')}</div>` : ''}
+            `<button data-testid="ird-esc-by" data-letters="${s.id}|by:${encodeURIComponent(who)}">${escHtml(who)}<b>${n}</b></button>`).join('')}</div>` : ''}
       </div>`;
   }
 
@@ -806,13 +809,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           const M = filled.filter(x.f), key = `${s.id}|${x.key}`, open = XOPEN.has(key);
           return `
           <div class="xb ${x.cls}${open ? ' open' : ''}">
-            <button class="xb-h" data-xb="${key}" aria-expanded="${open}">
+            <button class="xb-h" data-testid="ird-xbucket-${x.key}" data-xb="${key}" aria-expanded="${open}">
               <span class="tx">${x.label}</span>
               <span class="bar"><i style="width:${(M.length / tot * 100).toFixed(1)}%"></i></span>
               <span class="c">${M.length}</span><span class="ch">▶</span></button>
             <div class="xb-b">${M.length
               ? tableHTML(AREA_COLS, M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })))
-                + (M.length > 8 ? `<button class="xb-all" data-strip="${key}">See all ${M.length}</button>` : '')
+                + (M.length > 8 ? `<button class="xb-all" data-testid="ird-xbucket-seeall" data-strip="${key}">See all ${M.length}</button>` : '')
               : '<div class="none-note">No participants here.</div>'}</div>
           </div>`;
         }).join('')}
@@ -866,9 +869,9 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const show = rows.slice(0, 40);
     return `
     <div class="ptools">
-      <input id="psearch-${s.id}" placeholder="Search participant…" value="${escHtml(q)}">
+      <input id="psearch-${s.id}" data-testid="ird-people-search" placeholder="Search participant…" value="${escHtml(q)}">
       <div class="f" style="height:38px">Showing <b style="margin-left:5px">${show.length} of ${rows.length}</b></div>
-      <button class="pexp" data-pexport="${s.id}" title="Export these participants to Excel">⤓ Export</button>
+      <button class="pexp" data-testid="ird-people-export" data-pexport="${s.id}" title="Export these participants to Excel">⤓ Export</button>
     </div>
     <div class="pt">
       <div class="pt-head">
@@ -901,8 +904,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
   function prow(s, p){
     return `
-    <div class="prow" id="pr-${p.uid}">
-      <button class="prow-head" data-person="${p.uid}">
+    <div class="prow" data-testid="ird-people-row" id="pr-${p.uid}">
+      <button class="prow-head" data-testid="ird-people-rowhead" data-person="${p.uid}">
         <span class="who"><span class="av">${initials(p.nm)}</span>
           <span>${nameLink(p)}<small>${p.sub || ''}</small></span></span>
         <span><span class="pill grey">${p.journey}</span></span>
@@ -1080,7 +1083,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     } else head = `<tr><th>Name</th><th>Journey</th>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr>`;
     const firstOfGroup = cols.map((c, i) => c.g && (i === 0 || cols[i - 1].g !== c.g));
     return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map(r => `
-      <tr><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
+      <tr data-testid="ird-modal-row"><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
           <span>${nameLink(r.p)}<small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
         <td><span class="pill grey">${r.p.journey}</span></td>
         ${r.cells.map((c, i) => `<td${firstOfGroup[i] ? ' class="first"' : ''}>${c}</td>`).join('')}</tr>`).join('')}
@@ -1253,7 +1256,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       // real letters — tags, resolved and notes are set right here (tagEditor)
       const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || p.love.text.toLowerCase().includes(f));
       $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
-        <div class="letter">
+        <div class="letter" data-testid="ird-letter-row">
           <div class="lh"><span class="av">${initials(p.nm)}</span>
             <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
           <p>${escHtml(p.love.text)}</p>
@@ -1269,7 +1272,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const textOf = p => (kind === 'inst' ? p.asks.inst : p.asks.ah) || '';
     const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || textOf(p).toLowerCase().includes(f));
     $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
-      <div class="letter">
+      <div class="letter" data-testid="ird-ask-row">
         <div class="lh"><span class="av" style="background:var(--${kind === 'inst' ? 'teal' : 'purple'}-soft);color:var(--${kind === 'inst' ? 'teal' : 'purple'})">${initials(p.nm)}</span>
           <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
         <p>${escHtml(textOf(p))}</p>
@@ -1568,19 +1571,19 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       <div class="tagbar">
         <div class="tagger"><span class="lbl">TAG</span>
           ${TAG_BTNS.map(([k, label]) => `<button class="tg${t[k] ? ' on' : ''}" data-f="${label}"
-            data-settag="${key}|${k}" aria-pressed="${!!t[k]}">${label}</button>`).join('')}
-          <button class="nbtn${open ? ' on' : ''}" data-notes="${key}" aria-expanded="${open}">Notes <b>${r.notes.length}</b></button>
+            data-testid="ird-tag-${k}" data-settag="${key}|${k}" aria-pressed="${!!t[k]}">${label}</button>`).join('')}
+          <button class="nbtn${open ? ' on' : ''}" data-testid="ird-notes-toggle" data-notes="${key}" aria-expanded="${open}">Notes <b>${r.notes.length}</b></button>
         </div>
-        <div class="resbar"><span class="lbl">STATUS</span>
+        <div class="resbar" data-testid="ird-status-row"><span class="lbl">STATUS</span>
           ${t.resolved
             ? `<span class="pill teal">✓ Resolved</span><span class="rn">${t.resolvedBy ? `by <b>${escHtml(t.resolvedBy)}</b>` : ''}${
                 t.resolvedOn ? ' · ' + fmtDate(t.resolvedOn) : ''}</span>`
             : '<span class="pill grey">Not resolved</span>'}
           ${RES_ASK.has(key)
             ? `<span class="rconf" role="alertdialog">${t.resolved ? `Reopen this ${what}?` : `Mark this ${what} as resolved?`}
-                <button class="rno" data-resno="${key}">Cancel</button>
-                <button class="ryes${t.resolved ? ' reopen' : ''}" data-settag="${key}|resolved">${t.resolved ? 'Yes, reopen' : 'Yes, mark resolved'}</button></span>`
-            : `<button class="rask" data-resask="${key}">${t.resolved ? 'Reopen' : 'Mark resolved'}</button>`}
+                <button class="rno" data-testid="ird-resolve-cancel" data-resno="${key}">Cancel</button>
+                <button class="ryes${t.resolved ? ' reopen' : ''}" data-testid="ird-resolve-confirm" data-settag="${key}|resolved">${t.resolved ? 'Yes, reopen' : 'Yes, mark resolved'}</button></span>`
+            : `<button class="rask" data-testid="ird-resolve-ask" data-resask="${key}">${t.resolved ? 'Reopen' : 'Mark resolved'}</button>`}
         </div>
         ${open ? notesBox(kind, p) : ''}
       </div>`;
@@ -1590,10 +1593,10 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const key = `${kind}|${p.uid}`, list = [...recOf(kind, p).notes].reverse();   // newest first
     return `
       <div class="nbox">
-        <textarea data-notetext="${key}" placeholder="Add a note…">${escHtml(NOTE_DRAFT[key] || '')}</textarea>
-        <div class="nact"><button class="nsave" data-addnote="${key}">Save note</button></div>
+        <textarea data-testid="ird-note-text" data-notetext="${key}" placeholder="Add a note…">${escHtml(NOTE_DRAFT[key] || '')}</textarea>
+        <div class="nact"><button class="nsave" data-testid="ird-note-save" data-addnote="${key}">Save note</button></div>
         ${list.length ? `<ol class="nlist">${list.map(n => `
-          <li><div class="nh"><b>${escHtml(n.by)}</b><span>${fmtWhen(n.on)}</span></div>
+          <li data-testid="ird-note-item"><div class="nh"><b>${escHtml(n.by)}</b><span>${fmtWhen(n.on)}</span></div>
             <p>${escHtml(n.text)}</p></li>`).join('')}</ol>`
           : '<div class="cn-empty">No notes yet.</div>'}
       </div>`;
