@@ -40,6 +40,22 @@ Firebase projects: `fir-sample-aae4a` = **production**, `starlabs-test` = test, 
 - **Branch first if on a protected branch.** The working line is **`cicd`** (feature branches such as `test/queue-e2e` merge into it). **`main`** tracks the upstream School-of-Excellence repo — never merge or push to `main` without explicit operator approval.
 - **Pushing is a separate, gated step** — `git push` publishes; do it only when the operator asks. Committing locally does not.
 
+## e2e coverage — MUST FOLLOW
+
+**Before pushing any new or changed screen, run the `screen-e2e-coverage` skill, then push.** It is the
+playbook for the starlabs-angular ↔ starlabs-e2e-tests pipeline: `data-testid` hooks, finding the suite
+that already owns the folder (`suites-manifest.json`), seeding a world with negative controls, the spec,
+registering the hooks no case drives, and the landing order (app hooks first, spec second).
+
+Two rules that block the readiness gate if broken, so keep them in mind even without the skill loaded:
+- **One hook prefix per component**, declared in the spec's file header (`irl` parent, `ird` child, …).
+- **Literal `data-testid="…"` only.** The gate's scanner drops any id containing `${…}` — generated
+  markup must look up a table of whole literal attribute strings. Same on the spec side:
+  `getByTestId('literal')`, never an id passed through a helper parameter.
+
+Check alignment any time with:
+`python3 .claude/skills/screen-e2e-coverage/scripts/hook-diff.py src/app/<folder> <suite>`
+
 ## Session Protocol
 
 ### Start of every session
