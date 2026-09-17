@@ -44,7 +44,19 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      for the July 2026 send come from the "uP! July 2026 list" tab.
      ============================================================ */
 
-  const AREAS = CROSSOVER_AREAS;
+  /* The life areas are whatever `interim crossover.metric` carries — the Flutter app builds that map
+     from the participant's ATC model `category` list, so the names differ per model. CROSSOVER_AREAS is
+     only the fallback order for the mock pool; the real ones are learned from the loaded documents
+     (syncAreas), which is why every area-derived table below is a function, not a frozen const. */
+  let AREAS = CROSSOVER_AREAS.slice();
+  function syncAreas(){
+    const seen = new Set();
+    (REAL || []).forEach(p => Object.keys(p.cross || {}).forEach(a => seen.add(a)));
+    if(!seen.size) return;                       // nothing loaded yet — keep the current list
+    const known = CROSSOVER_AREAS.filter(a => seen.has(a));            // canonical five first, in order
+    const extra = [...seen].filter(a => !CROSSOVER_AREAS.includes(a)).sort();
+    AREAS = [...known, ...extra];
+  }
 
   // Accelerated Evolution Levels — 1 is the highest rung, 11 the lowest
   const AEL_LEVELS = [
@@ -389,15 +401,25 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      JOURNEY is a journey doc id, matched against the participant's
      activejourney / lastcompletedjourney / lastsubscribedjourney.
      EVENT is an event doc id; EVENT_SET holds the profileids that attended it. */
-  let JOURNEY = '', EVENT = '', EVENT_SET = null, EVENT_ERR = '';
+  // JOURNEY is a SET of journey doc ids (operator: multi-select) — empty means "all journeys".
+  // EVENT stays single: its attendee list is one query per event.
+  const JOURNEY = new Set();
+  let EVENT = '', EVENT_SET = null, EVENT_ERR = '';
   let OPEN_SEL = '';              // which filter dropdown is open: 'journey' | 'event' | ''
   const SEL = {
     journey: { all:'All journeys', box:'fJourneyBox', btn:'fJourneyBtn', panel:'fJourneyPanel',
-               list:'fJourneyList', search:'fJourneySearch', items:() => api.journeys(),
-               get:() => JOURNEY, set:v => { JOURNEY = v; } },
+               list:'fJourneyList', search:'fJourneySearch', items:() => api.journeys(), multi:true,
+               has:id => JOURNEY.has(id), any:() => JOURNEY.size > 0,
+               set:v => { JOURNEY.clear(); if(v) JOURNEY.add(v); },
+               toggle:v => { if(!v) JOURNEY.clear(); else JOURNEY.has(v) ? JOURNEY.delete(v) : JOURNEY.add(v); },
+               label:() => JOURNEY.size === 1 ? selName('journey', [...JOURNEY][0]) || [...JOURNEY][0]
+                         : `${JOURNEY.size} journeys` },
     event:   { all:'All events', box:'fEventBox', btn:'fEventBtn', panel:'fEventPanel',
                list:'fEventList', search:'fEventSearch', items:() => api.events(),
-               get:() => EVENT, set:v => { EVENT = v; EVENT_SET = null; EVENT_ERR = ''; if(v) loadAttendees(v); } }
+               has:id => EVENT === id, any:() => !!EVENT,
+               set:v => { EVENT = v; EVENT_SET = null; EVENT_ERR = ''; if(v) loadAttendees(v); },
+               toggle:v => SEL.event.set(v),
+               label:() => selName('event', EVENT) || EVENT }
   };
   const selName = (kind, id) => (SEL[kind].items().find(x => x.id === id) || {}).name || '';
 
@@ -409,28 +431,33 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* the dropdown: a search box over the collection's rows, and the count of matching participants */
   function paintSel(kind){
-    const s = SEL[kind], id = s.get(), box = $(s.box);
+    const s = SEL[kind], box = $(s.box);
     if(!box) return;
     const open = OPEN_SEL === kind;
     box.classList.toggle('open', open);
     const btn = $(s.btn);
     btn.setAttribute('aria-expanded', open);
-    const n = id ? realPool().length : 0;
+    const n = s.any() ? realPool().length : 0;
     // event: how many of everyone who attended it are in this range; journey: just the matches
     const cnt = kind === 'event'
       ? (EVENT_SET ? `${n} of ${EVENT_SET.size} attended` : 'loading…')
       : `${n} participant${n === 1 ? '' : 's'}`;
-    btn.innerHTML = id
-      ? `<span class="sv">${escHtml(selName(kind, id) || id)}</span>
+    btn.innerHTML = s.any()
+      ? `<span class="sv">${escHtml(s.label())}</span>
          <span class="cnt" ${SEL_TESTID[kind].count}>${cnt}</span>
-         <span class="clr" data-selclear="${kind}" title="Clear">×</span>`
+         <span class="clr" ${SEL_TESTID[kind].clear} data-selclear="${kind}" title="Clear">×</span>`
       : `${s.all}<span class="ch">▾</span>`;
     const q = ($(s.search).value || '').trim().toLowerCase();
     const rows = s.items().filter(x => !q || x.name.toLowerCase().includes(q));
+    // multi-select rows carry a tick and stay open on click; single-select rows close the panel
     $(s.list).innerHTML = (rows.length
-      ? [{ id:'', name:s.all }, ...rows].map(x => `
-          <button class="selopt${x.id === id ? ' on' : ''}" ${SEL_TESTID[kind].option} data-selopt="${kind}|${x.id}">
-            <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`).join('')
+      ? [{ id:'', name:s.all }, ...rows].map(x => {
+          const on = x.id ? s.has(x.id) : !s.any();
+          return `<button class="selopt${on ? ' on' : ''}" ${SEL_TESTID[kind].option} data-selopt="${kind}|${x.id}"
+            role="option" aria-selected="${on}">
+            ${s.multi && x.id ? `<span class="tick">${on ? '✓' : ''}</span>` : ''}
+            <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`;
+        }).join('')
       : `<div class="selnone">${s.items().length ? 'No match.' : 'Loading…'}</div>`);
   }
   const paintSels = () => { paintSel('journey'); paintSel('event'); };
@@ -469,12 +496,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(key === realKey) return;
     realKey = key; REAL = null; realErr = '';
     api.load(from, to)
-      .then(list => { if(key === realKey){ REAL = list; renderAll(); } })
+      .then(list => { if(key === realKey){ REAL = list; syncAreas(); renderAll(); } })
       .catch(err => { if(key === realKey){ realErr = String((err && err.message) || err); REAL = []; renderAll(); } });
   }
   const realPool = () => { const q = nameQ();
     return (REAL || []).filter(p => (!q || p.nm.toLowerCase().includes(q))
-      && (!JOURNEY || p.journeyId === JOURNEY)
+      && (!JOURNEY.size || JOURNEY.has(p.journeyId))
       && (!EVENT || !!(EVENT_SET && EVENT_SET.has(p.profileid)))); };
   /* every section (Crossover, By participant, their lists) leaves out Not started members —
      only ongoing or submitted reports. The summary strip still counts everyone. */
@@ -549,13 +576,21 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   };
   const XBUCKET_TESTID = { x0:'data-testid="ird-xbucket-x0"', x1:'data-testid="ird-xbucket-x1"', x2:'data-testid="ird-xbucket-x2"',
     x3:'data-testid="ird-xbucket-x3"', x4:'data-testid="ird-xbucket-x4"', x5:'data-testid="ird-xbucket-x5"' };
+  /* areas are per-ATC-model, so the tables above cannot name every one. Anything outside the canonical
+     five falls back to a shared hook and stays precisely addressable through its data-cross attribute. */
+  const CROSS_OTHER_TESTID = { b0:'data-testid="ird-cross-other-b0"', b1:'data-testid="ird-cross-other-b1"',
+    b2:'data-testid="ird-cross-other-b2"', b3:'data-testid="ird-cross-other-b3"' };
+  const crossTestId = (area, band) => CROSS_TESTID[area + '|' + band] || CROSS_OTHER_TESTID[band];
+  const xBucketTestId = key => XBUCKET_TESTID[key] || 'data-testid="ird-xbucket-other"';
   const TAG_TESTID = { happy:'data-testid="ird-tag-happy"', attention:'data-testid="ird-tag-attention"',
     opportunity:'data-testid="ird-tag-opportunity"', critical:'data-testid="ird-tag-critical"', resolved:'data-testid="ird-tag-resolved"' };
   const LETTERS_TESTID = { Happy:'data-testid="ird-letters-happy"', 'Needs Attention':'data-testid="ird-letters-needs-attention"',
     Opportunity:'data-testid="ird-letters-opportunity"', Critical:'data-testid="ird-letters-critical"' };
   const SEL_TESTID = {
-    journey: { option:'data-testid="ird-journey-option"', count:'data-testid="ird-journey-count"' },
-    event: { option:'data-testid="ird-event-option"', count:'data-testid="ird-event-count"' },
+    journey: { option:'data-testid="ird-journey-option"', count:'data-testid="ird-journey-count"',
+               clear:'data-testid="ird-journey-clear"' },
+    event: { option:'data-testid="ird-event-option"', count:'data-testid="ird-event-count"',
+             clear:'data-testid="ird-event-clear"' },
   };
   /* a participant's name opens their profile in a new tab (real rows only — the mock pool has no profileid) */
   const nameLink = p => p.profileid
@@ -601,9 +636,8 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   const xChanged = p => AREAS.filter(a => p.cross[a] >= 8).length;
   const xCount = n => p => xFilled(p) && xChanged(p) === n;
   const xNone = xCount(0);
-  const xAll  = xCount(AREAS.length);
   /* the six buckets on the Crossover Meter header — every filled report sits in exactly one */
-  const XBUCKETS = Array.from({ length: AREAS.length + 1 }, (_, n) => ({
+  const xBuckets = () => Array.from({ length: AREAS.length + 1 }, (_, n) => ({
     key: 'x' + n, f: xCount(n),
     label: n === 0 ? 'All areas not changed'
          : n === AREAS.length ? 'All areas changed'
@@ -614,7 +648,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* the crossover scale, clubbed into four columns */
   const XBANDS = [
-    { k:'b0', label:'0', sub:'Not progressed', f:v => v === null || v === 0 },
+    { k:'b0', label:'0', sub:'Not progressed', f:v => v === 0 },   // rated 0 only; unrated/skipped areas are not counted
     { k:'b1', label:'1–3',  f:v => v !== null && v >= 1 && v <= 3 },
     { k:'b2', label:'4–7',  f:v => v !== null && v >= 4 && v <= 7 },
     { k:'b3', label:'8–10', f:v => v !== null && v >= 8 }
@@ -727,7 +761,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
             const max = Math.max(...m.v.slice(1));
             return `<tr><td class="a">${m.a}</td>
               ${m.v.map((n, i) => `<td><button class="cell${i ? '' : ' free'}"${i ? ` style="${shade(n, max)}"` : ''}
-                ${CROSS_TESTID[m.a + '|' + XBANDS[i].k]}
+                ${crossTestId(m.a, XBANDS[i].k)}
                 data-cross="${s.id}|${m.a}|${XBANDS[i].k}">${n}</button></td>`).join('')}</tr>`;
           }).join('')}</tbody>
         </table></div>
@@ -861,16 +895,16 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const filled = P.filter(xFilled), tot = filled.length || 1;
     return `
       <div class="xbp${XPANEL.has(s.id) ? ' open' : ''}" id="xbp-${s.id}">
-        ${XBUCKETS.map(x => {
+        ${xBuckets().map(x => {
           const M = filled.filter(x.f), key = `${s.id}|${x.key}`, open = XOPEN.has(key);
           return `
           <div class="xb ${x.cls}${open ? ' open' : ''}">
-            <button class="xb-h" ${XBUCKET_TESTID[x.key]} data-xb="${key}" aria-expanded="${open}">
+            <button class="xb-h" ${xBucketTestId(x.key)} data-xb="${key}" aria-expanded="${open}">
               <span class="tx">${x.label}</span>
               <span class="bar"><i style="width:${(M.length / tot * 100).toFixed(1)}%"></i></span>
               <span class="c">${M.length}</span><span class="ch">▶</span></button>
             <div class="xb-b">${M.length
-              ? tableHTML(AREA_COLS, M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })), 'bucket')
+              ? tableHTML(areaCols(), M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })), 'bucket')
                 + (M.length > 8 ? `<button class="xb-all" data-testid="ird-xbucket-seeall" data-strip="${key}">See all ${M.length}</button>` : '')
               : '<div class="none-note">No participants here.</div>'}</div>
           </div>`;
@@ -1173,7 +1207,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     { h:'Love letter', g:'Report done' }, { h:'Asks', g:'Report done' }];
   const statusCells = p => [statusPill(p), ...doneCells(p)];
 
-  const AREA_COLS = AREAS.map(a => ({ h:a }));
+  const areaCols = () => AREAS.map(a => ({ h:a }));
   const areaCells = p => AREAS.map(a =>
     `<span class="mt-lv" style="${lvlColor(p.cross[a])}">${p.cross[a] ?? '–'}</span>`);
 
@@ -1196,8 +1230,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     notsubmitted: { t:'Have not submitted',                  f:p => !p.submitted },
     noletter:     { t:'Submitted without a letter',          f:p => p.submitted && !p.letter },
     noask:        { t:'Submitted without asking',            f:p => p.submitted && !p.instAsk && !p.ahAsk },
-    ...Object.fromEntries(XBUCKETS.map(x =>
-      [x.key, { t:x.label, f:x.f, cols:AREA_COLS, c:areaCells, real:true, section:true, cross:true }])),
+    // the x0..xN bucket lists are resolved in openStrip — how many there are depends on the data
     years:        { t:'Years saved', f:p => hoursPerDayOf(p) > 0, real:true, section:true,
                     cols:[{ h:'Years saved' }, { h:'Hours per day' }],
                     c:p => [`<span class="mt-v">${yearsOf(p).toFixed(1)}</span> <span class="mt-u">years</span>`,
@@ -1207,7 +1240,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* a KPI card or an inline count — the plain member list */
   function openStrip(sendId, key){
-    const d = STRIPS[key];
+    let d = STRIPS[key];
+    const bucket = /^x(\d+)$/.exec(key);        // "areas changed" buckets: as many as there are areas
+    if(!d && bucket){
+      const x = xBuckets()[+bucket[1]];
+      if(x) d = { t:x.label, f:x.f, cols:areaCols(), c:areaCells, real:true, section:true, cross:true };
+    }
     if(!d) return;
     const s = d.real ? realSend() : sendById(sendId);
     const c = d.c || (d.real ? realStatusCells : statusCells);
@@ -1233,7 +1271,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* level changes — one row per change, filterable by life area */
   const LVL_COLS = [{ h:'Area' }, { h:'Jumped from' }, { h:'Jumped to' }];
-  const AREA_FILTER = { label:'FILTER BY AREA', options:AREAS, of:r => r.c.area };
+  const areaFilter = () => ({ label:'FILTER BY AREA', options:AREAS, of:r => r.c.area });
   const lvlRow = ({ p, c }) => ({ p, c, cells:[
     `<span class="pill blue">${c.area}</span>`,
     `<span class="mt-u">${escHtml(c.from)}</span>`,
@@ -1244,7 +1282,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const s = realSend();
     const rows = crossPool().flatMap(p => p.levelChanges.filter(c => c.to === to).map(c => ({ p, c })));
     openTable(s, `Moved to ${escHtml(to)}`, LVL_COLS, rows.map(lvlRow),
-      { unit:'change', filter:AREA_FILTER });
+      { unit:'change', filter:areaFilter() });
   }
 
   function openEvoCell(sendId, k, bk){
@@ -1265,7 +1303,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const rows = [];
     P.forEach(p => p.levelChanges.forEach(c => rows.push({ p, c })));
     openTable(s, 'Upgraded their level', LVL_COLS, rows.map(lvlRow),
-      { unit:'change', filter:AREA_FILTER, fval:area || '' });
+      { unit:'change', filter:areaFilter(), fval:area || '' });
   }
 
   /* real love letters — flag: all | untagged | a tag label | esc:Open | esc:Resolved | by:<name> */
@@ -1402,7 +1440,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const sclr = e.target.closest('[data-selclear]');
     if(sclr){ SEL[sclr.dataset.selclear].set(''); OPEN_SEL = ''; renderAll(); return; }
     const sopt = e.target.closest('[data-selopt]');
-    if(sopt){ const [kind, id] = sopt.dataset.selopt.split('|'); SEL[kind].set(id); OPEN_SEL = ''; renderAll(); return; }
+    if(sopt){
+      const [kind, id] = sopt.dataset.selopt.split('|');
+      const s = SEL[kind];
+      if(s.multi && id) s.toggle(id); else { s.set(id); OPEN_SEL = ''; }
+      renderAll();
+      return;
+    }
     const sbtn = e.target.closest('.selbtn');
     if(sbtn){
       const kind = sbtn.id === 'fJourneyBtn' ? 'journey' : 'event';
@@ -1776,7 +1820,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* the date range is the component's Material range picker — it calls refresh() on change */
   $('fClear').addEventListener('click', () => {
-    SEL.journey.set(''); SEL.event.set('');
+    JOURNEY.clear(); SEL.event.set('');
     $('fWho').value = '';
     OPEN_SEL = '';
     api.resetRange();

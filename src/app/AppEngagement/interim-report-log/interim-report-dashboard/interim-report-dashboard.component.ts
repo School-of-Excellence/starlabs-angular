@@ -306,7 +306,12 @@ export class InterimReportDashboardComponent implements OnChanges {
     const jumped: Record<string, string | null> = {};   // metric[area].jumpedfrom — the goal before a level jump
     const levelChanges: { area: string; from: string; to: string }[] = [];
 
-    CROSSOVER_AREAS.forEach(area => {
+    // The life areas are NOT a fixed five: the Flutter app builds `participant AEL.crossovermetric`
+    // (and this doc's `metric`) from that participant's ATC model `category` list, so the keys differ
+    // per model. Read the keys the doc actually carries — a hard-coded list rendered every unmatched
+    // area as "Left blank" and showed a metric for only the areas whose names happened to line up.
+    const areaKeys: string[] = Object.keys(metric).length ? Object.keys(metric) : [];
+    areaKeys.forEach(area => {
       const m = metric[area] || {};
       const n = m['metric'] === null || m['metric'] === undefined || m['metric'] === '' ? NaN : Number(m['metric']);
       cross[area] = Number.isFinite(n) ? Math.round(n) : null;

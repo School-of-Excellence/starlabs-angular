@@ -124,3 +124,28 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
 - Follow-up (operator): Evolution dialog now shows "N of M adjustments". M = the adjustments they **answered** (the % denominator), not all adjustments, so N / M always equals the % shown beside it. Verified on all 5 non-zero cells (2/18 = 11 %, 5/18 = 28 %, 3/18 = 17 %). Writes were cross-checked in the Love Letter and Ask A&H tabs (separate reads) and the original tags restored afterwards. Two "E2E test note …" notes remain on those starlabs-test docs (no delete-note feature anywhere).
 - Gotcha: macOS has no `timeout`; `timeout 300 npx tsc … | grep` silently printed nothing — run tsc without it.
 - Re-extract if the design file changes (transform: `:root`→`:host`, `body`→`.stage`, drop `.topbar`, `document.`→`root.`, and drop `.wrap`'s `max-width:1460px; margin:0 auto` — operator wants the dashboard full width).
+
+## 2026-09-17 — operator data-validation round: per-model areas, rated-0, multi-select journey
+- **Reported:** "Mehak Garg filled the Crossover Meter as 0 for all five aspects, but the dashboard shows
+  Left Blank and a metric for only 2 of 5." **Root cause:** the five life areas were hard-coded here, but
+  the Flutter app builds `participant AEL.crossovermetric` / `interim crossover.metric` from the
+  participant's **ATC model `category` list** (`crossover.dart` `_updateMetrics`, `requestUPevent.dart`
+  `crossoverdata["metric"][item]`), so the keys differ per model. Any area whose name did not match read
+  as null → "Left blank", and only the coincidentally-matching names showed a metric. The component now
+  reads the doc's own keys; `syncAreas()` derives the matrix rows from the loaded pool (canonical five
+  first, then the rest alphabetically), and every area-derived table (buckets, columns, the area filter)
+  became a function instead of a frozen const. Verified with an in-memory pool on a made-up model
+  ('Wealth Creation' / 'Inner Peace'): rows, band counts and hooks all correct, 0 malformed attributes.
+- **"Not progressed" now means a RATED 0.** The band was `v === null || v === 0`, so an area nobody rated
+  sat beside a deliberate 0. It is `v === 0` now; unrated areas are simply not in the meter (participants
+  with no crossover doc at all were already excluded on 09-16). Verified: a synthetic pair (one rated 0,
+  one skipped) → the 0-band counts 1 and the drill-down lists only the rated participant.
+- **Journey filter is multi-select** (`JOURNEY` is a Set; ticks in the list, "2 journeys" on the pill, ×
+  clears all). Verified on starlabs-test: B!G 6 + uP! 11 → 17 together, an exact union because a
+  participant resolves to exactly one journey.
+- **Hook lesson:** the literal-id tables the readiness gate needs cannot name per-model areas, so unknown
+  areas emit `ird-cross-other-b*` (and a >5-area model emits `ird-xbucket-other`). Without that fallback
+  the attribute rendered as the string `undefined` — caught by the synthetic-model check, not by the
+  seeded data, which only ever uses the canonical five.
+- Hub: `modes/interim-report-dashboard.spec.ts` IRD-02 now asserts Health (rated 0) = 1 and Personal
+  Genius (never rated) = 0; new IRD-12 covers multi-select. 152 hooks, aligned both ways.
