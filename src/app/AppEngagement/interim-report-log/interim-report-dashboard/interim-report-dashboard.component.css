@@ -798,8 +798,12 @@ dialog.ov::backdrop, dialog.lg::backdrop{ background:transparent; }
   .rbtn{ margin-left:0; }
 }
 
-/* multi-select rows in the JOURNEY dropdown */
-.selopt .tick{ width:13px; flex:0 0 13px; font-size:11px; font-weight:800; color:var(--blue); }
+/* multi-select rows in the JOURNEY dropdown — an empty box is what makes the row look selectable */
+.selopt .tick{ flex:0 0 15px; width:15px; height:15px; border:1.5px solid #C4CBD0; border-radius:4px;
+  background:#fff; color:#fff; font-size:10px; font-weight:800; line-height:12px; text-align:center;
+  align-self:center; transition:all .12s; }
+.selopt:hover .tick{ border-color:var(--indigo); }
+.selopt .tick.on{ background:var(--indigo); border-color:var(--indigo); }
 
 /* ---------- picking participants for a message ---------- */
 .xc{ position:relative; }

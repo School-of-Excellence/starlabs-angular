@@ -195,3 +195,8 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
   (the property) rather than what rendered**, which is exactly why it passed while the operator could see
   the row; the e2e now uses `toBeHidden()`, which checks visibility, plus a case that exactly one cell
   reads as selected.
+- **Filter dropdown checkboxes** (operator: "in the filter dropdowns I can't see the checkbox"). The
+  multi-select rows only drew a ✓ when selected, so an unselected row had nothing to aim at — the same
+  mistake as the hover-only `+` on the grid. Every row in a multi-select list now carries a real box
+  (15px, grey outline, white fill; indigo with ✓ when on), "All journeys" included, so the column reads
+  as a checklist. Verified in the app: 16 rows, each with a box that renders at 15×15.

@@ -457,7 +457,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
           const on = x.id ? s.has(x.id) : !s.any();
           return `<button class="selopt${on ? ' on' : ''}" ${SEL_TESTID[kind].option} data-selopt="${kind}|${x.id}"
             role="option" aria-selected="${on}">
-            ${s.multi && x.id ? `<span class="tick">${on ? '✓' : ''}</span>` : ''}
+            ${s.multi ? `<span class="tick${on ? ' on' : ''}">${on ? '✓' : ''}</span>` : ''}
             <span>${escHtml(x.name)}</span>${x.on ? `<small>${escHtml(x.on)}</small>` : ''}</button>`;
         }).join('')
       : `<div class="selnone">${s.items().length ? 'No match.' : 'Loading…'}</div>`);
