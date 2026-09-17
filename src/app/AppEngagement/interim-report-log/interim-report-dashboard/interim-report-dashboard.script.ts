@@ -870,7 +870,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
               <span class="bar"><i style="width:${(M.length / tot * 100).toFixed(1)}%"></i></span>
               <span class="c">${M.length}</span><span class="ch">▶</span></button>
             <div class="xb-b">${M.length
-              ? tableHTML(AREA_COLS, M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })))
+              ? tableHTML(AREA_COLS, M.slice(0, 8).map(p => ({ p, cells:areaCells(p) })), 'bucket')
                 + (M.length > 8 ? `<button class="xb-all" data-testid="ird-xbucket-seeall" data-strip="${key}">See all ${M.length}</button>` : '')
               : '<div class="none-note">No participants here.</div>'}</div>
           </div>`;
@@ -1123,7 +1123,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       'table', rows, { send:s, cols, filter:o.filter || null, fval:o.fval || '' });
   }
 
-  function tableHTML(cols, rows){
+  /* `where` says which table this is: 'modal' (the drill-down dialog) or 'bucket' (the inline
+     Areas-changed panel). They need DIFFERENT row hooks — the bucket panel's rows stay in the page
+     while a dialog is open, so one shared id would make every dialog-scoped selector ambiguous
+     (and the hidden inline copy is what a .first() would pick). Literal attributes: the readiness
+     scanner cannot see an interpolated id. */
+  const ROW_TESTID = { modal:'data-testid="ird-modal-row"', bucket:'data-testid="ird-xbucket-row"' };
+  function tableHTML(cols, rows, where = 'modal'){
     let head;
     if(cols.some(c => c.g)){
       let r1 = '<th rowspan="2">Name</th><th rowspan="2">Journey</th>', r2 = '';
@@ -1139,7 +1145,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     } else head = `<tr><th>Name</th><th>Journey</th>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr>`;
     const firstOfGroup = cols.map((c, i) => c.g && (i === 0 || cols[i - 1].g !== c.g));
     return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map(r => `
-      <tr data-testid="ird-modal-row"><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
+      <tr ${ROW_TESTID[where]}><td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
           <span>${nameLink(r.p)}<small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
         <td><span class="pill grey">${r.p.journey}</span></td>
         ${r.cells.map((c, i) => `<td${firstOfGroup[i] ? ' class="first"' : ''}>${c}</td>`).join('')}</tr>`).join('')}

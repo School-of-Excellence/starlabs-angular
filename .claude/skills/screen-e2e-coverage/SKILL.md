@@ -27,6 +27,12 @@ Work through the steps in order. Do not skip step 6 — it is the one the gate a
   is invisible to the gate, so helpers take a `Locator`, not an id.
 - Shadow DOM is fine: Playwright pierces open shadow roots, so `getByTestId` reaches through.
 - Renaming a hook breaks whoever asserts it. Grep the hub's spec dirs before you rename.
+- **A shared render helper must not hand out one row hook.** If the same function draws both a dialog
+  list and an inline panel, give each call site its own id (`ird-modal-row` vs `ird-xbucket-row`).
+  Hidden markup still matches: an inactive tab body, a collapsed panel and a closed dialog all stay in
+  the DOM, so a page-wide `getByTestId(...).first()` can pick the hidden copy — which never becomes
+  actionable, and surfaces as a mystery timeout on whatever you awaited alongside the click. In the
+  spec, scope to the container you mean: `page.getByTestId('ird-people-row').first().getByTestId(…)`.
 
 ## 2. Find the suite — never invent one
 
