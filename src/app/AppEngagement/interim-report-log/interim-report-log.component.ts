@@ -939,4 +939,49 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     XLSX.writeFile(workbook, fileName);
   }
 
+  /** Export the Ask A&H / Love Letter rows the filters match, with their tags, resolution and notes.
+   *  The table is paged (100 at a time), so this re-runs the same query without the page limit. */
+  async exportRecords() {
+    const collectionName = this.collectionMap[this.activeTab];
+    const dateField = this.dateFieldMap[this.activeTab];
+    const snap = await getDocs(this.buildQuery(collectionName, dateField, 5000));
+    let rows: any[] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // the tag chips above the table narrow the page in memory — apply the same rule here
+    if (this.selectedFilterTypes.length) {
+      rows = rows.filter((r) =>
+        (this.selectedFilterTypes.includes('happy') && r['liked'] === true) ||
+        (this.selectedFilterTypes.includes('attention') && r['tagged'] === true) ||
+        (this.selectedFilterTypes.includes('opportunity') && r['opportunity'] === true) ||
+        (this.selectedFilterTypes.includes('critical') && r['critical'] === true));
+    }
+    if (!rows.length) {
+      alert('Nothing to export');
+      return;
+    }
+    const askTab = collectionName === 'ask AH';
+    const nameOf = (id: any) => this.mapProfiles[id]?.['name'] || '';
+    const when = (t: any) => this.datePipe.transform(t?.toDate ? t.toDate() : t, 'medium') || '';
+    const exportData = rows.map((row: any, i: number) => ({
+      'S.No': i + 1,
+      'name': nameOf(row['profileid']),
+      'email': this.mapParticipantMetaData[row['profileid'] || '']?.email ?? '',
+      'date': when(row['created']),
+      ...(askTab
+        ? { 'installation ask': row['installationaskah'] || '', 'ask A&H': row['askah'] || '' }
+        : { 'love letter': row['loveletter'] || '' }),
+      'happy': row['liked'] ? 'Yes' : 'No',
+      'needs attention': row['tagged'] ? 'Yes' : 'No',
+      'opportunity': row['opportunity'] ? 'Yes' : 'No',
+      'critical': row['critical'] ? 'Yes' : 'No',
+      'resolved': row['resolved'] ? 'Yes' : 'No',
+      'resolved by': nameOf(row['resolveddetails']?.['user']),
+      'resolved on': row['resolveddetails']?.['time'] ? when(row['resolveddetails']['time']) : '',
+      'notes': (row['notes'] || []).map((n: any) => `${nameOf(n['user'])}: ${n['notes']}`).join(' | '),
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, askTab ? 'Ask A&H' : 'Love Letter');
+    XLSX.writeFile(workbook, `${askTab ? 'ask_ah' : 'love_letter'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
 }

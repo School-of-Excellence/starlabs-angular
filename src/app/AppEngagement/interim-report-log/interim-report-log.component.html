@@ -302,7 +302,7 @@
     <!-- Interim Report Dashboard (lazy: only rendered when the tab is opened) -->
     <mat-tab label="Interim Report Dashboard">
       <ng-template matTabContent>
-        <app-interim-report-dashboard [profiles]="mapProfiles"></app-interim-report-dashboard>
+        <app-interim-report-dashboard [profiles]="mapProfiles" [profileId]="loggedInProfileId"></app-interim-report-dashboard>
       </ng-template>
     </mat-tab>
   </mat-tab-group>
@@ -313,6 +313,12 @@
     <div class="table-container">
       <div *ngIf="loading" class="loading-spinner">
         <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <div class="export-row" *ngIf="!loading && records.length > 0">
+        <button mat-stroked-button (click)="exportRecords()" data-testid="irl-export-records">
+          <mat-icon>download</mat-icon> Export
+        </button>
       </div>
 
       <table mat-table [dataSource]="records" *ngIf="!loading && records.length > 0">
