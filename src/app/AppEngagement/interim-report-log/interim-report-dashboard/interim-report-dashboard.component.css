@@ -803,14 +803,22 @@ dialog.ov::backdrop, dialog.lg::backdrop{ background:transparent; }
 
 /* ---------- picking participants for a message ---------- */
 .xc{ position:relative; }
-.pickbox{ position:absolute; top:3px; left:5px; width:16px; height:16px; border-radius:4px;
-  border:1px solid var(--line); background:#fff; color:var(--ink-mute); font-size:10px; font-weight:800;
-  line-height:14px; text-align:center; padding:0; opacity:0; transition:opacity .12s; }
-.xc:hover .pickbox, .pickbox.on, .pickbox:focus-visible{ opacity:1; }
-.pickbox.on{ background:var(--indigo); border-color:var(--indigo); color:#fff; }
+/* a real checkbox, always visible — the selection has to be findable without being explained */
+.pickbox{ position:absolute; top:4px; left:5px; width:15px; height:15px; border-radius:4px;
+  border:1.5px solid #C4CBD0; background:rgba(255,255,255,.92); color:#fff; font-size:10px;
+  font-weight:800; line-height:12px; text-align:center; padding:0; transition:all .12s; }
+.pickbox:hover{ border-color:var(--indigo); box-shadow:0 0 0 3px var(--indigo-soft); }
+.pickbox.on{ background:var(--indigo); border-color:var(--indigo); }
+.pickbox:focus-visible{ outline:2px solid var(--indigo); outline-offset:1px; }
+/* the cell's own number keeps its room next to the box */
+.mx .cell, .egrid .ecell{ padding-left:22px; }
 .mt th.pk, .mt td.pk{ width:28px; padding-left:4px; padding-right:0; }
 .mt td.pk input, .mt th.pk input{ width:15px; height:15px; accent-color:var(--indigo); cursor:pointer; }
 
+/* the communication row exists only while participants are picked. `display:flex` below outranks the
+   browser's [hidden] rule, so hiding has to be said explicitly — without this the row showed with an
+   empty selection. */
+.sendbar[hidden]{ display:none; }
 .sendbar{ position:sticky; bottom:14px; z-index:30; display:flex; align-items:center; gap:9px;
   margin-top:16px; padding:11px 14px; border-radius:11px; background:var(--ink); color:#fff;
   box-shadow:0 8px 26px rgba(16,24,40,.22); }

@@ -828,11 +828,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     </div>`;
   }
 
-  /** the small tick on a grid cell: adds (or removes) everyone behind that count */
+  /** the checkbox on a grid cell — always visible, so the selection is discoverable without being told */
   function pickBox(kind, a, b){
-    const on = allPicked(cellPeople(kind, a, b));
+    const on = SELCELLS.has(cellKey(kind, a, b));
+    const n = cellPeople(kind, a, b).length;
     return `<button class="pickbox${on ? ' on' : ''}" data-testid="ird-pick-cell" data-pickcell="${kind}|${a}|${b}"
-      title="Select these participants for a message" aria-pressed="${on}">${on ? '✓' : '+'}</button>`;
+      title="${on ? 'Remove' : 'Select'} these ${n} participant${n === 1 ? '' : 's'} for a message"
+      role="checkbox" aria-checked="${on}">${on ? '✓' : ''}</button>`;
   }
 
   /* one cell per (member, answer they gave): the answer's row × the band of its share of their adjustments */
@@ -1464,7 +1466,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const pc = e.target.closest('[data-pickcell]');
     if(pc){
       const [kind, a, b] = pc.dataset.pickcell.split('|');
-      togglePickList(cellPeople(kind, a, b));
+      toggleCell(kind, a, b);
       repaintViews();
       return;
     }
@@ -1472,16 +1474,18 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(prow){
       const id = prow.dataset.pickrow;
       const person = (REAL || []).find(p => p.profileid === id);
-      if(person) PICK.has(id) ? dropPick(person) : addPick(person);
+      if(person) toggleRow(person);
       repaintViews();
       return;
     }
     if(e.target.closest('[data-pickall]')){
-      togglePickList(mo.rows.map(r => r.p || r).filter(Boolean));
+      const rows = mo.rows.map(r => r.p || r).filter(Boolean);
+      const on = allPicked(rows);
+      rows.forEach(p => { if(on === isPicked(p)) toggleRow(p); });
       repaintViews();
       return;
     }
-    if(e.target.closest('[data-pickclear]')){ PICK.clear(); repaintViews(); return; }
+    if(e.target.closest('[data-pickclear]')){ PICK.clear(); SELCELLS.clear(); repaintViews(); return; }
     const snd = e.target.closest('[data-send]');
     if(snd){
       if(!PICK.size) return;
@@ -1718,11 +1722,42 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
      Keyed by PROFILEID, so a participant with several interim reports in the range is one recipient
      (operator choice). A grid cell adds everyone behind that count; a list row adds one person.
      ============================================================ */
-  const PICK = new Map();                        // profileid → display name
+  const PICK = new Map();                        // profileid → display name (the recipients)
+  const SELCELLS = new Set();                    // the grid cells ticked BY HAND — never inferred.
+  // Inferring a cell's tick from "are all its participants picked" lit up every other cell holding the
+  // same person, so one click looked like several. The tick is now explicit state.
   const pickable = p => !!p.profileid;
   const isPicked = p => PICK.has(p.profileid);
   const addPick = p => { if(pickable(p)) PICK.set(p.profileid, p.nm); };
   const dropPick = p => PICK.delete(p.profileid);
+  const cellKey = (kind, a, b) => `${kind}|${a}|${b}`;
+  const peopleOfKey = key => { const [kind, a, b] = key.split('|'); return cellPeople(kind, a, b); };
+
+  /** tick / untick ONE cell. Unticking only releases the people no other ticked cell still covers. */
+  function toggleCell(kind, a, b){
+    const key = cellKey(kind, a, b), people = cellPeople(kind, a, b).filter(pickable);
+    if(SELCELLS.has(key)){
+      SELCELLS.delete(key);
+      const stillCovered = new Set();
+      SELCELLS.forEach(k => peopleOfKey(k).forEach(p => stillCovered.add(p.profileid)));
+      people.forEach(p => { if(!stillCovered.has(p.profileid)) dropPick(p); });
+    } else {
+      SELCELLS.add(key);
+      people.forEach(addPick);
+    }
+  }
+
+  /** tick / untick ONE participant in a list. Dropping someone a ticked cell covered unticks that cell
+   *  (it is no longer "this whole cell"), but everyone else it brought in stays picked. */
+  function toggleRow(person){
+    if(!pickable(person)) return;
+    if(isPicked(person)){
+      dropPick(person);
+      [...SELCELLS].forEach(k => {
+        if(peopleOfKey(k).some(p => p.profileid === person.profileid)) SELCELLS.delete(k);
+      });
+    } else addPick(person);
+  }
   /** the participants behind one grid cell — the same sets the drill-downs open */
   function cellPeople(kind, a, b){
     if(kind === 'cross'){ const band = XBANDS.find(x => x.k === b);
@@ -1730,10 +1765,6 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     return sectionPool().filter(p => countOf(p, a) && bandOf(shareOf(p, a)).k === b);
   }
   const allPicked = list => list.length > 0 && list.filter(pickable).every(isPicked);
-  function togglePickList(list){
-    const on = allPicked(list);
-    list.filter(pickable).forEach(p => on ? dropPick(p) : addPick(p));
-  }
   /** the bar only exists while something is picked; it lives in the template, not the grid markup */
   function paintSendBar(){
     const bar = $('sendbar');

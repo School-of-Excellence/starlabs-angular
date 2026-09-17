@@ -178,3 +178,20 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
 - Hub: IRD-13 (Resolved ignores the JC tags, with a seeded resolved-but-untagged letter as the control)
   and IRD-14 (a grid cell picks its participants, all three channels offered, Email opens the composer,
   Clear empties). 161 hooks, aligned both ways.
+
+### Same day — two fixes to the picking UI (operator feedback)
+- **"When I click plus, select that cell only."** The tick was *inferred* (`allPicked(cellPeople)`), so
+  picking one participant lit the checkbox on every other cell that held them — one click looked like
+  several. Selection is now explicit state: `SELCELLS` holds the cells ticked by hand. Unticking a cell
+  only releases the people no other ticked cell still covers, and unticking a person in a list unticks
+  the cell that brought them in (the rest of that cell's people stay). Verified: one click → 1 cell
+  ticked of 20, the other 14 filled crossover cells stay clear.
+- **"By design it should be usable — the + is something I have to teach."** The affordance was a `+`
+  that only appeared on hover. It is now a real checkbox, always visible in every non-empty cell, with a
+  hover ring, a focus outline and a title that says how many participants it will take.
+- **"Only after selecting participants show the communication row."** It was already `hidden` when the
+  selection was empty — but `.sendbar{display:flex}` outranks the UA `[hidden]{display:none}`, so the row
+  rendered anyway. Added `.sendbar[hidden]{display:none}`. **My verification had asserted `bar.hidden`
+  (the property) rather than what rendered**, which is exactly why it passed while the operator could see
+  the row; the e2e now uses `toBeHidden()`, which checks visibility, plus a case that exactly one cell
+  reads as selected.
