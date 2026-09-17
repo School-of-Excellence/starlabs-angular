@@ -119,7 +119,7 @@
         </div>
 
         <div class="stats">
-          <div data-testid="jted-div-014" class="stat" *ngFor="let k of order" [class.sel]="kpiFilter === k" [style.--sc]="'var(' + lifecycleConfig[k].cssVar + ')'" (click)="toggleKpi(k)">
+          <div data-testid="jted-div-014" class="stat" [class.sel]="kpiFilter === 'needsAttention'" [style.--sc]="'var(' + lifecycleConfig.needsAttention.cssVar + ')'" (click)="toggleKpi('needsAttention')">
             <div class="top">
               <span class="lbl">Needs attention</span>
               <span class="dot" [class.pulse]="lifecycleCounts.needsAttention"></span>
@@ -155,7 +155,7 @@
                 <tbody>
                   <tr *ngIf="!filteredOverviewEntries.length"><td colspan="2" class="empty">No participants match.</td></tr>
 
-                  <ng-container *ngFor="let entry of dfuParticipantMap | keyvalue">
+                  <ng-container *ngFor="let entry of filteredOverviewEntries; trackBy: trackOverviewEntry">
                     <tr data-testid="jted-tr-015" class="click" (click)="toggleParticipant(entry.key)">
                       <td>
                         <div class="who-cell">

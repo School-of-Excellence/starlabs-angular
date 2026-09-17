@@ -438,6 +438,12 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     this.expandedOverviewProduct[key] = !isOpen;
   }
 
+  // filteredOverviewEntries is a getter, so it hands *ngFor a fresh array on every
+  // change-detection pass; track by profile id so rows are not torn down and rebuilt.
+  trackOverviewEntry(_i: number, entry: { key: string }): string {
+    return entry.key;
+  }
+
   toggleOverviewStatus(status: 'ongoing' | 'completed' | 'notStarted'): void {
     this.overviewStatusFilter = this.overviewStatusFilter === status ? null : status;
   }
