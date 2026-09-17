@@ -135,7 +135,7 @@
             </div>
           </div>
 
-          <div class="stat" [class.sel]="overviewStatusFilter === 'completed'" [style.--sc]="'var(--c-done)'" (click)="toggleOverviewStatus('completed')">
+          <div data-testid="jted-div-027" class="stat" [class.sel]="overviewStatusFilter === 'completed'" [style.--sc]="'var(--c-done)'" (click)="toggleOverviewStatus('completed')">
             <div class="top"><span class="lbl">Completed</span><span class="dot"></span></div>
             <div class="num">{{ dfuOverviewTotals.completed }}</div>
             <div class="desc">Milestone signed off</div>
