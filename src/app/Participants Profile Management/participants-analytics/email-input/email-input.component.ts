@@ -186,8 +186,10 @@ export class EmailInputComponent {
     this.categoryCollectionSnapShot = doc(this.firestore, 'email validators', 'templateCategories');
 
     docData(this.categoryCollectionSnapShot).pipe(takeUntil(this.destroy$)).subscribe((d: any) => {
-      this.templateCategories = d['categories'];
-      this.templateSubCategories = d['subcategories'];
+      // `email validators/templateCategories` may not exist yet — docData then emits undefined and the
+      // old unguarded read threw inside the dialog. Empty lists degrade to "no categories offered".
+      this.templateCategories = d?.['categories'] ?? [];
+      this.templateSubCategories = d?.['subcategories'] ?? [];
     });
  
     this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? []; 
@@ -240,7 +242,9 @@ export class EmailInputComponent {
     docData(doc(this.firestore,'classify','postmarkserver')).subscribe((senders)=>{
       console.log('Sender Emails:',senders);
 
-      this.fromEmails = senders['senderemails'] || [
+      // same here: the fallback senders below were unreachable, because reading a property off the
+      // undefined emission threw first.
+      this.fromEmails = senders?.['senderemails'] || [
         'starlabs@excellenceinstallation.com',
         'support@intl.soexcellence.com'
       ];

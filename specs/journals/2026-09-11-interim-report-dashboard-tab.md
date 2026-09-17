@@ -222,3 +222,18 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
 - The Interim Report Log tab keeps its own MatSort (now `#logSort`), re-verified after the change.
 - Hub: `IRT-SORT` in `modes/interim-report-tabs.spec.ts` sorts the Love Letter tab both ways — the
   second instance, i.e. the one that was broken.
+
+### Emulator run feedback — the composer crashed on missing config (2026-09-17)
+- The gate run went 13/14 on the dashboard file; the one failure was **IRD-14**, and not on an assertion:
+  the console guard caught `TypeError: Cannot read properties of undefined (reading 'senderemails')` and
+  `… (reading 'categories')` once the Email composer opened.
+- Root cause is an app defect, not a test gap. `EmailInputComponent` subscribes to
+  `email validators/templateCategories` and `classify/postmarkserver` and dereferences the emission
+  directly. AngularFire's `docData` emits **undefined** for a document that does not exist, so on any
+  project where that config is absent the composer opens and immediately throws — and the hard-coded
+  fallback sender list right below was unreachable, because reading the property threw first. Guarded
+  with `?.` + defaults in email-input (both reads) and wati-input.
+- The seed now also creates both config docs, so the emulator exercises the POPULATED path rather than
+  the fallback — a test that only ever saw the empty case would not notice the categories dropdown
+  breaking.
+- Verified locally: pick a participant → Email composer opens with no console error, closes clean.
