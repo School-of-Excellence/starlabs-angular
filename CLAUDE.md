@@ -42,10 +42,13 @@ Firebase projects: `fir-sample-aae4a` = **production**, `starlabs-test` = test, 
 
 ## e2e coverage — MUST FOLLOW
 
-**Before pushing any new or changed screen, run the `screen-e2e-coverage` skill, then push.** It is the
-playbook for the starlabs-angular ↔ starlabs-e2e-tests pipeline: `data-testid` hooks, finding the suite
-that already owns the folder (`suites-manifest.json`), seeding a world with negative controls, the spec,
-registering the hooks no case drives, and the landing order (app hooks first, spec second).
+**Before pushing any new or changed screen, add its e2e coverage, then push.** The pipeline is
+starlabs-angular (screen + `data-testid` hooks) ↔ starlabs-e2e-tests (suites, seeds, specs): find the
+suite whose `suites-manifest.json` glob already owns your folder, seed a world with negative controls,
+write the spec, register the hooks no case drives, and land app hooks FIRST, spec second.
+
+On this machine that playbook is the local `screen-e2e-coverage` skill (`.claude/` is gitignored — a
+skill script is not covered by any suite glob, and the rollout gate blocks on uncovered files).
 
 Two rules that block the readiness gate if broken, so keep them in mind even without the skill loaded:
 - **One hook prefix per component**, declared in the spec's file header (`irl` parent, `ird` child, …).

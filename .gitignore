@@ -55,9 +55,7 @@ src/firebase-messaging-sw.js
 /starlabs-cloud-function
 /firebase.emulator.json
 
-# local Claude Code state stays out; shared skills (the team playbooks) are tracked
-.claude/*
-!.claude/skills/
+.claude
 
 # Service-account keys / secrets — NEVER commit (migrated from starlabs-cicd)
 *firebase-adminsdk*.json
