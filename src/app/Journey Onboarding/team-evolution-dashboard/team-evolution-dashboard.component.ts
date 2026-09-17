@@ -235,16 +235,27 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
-  expandedOverviewProduct: { [key: string]: boolean } = {};
-  dfuParticipantMap: {
+    expandedOverviewProduct: { [key: string]: boolean } = {};
+    dfuParticipantMap: {
     [profileId: string]: {
       name: string;
       email: string;
-      activeproduct: string[];
+      activeproduct: string[];       
+      ongoingProducts: string[];
+      completedProducts: string[];
+      notStartedProducts: string[];
       participantproducts?: any[];
       deliverysequence?: { step: number; deliveryname: string; status: string }[];
     };
   } = {};
+
+  dfuOverviewTotals: { ongoing: number; completed: number; notStarted: number } = {
+    ongoing: 0,
+    completed: 0,
+    notStarted: 0
+  };
+
+  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
   
   constructor(
     private firestore : Firestore,
@@ -290,30 +301,41 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   // map the participants who have active DFU products ongoing or initiated
   mapDfuParticipants() {
-    const localMap: {
-      [profileId: string]: {
-        name: string;
-        email: string;
-        activeproduct: string[];
-      };
-    } = {};
+    const localMap: typeof this.dfuParticipantMap = {};
+    const totals = { ongoing: 0, completed: 0, notStarted: 0 };
 
     this.participantMetadata.forEach(participant => {
       if (!(participant.email?.toLowerCase().endsWith('@soexcellence.com'))) {
         return;
       }
-      const allActiveProducts: string[] = participant.activeproduct || [];
-      const dfuActiveProducts = allActiveProducts.filter(productId => this.dfuProductsMap[productId]);
-      const hasDfuProduct = dfuActiveProducts.length > 0;
-      if (hasDfuProduct) {
-        localMap[participant.profileid] = {
-          name: participant.name,
-          email: participant.email,
-          activeproduct: dfuActiveProducts
-        };
+
+      const ongoingProducts = (participant.activeproduct || [])
+        .filter((id: string) => this.dfuProductsMap[id]);
+      const completedProducts = (participant.consumedproducts || [])
+        .filter((id: string) => this.dfuProductsMap[id]);
+      const notStartedProducts = (participant.unconsumedproducts || [])
+        .filter((id: string) => this.dfuProductsMap[id]);
+
+      if (!ongoingProducts.length && !completedProducts.length && !notStartedProducts.length) {
+        return;
       }
+
+      localMap[participant.profileid] = {
+        name: participant.name,
+        email: participant.email,
+        activeproduct: ongoingProducts,
+        ongoingProducts,
+        completedProducts,
+        notStartedProducts
+      };
+
+      totals.ongoing += ongoingProducts.length;
+      totals.completed += completedProducts.length;
+      totals.notStarted += notStartedProducts.length;
     });
+
     this.dfuParticipantMap = localMap;
+    this.dfuOverviewTotals = totals;
     console.log('DFU Participant Map:', this.dfuParticipantMap);
   }
 
@@ -414,6 +436,23 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     const key = participantproductid;
     const isOpen = this.expandedOverviewProduct[key];
     this.expandedOverviewProduct[key] = !isOpen;
+  }
+
+  toggleOverviewStatus(status: 'ongoing' | 'completed' | 'notStarted'): void {
+    this.overviewStatusFilter = this.overviewStatusFilter === status ? null : status;
+  }
+
+  productsForStatus(p: { ongoingProducts: string[]; completedProducts: string[]; notStartedProducts: string[] },
+                      status: 'ongoing' | 'completed' | 'notStarted'): string[] {
+    return status === 'ongoing' ? p.ongoingProducts
+        : status === 'completed' ? p.completedProducts
+        : p.notStartedProducts;
+  }
+
+  get filteredOverviewEntries(): { key: string; value: typeof this.dfuParticipantMap[string] }[] {
+    const entries = Object.keys(this.dfuParticipantMap).map(key => ({ key, value: this.dfuParticipantMap[key] }));
+    if (!this.overviewStatusFilter) { return entries; }
+    return entries.filter(e => this.productsForStatus(e.value, this.overviewStatusFilter!).length > 0);
   }
 
   // ================= HELPERS =================
