@@ -203,6 +203,7 @@ export class DeliveryDashboardCloneComponent {
 
     // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
     outerTabIndex: number = 0;
+    private uniqueTicketId = 0;
 
     // Stages chip loading state (5-8s data fetch needs visible feedback)
     stagesLoading: boolean = false;
@@ -1041,6 +1042,17 @@ export class DeliveryDashboardCloneComponent {
         return null;
     }
 
+    private getCardIdForProduct(product: string): string {
+        const matchedProduct = this.products.find(p => p.label === product);
+        const groupName = matchedProduct?.value;
+        const isMergedGroup = !!(groupName && this.mergedGroupIds[groupName]?.size);
+
+        if (isMergedGroup) {
+            return 'group:' + groupName;
+        }
+        return this.mapProductGroupId[product];
+    }
+
     async onProductMultiFilterChange() {
         const selectedProductIds: string[] = this.productFilterControl.value ?? [];
         if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
@@ -1453,7 +1465,7 @@ export class DeliveryDashboardCloneComponent {
             eiCustomSolutions: { totalEligible: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
-        const productId = this.mapProductGroupId[product];
+        const productId = this.getCardIdForProduct(product);
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
 
@@ -1625,22 +1637,11 @@ export class DeliveryDashboardCloneComponent {
                 productData.eiStarterPack.totalEligible.push(...totalEligible);
             }
             else if (this.selectedProductType === 'eiCustomSolutions') {
-                for (let data of totalEligible) {
-                    const { tentativestart } = data;
-
-                    if (!tentativestart) {
-                        productData.eiCustomSolutions.totalEligible.push(data);
-                    } else {
-                        const date = tentativestart.toDate();
-                        const itemMonth = date.getMonth();
-                        const itemYear = date.getFullYear();
-                        this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiCustomSolutions');
-                    }
-                }
+                productData.eiCustomSolutions.totalEligible.push(...totalEligible);
             }
 
             // Total Eligible
-            const ongoingData = this.funnelData[productId]?.ongoing || [];
+            const ongoingData = this.getCardFunnel(productId)?.ongoing || [];
 
             for (let data of ongoingData) {
                 let appointments = Array.from(allAppointments.values() || [])
@@ -1666,14 +1667,7 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiStarterPack') {
                         productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
-                        if (!data.tentativestart) {
-                            productData.eiCustomSolutions.totalEligible.push(mergedData);
-                        } else {
-                            const date = data.tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiCustomSolutions');
-                        }
+                        productData.eiCustomSolutions.totalEligible.push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1801,7 +1795,7 @@ export class DeliveryDashboardCloneComponent {
             }
 
             // ========================= COMPLETED DATA =========================
-            const completedData = this.funnelData[productId]?.completed || [];
+            const completedData = this.getCardFunnel(productId)?.completed || [];
 
             for (let data of completedData) {
                 let appointments = Array.from(allAppointments.values() || [])
@@ -4263,6 +4257,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
                 { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
+                { key: 'recentappointmentdate', label: 'LAST APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'actualstuckdays', label: 'DAYS', width: '10%', type: 'number' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -5415,6 +5411,10 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (header.key === 'waitingperiod') {
+            return `${value || 0} DAYS`;
+        }
+
+        if (header.key === 'actualstuckdays') {
             return `${value || 0} DAYS`;
         }
 
@@ -7042,6 +7042,9 @@ export class DeliveryDashboardCloneComponent {
                     assignedto: 'Unassigned',
                     escalationlevel: escalation,
                     generalnotes: [],
+                    participantproductid: item?.docid || null,
+                    recentappointmentdate: null,
+                    actualstuckdays: null,
                 });
             }
         }
@@ -7054,9 +7057,58 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
+        this.getRecentAppointmentDetails(stuck);
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    private async getRecentAppointmentDetails(stuckItems: any[]): Promise<void> {
+        const requestId = ++this.uniqueTicketId;
+
+        const participantProductIds = Array.from(new Set(stuckItems.map(item => item.participantproductid).filter(Boolean)));
+        if (participantProductIds.length === 0) return;
+
+        const recentAppointmentMap = new Map<string, any>();
+        const chunkSize = 30;
+
+        for (let i = 0; i < participantProductIds.length; i += chunkSize) {
+            const chunk = participantProductIds.slice(i, i + chunkSize);
+            try {
+                const snap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'appointments'),
+                        where('participantproductid', 'in', chunk),
+                        where('attended', '==', true),
+                        orderBy('endtime', 'desc')
+                    ))
+                );
+
+                for (const appointmentDoc of snap.docs) {
+                    const appointment = appointmentDoc.data();
+                    const participantProductId = appointment['participantproductid'];
+                    const alreadyHasLatest = recentAppointmentMap.has(participantProductId);
+                    if (!alreadyHasLatest) {
+                        recentAppointmentMap.set(participantProductId, appointment);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching recent completed appointments for stuck cases:', err);
+            }
+        }
+
+        const isStaleRequest = requestId !== this.uniqueTicketId;
+        if (isStaleRequest) return;
+
+        for (const item of stuckItems) {
+            const recentAppointment = recentAppointmentMap.get(item.participantproductid);
+            if (!recentAppointment) continue;
+            item.recentappointmentdate = recentAppointment['endtime'];
+            item.actualstuckdays = daysSince(recentAppointment['endtime']);
+        }
+
+        this.calculatePagination();
+        this.cdr.detectChanges();
     }
 
     openParticipant(profileId: string) {
