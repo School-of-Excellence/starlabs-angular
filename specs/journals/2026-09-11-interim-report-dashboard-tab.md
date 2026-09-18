@@ -237,3 +237,101 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
   the fallback — a test that only ever saw the empty case would not notice the categories dropdown
   breaking.
 - Verified locally: pick a participant → Email composer opens with no console error, closes clean.
+
+## 2026-09-18 — "the values change when I go to another screen": filters now survive leaving the tab
+
+**Found:** the dashboard sits in `<ng-template matTabContent>`, so leaving the tab — or the whole
+`/interimreportlog` route — destroys the component. The next visit rebuilt it on the defaults (current
+month, all journeys, no event, no name, By step), so the numbers differed from what the operator had
+left on screen. Nothing in the data moved.
+
+Audited and ruled out as sources of drift: no RouteReuseStrategy; all script state is per-mount;
+`ensureReal` keys each load by its range so a stale load cannot overwrite a newer one; `latestByLog`
+tie-breaks are deterministic (`in` queries return in document-id order); the parent hands `profiles`
+over as one new object; setTag / addNote write exactly the fields toMember reads back. The seeded
+mock pool (`peopleFor`) is still computed by `sendById` but no visible section reads it.
+
+**Fix:** module-scope `keptRange` / `keptFilters` in the component (outside any instance) — the date
+range, journeys, event, name and view. Scope is the browser session: a full reload starts on the
+defaults. Clear resets them exactly as before. The script restores them at boot
+(`api.initialFilters`) and reports every change (`api.saveFilters`, called from `renderAll` and the
+view switch).
+
+**e2e:** IRD-15 (hub `modes/interim-report-dashboard.spec.ts`) — set p1 + journey B + By participant,
+leave the tab, return: same filters, same count; Clear then round-trip stays cleared.
+
+**Revert:** drop `keptRange`/`keptFilters` and the two api members in the component, `saveFilters` /
+the boot restore in the script, and IRD-15.
+
+## 2026-09-18 — the send bar was unreachable from a drill-down list
+
+**Found:** the drill-down list is a native `<dialog>` opened with `showModal()`; everything outside it —
+including the page's sticky `#sendbar` — is inert, so rows ticked inside a list could not be sent.
+Second, latent: the composers are MatDialogs in the cdk overlay container, and a top-layer `<dialog>`
+stays above them, so even a reachable Send would have opened the composer underneath the list.
+Third, cosmetic: the list's "select everyone" header box always rendered unticked.
+
+**Fix:** the list carries its own bar (`#moSendbar`, `ird-modal-sendbar` / `-pick-count` /
+`-send-whatsapp|email|notification` / `-pick-clear`), painted by the same `paintSendBar` as the page
+bar and driven by the same delegated `data-send` / `data-pickclear` handlers. `data-send` now closes
+the list before `api.send`, so the composer opens on top. `tableHTML` renders `ird-pick-all` checked
+when every pickable row is picked.
+
+**Verified (dev server, starlabs-test, real clicks):** ticking the header box showed the in-list bar;
+`elementFromPoint` at each of its four buttons returned that button; Email closed the list and opened
+the Email Campaign Composer with 1 recipient (cancelled — nothing sent); the list's Clear unticked
+the rows and hid both bars.
+
+**e2e:** IRD-16. **Revert:** remove `#moSendbar` + `.sendbar.mo-send`, the two-bar loop in
+`paintSendBar`, the `ov` close in the `data-send` handler, the `everyone` checked flag, and IRD-16.
+
+## 2026-09-18 — the send bar names who is picked
+
+> **Superseded the same day** (operator: "don't show participants outside — show the count, and when I click
+> it show them, read-only"): see *who-is-picked is a read-only list behind the count* below. Chips and × are gone.
+
+Operator: "after selecting I need to see to whom all I selected." Both bars (page + list dialog) now
+carry a chip row (`ird-pick-list` / `ird-modal-pick-list`, chips `ird-pick-chip`) above the count:
+one chip per recipient, A → Z, names read live from the loaded pool (falling back to the name stored
+at pick time). × (`ird-pick-chip-remove`, `data-pickdrop`) goes through `toggleRow`, so it is exactly
+"untick their row" — the grid cell that brought them in unticks, everyone else stays picked. The row
+is capped at 78px and scrolls, so a large pick never buries the page. Verified in the dev server
+(starlabs-test): two cells → two chips; × on one dropped it and unticked only its cell; × inside the
+list dialog unticked its rows and kept the dialog open. e2e: IRD-17 (+ a chip assertion in IRD-16).
+
+## 2026-09-18 — who-is-picked is a read-only list behind the count
+
+The bar shows only "N participants selected"; that label is a button (`ird-pick-count` /
+`ird-modal-pick-count`, `aria-expanded`) that opens a numbered, READ-ONLY list above it
+(`ird-pick-list` / `ird-modal-pick-list`, entries `ird-pick-name`) — no controls inside. Open state is per bar
+(`PICKLIST_OPEN`), survives repaints so the list updates live as rows are ticked, and resets when the
+selection empties. `ird-pick-chip` / `ird-pick-chip-remove` and the `data-pickdrop` handler are removed.
+e2e: IRD-17 rewritten; IRD-16 opens the list before reading it.
+
+## 2026-09-18 — ROOT CAUSE of "the values change": cached reads during a dropped connection
+
+The filter reset (above) was real but not the whole story. Reproduced in the operator's Chrome: same page,
+same defaults, the strip read 7 / 3 / 0 / 4 while the Crossover Meter was ALL ZEROS and Evolution said
+"Nobody has answered"; a reload later drew the grid (15 values). The component's own `loadPool`, called
+three times by hand, returned identical, complete data. The console at the failing moment:
+`@firebase/firestore: WebChannelConnection RPC 'Listen' stream … transport errored` (a burst of them).
+
+Mechanism, proven with `disableNetwork` on the app's own Firestore instance: plain `getDocs` does not fail
+offline — it answers from the local cache with `metadata.fromCache: true`. The Log tab's live listener keeps
+`interimreport log` in that cache, but nothing keeps `interim crossover` / `interim evolutionprogress` /
+`love letter` / `ask AH` there; so a load that ran while the connection was down drew the REAL totals over
+EMPTY sections, silently. `getDocsFromServer` throws `unavailable` instead.
+
+**Fix:** every dashboard read goes through `fromServer()` — `getDocsFromServer`, one retry after 1.5 s on
+`unavailable`, then a plain-language error. The script shows it with a Retry button (`ird-retry`; the
+event-attendee variant `ird-retry-event`) and never draws partial numbers. `ensureFilters()` forgets a failed
+journey/event load so Retry re-reads it; a failed attendee read is never cached. `getCountFromServer`
+(calendar dots) was already server-only.
+
+**Verified (operator's Chrome, starlabs-test):** network disabled → changing the date showed "Could not load
+interim reports: the connection to the database dropped, so nothing is shown rather than partial numbers.
+Retry"; network enabled → Retry drew 7 / 3 / 0 / 4 and the full grid. e2e: the Retry hooks are registered in
+IRD-ADDR2 — a dropped connection is not reproducible deterministically in the emulator lane.
+
+**Revert:** `fromServer` → `getDocs`, `ensureFilters` → the old `filtersReady` promise, drop the two Retry
+buttons + `data-retry` handler.

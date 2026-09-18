@@ -34,7 +34,10 @@
 
     <!-- picked participants → the same three composers the Log tab uses -->
     <div class="sendbar" id="sendbar" data-testid="ird-sendbar" hidden>
-      <b id="pickCount" data-testid="ird-pick-count">0 participants selected</b>
+      <!-- who is picked: only the count shows; clicking it opens a read-only list of the recipients -->
+      <div class="picks" id="pickList" data-testid="ird-pick-list" hidden></div>
+      <button type="button" class="pcount" id="pickCount" data-testid="ird-pick-count" data-picklist="page"
+        aria-expanded="false" aria-controls="pickList">0 participants selected</button>
       <button class="sb wa" data-testid="ird-send-whatsapp" data-send="whatsapp">WhatsApp</button>
       <button class="sb em" data-testid="ird-send-email" data-send="email">Email</button>
       <button class="sb nt" data-testid="ird-send-notification" data-send="notification">App notification</button>
@@ -54,6 +57,17 @@
       <div class="mo-body">
         <input class="mo-search" id="moSearch" data-testid="ird-modal-search" placeholder="Search participant…">
         <div id="moBody"></div>
+      </div>
+      <!-- the page's send bar sits BEHIND this modal (showModal makes the rest of the page inert),
+           so a list with pickable rows carries its own; it mirrors the page bar through paintSendBar -->
+      <div class="sendbar mo-send" id="moSendbar" data-testid="ird-modal-sendbar" hidden>
+        <div class="picks" id="moPickList" data-testid="ird-modal-pick-list" hidden></div>
+        <button type="button" class="pcount" id="moPickCount" data-testid="ird-modal-pick-count" data-picklist="modal"
+          aria-expanded="false" aria-controls="moPickList">0 participants selected</button>
+        <button class="sb wa" data-testid="ird-modal-send-whatsapp" data-send="whatsapp">WhatsApp</button>
+        <button class="sb em" data-testid="ird-modal-send-email" data-send="email">Email</button>
+        <button class="sb nt" data-testid="ird-modal-send-notification" data-send="notification">App notification</button>
+        <button class="sb clr" data-testid="ird-modal-pick-clear" data-pickclear>Clear</button>
       </div>
     </div>
   </dialog>

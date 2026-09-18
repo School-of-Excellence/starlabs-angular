@@ -35,7 +35,14 @@ export interface InterimDashboardApi {
   openProfile(profileid: string): void;
   /** hand the picked participants to the Log tab's WhatsApp / email / app-notification composers */
   send(channel: 'whatsapp' | 'email' | 'notification', profileids: string[]): void;
+  /** the filters from the last visit — the tab is destroyed on leave, so without these it reopens on defaults */
+  initialFilters?(): DashboardFilters | null;
+  /** remember the current filters for the next visit */
+  saveFilters?(f: DashboardFilters): void;
 }
+
+/** what survives leaving the dashboard: JOURNEY / EVENT / PARTICIPANT filters and the By step / By participant view */
+export interface DashboardFilters { journeys: string[]; event: string; who: string; view: string; }
 
 export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashboardApi): { refresh(): void } {
   /* ============================================================
@@ -662,14 +669,23 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   /* ============================================================
      SEND ROWS
      ============================================================ */
+  /* filters outlive this mount: the tab (and the whole screen) is destroyed when the user leaves it */
+  function saveFilters(){
+    if(api.saveFilters) api.saveFilters({ journeys:[...JOURNEY], event:EVENT,
+      who:$('fWho') ? $('fWho').value : '', view:VIEW });
+  }
+
   function renderAll(){
     ensureReal();
+    saveFilters();
     $('overview').innerHTML = REAL === null
       ? `<div class="empty" data-testid="ird-empty">Loading interim reports…</div>`
       : realErr
-      ? `<div class="empty" data-testid="ird-empty">Could not load interim reports: ${escHtml(realErr)}</div>`
+      ? `<div class="empty" data-testid="ird-empty">Could not load interim reports: ${escHtml(realErr)}.
+          <button class="retry" data-testid="ird-retry" data-retry>Retry</button></div>`
       : EVENT && EVENT_ERR
-      ? `<div class="empty" data-testid="ird-empty">Could not load who attended this event: ${escHtml(EVENT_ERR)}</div>`
+      ? `<div class="empty" data-testid="ird-empty">Could not load who attended this event: ${escHtml(EVENT_ERR)}.
+          <button class="retry" data-testid="ird-retry-event" data-retry>Retry</button></div>`
       : EVENT && !EVENT_SET
       ? `<div class="empty" data-testid="ird-empty">Loading who attended ${escHtml(selName('event', EVENT) || 'this event')}…</div>`
       : !REAL.length
@@ -1185,8 +1201,10 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     // the modal lists are pickable (tick a row to add just that participant); the inline bucket
     // tables are not — they are a preview inside the Areas-changed panel.
     const pick = where === 'modal';
+    // ticked when every pickable row is — it used to render unticked always, even with the whole list picked
+    const everyone = pick && allPicked(rows.map(r => r.p).filter(Boolean));
     const pkHead = pick ? `<th class="pk"${cols.some(c => c.g) ? ' rowspan="2"' : ''}><input type="checkbox"
-      data-testid="ird-pick-all" data-pickall aria-label="Select everyone in this list"></th>` : '';
+      data-testid="ird-pick-all" data-pickall aria-label="Select everyone in this list"${everyone ? ' checked' : ''}></th>` : '';
     let head;
     if(cols.some(c => c.g)){
       let r1 = pkHead + '<th rowspan="2">Name</th><th rowspan="2">Journey</th>', r2 = '';
@@ -1486,9 +1504,27 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       return;
     }
     if(e.target.closest('[data-pickclear]')){ PICK.clear(); SELCELLS.clear(); repaintViews(); return; }
+    /* a failed load — nothing was drawn rather than partial numbers; run it again */
+    if(e.target.closest('[data-retry]')){
+      if(realErr){ realKey = null; realErr = ''; }
+      if(EVENT && EVENT_ERR) SEL.event.set(EVENT);
+      renderAll();
+      return;
+    }
+    /* the count toggles the read-only recipient list of ITS bar */
+    const plist = e.target.closest('[data-picklist]');
+    if(plist){
+      const which = plist.dataset.picklist;
+      PICKLIST_OPEN.has(which) ? PICKLIST_OPEN.delete(which) : PICKLIST_OPEN.add(which);
+      paintSendBar();
+      return;
+    }
     const snd = e.target.closest('[data-send]');
     if(snd){
       if(!PICK.size) return;
+      // The composers are Material dialogs in the page's overlay container, which a native modal <dialog>
+      // stays on top of — so close the list first, or the composer opens underneath it, out of reach.
+      $('ov').classList.remove('show');
       api.send(snd.dataset.send, [...PICK.keys()]);
       return;
     }
@@ -1589,6 +1625,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(v){
       const [id, which] = v.dataset.view.split('|');
       VIEW = which;   // kept across re-renders (search, date change)
+      saveFilters();
       v.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === v));
       $('v-step-' + id).classList.toggle('on', which === 'step');
       $('v-people-' + id).classList.toggle('on', which === 'people');
@@ -1766,13 +1803,34 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   }
   const allPicked = list => list.length > 0 && list.filter(pickable).every(isPicked);
   /** the bar only exists while something is picked; it lives in the template, not the grid markup */
+  /* two copies: the page bar, and the list dialog's own — the page one is unreachable behind the modal */
+  /* who is picked — READ-ONLY (operator): the bar shows only the count; clicking it opens this list.
+     Names are read live, so a name that arrived after the pick still shows; A → Z. */
+  const PICKLIST_OPEN = new Set();   // 'page' | 'modal' — whose recipient list is open
+  function pickNames(){
+    const names = [...PICK.keys()]
+      .map(id => ((REAL || []).find(p => p.profileid === id) || {}).nm || PICK.get(id) || '—')
+      .sort((a, b) => a.localeCompare(b));
+    return `<ol>${names.map(nm => `<li data-testid="ird-pick-name">${escHtml(nm)}</li>`).join('')}</ol>`;
+  }
   function paintSendBar(){
-    const bar = $('sendbar');
-    if(!bar) return;
     const n = PICK.size;
-    bar.hidden = n === 0;
-    const label = $('pickCount');
-    if(label) label.textContent = `${n} participant${n === 1 ? '' : 's'} selected`;
+    if(!n) PICKLIST_OPEN.clear();   // nothing picked → nothing to list, and it starts closed next time
+    [['page', 'sendbar', 'pickCount', 'pickList'], ['modal', 'moSendbar', 'moPickCount', 'moPickList']]
+      .forEach(([which, barId, labelId, listId]) => {
+        const bar = $(barId);
+        if(!bar) return;
+        bar.hidden = n === 0;
+        const open = PICKLIST_OPEN.has(which);
+        const label = $(labelId);
+        if(label){
+          label.textContent = `${n} participant${n === 1 ? '' : 's'} selected`;
+          label.setAttribute('aria-expanded', String(open));
+          label.title = open ? 'Hide who is selected' : 'Show who is selected';
+        }
+        const list = $(listId);
+        if(list){ list.hidden = !open; list.innerHTML = open ? pickNames() : ''; }
+      });
   }
 
   /* ---------- love letter / ask AH: tags, resolved, notes ---------- */
@@ -1958,6 +2016,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   });
 
   /* ---------- boot ---------- */
+  // reopen on the filters the user left with — otherwise every return shows the defaults, and different numbers
+  const kept = api.initialFilters ? api.initialFilters() : null;
+  if(kept){
+    (kept.journeys || []).forEach(id => JOURNEY.add(id));
+    if(kept.event) SEL.event.set(kept.event);
+    if(kept.who) $('fWho').value = kept.who;
+    if(kept.view === 'step' || kept.view === 'people') VIEW = kept.view;
+  }
   renderAll();   // also paints the JOURNEY / EVENT dropdowns (empty until api.journeys/events arrive)
 
   // the component calls this when the participant names arrive after the first paint
