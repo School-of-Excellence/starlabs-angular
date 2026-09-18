@@ -16,6 +16,10 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSelectModule } from '@angular/material/select';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { getApp } from '@angular/fire/app';
+import {
+  CompanyConfig, DEFAULT_COMPANY_KEY, resolveCompanies, findCompany,
+  isDefaultCompany, companyPrefixFor, ratioCounterDocId,
+} from '../../Service/company-config';
 
 interface Checkpoint {
   label: string;
@@ -101,6 +105,13 @@ export class CreateWatsonProfileComponent {
   initialpaymentbalance: number | null = 0;
   pendingbalanceamount: number | null = 0;
 
+  /** Watson's `accountsconfig/config`, loaded once the Watson app is ready. */
+  watsonConfigData: any = {};
+  /** The billing entities a payment can be registered under. */
+  watsonCompanies: CompanyConfig[] = [];
+  /** Which one this onboarding books its initial payment against. */
+  selectedCompanyKey: string = DEFAULT_COMPANY_KEY;
+
   watsonDatabase: Firestore;
   watsonBatch: WriteBatch;
   starlabsBatch: WriteBatch;
@@ -151,6 +162,8 @@ export class CreateWatsonProfileComponent {
       const loadingRef = this.dialog.open(LoadingProgressComponent, { data: { msg: "loading..." }, disableClose: true })
       this.watsonDatabase = getFirestore(getApp("watson"));
       console.log("WATSON Database Initialized");
+
+      await this.loadWatsonCompanies();
 
       this.watsonBatch = writeBatch(this.watsonDatabase);
       this.starlabsBatch = writeBatch(this.firestore);
@@ -1336,6 +1349,11 @@ private validateAddonsJourney(): boolean {
       const loadingDialog = this.dialog.open(LoadingProgressComponent, { data: { msg: "Processing Please Wait..." }, disableClose: true });
 
       try {
+        // The company picker lives in this dialog, but the payment was built
+        // when the dialog loaded. Re-resolve against the current selection
+        // before committing, so what was chosen is what gets written.
+        await this.applySelectedCompanyToBatch();
+
         await this.watsonBatch.commit();
         await this.starlabsBatch.commit();
         this.dialogRef.close({
@@ -1760,15 +1778,137 @@ private validateAddonsJourney(): boolean {
     }
   }
 
+  /** The company the initial payment will be booked under. */
+  get activeCompany(): CompanyConfig | null {
+    return findCompany(this.watsonCompanies, this.selectedCompanyKey);
+  }
+
+  /**
+   * Set while the dialog validates, consumed at submit.
+   *
+   * validateWatsonPayment() runs on load — before the operator can pick a
+   * company — so whatever it resolved is provisional. This carries the inputs
+   * forward so the choice made in the dialog is the one that gets written.
+   */
+  pendingPayment: { ref: any; participantData: any; paymentDate: Date } | null = null;
+
+  /**
+   * Re-resolves the payment's GST against the company selected in the dialog
+   * and appends it to the Watson batch, so it lands as part of the same commit.
+   * Later writes to the same document win, so this overrides whatever the
+   * load-time pass put there.
+   */
+  async applySelectedCompanyToBatch() {
+    if (!this.pendingPayment) return;
+
+    const { ref, participantData, paymentDate } = this.pendingPayment;
+    const company = this.activeCompany;
+
+    if (!company || !company.gstdetails.length) {
+      throw new Error(
+        "Could not read Watson's GST configuration (accountsconfig/config). " +
+        "The payment was not created. Check Watson access for this account and retry."
+      );
+    }
+
+    const { GSTState, GSTRatio } = await this.updateGSTState(
+      { gstno: participantData['gstno'], paymentdate: paymentDate }, company);
+
+    const gstdetails = (company.gstdetails || []).find((e) =>
+      e['statename']?.toLowerCase().replace(/\s+/g, ' ').trim() ==
+      GSTState?.toLowerCase().replace(/\s+/g, ' ').trim());
+
+    if (!gstdetails) {
+      throw new Error(
+        `No GST registration found for "${GSTState ?? '(no state resolved)'}" under ` +
+        `${company.title}. Check that company's GST Details and Non-GST Ratio ` +
+        `in Watson's Accounts Config.`
+      );
+    }
+
+    const intraState = [null, undefined, ""].includes(participantData['gstno'])
+      || participantData['gstno'].substring(0, 2) == gstdetails['statecode'];
+
+    this.watsonBatch.set(ref, {
+      gstdetails: gstdetails,
+      companygstno: gstdetails['gstno'],
+      templateid: intraState ? 40962079 : 40962160,
+      companykey: company.key,
+      companyprefix: companyPrefixFor(company, gstdetails),
+    }, { merge: true });
+
+    // Deferred from validation so the tally lands against the chosen company.
+    if ([null, undefined, ""].includes(participantData['gstno']) && GSTRatio) {
+      const actualmonth = paymentDate.getMonth() + 1;
+      const month = this.padWithZeros(actualmonth, 2);
+      const year = paymentDate.getFullYear().toString().slice(-2);
+      const ratioRef = doc(this.watsonDatabase, "nongstratiocounters",
+        ratioCounterDocId(company, month, year));
+
+      GSTRatio[GSTState]++;
+      GSTRatio['total']++;
+      this.watsonBatch.update(ratioRef, GSTRatio);
+    }
+  }
+
+  /**
+   * Explicit change handler rather than relying on `[(ngModel)]` alone, so the
+   * selection is written to the field by code we can see.
+   */
+  onCompanyChange(key: string) {
+    this.selectedCompanyKey = key;
+  }
+
+  /** Registrations of the selected company — what the seller state is chosen from. */
+  get activeGSTDetails(): any[] {
+    return this.activeCompany?.gstdetails || [];
+  }
+
+  /**
+   * Reads Watson's accounts config once and resolves its company list. A legacy
+   * single-company doc is promoted to one default company, so this works
+   * whether or not Watson has been migrated yet.
+   */
+  async loadWatsonCompanies(): Promise<boolean> {
+    try {
+      const snap = await getDoc(doc(this.watsonDatabase, "accountsconfig", "config"));
+      if (!snap.exists()) {
+        console.log("Watson accountsconfig/config does not exist");
+        return false;
+      }
+      this.watsonConfigData = snap.data();
+      this.watsonCompanies = resolveCompanies(this.watsonConfigData);
+      if (!findCompany(this.watsonCompanies, this.selectedCompanyKey)) {
+        this.selectedCompanyKey = this.watsonCompanies[0]?.key || DEFAULT_COMPANY_KEY;
+      }
+      return this.watsonCompanies.length > 0;
+    } catch (error) {
+      // Swallowed on the constructor's early attempt (Watson auth may not be
+      // established yet); validateWatsonPayment retries and reports properly.
+      console.log("Error loading Watson accounts config", error);
+      return false;
+    }
+  }
+
   async validateWatsonPayment(participantRef, paymentref, watsonParticipantData) {
     let watsonPaymentData = null;
-    let configData = {};
 
-    await getDoc(doc(this.watsonDatabase, "accountsconfig", "config")).then((data) => {
-      if (data.exists()) {
-        configData = data.data();
-      }
-    });
+    // Loaded when the Watson app came up; re-read only if that had not
+    // happened yet, so the company picker and this write always agree.
+    if (!this.watsonCompanies.length) {
+      await this.loadWatsonCompanies();
+    }
+    const company = this.activeCompany;
+
+    // Without this the failure surfaces much later as a bare
+    // "Cannot read properties of undefined (reading 'gstno')": no config means
+    // no registrations, so no seller state resolves and the lookup misses.
+    if (!company || !company.gstdetails.length) {
+      throw new Error(
+        "Could not read Watson's GST configuration (accountsconfig/config). " +
+        "The payment was not created. Check Watson access for this account and retry."
+      );
+    }
 
     try {
 
@@ -1798,8 +1938,21 @@ private validateAddonsJourney(): boolean {
           watsonPaymentData['billingname'] = watsonParticipantData['billingname'],
           watsonPaymentData['billingaddress'] = watsonParticipantData['billingaddress'],
           watsonPaymentData['billingemail'] = watsonParticipantData['billingemail']
-          const { GSTState, GSTRatio } = await this.updateGSTState(watsonPaymentData, configData);
-          let gstdetails = configData['gstdetails'].find((e) => e['statename']?.toLowerCase().replace(/\s+/g, ' ').trim() == GSTState?.toLowerCase().replace(/\s+/g, ' ').trim());
+          const { GSTState, GSTRatio } = await this.updateGSTState(watsonPaymentData, company);
+          let gstdetails = (company?.gstdetails || []).find((e) => e['statename']?.toLowerCase().replace(/\s+/g, ' ').trim() == GSTState?.toLowerCase().replace(/\s+/g, ' ').trim());
+
+          // Fail with something readable. Without this the next line reads
+          // `gstdetails['gstno']` off undefined and reports a bare
+          // "Cannot read properties of undefined", which says nothing about
+          // which company or state could not be resolved.
+          if (!gstdetails) {
+            throw new Error(
+              `No GST registration found for "${GSTState ?? '(no state resolved)'}" under ` +
+              `${company?.title || 'the default company'}. Check that company's GST Details ` +
+              `and Non-GST Ratio in Watson's Accounts Config.`
+            );
+          }
+
           var templateID;
           if ([null, undefined, ""].includes(watsonParticipantData['gstno']) || watsonParticipantData['gstno'].substring(0, 2) == gstdetails['statecode']) {
             templateID = 40962079;
@@ -1810,21 +1963,29 @@ private validateAddonsJourney(): boolean {
           watsonPaymentData['gstdetails'] = gstdetails;
           watsonPaymentData['companygstno'] = gstdetails['gstno'];
           watsonPaymentData['templateid'] = templateID;
+          // Which entity issued this payment. Absent/'A' means the default
+          // company, which is how Watson numbers every pre-existing payment.
+          watsonPaymentData['companykey'] = company?.key || DEFAULT_COMPANY_KEY;
+          watsonPaymentData['companyprefix'] = companyPrefixFor(company, gstdetails);
 
           const paymentDate = watsonPaymentData['paymentdate'];
           const actualmonth = paymentDate.getMonth() + 1;
           const month = this.padWithZeros(actualmonth, 2);
           const fullYear = paymentDate.getFullYear();
           const year = fullYear.toString().slice(-2);
-          const docid = `${month}-${year}`;
+          const docid = ratioCounterDocId(company, month, year);
 
-          const ratioRef = doc(this.watsonDatabase, "nongstratiocounters", docid);
+          // The ratio increment is NOT applied here. This runs when the dialog
+          // loads, before the operator has chosen a company; applying it now
+          // would tally the wrong entity and could not be taken back. It is
+          // recomputed and batched in applySelectedCompanyToBatch() at submit.
 
-          if ([null, undefined, ""].includes(watsonParticipantData['gstno'])) {
-            GSTRatio[GSTState]++;
-            GSTRatio['total']++;
-            updateDoc(ratioRef, GSTRatio);
-          }
+          // Everything needed to redo this resolution once the company is known.
+          this.pendingPayment = {
+            ref: paymentref,
+            participantData: watsonParticipantData,
+            paymentDate: watsonPaymentData['paymentdate'],
+          };
         }
         
         this.updateCheckpoint(this.saleData['journeytype'], 'validate_watsonpayment', 'Watson Payment Validation', 'Completed', 'Validated');
@@ -1839,22 +2000,31 @@ private validateAddonsJourney(): boolean {
     }
   }
 
-  async updateGSTState(value, configData) {
+  /**
+   * Picks the seller state for a payment, within the selected company.
+   *
+   * A buyer with a GSTIN matches the company registration sharing its state
+   * code, falling back to that company's IGST state. A buyer without one is
+   * distributed across the company's states by its configured ratio.
+   */
+  async updateGSTState(value, company: CompanyConfig | null) {
     let GSTState = null;
     let GSTRatio = null;
+    const gstdetails = company?.gstdetails || [];
+
     if (![null, undefined, ""].includes(value['gstno'])) {
       const gstno = value['gstno'].substring(0, 2);
 
-      for (let i = 0; i < configData['gstdetails'].length; i++) {
-        const element = configData['gstdetails'][i];
+      for (let i = 0; i < gstdetails.length; i++) {
+        const element = gstdetails[i];
 
         if (element['statecode'] == gstno) {
           GSTState = element['statename'];
           break;
         }
 
-        if (i + 1 == configData['gstdetails'].length && [null, undefined, ""].includes(GSTState)) {
-          GSTState = configData['igststate']
+        if (i + 1 == gstdetails.length && [null, undefined, ""].includes(GSTState)) {
+          GSTState = company?.igststate
         }
       }
 
@@ -1865,38 +2035,45 @@ private validateAddonsJourney(): boolean {
       const fullYear = paymentDate.getFullYear();
       const year = fullYear.toString().slice(-2);
 
-      const docid = `${month}-${year}`;
+      // Namespaced per company: the counter keys are bare state names, so two
+      // companies registered in the same state would otherwise share a tally.
+      const docid = ratioCounterDocId(company, month, year);
 
-      await getDoc(doc(this.watsonDatabase, "nongstratiocounters", docid)).then(async (counter) => {
-        if (counter.exists()) {
-          GSTRatio = counter.data();
-          GSTState = await this.processRatioData(counter.data(), configData);
-        } else {
-          const docRef = doc(this.watsonDatabase, "nongstratiocounters", docid);
-          var map = {};
+      // Awaited throughout. The seed path used to run inside a floating
+      // `.then()`, so when the counter doc did not exist yet this returned
+      // before GSTState was assigned — the caller then read `gstdetails` off
+      // an unmatched `find()` and threw. That was rare for the default company
+      // (only the first payment of a month) but permanent for a new company,
+      // whose counter never exists on first use.
+      const counterRef = doc(this.watsonDatabase, "nongstratiocounters", docid);
+      const counter = await getDoc(counterRef);
 
-          for (let i = 0; i < configData['gstdetails'].length; i++) {
-            const element = configData['gstdetails'][i];
-            map[element['statename']] = 0;
-          }
+      if (counter.exists()) {
+        GSTRatio = counter.data();
+        GSTState = this.processRatioData(counter.data(), company);
+      } else {
+        const map = {};
 
-          map['total'] = 0;
-          setDoc(docRef, map).then(async () => {
-            console.log("Config Data Set Successfully");
-            GSTState = await this.processRatioData(map, configData);
-            GSTRatio = map;
-          })
+        for (let i = 0; i < gstdetails.length; i++) {
+          const element = gstdetails[i];
+          map[element['statename']] = 0;
         }
-      })
+
+        map['total'] = 0;
+        await setDoc(counterRef, map);
+        GSTState = this.processRatioData(map, company);
+        GSTRatio = map;
+      }
     }
 
     return { GSTState, GSTRatio };
   }
 
-  processRatioData(data, configData) {
+  processRatioData(data, company: CompanyConfig | null) {
     let GSTState;
-    for (let i = 0; i < configData['nongstratio'].length; i++) {
-      const element = configData['nongstratio'][i];
+    const nongstratio = company?.nongstratio || [];
+    for (let i = 0; i < nongstratio.length; i++) {
+      const element = nongstratio[i];
       const count = data[element['state']];
 
       let result = 0;

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, OnInit, OnDestroy, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { CommonModule , DatePipe} from '@angular/common';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { arrayUnion, collection, collectionData, doc, Firestore, getDocs, limit, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where, setDoc } from '@angular/fire/firestore';
@@ -56,13 +56,18 @@ import { InterimReportDashboardComponent } from './interim-report-dashboard/inte
   styleUrl: './interim-report-log.component.css',
   providers : [DatePipe]
 })
-export class InterimReportLogComponent implements OnInit, OnDestroy {
+export class InterimReportLogComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // ==========================================
   // INTERIM LOG
   // ==========================================
   @ViewChild('logPaginator') logPaginator: MatPaginator;
-  @ViewChild(MatSort) sort: MatSort;
+  @ViewChild('logSort') sort: MatSort;
+  // The Ask A&H and Love Letter tabs both instantiate the SAME table template, so there are two live
+  // MatSort directives. A single @ViewChild picks the first — the hidden one — and clicking a header
+  // on the visible tab then sorted a table nobody was looking at. Keep both and attach the active one.
+  @ViewChildren('recordsSort') recordsSorts: QueryList<MatSort>;
+  @ViewChildren('recordsTable', { read: ElementRef }) recordsTables: QueryList<ElementRef>;
 
   selection = new SelectionModel<any>(true, []);
   private destroy$ = new Subject<void>()
@@ -122,6 +127,10 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
 
   // Data
   records: any[] = [];
+  /** the Ask A&H / Love Letter table renders through this, so its headers can sort. It holds the rows
+   *  the current page loaded — sorting reorders what is on screen, it does not re-query Firestore
+   *  (name lives in `profile_data`, not on the doc, so Firestore could not order by it anyway). */
+  recordsDataSource = new MatTableDataSource<any>([]);
   loading = false;
   mapProfiles: any = {};
   mapParticipantMetaData: { [key: string]: any } = {};
@@ -165,6 +174,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
 
     this.logStartDate.setValue(logStartDate);
     this.logEndDate.setValue(logEndDate);
+    this.recordsDataSource.sortingDataAccessor = this.recordsSortAccessor;
   }
 
   ngOnInit() {
@@ -185,6 +195,15 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngAfterViewChecked() {
+    const sorts = this.recordsSorts?.toArray() ?? [];
+    if (!sorts.length) return;
+    const tables = this.recordsTables?.toArray() ?? [];
+    const visible = tables.findIndex((t) => !!t.nativeElement.closest('.mat-mdc-tab-body-active'));
+    const live = sorts[visible >= 0 ? visible : 0];
+    if (live && this.recordsDataSource.sort !== live) this.recordsDataSource.sort = live;
+  }
+
   ngOnDestroy() {
     this.interimlogSubscription?.unsubscribe();
     if (this.destroy$) {
@@ -192,6 +211,32 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.destroy$.complete();
     }
   }
+
+  /** Every path that swaps the table's rows goes through here, so the sortable source never drifts. */
+  private setRecords(rows: any[]) {
+    this.records = rows;
+    this.recordsDataSource.data = rows;
+    // ngAfterViewChecked attaches the ACTIVE tab's MatSort — the tables are rebuilt on every tab
+    // switch, so binding one here would go stale.
+  }
+
+  /** Name comes from the joined profile, date from a Timestamp, the tags are booleans. */
+  private recordsSortAccessor = (row: any, column: string): string | number => {
+    switch (column) {
+      case 'name': return (this.mapProfiles[row['profileid']]?.['name'] || '').toLowerCase();
+      case 'date': {
+        const t = row['created'];
+        return t?.toDate ? t.toDate().getTime() : (t ? new Date(t).getTime() : 0);
+      }
+      case 'notes': return (row['notes'] || []).length;
+      case 'like': return row['liked'] ? 1 : 0;
+      case 'flag': return row['tagged'] ? 1 : 0;
+      case 'opportunity': return row['opportunity'] ? 1 : 0;
+      case 'critical': return row['critical'] ? 1 : 0;
+      case 'resolved': return row['resolved'] ? 1 : 0;
+      default: return '';
+    }
+  };
 
   // ==========================================
   // PARTICIPANTS
@@ -356,7 +401,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     const q = this.buildQuery(collectionName, dateField, this.pageSize, startAfterDoc);
 
     getDocs(q).then((snap) => {
-      this.records = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      this.setRecords(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
 
       this.allLetters = [...this.records];
       this.totalLetters = this.allLetters.length;
@@ -386,7 +431,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     ) {
       if (type === 'totalletters') {
         this.selectedFilterTypes = [];
-        this.records = [...this.allLetters];
+        this.setRecords([...this.allLetters]);
         return;
       }
 
@@ -398,13 +443,13 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       }
 
       if (this.selectedFilterTypes.length === 0) {
-        this.records = [...this.allLetters];
+        this.setRecords([...this.allLetters]);
         return;
       }
 
       const show = new Set<string>();
 
-      this.records = this.allLetters.filter((item) => {
+      this.setRecords(this.allLetters.filter((item) => {
         const match =
           (this.selectedFilterTypes.includes('happy') && item.liked === true) ||
           (this.selectedFilterTypes.includes('attention') && item.tagged === true) ||
@@ -419,7 +464,7 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
         show.add(key);
         return true;
 
-      });
+      }));
     }
 
   
@@ -457,14 +502,14 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       this.currentPage = event.pageIndex;
       if (this.pageCache.has(this.currentPage)) {
         const cachedDocs = this.pageCache.get(this.currentPage)!;
-        this.records = cachedDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        this.setRecords(cachedDocs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
       } else {
         this.fetchRecords(this.lastDoc);
       }
     } else if (event.pageIndex < this.currentPage) {
       this.currentPage = event.pageIndex;
       const cachedDocs = this.pageCache.get(this.currentPage)!;
-      this.records = cachedDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      this.setRecords(cachedDocs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
       this.lastDoc = cachedDocs[cachedDocs.length - 1];
     }
   }
@@ -769,8 +814,28 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     return `${this.selection.isSelected(row) ? 'deselect' : 'select'} row ${row.position + 1}`;
   }
 
-  sendNotificationinBreakthrough() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  /** The three composers work off `participant metadata` docs. The Log tab passes its table selection
+   *  (the default); the Dashboard tab passes the profileids picked in its grids and lists. */
+  private profilesFor(profileids?: string[]): any[] {
+    const ids = profileids ?? this.selection.selected.map((p: any) => p['profileid'] || '');
+    return ids.map((id: string) => this.mapParticipantMetaData[id || '']).filter(Boolean);
+  }
+
+  /** Dashboard tab → the same WhatsApp / email / app-notification composers, same records. */
+  onDashboardSend(e: { channel: 'whatsapp' | 'email' | 'notification'; profileids: string[] }) {
+    if (!e?.profileids?.length) return;
+    const missing = e.profileids.filter((id) => !this.mapParticipantMetaData[id]);
+    if (missing.length === e.profileids.length) {
+      alert('No participant metadata found for the selected participants');
+      return;
+    }
+    if (e.channel === 'email') this.sendEmailToSelectedParicipant(e.profileids);
+    else if (e.channel === 'whatsapp') this.sendWatiMessage(e.profileids);
+    else this.sendNotificationinBreakthrough(e.profileids);
+  }
+
+  sendNotificationinBreakthrough(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
     console.log(selectedProfiles)
     let dialogRef = this.dialog.open(AhNotificationComponent, {
       data: selectedProfiles,
@@ -822,8 +887,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
       }
     })
   }
-  sendEmailToSelectedParicipant() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  sendEmailToSelectedParicipant(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
     let dialogRef = this.dialog.open(EmailInputComponent, {
       data: selectedProfiles,
       minWidth: "600px",
@@ -872,8 +937,8 @@ export class InterimReportLogComponent implements OnInit, OnDestroy {
     this._snackBar.open(message, action);
   }
 
-  sendWatiMessage() {
-    const selectedProfiles = this.selection.selected.map((p) => this.mapParticipantMetaData[p['profileid'] || '']);
+  sendWatiMessage(profileids?: string[]) {
+    const selectedProfiles = this.profilesFor(profileids);
 
     let dialogRef = this.dialog.open(WatiInputComponent, {
       data: selectedProfiles,
