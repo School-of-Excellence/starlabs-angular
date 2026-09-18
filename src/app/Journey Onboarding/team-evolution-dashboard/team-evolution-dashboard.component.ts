@@ -223,39 +223,54 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   expandedSpecialistId: string | null = null;
   expandedOverviewRowId: string | null = null;
   kpiFilter: LifecycleKey | null = null;
+  ahMemberProfileIds: Set<string> = new Set();
+  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
+  selectedProductId: string | null = null;
+  statusView: 'ongoing' | 'notStarted' = 'ongoing';
   
   // Boolean declarations
   drawerOpen = false;
   paletteOpen = false;
+  loadingParticipants = false;
 
   // Array declarations
   participants: any[] = [];                   
   participantMetadata: any[] = [];
   dfuProductRefs: any[] = [];
+  readonly diagnosticsArray: string[] = [
+    'EI Diagnostics',
+    'WiSH Diagnostics',
+    'EI Starter Pack Diagnostics',
+    'Custom Solutions Diagnostics',
+    'Critical Support Diagnostics',
+    'A&H Light Diagnostics'
+  ];
+  selectedProductIds: string[] = [];
 
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
-    expandedOverviewProduct: { [key: string]: boolean } = {};
-    dfuParticipantMap: {
+  expandedOverviewProduct: { [key: string]: boolean } = {};
+
+  readonly productNameGroups: { [displayName: string]: string[] } = {
+    'EI Custom Solutions': [
+      'EI Solution',
+      'EI Custom Solutions',
+      'EI Solution for Wife',
+      'EI Solution for Husband',
+      'EI for Entrepreneurs',
+      'EI for Academy Growth',
+    ],
+  };
+
+  ongoingparticipants: {
     [profileId: string]: {
       name: string;
       email: string;
-      activeproduct: string[];       
-      ongoingProducts: string[];
-      completedProducts: string[];
-      notStartedProducts: string[];
-      participantproducts?: any[];
-      deliverysequence?: { step: number; deliveryname: string; status: string }[];
+      activeproduct: string[];
+      participantproducts?: any[];   
+      notstartedparticipant?: boolean;
     };
   } = {};
-
-  dfuOverviewTotals: { ongoing: number; completed: number; notStarted: number } = {
-    ongoing: 0,
-    completed: 0,
-    notStarted: 0
-  };
-
-  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
   
   constructor(
     private firestore : Firestore,
@@ -267,7 +282,32 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       this.getDfuProducts(),
       this.getParticipantMetadata()
     ]);
-    this.mapDfuParticipants();
+  }
+
+  // get ahmember from users_roles
+  async getAhMembers(){
+    try {
+      const q = query(collection(this.firestore, 'users_roles'), where('ahmember', '==', true));
+      const ahMembersSnapshot = await getDocs(q);
+
+      ahMembersSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        this.ahMemberProfileIds.add(data['profile_ref'].id);
+      });
+      console.log('AH Member profileids fetched:', this.ahMemberProfileIds);
+    } catch (error) {
+      console.error('Error fetching AH members:', error);
+    }
+  }
+
+  async selectProduct(displayName: string, docIds: string[] = [displayName]): Promise<void> {
+    this.selectedProductId = displayName;
+    this.selectedProductIds = docIds;
+    this.statusView = 'ongoing';
+    this.loadingParticipants = true;
+    this.buildOngoingParticipants(docIds);
+    await this.fetchParticipantProducts();
+    this.loadingParticipants = false;
   }
 
   // fetch the DFU products type from products collection
@@ -299,149 +339,194 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
   }
 
-  // map the participants who have active DFU products ongoing or initiated
-  mapDfuParticipants() {
-    const localMap: typeof this.dfuParticipantMap = {};
-    const totals = { ongoing: 0, completed: 0, notStarted: 0 };
+  buildOngoingParticipants(productIds: string[]): void {
+    const localMap: typeof this.ongoingparticipants = {};
+    const ids = productIds ?? [];
 
     this.participantMetadata.forEach(participant => {
-      if (!(participant.email?.toLowerCase().endsWith('@soexcellence.com'))) {
-        return;
-      }
+      const isAhMember = this.ahMemberProfileIds.has(participant.profileid);
+      const activeProducts: string[] = participant.activeproduct || [];
+      const hasChosenProduct = activeProducts.some((id: string) => ids.includes(id));
 
-      const ongoingProducts = (participant.activeproduct || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-      const completedProducts = (participant.consumedproducts || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-      const notStartedProducts = (participant.unconsumedproducts || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-
-      if (!ongoingProducts.length && !completedProducts.length && !notStartedProducts.length) {
+      if (!isAhMember || !hasChosenProduct) {
         return;
       }
 
       localMap[participant.profileid] = {
         name: participant.name,
         email: participant.email,
-        activeproduct: ongoingProducts,
-        ongoingProducts,
-        completedProducts,
-        notStartedProducts
+        activeproduct: participant.activeproduct
       };
-
-      totals.ongoing += ongoingProducts.length;
-      totals.completed += completedProducts.length;
-      totals.notStarted += notStartedProducts.length;
     });
 
-    this.dfuParticipantMap = localMap;
-    this.dfuOverviewTotals = totals;
-    console.log('DFU Participant Map:', this.dfuParticipantMap);
+    this.ongoingparticipants = localMap;
   }
 
-  // fetch the participant products for a given participant profileid
-  async toggleParticipant(profileid: string): Promise<void> {
-    this.toggleOverviewRow(profileid);
-    const participant = this.dfuParticipantMap[profileid];
-
-    if (!participant) {
-      return;
-    }
-
-    const activeProductIds: string[] = participant.activeproduct || [];
-    if (activeProductIds.length == 0) {
-      this.dfuParticipantMap[profileid].participantproducts = [];
-      return;
-    }
-
-    const productRefs = this.dfuProductRefs.filter(ref =>
-      activeProductIds.includes(ref.id)
-    );
+  async fetchParticipantProducts(): Promise<void> {
+    const profileIds = Object.keys(this.ongoingparticipants);
     const chunkSize = 30;
-    const participantProducts: any[] = [];
 
-    for (let i = 0; i < productRefs.length; i += chunkSize) {
-      const chunk = productRefs.slice(i, i + chunkSize);
-
+    for (let i = 0; i < profileIds.length; i += chunkSize) {
+      const chunk = profileIds.slice(i, i + chunkSize);
       const q = query(
         collection(this.firestore, 'participantsproduct'),
-        where('profileid', '==', profileid),
-        where('status', 'in', ['ongoing', 'initiated']),
-        where('productref', 'in', chunk)
+        where('profileid', 'in', chunk)
       );
-
       const snapshot = await getDocs(q);
 
       snapshot.docs.forEach(docSnap => {
-        participantProducts.push({
-          participantproductid: docSnap.id,
-          ...docSnap.data()
-        });
+        const data = docSnap.data();
+        const productRefId = data['productref']?.id;
+        const status = data['status'];
+        const isSelectedProduct = this.selectedProductIds.includes(productRefId);
+        const isActiveStatus = status === 'ongoing' || status === 'initiated';
+
+        if (!isSelectedProduct || !isActiveStatus) {
+          return;
+        }
+
+        const participantProduct = { participantproductid: docSnap.id, ...data };
+        const profileid = participantProduct['profileid'];
+        const participant = this.ongoingparticipants[profileid];
+
+        if (!participant) {
+          return;
+        }
+
+        if (!participant.participantproducts) {
+          participant.participantproducts = [];
+        }
+        participant.participantproducts.push(participantProduct);
       });
     }
 
-    this.dfuParticipantMap[profileid].participantproducts = participantProducts;
-    console.log('Participant products for', profileid, participantProducts);
+    await this.fetchDeliverySequences();
   }
 
-  // fetch the delivery sequence for a participant product
-  async deliverySequence(profileid: string, participantproductid: string): Promise<void> { 
-    this.toggleOverviewProduct(profileid, participantproductid);
-    const deliverysequenceQuery = query(collection(this.firestore, 'participantdeliverysequence'), where('profileid', '==', profileid)); 
-    const deliverySnapshot = await getDocs(deliverysequenceQuery); 
-    let deliverySteps: any[] = []; 
-    const stepList: { step: number; deliveryname: string; status: string }[] = []; 
+  async fetchDeliverySequences(): Promise<void> {
+    const profileIds = Object.keys(this.ongoingparticipants);
 
-    deliverySnapshot.docs.forEach(docSnap => { 
-      const data = docSnap.data(); 
-      const products = data['products'] || []; 
-      const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid); 
-      if (matchedProduct) { 
-        deliverySteps = matchedProduct.delivery || []; 
-      } 
-    }); 
+    for (const profileid of profileIds) {
+      await this.fetchDeliverySequenceForParticipant(profileid);
+    }
+  }
 
-    for (let i = 0; i < deliverySteps.length; i++) { 
-      const seqStep = deliverySteps[i]; 
-      const deliverableDoc = await getDoc(seqStep.sequenceref); 
-      const deliverableData = deliverableDoc.data(); 
-      const deliveryType = deliverableData?.['type']; 
-      console.log('Delivery step', i, 'for', profileid, 'participantproductid', participantproductid, 'is', deliverableData); 
-      let deliveryName = ''; 
+  async fetchDeliverySequenceForParticipant(profileid: string): Promise<void> {
+    const participant = this.ongoingparticipants[profileid];
+    const participantProducts = participant.participantproducts || [];
+
+    if (!participantProducts.length) {
+      return;
+    }
+
+    const deliverysequenceQuery = query(collection(this.firestore, 'participantdeliverysequence'), where('profileid', '==', profileid));
+    const deliverySnapshot = await getDocs(deliverysequenceQuery);
+
+    for (const participantProduct of participantProducts) {
+      const deliverySteps = this.findDeliverySteps(deliverySnapshot, participantProduct.participantproductid);
+      participantProduct.deliverysequence = await this.buildStepList(deliverySteps, participant);
+    }
+  }
+
+  findDeliverySteps(deliverySnapshot: any, participantproductid: string): any[] {
+    let deliverySteps: any[] = [];
+
+    deliverySnapshot.docs.forEach((docSnap: any) => {
+      const data = docSnap.data();
+      const products = data['products'] || [];
+      const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid);
+
+      if (matchedProduct) {
+        deliverySteps = matchedProduct.delivery || [];
+      }
+    });
+
+    return deliverySteps;
+  }
+
+  async buildStepList(deliverySteps: any[], participant: any): Promise<{ step: number; deliveryname: string; status: string }[]> {
+    const stepList: { step: number; deliveryname: string; status: string }[] = [];
+
+    for (let i = 0; i < deliverySteps.length; i++) {
+      const seqStep = deliverySteps[i];
+      const deliveryStatus = seqStep.status || '';
+      const deliverableDoc = await getDoc(seqStep.sequenceref);
+      const deliverableData = deliverableDoc.data();
+      const deliveryType = deliverableData?.['type'];
+      let deliveryName = '';
+      let appointmentType = '';
 
       if (deliveryType === 'appointment') {
-         const appointmentType = await getDoc(deliverableData['deliveryref']); 
-         deliveryName = appointmentType.data()?.['appointmenttype'] || ''; 
-      } else if (deliveryType === 'form') { 
-        const form = await getDoc(deliverableData['deliveryref']); 
-        deliveryName = form.data()?.['formname'] || ''; 
-      } 
-      stepList.push({ 
-        step: i+1, 
-        deliveryname: deliveryName, 
-        status: deliverableData?.['status'] || '' 
-      }); 
-    } 
-      this.dfuParticipantMap[profileid].deliverysequence = stepList; 
-      console.log('deliverysequence for', profileid, stepList); 
+        const appointmentDoc = await getDoc(deliverableData['deliveryref']);
+        appointmentType = appointmentDoc.data()?.['appointmenttype'] || '';
+        deliveryName = appointmentType;
+      } else if (deliveryType === 'form') {
+        const form = await getDoc(deliverableData['deliveryref']);
+        deliveryName = form.data()?.['formname'] || '';
+      } else {
+        deliveryName = deliveryType || '';
+      }
+
+      stepList.push({
+        step: i + 1,
+        deliveryname: deliveryName,
+        status: deliveryStatus
+      });
+
+      const isDiagnosticsAppointment = this.diagnosticsArray.includes(appointmentType);
+      const isReady = deliveryStatus === 'ready';
+
+      if (isDiagnosticsAppointment && isReady) {
+        participant.notstartedparticipant = true;
+      }
+    }
+
+    return stepList;
   }
 
   // Helper functions
+  get productCardGroups(): { displayName: string; docIds: string[] }[] {
+    const groups: { [displayName: string]: string[] } = {};
+
+    Object.keys(this.dfuProductsMap).forEach(docId => {
+      const productName = this.dfuProductsMap[docId]?.product || docId;
+      const displayName = this.resolveDisplayName(productName);
+
+      if (!groups[displayName]) {
+        groups[displayName] = [];
+      }
+      groups[displayName].push(docId);
+    });
+
+    return Object.keys(groups).map(displayName => ({ displayName, docIds: groups[displayName] }));
+  }
+
+  resolveDisplayName(productName: string): string {
+    const groupKeys = Object.keys(this.productNameGroups);
+
+    for (const groupKey of groupKeys) {
+      const aliases = this.productNameGroups[groupKey];
+      const isAlias = aliases.includes(productName);
+
+      if (isAlias) {
+        return groupKey;
+      }
+    }
+
+    return productName;
+  }
+
   toggleOverviewRow(profileid: string): void {
     const isSameRow = this.expandedOverviewRowId === profileid;
     this.expandedOverviewRowId = isSameRow ? null : profileid;
   }
 
-  toggleOverviewProduct(profileid: string, participantproductid: any): void {
-    const key = participantproductid;
-    const isOpen = this.expandedOverviewProduct[key];
-    this.expandedOverviewProduct[key] = !isOpen;
+  setStatusView(view: 'ongoing' | 'notStarted'): void {
+    this.statusView = view;
   }
 
-  // filteredOverviewEntries is a getter, so it hands *ngFor a fresh array on every
-  // change-detection pass; track by profile id so rows are not torn down and rebuilt.
-  trackOverviewEntry(_i: number, entry: { key: string }): string {
-    return entry.key;
+  get displayedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.statusView === 'notStarted' ? this.notStartedEntries : this.ongoingEntries;
   }
 
   toggleOverviewStatus(status: 'ongoing' | 'completed' | 'notStarted'): void {
@@ -455,10 +540,21 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         : p.notStartedProducts;
   }
 
-  get filteredOverviewEntries(): { key: string; value: typeof this.dfuParticipantMap[string] }[] {
-    const entries = Object.keys(this.dfuParticipantMap).map(key => ({ key, value: this.dfuParticipantMap[key] }));
-    if (!this.overviewStatusFilter) { return entries; }
-    return entries.filter(e => this.productsForStatus(e.value, this.overviewStatusFilter!).length > 0);
+  get ongoingEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return Object.keys(this.ongoingparticipants).map(key => ({ key, value: this.ongoingparticipants[key] }));
+  }
+
+  get notStartedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.notstartedparticipant === true);
+  }
+
+  get notStartedCount(): number {
+    return this.notStartedEntries.length;
+  }
+
+  toggleOverviewProduct(participantproductid: string): void {
+    const isOpen = this.expandedOverviewProduct[participantproductid];
+    this.expandedOverviewProduct[participantproductid] = !isOpen;
   }
 
   // ================= HELPERS =================

@@ -118,45 +118,54 @@
           <div class="note">Cards &amp; table update live · click a card to filter</div>
         </div>
 
-        <div class="stats">
-          <div data-testid="jted-div-014" class="stat" [class.sel]="kpiFilter === 'needsAttention'" [style.--sc]="'var(' + lifecycleConfig.needsAttention.cssVar + ')'" (click)="toggleKpi('needsAttention')">
+        <!-- ===== PRODUCT PICKER ===== -->
+        <div class="sect" style="margin-top:0"><span class="eyebrow">STEP 1</span><h2>Choose a DFU product</h2></div>
+        <div class="cards">
+          <div class="empty" *ngIf="!(dfuProductsMap | keyvalue).length">No DFU products found.</div>
+          <div class="mcard"
+              *ngFor="let entry of dfuProductsMap | keyvalue"
+              [class.selected]="selectedProductId === entry.key"
+              (click)="selectProduct(entry.key)">
             <div class="top">
-              <span class="lbl">Needs attention</span>
-              <span class="dot" [class.pulse]="lifecycleCounts.needsAttention"></span>
-            </div>
-            <div class="num">
-              {{ lifecycleCounts.needsAttention }}
-              <span class="den"> / {{ totalJourneys }}</span>
-            </div>
-            <div class="desc">Overdue — act now</div>
-            <div class="flag" *ngIf="lifecycleCounts.needsAttention">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/></svg>
-              act now
+              <div class="avatar" [style.background]="tokColor(entry.key)">{{ (entry.value.product || entry.key).substring(0,2).toUpperCase() }}</div>
+              <div class="name-strong">{{ entry.value.product || entry.key }}</div>
             </div>
           </div>
-
-          <div data-testid="jted-div-027" class="stat" [class.sel]="overviewStatusFilter === 'completed'" [style.--sc]="'var(--c-done)'" (click)="toggleOverviewStatus('completed')">
-            <div class="top"><span class="lbl">Completed</span><span class="dot"></span></div>
-            <div class="num">{{ dfuOverviewTotals.completed }}</div>
-            <div class="desc">Milestone signed off</div>
-          </div>
-
         </div>
 
-        <div class="split">
-          <div class="panel">
-            <div class="head">
-              <h3>Member overview</h3>
-              <span class="sub">{{ overviewStatusFilter ? overviewStatusFilter + ' · ' : '' }}{{ filteredOverviewEntries.length }} participants</span>
-            </div>
-            <div class="body">
-              <table class="tbl tbl-overview">
-                <thead><tr><th>Member</th><th>Products</th></tr></thead>
-                <tbody>
-                  <tr *ngIf="!filteredOverviewEntries.length"><td colspan="2" class="empty">No participants match.</td></tr>
+        <!-- ===== STATS (only after a product is selected) ===== -->
+        <ng-container *ngIf="selectedProductId">
 
-                  <ng-container *ngFor="let entry of filteredOverviewEntries; trackBy: trackOverviewEntry">
-                    <tr data-testid="jted-tr-015" class="click" (click)="toggleParticipant(entry.key)">
+          <div class="empty" *ngIf="loadingParticipants">Loading participants for {{ selectedProductId }}…</div>
+
+          <ng-container *ngIf="!loadingParticipants">
+            <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-top:18px;">
+              <div class="stat" [class.sel]="statusView === 'ongoing'" [style.--sc]="'var(--c-ontrack)'" (click)="setStatusView('ongoing')">
+                <div class="top"><span class="lbl">Ongoing</span><span class="dot"></span></div>
+                <div class="num">{{ ongoingEntries.length }}</div>
+                <div class="desc">Participants active on this product</div>
+              </div>
+
+              <div class="stat" [class.sel]="statusView === 'notStarted'" [style.--sc]="'var(--c-notstarted)'" (click)="setStatusView('notStarted')">
+                <div class="top"><span class="lbl">Not started</span><span class="dot"></span></div>
+                <div class="num">{{ notStartedCount }}</div>
+                <div class="desc">Diagnostics ready, not yet begun</div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-top:16px;">
+              <div class="head">
+                <h3>{{ selectedProductId }} — participants</h3>
+                <span class="sub">{{ statusView === 'notStarted' ? 'Not started · ' : 'Ongoing · ' }}{{ displayedEntries.length }} participants</span>
+              </div>
+              <div class="body">
+                <table class="tbl tbl-overview">
+                  <thead><tr><th>Member</th><th>Products</th></tr></thead>
+                  <tbody>
+                    <tr *ngIf="!displayedEntries.length"><td colspan="2" class="empty">No participants match.</td></tr>
+
+                    <ng-container *ngFor="let entry of displayedEntries">
+                    <tr>
                       <td>
                         <div class="who-cell">
                           <div class="tok" [style.background]="tokColor(entry.key)">{{ entry.value.name.substring(0,2).toUpperCase() }}</div>
@@ -164,82 +173,47 @@
                         </div>
                       </td>
                       <td>
-                        {{ (overviewStatusFilter ? productsForStatus(entry.value, overviewStatusFilter) : entry.value.ongoingProducts).length }}
-                        product{{ (overviewStatusFilter ? productsForStatus(entry.value, overviewStatusFilter) : entry.value.ongoingProducts).length > 1 ? 's' : '' }}
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                            style="width:14px;height:14px;margin-left:6px;"
-                            [style.transform]="expandedOverviewRowId === entry.key ? 'rotate(180deg)' : 'none'">
-                          <path d="M6 9l6 6 6-6"/>
-                        </svg>
+                        {{ (entry.value.participantproducts || []).length }}
+                        product{{ (entry.value.participantproducts || []).length > 1 ? 's' : '' }}
+                        <span class="tag" style="margin-left:8px;background:var(--surface-3);color:var(--muted)" *ngIf="entry.value.notstartedparticipant">Not started</span>
                       </td>
                     </tr>
 
-                    <tr *ngIf="expandedOverviewRowId === entry.key">
-                      <td colspan="2">
-                        <div class="empty" *ngIf="!entry.value.participantproducts">Loading ongoing products…</div>
+                    <ng-container *ngFor="let product of entry.value.participantproducts">
+                      <tr class="click" (click)="toggleOverviewProduct(product.participantproductid)">
+                        <td colspan="2">
+                          <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <span class="name-strong" style="font-size:12.5px;">{{ dfuProductsMap[product.productref?.id]?.product || product.participantproductid }}</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                style="width:14px;height:14px;"
+                                [style.transform]="expandedOverviewProduct[product.participantproductid] ? 'rotate(180deg)' : 'none'">
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </div>
+                        </td>
+                      </tr>
 
-                        <div class="product-accordion" *ngIf="entry.value.participantproducts">
-                          <div class="empty" *ngIf="!entry.value.participantproducts.length">No ongoing products.</div>
-
-                          <div class="product-item"
-                              *ngFor="let product of entry.value.participantproducts"
-                              [class.open]="expandedOverviewProduct[product.participantproductid]">
-
-                            <button data-testid="jted-btn-016" class="product-item-head" (click)="deliverySequence(entry.key, product.participantproductid)">
-                              <span class="product-item-name">{{ dfuProductsMap[product.productref?.id]?.product || product.participantproductid }} </span>
-                              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M6 9l6 6 6-6"/>
-                              </svg>
-                            </button>
-
-                            <div class="product-item-body" *ngIf="expandedOverviewProduct[product.participantproductid]">
-                              <div class="empty" *ngIf="!entry.value.deliverysequence">Loading…</div>
-                              <div class="delivery-stepper" *ngIf="entry.value.deliverysequence">
-                                <div class="stepper-step" *ngFor="let step of entry.value.deliverysequence">
-                                  <div class="stepper-circle" [ngClass]="stepStatusClass(step.status)">{{ step.step }}</div>
-                                  <div class="stepper-label">{{ step.deliveryname }}</div>
-                                  <div class="stepper-status">{{ step.status }}</div>
-                                </div>
-                              </div>
+                      <tr *ngIf="expandedOverviewProduct[product.participantproductid]">
+                        <td colspan="2">
+                          <div class="delivery-stepper" *ngIf="product.deliverysequence?.length">
+                            <div class="stepper-step" *ngFor="let step of product.deliverysequence">
+                              <div class="stepper-circle" [ngClass]="stepStatusClass(step.status)">{{ step.step }}</div>
+                              <div class="stepper-label">{{ step.deliveryname }}</div>
+                              <div class="stepper-status">{{ step.status }}</div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
+                          <div class="empty" *ngIf="!product.deliverysequence?.length" style="padding:14px;">No delivery steps yet.</div>
+                        </td>
+                      </tr>
+                    </ng-container>
                   </ng-container>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          </ng-container>
 
-          <div style="display:flex;flex-direction:column;gap:16px;">
-            <div class="panel">
-              <div class="head"><h3>Status mix</h3><span class="sub">this time frame</span></div>
-              <div class="donut-wrap">
-                <div style="width:168px;height:168px;border-radius:50%;" [style.background]="donutGradient">
-                  <div style="width:130px;height:130px;margin:19px;border-radius:50%;background:var(--surface);"></div>
-                </div>
-                <div class="donut-center"><b>{{ totalJourneys }}</b><span>journeys</span></div>
-              </div>
-              <div class="legend">
-                <div data-testid="jted-div-017" class="li" *ngFor="let k of order" (click)="toggleKpi(k)">
-                  <span class="sw" [style.background]="'var(' + lifecycleConfig[k].cssVar + ')'"></span>{{ lifecycleConfig[k].label }}<span class="lv">{{ lifecycleCounts[k] }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="panel">
-              <div class="head"><h3>Needs acceleration</h3><span class="sub">{{ attentionRows.length }} waiting</span></div>
-              <div class="att">
-                <div class="empty" *ngIf="!attentionRows.length">All journeys within their stipulated time. 🎉</div>
-                <div data-testid="jted-div-018" class="row" *ngFor="let j of attentionRows" (click)="openDrawer(j.pid, j.id)">
-                  <div class="tok" [style.background]="tokColor(j.pid)">{{ member(j.pid).ini }}</div>
-                  <div class="meta"><b>{{ member(j.pid).name }}</b><small>{{ stageLabel(j) }} · {{ products[j.prod].name }}</small></div>
-                  <span class="sev" [style.--sv]="sevColor(j.days)" style="margin-left:auto;">{{ j.days }}d</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </ng-container>
       </section>
 
       <!-- ===== PARTICIPANTS ===== -->
@@ -252,24 +226,16 @@
         </div>
 
         <div class="cards">
-          <div class="empty" *ngIf="!(dfuParticipantMap | keyvalue).length">No participants match.</div>
-
-          <ng-container *ngFor="let entry of dfuParticipantMap | keyvalue">
-            <div class="mcard" *ngIf="!pplSearch || entry.value.name.toLowerCase().includes(pplSearch.toLowerCase())">
-              <div class="top">
-                <div class="avatar" [style.background]="tokColor(entry.key)">{{ entry.value.name.substring(0,2).toUpperCase() }}</div>
-                <div>
-                  <a data-testid="jted-a-020" class="name-strong" style="font-size:15px; cursor:pointer;" (click)="openUserProfile(entry.key)">{{ entry.value.name || 'Unnamed' }}</a>
-                  <div style="font-size:11.5px;color:var(--muted);margin-top:1px;">{{ entry.value.email }}</div>
-                </div>
-              </div>
-              <div class="chips">
-                <span class="tag" *ngFor="let prodId of entry.value.activeproduct" style="background:var(--surface-3);color:var(--muted)">
-                  {{ dfuProductsMap[prodId]?.product || prodId }}
-                </span>
-              </div>
+          <div class="empty" *ngIf="!productCardGroups.length">No DFU products found.</div>
+          <div class="mcard"
+              *ngFor="let group of productCardGroups"
+              [class.selected]="selectedProductId === group.displayName"
+              (click)="selectProduct(group.displayName, group.docIds)">
+            <div class="top">
+              <div class="avatar" [style.background]="tokColor(group.displayName)">{{ group.displayName.substring(0,2).toUpperCase() }}</div>
+              <div class="name-strong">{{ group.displayName }}</div>
             </div>
-          </ng-container>
+          </div>
         </div>
       </section>
       <!-- ===== SPECIALISTS ===== -->
