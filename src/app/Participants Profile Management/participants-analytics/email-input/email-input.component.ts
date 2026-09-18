@@ -188,8 +188,11 @@ export class EmailInputComponent {
     docData(this.categoryCollectionSnapShot).pipe(takeUntil(this.destroy$)).subscribe((d: any) => {
       // `email validators/templateCategories` may not exist yet — docData then emits undefined and the
       // old unguarded read threw inside the dialog. Empty lists degrade to "no categories offered".
-      this.templateCategories = d?.['categories'] ?? [];
-      this.templateSubCategories = d?.['subcategories'] ?? [];
+      // Both are flat string lists (filtered with .includes, rendered with *ngFor). Anything else —
+      // missing doc, or a map where a list belongs — becomes [], because *ngFor over a non-iterable
+      // throws NG0900 on every change detection, not once.
+      this.templateCategories = Array.isArray(d?.['categories']) ? d['categories'] : [];
+      this.templateSubCategories = Array.isArray(d?.['subcategories']) ? d['subcategories'] : [];
     });
  
     this.selectedParticipants = Array.isArray(this.data) ? this.data : this.data?.selectedParticipants ?? []; 
