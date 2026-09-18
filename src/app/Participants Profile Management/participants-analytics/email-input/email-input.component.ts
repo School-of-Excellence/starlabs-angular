@@ -507,7 +507,8 @@ export class EmailInputComponent {
       subject: queuedEmail.subject,
       htmlbody: queuedEmail.body,
       docid: queuedEmail.docid,
-      templatedocid: queuedEmail.templatedocid
+      templatedocid: queuedEmail.templatedocid,
+      servername : queuedEmail.servername
     };
     this.selectedQueuedEmail = queuedEmail;
     this.bufferDoc.subject = queuedEmail.subject || '';
@@ -769,12 +770,13 @@ export class EmailInputComponent {
   }
 
   async onSubmit(): Promise<void> {
+    const status = this.isQueuedEmailSelected()? 'validated' : 'send';
     if (!this.isValidPlannedCommunication()) { return }
     if (this.formValidation()) { alert('Please fill in all required fields...'); return; }
     if (confirm('Are you sure to send email to Participants?')) {
       if (!this.applyDeliveryHoldFilter()) return;
       await this.maybeUploadSheet();
-      this.closeWithPayload('send');
+      this.closeWithPayload(status);
     }
   }
 
