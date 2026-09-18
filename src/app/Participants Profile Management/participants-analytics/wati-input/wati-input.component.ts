@@ -177,8 +177,8 @@ export class WatiInputComponent {
     this.loadWatiCategories();
     this.categoryCollectionSnapShot = doc(this.firestore, 'email validators', 'templateCategories');
     docData(this.categoryCollectionSnapShot).pipe(takeUntil(this.destroy$)).subscribe((d: any) => {
-      this.templateCategories = d['categories'];
-      this.templateSubCategories = d['subcategories'];
+      this.templateCategories = Array.isArray(d?.['categories']) ? d['categories'] : [];
+      this.templateSubCategories = Array.isArray(d?.['subcategories']) ? d['subcategories'] : [];
     });
 
     this.searchSubject.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))

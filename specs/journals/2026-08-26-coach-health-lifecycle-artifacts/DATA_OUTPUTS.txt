@@ -1,0 +1,121 @@
+### project: starlabs-test  (NOT production) — run 2026-08-26
+
+$ node customerstatus-vs-screen.js <sa.json>
+project: starlabs-test
+
+participant metadata docs: 185
+raw customerstatus tokens:
+      123  "active"
+       20  "non active"
+       19  <missing>
+       15  "none"
+        5  "discontinued"
+        1  "banned"
+        1  null
+        1  "late"
+
+bucketed (lifecycleOf):
+   active        123
+   nonactive     20
+   discontinued  7
+   nostatus      35
+
+!! metadata docs with NO 'name' field: 12 (getParticipantMetaMap orderBy('name') drops these from the app's metaMap)
+   1p4CkphTEI31wuq39OXN, H6HmG6y5Oswq8utFdGmr, SG5EEFB7C7oCDdlfqaYv, UhvhXgMrLkB5SrNZhQWd, Y5LDhMdLCrPdfgIo1gux, bnGC3eax3MoWb0g8JQ2P, dp41NGeAJ2iGE9vyIgks, e6f2lvGgkekNyY6FmqGi, hR0jEQMaoNNx2ekUzX7z, oalIc5i9mCHq7N60SueG, u5RbLGOTmgy5ZkLfBU2q, uSrg3KVkRO0ScSwiyO9v
+
+pjp records matching journeystatus in [initiated,ongoing,completed,cancelled]: 206
+distinct profileids on screen (= "All participants" total): 169
+
+ALL pjp records: 334   distinct profileids: 178
+journeystatus distribution (all records):
+      123  "initiated"
+       60  null
+       47  "upgraded"
+       34  "completed"
+       32  "ongoing"
+       17  "cancelled"
+       17  "downgraded"
+        2  "shifted"
+        1  "closed lost"
+        1  "Upgraded"
+
+========================================================================
+MISSING — in participant metadata, absent from the screen
+========================================================================
+
+active: 123 in metadata, 121 on screen, 2 MISSING
+   • 0 have NO participantjourneyproduct record at all
+   • 2 HAVE pjp records but every one is outside the journeystatus gate
+     these are the ones the journeystatus filter is hiding:
+       M3kUnBxomCPXvLyiYbag
+       ZJ4X7qgCRBs6AheSmCO6
+
+nonactive: 20 in metadata, 19 on screen, 1 MISSING
+   • 0 have NO participantjourneyproduct record at all
+   • 1 HAVE pjp records but every one is outside the journeystatus gate
+     these are the ones the journeystatus filter is hiding:
+       CmsBO279Iml4Nig19ctk
+
+discontinued: 7 in metadata, 7 on screen, 0 MISSING
+   • 0 have NO participantjourneyproduct record at all
+   • 0 HAVE pjp records but every one is outside the journeystatus gate
+
+========================================================================
+REVERSE — on the screen, but no usable customerstatus
+========================================================================
+on screen with NO participant metadata doc: 0
+on screen but customerstatus blank/unrecognised (→ "No status" tile): 22
+   GznsfRTzLPzJJMNG51XU
+   M0ERw9dTve9XFSwSYDFR
+   4gQoleQS5T6HUsXuPUO7
+   sKfRgUCugsthZCrL7J9P
+   dp41NGeAJ2iGE9vyIgks
+   Y5LDhMdLCrPdfgIo1gux
+   6TtpB49tVs9AZYVgSZhT
+   PvZXg2AdQG3DfDgpUa9b
+   ENL1ojeLhxT04m3P8xqG
+   0mBKSCFUXvgpqy5aQ2Ae
+   THD2HgytLFXLNK5brOSz
+   3bOmPHG3A6bk7AxXekyM
+   SG5EEFB7C7oCDdlfqaYv
+   trjXLhaqean7FwXvGuoO
+   o3Yf6F7FxULofpUIr5iT
+   RheJVJv8PbUSPpdyJ6zd
+   V22tBtPnSVAN4VJqdh8n
+   OXJbyIQe8X2TjoNc3DIP
+   Dv9nH7eGOPHO6GsiX8jh
+   rZkdbityqajTFMOSAAfa
+   uSrg3KVkRO0ScSwiyO9v
+   oalIc5i9mCHq7N60SueG
+
+--- reconciliation ---
+what the status band should show for "All participants":
+   active        121
+   nonactive     19
+   discontinued  7
+   nostatus      22
+   TOTAL         169
+
+$ node noname-impact.js <sa.json>
+metadata docs with NO `name` field — what the app LOSES for them:
+
+profileid                onScreen  raw customerstatus
+1p4CkphTEI31wuq39OXN     true      "active"
+H6HmG6y5Oswq8utFdGmr     false     <missing>
+SG5EEFB7C7oCDdlfqaYv     true      <missing>
+UhvhXgMrLkB5SrNZhQWd     false     <missing>
+Y5LDhMdLCrPdfgIo1gux     true      <missing>
+bnGC3eax3MoWb0g8JQ2P     false     <missing>
+dp41NGeAJ2iGE9vyIgks     true      <missing>
+e6f2lvGgkekNyY6FmqGi     true      "active"
+hR0jEQMaoNNx2ekUzX7z     true      "active"
+oalIc5i9mCHq7N60SueG     true      <missing>
+u5RbLGOTmgy5ZkLfBU2q     false     <missing>
+uSrg3KVkRO0ScSwiyO9v     true      <missing>
+
+=> 3 of them are ON SCREEN and DO have a real customerstatus,
+   but the app never sees it (getParticipantMetaMap orderBy("name") drops the doc),
+   so they fall into the "No status" bucket regardless of their true status.
+
+profile_data docs with NO 'name' field: 4 (getProfileMap orderBy('name') drops these too)
+   of which ON SCREEN: 0
