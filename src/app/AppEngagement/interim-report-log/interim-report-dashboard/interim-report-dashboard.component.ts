@@ -1,4 +1,7 @@
-import { Component, DestroyRef, ElementRef, Input, OnChanges, ViewChild, ViewEncapsulation, afterNextRender, inject } from '@angular/core';
+import {
+  Component, DestroyRef, ElementRef, EventEmitter, Input, OnChanges, Output, ViewChild, ViewEncapsulation,
+  afterNextRender, inject,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCalendarCellClassFunction, MatDateRangePicker, MatDatepickerModule } from '@angular/material/datepicker';
@@ -39,6 +42,8 @@ export class InterimReportDashboardComponent implements OnChanges {
   @Input() profiles: Record<string, any> = {};
   /** the signed-in profile — recorded on tags and notes, as the Love Letter / Ask A&H tabs do */
   @Input() profileId: string | null = null;
+  /** participants picked in the grids / lists, for the parent's WhatsApp / email / notification composers */
+  @Output() send = new EventEmitter<{ channel: 'whatsapp' | 'email' | 'notification'; profileids: string[] }>();
 
   @ViewChild('rangePicker') rangePicker?: MatDateRangePicker<Date>;
 
@@ -84,6 +89,7 @@ export class InterimReportDashboardComponent implements OnChanges {
         events: () => this.events,
         attendees: id => this.attendees(id),
         openProfile: profileid => { if (profileid) window.open(`/userprofile/${profileid}`, '_blank'); },
+        send: (channel, profileids) => this.send.emit({ channel, profileids }),
         exportXlsx: (name, headers, rows) => this.exportXlsx(name, headers, rows),
         getRange: () => ({ from: this.range.value.start ?? null, to: this.range.value.end ?? null }),
         resetRange: () => this.range.setValue(this.defaultRange()),
@@ -306,7 +312,12 @@ export class InterimReportDashboardComponent implements OnChanges {
     const jumped: Record<string, string | null> = {};   // metric[area].jumpedfrom — the goal before a level jump
     const levelChanges: { area: string; from: string; to: string }[] = [];
 
-    CROSSOVER_AREAS.forEach(area => {
+    // The life areas are NOT a fixed five: the Flutter app builds `participant AEL.crossovermetric`
+    // (and this doc's `metric`) from that participant's ATC model `category` list, so the keys differ
+    // per model. Read the keys the doc actually carries — a hard-coded list rendered every unmatched
+    // area as "Left blank" and showed a metric for only the areas whose names happened to line up.
+    const areaKeys: string[] = Object.keys(metric).length ? Object.keys(metric) : [];
+    areaKeys.forEach(area => {
       const m = metric[area] || {};
       const n = m['metric'] === null || m['metric'] === undefined || m['metric'] === '' ? NaN : Number(m['metric']);
       cross[area] = Number.isFinite(n) ? Math.round(n) : null;

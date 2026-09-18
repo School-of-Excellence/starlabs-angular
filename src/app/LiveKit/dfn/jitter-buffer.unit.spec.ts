@@ -4,9 +4,13 @@
 // ease it back after clean seconds — tuned from real India->Mumbai call logs. Verifying it in a live call
 // means reproducing network jitter on demand; here a fake track and Jasmine's clock drive it exactly.
 //
+// TUNING: the cases pin the "Option 1" A/V-sync tuning in jitter-buffer.ts (2026-07-18) — ceiling 300ms,
+// ease down 30ms after TWO clean cycles. The first draft of this file pinned the pre-retune numbers
+// (600 / 20 / four) and failed OPU-19/20 from the day it merged; change these together with the constants.
+//
 // The track is a hand-rolled double: a getRTCStatsReport that returns whatever concealedSamples the test
 // wants, and a setPlayoutDelay that records what it was told. No LiveKit, no TestBed.
-import { startJitterController } from './jitter-buffer';
+import { getJitterMax, startJitterController } from './jitter-buffer';
 
 /** Build a fake RemoteTrack whose stats the test controls. */
 const makeTrack = () => {
@@ -84,12 +88,14 @@ describe('startJitterController', () => {
       stop();
     });
 
-    it('caps the target at 600ms however bad the line gets', async () => {
+    it('caps the target at the 300ms ceiling however bad the line gets', async () => {
+      // 300, not the old 600: audio delay is not applied to video, so a high ceiling drifts lip-sync.
       const { track, receiver } = makeTrack();
       const stop = startJitterController(track);
       await cycle();
       for (let i = 0; i < 20; i++) { track.concealMs(50); await cycle(); }
-      expect(receiver.jitterBufferTarget).toBe(600);
+      expect(getJitterMax()).toBe(300);
+      expect(receiver.jitterBufferTarget).toBe(300);
       stop();
     });
 
@@ -97,9 +103,10 @@ describe('startJitterController', () => {
       const { track, receiver } = makeTrack();
       const stop = startJitterController(track);
       await cycle();
-      track.concealMs(5);     // the threshold is `> 5`, so exactly 5 does not raise
+      track.concealMs(5);     // the threshold is `> 5`, so exactly 5 does not raise…
       await cycle();
-      expect(receiver.jitterBufferTarget).toBe(200);
+      // …it counts as a CLEAN cycle instead: that is the second in a row, so the target eases 200 → 170.
+      expect(receiver.jitterBufferTarget).toBe(170);
       stop();
     });
   });
@@ -108,13 +115,15 @@ describe('startJitterController', () => {
   // OPU-20 — clean seconds ease the target back down
   // =============================================================================================
   describe('OPU-20 easing back down', () => {
-    it('drops by 20ms only after FOUR consecutive clean cycles', async () => {
+    it('drops by 30ms only after TWO consecutive clean cycles', async () => {
       const { track, receiver } = makeTrack();
       const stop = startJitterController(track);
-      await cycle(3);
+      await cycle(1);
       expect(receiver.jitterBufferTarget).toBe(200);   // not yet
       await cycle(1);
-      expect(receiver.jitterBufferTarget).toBe(180);   // fourth clean cycle
+      expect(receiver.jitterBufferTarget).toBe(170);   // second clean cycle
+      await cycle(2);
+      expect(receiver.jitterBufferTarget).toBe(140);   // and again after the next two
       stop();
     });
 
@@ -127,15 +136,18 @@ describe('startJitterController', () => {
     });
 
     it('resets the clean streak when concealment reappears', async () => {
-      // Three clean cycles then concealment: the streak restarts, so the next three cycles must NOT drop it.
+      // One clean cycle then concealment: the streak restarts, so the next clean cycle must NOT drop it —
+      // had the earlier clean cycle carried over, that one would have been the second in a row.
       const { track, receiver } = makeTrack();
       const stop = startJitterController(track);
-      await cycle(3);
+      await cycle(1);
       track.concealMs(20);
       await cycle();                                   // raises to 260 and clears the streak
       expect(receiver.jitterBufferTarget).toBe(260);
-      await cycle(3);
-      expect(receiver.jitterBufferTarget).toBe(260);   // still three short of a drop
+      await cycle(1);
+      expect(receiver.jitterBufferTarget).toBe(260);   // one clean cycle: still one short of a drop
+      await cycle(1);
+      expect(receiver.jitterBufferTarget).toBe(230);   // the second eases it down
       stop();
     });
   });

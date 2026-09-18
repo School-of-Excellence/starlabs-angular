@@ -124,3 +124,116 @@ Plan: `specs/plans/2026-09-15-interim-dashboard-tagging.md` (operator's 7-point 
 - Follow-up (operator): Evolution dialog now shows "N of M adjustments". M = the adjustments they **answered** (the % denominator), not all adjustments, so N / M always equals the % shown beside it. Verified on all 5 non-zero cells (2/18 = 11 %, 5/18 = 28 %, 3/18 = 17 %). Writes were cross-checked in the Love Letter and Ask A&H tabs (separate reads) and the original tags restored afterwards. Two "E2E test note …" notes remain on those starlabs-test docs (no delete-note feature anywhere).
 - Gotcha: macOS has no `timeout`; `timeout 300 npx tsc … | grep` silently printed nothing — run tsc without it.
 - Re-extract if the design file changes (transform: `:root`→`:host`, `body`→`.stage`, drop `.topbar`, `document.`→`root.`, and drop `.wrap`'s `max-width:1460px; margin:0 auto` — operator wants the dashboard full width).
+
+## 2026-09-17 — operator data-validation round: per-model areas, rated-0, multi-select journey
+- **Reported:** "Mehak Garg filled the Crossover Meter as 0 for all five aspects, but the dashboard shows
+  Left Blank and a metric for only 2 of 5." **Root cause:** the five life areas were hard-coded here, but
+  the Flutter app builds `participant AEL.crossovermetric` / `interim crossover.metric` from the
+  participant's **ATC model `category` list** (`crossover.dart` `_updateMetrics`, `requestUPevent.dart`
+  `crossoverdata["metric"][item]`), so the keys differ per model. Any area whose name did not match read
+  as null → "Left blank", and only the coincidentally-matching names showed a metric. The component now
+  reads the doc's own keys; `syncAreas()` derives the matrix rows from the loaded pool (canonical five
+  first, then the rest alphabetically), and every area-derived table (buckets, columns, the area filter)
+  became a function instead of a frozen const. Verified with an in-memory pool on a made-up model
+  ('Wealth Creation' / 'Inner Peace'): rows, band counts and hooks all correct, 0 malformed attributes.
+- **"Not progressed" now means a RATED 0.** The band was `v === null || v === 0`, so an area nobody rated
+  sat beside a deliberate 0. It is `v === 0` now; unrated areas are simply not in the meter (participants
+  with no crossover doc at all were already excluded on 09-16). Verified: a synthetic pair (one rated 0,
+  one skipped) → the 0-band counts 1 and the drill-down lists only the rated participant.
+- **Journey filter is multi-select** (`JOURNEY` is a Set; ticks in the list, "2 journeys" on the pill, ×
+  clears all). Verified on starlabs-test: B!G 6 + uP! 11 → 17 together, an exact union because a
+  participant resolves to exactly one journey.
+- **Hook lesson:** the literal-id tables the readiness gate needs cannot name per-model areas, so unknown
+  areas emit `ird-cross-other-b*` (and a >5-area model emits `ird-xbucket-other`). Without that fallback
+  the attribute rendered as the string `undefined` — caught by the synthetic-model check, not by the
+  seeded data, which only ever uses the canonical five.
+- Hub: `modes/interim-report-dashboard.spec.ts` IRD-02 now asserts Health (rated 0) = 1 and Personal
+  Genius (never rated) = 0; new IRD-12 covers multi-select. 152 hooks, aligned both ways.
+
+## 2026-09-17 (2) — Resolved irrespective of tags; pick participants → WhatsApp / email / notification
+- **Resolved counts every resolved letter** (operator). It used to be the Journey Coaching set
+  (Needs Attention + Critical) split into Open / Resolved, so a Happy — or untagged — letter that a coach
+  resolved was invisible. Now `done = every letter with tags.resolved`, `Open` stays the JC set that is
+  not resolved, and the card says "marked resolved · any tag". The two no longer add up to the JC total
+  by construction — that is the intent. The `esc:Resolved` list and the "Resolved by" chips follow the
+  same rule, and that list is titled "Resolved letters".
+- **Picking participants for a message.** `PICK` is a Map keyed by **profileid**, so a participant with
+  several interim reports in the range is one recipient (operator choice). Two ways in, as asked:
+  a tick on any Crossover / Evolution grid cell adds everyone behind that count, and a checkbox on each
+  drill-down list row (plus select-all) adds or drops one person. A sticky bar shows "N participants
+  selected" with WhatsApp / Email / App notification / Clear.
+- **The three sends reuse the Log tab's composers** rather than re-implementing them: the dashboard emits
+  `(send)={channel, profileids}`, and the parent's `onDashboardSend` maps profileids → `participant
+  metadata` docs and calls the SAME `sendWatiMessage` / `sendEmailToSelectedParicipant` /
+  `sendNotificationinBreakthrough` the Log tab uses (each now takes an optional profileid list; the
+  default is still the table selection). One `profilesFor()` decides whose metadata the composers get.
+- Verified in the app: bar hidden until a pick; a cell of 1 → "1 participant selected"; a second cell
+  adds (deduplicated); re-ticking removes; Clear hides the bar; all three buttons emit the right channel
+  with the picked profileid and open their composer, each dismissed without sending.
+- **Gotcha that cost the most time:** my new `const pr` (pick row) collided with the existing `const pr`
+  (person row) in the same click handler. The script is `@ts-nocheck`, so `tsc --noEmit` stayed green,
+  esbuild refused the bundle, and `ng serve` kept serving the last good one — the send bar simply never
+  appeared while the grid ticks (built one edit earlier) did. `ng build` named the collision in seconds.
+  The skill now carries this.
+- Hub: IRD-13 (Resolved ignores the JC tags, with a seeded resolved-but-untagged letter as the control)
+  and IRD-14 (a grid cell picks its participants, all three channels offered, Email opens the composer,
+  Clear empties). 161 hooks, aligned both ways.
+
+### Same day — two fixes to the picking UI (operator feedback)
+- **"When I click plus, select that cell only."** The tick was *inferred* (`allPicked(cellPeople)`), so
+  picking one participant lit the checkbox on every other cell that held them — one click looked like
+  several. Selection is now explicit state: `SELCELLS` holds the cells ticked by hand. Unticking a cell
+  only releases the people no other ticked cell still covers, and unticking a person in a list unticks
+  the cell that brought them in (the rest of that cell's people stay). Verified: one click → 1 cell
+  ticked of 20, the other 14 filled crossover cells stay clear.
+- **"By design it should be usable — the + is something I have to teach."** The affordance was a `+`
+  that only appeared on hover. It is now a real checkbox, always visible in every non-empty cell, with a
+  hover ring, a focus outline and a title that says how many participants it will take.
+- **"Only after selecting participants show the communication row."** It was already `hidden` when the
+  selection was empty — but `.sendbar{display:flex}` outranks the UA `[hidden]{display:none}`, so the row
+  rendered anyway. Added `.sendbar[hidden]{display:none}`. **My verification had asserted `bar.hidden`
+  (the property) rather than what rendered**, which is exactly why it passed while the operator could see
+  the row; the e2e now uses `toBeHidden()`, which checks visibility, plus a case that exactly one cell
+  reads as selected.
+- **Filter dropdown checkboxes** (operator: "in the filter dropdowns I can't see the checkbox"). The
+  multi-select rows only drew a ✓ when selected, so an unselected row had nothing to aim at — the same
+  mistake as the hover-only `+` on the grid. Every row in a multi-select list now carries a real box
+  (15px, grey outline, white fill; indigo with ✓ when on), "All journeys" included, so the column reads
+  as a checklist. Verified in the app: 16 rows, each with a box that renders at 15×15.
+
+### Sorting on the Ask A&H / Love Letter tables (2026-09-17)
+- Both tabs render through the shared `formTableTemplate`, which was bound straight to the `records`
+  array — no MatSort. It now renders through `recordsDataSource` (a `MatTableDataSource`) with sort
+  headers on Name, Date, Notes and the four tag columns plus Resolved. A `sortingDataAccessor` handles
+  the columns whose value is not on the doc: **name** is joined from `profile_data` via `mapProfiles`,
+  **date** is a Timestamp → millis, the tags are booleans → 0/1, notes → array length.
+- Every path that swaps rows (fetch, page cache, the metric chips) goes through one `setRecords()`, so
+  the sortable source can never drift from `records`.
+- **Two gotchas, both found by testing rather than by reading:**
+  1. The table is rebuilt on every tab switch, so a MatSort captured once goes stale — the wiring is
+     re-attached in `ngAfterViewChecked`.
+  2. More subtly, **both tabs instantiate that template**, so there are two live MatSort directives.
+     `@ViewChild` returned the first (hidden) one, and clicking a header on the visible tab set
+     `aria-sort` but reordered nothing. Now `@ViewChildren` keeps both and the one inside
+     `.mat-mdc-tab-body-active` is attached. Ask A&H passed throughout precisely because it was the
+     first instance — a single-tab check would have called this done.
+- Sorting reorders the rows the current page loaded (server paging is `created desc`, 100 a page), and
+  Firestore could not order by name anyway since the name is not on the doc.
+- The Interim Report Log tab keeps its own MatSort (now `#logSort`), re-verified after the change.
+- Hub: `IRT-SORT` in `modes/interim-report-tabs.spec.ts` sorts the Love Letter tab both ways — the
+  second instance, i.e. the one that was broken.
+
+### Emulator run feedback — the composer crashed on missing config (2026-09-17)
+- The gate run went 13/14 on the dashboard file; the one failure was **IRD-14**, and not on an assertion:
+  the console guard caught `TypeError: Cannot read properties of undefined (reading 'senderemails')` and
+  `… (reading 'categories')` once the Email composer opened.
+- Root cause is an app defect, not a test gap. `EmailInputComponent` subscribes to
+  `email validators/templateCategories` and `classify/postmarkserver` and dereferences the emission
+  directly. AngularFire's `docData` emits **undefined** for a document that does not exist, so on any
+  project where that config is absent the composer opens and immediately throws — and the hard-coded
+  fallback sender list right below was unreachable, because reading the property threw first. Guarded
+  with `?.` + defaults in email-input (both reads) and wati-input.
+- The seed now also creates both config docs, so the emulator exercises the POPULATED path rather than
+  the fallback — a test that only ever saw the empty case would not notice the categories dropdown
+  breaking.
+- Verified locally: pick a participant → Email composer opens with no console error, closes clean.
