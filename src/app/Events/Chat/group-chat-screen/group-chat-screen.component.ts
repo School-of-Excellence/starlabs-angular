@@ -1134,10 +1134,20 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
    * Mirrors chat-screen's parseChannelButtons(), which accepts an array, an object map or a JSON
    * string — older records were evidently written inconsistently.
    */
+  /**
+   * The link form used to store the URL exactly as typed, so "google.com" went out with no scheme:
+   * the browser read it as a relative path and the app could not open it at all. New buttons are
+   * saved with https:// added; old ones are fixed up here when read.
+   */
+  static withScheme(url: string): string {
+    const u = String(url || '').trim();
+    return !u || /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : `https://${u}`;
+  }
+
   private parseButtons(raw: any): Cta[] {
     const take = (arr: any[]): Cta[] => arr
       .filter(b => b?.url && b?.label)
-      .map(b => ({ label: b.label, href: b.url }));
+      .map(b => ({ label: b.label, href: GroupChatScreenComponent.withScheme(b.url) }));
     if (!raw) return [];
     if (Array.isArray(raw)) return take(raw);
     if (typeof raw === 'object') return take(Object.values(raw));
@@ -2649,7 +2659,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   insertLink(label: string, url: string): void {
     if (!label.trim() || !url.trim()) return;
     if (this.pendingButtons.length >= 5) { this.notify('A message can carry at most 5 buttons'); return; }
-    this.pendingButtons = [...this.pendingButtons, { label: label.trim(), href: url.trim() }];
+    this.pendingButtons = [...this.pendingButtons, { label: label.trim(), href: GroupChatScreenComponent.withScheme(url) }];
     this.linkForm = null;
     setTimeout(() => this.composerRef?.nativeElement?.focus(), 0);
   }
