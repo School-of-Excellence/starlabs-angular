@@ -451,6 +451,130 @@
     </article>
   </section>
 
+  <!-- ============ EiFlix Mobile App Logs ============ -->
+  <section class="eod-section eod-section-gap" data-testid="eif-logs-section">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">EiFlix Mobile App Logs</h2>
+      <span class="eod-section-rule"></span>
+      <div class="eod-seg" role="group" aria-label="Login log period">
+        <button data-testid="eif-logs-range-today" type="button" [class.eod-seg-active]="logRange === 1" [attr.aria-pressed]="logRange === 1" (click)="setLogRange(1)">Today</button>
+        <button data-testid="eif-logs-range-7d" type="button" [class.eod-seg-active]="logRange === 7" [attr.aria-pressed]="logRange === 7" (click)="setLogRange(7)">7D</button>
+        <button data-testid="eif-logs-range-30d" type="button" [class.eod-seg-active]="logRange === 30" [attr.aria-pressed]="logRange === 30" (click)="setLogRange(30)">30D</button>
+      </div>
+    </div>
+
+    <article class="eod-bigcard eod-logcard" [style.animation-delay.ms]="140">
+      <div class="eod-log-tools">
+        <label class="eod-log-search">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input data-testid="eif-logs-search" type="search" [(ngModel)]="logSearch" (ngModelChange)="onLogFilterChange()"
+                 placeholder="Search name, id, OS, version…" autocomplete="off" spellcheck="false" aria-label="Search app logs">
+        </label>
+        <mat-form-field appearance="outline" class="eod-log-select" subscriptSizing="dynamic">
+          <mat-label>Filter by name</mat-label>
+          <mat-select data-testid="eif-logs-name-filter" [(value)]="logNameFilter" (selectionChange)="onLogFilterChange()">
+            <mat-option>
+              <ngx-mat-select-search data-testid="eif-logs-name-search" [(ngModel)]="logNameSearch" ngDefaultControl
+                                     [placeholderLabel]="'Search names'" [noEntriesFoundLabel]="'No matching name'"></ngx-mat-select-search>
+            </mat-option>
+            <mat-option value="all">All names</mat-option>
+            @for (o of logNameOptionsShown; track o.profileid) {
+              <mat-option data-testid="eif-logs-name-option" [value]="o.profileid">{{ o.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="eod-log-select eod-log-select-sm" subscriptSizing="dynamic">
+          <mat-label>Device OS</mat-label>
+          <mat-select data-testid="eif-logs-os-filter" [(value)]="logOsFilter" (selectionChange)="onLogFilterChange()">
+            <mat-option value="all">All</mat-option>
+            @for (o of logOsOptions; track o) {
+              <mat-option data-testid="eif-logs-os-option" [value]="o">{{ o }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (logFilterCount) {
+          <button data-testid="eif-logs-clear" type="button" class="eod-log-clear" (click)="clearLogFilters()">
+            <mat-icon aria-hidden="true">filter_alt_off</mat-icon>Clear {{ logFilterCount }}
+          </button>
+        }
+        <span class="eod-log-count" data-testid="eif-logs-count" aria-live="polite">
+          @if (logLoading) { loading… } @else {
+            <strong>{{ logShown.length }}</strong> of {{ logAll.length }} EiFlix log(s) {{ logRangeLabel }}
+            <span class="eod-log-dot" aria-hidden="true">·</span>
+            <span data-testid="eif-logs-unique"><strong>{{ logUniquePeopleShown }}</strong> of {{ logUniquePeople }} unique people</span>
+          }
+        </span>
+      </div>
+
+      @if (logLoading) {
+        <div class="eod-log-skel" aria-hidden="true">
+          @for (i of [0, 1, 2, 3, 4]; track i) { <span class="eod-skeleton eod-log-skelrow"></span> }
+        </div>
+      } @else if (logError) {
+        <div class="eod-empty eod-empty-slim">
+          <mat-icon>error_outline</mat-icon>
+          <p>Couldn&rsquo;t load the login log.</p>
+        </div>
+      } @else if (logAll.length === 0) {
+        <div class="eod-empty eod-empty-slim">
+          <mat-icon>phonelink_off</mat-icon>
+          <p>No EiFlix app logins {{ logRangeLabel }}.</p>
+        </div>
+      } @else {
+        <div class="eod-log-tablewrap">
+          <table class="eod-log-table" aria-label="EiFlix mobile app logins">
+            <thead>
+              <tr>
+                <th [attr.aria-sort]="logSortKey === 'name' ? (logSortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                  <button data-testid="eif-logs-sort-name" type="button" class="eod-log-th" [class.on]="logSortKey === 'name'" (click)="setLogSort('name')">
+                    Name <mat-icon aria-hidden="true">{{ logSortKey === 'name' ? (logSortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="logSortKey === 'date' ? (logSortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                  <button data-testid="eif-logs-sort-date" type="button" class="eod-log-th" [class.on]="logSortKey === 'date'" (click)="setLogSort('date')">
+                    Date <mat-icon aria-hidden="true">{{ logSortKey === 'date' ? (logSortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="logSortKey === 'device_os' ? (logSortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                  <button data-testid="eif-logs-sort-os" type="button" class="eod-log-th" [class.on]="logSortKey === 'device_os'" (click)="setLogSort('device_os')">
+                    Device OS <mat-icon aria-hidden="true">{{ logSortKey === 'device_os' ? (logSortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="logSortKey === 'current_version' ? (logSortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                  <button data-testid="eif-logs-sort-version" type="button" class="eod-log-th" [class.on]="logSortKey === 'current_version'" (click)="setLogSort('current_version')">
+                    Version <mat-icon aria-hidden="true">{{ logSortKey === 'current_version' ? (logSortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more' }}</mat-icon>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of logPage; track r.id) {
+                <tr data-testid="eif-logs-row">
+                  <td class="eod-log-name"><span class="eod-log-nm">{{ r.name }}</span></td>
+                  <td class="eod-log-mono">{{ r.dateLabel }}</td>
+                  <td><span class="eod-log-os" [attr.data-os]="r.device_os">{{ r.device_os || '—' }}</span></td>
+                  <td class="eod-log-mono">{{ r.current_version || '—' }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="4" class="eod-log-none">Nobody matches these filters.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="eod-log-pager">
+          <label class="eod-log-pagesize">Rows
+            <select data-testid="eif-logs-page-size" [ngModel]="logPageSize" (ngModelChange)="setLogPageSize($event)" aria-label="Rows per page">
+              @for (n of logPageSizes; track n) { <option [ngValue]="n">{{ n }}</option> }
+            </select>
+          </label>
+          <span class="eod-log-pagelabel" data-testid="eif-logs-page-label">{{ logPageFrom }}–{{ logPageTo }} of {{ logShown.length }}</span>
+          <button data-testid="eif-logs-prev" type="button" class="eod-log-pgbtn" (click)="logPrev()" [disabled]="logPageIndex === 0" aria-label="Previous page"><mat-icon>chevron_left</mat-icon></button>
+          <button data-testid="eif-logs-next" type="button" class="eod-log-pgbtn" (click)="logNext()" [disabled]="logPageIndex >= logPageCount - 1" aria-label="Next page"><mat-icon>chevron_right</mat-icon></button>
+        </div>
+      }
+    </article>
+  </section>
+
   <!-- ============ Detail side panel ============ -->
   @if (activePanel; as p) {
     <div data-testid="eif-close-panel-24" class="eod-backdrop" @fade (click)="closePanel()" aria-hidden="true"></div>

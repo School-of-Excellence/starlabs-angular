@@ -98,6 +98,28 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     else this.expandedArchiveGroups.add(key);
   }
 
+  /**
+   * All Assignments: a text submission is clamped to three lines; clicking its card opens THAT card only
+   * to show the complete text. Keyed by assignment position + profile so no two cards share state.
+   */
+  expandedAssignmentTexts = new Set<string>();
+  assignmentTextKey(assignmentIndex: number, participant: any): string { return `assign-${assignmentIndex}:${participant?.profileid}`; }
+  isAssignmentTextExpanded(assignmentIndex: number, participant: any): boolean { return this.expandedAssignmentTexts.has(this.assignmentTextKey(assignmentIndex, participant)); }
+  toggleAssignmentText(assignmentIndex: number, participant: any): void {
+    const key = this.assignmentTextKey(assignmentIndex, participant);
+    if (this.expandedAssignmentTexts.has(key)) this.expandedAssignmentTexts.delete(key);
+    else this.expandedAssignmentTexts.add(key);
+  }
+  /** A typed answer: shown inline, so the card expands instead of opening a viewer. */
+  isTextSubmission(participant: any): boolean {
+    return participant?.assignmentType === 'question' && participant?.submissionformat === 'text' && !!participant?.result;
+  }
+  /** One click handler for a participant card: text answers expand in place, files/forms open their viewer. */
+  onAssignmentCardClick(assignment: any, assignmentIndex: number, participant: any): void {
+    if (this.isTextSubmission(participant)) { this.toggleAssignmentText(assignmentIndex, participant); return; }
+    if (participant?.hasResult) this.viewParticipantAssignment(assignment, participant);
+  }
+
   isArchiveGroupExpanded(key: string): boolean {
     return this.expandedArchiveGroups.has(key);
   }
@@ -206,6 +228,12 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['totalEnrolled', 'Total Enrolled'], ['totalStarted', 'Total Started'], ['notStarted', 'Not Started'],
     ['notstartedcurrent', 'Ready to Start']
   ]);
+
+  /** Sub-challenge chips: Completed / Not Started always, Ready to Start when anyone is ready; the
+   *  review-flow ones only when someone is in them. In Progress is a challenge-level idea (a step is
+   *  done or not), so it is not shown on a step (operator, 2026-09-21). */
+  readonly subStatusChipOrder = ['completed', 'inreview', 'rework', 'readyformobile', 'notstartedcurrent', 'notstarted'];
+  readonly subStatusChipAlways = new Set(['completed', 'notstarted']);
 
   statusIconMap = new Map([
     ['completed', 'check_circle'], ['inreview', 'visibility'], ['rework', 'refresh'],
@@ -1620,7 +1648,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** Per-status participant lists behind every clickable count — see workshop-dashboard.engine.ts
-   *  (challengeStatusBuckets), including why notstartedcurrent is a SUBSET of notstarted. */
+   *  (challengeStatusBuckets): the four buckets are exclusive and add up to the participant total. */
   calculateChallengeStats(challenge: any, challengeIndex: number, challengeStats: any, progressList?: any[]) {
     const participants = progressList || this.participantProgressList;
     const buckets = challengeStatusBuckets(participants, challenge, challengeIndex, this.workshopData?.challenges || []);
