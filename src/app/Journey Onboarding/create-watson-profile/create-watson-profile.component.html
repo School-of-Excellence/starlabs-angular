@@ -227,6 +227,31 @@
                   </div>
                 </div>
 
+                <!-- Which Watson billing entity the initial payment is booked
+                     under. Only shown once Watson has more than one company
+                     configured; with a single company there is nothing to pick
+                     and the default is used. -->
+                <div class="form-group mt-3">
+                  <mat-form-field appearance="outline" class="w-100">
+                    <mat-label>GST Company</mat-label>
+                    <mat-select data-testid="cwp-sel-020" name="gstcompany"
+                      [ngModel]="selectedCompanyKey"
+                      (ngModelChange)="onCompanyChange($event)"
+                      [disabled]="watsonCompanies.length < 2">
+                      <mat-option *ngFor="let company of watsonCompanies" [value]="company.key">
+                        {{ company.title }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <small class="text-muted" *ngIf="watsonCompanies.length > 1">
+                    Invoice will be issued from
+                    <strong>{{ activeCompany?.title }}</strong>'s GST registration.
+                  </small>
+                  <small class="text-muted" *ngIf="watsonCompanies.length < 2">
+                    Only one company is configured in Watson, so there is nothing to choose.
+                  </small>
+                </div>
+
               </div>
             </div>
 
