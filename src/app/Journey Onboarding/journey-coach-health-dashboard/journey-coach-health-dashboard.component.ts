@@ -1155,6 +1155,57 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return { today, week, month, ready };
   });
 
+  // ---- "Coming up": scheduled / overdue JCs (booked journey-coach appointments not yet attended) ----
+  /** Which window the Coming-up list shows. */
+  comingWindow = signal<'today' | 'week' | 'overdue'>('today');
+  setComingWindow(w: 'today' | 'week' | 'overdue'): void { this.comingWindow.set(w); }
+
+  /** Date span each Coming-up tile covers, for the small caption under the number. */
+  comingRange(w: 'today' | 'week'): { from: Date; to: Date } {
+    const now = new Date();
+    const dayMs = 86400000;
+    if (w === 'today') return { from: this.startOfDay(now), to: this.endOfDay(now) };
+    const endToday = this.endOfDay(now).getTime();
+    return { from: new Date(endToday + 1000), to: new Date(endToday + 7 * dayMs) };
+  }
+
+  /** Scheduled JC sessions for the current scope, from jcPendingEvents (booked, not cancelled, not
+   *  attended). Today = still to come today; next 7 days = the week after today; overdue = the slot's
+   *  time passed and it was never marked attended. Same scope + readiness as the JC pipeline. */
+  jcScheduled = computed<{ today: number; week: number; overdue: number; ready: boolean }>(() => {
+    const ready = this.contactDataLoaded();
+    const now = Date.now();
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
+    const inScope = new Set(this.rosterIds());
+    let today = 0, week = 0, overdue = 0;
+    for (const e of this.jcPendingEvents()) {
+      if (!inScope.has(e.profileid)) continue;
+      if (e.ms < now) { overdue++; continue; }   // slot passed, never marked attended
+      if (e.ms <= endToday) today++;
+      else if (e.ms <= week7) week++;
+    }
+    return { today, week, overdue, ready };
+  });
+
+  /** The sessions behind the selected Coming-up tile — participant + host coach + when. */
+  jcScheduledList = computed<{ profileid: string; participant: string; coach: string; date: Date }[]>(() => {
+    const now = Date.now();
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
+    const w = this.comingWindow();
+    const inScope = new Set(this.rosterIds());
+    return this.jcPendingEvents()
+      .filter(e => {
+        if (!inScope.has(e.profileid)) return false;
+        if (w === 'overdue') return e.ms < now;
+        if (w === 'today') return e.ms >= now && e.ms <= endToday;
+        return e.ms > endToday && e.ms <= week7;   // next 7 days
+      })
+      .sort((a, b) => a.ms - b.ms)
+      .map(e => ({ profileid: e.profileid, participant: this.nameOf(e.profileid), coach: this.jcCoachName(e.coachId), date: new Date(e.ms) }));
+  });
+
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
    *  the latest is the current state. Degrades to none on failure. */

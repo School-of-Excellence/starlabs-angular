@@ -3078,6 +3078,9 @@ td.mat-mdc-cell span {
 
 /* JC pipeline card (doc item 8) — completed journey coaches, today / last week / last month. */
 .jc-pipeline { margin-bottom: 12px; }
+.jc-coming { margin-bottom: 12px; }
+.jcp-tile.jcp-overdue .jcp-num { color: #d70015; }
+.jcp-tile.jcp-overdue.is-on { box-shadow: inset 0 0 0 2px #d70015; }
 .jcp-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-top: 10px; }
 .jcp-tile { background: #f2f2f7; border-radius: 12px; padding: 12px 14px; }
 .jcp-num { display: block; font-size: 24px; font-weight: 600; color: #1c1c1e; font-variant-numeric: tabular-nums; }
