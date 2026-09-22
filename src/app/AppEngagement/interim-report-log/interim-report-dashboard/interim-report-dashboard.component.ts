@@ -6,11 +6,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCalendarCellClassFunction, MatDateRangePicker, MatDatepickerModule } from '@angular/material/datepicker';
 import {
-  Firestore, QueryConstraint, Timestamp, arrayUnion, collection, doc, documentId, getCountFromServer, getDocs, query,
-  serverTimestamp, updateDoc, where,
+  Firestore, Query, QueryConstraint, QuerySnapshot, Timestamp, arrayUnion, collection, doc, documentId,
+  getCountFromServer, getDocsFromServer, query, serverTimestamp, updateDoc, where,
 } from '@angular/fire/firestore';
 import * as XLSX from 'xlsx';
-import { CROSSOVER_AREAS, EVO_RESULT_OF, mountInterimReportDashboard } from './interim-report-dashboard.script';
+import { CROSSOVER_AREAS, DashboardFilters, EVO_RESULT_OF, mountInterimReportDashboard } from './interim-report-dashboard.script';
 
 /** love letter / ask AH tag → the same boolean + details fields the Love Letter / Ask A&H tabs write */
 const TAG_FIELD: Record<string, [string, string]> = {
@@ -22,6 +22,15 @@ const TAG_FIELD: Record<string, [string, string]> = {
 };
 const TAG_COLLECTION = { love: 'love letter', ask: 'ask AH' } as const;
 type TagKind = keyof typeof TAG_COLLECTION;
+
+/**
+ * The dashboard tab is lazy (`matTabContent`): switching to another tab or another screen DESTROYS this
+ * component, and a new one used to reopen on the defaults — current month, all journeys, all events — so the
+ * numbers "changed" whenever the user came back. The filters live here, outside any one instance, for the rest
+ * of the browser session; a page reload starts over on the defaults. Clear resets them like before.
+ */
+let keptRange: { start: Date | null; end: Date | null } | null = null;
+let keptFilters: DashboardFilters | null = null;
 
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const toDate = (t: any): Date | null => t?.toDate?.() ?? (t instanceof Date ? t : null);
@@ -65,7 +74,8 @@ export class InterimReportDashboardComponent implements OnChanges {
   private events: { id: string; name: string; on: string }[] = [];
   private journeyName = new Map<string, string>();
   private attendeeCache = new Map<string, Set<string>>();
-  private filtersReady: Promise<void> = Promise.resolve();
+  /** the JOURNEY / EVENT sources; null until loaded — or again after a failed load, so the next use retries */
+  private filtersReady: Promise<void> | null = null;
 
   dateClass: MatCalendarCellClassFunction<Date> = (date, view) => {
     if (view !== 'month') return '';
@@ -74,15 +84,18 @@ export class InterimReportDashboardComponent implements OnChanges {
   };
 
   constructor() {
-    this.range.setValue(this.defaultRange());
+    this.range.setValue(keptRange ?? this.defaultRange());
     // the picker sets start first and end second — reload once the range is complete (or cleared)
     this.range.valueChanges.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe(({ start, end }) => {
-      if (!!start === !!end) this.dashboard?.refresh();
+      if (!!start === !!end) {
+        keptRange = { start: start ?? null, end: end ?? null };
+        this.dashboard?.refresh();
+      }
     });
 
     const host: HTMLElement = inject(ElementRef).nativeElement;
     afterNextRender(() => {
-      this.filtersReady = this.loadFilters();
+      this.ensureFilters().catch(() => {});   // a failure surfaces through the next load's error + Retry
       this.dashboard = mountInterimReportDashboard(host.shadowRoot, {
         load: (from, to) => this.loadPool(from, to),
         journeys: () => this.journeys,
@@ -95,6 +108,8 @@ export class InterimReportDashboardComponent implements OnChanges {
         resetRange: () => this.range.setValue(this.defaultRange()),
         setTag: (kind, d, key, on) => this.setTag(kind, d, key, on),
         addNote: (kind, d, text) => this.addNote(kind, d, text),
+        initialFilters: () => keptFilters,
+        saveFilters: f => { keptFilters = f; },
       });
     });
   }
@@ -109,11 +124,43 @@ export class InterimReportDashboardComponent implements OnChanges {
     return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
   }
 
+  /**
+   * Every read behind a dashboard number goes to the SERVER. Plain `getDocs` answers from the local cache
+   * while Firestore's connection is down — and the Log tab's live listener keeps `interimreport log` in that
+   * cache, but nothing keeps `interim crossover` / `interim evolutionprogress` / `love letter` / `ask AH`
+   * there. So a dropped connection drew the real totals over EMPTY sections, with no error (operator,
+   * 2026-09-18: "the values are being changed"; the console showed `Listen stream transport errored` at the
+   * moment the Crossover Meter read all zeros). One quick retry covers a blip; after that the load fails
+   * loudly and the dashboard offers Retry instead of drawing partial numbers.
+   */
+  private async fromServer<T>(q: Query<T>): Promise<QuerySnapshot<T>> {
+    try {
+      return await getDocsFromServer(q);
+    } catch (err: any) {
+      if (err?.code !== 'unavailable') throw err;
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        return await getDocsFromServer(q);
+      } catch (again: any) {
+        if (again?.code !== 'unavailable') throw again;
+        throw new Error('the connection to the database dropped, so nothing is shown rather than partial numbers');
+      }
+    }
+  }
+
+  /** load the JOURNEY / EVENT sources once; a failed attempt is forgotten, so the next caller tries again */
+  private ensureFilters(): Promise<void> {
+    if (!this.filtersReady) {
+      this.filtersReady = this.loadFilters().catch(err => { this.filtersReady = null; throw err; });
+    }
+    return this.filtersReady;
+  }
+
   /** the JOURNEY and EVENT dropdowns — one read of each collection per dashboard mount */
   private async loadFilters(): Promise<void> {
     const [jSnap, eSnap] = await Promise.all([
-      getDocs(collection(this.firestore, 'journey')),
-      getDocs(collection(this.firestore, 'event collection')),
+      this.fromServer(collection(this.firestore, 'journey')),
+      this.fromServer(collection(this.firestore, 'event collection')),
     ]);
     this.journeys = jSnap.docs.map(d => {
       const x = d.data() as any;
@@ -139,7 +186,7 @@ export class InterimReportDashboardComponent implements OnChanges {
   private async attendees(eventId: string): Promise<Set<string>> {
     const hit = this.attendeeCache.get(eventId);
     if (hit) return hit;
-    const snap = await getDocs(query(collection(this.firestore, 'event participation request'),
+    const snap = await this.fromServer(query(collection(this.firestore, 'event participation request'),
       where('eventref', '==', doc(this.firestore, 'event collection', eventId)),
       where('status', '==', 'attended')));
     const ids = new Set<string>(snap.docs.map(d => String(d.data()['profileid'] ?? '')).filter(Boolean));
@@ -153,7 +200,7 @@ export class InterimReportDashboardComponent implements OnChanges {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
     const snaps = await Promise.all(chunks.map(chunk =>
-      getDocs(query(collection(this.firestore, 'participant metadata'), where(documentId(), 'in', chunk)))));
+      this.fromServer(query(collection(this.firestore, 'participant metadata'), where(documentId(), 'in', chunk)))));
     const out = new Map<string, { id: string; name: string }>();
     snaps.forEach(snap => snap.docs.forEach(d => {
       const m = d.data() as any;
@@ -239,9 +286,9 @@ export class InterimReportDashboardComponent implements OnChanges {
       end.setHours(23, 59, 59, 999);
       constraints.push(where('createdon', '<=', Timestamp.fromDate(end)));
     }
-    const logs = await getDocs(query(collection(this.firestore, 'interimreport log'), ...constraints));
+    const logs = await this.fromServer(query(collection(this.firestore, 'interimreport log'), ...constraints));
     const ids = logs.docs.map(d => d.id);
-    await this.filtersReady;   // journey names are needed to label each participant's journey
+    await this.ensureFilters();   // journey names are needed to label each participant's journey
     const journeys = await this.journeysOf(logs.docs.map(d => d.data()['profileid']));
 
     const [cross, evo, love, ask] = await Promise.all([
@@ -261,7 +308,7 @@ export class InterimReportDashboardComponent implements OnChanges {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
     const snaps = await Promise.all(chunks.map(chunk =>
-      getDocs(query(collection(this.firestore, collectionName), where('interimlogid', 'in', chunk)))));
+      this.fromServer(query(collection(this.firestore, collectionName), where('interimlogid', 'in', chunk)))));
     const latest = new Map<string, any>();
     const millis = (t: any) => (t?.toMillis ? t.toMillis() : 0);
     snaps.forEach(snap => snap.docs.forEach(d => {
