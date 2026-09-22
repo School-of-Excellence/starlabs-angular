@@ -362,9 +362,14 @@ export interface ChallengeStatusBuckets {
 /**
  * Bucket every participant by their status on one challenge and on each of its sub-challenges.
  *
- * 'notstartedcurrent' is a SUBSET of 'notstarted', not a sibling: a participant who has not started
- * AND is next in line is counted in both, so the "not started" total stays whole while the dashboard
- * can still highlight the ones who could start right now.
+ * The four challenge-level buckets are EXCLUSIVE — they add up to the participant total (operator,
+ * 2026-09-21; until then "ready to start" was counted inside "not started" as well, so a row's chips
+ * over-counted by the ready ones):
+ *   • 'notstartedcurrent' (Ready to Start) — not started, and every earlier real challenge is done;
+ *   • 'notstarted' — not started and still blocked by an unfinished earlier challenge.
+ * A challenge with no earlier real challenge has no prerequisite, so nobody there is "ready" in any
+ * meaningful sense: all of its not-started participants sit in 'notstarted' and the ready bucket stays
+ * empty. Sub-challenge buckets keep the same exclusivity for their own not-started split.
  */
 export function challengeStatusBuckets(
   participants: { profileid: string; challenges: ParticipantChallenge[] }[],
@@ -385,25 +390,29 @@ export function challengeStatusBuckets(
     participants.forEach(participant => {
       const participantSubChallenge = participant.challenges[challengeIndex]?.challenges?.[subIndex];
       const status = normalizeSubChallengeStatus(participantSubChallenge?.status);
-      subStats.participantsByStatus.get(status)?.push(participant.profileid);
-      if (status === 'notstarted' && isReadyForSubChallenge(participant, challengeIndex, subIndex, workshopChallenges)) {
-        subStats.participantsByStatus.get('notstartedcurrent')?.push(participant.profileid);
-      }
+      const ready = status === 'notstarted' && !firstStep(challengeIndex, subIndex, workshopChallenges)
+        && isReadyForSubChallenge(participant, challengeIndex, subIndex, workshopChallenges);
+      subStats.participantsByStatus.get(ready ? 'notstartedcurrent' : status)?.push(participant.profileid);
     });
     subChallengeStats.push(subStats);
   });
 
+  const firstChallenge = previousNonZoomIndex(challengeIndex, workshopChallenges) === -1;
   participants.forEach(participant => {
     const participantStatus = participantChallengeStatus(
       participant.challenges[challengeIndex], workshopChallenges?.[challengeIndex]
     );
-    statusMap.get(participantStatus)?.push(participant.profileid);
-    if (participantStatus === 'notstarted' && isReadyForChallenge(participant, challengeIndex, workshopChallenges)) {
-      statusMap.get('notstartedcurrent')?.push(participant.profileid);
-    }
+    const ready = participantStatus === 'notstarted' && !firstChallenge
+      && isReadyForChallenge(participant, challengeIndex, workshopChallenges);
+    statusMap.get(ready ? 'notstartedcurrent' : participantStatus)?.push(participant.profileid);
   });
 
   return { participantsByStatus: statusMap, subChallengeStats };
+}
+
+/** The very first step of the workshop — nothing precedes it, so "ready" would mean nothing. */
+function firstStep(challengeIndex: number, subIndex: number, workshopChallenges: WorkshopChallenge[]): boolean {
+  return subIndex === 0 && previousNonZoomIndex(challengeIndex, workshopChallenges) === -1;
 }
 
 // =================================================================================================
