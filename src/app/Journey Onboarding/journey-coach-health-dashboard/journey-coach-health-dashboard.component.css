@@ -8,6 +8,7 @@
 /* ---- design tokens (iOS) ---- */
 :host {
   display: block;
+  min-height: 100vh;   /* fill the viewport so the themed canvas never leaves the page half white/black */
   color: var(--ink);
   font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   font-feature-settings: "tnum" 0;
@@ -61,10 +62,23 @@
 
   padding: 14px 28px 72px;
   background: var(--canvas);
-  min-height: 100%;
+  min-height: 100vh;   /* viewport-relative so the dark canvas fills below short content (no white gap) */
   color: var(--ink);
   transition: background .3s ease, color .3s ease;
 }
+
+/* Angular Material paginator hard-codes a white surface; theme it so the base view's footer isn't a
+   white bar in dark mode. */
+.jchd-wrap ::ng-deep .mat-mdc-paginator {
+  --mat-paginator-container-background-color: var(--surface);
+  --mat-paginator-container-text-color: var(--ink-2);
+  --mat-paginator-enabled-icon-color: var(--ink-2);
+  --mat-paginator-disabled-icon-color: var(--ink-4);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.jchd-wrap ::ng-deep .mat-mdc-paginator .mat-mdc-select-value,
+.jchd-wrap ::ng-deep .mat-mdc-paginator .mat-mdc-paginator-range-label { color: var(--ink-2); }
 
 /* ---- dark theme: system default, overridable by the header toggle ---- */
 @media (prefers-color-scheme: dark) {
