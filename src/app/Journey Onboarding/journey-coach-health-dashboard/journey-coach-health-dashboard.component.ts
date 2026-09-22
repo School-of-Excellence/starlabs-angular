@@ -99,6 +99,10 @@ interface PortfolioRow {
   llCritical?: boolean;
   llAttention?: boolean;
   llOpportunity?: boolean;
+  // Settled ONCE per row in scoreRow(): the needs-attention flag + human-readable trigger conditions,
+  // so the hero / table / worklist render the SAME reasons without recomputing per change-detection.
+  naFlag?: boolean;
+  naReasons?: string[];
 }
 
 type Lever = 'all' | 'active' | 'goingQuiet' | 'renewalWindow' | 'lapsed' | 'notStarted' | 'inactive' | 'tickets' | 'flagged' | 'needsAttention';
@@ -1103,11 +1107,18 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (data['cancelled'] === true) return;   // cancelled JCs never count (operator directive)
         const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
         const host = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+        // Onboarding detection hardened (item 4): the schedule dialog sets onboarding===true AND a
+        // journeyid + participantjourneyproductid ONLY for onboarding calls (coach calls leave both
+        // null — schedule-dialog.component.ts:616-618/623), so an onboarding appointment that is
+        // missing the onboarding flag is still kept OUT of Journey Coaching by its journey/pjp ref.
+        const isOnboarding = data['onboarding'] === true
+          || data['journeyid'] != null
+          || data['participantjourneyproductid'] != null;
         if (data['attended'] === true) {
           map[pid] = Math.max(map[pid] ?? 0, dt.getTime());   // recency: onboarding included (feature 9)
         } else {
           // booked and live: future = pending, past = overdue. onboarding partitions JC vs Onboarding.
-          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: data['onboarding'] === true });
+          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
         }
       });
     } catch (e) {
@@ -1244,6 +1255,34 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
    *  tagged=needs-attn / opportunity) OR-ed per participant, within a recent 180d window applied
    *  client-side (avoids a profileid+created composite index). Degrades on permission-denied. */
+  // ---- Recent Ask A&H / Love Letter for the Summary (item 3): latest per participant, coach-scoped ----
+  //  Captured WITH content while the tag loaders already sweep 'love letter' / 'ask AH' — no extra read.
+  private recentAHRaw = signal<Record<string, { love?: { text: string; tags: string[]; ms: number }; ask?: { text: string; tags: string[]; ms: number } }>>({});
+  /** Map a love-letter / ask-A&H doc to its display item (the caller keeps the latest per profile). */
+  private ahItemFrom(data: any): { text: string; tags: string[]; ms: number } | null {
+    const created = this.toDate(data['created']);
+    if (!created) return null;
+    const text = (data['message'] ?? data['content'] ?? data['loveletter'] ?? data['letter'] ?? data['note'] ?? data['text'] ?? '').toString().trim();
+    const tags: string[] = [];
+    if (data['critical'] === true) tags.push('critical');
+    if (data['tagged'] === true) tags.push('needs attention');
+    if (data['opportunity'] === true) tags.push('opportunity');
+    return { text, tags, ms: created.getTime() };
+  }
+  /** Summary A&H feed — latest love-letter + ask-A&H per participant IN THE CURRENT COACH SCOPE, newest first. */
+  recentAH = computed<{ profileid: string; name: string; kind: 'love' | 'ask'; text: string; tags: string[]; date: Date }[]>(() => {
+    const raw = this.recentAHRaw();
+    const inScope = new Set(this.rosterIds());
+    const rows: { profileid: string; name: string; kind: 'love' | 'ask'; text: string; tags: string[]; date: Date }[] = [];
+    for (const pid of Object.keys(raw)) {
+      if (!inScope.has(pid)) continue;
+      const rec = raw[pid];
+      if (rec.love) rows.push({ profileid: pid, name: this.nameOf(pid), kind: 'love', text: rec.love.text, tags: rec.love.tags, date: new Date(rec.love.ms) });
+      if (rec.ask) rows.push({ profileid: pid, name: this.nameOf(pid), kind: 'ask', text: rec.ask.text, tags: rec.ask.tags, date: new Date(rec.ask.ms) });
+    }
+    return rows.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 8);
+  });
+
   private async loadLoveLetterTagsFor(profileIds: string[]): Promise<void> {
     const ids = profileIds.filter(id => id && !(id in this.llTagsByProfile));
     if (!ids.length) return;
@@ -1251,7 +1290,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
     const llSince = Date.now() - 180 * 86400000;
+    const raw = { ...this.recentAHRaw() };
     const collect = async (coll: string) => {
+      const kind: 'love' | 'ask' = coll === 'love letter' ? 'love' : 'ask';
       for (const chunk of chunks) {
         try {
           const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', 'in', chunk)));
@@ -1265,6 +1306,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
             if (data['critical'] === true) t.critical = true;
             if (data['tagged'] === true) t.attention = true;      // 'tagged' == needs-attention
             if (data['opportunity'] === true) t.opportunity = true;
+            const item = this.ahItemFrom(data);                    // capture content for the Summary A&H card (item 3)
+            if (item) {
+              const rec = raw[data['profileid']] ?? (raw[data['profileid']] = {});
+              if (!rec[kind] || item.ms > rec[kind]!.ms) rec[kind] = item;
+            }
           });
         } catch (e) {
           if (this.isPermissionDenied(e)) return;
@@ -1273,6 +1319,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
     };
     await Promise.all([collect('love letter'), collect('ask AH')]);
+    this.recentAHRaw.set(raw);
   }
 
   /** Base-wide A&H tags for the ALL / admin paged view (doc item 5): a SINGLE date-bounded read per
@@ -1283,7 +1330,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (!this.fullIndexBuilt) return;
     const since = new Date(Date.now() - 180 * 86400000);
     const map: Record<string, { critical: boolean; attention: boolean }> = {};
+    const raw = { ...this.recentAHRaw() };
     const collect = async (coll: string) => {
+      const kind: 'love' | 'ask' = coll === 'love letter' ? 'love' : 'ask';
       try {
         const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
         snap.forEach(d => {
@@ -1294,6 +1343,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           const t = map[pid] ?? (map[pid] = { critical: false, attention: false });
           if (data['critical'] === true) t.critical = true;
           if (data['tagged'] === true) t.attention = true;
+          const item = this.ahItemFrom(data);                      // capture content for the Summary A&H card (item 3)
+          if (item) {
+            const rec = raw[pid] ?? (raw[pid] = {});
+            if (!rec[kind] || item.ms > rec[kind]!.ms) rec[kind] = item;
+          }
         });
       } catch (e) {
         if (this.isPermissionDenied(e)) return;
@@ -1306,6 +1360,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       l.llCritical = !!t?.critical;
       l.llAttention = !!t?.attention;
     }
+    this.recentAHRaw.set(raw);
     this.computeBaseWideAttention();
     if (this.pagedMode) { this.accumulatePagedSummary(); this.applyFilters(); }
   }
@@ -1518,6 +1573,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     r.priority = Math.max(0, Math.min(100, Math.round(p)));
     r.priorityBand = r.priority >= 40 ? 'High' : r.priority >= 22 ? 'Medium' : 'Low';
     r.reason = drivers.length ? `${drivers.slice(0, 2).join(' + ')} → ${this.actionFor(r)}` : 'On track';
+    // Settle the needs-attention flag + conditions ONCE per row so every surface renders the same
+    // (doc item: show WHY, and don't recompute the predicate/reasons on every click/screen).
+    r.naFlag = this.isNeedsAttention(r);
+    r.naReasons = this.naReasonsFor(r);
   }
 
   /** Phase-2 (gated): compute the Health state from whatever signals exist today. Sparse until
@@ -1950,6 +2009,21 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (r.llAttention) out.push('llAttention');
     return out;
   }
+  /** Human-readable needs-attention conditions for a row — the SAME triggers as isNeedsAttention()
+   *  / activeIssues(), mapped to labels so the UI shows WHY a participant needs attention (doc item 4).
+   *  Going-quiet & renewals are deliberately NOT here (they keep their own tiles). */
+  private naReasonsFor(r: PortfolioRow): string[] {
+    const out: string[] = [];
+    if (r.lapsed) out.push('Lapsed');
+    if (r.notStarted) out.push('Journey not started');
+    if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
+    const fin = (r.financialstatus ?? '').toLowerCase();
+    if (fin === 'locked') out.push('Payments locked');
+    else if (fin === 'defaulted') out.push('Payments defaulted');
+    if (r.llCritical) out.push('A&H critical');
+    if (r.llAttention) out.push('A&H needs attention');
+    return out;
+  }
   /** Needs-attention — the ONE actionable-now predicate (doc item 4), the single source of truth that
    *  every count / lever / hero / coach-card site delegates to. Renewals and going-quiet are
    *  deliberately NOT folded in (they keep their own tiles/levers); financial locked / defaulted and
@@ -2045,9 +2119,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       return;
     }
     // unified activity event (coachedby write is per-pjp above; the activity log carries the change once).
-    void this.logActivity(row.profileid, 'coach_change', {
+    this.logActivity(row.profileid, 'coach_change', {
       action, fromCoachId, fromCoachName, toCoachId: coachId, toCoachName: coachName, note: note.trim(),
-    });
+    }).catch(e => { console.error('coach_change (assign) log failed', e); this.guard.openSnackBar('Assigned, but the activity log failed to record', 'Close', 5000); });
     // reflect on the row + recompute the unassigned count from live data
     row.coachname = coachName;
     const unassignedProfiles = new Set<string>();
@@ -2070,9 +2144,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.guard.openSnackBar(`Could not unassign ${row.name}: ${fail} write(s) failed (permission denied?)`, 'Close', 5000);
       return;
     }
-    void this.logActivity(row.profileid, 'coach_change', {
+    this.logActivity(row.profileid, 'coach_change', {
       action: 'unassign', fromCoachId, fromCoachName, toCoachId: null, toCoachName: null, note: note.trim(),
-    });
+    }).catch(e => { console.error('coach_change (unassign) log failed', e); this.guard.openSnackBar('Unassigned, but the activity log failed to record', 'Close', 5000); });
     row.coachname = '—';
     const unassignedProfiles = new Set<string>();
     for (const d of this.pjpData) {
@@ -2929,10 +3003,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         const fromCoachName = row && row.coachname && row.coachname !== '—' ? row.coachname : null;
         const fromCoachId = this.coaches.find(c => c.name === fromCoachName)?.id ?? null;
         if (row) row.coachname = targetCoachName;
-        void this.logActivity(pid, 'coach_change', {
+        this.logActivity(pid, 'coach_change', {
           action: fromCoachName ? 'reassign' : 'assign',
           fromCoachId, fromCoachName, toCoachId: targetCoachId, toCoachName: targetCoachName, note: '',
-        });
+        }).catch(e => console.error('coach_change (bulk) log failed', e));
       }));
     }
     this.assigning = false;

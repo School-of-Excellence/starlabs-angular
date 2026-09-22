@@ -116,7 +116,7 @@
           <div class="ios2-people" *ngIf="needsAttentionRows().length; else naEmpty">
             <span class="ios2-person" *ngFor="let r of needsAttentionRows() | slice:0:3">
               <span class="ios-avatar av-xs" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
-              <span class="ios2-pmeta"><span class="ios2-nm">{{ r.name }}</span><span class="ios2-reason">{{ r.reason }}</span></span>
+              <span class="ios2-pmeta"><span class="ios2-nm">{{ r.name }}</span><span class="ios2-reason">{{ (r.naReasons && r.naReasons.length) ? r.naReasons.join(' · ') : r.reason }}</span></span>
               <span class="ios-pill" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }}</span>
             </span>
           </div>
@@ -238,6 +238,31 @@
             <ng-template #noObSched><p class="ios2-empty" *ngIf="obSchedCounts().ready">Nothing scheduled.</p></ng-template>
           </div>
 
+        </div>
+      </section>
+
+      <!-- Recent Ask A&H + Love Letter (item 3): latest per participant in the current coach scope,
+           captured from the same reads that feed the A&H needs-attention tags. Click opens the slide-over. -->
+      <section class="ios2-card jchd-ah-card" *ngIf="recentAH().length">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>favorite</mat-icon></span>
+          <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
+        </div>
+        <div class="ah-list">
+          <button type="button" class="ah-item" *ngFor="let a of recentAH()" (click)="openJcParticipant(a.profileid)" matTooltip="Open participant">
+            <span class="ios-avatar av-xs" [ngClass]="avatarClass(a.profileid)">{{ initials(a.name) }}</span>
+            <span class="ah-body">
+              <span class="ah-top">
+                <span class="ah-name">{{ a.name }}</span>
+                <span class="ah-kind" [ngClass]="a.kind === 'love' ? 'ah-love' : 'ah-ask'">{{ a.kind === 'love' ? 'Love letter' : 'Ask A&H' }}</span>
+              </span>
+              <span class="ah-text">{{ a.text || '(no message)' }}</span>
+              <span class="ah-tags" *ngIf="a.tags.length">
+                <span class="chip" *ngFor="let tg of a.tags" [ngClass]="{ 'chip-bad': tg === 'critical', 'chip-warn': tg === 'needs attention' }">{{ tg }}</span>
+              </span>
+            </span>
+            <span class="ah-when">{{ a.date | date:'d MMM' }}</span>
+          </button>
         </div>
       </section>
 
@@ -611,6 +636,9 @@
               <span class="plabel">{{ prioLabel(r.priorityBand) }}</span>
               <span class="pscore">· {{ r.priority }}</span>
             </span>
+            <span class="na-why" *ngIf="r.naReasons?.length">
+              <span class="na-chip" *ngFor="let w of r.naReasons">{{ w }}</span>
+            </span>
           </td>
         </ng-container>
 
@@ -834,6 +862,9 @@
               <span class="chip chip-bad" *ngIf="r.lapsed">Lapsed</span>
               <span class="chip chip-warn" *ngIf="r.goingQuiet">Quiet {{ r.daysSinceCoach }}d</span>
               <span class="chip chip-warn" *ngIf="r.openTickets > 0">{{ r.openTickets }} open ticket<span *ngIf="r.openTickets > 1">s</span></span>
+              <span class="chip chip-warn" *ngIf="r.notStarted">Journey not started</span>
+              <span class="chip chip-bad" *ngIf="r.llCritical">A&amp;H critical</span>
+              <span class="chip chip-warn" *ngIf="r.llAttention">A&amp;H needs attention</span>
               <span class="chip" *ngIf="r.recentEventRequest" [ngClass]="eventStatusClass(r.recentEventRequest.status)"
                     [matTooltip]="r.recentEventRequest.eventName + (r.recentEventRequest.date ? ' · ' + fmtDate(r.recentEventRequest.date) : '')">{{ r.recentEventRequest.eventName }}: {{ r.recentEventRequest.status }}</span>
               <span class="chip" *ngIf="r.coachHealthState" [ngClass]="stateClass(r.coachHealthState.state)"

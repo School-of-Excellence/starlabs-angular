@@ -3,7 +3,7 @@ import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs,
+  Firestore, collection, query, where, getDocs, orderBy, limit,
   doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -1272,13 +1272,14 @@ export class ParticipantSlideoverComponent implements OnInit {
   private async loadLoveLetters(): Promise<void> {
     const pid = this.row.profileid;
     try {
+      // Latest 1 only (item 5) — requires a 'love letter' (profileid ASC, created DESC) composite index.
       const snap = await getDocs(query(
         collection(this.firestore, 'love letter'),
         where('profileid', '==', pid),
+        orderBy('created', 'desc'),
+        limit(1),
       ));
-      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
-      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-      this.loveLetters = items.slice(0, this.sectionCap);
+      this.loveLetters = snap.docs.map(d => this.toLoveNote(d.data() as any));
     } catch (e) {
       console.warn('slideover love letter read failed', e);
     } finally {
@@ -1289,13 +1290,14 @@ export class ParticipantSlideoverComponent implements OnInit {
   private async loadAskAH(): Promise<void> {
     const pid = this.row.profileid;
     try {
+      // Latest 1 only (item 5) — requires an 'ask AH' (profileid ASC, created DESC) composite index.
       const snap = await getDocs(query(
         collection(this.firestore, 'ask AH'),
         where('profileid', '==', pid),
+        orderBy('created', 'desc'),
+        limit(1),
       ));
-      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
-      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-      this.askAH = items.slice(0, this.sectionCap);
+      this.askAH = snap.docs.map(d => this.toLoveNote(d.data() as any));
     } catch (e) {
       console.warn('slideover ask A&H read failed', e);
     } finally {
@@ -1441,8 +1443,23 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
   /** Dropdown change: '__unassign__' -> unassign (null); a coach id -> assign/reassign. */
   onAssignCoach(value: string): void {
-    if (value === '__unassign__') { this.data.onAssignCoach(null); return; }
-    this.data.onAssignCoach(value);
+    // Capture the current coach BEFORE the parent mutates the row.
+    const from = this.currentCoachName || null;
+    const isUnassign = value === '__unassign__';
+    const toName = isUnassign ? null : (this.data.coaches?.find(c => c.id === value)?.name ?? null);
+    const action = isUnassign ? 'unassign' : (from ? 'reassign' : 'assign');
+    // The parent owns the Firestore write (healthtracker_activity coach_change); the timeline is
+    // one-shot loaded at open, so optimistically prepend the coach change here too (mirrors submit()),
+    // otherwise it only appears after the panel is reopened.
+    this.data.activity = [{
+      type: 'coach_change' as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note: '',
+      outcome: null, state: null, flagged: false, dueDate: null,
+      action, fromCoachName: from, toCoachName: toName,
+    }, ...(this.data.activity ?? [])];
+    this.data.onAssignCoach(isUnassign ? null : value);
   }
 
   /** Header flag toggle: prompt for an optional short note, then delegate (parent owns the write). */
