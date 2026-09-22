@@ -2767,6 +2767,12 @@
 .arc-preview mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--arc-accent); }
 .arc-eye { margin-left: auto; color: var(--arc-ink3) !important; }
 .arc-preview-text { align-items: flex-start; }
+/* the expanded card: full answer, wrapped as typed, and it may grow past its grid row */
+.arc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.arc-pcard.arc-expanded { border-color: var(--arc-accent); box-shadow: 0 3px 10px rgba(20, 26, 45, 0.08); }
+.arc-more { display: inline-flex; align-items: center; gap: 2px; margin-top: 6px; padding: 2px 8px 2px 4px; border: 0; border-radius: 12px; background: transparent; color: var(--arc-accent); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.arc-more mat-icon { font-size: 16px; width: 16px; height: 16px; }
+.arc-more:hover { background: rgba(37, 87, 199, 0.08); }
 .arc-text-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 3;

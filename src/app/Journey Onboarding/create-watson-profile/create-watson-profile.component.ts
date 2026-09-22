@@ -154,6 +154,12 @@ export class CreateWatsonProfileComponent {
     this.purchasedate = this.saleData['purchasedate'].toDate();
     this.totalPurchaseValue = this.saleData['totalpurchasevalue'];
     this.selectedWatsonParticipantID = this.saleData['watsonparticipantid'];
+    // Finance fixes the GST company at the first approval. Once it is on the
+    // lead, every later opening of this dialog starts from — and, after that
+    // approval, is locked to — that choice.
+    if (this.saleData['gstcompanykey']) {
+      this.selectedCompanyKey = this.saleData['gstcompanykey'];
+    }
     this.mapPackageName = metadata['mappackagename'];
     this.mapProductminimumamount = metadata['mapproductminimumamount'];
 
@@ -1294,12 +1300,21 @@ private validateAddonsJourney(): boolean {
 
     if (users.includes(this.guard.uid)) {
 
-      var check = confirm("Are you sure want to Approve the Initial Payment of Amount : " + this.saleData['initialpayment'] + ' Payment ID : ' + this.saleData['paymentid']);
+      const company = this.activeCompany;
+      if (!company) {
+        alert("Watson's GST companies have not loaded yet, so the GST company cannot be recorded. Please reopen and try again.");
+        return;
+      }
+
+      var check = confirm("Are you sure want to Approve the Initial Payment of Amount : " + this.saleData['initialpayment'] + ' Payment ID : ' + this.saleData['paymentid'] + ' under GST Company : ' + company.title);
 
       if (check) {
         const loading = this.loading;
         await updateDoc(doc(this.firestore, "salesleads", this.saleData['docid']), {
-          initialpaymentapproved: this.saleData['initialpaymentapproved'] == true ? false : true
+          initialpaymentapproved: this.saleData['initialpaymentapproved'] == true ? false : true,
+          // Fixed here, read-only at the final approval.
+          gstcompanykey: company.key,
+          gstcompanytitle: company.title,
         }).then(() => {
           console.log("Approved Initial Payment");
           this.guard.openSnackBar("Initial Payment Approved Successfully", "OK",600)
@@ -1832,7 +1847,7 @@ private validateAddonsJourney(): boolean {
     this.watsonBatch.set(ref, {
       gstdetails: gstdetails,
       companygstno: gstdetails['gstno'],
-      templateid: intraState ? 40962079 : 40962160,
+      templateid: intraState ? 47823311 : 47823339, // CGST + SGST (intra) / IGST (inter)
       companykey: company.key,
       companyprefix: companyPrefixFor(company, gstdetails),
     }, { merge: true });
@@ -1856,7 +1871,18 @@ private validateAddonsJourney(): boolean {
    * selection is written to the field by code we can see.
    */
   onCompanyChange(key: string) {
+    if (this.companyLocked) return;
     this.selectedCompanyKey = key;
+  }
+
+  /**
+   * The GST company is Finance's decision, made at the initial payment
+   * approval. After that the final approver only sees it. A lead approved
+   * before this existed has no `gstcompanykey`, and no company key means
+   * Company A — so it stays locked to the default.
+   */
+  get companyLocked(): boolean {
+    return this.saleData['initialpaymentapproved'] === true;
   }
 
   /** Registrations of the selected company — what the seller state is chosen from. */
@@ -1878,7 +1904,10 @@ private validateAddonsJourney(): boolean {
       }
       this.watsonConfigData = snap.data();
       this.watsonCompanies = resolveCompanies(this.watsonConfigData);
-      if (!findCompany(this.watsonCompanies, this.selectedCompanyKey)) {
+      // Only fall back while the choice is still open. A locked company that
+      // has since vanished from the config must fail at submit, not be
+      // silently swapped for another one.
+      if (!this.companyLocked && !findCompany(this.watsonCompanies, this.selectedCompanyKey)) {
         this.selectedCompanyKey = this.watsonCompanies[0]?.key || DEFAULT_COMPANY_KEY;
       }
       return this.watsonCompanies.length > 0;
@@ -1955,9 +1984,9 @@ private validateAddonsJourney(): boolean {
 
           var templateID;
           if ([null, undefined, ""].includes(watsonParticipantData['gstno']) || watsonParticipantData['gstno'].substring(0, 2) == gstdetails['statecode']) {
-            templateID = 40962079;
+            templateID = 47823311; // CGST + SGST (intra-state)
           } else {
-            templateID = 40962160;
+            templateID = 47823339; // IGST (inter-state)
           }
 
           watsonPaymentData['gstdetails'] = gstdetails;
