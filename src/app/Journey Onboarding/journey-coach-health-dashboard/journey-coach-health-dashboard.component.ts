@@ -56,6 +56,7 @@ interface PortfolioRow {
   number: string | null;
   email: string | null;
   coachname: string;
+  coachedby?: any;                  // raw coachedby ref (real coach OR stale non-journeycoach id) — kept so the Unassign action stays available when coachNameFor resolves the name to '—' (doc item 2)
   journeyname: string;
   atcmodel: string | null;
   productType: ProductType;        // ecosystem / dfu / gifts / other (derived from journey.type)
@@ -1420,6 +1421,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       number: meta['phonenumber'] ?? meta['number'] ?? null,
       email: meta['email'] ?? null,
       coachname: this.coachNameFor(meta['coachedby']),
+      coachedby: meta['coachedby'] ?? null,
       journeyname: this.journeyLabelFor(journeyId),
       atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
       productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
@@ -3009,8 +3011,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } else {
       id = coachedby?.id ?? null;
     }
-    return id ? (this.coaches.find(c => c.id === id)?.name ?? this.metaMap?.docdata?.[id]?.['name'] ?? '—') : '—';
+    // ACTUAL journey coaches only (doc item 2): a coachedby pointing at someone who is NOT a
+    // journeycoach must NOT render their name — resolve only within this.coaches, else '—'
+    // (the raw ref is still carried on the row as `coachedby` so it stays clearable).
+    return id ? (this.coaches.find(c => c.id === id)?.name ?? '—') : '—';
   }
+
+  /** Row still holds a coachedby ref (a real coach OR a stale non-journeycoach id) — used to keep the
+   *  row-menu "Unassign" action available even when coachNameFor resolves the name to '—' (doc item 2). */
+  rowHasCoachRef(r: PortfolioRow): boolean { return !this.isUnassigned(r.coachedby); }
 
   private isMine(coachedby: any, coachId: string): boolean {
     if (!coachId || coachedby == null) return false;

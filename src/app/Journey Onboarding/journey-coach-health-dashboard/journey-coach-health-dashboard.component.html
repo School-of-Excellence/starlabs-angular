@@ -730,7 +730,7 @@
                 <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
                 <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
               </button>
-              <button mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
+              <button mat-menu-item class="assign-unassign" *ngIf="rowHasCoachRef(r)"
                       (click)="unassignCoach(r)">
                 <mat-icon>person_remove</mat-icon>
                 <span>Unassign (remove coach)</span>
