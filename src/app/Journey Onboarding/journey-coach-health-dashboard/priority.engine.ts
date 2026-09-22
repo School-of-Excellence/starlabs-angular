@@ -31,6 +31,9 @@ export interface PriorityInput {
   openTickets: number;
   opportunities: string[];
   opportunitiesConsumed: string[];
+  /** A&H love-letter / ask-A&H tags (unresolved, recent). Optional: absent = not tagged. */
+  llCritical?: boolean;
+  llAttention?: boolean;
 }
 
 export type PriorityBand = 'High' | 'Medium' | 'Low';
@@ -49,9 +52,15 @@ export const RENEWAL_DAYS = 90;
 export const HIGH_MIN = 40;
 export const MEDIUM_MIN = 22;
 
+/** A&H tag weights (component W_LL_CRITICAL / W_LL_ATTENTION). */
+export const LL_CRITICAL_WEIGHT = 30;
+export const LL_ATTENTION_WEIGHT = 18;
+
 export interface PriorityThresholds {
   quietDays: number;
   renewalDays: number;
+  llCriticalWeight?: number;
+  llAttentionWeight?: number;
 }
 
 const DEFAULTS: PriorityThresholds = { quietDays: QUIET_DAYS, renewalDays: RENEWAL_DAYS };
@@ -92,12 +101,15 @@ export function bandFor(priority: number): PriorityBand {
  *   in renewal window        -> up to 32, scaled by how close the renewal is, +8 if continuity is open
  *   payments defaulted/locked-> 26   (late -> 15)
  *   open tickets             -> 4 each, counting at most 3
+ *   A&H critical / attention -> 30 / 18 (llCriticalWeight / llAttentionWeight)
  *
  * NOTE (carried over from the original): customerstatus 'late' means the participant is gone
  * (unactionable). It does NOT add priority; such rows are excluded from the active board upstream.
  */
 export function scorePriority(r: PriorityInput, thresholds: PriorityThresholds = DEFAULTS): PriorityResult {
   const { quietDays, renewalDays } = thresholds;
+  const llCriticalWeight = thresholds.llCriticalWeight ?? LL_CRITICAL_WEIGHT;
+  const llAttentionWeight = thresholds.llAttentionWeight ?? LL_ATTENTION_WEIGHT;
   let p = 0;
   const drivers: string[] = [];
 
@@ -119,6 +131,8 @@ export function scorePriority(r: PriorityInput, thresholds: PriorityThresholds =
     p += Math.min(r.openTickets, 3) * 4;
     drivers.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
   }
+  if (r.llCritical) { p += llCriticalWeight; drivers.push('A&H critical'); }
+  if (r.llAttention) { p += llAttentionWeight; drivers.push('A&H needs attention'); }
 
   const priority = Math.max(0, Math.min(100, Math.round(p)));
   return {

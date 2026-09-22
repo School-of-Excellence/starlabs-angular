@@ -1963,3 +1963,17 @@ If it is picked up again, the two things that made it awkward were:
    on a name, so paging hides groups reachable no other way. Part 32 widened the window on search.
 2. **Pinned chats.** Server-side ordering is `last_modification desc`, so a pinned but idle group can
    fall outside the first pages. Needs a second `where pinned == true` query and another index.
+
+## Part 34 — 2026-09-18: CTA links saved without a scheme
+
+**Found:** the link form stored the URL exactly as typed. `google.com` went out with no scheme, so
+the browser treated `<a href="google.com">` as a relative path and the app's `launchUrl` could not
+open it at all (reported as "the button doesn't take anywhere" on the app receiver).
+
+**Change:** `static withScheme(url)` adds `https://` when no scheme is present. Applied in
+`insertLink()` (new buttons are saved correctly) and in `parseButtons()` (old stored buttons are
+fixed on read — no data migration). The app got the same guard (see breakthroughs-flutter journal
+`2026-09-18-chat-bullets-and-link-buttons.md`).
+
+**Revert:** remove `withScheme` and its two call sites (`insertLink` → `href: url.trim()`,
+`parseButtons` → `href: b.url`).
