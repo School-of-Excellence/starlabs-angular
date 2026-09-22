@@ -441,3 +441,49 @@ describe('WorkshopDashboard — Users Not in Chat Group', () => {
     });
   });
 });
+
+describe('WorkshopDashboard — All Assignments: a text answer expands its own card', () => {
+  function make(): any {
+    const c: any = Object.create(WorkshopDashboardComponent.prototype);
+    c.expandedAssignmentTexts = new Set<string>();
+    c.viewed = [];
+    c.viewParticipantAssignment = (a: any, p: any) => { c.viewed.push(p.profileid); };
+    return c;
+  }
+  const text = { profileid: 'p1', assignmentType: 'question', submissionformat: 'text', result: 'A long typed answer…', hasResult: true };
+  const text2 = { profileid: 'p2', assignmentType: 'question', submissionformat: 'text', result: 'Another answer', hasResult: true };
+  const upload = { profileid: 'p3', assignmentType: 'question', submissionformat: 'upload', assignmentresult: [{}], hasResult: true };
+  const form = { profileid: 'p4', assignmentType: 'form', result: { id: 'r' }, hasResult: true };
+  const none = { profileid: 'p5', assignmentType: 'question', submissionformat: 'text', result: '', hasResult: false };
+
+  it('recognises a typed answer, and only that', () => {
+    const c = make();
+    expect(c.isTextSubmission(text)).toBe(true);
+    expect(c.isTextSubmission(upload)).toBe(false);
+    expect(c.isTextSubmission(form)).toBe(false);
+    expect(c.isTextSubmission(none)).toBe(false);
+  });
+
+  it('clicking a text card expands that card only; clicking again collapses it', () => {
+    const c = make();
+    c.onAssignmentCardClick({}, 0, text);
+    expect(c.isAssignmentTextExpanded(0, text)).toBe(true);
+    expect(c.isAssignmentTextExpanded(0, text2)).toBe(false);          // the neighbour stays clamped
+    expect(c.isAssignmentTextExpanded(1, text)).toBe(false);           // same person under another assignment too
+    c.onAssignmentCardClick({}, 0, text);
+    expect(c.isAssignmentTextExpanded(0, text)).toBe(false);
+    expect(c.viewed).toEqual([]);                                      // no viewer dialog for text
+  });
+
+  it('files and forms still open their viewer instead of expanding', () => {
+    const c = make();
+    c.onAssignmentCardClick({}, 0, upload); c.onAssignmentCardClick({}, 0, form);
+    expect(c.viewed).toEqual(['p3', 'p4']);
+    expect(c.expandedAssignmentTexts.size).toBe(0);
+  });
+
+  it('a card with no result does nothing on click', () => {
+    const c = make(); c.onAssignmentCardClick({}, 0, none);
+    expect(c.viewed).toEqual([]); expect(c.expandedAssignmentTexts.size).toBe(0);
+  });
+});
