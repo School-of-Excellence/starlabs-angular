@@ -125,7 +125,7 @@
           <div class="mcard"
               *ngFor="let entry of dfuProductsMap | keyvalue"
               [class.selected]="selectedProductId === entry.key"
-              (click)="selectProduct(entry.key)">
+              (click)="selectProduct(entry.key, entry.value.product || entry.key)">
             <div class="top">
               <div class="avatar" [style.background]="tokColor(entry.key)">{{ (entry.value.product || entry.key).substring(0,2).toUpperCase() }}</div>
               <div class="name-strong">{{ entry.value.product || entry.key }}</div>
@@ -136,10 +136,10 @@
         <!-- ===== STATS (only after a product is selected) ===== -->
         <ng-container *ngIf="selectedProductId">
 
-          <div class="empty" *ngIf="loadingParticipants">Loading participants for {{ selectedProductId }}…</div>
+          <div class="empty" *ngIf="loadingParticipants">Loading participants for {{ selectedProductName }}…</div>
 
           <ng-container *ngIf="!loadingParticipants">
-            <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-top:18px;">
+            <div class="stats" style="grid-template-columns:repeat(5,1fr);margin-top:18px;">
               <div class="stat" [class.sel]="statusView === 'ongoing'" [style.--sc]="'var(--c-ontrack)'" (click)="setStatusView('ongoing')">
                 <div class="top"><span class="lbl">Ongoing</span><span class="dot"></span></div>
                 <div class="num">{{ ongoingEntries.length }}</div>
@@ -151,12 +151,36 @@
                 <div class="num">{{ notStartedCount }}</div>
                 <div class="desc">Diagnostics ready, not yet begun</div>
               </div>
+
+              <div class="stat" [class.sel]="statusView === 'needsAttention'" [style.--sc]="'var(--c-attention)'" (click)="setStatusView('needsAttention')">
+                <div class="top"><span class="lbl">Needs attention</span><span class="dot"></span></div>
+                <div class="num">{{ needsAttentionCount }}</div>
+                <div class="desc">Waiting 7+ days for next appointment</div>
+              </div>
+
+              <div class="stat" [class.sel]="statusView === 'completed'" [style.--sc]="'var(--c-done)'" (click)="setStatusView('completed')">
+                <div class="top"><span class="lbl">Completed</span><span class="dot"></span></div>
+                <div class="num">{{ completedCount }}</div>
+                <div class="desc">Product marked completed</div>
+              </div>
+
+              <div class="stat" [class.sel]="statusView === 'awaitingSignoff'" [style.--sc]="'var(--c-await)'" (click)="setStatusView('awaitingSignoff')">
+                <div class="top"><span class="lbl">Awaiting sign-off</span><span class="dot"></span></div>
+                <div class="num">{{ awaitingSignoffCount }}</div>
+                <div class="desc">Completed 30+ days ago, no sign-off</div>
+              </div>
             </div>
 
             <div class="panel" style="margin-top:16px;">
               <div class="head">
-                <h3>{{ selectedProductId }} — participants</h3>
-                <span class="sub">{{ statusView === 'notStarted' ? 'Not started · ' : 'Ongoing · ' }}{{ displayedEntries.length }} participants</span>
+                <h3>{{ selectedProductName }} — participants</h3>
+                <span class="sub">
+                  {{ statusView === 'notStarted' ? 'Not started · '
+                    : statusView === 'needsAttention' ? 'Needs attention · '
+                    : statusView === 'completed' ? 'Completed · '
+                    : statusView === 'awaitingSignoff' ? 'Awaiting sign-off · '
+                    : 'Ongoing · ' }}{{ displayedEntries.length }} participants
+                </span>
               </div>
               <div class="body">
                 <table class="tbl tbl-overview">
@@ -176,6 +200,9 @@
                         {{ (entry.value.participantproducts || []).length }}
                         product{{ (entry.value.participantproducts || []).length > 1 ? 's' : '' }}
                         <span class="tag" style="margin-left:8px;background:var(--surface-3);color:var(--muted)" *ngIf="entry.value.notstartedparticipant">Not started</span>
+                        <span class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-attention) 15%, transparent);color:var(--c-attention)" *ngIf="entry.value.needsattention">Needs attention</span>
+                        <span class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-done) 15%, transparent);color:var(--c-done)" *ngIf="entry.value.completed">Completed</span>
+                        <span class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-await) 15%, transparent);color:var(--c-await)" *ngIf="entry.value.awaitingsignoff">Awaiting sign-off</span>
                       </td>
                     </tr>
 
@@ -226,14 +253,14 @@
         </div>
 
         <div class="cards">
-          <div class="empty" *ngIf="!productCardGroups.length">No DFU products found.</div>
+          <div class="empty" *ngIf="!(dfuProductsMap | keyvalue).length">No DFU products found.</div>
           <div class="mcard"
-              *ngFor="let group of productCardGroups"
-              [class.selected]="selectedProductId === group.displayName"
-              (click)="selectProduct(group.displayName, group.docIds)">
+              *ngFor="let entry of dfuProductsMap | keyvalue"
+              [class.selected]="selectedProductId === entry.key"
+              (click)="selectProduct(entry.key, entry.value.product || entry.key)">
             <div class="top">
-              <div class="avatar" [style.background]="tokColor(group.displayName)">{{ group.displayName.substring(0,2).toUpperCase() }}</div>
-              <div class="name-strong">{{ group.displayName }}</div>
+              <div class="avatar" [style.background]="tokColor(entry.key)">{{ (entry.value.product || entry.key).substring(0,2).toUpperCase() }}</div>
+              <div class="name-strong">{{ entry.value.product || entry.key }}</div>
             </div>
           </div>
         </div>

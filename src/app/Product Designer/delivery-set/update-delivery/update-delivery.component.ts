@@ -113,6 +113,7 @@ export class UpdateDeliveryComponent {
         duration: [, {validators: [Validators.required], updateOn:"change"}],
         ischangeworkrequired: [false, {validators: [], updateOn:"change"}],
         groupappointment: [false, {validators: [], updateOn:"change"}],
+        queueappointment: [false, {validators: [], updateOn:"change"}],
         maxbooking: [1, {validators: [], updateOn:"change"}],
         docid: [, {}]
       })
@@ -160,6 +161,7 @@ export class UpdateDeliveryComponent {
           duration: dialogdata.duration,
           ischangeworkrequired: dialogdata.ischangeworkrequired ?? false,
           groupappointment: dialogdata.groupappointment ?? false,
+          queueappointment: dialogdata.queueappointment ?? false,
           maxbooking: dialogdata.maxbooking ?? null,
           docid: dialogdata.docid
         })
@@ -304,6 +306,20 @@ export class UpdateDeliveryComponent {
     this.dialogRef.close()
   }
 
+  onGroupAppointmentChange(){
+    const groupAppointmentChecked = this.appointmentform.get('groupappointment').value
+    if(groupAppointmentChecked){
+      this.appointmentform.get('queueappointment').setValue(false)
+    }
+  }
+
+  onQueueAppointmentChange(){
+    const queueAppointmentChecked = this.appointmentform.get('queueappointment').value
+    if(queueAppointmentChecked){
+      this.appointmentform.get('groupappointment').setValue(false)
+    }
+  }
+
   ngAfterViewInit() {
     if(this.selectedType == "Form"){
       setTimeout(() => {
@@ -364,11 +380,12 @@ export class UpdateDeliveryComponent {
       this.loading = true
       var docid = value.docid ?? doc(collection(this.firestore,"appointmenttype")).id
       const docRef = doc(this.firestore,"appointmenttype",docid)
-      setDoc(docRef,{
+       setDoc(docRef,{
         appointmenttype: value.appointmentname,
         duration: value.duration,
         ischangeworkrequired: value.ischangeworkrequired,
         groupappointment: value.groupappointment,
+        queueappointment: value.queueappointment,
         maxbooking: value.groupappointment ? value.maxbooking : null,
         id: docid
       },{merge:true}).then(()=>{

@@ -226,7 +226,8 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   ahMemberProfileIds: Set<string> = new Set();
   overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
   selectedProductId: string | null = null;
-  statusView: 'ongoing' | 'notStarted' = 'ongoing';
+  selectedProductName: string | null = null;
+  statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
   
   // Boolean declarations
   drawerOpen = false;
@@ -250,18 +251,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
   expandedOverviewProduct: { [key: string]: boolean } = {};
-
-  readonly productNameGroups: { [displayName: string]: string[] } = {
-    'EI Custom Solutions': [
-      'EI Solution',
-      'EI Custom Solutions',
-      'EI Solution for Wife',
-      'EI Solution for Husband',
-      'EI for Entrepreneurs',
-      'EI for Academy Growth',
-    ],
-  };
-
   ongoingparticipants: {
     [profileId: string]: {
       name: string;
@@ -269,6 +258,9 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       activeproduct: string[];
       participantproducts?: any[];   
       notstartedparticipant?: boolean;
+      needsattention?: boolean;
+      completed?: boolean;
+      awaitingsignoff?: boolean;
     };
   } = {};
   
@@ -280,10 +272,10 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   async ngOnInit() {
     await Promise.all([
       this.getDfuProducts(),
-      this.getParticipantMetadata()
+      this.getParticipantMetadata(),
+      this.getAhMembers()
     ]);
   }
-
   // get ahmember from users_roles
   async getAhMembers(){
     try {
@@ -300,8 +292,9 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
   }
 
-  async selectProduct(displayName: string, docIds: string[] = [displayName]): Promise<void> {
-    this.selectedProductId = displayName;
+  async selectProduct(docId: string, displayName: string = docId, docIds: string[] = [docId]): Promise<void> {
+    this.selectedProductId = docId;
+    this.selectedProductName = displayName;
     this.selectedProductIds = docIds;
     this.statusView = 'ongoing';
     this.loadingParticipants = true;
@@ -379,7 +372,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         const productRefId = data['productref']?.id;
         const status = data['status'];
         const isSelectedProduct = this.selectedProductIds.includes(productRefId);
-        const isActiveStatus = status === 'ongoing' || status === 'initiated';
+        const isActiveStatus = status === 'ongoing' || status === 'initiated' || status === 'completed';
 
         if (!isSelectedProduct || !isActiveStatus) {
           return;
@@ -397,6 +390,19 @@ export class TeamEvolutionDashboardComponent implements OnInit {
           participant.participantproducts = [];
         }
         participant.participantproducts.push(participantProduct);
+
+        const completedTimestamp = data['statusdate']?.['completed'];
+        const isCompletedProduct = !!completedTimestamp;
+
+        if (isCompletedProduct) {
+          participant.completed = true;
+          const completedDate = completedTimestamp.toDate();
+          const daysSinceCompletion = this.daysSince(completedDate);
+          const isAwaitingSignoff = daysSinceCompletion > 30;
+          if (isAwaitingSignoff) {
+            participant.awaitingsignoff = true;
+          }
+        }
       });
     }
 
@@ -446,6 +452,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   async buildStepList(deliverySteps: any[], participant: any): Promise<{ step: number; deliveryname: string; status: string }[]> {
     const stepList: { step: number; deliveryname: string; status: string }[] = [];
+    let previousCompletedDate: Date | null = null;
 
     for (let i = 0; i < deliverySteps.length; i++) {
       const seqStep = deliverySteps[i];
@@ -455,11 +462,19 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       const deliveryType = deliverableData?.['type'];
       let deliveryName = '';
       let appointmentType = '';
+      let completedDate: Date | null = null;
 
       if (deliveryType === 'appointment') {
         const appointmentDoc = await getDoc(deliverableData['deliveryref']);
-        appointmentType = appointmentDoc.data()?.['appointmenttype'] || '';
+        const appointmentData = appointmentDoc.data();
+        appointmentType = appointmentData?.['appointmenttype'] || '';
         deliveryName = appointmentType;
+
+        const isCompletedAppointment = deliveryStatus === 'completed';
+        if (isCompletedAppointment) {
+          const endTimestamp = appointmentData?.['appointmentend'] || appointmentData?.['endtime'];
+          completedDate = endTimestamp ? endTimestamp.toDate() : null;
+        }
       } else if (deliveryType === 'form') {
         const form = await getDoc(deliverableData['deliveryref']);
         deliveryName = form.data()?.['formname'] || '';
@@ -479,41 +494,27 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       if (isDiagnosticsAppointment && isReady) {
         participant.notstartedparticipant = true;
       }
+
+      const isWaitingOnNextAppointment = isReady && previousCompletedDate !== null;
+      if (isWaitingOnNextAppointment) {
+        const daysSinceLastCompletion = this.daysSince(previousCompletedDate!);
+        const isOverdue = daysSinceLastCompletion > 7;
+        if (isOverdue) {
+          participant.needsattention = true;
+        }
+      }
+
+      if (completedDate) {
+        previousCompletedDate = completedDate;
+      }
     }
 
     return stepList;
   }
 
   // Helper functions
-  get productCardGroups(): { displayName: string; docIds: string[] }[] {
-    const groups: { [displayName: string]: string[] } = {};
-
-    Object.keys(this.dfuProductsMap).forEach(docId => {
-      const productName = this.dfuProductsMap[docId]?.product || docId;
-      const displayName = this.resolveDisplayName(productName);
-
-      if (!groups[displayName]) {
-        groups[displayName] = [];
-      }
-      groups[displayName].push(docId);
-    });
-
-    return Object.keys(groups).map(displayName => ({ displayName, docIds: groups[displayName] }));
-  }
-
-  resolveDisplayName(productName: string): string {
-    const groupKeys = Object.keys(this.productNameGroups);
-
-    for (const groupKey of groupKeys) {
-      const aliases = this.productNameGroups[groupKey];
-      const isAlias = aliases.includes(productName);
-
-      if (isAlias) {
-        return groupKey;
-      }
-    }
-
-    return productName;
+  private daysSince(date: Date): number {
+    return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
   }
 
   toggleOverviewRow(profileid: string): void {
@@ -521,12 +522,16 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     this.expandedOverviewRowId = isSameRow ? null : profileid;
   }
 
-  setStatusView(view: 'ongoing' | 'notStarted'): void {
+  setStatusView(view: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff'): void {
     this.statusView = view;
   }
 
   get displayedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return this.statusView === 'notStarted' ? this.notStartedEntries : this.ongoingEntries;
+    if (this.statusView === 'notStarted') { return this.notStartedEntries; }
+    if (this.statusView === 'needsAttention') { return this.needsAttentionEntries; }
+    if (this.statusView === 'completed') { return this.completedEntries; }
+    if (this.statusView === 'awaitingSignoff') { return this.awaitingSignoffEntries; }
+    return this.ongoingEntries;
   }
 
   toggleOverviewStatus(status: 'ongoing' | 'completed' | 'notStarted'): void {
@@ -550,6 +555,30 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
   get notStartedCount(): number {
     return this.notStartedEntries.length;
+  }
+
+  get needsAttentionEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.needsattention === true);
+  }
+
+  get needsAttentionCount(): number {
+    return this.needsAttentionEntries.length;
+  }
+
+  get completedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.completed === true);
+  }
+
+  get completedCount(): number {
+    return this.completedEntries.length;
+  }
+
+  get awaitingSignoffEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.awaitingsignoff === true);
+  }
+
+  get awaitingSignoffCount(): number {
+    return this.awaitingSignoffEntries.length;
   }
 
   toggleOverviewProduct(participantproductid: string): void {

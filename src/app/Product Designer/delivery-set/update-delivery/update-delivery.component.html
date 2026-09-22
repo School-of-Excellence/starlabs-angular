@@ -36,7 +36,8 @@
         <mat-checkbox formControlName="ischangeworkrequired">Is Changework Required</mat-checkbox>
         <br>
 
-        <mat-checkbox formControlName="groupappointment">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox formControlName="groupappointment" (change)="onGroupAppointmentChange()">Mark as Group Appointment</mat-checkbox>
+        <mat-checkbox formControlName="queueappointment" (change)="onQueueAppointmentChange()">Mark as Queue Appointment</mat-checkbox>
         <div *ngIf="appointmentform.get('groupappointment').value">
           <mat-form-field class="textField" appearance="outline">
             <mat-label>Maximum Slots</mat-label>
