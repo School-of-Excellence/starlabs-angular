@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/audit-spec",
+    "types": ["jasmine"]
+  },
+  "include": [
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.needs-attention.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}
