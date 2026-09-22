@@ -10,7 +10,18 @@
   display: block;
   min-height: 100vh;   /* fill the viewport so the themed canvas never leaves the page half white/black */
   color: var(--ink);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  /* Type + spacing + radius scales — theme-invariant, so defined once here and inherited everywhere
+     (colors stay on .jchd-wrap with their dark overrides). Foundation only: existing usages are
+     migrated onto these incrementally, so adding them shifts nothing on its own. */
+  --font-sans: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  --fs-100: 11px; --fs-200: 12px; --fs-300: 13px; --fs-400: 14px; --fs-500: 16px;
+  --fs-600: 18px; --fs-700: 24px; --fs-800: 30px; --fs-900: 34px; --fs-display: 40px;
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+  --lh-tight: 1; --lh-snug: 1.2; --lh-normal: 1.4;
+  --ls-display: -0.02em; --ls-tight: -0.01em; --ls-normal: 0; --ls-caps: 0.06em;
+  --sp-0: 2px; --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-7: 32px;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 20px; --r-pill: 999px;
+  font-family: var(--font-sans);
   font-feature-settings: "tnum" 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -47,7 +58,7 @@
   --blue-12: rgba(0,122,255,0.12);
   --blue-16: rgba(0,122,255,0.16);
   --blue-22: rgba(0,122,255,0.22);
-  --card-radius: 18px; --card-pad: 16px; --gap: 12px; --stack: 8px; --nest-radius: 12px; --icon-radius: 8px;
+  --card-radius: var(--r-lg); --card-pad: var(--sp-4); --gap: var(--sp-3); --stack: var(--sp-2); --nest-radius: 12px; --icon-radius: 8px;
   --card-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 28px -18px rgba(0,0,0,0.16);
   --card-shadow-hover: 0 1px 2px rgba(0,0,0,0.05), 0 16px 34px -18px rgba(0,0,0,0.22);
   --sem-red: #d70015; --sem-red-strong: #ff3b30; --sem-orange-fg: #c25e00; --sem-orange: #ff9500;
@@ -272,7 +283,7 @@
 .jchd-assign .assign-text {
   font-size: 13px;
   color: var(--blue-fg);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -393,7 +404,7 @@
   line-height: 1;
   color: var(--ink);
   letter-spacing: -0.03em;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -520,7 +531,7 @@
   font-size: 12px;
   color: var(--muted);
   margin: 8px 2px 12px;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1032,13 +1043,9 @@
 .jchd-table th.mat-mdc-header-cell {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--faint);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--faint);
-  font-weight: 600;
   letter-spacing: 0.07em;
+  color: var(--faint);
+  font-weight: 600;
   border-bottom: 1px solid var(--hairline);
   background: var(--surface);
   padding-top: 14px;
@@ -1136,7 +1143,7 @@
   display: block;
   font-size: 11.5px;
   color: var(--faint);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1279,7 +1286,7 @@ a.name-link:hover, a.name-link:focus {
 .text-warn {
   color: var(--sem-orange-fg);
   font-weight: 650;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1287,7 +1294,7 @@ a.name-link:hover, a.name-link:focus {
 
 /* renewal / last-touch dates carry numerics */
 td.mat-mdc-cell span {
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1301,7 +1308,7 @@ td.mat-mdc-cell span {
   font-size: 11.5px;
   font-weight: 650;
   white-space: nowrap;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1390,7 +1397,7 @@ td.mat-mdc-cell span {
   font-size: 11.5px;
   font-weight: 650;
   text-transform: capitalize;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1622,7 +1629,7 @@ td.mat-mdc-cell span {
 }
 .scoreboard-table tbody td.num {
   text-align: right;
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1655,7 +1662,7 @@ td.mat-mdc-cell span {
   font-weight: 700;
   color: var(--muted);
   background: var(--hairline-2);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1679,7 +1686,7 @@ td.mat-mdc-cell span {
 .cov-line {
   font-weight: 650;
   color: var(--ink);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1713,7 +1720,7 @@ td.mat-mdc-cell span {
   color: var(--blue-fg);
   background: var(--blue-08);
   box-shadow: inset 0 0 0 1px var(--blue-22);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1741,7 +1748,7 @@ td.mat-mdc-cell span {
   margin: 4px 0 0;
   font-size: 12.5px;
   color: var(--muted);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1749,7 +1756,7 @@ td.mat-mdc-cell span {
 .wl-head .wl-diag {
   font-size: 11.5px;
   color: var(--faint);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
@@ -1826,7 +1833,7 @@ td.mat-mdc-cell span {
 .wl-meta {
   font-size: 12px;
   color: var(--muted);
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: -0.01em;
