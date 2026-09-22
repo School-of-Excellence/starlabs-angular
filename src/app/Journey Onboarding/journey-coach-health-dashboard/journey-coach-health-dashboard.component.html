@@ -951,6 +951,9 @@
                     [matTooltip]="(r.coachHealthState.note || 'No note') + ' · ' + fmtDate(r.coachHealthState.date)">{{ healthLabel(r.coachHealthState.state) }}</span>
               <span class="chip" *ngIf="r.customerstatus" [ngClass]="statusClass(r.customerstatus)">{{ r.customerstatus }}</span>
               <span class="chip chip-bad" *ngIf="r.financialstatus === 'locked' || r.financialstatus === 'defaulted'">{{ r.financialstatus }}</span>
+              <span class="chip chip-bad" *ngIf="r.llCritical">A&amp;H critical</span>
+              <span class="chip chip-warn" *ngIf="r.llAttention">A&amp;H needs attention</span>
+              <span class="chip" *ngIf="r.llOpportunity">A&amp;H opportunity</span>
             </div>
           </div>
 
