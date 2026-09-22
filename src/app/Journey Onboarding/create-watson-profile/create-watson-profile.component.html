@@ -237,17 +237,22 @@
                     <mat-select data-testid="cwp-sel-020" name="gstcompany"
                       [ngModel]="selectedCompanyKey"
                       (ngModelChange)="onCompanyChange($event)"
-                      [disabled]="watsonCompanies.length < 2">
+                      [disabled]="watsonCompanies.length < 2 || companyLocked">
                       <mat-option *ngFor="let company of watsonCompanies" [value]="company.key">
                         {{ company.title }}
                       </mat-option>
                     </mat-select>
                   </mat-form-field>
-                  <small class="text-muted" *ngIf="watsonCompanies.length > 1">
+                  <small class="text-muted" *ngIf="watsonCompanies.length > 1 && !companyLocked">
                     Invoice will be issued from
                     <strong>{{ activeCompany?.title }}</strong>'s GST registration.
+                    Finance fixes this at Initial Payment Approval.
                   </small>
-                  <small class="text-muted" *ngIf="watsonCompanies.length < 2">
+                  <small class="text-muted" *ngIf="companyLocked">
+                    Fixed by Finance at Initial Payment Approval —
+                    <strong>{{ activeCompany?.title ?? saleData['gstcompanytitle'] ?? selectedCompanyKey }}</strong>.
+                  </small>
+                  <small class="text-muted" *ngIf="watsonCompanies.length < 2 && !companyLocked">
                     Only one company is configured in Watson, so there is nothing to choose.
                   </small>
                 </div>
