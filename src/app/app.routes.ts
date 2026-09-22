@@ -268,6 +268,8 @@ export const routes: Routes = [
   {path: 'bigactivity', loadComponent: () => import('./big/big-activity/big-activity.component').then(m => m.BigActivityComponent), canActivate:[authGuard]},
   {path: 'arena_space', loadComponent: () => import('./big/create-arena-space/create-arena-space.component').then(m => m.CreateArenaSpaceComponent), canActivate:[authGuard]},
   {path: 'bigactivitylog', loadComponent: () => import('./big/big-activity-log/big-activity-log.component').then(m => m.BigActivityLogComponent), canActivate:[authGuard]},
+  {path: 'big-ladder', loadComponent: () => import('./big/big-ladder/big-ladder.component').then(m => m.BigLadderComponent), canActivate:[authGuard]},
+
 
   // Notifications
   {path: 'notificationlog', loadComponent: () => import('./AppEngagement/notifications-log/notifications-log.component').then(m => m.NotificationsLogComponent), canActivate:[authGuard]},

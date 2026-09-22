@@ -1,0 +1,1074 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.bl-app {
+    background: #F2F2F7;
+    color: #1C1C1E;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    padding: 20px 16px 48px;
+    box-sizing: border-box;
+}
+
+.bl-app * {
+    box-sizing: border-box
+}
+
+/* the sort radios are functional, not visible */
+.bl-switch {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   2. CARD
+   -------------------------------------------------------------------------- */
+.bl-card {
+    max-width: 1600px;
+    margin: 0 auto;
+    background: #FFFFFF;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 10px 30px rgba(0, 0, 0, .05);
+}
+
+.bl-scroll {
+    overflow-x: auto
+}
+
+.bl-grid {
+    min-width: 1020px
+}
+
+/* one column template shared by the heading row, the totals row and every
+   data row - this is what keeps the columns lined up without a <table> */
+.bl-head,
+.bl-summary,
+.bl-row {
+    display: grid;
+    grid-template-columns: 62px minmax(180px, 1fr) 112px 100px 104px 108px 164px 178px;
+    align-items: center;
+}
+
+/* --------------------------------------------------------------------------
+   3. COLUMN HEADINGS - each one is a label bound to a sort radio
+   -------------------------------------------------------------------------- */
+.bl-head {
+    background: #FFFFFF;
+    border-bottom: .5px solid rgba(60, 60, 67, .16);
+}
+
+.bl-head .bl-cell {
+    padding: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: rgba(60, 60, 67, .62);
+}
+
+.bl-head label {
+    display: block;
+    padding: 12px 10px;
+    cursor: pointer;
+    text-align: right;
+}
+
+.bl-head .bl-left label {
+    text-align: left
+}
+
+.bl-head .bl-h-rank {
+    padding: 12px 10px
+}
+
+.bl-head label:hover {
+    color: #1C1C1E
+}
+
+.bl-caret {
+    margin-left: 3px;
+    font-size: 9px;
+    opacity: 0;
+}
+
+/* --------------------------------------------------------------------------
+   4. TOTALS STRIP
+   -------------------------------------------------------------------------- */
+.bl-summary {
+    background: #F7F7FA;
+    border-bottom: .5px solid rgba(60, 60, 67, .16);
+}
+
+.bl-summary .bl-cell {
+    padding: 7px 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: rgba(60, 60, 67, .62);
+    font-variant-numeric: tabular-nums;
+}
+
+.bl-sumlabel {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: rgba(60, 60, 67, .36);
+}
+
+.bl-mark {
+    color: rgba(60, 60, 67, .36);
+    margin-right: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   5. ROWS
+   -------------------------------------------------------------------------- */
+.bl-rows {
+    display: flex;
+    flex-direction: column
+}
+
+.bl-row {
+    border-bottom: .5px solid rgba(60, 60, 67, .16)
+}
+
+.bl-row:hover {
+    background: #F7F7FA
+}
+
+.bl-cell {
+    padding: 10px;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 14px;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+    color: #1C1C1E;
+}
+
+.bl-left {
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.bl-rank {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(60, 60, 67, .36);
+    font-variant-numeric: tabular-nums;
+}
+
+.bl-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    flex: none;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .2px;
+    color: #FFFFFF;
+}
+
+.bl-person {
+    display: flex;
+    flex-direction: column
+}
+
+.bl-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -.2px;
+    color: #1C1C1E;
+}
+
+.bl-pod {
+    font-size: 12.5px;
+    color: rgba(60, 60, 67, .62);
+}
+
+/* keyboard focus has to stay visible even though the radios are hidden */
+.bl-switch:focus-visible~.bl-card {
+    outline: 3px solid #007AFF;
+    outline-offset: 2px
+}
+
+/* --------------------------------------------------------------------------
+   6. SORTING
+   Each radio rewrites the running order of the rows. The rank number is the
+   participant's position by current level, so it stays with the person rather
+   than renumbering under a different sort.
+   -------------------------------------------------------------------------- */
+/* sorted by n */
+#bl-sort-n:checked~.bl-card .bl-r0 {
+    order: 2
+}
+
+#bl-sort-n:checked~.bl-card .bl-r1 {
+    order: 11
+}
+
+#bl-sort-n:checked~.bl-card .bl-r2 {
+    order: 26
+}
+
+#bl-sort-n:checked~.bl-card .bl-r3 {
+    order: 3
+}
+
+#bl-sort-n:checked~.bl-card .bl-r4 {
+    order: 15
+}
+
+#bl-sort-n:checked~.bl-card .bl-r5 {
+    order: 20
+}
+
+#bl-sort-n:checked~.bl-card .bl-r6 {
+    order: 23
+}
+
+#bl-sort-n:checked~.bl-card .bl-r7 {
+    order: 4
+}
+
+#bl-sort-n:checked~.bl-card .bl-r8 {
+    order: 13
+}
+
+#bl-sort-n:checked~.bl-card .bl-r9 {
+    order: 21
+}
+
+#bl-sort-n:checked~.bl-card .bl-r10 {
+    order: 0
+}
+
+#bl-sort-n:checked~.bl-card .bl-r11 {
+    order: 8
+}
+
+#bl-sort-n:checked~.bl-card .bl-r12 {
+    order: 16
+}
+
+#bl-sort-n:checked~.bl-card .bl-r13 {
+    order: 17
+}
+
+#bl-sort-n:checked~.bl-card .bl-r14 {
+    order: 25
+}
+
+#bl-sort-n:checked~.bl-card .bl-r15 {
+    order: 5
+}
+
+#bl-sort-n:checked~.bl-card .bl-r16 {
+    order: 12
+}
+
+#bl-sort-n:checked~.bl-card .bl-r17 {
+    order: 14
+}
+
+#bl-sort-n:checked~.bl-card .bl-r18 {
+    order: 18
+}
+
+#bl-sort-n:checked~.bl-card .bl-r19 {
+    order: 7
+}
+
+#bl-sort-n:checked~.bl-card .bl-r20 {
+    order: 9
+}
+
+#bl-sort-n:checked~.bl-card .bl-r21 {
+    order: 22
+}
+
+#bl-sort-n:checked~.bl-card .bl-r22 {
+    order: 1
+}
+
+#bl-sort-n:checked~.bl-card .bl-r23 {
+    order: 6
+}
+
+#bl-sort-n:checked~.bl-card .bl-r24 {
+    order: 24
+}
+
+#bl-sort-n:checked~.bl-card .bl-r25 {
+    order: 10
+}
+
+#bl-sort-n:checked~.bl-card .bl-r26 {
+    order: 19
+}
+
+#bl-sort-n:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-n:checked~.bl-card .bl-h-n label {
+    color: #007AFF
+}
+
+#bl-sort-n:checked~.bl-card .bl-h-n .bl-caret {
+    opacity: 1
+}
+
+/* sorted by level */
+#bl-sort-level:checked~.bl-card .bl-r0 {
+    order: 0
+}
+
+#bl-sort-level:checked~.bl-card .bl-r1 {
+    order: 1
+}
+
+#bl-sort-level:checked~.bl-card .bl-r2 {
+    order: 2
+}
+
+#bl-sort-level:checked~.bl-card .bl-r3 {
+    order: 3
+}
+
+#bl-sort-level:checked~.bl-card .bl-r4 {
+    order: 4
+}
+
+#bl-sort-level:checked~.bl-card .bl-r5 {
+    order: 5
+}
+
+#bl-sort-level:checked~.bl-card .bl-r6 {
+    order: 6
+}
+
+#bl-sort-level:checked~.bl-card .bl-r7 {
+    order: 7
+}
+
+#bl-sort-level:checked~.bl-card .bl-r8 {
+    order: 8
+}
+
+#bl-sort-level:checked~.bl-card .bl-r9 {
+    order: 9
+}
+
+#bl-sort-level:checked~.bl-card .bl-r10 {
+    order: 10
+}
+
+#bl-sort-level:checked~.bl-card .bl-r11 {
+    order: 11
+}
+
+#bl-sort-level:checked~.bl-card .bl-r12 {
+    order: 12
+}
+
+#bl-sort-level:checked~.bl-card .bl-r13 {
+    order: 13
+}
+
+#bl-sort-level:checked~.bl-card .bl-r14 {
+    order: 14
+}
+
+#bl-sort-level:checked~.bl-card .bl-r15 {
+    order: 15
+}
+
+#bl-sort-level:checked~.bl-card .bl-r16 {
+    order: 16
+}
+
+#bl-sort-level:checked~.bl-card .bl-r17 {
+    order: 17
+}
+
+#bl-sort-level:checked~.bl-card .bl-r18 {
+    order: 18
+}
+
+#bl-sort-level:checked~.bl-card .bl-r19 {
+    order: 19
+}
+
+#bl-sort-level:checked~.bl-card .bl-r20 {
+    order: 20
+}
+
+#bl-sort-level:checked~.bl-card .bl-r21 {
+    order: 21
+}
+
+#bl-sort-level:checked~.bl-card .bl-r22 {
+    order: 22
+}
+
+#bl-sort-level:checked~.bl-card .bl-r23 {
+    order: 23
+}
+
+#bl-sort-level:checked~.bl-card .bl-r24 {
+    order: 24
+}
+
+#bl-sort-level:checked~.bl-card .bl-r25 {
+    order: 25
+}
+
+#bl-sort-level:checked~.bl-card .bl-r26 {
+    order: 26
+}
+
+#bl-sort-level:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-level:checked~.bl-card .bl-h-level label {
+    color: #007AFF
+}
+
+#bl-sort-level:checked~.bl-card .bl-h-level .bl-caret {
+    opacity: 1
+}
+
+/* sorted by studio */
+#bl-sort-studio:checked~.bl-card .bl-r0 {
+    order: 0
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r1 {
+    order: 1
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r2 {
+    order: 2
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r3 {
+    order: 9
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r4 {
+    order: 3
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r5 {
+    order: 6
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r6 {
+    order: 5
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r7 {
+    order: 4
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r8 {
+    order: 7
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r9 {
+    order: 11
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r10 {
+    order: 13
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r11 {
+    order: 10
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r12 {
+    order: 14
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r13 {
+    order: 8
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r14 {
+    order: 12
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r15 {
+    order: 18
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r16 {
+    order: 15
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r17 {
+    order: 17
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r18 {
+    order: 16
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r19 {
+    order: 19
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r20 {
+    order: 21
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r21 {
+    order: 20
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r22 {
+    order: 24
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r23 {
+    order: 22
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r24 {
+    order: 23
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r25 {
+    order: 26
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r26 {
+    order: 25
+}
+
+#bl-sort-studio:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-studio:checked~.bl-card .bl-h-studio label {
+    color: #007AFF
+}
+
+#bl-sort-studio:checked~.bl-card .bl-h-studio .bl-caret {
+    opacity: 1
+}
+
+/* sorted by cohortlog */
+#bl-sort-cohortlog:checked~.bl-card .bl-r0 {
+    order: 0
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r1 {
+    order: 1
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r2 {
+    order: 3
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r3 {
+    order: 7
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r4 {
+    order: 2
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r5 {
+    order: 4
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r6 {
+    order: 5
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r7 {
+    order: 6
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r8 {
+    order: 8
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r9 {
+    order: 11
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r10 {
+    order: 15
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r11 {
+    order: 13
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r12 {
+    order: 10
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r13 {
+    order: 9
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r14 {
+    order: 12
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r15 {
+    order: 17
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r16 {
+    order: 14
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r17 {
+    order: 18
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r18 {
+    order: 16
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r19 {
+    order: 19
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r20 {
+    order: 22
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r21 {
+    order: 20
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r22 {
+    order: 23
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r23 {
+    order: 21
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r24 {
+    order: 24
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r25 {
+    order: 26
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r26 {
+    order: 25
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-h-cohortlog label {
+    color: #007AFF
+}
+
+#bl-sort-cohortlog:checked~.bl-card .bl-h-cohortlog .bl-caret {
+    opacity: 1
+}
+
+/* sorted by att */
+#bl-sort-att:checked~.bl-card .bl-r0 {
+    order: 1
+}
+
+#bl-sort-att:checked~.bl-card .bl-r1 {
+    order: 5
+}
+
+#bl-sort-att:checked~.bl-card .bl-r2 {
+    order: 11
+}
+
+#bl-sort-att:checked~.bl-card .bl-r3 {
+    order: 15
+}
+
+#bl-sort-att:checked~.bl-card .bl-r4 {
+    order: 0
+}
+
+#bl-sort-att:checked~.bl-card .bl-r5 {
+    order: 8
+}
+
+#bl-sort-att:checked~.bl-card .bl-r6 {
+    order: 3
+}
+
+#bl-sort-att:checked~.bl-card .bl-r7 {
+    order: 13
+}
+
+#bl-sort-att:checked~.bl-card .bl-r8 {
+    order: 2
+}
+
+#bl-sort-att:checked~.bl-card .bl-r9 {
+    order: 18
+}
+
+#bl-sort-att:checked~.bl-card .bl-r10 {
+    order: 22
+}
+
+#bl-sort-att:checked~.bl-card .bl-r11 {
+    order: 20
+}
+
+#bl-sort-att:checked~.bl-card .bl-r12 {
+    order: 9
+}
+
+#bl-sort-att:checked~.bl-card .bl-r13 {
+    order: 4
+}
+
+#bl-sort-att:checked~.bl-card .bl-r14 {
+    order: 6
+}
+
+#bl-sort-att:checked~.bl-card .bl-r15 {
+    order: 14
+}
+
+#bl-sort-att:checked~.bl-card .bl-r16 {
+    order: 7
+}
+
+#bl-sort-att:checked~.bl-card .bl-r17 {
+    order: 24
+}
+
+#bl-sort-att:checked~.bl-card .bl-r18 {
+    order: 12
+}
+
+#bl-sort-att:checked~.bl-card .bl-r19 {
+    order: 17
+}
+
+#bl-sort-att:checked~.bl-card .bl-r20 {
+    order: 25
+}
+
+#bl-sort-att:checked~.bl-card .bl-r21 {
+    order: 19
+}
+
+#bl-sort-att:checked~.bl-card .bl-r22 {
+    order: 10
+}
+
+#bl-sort-att:checked~.bl-card .bl-r23 {
+    order: 21
+}
+
+#bl-sort-att:checked~.bl-card .bl-r24 {
+    order: 26
+}
+
+#bl-sort-att:checked~.bl-card .bl-r25 {
+    order: 23
+}
+
+#bl-sort-att:checked~.bl-card .bl-r26 {
+    order: 16
+}
+
+#bl-sort-att:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-att:checked~.bl-card .bl-h-att label {
+    color: #007AFF
+}
+
+#bl-sort-att:checked~.bl-card .bl-h-att .bl-caret {
+    opacity: 1
+}
+
+/* sorted by impact */
+#bl-sort-impact:checked~.bl-card .bl-r0 {
+    order: 1
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r1 {
+    order: 2
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r2 {
+    order: 0
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r3 {
+    order: 3
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r4 {
+    order: 4
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r5 {
+    order: 5
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r6 {
+    order: 6
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r7 {
+    order: 7
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r8 {
+    order: 9
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r9 {
+    order: 8
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r10 {
+    order: 10
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r11 {
+    order: 11
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r12 {
+    order: 13
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r13 {
+    order: 12
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r14 {
+    order: 14
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r15 {
+    order: 18
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r16 {
+    order: 17
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r17 {
+    order: 15
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r18 {
+    order: 16
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r19 {
+    order: 20
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r20 {
+    order: 19
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r21 {
+    order: 21
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r22 {
+    order: 24
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r23 {
+    order: 22
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r24 {
+    order: 23
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r25 {
+    order: 26
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r26 {
+    order: 25
+}
+
+#bl-sort-impact:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-impact:checked~.bl-card .bl-h-impact label {
+    color: #007AFF
+}
+
+#bl-sort-impact:checked~.bl-card .bl-h-impact .bl-caret {
+    opacity: 1
+}
+
+/* sorted by eilifiz */
+#bl-sort-eilifiz:checked~.bl-card .bl-r0 {
+    order: 0
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r1 {
+    order: 1
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r2 {
+    order: 5
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r3 {
+    order: 9
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r4 {
+    order: 2
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r5 {
+    order: 6
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r6 {
+    order: 3
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r7 {
+    order: 4
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r8 {
+    order: 8
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r9 {
+    order: 12
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r10 {
+    order: 16
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r11 {
+    order: 13
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r12 {
+    order: 14
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r13 {
+    order: 7
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r14 {
+    order: 10
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r15 {
+    order: 17
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r16 {
+    order: 11
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r17 {
+    order: 19
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r18 {
+    order: 15
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r19 {
+    order: 18
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r20 {
+    order: 22
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r21 {
+    order: 20
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r22 {
+    order: 23
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r23 {
+    order: 21
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r24 {
+    order: 25
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r25 {
+    order: 26
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r26 {
+    order: 24
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-r27 {
+    order: 27
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-h-eilifiz label {
+    color: #007AFF
+}
+
+#bl-sort-eilifiz:checked~.bl-card .bl-h-eilifiz .bl-caret {
+    opacity: 1
+}
+
+/* --------------------------------------------------------------------------
+   7. RESPONSIVE
+   -------------------------------------------------------------------------- */
+@media (max-width:600px) {
+    .bl-app {
+        padding: 12px 10px 32px
+    }
+}
+
+@media (prefers-reduced-motion:reduce) {
+    .bl-app * {
+        transition: none;
+        animation: none
+    }
+}

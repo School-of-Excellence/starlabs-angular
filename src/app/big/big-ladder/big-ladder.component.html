@@ -1,0 +1,493 @@
+<div class="bl-app">
+
+    <!-- sort controls: hidden radios, read by the stylesheet -->
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-n">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-level" checked>
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-studio">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-cohortlog">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-att">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-impact">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-eilifiz">
+
+    <div class="bl-card">
+        <div class="bl-scroll">
+            <div class="bl-grid">
+
+                <!-- column headings double as the sort buttons -->
+                <div class="bl-head">
+                    <div class="bl-cell bl-left bl-h-rank">Rank</div>
+                    <div class="bl-cell bl-left bl-h-n"><label for="bl-sort-n">Participant<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <!-- <div class="bl-cell bl-h-level"><label for="bl-sort-level">Current level<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-studio"><label for="bl-sort-studio">Studio log<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-cohortlog"><label for="bl-sort-cohortlog">Cohort log<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-att"><label for="bl-sort-att">Attendance<span
+                                class="bl-caret">&#9660;</span></label></div> -->
+                    <div class="bl-cell bl-h-impact"><label for="bl-sort-impact">Extended impact (yrs)<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-att"><label for="bl-sort-att">Attendance<span
+                                class="bl-caret">&#9660;</span></label></div> 
+                    <!-- <div class="bl-cell bl-h-eilifiz"><label for="bl-sort-eilifiz">Eilifiz consumption<span
+                                class="bl-caret">&#9660;</span></label></div> -->
+                </div>
+
+                <!-- totals where a total means something, averages where it does not -->
+                <div class="bl-summary">
+                    <div class="bl-cell bl-left"></div>
+                    <div class="bl-cell bl-left bl-sumlabel">{{filteredDashbordData.length}} participants</div>
+                    <!-- <div class="bl-cell"><span class="bl-mark">&empty;</span>5.6</div>
+                    <div class="bl-cell"><span class="bl-mark">&Sigma;</span>535</div>
+                    <div class="bl-cell"><span class="bl-mark">&Sigma;</span>984</div>
+                    <div class="bl-cell"><span class="bl-mark">&empty;</span>80%</div>
+                    <div class="bl-cell"><span class="bl-mark">&Sigma;</span>453</div>
+                    <div class="bl-cell"><span class="bl-mark">&Sigma;</span>1401</div> -->
+                </div>
+
+                <!-- <div class="bl-rows">
+                    <div class="bl-row bl-r0">
+                        <div class="bl-cell bl-left"><span class="bl-rank">1</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">AI</span>
+                            <span class="bl-person"><span class="bl-name">Aparna Iyer</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">9</div>
+                        <div class="bl-cell">38</div>
+                        <div class="bl-cell">57</div>
+                        <div class="bl-cell">97%</div>
+                        <div class="bl-cell">34</div>
+                        <div class="bl-cell">78</div>
+                    </div>
+                    <div class="bl-row bl-r1">
+                        <div class="bl-cell bl-left"><span class="bl-rank">2</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(237 62% 52%),hsl(275 64% 42%))">KS</span>
+                            <span class="bl-person"><span class="bl-name">Karthik Subramanian</span><span
+                                    class="bl-pod">Pod Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">9</div>
+                        <div class="bl-cell">35</div>
+                        <div class="bl-cell">53</div>
+                        <div class="bl-cell">92%</div>
+                        <div class="bl-cell">31</div>
+                        <div class="bl-cell">73</div>
+                    </div>
+                    <div class="bl-row bl-r2">
+                        <div class="bl-cell bl-left"><span class="bl-rank">3</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(190 62% 52%),hsl(228 64% 42%))">VR</span>
+                            <span class="bl-person"><span class="bl-name">Vikram Rao</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">9</div>
+                        <div class="bl-cell">33</div>
+                        <div class="bl-cell">48</div>
+                        <div class="bl-cell">84%</div>
+                        <div class="bl-cell">36</div>
+                        <div class="bl-cell">67</div>
+                    </div>
+                    <div class="bl-row bl-r3">
+                        <div class="bl-cell bl-left"><span class="bl-rank">4</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(127 62% 52%),hsl(165 64% 42%))">AP</span>
+                            <span class="bl-person"><span class="bl-name">Arjun Pillai</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">8</div>
+                        <div class="bl-cell">24</div>
+                        <div class="bl-cell">42</div>
+                        <div class="bl-cell">79%</div>
+                        <div class="bl-cell">28</div>
+                        <div class="bl-cell">57</div>
+                    </div>
+                    <div class="bl-row bl-r4">
+                        <div class="bl-cell bl-left"><span class="bl-rank">5</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(251 62% 52%),hsl(289 64% 42%))">MJ</span>
+                            <span class="bl-person"><span class="bl-name">Meera Joshi</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">8</div>
+                        <div class="bl-cell">31</div>
+                        <div class="bl-cell">51</div>
+                        <div class="bl-cell">99%</div>
+                        <div class="bl-cell">27</div>
+                        <div class="bl-cell">72</div>
+                    </div>
+                    <div class="bl-row bl-r5">
+                        <div class="bl-cell bl-left"><span class="bl-rank">6</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(339 62% 52%),hsl(17 64% 42%))">RM</span>
+                            <span class="bl-person"><span class="bl-name">Rohit Menon</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">8</div>
+                        <div class="bl-cell">27</div>
+                        <div class="bl-cell">47</div>
+                        <div class="bl-cell">88%</div>
+                        <div class="bl-cell">26</div>
+                        <div class="bl-cell">64</div>
+                    </div>
+                    <div class="bl-row bl-r6">
+                        <div class="bl-cell bl-left"><span class="bl-rank">7</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(130 62% 52%),hsl(168 64% 42%))">SK</span>
+                            <span class="bl-person"><span class="bl-name">Sneha Kulkarni</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">8</div>
+                        <div class="bl-cell">29</div>
+                        <div class="bl-cell">47</div>
+                        <div class="bl-cell">94%</div>
+                        <div class="bl-cell">24</div>
+                        <div class="bl-cell">68</div>
+                    </div>
+                    <div class="bl-row bl-r7">
+                        <div class="bl-cell bl-left"><span class="bl-rank">8</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(279 62% 52%),hsl(317 64% 42%))">DN</span>
+                            <span class="bl-person"><span class="bl-name">Deepa Nambiar</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">7</div>
+                        <div class="bl-cell">30</div>
+                        <div class="bl-cell">46</div>
+                        <div class="bl-cell">81%</div>
+                        <div class="bl-cell">23</div>
+                        <div class="bl-cell">67</div>
+                    </div>
+                    <div class="bl-row bl-r8">
+                        <div class="bl-cell bl-left"><span class="bl-rank">9</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(165 62% 52%),hsl(203 64% 42%))">LK</span>
+                            <span class="bl-person"><span class="bl-name">Lakshmi Krishnan</span><span
+                                    class="bl-pod">Pod Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">7</div>
+                        <div class="bl-cell">26</div>
+                        <div class="bl-cell">42</div>
+                        <div class="bl-cell">96%</div>
+                        <div class="bl-cell">21</div>
+                        <div class="bl-cell">61</div>
+                    </div>
+                    <div class="bl-row bl-r9">
+                        <div class="bl-cell bl-left"><span class="bl-rank">10</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(39 62% 52%),hsl(77 64% 42%))">SV</span>
+                            <span class="bl-person"><span class="bl-name">Sandeep Varma</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">7</div>
+                        <div class="bl-cell">22</div>
+                        <div class="bl-cell">38</div>
+                        <div class="bl-cell">76%</div>
+                        <div class="bl-cell">22</div>
+                        <div class="bl-cell">53</div>
+                    </div>
+                    <div class="bl-row bl-r10">
+                        <div class="bl-cell bl-left"><span class="bl-rank">11</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(213 62% 52%),hsl(251 64% 42%))">AS</span>
+                            <span class="bl-person"><span class="bl-name">Anand Sethi</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">20</div>
+                        <div class="bl-cell">34</div>
+                        <div class="bl-cell">69%</div>
+                        <div class="bl-cell">20</div>
+                        <div class="bl-cell">48</div>
+                    </div>
+                    <div class="bl-row bl-r11">
+                        <div class="bl-cell bl-left"><span class="bl-rank">12</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(177 62% 52%),hsl(215 64% 42%))">HG</span>
+                            <span class="bl-person"><span class="bl-name">Harish Gowda</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">23</div>
+                        <div class="bl-cell">36</div>
+                        <div class="bl-cell">72%</div>
+                        <div class="bl-cell">19</div>
+                        <div class="bl-cell">52</div>
+                    </div>
+                    <div class="bl-row bl-r12">
+                        <div class="bl-cell bl-left"><span class="bl-rank">13</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(224 62% 52%),hsl(262 64% 42%))">NB</span>
+                            <span class="bl-person"><span class="bl-name">Nisha Bhat</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">19</div>
+                        <div class="bl-cell">38</div>
+                        <div class="bl-cell">85%</div>
+                        <div class="bl-cell">16</div>
+                        <div class="bl-cell">52</div>
+                    </div>
+                    <div class="bl-row bl-r13">
+                        <div class="bl-cell bl-left"><span class="bl-rank">14</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(77 62% 52%),hsl(115 64% 42%))">PR</span>
+                            <span class="bl-person"><span class="bl-name">Priya Ramesh</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">25</div>
+                        <div class="bl-cell">42</div>
+                        <div class="bl-cell">93%</div>
+                        <div class="bl-cell">17</div>
+                        <div class="bl-cell">62</div>
+                    </div>
+                    <div class="bl-row bl-r14">
+                        <div class="bl-cell bl-left"><span class="bl-rank">15</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(102 62% 52%),hsl(140 64% 42%))">TD</span>
+                            <span class="bl-person"><span class="bl-name">Tanvi Desai</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">21</div>
+                        <div class="bl-cell">38</div>
+                        <div class="bl-cell">90%</div>
+                        <div class="bl-cell">15</div>
+                        <div class="bl-cell">56</div>
+                    </div>
+                    <div class="bl-row bl-r15">
+                        <div class="bl-cell bl-left"><span class="bl-rank">16</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(214 62% 52%),hsl(252 64% 42%))">DP</span>
+                            <span class="bl-person"><span class="bl-name">Divya Prasad</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">5</div>
+                        <div class="bl-cell">15</div>
+                        <div class="bl-cell">32</div>
+                        <div class="bl-cell">80%</div>
+                        <div class="bl-cell">11</div>
+                        <div class="bl-cell">46</div>
+                    </div>
+                    <div class="bl-row bl-r16">
+                        <div class="bl-cell bl-left"><span class="bl-rank">17</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(294 62% 52%),hsl(332 64% 42%))">KR</span>
+                            <span class="bl-person"><span class="bl-name">Kavya Reddy</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">5</div>
+                        <div class="bl-cell">18</div>
+                        <div class="bl-cell">36</div>
+                        <div class="bl-cell">88%</div>
+                        <div class="bl-cell">12</div>
+                        <div class="bl-cell">53</div>
+                    </div>
+                    <div class="bl-row bl-r17">
+                        <div class="bl-cell bl-left"><span class="bl-rank">18</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(166 62% 52%),hsl(204 64% 42%))">MT</span>
+                            <span class="bl-person"><span class="bl-name">Manoj Thakur</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">5</div>
+                        <div class="bl-cell">16</div>
+                        <div class="bl-cell">31</div>
+                        <div class="bl-cell">64%</div>
+                        <div class="bl-cell">14</div>
+                        <div class="bl-cell">43</div>
+                    </div>
+                    <div class="bl-row bl-r18">
+                        <div class="bl-cell bl-left"><span class="bl-rank">19</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(11 62% 52%),hsl(49 64% 42%))">RB</span>
+                            <span class="bl-person"><span class="bl-name">Rekha Balan</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">5</div>
+                        <div class="bl-cell">17</div>
+                        <div class="bl-cell">34</div>
+                        <div class="bl-cell">83%</div>
+                        <div class="bl-cell">13</div>
+                        <div class="bl-cell">50</div>
+                    </div>
+                    <div class="bl-row bl-r19">
+                        <div class="bl-cell bl-left"><span class="bl-rank">20</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(120 62% 52%),hsl(158 64% 42%))">GM</span>
+                            <span class="bl-person"><span class="bl-name">Gaurav Malhotra</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">4</div>
+                        <div class="bl-cell">13</div>
+                        <div class="bl-cell">29</div>
+                        <div class="bl-cell">77%</div>
+                        <div class="bl-cell">9</div>
+                        <div class="bl-cell">43</div>
+                    </div>
+                    <div class="bl-row bl-r20">
+                        <div class="bl-cell bl-left"><span class="bl-rank">21</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(55 62% 52%),hsl(93 64% 42%))">IS</span>
+                            <span class="bl-person"><span class="bl-name">Imran Shaikh</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">4</div>
+                        <div class="bl-cell">11</div>
+                        <div class="bl-cell">24</div>
+                        <div class="bl-cell">61%</div>
+                        <div class="bl-cell">10</div>
+                        <div class="bl-cell">35</div>
+                    </div>
+                    <div class="bl-row bl-r21">
+                        <div class="bl-cell bl-left"><span class="bl-rank">22</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(248 62% 52%),hsl(286 64% 42%))">SN</span>
+                            <span class="bl-person"><span class="bl-name">Shruti Naik</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">4</div>
+                        <div class="bl-cell">12</div>
+                        <div class="bl-cell">27</div>
+                        <div class="bl-cell">74%</div>
+                        <div class="bl-cell">8</div>
+                        <div class="bl-cell">40</div>
+                    </div>
+                    <div class="bl-row bl-r22">
+                        <div class="bl-cell bl-left"><span class="bl-rank">23</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(86 62% 52%),hsl(124 64% 42%))">AS</span>
+                            <span class="bl-person"><span class="bl-name">Ananya Sen</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">3</div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">23</div>
+                        <div class="bl-cell">84%</div>
+                        <div class="bl-cell">3</div>
+                        <div class="bl-cell">32</div>
+                    </div>
+                    <div class="bl-row bl-r23">
+                        <div class="bl-cell bl-left"><span class="bl-rank">24</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(171 62% 52%),hsl(209 64% 42%))">FQ</span>
+                            <span class="bl-person"><span class="bl-name">Farah Qureshi</span><span class="bl-pod">Pod
+                                    Gamma</span></span>
+                        </div>
+                        <div class="bl-cell">3</div>
+                        <div class="bl-cell">9</div>
+                        <div class="bl-cell">24</div>
+                        <div class="bl-cell">70%</div>
+                        <div class="bl-cell">6</div>
+                        <div class="bl-cell">35</div>
+                    </div>
+                    <div class="bl-row bl-r24">
+                        <div class="bl-cell bl-left"><span class="bl-rank">25</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(250 62% 52%),hsl(288 64% 42%))">SN</span>
+                            <span class="bl-person"><span class="bl-name">Suresh Nair</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">3</div>
+                        <div class="bl-cell">7</div>
+                        <div class="bl-cell">19</div>
+                        <div class="bl-cell">55%</div>
+                        <div class="bl-cell">5</div>
+                        <div class="bl-cell">27</div>
+                    </div>
+                    <div class="bl-row bl-r25">
+                        <div class="bl-cell bl-left"><span class="bl-rank">26</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(123 62% 52%),hsl(161 64% 42%))">JM</span>
+                            <span class="bl-person"><span class="bl-name">Joseph Mathew</span><span class="bl-pod">Pod
+                                    Alpha</span></span>
+                        </div>
+                        <div class="bl-cell">2</div>
+                        <div class="bl-cell">3</div>
+                        <div class="bl-cell">16</div>
+                        <div class="bl-cell">66%</div>
+                        <div class="bl-cell">1</div>
+                        <div class="bl-cell">23</div>
+                    </div>
+                    <div class="bl-row bl-r26">
+                        <div class="bl-cell bl-left"><span class="bl-rank">27</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(48 62% 52%),hsl(86 64% 42%))">RS</span>
+                            <span class="bl-person"><span class="bl-name">Ritika Sharma</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">2</div>
+                        <div class="bl-cell">4</div>
+                        <div class="bl-cell">18</div>
+                        <div class="bl-cell">78%</div>
+                        <div class="bl-cell">2</div>
+                        <div class="bl-cell">27</div>
+                    </div>
+                    <div class="bl-row bl-r27">
+                        <div class="bl-cell bl-left"><span class="bl-rank">28</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(218 62% 52%),hsl(256 64% 42%))">VC</span>
+                            <span class="bl-person"><span class="bl-name">Vivek Chandra</span><span class="bl-pod">Pod
+                                    Beta</span></span>
+                        </div>
+                        <div class="bl-cell">1</div>
+                        <div class="bl-cell">1</div>
+                        <div class="bl-cell">12</div>
+                        <div class="bl-cell">52%</div>
+                        <div class="bl-cell">0</div>
+                        <div class="bl-cell">17</div>
+                    </div>
+                </div> -->
+
+                <div class="bl-rows" *ngFor="let participant of filteredDashbordData; let i = index;">
+                    <div class="bl-row bl-r0">
+                        <div class="bl-cell bl-left"><span class="bl-rank">{{i + 1}}</span></div>
+                        <div class="bl-cell bl-left">
+                            <span class="bl-avatar"
+                                style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span>
+                            <span class="bl-person"><span class="bl-name">{{participant.name}}</span></span>
+                        </div>
+                        <div class="bl-cell">{{participant.extendedlifeimpact}}</div>
+                        <div class="bl-cell">{{participant.eventAttended}}</div>
+                        <!-- <div class="bl-cell">38</div>
+                        <div class="bl-cell">57</div>
+                        <div class="bl-cell">97%</div>
+                        <div class="bl-cell">34</div>
+                        <div class="bl-cell">78</div> -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
