@@ -131,8 +131,8 @@ export function scorePriority(r: PriorityInput, thresholds: PriorityThresholds =
     p += Math.min(r.openTickets, 3) * 4;
     drivers.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
   }
-  if (r.llCritical) { p += llCriticalWeight; drivers.push('A&H critical'); }
-  if (r.llAttention) { p += llAttentionWeight; drivers.push('A&H needs attention'); }
+  if (r.llCritical) { p += llCriticalWeight; drivers.push('Critical'); }
+  if (r.llAttention) { p += llAttentionWeight; drivers.push('Needs Attention'); }
 
   const priority = Math.max(0, Math.min(100, Math.round(p)));
   return {

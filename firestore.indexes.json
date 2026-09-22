@@ -994,6 +994,34 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "love letter",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ask AH",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
