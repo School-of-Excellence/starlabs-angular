@@ -343,9 +343,7 @@
   flex-direction: column;
   gap: 8px;
   overflow: hidden;
-  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.2s cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: transform;
-  animation: jchd-card-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.2s cubic-bezier(0.32, 0.72, 0, 1);  animation: jchd-card-in 0.34s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 .jchd-summary .kpi:nth-child(1) {
   animation-delay: 0ms;
@@ -1779,9 +1777,7 @@ td.mat-mdc-cell span {
   border-radius: 20px;
   box-shadow: var(--card-shadow);
   overflow: hidden;
-  transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.16s cubic-bezier(0.2, 0.7, 0.3, 1);
-  will-change: transform;
-  animation: jchd-row-in 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.16s cubic-bezier(0.2, 0.7, 0.3, 1);  animation: jchd-row-in 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
   animation-delay: calc(min(var(--i, 0), 12) * 24ms);
 }
 .wl-card:hover {
@@ -3204,7 +3200,7 @@ td.mat-mdc-cell span {
 /* JC pipeline card (doc item 8) — completed journey coaches, today / last week / last month. */
 .jc-pipeline { margin-bottom: 12px; }
 /* Schedule (doc item 1): two side-by-side JC / Onboarding schedules */
-.jc-schedule { margin-bottom: 12px; }
+.jc-schedule { margin-top: var(--gap); margin-bottom: 12px; }
 /* Ecosystem A&H analytics summary card (item 3). */
 .jchd-ah-card { margin-bottom: 12px; }
 .jchd-ah-card .ah-src { margin-left: auto; display: flex; gap: 6px; }
