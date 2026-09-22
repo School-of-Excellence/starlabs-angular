@@ -275,7 +275,7 @@
   flex-wrap: wrap;
   background: linear-gradient(180deg, var(--blue-08) 0%, var(--blue-wash-2) 100%);
   border: 1px solid var(--blue-22);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   padding: 14px 18px;
   margin: 0 0 18px;
@@ -772,7 +772,7 @@
 
 .jchd-filter-panel {
   border: 1px solid var(--hairline);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: var(--card-shadow);
   padding: 18px 20px;
@@ -1009,7 +1009,7 @@
 .jchd-table-wrap {
   position: relative;
   border: 1px solid var(--hairline);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   overflow: auto;
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
@@ -1487,7 +1487,7 @@ td.mat-mdc-cell span {
 .jchd-skeleton .sk-table {
   background: var(--surface);
   border: 1px solid var(--hairline);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
@@ -1774,7 +1774,7 @@ td.mat-mdc-cell span {
   align-items: stretch;
   background: var(--surface);
   border: 1px solid var(--hairline);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: var(--card-shadow);
   overflow: hidden;
   transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.16s cubic-bezier(0.2, 0.7, 0.3, 1);  animation: jchd-row-in 0.3s cubic-bezier(0.2, 0.7, 0.3, 1) both;
@@ -1897,7 +1897,7 @@ td.mat-mdc-cell span {
   gap: 7px;
   background: var(--surface);
   border: 1px solid var(--hairline);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
   padding: 44px 24px;
 }
@@ -2563,7 +2563,7 @@ td.mat-mdc-cell span {
    ===================================================================== */
 .jchd-table-wrap.ios-table-card {
   border: none;
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
 }
 
@@ -2586,7 +2586,7 @@ td.mat-mdc-cell span {
 .jchd-table.ios-grid-t td.mat-mdc-cell {
   font-size: var(--fs-400);
   color: var(--ink);
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--hairline);
   vertical-align: middle;
 }
@@ -2629,12 +2629,12 @@ td.mat-mdc-cell span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 .jchd-table.ios-grid-t .cell-person .cp-email {
   font-size: var(--fs-200);
   color: rgba(60, 60, 67, 0.7);
-  margin-top: 2px;
+  margin-top: 1px;
   line-height: 1.25;
 }
 .jchd-table.ios-grid-t .cell-person .cp-id {
@@ -2805,7 +2805,7 @@ td.mat-mdc-cell span {
 
 .coach-card {
   background: var(--surface);
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   box-shadow: var(--card-shadow);
   padding: 18px 20px;
   cursor: pointer;
