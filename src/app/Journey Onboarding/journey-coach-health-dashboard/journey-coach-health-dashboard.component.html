@@ -241,28 +241,41 @@
         </div>
       </section>
 
-      <!-- Recent Ask A&H + Love Letter (item 3): latest per participant in the current coach scope,
-           captured from the same reads that feed the A&H needs-attention tags. Click opens the slide-over. -->
-      <section class="ios2-card jchd-ah-card" *ngIf="recentAH().length">
+      <!-- Ecosystem Health · Ask A&H + Love Letter analytics (item 3): flag breakdown per collection +
+           combined + resolved, over the recent window, base-wide. Mirrors the original dashboard. -->
+      <section class="ios2-card jchd-ah-card" *ngIf="ahSummary() as s">
         <div class="ios2-head">
           <span class="ios2-app ap-pink"><mat-icon>favorite</mat-icon></span>
           <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
+          <span class="ah-src">
+            <span class="ah-src-pill ah-src-ask">Ask AH · {{ s.askAH.total }}</span>
+            <span class="ah-src-pill ah-src-love">Love Letter · {{ s.loveLetter.total }}</span>
+          </span>
         </div>
-        <div class="ah-list">
-          <button type="button" class="ah-item" *ngFor="let a of recentAH()" (click)="openJcParticipant(a.profileid)" matTooltip="Open participant">
-            <span class="ios-avatar av-xs" [ngClass]="avatarClass(a.profileid)">{{ initials(a.name) }}</span>
-            <span class="ah-body">
-              <span class="ah-top">
-                <span class="ah-name">{{ a.name }}</span>
-                <span class="ah-kind" [ngClass]="a.kind === 'love' ? 'ah-love' : 'ah-ask'">{{ a.kind === 'love' ? 'Love letter' : 'Ask A&H' }}</span>
-              </span>
-              <span class="ah-text">{{ a.text || '(no message)' }}</span>
-              <span class="ah-tags" *ngIf="a.tags.length">
-                <span class="chip" *ngFor="let tg of a.tags" [ngClass]="{ 'chip-bad': tg === 'critical', 'chip-warn': tg === 'needs attention' }">{{ tg }}</span>
-              </span>
-            </span>
-            <span class="ah-when">{{ a.date | date:'d MMM' }}</span>
-          </button>
+        <div class="ah-table">
+          <table>
+            <thead>
+              <tr><th class="ah-flag">Flag</th><th>Ask AH</th><th>Love Letter</th><th>Combined</th><th class="ah-res">Resolved</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="ah-flag"><span class="ah-dot ah-happy"></span>Happy</td><td>{{ s.askAH.liked }}</td><td>{{ s.loveLetter.liked }}</td><td>{{ s.liked }}</td><td class="ah-res">{{ s.resolvedLiked }}</td></tr>
+              <tr><td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td><td>{{ s.askAH.tagged }}</td><td>{{ s.loveLetter.tagged }}</td><td>{{ s.tagged }}</td><td class="ah-res">{{ s.resolvedTagged }}</td></tr>
+              <tr><td class="ah-flag"><span class="ah-dot ah-opp"></span>Opportunity</td><td>{{ s.askAH.opportunity }}</td><td>{{ s.loveLetter.opportunity }}</td><td>{{ s.opportunity }}</td><td class="ah-res">{{ s.resolvedOpportunity }}</td></tr>
+              <tr><td class="ah-flag"><span class="ah-dot ah-crit"></span>Critical</td><td>{{ s.askAH.critical }}</td><td>{{ s.loveLetter.critical }}</td><td>{{ s.critical }}</td><td class="ah-res">{{ s.resolvedCritical }}</td></tr>
+              <tr class="ah-total">
+                <td class="ah-flag">Total Flagged</td>
+                <td>{{ s.askAH.liked + s.askAH.tagged + s.askAH.opportunity + s.askAH.critical }}</td>
+                <td>{{ s.loveLetter.liked + s.loveLetter.tagged + s.loveLetter.opportunity + s.loveLetter.critical }}</td>
+                <td>{{ s.liked + s.tagged + s.opportunity + s.critical }}</td>
+                <td class="ah-res">{{ s.resolvedTotal }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ah-cards">
+          <div class="ah-mini ah-mini-unflagged"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></div>
+          <div class="ah-mini ah-mini-positive"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></div>
+          <div class="ah-mini ah-mini-critattn"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></div>
         </div>
       </section>
 

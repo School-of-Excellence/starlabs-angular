@@ -1265,21 +1265,38 @@ export class ParticipantSlideoverComponent implements OnInit {
     if (data['opportunity']) tags.push('opportunity');
     if (data['liked']) tags.push('happy');
     if (data['resolved']) tags.push('resolved');
-    const text = (data['message'] ?? data['content'] ?? data['loveletter'] ?? data['letter'] ?? data['note'] ?? data['text'] ?? '').toString().trim();
+    // love letter -> 'loveletter', ask A&H -> 'askah' (fallback 'installationaskah'); first non-empty.
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) { const v = data[k]; if (typeof v === 'string' && v.trim()) return v.trim(); }
+      return '';
+    };
+    const text = pick('loveletter', 'askah', 'installationaskah', 'message', 'content', 'letter', 'note', 'text');
     return { text, tags, date: this.toDate(data['created']) };
+  }
+
+  /** Latest 1 doc for a participant from an A&H collection: prefers the indexed
+   *  orderBy(created desc)+limit(1); falls back to an index-free fetch + client-side latest-1 when
+   *  the (profileid, created) composite index isn't deployed yet (so the section never breaks). */
+  private async latestOne(coll: string, pid: string): Promise<LoveNoteItem[]> {
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, coll), where('profileid', '==', pid), orderBy('created', 'desc'), limit(1),
+      ));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any));
+    } catch {
+      const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', '==', pid)));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any))
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0)).slice(0, 1);
+    }
   }
 
   private async loadLoveLetters(): Promise<void> {
     const pid = this.row.profileid;
     try {
-      // Latest 1 only (item 5) — requires a 'love letter' (profileid ASC, created DESC) composite index.
-      const snap = await getDocs(query(
-        collection(this.firestore, 'love letter'),
-        where('profileid', '==', pid),
-        orderBy('created', 'desc'),
-        limit(1),
-      ));
-      this.loveLetters = snap.docs.map(d => this.toLoveNote(d.data() as any));
+      // Latest 1 only (item 5). Prefer the indexed orderBy+limit(1); if the ('love letter':
+      // profileid ASC, created DESC) composite index isn't deployed yet, fall back to an index-free
+      // fetch + client-side latest-1 so the section still shows the latest note (no breakage).
+      this.loveLetters = await this.latestOne('love letter', pid);
     } catch (e) {
       console.warn('slideover love letter read failed', e);
     } finally {
@@ -1290,14 +1307,8 @@ export class ParticipantSlideoverComponent implements OnInit {
   private async loadAskAH(): Promise<void> {
     const pid = this.row.profileid;
     try {
-      // Latest 1 only (item 5) — requires an 'ask AH' (profileid ASC, created DESC) composite index.
-      const snap = await getDocs(query(
-        collection(this.firestore, 'ask AH'),
-        where('profileid', '==', pid),
-        orderBy('created', 'desc'),
-        limit(1),
-      ));
-      this.askAH = snap.docs.map(d => this.toLoveNote(d.data() as any));
+      // Latest 1 only (item 5) — indexed orderBy+limit(1) with an index-free client-side fallback.
+      this.askAH = await this.latestOne('ask AH', pid);
     } catch (e) {
       console.warn('slideover ask A&H read failed', e);
     } finally {

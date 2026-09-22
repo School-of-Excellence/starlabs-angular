@@ -3172,33 +3172,32 @@ td.mat-mdc-cell span {
 .jc-pipeline { margin-bottom: 12px; }
 /* Schedule (doc item 1): two side-by-side JC / Onboarding schedules */
 .jc-schedule { margin-bottom: 12px; }
-/* Recent Ask A&H + Love Letter summary card (item 3). */
+/* Ecosystem A&H analytics summary card (item 3). */
 .jchd-ah-card { margin-bottom: 12px; }
-.jchd-ah-card .ah-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
-.ah-item {
-  display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
-  border: 0; background: transparent; cursor: pointer; padding: 8px 6px; border-radius: 10px;
-}
-.ah-item:hover { background: var(--tile-hover); }
-.ah-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ah-top { display: flex; align-items: center; gap: 8px; }
-.ah-name { font-weight: 650; font-size: 13px; color: var(--ink); }
-.ah-kind {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
-  padding: 2px 6px; border-radius: 5px;
-}
-.ah-kind.ah-love { color: var(--sem-pink); background: var(--tile); }
-.ah-kind.ah-ask { color: var(--blue-fg); background: var(--blue-08); }
-.ah-text {
-  font-size: 12.5px; color: var(--ink-2); line-height: 1.35;
-  overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-}
-.ah-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.ah-when {
-  flex: 0 0 auto; font-size: 11px; color: var(--ink-3);
-  font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px;
-}
+.jchd-ah-card .ah-src { margin-left: auto; display: flex; gap: 6px; }
+.ah-src-pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; white-space: nowrap; }
+.ah-src-pill.ah-src-ask { color: var(--blue-fg); background: var(--blue-08); }
+.ah-src-pill.ah-src-love { color: var(--sem-pink); background: var(--tile); }
+.ah-table { margin-top: 8px; overflow-x: auto; }
+.ah-table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ah-table th, .ah-table td { padding: 7px 10px; text-align: right; font-size: 13px; color: var(--ink); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.ah-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-3); }
+.ah-table th.ah-flag, .ah-table td.ah-flag { text-align: left; }
+.ah-table th.ah-res, .ah-table td.ah-res { color: var(--sem-purple); background: var(--surface-2); }
+.ah-table td.ah-flag { display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.ah-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.ah-dot.ah-happy { background: var(--sem-green); }
+.ah-dot.ah-attn { background: var(--sem-orange); }
+.ah-dot.ah-opp { background: var(--sem-indigo); }
+.ah-dot.ah-crit { background: var(--sem-red-strong); }
+.ah-table tr.ah-total td { font-weight: 800; border-bottom: 0; border-top: 1px solid var(--border-strong); }
+.ah-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.ah-mini { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: center; background: var(--tile); }
+.ah-mini-k { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.ah-mini-n { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.ah-mini-unflagged .ah-mini-k, .ah-mini-unflagged .ah-mini-n { color: var(--sem-pink); }
+.ah-mini-positive .ah-mini-k, .ah-mini-positive .ah-mini-n { color: var(--sem-green-fg); }
+.ah-mini-critattn .ah-mini-k, .ah-mini-critattn .ah-mini-n { color: var(--sem-red); }
 .jcs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .jcs-col { min-width: 0; }
 .jc-schedule .jcp-tile { cursor: default; }

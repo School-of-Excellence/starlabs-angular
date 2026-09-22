@@ -160,6 +160,15 @@ interface JourneyGroup { id: string; name: string; journeys: string[]; }
  *  `onboarding` partitions the JC schedule from the Onboarding schedule. */
 interface JcSchedEvent { profileid: string; coachId: string | null; ms: number; onboarding: boolean; }
 
+/** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
+interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
+interface AHSummary {
+  askAH: AHFlagCounts;
+  loveLetter: AHFlagCounts;
+  liked: number; tagged: number; opportunity: number; critical: number; unflagged: number;
+  resolvedTotal: number; resolvedLiked: number; resolvedTagged: number; resolvedOpportunity: number; resolvedCritical: number;
+}
+
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
 interface ScoreboardRow {
   coachId: string;
@@ -436,6 +445,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const t = localStorage.getItem(this.THEME_KEY);
       if (t === 'dark' || t === 'light') this.theme = t;
     } catch {}
+    void this.loadAHSummary();   // Ecosystem A&H analytics (item 3) — base-wide, loads in parallel.
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
@@ -1255,33 +1265,51 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
    *  tagged=needs-attn / opportunity) OR-ed per participant, within a recent 180d window applied
    *  client-side (avoids a profileid+created composite index). Degrades on permission-denied. */
-  // ---- Recent Ask A&H / Love Letter for the Summary (item 3): latest per participant, coach-scoped ----
-  //  Captured WITH content while the tag loaders already sweep 'love letter' / 'ask AH' — no extra read.
-  private recentAHRaw = signal<Record<string, { love?: { text: string; tags: string[]; ms: number }; ask?: { text: string; tags: string[]; ms: number } }>>({});
-  /** Map a love-letter / ask-A&H doc to its display item (the caller keeps the latest per profile). */
-  private ahItemFrom(data: any): { text: string; tags: string[]; ms: number } | null {
-    const created = this.toDate(data['created']);
-    if (!created) return null;
-    const text = (data['message'] ?? data['content'] ?? data['loveletter'] ?? data['letter'] ?? data['note'] ?? data['text'] ?? '').toString().trim();
-    const tags: string[] = [];
-    if (data['critical'] === true) tags.push('critical');
-    if (data['tagged'] === true) tags.push('needs attention');
-    if (data['opportunity'] === true) tags.push('opportunity');
-    return { text, tags, ms: created.getTime() };
+  // ---- Ecosystem Health · Ask A&H + Love Letter analytics summary (item 3) — mirrors the original
+  //  journeycoach-dashboard's askAHLoveLetterSummary: flag breakdown per collection + combined + resolved,
+  //  over a recent window, base-wide. One-shot read of 'ask AH' + 'love letter' (single 'created' filter,
+  //  no composite index). tagged = Needs Attention · opportunity = Opportunity · liked = Happy · critical = Critical.
+  ahSummary = signal<AHSummary | null>(null);
+  private ahSummaryLoaded = false;
+  private async loadAHSummary(): Promise<void> {
+    if (this.ahSummaryLoaded) return;
+    this.ahSummaryLoaded = true;
+    const since = new Date(Date.now() - 180 * 86400000);
+    const read = async (coll: string): Promise<any[]> => {
+      try {
+        const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
+        return snap.docs.map(d => d.data());
+      } catch (e) {
+        if (this.isPermissionDenied(e)) return [];
+        console.warn(`${coll} summary read failed (non-fatal)`, e);
+        return [];
+      }
+    };
+    const [ask, love] = await Promise.all([read('ask AH'), read('love letter')]);
+    const count = (docs: any[]): AHFlagCounts => ({
+      total: docs.length,
+      tagged: docs.filter(d => d['tagged'] === true).length,
+      opportunity: docs.filter(d => d['opportunity'] === true).length,
+      liked: docs.filter(d => d['liked'] === true).length,
+      critical: docs.filter(d => d['critical'] === true).length,
+      resolved: docs.filter(d => d['resolved'] === true).length,
+    });
+    const all = [...ask, ...love];
+    this.ahSummary.set({
+      askAH: count(ask),
+      loveLetter: count(love),
+      liked: all.filter(d => d['liked'] === true).length,
+      tagged: all.filter(d => d['tagged'] === true).length,
+      opportunity: all.filter(d => d['opportunity'] === true).length,
+      critical: all.filter(d => d['critical'] === true).length,
+      unflagged: all.filter(d => !d['tagged'] && !d['opportunity'] && !d['liked'] && !d['critical']).length,
+      resolvedTotal: all.filter(d => d['resolved'] === true).length,
+      resolvedLiked: all.filter(d => d['liked'] && d['resolved']).length,
+      resolvedTagged: all.filter(d => d['tagged'] && d['resolved']).length,
+      resolvedOpportunity: all.filter(d => d['opportunity'] && d['resolved']).length,
+      resolvedCritical: all.filter(d => d['critical'] && d['resolved']).length,
+    });
   }
-  /** Summary A&H feed — latest love-letter + ask-A&H per participant IN THE CURRENT COACH SCOPE, newest first. */
-  recentAH = computed<{ profileid: string; name: string; kind: 'love' | 'ask'; text: string; tags: string[]; date: Date }[]>(() => {
-    const raw = this.recentAHRaw();
-    const inScope = new Set(this.rosterIds());
-    const rows: { profileid: string; name: string; kind: 'love' | 'ask'; text: string; tags: string[]; date: Date }[] = [];
-    for (const pid of Object.keys(raw)) {
-      if (!inScope.has(pid)) continue;
-      const rec = raw[pid];
-      if (rec.love) rows.push({ profileid: pid, name: this.nameOf(pid), kind: 'love', text: rec.love.text, tags: rec.love.tags, date: new Date(rec.love.ms) });
-      if (rec.ask) rows.push({ profileid: pid, name: this.nameOf(pid), kind: 'ask', text: rec.ask.text, tags: rec.ask.tags, date: new Date(rec.ask.ms) });
-    }
-    return rows.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 8);
-  });
 
   private async loadLoveLetterTagsFor(profileIds: string[]): Promise<void> {
     const ids = profileIds.filter(id => id && !(id in this.llTagsByProfile));
@@ -1290,9 +1318,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
     const llSince = Date.now() - 180 * 86400000;
-    const raw = { ...this.recentAHRaw() };
     const collect = async (coll: string) => {
-      const kind: 'love' | 'ask' = coll === 'love letter' ? 'love' : 'ask';
       for (const chunk of chunks) {
         try {
           const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', 'in', chunk)));
@@ -1306,11 +1332,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
             if (data['critical'] === true) t.critical = true;
             if (data['tagged'] === true) t.attention = true;      // 'tagged' == needs-attention
             if (data['opportunity'] === true) t.opportunity = true;
-            const item = this.ahItemFrom(data);                    // capture content for the Summary A&H card (item 3)
-            if (item) {
-              const rec = raw[data['profileid']] ?? (raw[data['profileid']] = {});
-              if (!rec[kind] || item.ms > rec[kind]!.ms) rec[kind] = item;
-            }
           });
         } catch (e) {
           if (this.isPermissionDenied(e)) return;
@@ -1319,7 +1340,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
     };
     await Promise.all([collect('love letter'), collect('ask AH')]);
-    this.recentAHRaw.set(raw);
   }
 
   /** Base-wide A&H tags for the ALL / admin paged view (doc item 5): a SINGLE date-bounded read per
@@ -1330,9 +1350,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (!this.fullIndexBuilt) return;
     const since = new Date(Date.now() - 180 * 86400000);
     const map: Record<string, { critical: boolean; attention: boolean }> = {};
-    const raw = { ...this.recentAHRaw() };
     const collect = async (coll: string) => {
-      const kind: 'love' | 'ask' = coll === 'love letter' ? 'love' : 'ask';
       try {
         const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
         snap.forEach(d => {
@@ -1343,11 +1361,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           const t = map[pid] ?? (map[pid] = { critical: false, attention: false });
           if (data['critical'] === true) t.critical = true;
           if (data['tagged'] === true) t.attention = true;
-          const item = this.ahItemFrom(data);                      // capture content for the Summary A&H card (item 3)
-          if (item) {
-            const rec = raw[pid] ?? (raw[pid] = {});
-            if (!rec[kind] || item.ms > rec[kind]!.ms) rec[kind] = item;
-          }
         });
       } catch (e) {
         if (this.isPermissionDenied(e)) return;
@@ -1360,7 +1373,6 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       l.llCritical = !!t?.critical;
       l.llAttention = !!t?.attention;
     }
-    this.recentAHRaw.set(raw);
     this.computeBaseWideAttention();
     if (this.pagedMode) { this.accumulatePagedSummary(); this.applyFilters(); }
   }
