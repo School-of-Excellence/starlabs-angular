@@ -620,9 +620,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const last = this.lastTouchMs(lite.profileid);
       const daysSince = last != null ? Math.floor((now - last) / 86400000) : null;
       const goingQuiet = daysSince != null && daysSince > this.QUIET_DAYS;
-      lite.goingQuiet = goingQuiet;   // so the Going-quiet / Needs-attention levers can scope the matched set
-      if (goingQuiet) gq++;
-      if (this.isNeedsAttentionLite(lite)) na++;
+      lite.goingQuiet = goingQuiet;   // raw signal; the Going-Quiet BUCKET below excludes Needs-Attention
+      const naLite = this.isNeedsAttentionLite(lite);
+      if (goingQuiet && !naLite) gq++;   // bucket = quiet AND not Needs-Attention (Needs Attention wins)
+      if (naLite) na++;
     }
     this.fullBaseGoingQuiet = gq;
     this.fullBaseNeedsAttention.set(na);
@@ -831,7 +832,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (r.renewalWindow) this.summary.renewalsSoon++;
       if (r.lapsed) this.summary.lapsed++;
       if (r.openTickets > 0) this.summary.withOpenTickets++;
-      if (r.goingQuiet) this.summary.goingQuiet++;
+      if (this.isGoingQuietBucket(r)) this.summary.goingQuiet++;
       if (r.notStarted) this.summary.notStarted++;
       const finR = (r.financialstatus ?? '').toLowerCase();
       if (finR === 'locked') this.summary.paymentsLocked++;
@@ -876,7 +877,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.lapsed = filteredIdx.reduce((n, l) => n + (l.lapsed ? 1 : 0), 0);
       // going-quiet flags land on the lite rows only once contact data loads (computeBaseWideAttention);
       // until then keep the earlier fallback rather than flash 0.
-      if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (l.goingQuiet ? 1 : 0), 0);
+      if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (this.isGoingQuietBucketLite(l) ? 1 : 0), 0);
       // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
       this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) ? 1 : 0), 0));
       this.pagedFilteredCount.set(filteredIdx.length);
@@ -2115,6 +2116,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       || ['locked', 'defaulted'].includes((l.financialstatus ?? '').toLowerCase())
       || !!l.llCritical || !!l.llAttention;
   }
+  /** "Going Quiet" BUCKET membership — quiet AND not already a Needs-Attention case, so a participant
+   *  shows in exactly ONE of the two buckets (Needs Attention wins; per Joshua — no duplicates). Every
+   *  Going-Quiet count / lever / list uses this; the raw `goingQuiet` flag stays for the scoreboard
+   *  coverage metric (which measures contact, independent of needs-attention). */
+  private isGoingQuietBucket(r: PortfolioRow): boolean {
+    return r.goingQuiet && !this.isNeedsAttention(r);
+  }
+  private isGoingQuietBucketLite(l: LiteIndexRow): boolean {
+    return l.goingQuiet && !this.isNeedsAttentionLite(l);
+  }
   /** Does this row have at least one live Needs-Attention issue? Delegates to isNeedsAttention(). */
   hasAddressableIssue(r: PortfolioRow): boolean {
     return this.isNeedsAttention(r);
@@ -2288,7 +2299,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
   goingQuietRows = computed<PortfolioRow[]>(() =>
-    this.filteredRows().filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
+    this.filteredRows().filter(r => this.isGoingQuietBucket(r)).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
   paymentsLockedRows = computed<PortfolioRow[]>(() =>
     this.filteredRows().filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority));
   renewalRows = computed<PortfolioRow[]>(() =>
@@ -2695,7 +2706,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const rows = rowsByCoach.get(c.name) ?? [];
       const caseload = baseByScoreboard[c.id] ?? rows.length;
       const needToday = rows.filter(r => this.isNeedsAttention(r)).length;
-      const goingQuiet = rows.filter(r => r.goingQuiet).length;
+      const goingQuiet = rows.filter(r => this.isGoingQuietBucket(r)).length;
       const flagged = rows.filter(r => r.flagged).length;
       const handled = handledByCoach[c.id] ?? 0;
       // only surface coaches with an actual base (assignments OR loaded rows) — never invent coaches
@@ -3131,7 +3142,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (r.renewalWindow) s.renewalsSoon++;
       if (r.lapsed) s.lapsed++;
       if (r.openTickets > 0) s.withOpenTickets++;
-      if (r.goingQuiet) s.goingQuiet++;
+      if (this.isGoingQuietBucket(r)) s.goingQuiet++;
       if (r.notStarted) s.notStarted++;
       // Payments locked: rows whose financialstatus is the 'locked' token (same token the
       // priority/action logic keys off — see scoreRow / actionFor). New count for the Summary view.
@@ -3228,7 +3239,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     if (this.activeLever === 'needsAttention'
       && (!this.isNeedsAttention(r) || this.isAddressed(r))) return false;
     if (this.activeLever === 'flagged' && !r.flagged) return false;
-    if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
+    if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucket(r)) return false;
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
     if (this.activeLever === 'notStarted' && !r.notStarted) return false;
@@ -3249,7 +3260,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     if (this.financeFilters.length && !this.financeFilters.some(f => f.toLowerCase() === (r.financialstatus ?? '').toLowerCase())) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
-    if (this.goingQuietOnly && !r.goingQuiet) return false;
+    if (this.goingQuietOnly && !this.isGoingQuietBucket(r)) return false;
     if (this.noEventRequestOnly && r.recentEventRequest) return false;
     // paged mode: only rows whose lightweight full-base entry also matches the index-level filters
     if (this.pagedMode && this.fullBaseMatchIds && !this.fullBaseMatchIds.has(r.profileid)) return false;
@@ -3299,8 +3310,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // going-quiet / needs-attention need touchpoint+appointment data. Once it has loaded (lite.goingQuiet
     // is populated), scope the matched set base-wide; before that, fall through (page-local refine).
     if (this.contactDataLoaded()) {
-      if (this.activeLever === 'goingQuiet' && !lite.goingQuiet) return false;
-      if (this.goingQuietOnly && !lite.goingQuiet) return false;
+      if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucketLite(lite)) return false;
+      if (this.goingQuietOnly && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.activeLever === 'needsAttention'
         && !this.isNeedsAttentionLite(lite)) return false;
     }
