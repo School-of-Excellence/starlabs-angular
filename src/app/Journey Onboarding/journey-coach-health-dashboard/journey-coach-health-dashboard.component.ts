@@ -1372,6 +1372,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
     const ref = this.dialog.open(AhFlagListDialogComponent, {
       data: { title, entries }, autoFocus: false, maxHeight: '80vh',
+      panelClass: this.isDark ? 'jchd-overlay-dark' : undefined,
     });
     ref.afterClosed().subscribe((pid: string | undefined) => { if (pid) this.openJcParticipant(pid); });
   }
@@ -1741,13 +1742,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       addressed: this.isAddressed(row),
       needsAttention: this.isNeedsAttention(row),
       onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
+      isDark: this.isDark,   // the slide-over + its composer render in CDK overlays outside .jchd-wrap
     };
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
       width: 'min(520px, 100vw)',
       height: '100vh',
       position: { right: '0', top: '0' },
-      panelClass: 'jchd-slideover-panel',
+      panelClass: this.isDark ? ['jchd-slideover-panel', 'jchd-overlay-dark'] : 'jchd-slideover-panel',
       // a11y: label the dialog by the participant-name heading and move focus into the panel
       // (the close button) on open, instead of leaving focus on the trigger outside the overlay.
       ariaLabelledBy: 'so-title',
@@ -1879,7 +1881,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
   logCall(row: PortfolioRow): void {
-    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false });
+    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false, panelClass: this.isDark ? 'jchd-overlay-dark' : undefined });
     ref.afterClosed().subscribe(async (res: LogCallResult | undefined) => {
       if (!res) return;
       await this.writeCall(row, res.outcome, res.note, res.nextActionDate ?? null);
@@ -1938,6 +1940,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const ref = this.dialog.open(SetHealthStateDialogComponent, {
       data: { name: row.name, current: row.coachHealthState?.state ?? null },
       autoFocus: false,
+      panelClass: this.isDark ? 'jchd-overlay-dark' : undefined,
     });
     ref.afterClosed().subscribe(async (res: SetHealthStateResult | undefined) => {
       if (!res) return;

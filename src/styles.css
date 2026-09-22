@@ -202,6 +202,39 @@ body {
   padding: 0 !important;
 }
 
+/* JC Health dashboard — dark theme for its CDK overlays (A&H drill dialog, slide-over, log composer,
+   log-call / set-health dialogs). Applied via the jchd-overlay-dark panelClass the dashboard adds when
+   its resolved theme is dark; colours mirror the dashboard's own dark tokens. Content text colours flip
+   in each component's :host-context / --so-* styles — here we dark the SURFACE and the Material form
+   controls that live outside component scope. */
+.jchd-overlay-dark .mat-mdc-dialog-surface,
+.jchd-overlay-dark .mat-mdc-dialog-container .mdc-dialog__surface { background: #1b1b20 !important; }
+.jchd-slideover-panel.jchd-overlay-dark .mat-mdc-dialog-surface,
+.jchd-logcomposer-panel.jchd-overlay-dark .mat-mdc-dialog-surface {
+  background: #1b1b20 !important;
+  box-shadow: -18px 0 48px -24px rgba(0, 0, 0, 0.6);
+}
+.jchd-overlay-dark .mat-mdc-dialog-container {
+  color: #f5f5f7;
+  --mdc-dialog-container-color: #1b1b20;
+  --mdc-dialog-subhead-color: #f5f5f7;
+  --mdc-dialog-supporting-text-color: rgba(235, 235, 245, 0.64);
+  --mdc-outlined-text-field-input-text-color: #f5f5f7;
+  --mdc-outlined-text-field-label-text-color: rgba(235, 235, 245, 0.6);
+  --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.22);
+  --mdc-outlined-text-field-hover-outline-color: rgba(255, 255, 255, 0.4);
+  --mat-select-enabled-trigger-text-color: #f5f5f7;
+  --mat-select-placeholder-text-color: rgba(235, 235, 245, 0.5);
+}
+/* slide-over + composer content: re-point the --so-* token set to dark (inherits to every descendant,
+   which already reference var(--so-*)). */
+.jchd-slideover-panel.jchd-overlay-dark .so-root,
+.jchd-logcomposer-panel.jchd-overlay-dark .so-composer {
+  --so-bg: #1b1b20; --so-ink: #f5f5f7; --so-ink2: rgba(235, 235, 245, 0.64); --so-muted: rgba(235, 235, 245, 0.45);
+  --so-border: rgba(255, 255, 255, 0.12); --so-border-soft: rgba(255, 255, 255, 0.08);
+  --so-accent: #0a84ff; --so-accent-soft: rgba(10, 132, 255, 0.16); --so-surface-soft: rgba(235, 235, 245, 0.06);
+}
+
 .fullscreen-dialog .mat-mdc-dialog-surface {
   border-radius: 10px !important;
   overflow: auto !important;

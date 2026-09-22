@@ -56,6 +56,15 @@ export interface AhFlagListData {
       overflow: hidden; text-overflow: ellipsis; }
     .afl-date { font-size: 12px; color: #8a93a2; font-variant-numeric: tabular-nums; }
     .afl-chev { color: #b6bdc8; font-size: 18px; width: 18px; height: 18px; }
+    /* dark mode — the dialog renders in a CDK overlay; the dashboard adds .jchd-overlay-dark to the
+       panel when its theme is dark (the surface is darkened globally in styles.css). */
+    :host-context(.jchd-overlay-dark) .afl-title { color: #f5f5f7; }
+    :host-context(.jchd-overlay-dark) .afl-count { color: rgba(235,235,245,.64); background: rgba(255,255,255,.10); }
+    :host-context(.jchd-overlay-dark) .afl-empty,
+    :host-context(.jchd-overlay-dark) .afl-date { color: rgba(235,235,245,.5); }
+    :host-context(.jchd-overlay-dark) .afl-name { color: #f5f5f7; }
+    :host-context(.jchd-overlay-dark) .afl-row:hover:not([disabled]) { background: rgba(255,255,255,.06); }
+    :host-context(.jchd-overlay-dark) .afl-chev { color: rgba(235,235,245,.4); }
   `],
 })
 export class AhFlagListDialogComponent {

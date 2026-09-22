@@ -93,6 +93,9 @@ export interface SlideoverData {
   addressed: boolean;
   needsAttention: boolean;
   onMarkAddressed: (next: boolean) => void;
+  // resolved dashboard theme (the slide-over + its composer render in CDK overlays outside .jchd-wrap,
+  // so they can't inherit the dashboard's [data-theme]; used to add the dark overlay panelClass).
+  isDark?: boolean;
 }
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
@@ -722,10 +725,10 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-body::-webkit-scrollbar { width: 9px; }
     .so-body::-webkit-scrollbar-thumb {
-      background: #cdd6e3; border-radius: 999px;
+      background: var(--so-border); border-radius: 999px;
       border: 2px solid var(--so-bg); background-clip: padding-box;
     }
-    .so-body::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+    .so-body::-webkit-scrollbar-thumb:hover { background: var(--so-muted); background-clip: padding-box; }
     .so-body::-webkit-scrollbar-track { background: transparent; }
 
     .so-sec { padding: 14px 20px; border-top: 1px solid var(--so-border-soft); }
@@ -870,7 +873,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-coach-current { font-size: 13px; font-weight: 600; color: var(--so-ink); }
     .so-coach-select {
       font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink); cursor: pointer;
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink); cursor: pointer;
       max-width: 55%;
     }
 
@@ -890,7 +893,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       --so-bg: #ffffff; --so-ink: #1c1c1e; --so-ink2: rgba(60,60,67,.6); --so-muted: rgba(60,60,67,.45);
       --so-border: rgba(60,60,67,.12); --so-border-soft: rgba(60,60,67,.08);
       --so-accent: #007aff; --so-accent-soft: rgba(0,122,255,.08);
-      background: #ffffff; color: var(--so-ink); padding: 22px 24px 22px;
+      background: var(--so-bg); color: var(--so-ink); padding: 22px 24px 22px;
       font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     }
     .so-comp-top {
@@ -912,7 +915,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       transition: color .2s ease, background-color .2s ease, transform .06s ease;
     }
     .so-seg-btn.on {
-      background: #fff; color: var(--so-ink); font-weight: 600;
+      background: var(--so-bg); color: var(--so-ink); font-weight: 600;
       box-shadow: 0 3px 8px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.04);
     }
     .so-seg-btn:active { transform: scale(.97); }
@@ -935,7 +938,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-input::placeholder { color: var(--so-muted); }
     .so-input:focus {
-      outline: none; background-color: #fff; border-color: var(--so-accent);
+      outline: none; background-color: var(--so-bg); border-color: var(--so-accent);
       box-shadow: 0 0 0 3px var(--so-accent-soft);
     }
     select.so-input {
@@ -945,7 +948,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     textarea.so-input { resize: vertical; min-height: 64px; line-height: 1.4; }
     .so-state-pick { display: flex; flex-wrap: wrap; gap: 8px; }
     .so-state-opt {
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink2);
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink2);
       font: inherit; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px; cursor: pointer;
       transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
     }
@@ -1486,7 +1489,7 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.composerRef = this.dialog.open(this.composerTpl, {
       width: 'min(560px, 92vw)',
       maxHeight: '85vh',
-      panelClass: 'jchd-logcomposer-panel',
+      panelClass: this.data.isDark ? ['jchd-logcomposer-panel', 'jchd-overlay-dark'] : 'jchd-logcomposer-panel',
       autoFocus: false,
       restoreFocus: true,
     });
