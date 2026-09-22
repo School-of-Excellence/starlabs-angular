@@ -1643,8 +1643,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // NOTE: customerstatus 'late' means the participant is gone (unactionable) — it does NOT add
     // priority and such rows are excluded from the active board (see isInactiveStatus / applyFilters).
     if (r.openTickets > 0) { p += Math.min(r.openTickets, 3) * 4; drivers.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`); }
-    if (r.llCritical) { p += this.W_LL_CRITICAL; drivers.push('A&H critical'); }
-    if (r.llAttention) { p += this.W_LL_ATTENTION; drivers.push('A&H needs attention'); }
+    if (r.llCritical) { p += this.W_LL_CRITICAL; drivers.push('Critical'); }
+    if (r.llAttention) { p += this.W_LL_ATTENTION; drivers.push('Needs Attention'); }
 
     r.priority = Math.max(0, Math.min(100, Math.round(p)));
     r.priorityBand = r.priority >= 40 ? 'High' : r.priority >= 22 ? 'Medium' : 'Low';
@@ -2096,8 +2096,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const fin = (r.financialstatus ?? '').toLowerCase();
     if (fin === 'locked') out.push('Payments locked');
     else if (fin === 'defaulted') out.push('Payments defaulted');
-    if (r.llCritical) out.push('A&H critical');
-    if (r.llAttention) out.push('A&H needs attention');
+    if (r.llCritical) out.push('Critical');
+    if (r.llAttention) out.push('Needs Attention');
     return out;
   }
   /** Needs-attention — the ONE actionable-now predicate (doc item 4), the single source of truth that

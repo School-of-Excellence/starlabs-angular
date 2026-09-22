@@ -649,9 +649,9 @@
                 <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
                 <span class="cp-id">{{ r.number || '—' }}</span>
                 <span class="cp-ah" *ngIf="r.llCritical || r.llAttention || r.llOpportunity">
-                  <span class="chip chip-bad" *ngIf="r.llCritical" matTooltip="Unresolved A&H critical tag">A&amp;H critical</span>
-                  <span class="chip chip-warn" *ngIf="r.llAttention" matTooltip="A&H needs-attention tag">A&amp;H attention</span>
-                  <span class="chip" *ngIf="r.llOpportunity" matTooltip="A&H opportunity tag">A&amp;H opportunity</span>
+                  <span class="chip chip-bad" *ngIf="r.llCritical" matTooltip="Unresolved Critical tag on a recent Ask A&H / Love Letter">Critical</span>
+                  <span class="chip chip-warn" *ngIf="r.llAttention" matTooltip="Needs-Attention tag on a recent Ask A&H / Love Letter">Needs Attention</span>
+                  <span class="chip" *ngIf="r.llOpportunity" matTooltip="Opportunity tag on a recent Ask A&H / Love Letter">Opportunity</span>
                 </span>
               </span>
             </span>
@@ -900,8 +900,8 @@
               <span class="chip chip-warn" *ngIf="r.goingQuiet">Quiet {{ r.daysSinceCoach }}d</span>
               <span class="chip chip-warn" *ngIf="r.openTickets > 0">{{ r.openTickets }} open ticket<span *ngIf="r.openTickets > 1">s</span></span>
               <span class="chip chip-warn" *ngIf="r.notStarted">Journey not started</span>
-              <span class="chip chip-bad" *ngIf="r.llCritical">A&amp;H critical</span>
-              <span class="chip chip-warn" *ngIf="r.llAttention">A&amp;H needs attention</span>
+              <span class="chip chip-bad" *ngIf="r.llCritical">Critical</span>
+              <span class="chip chip-warn" *ngIf="r.llAttention">Needs Attention</span>
               <span class="chip" *ngIf="r.recentEventRequest" [ngClass]="eventStatusClass(r.recentEventRequest.status)"
                     [matTooltip]="r.recentEventRequest.eventName + (r.recentEventRequest.date ? ' · ' + fmtDate(r.recentEventRequest.date) : '')">{{ r.recentEventRequest.eventName }}: {{ r.recentEventRequest.status }}</span>
               <span class="chip" *ngIf="r.coachHealthState" [ngClass]="stateClass(r.coachHealthState.state)"

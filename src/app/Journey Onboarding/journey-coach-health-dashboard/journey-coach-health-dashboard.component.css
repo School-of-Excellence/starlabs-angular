@@ -1102,6 +1102,18 @@
 .jchd-table ::ng-deep .mat-mdc-row:last-child td.mat-mdc-cell {
   border-bottom: none;
 }
+/* Angular Material's MDC table hard-codes a white --mat-table-background-color and paints it on the
+   cells; in dark mode the light --ink participant text sat on that white and became invisible. Bind
+   the table surface to our theme tokens and let the (themed) table background show through the cells
+   so row hover/focus still composites over it. */
+.jchd-table {
+  --mat-table-background-color: var(--surface);
+  background-color: var(--surface);
+}
+.jchd-table td.mat-mdc-cell,
+.jchd-table ::ng-deep .mat-mdc-row {
+  background-color: transparent;
+}
 .jchd-table .cell-name {
   font-weight: 650;
   color: var(--ink);
