@@ -3200,7 +3200,7 @@ td.mat-mdc-cell span {
 /* JC pipeline card (doc item 8) — completed journey coaches, today / last week / last month. */
 .jc-pipeline { margin-bottom: 12px; }
 /* Schedule (doc item 1): two side-by-side JC / Onboarding schedules */
-.jc-schedule { margin-top: var(--gap); margin-bottom: 12px; }
+.jc-schedule { margin-top: var(--sp-6); margin-bottom: 12px; }
 /* Ecosystem A&H analytics summary card (item 3). */
 .jchd-ah-card { margin-bottom: 12px; }
 .jchd-ah-card .ah-src { margin-left: auto; display: flex; gap: 6px; }
