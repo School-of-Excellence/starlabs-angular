@@ -345,7 +345,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private matchedIds: string[] = [];
   private suppressPagedRender = false;   // guards computeRows→applyFilters re-entry during a matched render
 
-  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
 
   // Current Firebase Auth uid, resolved during resolveCoach() so the audit-trail writes
   // (logCall / setHealthState / toggleFlag) can stamp actorUid synchronously. Never reused from
@@ -676,6 +676,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (r.goingQuiet) this.summary.goingQuiet++;
       if (r.notStarted) this.summary.notStarted++;
       if ((r.financialstatus ?? '').toLowerCase() === 'locked') this.summary.paymentsLocked++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'defaulted') this.summary.defaulted++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'late') this.summary.missed++;
     }
     this.loadedRowCount = this.countedProfiles.size;
     if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
@@ -711,6 +713,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.noStatus = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'nostatus' ? 1 : 0), 0);
       this.summary.renewalsSoon = filteredIdx.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
       this.summary.paymentsLocked = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
+      this.summary.defaulted = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'defaulted' ? 1 : 0), 0);
+      this.summary.missed = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'late' ? 1 : 0), 0);
       // journeyIdx, NOT filteredIdx: tickets are exempt from the lifecycle filter (see
       // leverIgnoresLifecycle) so the card matches the list it opens.
       this.summary.withOpenTickets = journeyIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
@@ -755,7 +759,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // Only zero the summary BEFORE the base-wide numbers exist. Once the lite index is built the
     // counts are base-wide (not page-accumulated), so a page reload must not flash them to 0.
     if (!this.fullIndexBuilt) {
-      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     }
     this.loadedRowCount = 0;
   }
@@ -2574,6 +2578,26 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
+  /** Summary "Defaulted" / "Missed" finance tiles → Participants filtered to the matching finance
+   *  token ('defaulted' / 'late'), reusing the SAME finance-filter drill-down as Payments locked. */
+  goToDefaulted(): void {
+    this.statusFilter = '';
+    this.activeLever = 'all';
+    this.carrySummaryFilterToBase();
+    this.view = 'base';
+    this.financeFilters = ['defaulted'];
+    this.applyFilters();
+  }
+
+  goToMissed(): void {
+    this.statusFilter = '';
+    this.activeLever = 'all';
+    this.carrySummaryFilterToBase();
+    this.view = 'base';
+    this.financeFilters = ['late'];
+    this.applyFilters();
+  }
+
   /** Build one coach card per coach, every stat traced to real loaded data (honest zeros otherwise).
    *  Caseload reuses the scoreboard's baseSize (distinct coachedby assignments); the action stats are
    *  grouped from the currently-loaded base rows by coach name; Handled today = touchpoints this coach
@@ -3121,7 +3145,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // allRows is already per-distinct-participant. Total = distinct participants. The lifecycle
     // split (Active / Non-active / Discontinued / No status) is CUSTOMERSTATUS-based, read from the
     // participant metadata doc — NOT from the pjp record, whose customerstatus is empty.
-    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     // Band (lifecycle split) reflects the JOURNEY filter only, so all three segments stay visible and
     // switchable even while one is selected as the active lifecycle filter.
     for (const r of this.journeyFilteredRows()) {
@@ -3149,6 +3173,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // Payments locked: rows whose financialstatus is the 'locked' token (same token the
       // priority/action logic keys off — see scoreRow / actionFor). New count for the Summary view.
       if ((r.financialstatus ?? '').toLowerCase() === 'locked') s.paymentsLocked++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'defaulted') s.defaulted++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'late') s.missed++;
     }
     this.summary = s;
   }

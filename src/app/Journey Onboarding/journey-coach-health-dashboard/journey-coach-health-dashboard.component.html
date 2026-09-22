@@ -164,9 +164,17 @@
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
           <span class="ios2-n">{{ summary.goingQuiet }}</span><span class="ios2-l">Going quiet</span>
         </button>
+        <button type="button" class="ios2-tile" (click)="goToDefaulted()">
+          <span class="ios2-app ap-purple"><mat-icon>credit_card_off</mat-icon></span>
+          <span class="ios2-n">{{ summary.defaulted }}</span><span class="ios2-l">Defaulted</span>
+        </button>
         <button type="button" class="ios2-tile" (click)="goToPaymentsLocked()">
           <span class="ios2-app ap-red"><mat-icon>lock</mat-icon></span>
           <span class="ios2-n">{{ summary.paymentsLocked }}</span><span class="ios2-l">Payments locked</span>
+        </button>
+        <button type="button" class="ios2-tile" (click)="goToMissed()">
+          <span class="ios2-app ap-indigo"><mat-icon>schedule</mat-icon></span>
+          <span class="ios2-n">{{ summary.missed }}</span><span class="ios2-l">Missed</span>
         </button>
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('renewalWindow')">
           <span class="ios2-app ap-blue"><mat-icon>autorenew</mat-icon></span>
