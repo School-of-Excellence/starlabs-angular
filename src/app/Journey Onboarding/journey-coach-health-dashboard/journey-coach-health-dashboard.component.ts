@@ -1030,6 +1030,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
           pending.push({ profileid: pid, coachId: host, ms: dt.getTime() });
           return;
         }
+        // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
+        // journeycoach==true on `appointments` (schedule-dialog sets `onboarding: true` only for
+        // calltype 'onboarding'), so an attended ONBOARDING must not count as a completed JC or show
+        // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
+        // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
+        // (doc item 1) is handled there separately.
+        if (data['onboarding'] === true) return;
         map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
         // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
         // attended), and the JC pipeline metrics need the individual occurrences, not just the
