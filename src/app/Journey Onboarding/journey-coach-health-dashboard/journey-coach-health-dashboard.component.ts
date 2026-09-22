@@ -33,6 +33,7 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
+import { AhFlagListDialogComponent, AhFlagListEntry } from './ah-flag-list-dialog.component';
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import {
@@ -1147,6 +1148,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Booked, non-cancelled, not-yet-attended journey-coach appointments. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcSchedEvent[]>([]);
 
+  /** Which count tile is active per schedule column; 'all' = show every booked session (default).
+   *  Clicking a Today / Next-7 / Overdue tile filters that column's list to the bucket (toggle off). */
+  jcSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  obSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  setSchedBucket(onboarding: boolean, bucket: 'today' | 'week' | 'overdue'): void {
+    const sig = onboarding ? this.obSchedBucket : this.jcSchedBucket;
+    sig.set(sig() === bucket ? 'all' : bucket);
+  }
+
   /** profileids in the current summary scope (selected coach's base, or the whole base in ALL mode). */
   private rosterIds(): string[] {
     if (this.pagedMode && this.fullIndexBuilt) return this.fullIndex.map(l => l.profileid);
@@ -1188,10 +1198,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** One schedule's booked sessions grouped by day (overdue days first, then today, then the next 7). */
   private schedList(onboarding: boolean): { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }[] {
     const todayStart = this.startOfDay(new Date()).getTime();
-    const week7 = this.endOfDay(new Date()).getTime() + 7 * 86400000;
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
     const inScope = new Set(this.rosterIds());
+    const bucket = (onboarding ? this.obSchedBucket : this.jcSchedBucket)();
+    const inBucket = (ms: number): boolean => {
+      if (bucket === 'all') return ms <= week7;
+      const overdue = this.startOfDay(new Date(ms)).getTime() < todayStart;
+      if (bucket === 'overdue') return overdue;
+      if (bucket === 'today') return !overdue && ms <= endToday;
+      return !overdue && ms > endToday && ms <= week7;   // 'week' = Next 7 days
+    };
     const rows = this.jcPendingEvents()
-      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && e.ms <= week7)
+      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && inBucket(e.ms))
       .sort((a, b) => a.ms - b.ms);
     const groups = new Map<number, { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }>();
     for (const e of rows) {
@@ -1271,6 +1290,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   //  no composite index). tagged = Needs Attention · opportunity = Opportunity · liked = Happy · critical = Critical.
   ahSummary = signal<AHSummary | null>(null);
   private ahSummaryLoaded = false;
+  /** One row per source A&H / Love Letter document kept behind the analytics card, so a clicked cell
+   *  can drill to the exact participants that make up its count (list length reconciles the cell). */
+  private ahDocs: { profileid: string; coll: 'ask' | 'love'; liked: boolean; tagged: boolean;
+    opportunity: boolean; critical: boolean; resolved: boolean; created: number }[] = [];
   private async loadAHSummary(): Promise<void> {
     if (this.ahSummaryLoaded) return;
     this.ahSummaryLoaded = true;
@@ -1286,6 +1309,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
     };
     const [ask, love] = await Promise.all([read('ask AH'), read('love letter')]);
+    const mapDoc = (d: any, coll: 'ask' | 'love') => ({
+      profileid: typeof d['profileid'] === 'string' ? d['profileid'] : '',
+      coll,
+      liked: d['liked'] === true, tagged: d['tagged'] === true,
+      opportunity: d['opportunity'] === true, critical: d['critical'] === true,
+      resolved: d['resolved'] === true,
+      created: this.toDate(d['created'])?.getTime() ?? 0,
+    });
+    this.ahDocs = [...ask.map(d => mapDoc(d, 'ask')), ...love.map(d => mapDoc(d, 'love'))];
     const count = (docs: any[]): AHFlagCounts => ({
       total: docs.length,
       tagged: docs.filter(d => d['tagged'] === true).length,
@@ -1309,6 +1341,38 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       resolvedOpportunity: all.filter(d => d['opportunity'] && d['resolved']).length,
       resolvedCritical: all.filter(d => d['critical'] && d['resolved']).length,
     });
+  }
+
+  /** A&H analytics card drill-down: list the participants behind a clicked count, then open the one
+   *  the coach taps. `coll` scopes to a collection ('both' = combined); `flag` picks the predicate;
+   *  `resolvedOnly` restricts to resolved docs. One row per matching document (no de-dup) so the list
+   *  length equals the clicked cell's number. */
+  openAhDrill(
+    coll: 'ask' | 'love' | 'both',
+    flag: 'all' | 'liked' | 'tagged' | 'opportunity' | 'critical' | 'unflagged' | 'critattn',
+    resolvedOnly: boolean, title: string,
+  ): void {
+    const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
+      d.liked || d.tagged || d.opportunity || d.critical;
+    const docs = this.ahDocs.filter(d => {
+      if (coll !== 'both' && d.coll !== coll) return false;
+      if (resolvedOnly && !d.resolved) return false;
+      switch (flag) {
+        case 'all': return true;
+        case 'unflagged': return !flagged(d);
+        case 'critattn': return d.critical || d.tagged;
+        default: return d[flag] === true;
+      }
+    });
+    if (!docs.length) return;
+    const entries: AhFlagListEntry[] = docs
+      .slice()
+      .sort((a, b) => b.created - a.created)
+      .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
+    const ref = this.dialog.open(AhFlagListDialogComponent, {
+      data: { title, entries }, autoFocus: false, maxHeight: '80vh',
+    });
+    ref.afterClosed().subscribe((pid: string | undefined) => { if (pid) this.openJcParticipant(pid); });
   }
 
   private async loadLoveLetterTagsFor(profileIds: string[]): Promise<void> {
@@ -2655,6 +2719,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   toggleCoachCard(coachId: string): void {
     if (this.expandedCoachIds.has(coachId)) this.expandedCoachIds.delete(coachId);
     else this.expandedCoachIds.add(coachId);
+  }
+
+  /** Coach-card stat cell → jump into that coach's Participants list, filtered by the stat's lever.
+   *  Caseload and Handled open the whole caseload (lever 'all') — Handled is a productivity count with
+   *  no participant predicate, so it opens the base rather than a mismatched filtered list. The other
+   *  three levers (needsAttention/goingQuiet/flagged) use the same predicate as the card stat, so the
+   *  resulting list length reconciles with the number on the tile. */
+  async drillCoachStat(card: CoachCard, lever: Lever): Promise<void> {
+    this.view = 'base';
+    await this.onCoachChange(card.coachId);   // scopes the base to this coach (resets lever to 'all')
+    if (lever !== 'all') this.setLever(lever);
   }
 
   onRangeChange(): void {

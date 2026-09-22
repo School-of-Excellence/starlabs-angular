@@ -3175,9 +3175,19 @@ td.mat-mdc-cell span {
 /* Ecosystem A&H analytics summary card (item 3). */
 .jchd-ah-card { margin-bottom: 12px; }
 .jchd-ah-card .ah-src { margin-left: auto; display: flex; gap: 6px; }
-.ah-src-pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; white-space: nowrap; }
+.ah-src-pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; white-space: nowrap;
+  border: none; font-family: inherit; cursor: pointer; transition: filter .12s ease, box-shadow .12s ease; }
+.ah-src-pill:hover { filter: brightness(0.96); }
+.ah-src-pill:active { transform: translateY(0.5px); }
 .ah-src-pill.ah-src-ask { color: var(--blue-fg); background: var(--blue-08); }
 .ah-src-pill.ah-src-love { color: var(--sem-pink); background: var(--tile); }
+/* clickable count cells: the number is a borderless button that drills to the participants behind it */
+.ah-num { border: none; background: none; font: inherit; color: inherit; cursor: pointer;
+  padding: 2px 7px; margin: -2px -3px; border-radius: 7px; font-variant-numeric: tabular-nums;
+  transition: background .12s ease; }
+.ah-num:hover { background: var(--tile-hover); }
+.ah-num:active { background: var(--blue-08); }
+.ah-table td.ah-res .ah-num:hover { background: var(--surface-2); }
 .ah-table { margin-top: 8px; overflow-x: auto; }
 .ah-table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .ah-table th, .ah-table td { padding: 7px 10px; text-align: right; font-size: 13px; color: var(--ink); border-bottom: 1px solid var(--hairline); white-space: nowrap; }
@@ -3192,7 +3202,10 @@ td.mat-mdc-cell span {
 .ah-dot.ah-crit { background: var(--sem-red-strong); }
 .ah-table tr.ah-total td { font-weight: 800; border-bottom: 0; border-top: 1px solid var(--border-strong); }
 .ah-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
-.ah-mini { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: center; background: var(--tile); }
+.ah-mini { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 12px; border-radius: 10px; text-align: center; background: var(--tile);
+  border: none; font: inherit; width: 100%; cursor: pointer; transition: box-shadow .12s ease, transform .1s ease; }
+.ah-mini:hover { box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.ah-mini:active { transform: translateY(0.5px); }
 .ah-mini-k { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .ah-mini-n { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .ah-mini-unflagged .ah-mini-k, .ah-mini-unflagged .ah-mini-n { color: var(--sem-pink); }
@@ -3200,7 +3213,7 @@ td.mat-mdc-cell span {
 .ah-mini-critattn .ah-mini-k, .ah-mini-critattn .ah-mini-n { color: var(--sem-red); }
 .jcs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .jcs-col { min-width: 0; }
-.jc-schedule .jcp-tile { cursor: default; }
+.jc-schedule .jcp-tile { cursor: pointer; }
 .jcs-colhead { display: flex; align-items: center; margin: 2px 0 8px; }
 .jcs-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 7px; }
 .jcs-tag-jc { background: rgba(0,122,255,0.12); color: var(--blue-fg); }
@@ -3239,7 +3252,12 @@ td.mat-mdc-cell span {
 /* Coach-card numbers are drill buttons: clicking one lists those people in the expanded section. */
 .stat-row .stat { border: none; background: none; font: inherit; cursor: pointer; padding: 6px 4px; border-radius: 10px; }
 .stat-row .stat:hover { background: rgba(120,120,128,0.08); }
+.stat-row .stat:active { transform: translateY(0.5px); }
 .stat-row .stat.is-drill, .cjc.is-drill { box-shadow: inset 0 0 0 2px var(--blue); }
+/* one visible keyboard-focus ring for every control made clickable in this pass */
+.ah-num:focus-visible, .ah-src-pill:focus-visible, .ah-mini:focus-visible,
+.jcp-tile:focus-visible, .stat-row .stat:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px; }
 .cjc { border: none; font: inherit; cursor: pointer; text-align: left; width: 100%; }
 .cjc:hover { background: var(--surface-2); }
 .coach-expand .expand-inner { max-height: 340px; overflow-y: auto; }
