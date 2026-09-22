@@ -69,8 +69,8 @@
     </div>
 
     <!-- ===== Summary view (iOS cards) ===== -->
-    <ng-container *ngIf="view === 'summary'">
-    <div class="jchd-anim">
+    <!-- kept mounted ([hidden], not *ngIf) so switching tabs never rebuilds it -->
+    <div class="jchd-anim" [hidden]="view !== 'summary'">
 
       <!-- Global summary filter: lifecycle + journey/group. Rescopes every metric below.
            Active only when the full base is loaded; disabled in the paged/All view (honest). -->
@@ -373,12 +373,11 @@
         </section>
       </div>
     </div>
-    </ng-container>
     <!-- ===== /Summary view ===== -->
 
-    <!-- ===== Base view (existing dashboard) ===== -->
-    <ng-container *ngIf="view === 'base'">
-    <div class="jchd-anim">
+    <!-- ===== Base view — kept mounted so the mat-table (and its MatSort/MatPaginator ViewChild
+         bindings) survive tab switches instead of being destroyed/rebuilt ===== -->
+    <div class="jchd-anim" [hidden]="view !== 'base'">
 
     <!-- Fallback notice: logged-in coach couldn't be matched, so we're showing everyone. -->
     <div class="jchd-fallback-banner" *ngIf="coachFallback && selectedCoachId === ALL && !coachFallbackDismissed">
@@ -792,7 +791,6 @@
     </div>
 
     </div>
-    </ng-container>
     <!-- ===== /Base view ===== -->
 
     <!-- ===== Phase C: Coach Scoreboard ===== -->

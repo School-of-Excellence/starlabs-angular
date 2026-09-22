@@ -2876,6 +2876,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private endOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 
   async onCoachChange(id: string): Promise<void> {
+    // Re-picking the scope that's already loaded is a no-op — don't re-read the base or wipe the
+    // active summary filter. (Initial load sets selectedCoachId via loadPortfolio, not here.)
+    if (id === this.selectedCoachId) return;
     this.selectedCoachId = id;
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
