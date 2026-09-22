@@ -1,4 +1,4 @@
-<div class="jcd-root">
+<div class="jcd-root" [class.jcd-dark]="darkMode">
 <!-- ══════ LOADING ══════ -->
 <div class="loading-overlay" *ngIf="isLoading">
   <div class="loading-container">
@@ -14,791 +14,351 @@
 </div>
 
 <!-- ══════ TOOLBAR ══════ -->
-<div class="jcd-toolbar">
-  <div class="jcd-toolbar-left">
-
-    <!-- Toggle mode button — always visible -->
-    <button data-testid="jcd-btn-001" class="jcd-mode-toggle" (click)="toggleDate()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
-      </svg>
-      {{ pickerMode === 'month' ? 'Range' : 'Month' }}
-    </button>
-
-    <!-- Month picker -->
-    <div class="jcd-month-picker" *ngIf="pickerMode === 'month'">
-      <button data-testid="jcd-btn-002" class="jcd-nav-btn" (click)="backwardMonth()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <input data-testid="jcd-inp-003" class="jcd-month-input" type="month" [(ngModel)]="monthyear" (change)="updateDate()">
-      <button data-testid="jcd-btn-004" class="jcd-nav-btn" (click)="forwardMonth()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
-    </div>
-
-    <!-- Date range picker -->
-    <div class="jcd-range-picker" *ngIf="pickerMode === 'range'">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <mat-date-range-input [rangePicker]="picker" style="font-size:12px;width:160px">
-        <input data-testid="jcd-inp-005" matStartDate [(ngModel)]="startDate" placeholder="Start">
-        <input data-testid="jcd-inp-006" matEndDate [(ngModel)]="endDate" placeholder="End">
-      </mat-date-range-input>
-      <mat-datepicker-toggle [for]="picker" style="color:var(--primary);width:20px;height:20px"></mat-datepicker-toggle>
-      <mat-date-range-picker #picker (closed)="fetchData()"></mat-date-range-picker>
-    </div>
-
-    <div class="jcd-toolbar-sep"></div>
-
-    <!-- days Filter -->
-
-   <input data-testid="jcd-inp-007" class="jcd-filter-chip" [class.jcd-filter-chip--active]="selectedDateFilter==='days'"type="texts"placeholder="Enter days(1-60)" [(ngModel)]="daysInput"max="60"(input)="onDaysChange()">
-    <button data-testid="jcd-btn-008" class="jcd-filter"  [disabled]="!daysInput" (click)="onDateFilterClick('days')"> + </button>
-
-    <!-- Clear quick filter -->
-    <button data-testid="jcd-btn-009" class="jcd-clear-filter" *ngIf="selectedDateFilter != null" (click)="onDateFilterClick(null)" title="Clear filter">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-
-    <!-- Calendar button -->
-    <button data-testid="jcd-btn-010" class="jcd-cal-btn" (click)="openCalendarDialog()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Calendar
-    </button>
+<!-- ══════ TOOLBAR (redesign — mockup .top) ══════ -->
+<div class="top">
+  <div class="brand"><div class="mk">JE</div><div><div class="t">Journey Experience</div><div class="s">Antano &amp; Harini · Overview</div></div></div>
+  <div class="spacer"></div>
+  <span class="lovepill" data-testid="jcd-div-011" (click)="openCURADialog()">
+    <span class="h"></span><span class="lf">Love</span>
+    <span class="fx"><b>{{totalCURASales}}</b> − ({{originalData['continuitySales'].count}}+{{originalData['upgradeSales'].count}}+{{originalData['referralSales'].count}}+{{originalData['addonSales'].count}}) ⁄ {{totalMTSSales}} = <b>{{loveFactor.toFixed(2)}}</b></span>
+  </span>
+  <div class="seg">
+    <button data-testid="jcd-btn-001" [class.on]="pickerMode==='month'" (click)="pickerMode!=='month' && toggleDate()">Month</button>
+    <button [class.on]="pickerMode==='range'" (click)="pickerMode!=='range' && toggleDate()">Range</button>
   </div>
-
-  <div class="jcd-toolbar-right">
-    <div data-testid="jcd-div-011" class="jcd-love-pill" (click)="openCURADialog()">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="#e11d48" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-      <span>Love Factor</span>
-      <span class="jcd-love-eq">=</span>
-      <span><b>{{totalCURASales}}</b> - ({{originalData['continuitySales'].count}}+{{originalData['upgradeSales'].count}}+{{originalData['referralSales'].count}}+{{originalData['addonSales'].count}})</span>
-      <span class="jcd-love-eq">/</span>
-      <span>{{totalMTSSales}}</span>
-      <span class="jcd-love-eq">=</span>
-      <span class="jcd-love-val">{{loveFactor.toFixed(2)}}</span>
+  <span class="dmode" *ngIf="pickerMode==='month'">
+    <div class="navmo">
+      <button data-testid="jcd-btn-002" class="icobtn" (click)="backwardMonth()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <input data-testid="jcd-inp-003" type="month" class="monthin" [(ngModel)]="monthyear" (change)="updateDate()">
+      <button data-testid="jcd-btn-004" class="icobtn" (click)="forwardMonth()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
+    <span style="display:flex;align-items:center;gap:6px">
+      <input data-testid="jcd-inp-007" class="daysin" placeholder="Enter days(1-60)" [(ngModel)]="daysInput" (input)="onDaysChange()">
+      <button data-testid="jcd-btn-008" class="icobtn" title="Apply days" style="border:1px solid var(--line)" [disabled]="!daysInput" (click)="onDateFilterClick('days')">+</button>
+      <button data-testid="jcd-btn-009" class="icobtn" title="Clear filter" style="border:1px solid var(--line)" *ngIf="selectedDateFilter != null" (click)="onDateFilterClick(null)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </span>
+  </span>
+  <span class="dmode" *ngIf="pickerMode==='range'" style="gap:7px">
+    <mat-date-range-input [rangePicker]="picker" style="font-size:12px;width:160px">
+      <input data-testid="jcd-inp-005" matStartDate [(ngModel)]="startDate" placeholder="Start">
+      <input data-testid="jcd-inp-006" matEndDate [(ngModel)]="endDate" placeholder="End">
+    </mat-date-range-input>
+    <mat-datepicker-toggle [for]="picker"></mat-datepicker-toggle>
+    <mat-date-range-picker #picker (closed)="fetchData()"></mat-date-range-picker>
+  </span>
+  <span class="calbtn" data-testid="jcd-btn-010" (click)="openCalendarDialog()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>Calendar</span>
+  <button class="themebtn" data-testid="jcd-btn-theme" (click)="toggleTheme()" [title]="darkMode ? 'Light mode' : 'Dark mode'" aria-label="Toggle theme">
+    <svg class="moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    <svg class="sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+</div>
+
+<!-- ══════ DASHBOARD GRID (redesign — mockup .content) ══════ -->
+<div class="content" *ngIf="!isLoading">
+
+<!-- ROW 1 -->
+<!-- ROW 1 -->
+<!-- GROSS SALES -->
+<div data-testid="jcd-div-012" class="card span4" (click)="onBoxClick('grossSales')" style="cursor:pointer">
+  <div class="ch"><span class="ct">Gross Sales</span><span class="clink" data-testid="jcd-lnk-gross-table" (click)="onBoxClick('grossSales');$event.stopPropagation()">Open table &rsaquo;</span></div>
+  <div class="cbody">
+    <div class="big"><span class="c">&#8377;</span>{{totalGrossValue.toLocaleString('en-IN')}}</div><div class="sub2">EMI &#8377;{{totalGrossEMI.toLocaleString('en-IN')}} · {{approvedGrossSales}} approved · +{{pendingGrossSales}} pending</div>
+    <div class="split"><div class="sbox pos"><div class="k">New</div><div data-testid="jcd-div-013" class="v" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="m">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Upgrade</div><div data-testid="jcd-div-014" class="v" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="m">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Add-on</div><div data-testid="jcd-div-015" class="v" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="m">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div></div>
+    <div class="neg"><div data-testid="jcd-div-016" class="b" (click)="onCancelledClick($event,'grossCancelledSales')"><div class="k">Cancelled</div><div class="v">{{originalData['grosscancelledsale'].count}}</div><div class="a">&#8377;{{totalGrossCancelled.toLocaleString('en-IN')}}</div></div><div data-testid="jcd-div-017" class="b w" (click)="onDowngradeClick($event,'grossDowngradeToOldSales')"><div class="k">Downgrade Old</div><div class="v">{{originalData['grossdowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToOld.toLocaleString('en-IN')}}</div></div><div data-testid="jcd-div-018" class="b w" (click)="onDowngradeClick($event,'grossDowngradeToNewSales')"><div class="k">Downgrade New</div><div class="v">{{originalData['grossdowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToNew.toLocaleString('en-IN')}}</div></div></div>
+    <div class="glegend"><span style="background:var(--amber-soft);color:var(--amber)" (click)="onBoxClick('grossSales');$event.stopPropagation()">Pending {{getGrossPendingCount()}}</span><span style="background:var(--green-soft);color:var(--green)" (click)="onBoxClick('grossSales');$event.stopPropagation()">Assured {{getGrossAssuredCount()}}</span><span style="background:var(--red-soft);color:var(--red)" (click)="onBoxClick('grossSales');$event.stopPropagation()">Not-assured {{getGrossNotAssuredCount()}}</span></div>
+    <div data-testid="jcd-div-019" class="avgpill" (click)="openDialog('avgToASV')"><span>Avg days to ASV</span><span>{{ originalData['grosssale'].count > 0 ? currentAvgToASV ?? 0 : 'N/A' }}</span></div>
+  </div>
+</div>
+<!-- ASSURED SALES -->
+<div data-testid="jcd-div-020" class="card span4" (click)="onBoxClick('assuredSales')" style="cursor:pointer">
+  <div class="ch"><span class="ct">Assured Sales</span><span class="clink" data-testid="jcd-lnk-assured-table" (click)="onBoxClick('assuredSales');$event.stopPropagation()">Open table &rsaquo;</span></div>
+  <div class="cbody">
+    <div class="big"><span class="c">&#8377;</span>{{totalAssuredValue.toLocaleString('en-IN')}}</div><div class="sub2">EMI &#8377;{{totalAssuredEMI.toLocaleString('en-IN')}} · {{originalData['assuredsale'].count}} assured</div>
+    <div class="split"><div class="sbox pos"><div class="k">New</div><div data-testid="jcd-div-021" class="v" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div><div class="m">&#8377;{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Upgrade</div><div data-testid="jcd-div-022" class="v" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div><div class="m">&#8377;{{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div><div class="sbox"><div class="k">Add-on</div><div data-testid="jcd-div-023" class="v" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div><div class="m">&#8377;{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div></div>
+    <div class="neg"><div data-testid="jcd-div-024" class="b" (click)="onCancelledClick($event,'assuredCancelledSales')"><div class="k">Cancelled</div><div class="v">{{originalData['assuredcancelledsale'].count}}</div><div class="a">&#8377;{{totalAssuredCancelled.toLocaleString('en-IN')}}</div></div><div data-testid="jcd-div-025" class="b w" (click)="onDowngradeClick($event,'assuredDowngradeToOldSales')"><div class="k">Downgrade Old</div><div class="v">{{originalData['assureddowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToOld.toLocaleString('en-IN')}}</div></div><div data-testid="jcd-div-026" class="b w" (click)="onDowngradeClick($event,'assuredDowngradeToNewSales')"><div class="k">Downgrade New</div><div class="v">{{originalData['assureddowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToNew.toLocaleString('en-IN')}}</div></div></div>
+    <div data-testid="jcd-div-027" class="avgpill" (click)="openDialog('avgGSVToASV')"><span>Avg days GSV → ASV</span><span>{{ originalData['assuredsale'].count > 0 ? currentAvgGSVToASV ?? 0 : 'N/A' }}</span></div>
+  </div>
+</div>
+<!-- AR HEALTH -->
+<div class="card span4">
+  <div class="ch"><span class="ct">AR Health · {{ originalData['regularstatus'].count + originalData['missedstatus'].count + originalData['defaultedstatus'].count + originalData['lockedstatus'].count + originalData['fullypaidstatus'].count }}</span></div>
+  <div class="cbody">
+    <div class="ar" style="margin-top:2px">
+      <div data-testid="jcd-div-028" class="arow" *ngFor="let ar of [
+        {label:'Regular',    count: originalData['regularstatus'].count,   color:'var(--green)',  key:'regularStatus',    bucket:'regular'},
+        {label:'Missed',     count: originalData['missedstatus'].count,    color:'var(--amber)',  key:'missedStatus',     bucket:'missed'},
+        {label:'Defaulted',  count: originalData['defaultedstatus'].count, color:'var(--red)',    key:'defaultedStatus',  bucket:'defaulted'},
+        {label:'Locked',     count: originalData['lockedstatus'].count,    color:'var(--indigo)', key:'lockedStatus',     bucket:'locked'},
+        {label:'Fully Paid', count: originalData['fullypaidstatus'].count, color:'var(--teal)',   key:'fullyPaidStatus',  bucket:'fullypaid'}
+      ]" (click)="onBoxClick(ar.key)">
+        <span class="sw" [style.background]="ar.color"></span>
+        <span class="an">{{ar.label}}</span>
+        <span class="track"><span class="fill" [style.background]="ar.color" [style.width.%]="(ar.count / (originalData['regularstatus'].count + originalData['missedstatus'].count + originalData['defaultedstatus'].count + originalData['lockedstatus'].count + originalData['fullypaidstatus'].count)) * 100"></span></span>
+        <span class="acount">{{ar.count}}</span>
+        <span class="adelta" *ngIf="getArDelta(ar.bucket) !== 0" title="vs last month" [class.up]="getArDelta(ar.bucket) > 0" [class.down]="getArDelta(ar.bucket) < 0">{{ getArDelta(ar.bucket) > 0 ? '▲' : '▼' }}{{ getArDelta(ar.bucket) > 0 ? getArDelta(ar.bucket) : -getArDelta(ar.bucket) }}</span>
+      </div>
+    </div>
+    <div class="sub2" style="margin-top:11px">Deltas this month vs last · click a status for the table</div>
   </div>
 </div>
 
-<!-- ══════ MAIN ══════ -->
-<div class="main" *ngIf="!isLoading">
-
-<!-- ──── ROW 1: Gross Sales | Assured Sales | AR Health | Customer Tags | Onboarding ──── -->
-<div class="row row-top">
-
-  <!-- GROSS SALES -->
-  <div data-testid="jcd-div-012" class="card" (click)="onBoxClick('grossSales')" style="cursor:pointer">
-    <div class="card-h"><span class="card-t">Gross Sales</span></div>
-    <div class="sales-top">
-      <div>
-        <div class="sales-big" style="color:var(--primary)">{{approvedGrossSales}} <span class="pend">+ {{pendingGrossSales}}</span></div>
-        <div class="sales-label">Approved + Pending</div>
-      </div>
-      <div class="sales-val">
-        <div class="v">&#8377;{{totalGrossValue.toLocaleString('en-IN')}}</div>
-        <div class="e">EMI: &#8377;{{totalGrossEMI.toLocaleString('en-IN')}}</div>
-      </div>
+<!-- ROW 2 -->
+<div class="card span8">
+  <div class="ch"><span class="ct">Onboarding · by product</span><span style="display:flex;gap:12px;align-items:center"><span class="clink" (click)="openCalendarDialog()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="vertical-align:-1px;margin-right:3px"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>Schedule</span><span class="clink nav" data-testid="jcd-btn-039" (click)="navigateToOnboardingPipeline();$event.stopPropagation()">Pipeline →</span></span></div>
+  <div class="cbody">
+    <!-- First-glance: rollup strip (To onboard = hero) then throughput -->
+    <div class="orstrip">
+      <div data-testid="jcd-div-035" class="orc hero" (click)="onBoxClick('toBeOnboarded')"><div class="k">To onboard</div><div class="v">{{originalData['all'].count}}</div></div>
+      <div data-testid="jcd-div-036" class="orc" (click)="onBoxClick('less7Days')"><div class="k">≤ 7 days</div><div class="v">{{originalData['last7DaysnotOnboarded'].count}}</div></div>
+      <div data-testid="jcd-div-037" class="orc" (click)="onBoxClick('more7Days')"><div class="k">7+ days</div><div class="v">{{originalData['last15daysnotOnboarded'].count}}</div></div>
+      <div data-testid="jcd-div-038" class="orc risk" (click)="onBoxClick('notAssured')"><div class="k">Not assured</div><div class="v">{{originalData['notassured'].count}}</div></div>
     </div>
-    <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div data-testid="jcd-div-013" class="v" style="color:var(--success)" (click)="onGrossSplitClick($event,'grossNewSales')">{{grossSalesSplit['new']}}</div><div class="l">&#8377;{{grossSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div data-testid="jcd-div-014" class="v" style="color:var(--primary)" (click)="onGrossSplitClick($event,'grossUpgradeSales')">{{grossSalesSplit['upgrades']}}</div><div class="l">&#8377;{{grossSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div data-testid="jcd-div-015" class="v" style="color:var(--accent)" (click)="onGrossSplitClick($event,'grossAddonSales')">{{grossSalesSplit['addons']}}</div><div class="l">&#8377;{{grossSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
-    </div>
-    <div class="row-neg">
-      <div data-testid="jcd-div-016" class="neg-box neg-cancel" (click)="onCancelledClick($event,'grossCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['grosscancelledsale'].count}}</div><div class="a">&#8377;{{totalGrossCancelled.toLocaleString('en-IN')}}</div></div>
-      <div data-testid="jcd-div-017" class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'grossDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['grossdowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToOld.toLocaleString('en-IN')}}</div></div>
-      <div data-testid="jcd-div-018" class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'grossDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['grossdowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalGrossDowngradeToNew.toLocaleString('en-IN')}}</div></div>
-    </div>
-    <div class="avg-row">
-      <div data-testid="jcd-div-019" class="avg-pill" style="flex:1" (click)="openDialog('avgToASV')">Avg days to become ASV <strong>{{ originalData['grosssale'].count > 0 ? currentAvgToASV ?? 0 : 'N/A' }}</strong></div>
+    <div data-testid="jcd-div-034" class="obhero" (click)="onBoxClick('onboarded')"><span class="k">Onboarded this month</span><span class="v">{{originalData['onboarded'].count}}</span></div>
+    <!-- Detail zone: activity + efficiency tiles, then the by-product breakdown -->
+    <div class="ob-tiles"><div data-testid="jcd-div-030" class="obt" (click)="openDialog('onboardingScheduled')"><div class="v">{{ getTotalOnboardingScheduledCount() }}</div><div class="k">OB Calls</div></div><div data-testid="jcd-div-031" class="obt" (click)="openDialog('coachingScheduled')"><div class="v">{{ getTotalCoachingScheduledCount() }}</div><div class="k">JC Calls</div></div><div data-testid="jcd-div-032" class="obt" (click)="openDialog('avgAssured')"><div class="v">{{ avgAssuredList.length > 0 ? avgAssured.toFixed(2) : 'N/A' }}</div><div class="k">Avg OB days</div></div><div data-testid="jcd-div-033" class="obt" (click)="openDialog('avgPurchase')"><div class="v">{{ avgPurchaseList.length > 0 ? avgPurchase.toFixed(2) : 'N/A' }}</div><div class="k">Avg purch days</div></div></div>
+    <div class="prow head" *ngIf="onboardingProducts.length"><span class="hh l">Product / journey</span><span class="hh">To onboard</span><span class="hh">≤7d</span><span class="hh">7+ d</span><span class="hh">Not assured</span></div>
+    <div data-testid="jcd-div-onb-product" class="prow" *ngFor="let p of onboardingProducts" (click)="openOnboardingProduct(p)"><span class="pn">{{p.product}}</span><span class="cell dan">{{p.toOnboard}}</span><span class="cell mut">{{p.within7}}</span><span class="cell warn">{{p.plus7}}</span><span class="cell mut">{{p.notAssured}}</span></div>
+  </div>
+</div>
+<div class="rail a">
+  <div class="card" style="max-height:none">
+    <div class="ch"><span class="ct">Participant Overview</span><span class="clink" data-testid="jcd-lnk-participant-viewall" (click)="onBoxClick('overallParticipants')">View all &rsaquo;</span></div>
+    <div class="pgrid">
+      <div data-testid="jcd-div-040" class="pcell hero" (click)="onBoxClick('overallParticipants')"><div class="v">{{originalData['allParticipants'].count.toLocaleString('en-IN')}}</div><div class="k">Overall</div></div>
+      <div data-testid="jcd-div-041" class="pcell" (click)="onBoxClick('ecosystem')"><div class="v">{{originalData['ecosystem'].count.toLocaleString('en-IN')}}</div><div class="k">Ecosystem</div><div class="s"><span data-testid="jcd-div-042" (click)="onBoxClick('ecosystemActive');$event.stopPropagation()">{{ originalData['ecosystemActive']?.count != null ? originalData['ecosystemActive'].count.toLocaleString('en-IN') : '—' }} active</span> · <span data-testid="jcd-div-043" style="color:var(--accent)" (click)="onBoxClick('ecosystemNonActive');$event.stopPropagation()">{{ originalData['ecosystemNonActive']?.count != null ? originalData['ecosystemNonActive'].count.toLocaleString('en-IN') : '—' }} non-act</span></div></div>
+      <div data-testid="jcd-div-044" class="pcell" (click)="onBoxClick('dfu')"><div class="v">{{originalData['dfu'].count.toLocaleString('en-IN')}}</div><div class="k">DFU</div><div class="s"><span data-testid="jcd-div-045" (click)="onBoxClick('dfuActive');$event.stopPropagation()">{{ originalData['dfuActive']?.count != null ? originalData['dfuActive'].count.toLocaleString('en-IN') : '—' }} active</span> · <span data-testid="jcd-div-046" style="color:var(--accent)" (click)="onBoxClick('dfuNonActive');$event.stopPropagation()">{{ originalData['dfuNonActive']?.count != null ? originalData['dfuNonActive'].count.toLocaleString('en-IN') : '—' }} non-act</span></div></div>
+      <div data-testid="jcd-div-047" class="pcell" (click)="onBoxClick('discontinued')"><div class="v">{{originalData['discontinued'].count.toLocaleString('en-IN')}}</div><div class="k">Discontinued</div><div class="s">{{ originalData['allParticipants'].count ? ((originalData['discontinued'].count / originalData['allParticipants'].count * 100) | number:'1.1-1') : 0 }}%</div></div>
     </div>
   </div>
-
-  <!-- ASSURED SALES -->
-  <div data-testid="jcd-div-020" class="card" (click)="onBoxClick('assuredSales')" style="cursor:pointer">
-    <div class="card-h"><span class="card-t">Assured Sales</span></div>
-    <div class="sales-top">
-      <div>
-        <div class="sales-big" style="color:var(--success)">{{originalData['assuredsale'].count}}</div>
-        <div class="sales-label">Total Sales</div>
-      </div>
-      <div class="sales-val">
-        <div class="v">&#8377;{{totalAssuredValue.toLocaleString('en-IN')}}</div>
-        <div class="e">EMI: &#8377;{{totalAssuredEMI.toLocaleString('en-IN')}}</div>
-      </div>
-    </div>
-    <div class="metrics-row">
-      <div class="m-box"><div class="l">New</div><div data-testid="jcd-div-021" class="v" style="color:var(--success)" (click)="onAssuredSplitClick($event,'assuredNewSales')">{{assuredSalesSplit['new']}}</div><div class="l">&#8377;{{assuredSalesSplit['newEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Upgrades</div><div data-testid="jcd-div-022" class="v" style="color:var(--primary)" (click)="onAssuredSplitClick($event,'assuredUpgradeSales')">{{assuredSalesSplit['upgrades']}}</div><div class="l">&#8377; {{assuredSalesSplit['upgradesEMI'].toLocaleString('en-IN')}}</div></div>
-      <div class="m-box"><div class="l">Add-On</div><div data-testid="jcd-div-023" class="v" style="color:var(--accent)" (click)="onAssuredSplitClick($event,'assuredAddonSales')">{{assuredSalesSplit['addons']}}</div><div class="l">&#8377;{{assuredSalesSplit['addonsEMI'].toLocaleString('en-IN')}}</div></div>
-    </div>
-    <div class="row-neg">
-      <div data-testid="jcd-div-024" class="neg-box neg-cancel" (click)="onCancelledClick($event,'assuredCancelledSales')"><div class="l">Cancelled</div><div class="v">{{originalData['assuredcancelledsale'].count}}</div><div class="a">&#8377;{{totalAssuredCancelled.toLocaleString('en-IN')}}</div></div>
-      <div data-testid="jcd-div-025" class="neg-box neg-dg-old" (click)="onDowngradeClick($event,'assuredDowngradeToOldSales')"><div class="l">Downgrade Old</div><div class="v">{{originalData['assureddowngradetooldsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToOld.toLocaleString('en-IN')}}</div></div>
-      <div data-testid="jcd-div-026" class="neg-box neg-dg-new" (click)="onDowngradeClick($event,'assuredDowngradeToNewSales')"><div class="l">Downgrade New</div><div class="v">{{originalData['assureddowngradetonewsale'].count}}</div><div class="a">&#8377;{{totalAssuredDowngradeToNew.toLocaleString('en-IN')}}</div></div>
-    </div>
-    <div class="avg-row">
-      <div data-testid="jcd-div-027" class="avg-pill" style="flex:1" (click)="openDialog('avgGSVToASV')">Avg days from GSV to ASV <strong>{{ originalData['assuredsale'].count > 0 ? currentAvgGSVToASV ?? 0 : 'N/A' }}</strong></div>
-    </div>
-  </div>
-
-  <!-- AR HEALTH -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">AR Health</span><span class="card-subtitle">{{ originalData['regularstatus'].count + originalData['missedstatus'].count + originalData['defaultedstatus'].count + originalData['lockedstatus'].count + originalData['fullypaidstatus'].count }} total</span></div>
-    <ng-container *ngFor="let ar of [
-      {label:'Regular', count: originalData['regularstatus'].count, color:'var(--success)', key:'regularStatus'},
-      {label:'Missed',  count: originalData['missedstatus'].count,  color:'var(--warning)', key:'missedStatus'},
-      {label:'Defaulted',count:originalData['defaultedstatus'].count,color:'var(--danger)',  key:'defaultedStatus'},
-      {label:'Locked',  count: originalData['lockedstatus'].count,  color:'#6366f1',         key:'lockedStatus'},
-      {label:'Fully Paid',count:originalData['fullypaidstatus'].count,color:'var(--teal)',   key:'fullyPaidStatus'}
-    ]">
-      <div data-testid="jcd-div-028" class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="onBoxClick(ar.key)">
-        <div style="display:flex;justify-content:space-between;width:100%">
-          <span class="ar-label">{{ar.label}}</span>
-          <span class="badge" [style.background]="ar.color">{{ar.count}}</span>
-        </div>
-        <div style="width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-          <div style="height:100%;border-radius:2px" [style.background]="ar.color"
-            [style.width.%]="(ar.count / (originalData['regularstatus'].count + originalData['missedstatus'].count + originalData['defaultedstatus'].count + originalData['lockedstatus'].count + originalData['fullypaidstatus'].count)) * 100"></div>
-        </div>
-      </div>
-    </ng-container>
-  </div>
-
-  <!-- CUSTOMER TAGS -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">Customer Tags</span><span class="card-subtitle">{{ activeJourneyCoachTags.length }} tags</span></div>
-    <div data-testid="jcd-div-029" *ngFor="let tag of activeJourneyCoachTags" class="ar-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer" (click)="openTagProfilesDialog(tag)">
-      <div style="display:flex;justify-content:space-between;width:100%">
-        <span class="ar-label">{{ tag['name'] || tag.id }}</span>
-        <span class="badge" style="background:var(--warning)">{{ getProfilesForTag(tag.id).length }}</span>
-      </div>
-      <div style="width:100%;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-        <div style="height:100%;background:var(--warning);border-radius:2px" [style.width.%]="getProfilesForTag(activeJourneyCoachTags[0]?.id)?.length ? (getProfilesForTag(tag.id).length / getProfilesForTag(activeJourneyCoachTags[0].id).length) * 100 : 0"></div>
-      </div>
-    </div>
-    <div *ngIf="activeJourneyCoachTags.length === 0" style="color:var(--text-muted);font-size:13px;padding:12px 0">No active tags</div>
-  </div>
-
-  <!-- ONBOARDING STATUS -->
-  <div class="card">
-    <div class="card-h" style="margin-bottom:10px"><span class="card-t">Onboarding Status</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:8px">
-      <div data-testid="jcd-div-030" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('onboardingScheduled')">
-        <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalOnboardingScheduledCount() }}</div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">OB Call</div>
-      </div>
-      <div data-testid="jcd-div-031" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('coachingScheduled')">
-        <div style="font-size:16px;font-weight:800;color:var(--primary)">{{ getTotalCoachingScheduledCount() }}</div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">JC Calls</div>
-      </div>
-      <div data-testid="jcd-div-032" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgAssured')">
-        <div style="font-size:16px;font-weight:800;color:var(--success)">{{ avgAssuredList.length > 0 ? avgAssured.toFixed(2) : 'N/A' }}</div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">Avg OB</div>
-      </div>
-      <div data-testid="jcd-div-033" style="padding:7px 5px;background:var(--bg);border-radius:var(--radius-xs);text-align:center;cursor:pointer" (click)="openDialog('avgPurchase')">
-        <div style="font-size:16px;font-weight:800;color:var(--warning)">{{ avgPurchaseList.length > 0 ? avgPurchase.toFixed(2) : 'N/A' }}</div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.3px;margin-top:2px">Avg Purch</div>
-      </div>
-    </div>
-    <div data-testid="jcd-div-034" style="padding:8px 12px;border-radius:var(--radius-xs);background:linear-gradient(135deg,#059669,#10b981);color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" (click)="onBoxClick('onboarded')">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;opacity:0.9">Onboarded This Month</span>
-      <span style="font-size:22px;font-weight:900;line-height:1">{{originalData['onboarded'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-035" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('toBeOnboarded')">
-      <span style="color:var(--text-secondary)">To Be Onboarded</span><span style="font-weight:700;color:var(--primary)">{{originalData['all'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-036" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('less7Days')">
-      <span style="color:var(--text-secondary)">Between 7 Days</span><span style="font-weight:700">{{originalData['last7DaysnotOnboarded'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-037" style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);cursor:pointer" (click)="onBoxClick('more7Days')">
-      <span style="color:var(--text-secondary)">7+ Days</span><span style="font-weight:700">{{originalData['last15daysnotOnboarded'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-038" style="margin-top:8px;padding:7px 12px;border-radius:var(--radius-xs);background:var(--danger-light);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('notAssured')">
-      <span style="font-size:12px;font-weight:600;color:var(--danger)">Not Assured</span>
-      <span style="font-size:16px;font-weight:900;color:var(--danger)">{{originalData['notassured'].count}}</span>
-    </div>
-    <button data-testid="jcd-btn-039" type="button"
-            (click)="navigateToOnboardingPipeline()"
-            style="margin-top:10px;width:100%;padding:9px 12px;border:none;border-radius:var(--radius-xs);background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 2px rgba(15,23,42,0.08);transition:filter 0.15s">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-      Onboarding Pipeline
-    </button>
-  </div>
-
-</div><!-- /row-top -->
-
-<!-- ──── PARTICIPANT OVERVIEW STRIP ──── -->
-<div class="row" style="grid-template-columns:1fr;margin-bottom:14px">
-  <div style="background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);overflow:hidden">
-    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;">
-      <!-- Overall Participants -->
-      <div data-testid="jcd-div-040" class="pov-seg pov-primary" (click)="onBoxClick('overallParticipants')" style="padding:22px 28px;background:linear-gradient(135deg,#1e40af 0%,#2563eb 60%,#0ea5e9 100%);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:filter 0.15s;">
-        <div>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:rgba(255,255,255,0.65);margin-bottom:6px">Overall Participants</div>
-          <div style="font-size:44px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px">{{originalData['allParticipants'].count}}</div>
-          <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:rgba(255,255,255,0.15);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,0.2)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            View All Participants
-          </div>
-        </div>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-      </div>
-      <!-- Ecosystem -->
-      <div data-testid="jcd-div-041" class="pov-seg" (click)="onBoxClick('ecosystem')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#065f46">Ecosystem</div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-        <div style="font-size:32px;font-weight:900;color:var(--success);line-height:1;letter-spacing:-0.5px;margin-bottom:12px">{{originalData['ecosystem'].count}}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div data-testid="jcd-div-042" style="padding:8px 10px;background:var(--success-light);border-radius:6px" (click)="onBoxClick('ecosystemActive');$event.stopPropagation()">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#065f46;margin-bottom:3px">Active</div>
-            <div style="font-size:18px;font-weight:900;color:var(--success);line-height:1">{{originalData['ecosystemActive']?.count || '—'}}</div>
-          </div>
-          <div data-testid="jcd-div-043" style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('ecosystemNonActive');$event.stopPropagation()">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:3px">Non Active</div>
-            <div style="font-size:18px;font-weight:900;color:var(--warning);line-height:1">{{originalData['ecosystemNonActive']?.count || '—'}}</div>
-          </div>
-        </div>
-      </div>
-      <!-- DFU -->
-      <div data-testid="jcd-div-044" class="pov-seg" (click)="onBoxClick('dfu')" style="padding:18px 22px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#1e40af">DFU</div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-        <div style="font-size:32px;font-weight:900;color:var(--primary);line-height:1;letter-spacing:-0.5px;margin-bottom:12px">{{originalData['dfu'].count}}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div data-testid="jcd-div-045" style="padding:8px 10px;background:var(--primary-light);border-radius:6px" (click)="onBoxClick('dfuActive');$event.stopPropagation()">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#1e40af;margin-bottom:3px">Active</div>
-            <div style="font-size:18px;font-weight:900;color:var(--primary);line-height:1">{{originalData['dfuActive']?.count || '—'}}</div>
-          </div>
-          <div data-testid="jcd-div-046" style="padding:8px 10px;background:#fff7ed;border-radius:6px" (click)="onBoxClick('dfuNonActive');$event.stopPropagation()">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#92400e;margin-bottom:3px">Non Active</div>
-            <div style="font-size:18px;font-weight:900;color:var(--warning);line-height:1">{{originalData['dfuNonActive']?.count || '—'}}</div>
-          </div>
-        </div>
-      </div>
-      <!-- Discontinued -->
-      <div data-testid="jcd-div-047" class="pov-seg" (click)="onBoxClick('discontinued')" style="padding:22px 24px;cursor:pointer;border-left:1px solid var(--border);transition:background 0.15s;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--danger)">Discontinued</div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </div>
-        <div style="font-size:38px;font-weight:900;color:var(--danger);line-height:1;letter-spacing:-0.5px">{{originalData['discontinued'].count}}</div>
-        <div style="margin-top:8px;height:4px;border-radius:2px;background:var(--border);overflow:hidden">
-          <div style="height:100%;background:var(--danger);border-radius:2px" [style.width.%]="originalData['allParticipants'].count ? (originalData['discontinued'].count / originalData['allParticipants'].count * 100) : 0"></div>
-        </div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">{{ originalData['allParticipants'].count ? ((originalData['discontinued'].count / originalData['allParticipants'].count * 100) | number:'1.0-0') : 0 }}% of total</div>
+  <div class="card grow">
+    <div class="ch"><span class="ct">Journey Engagement</span><span data-testid="jcd-span-048" class="clink" (click)="onBoxClick('allProduct')">Not started · {{originalData['alljourneynotstarted'].count.toLocaleString('en-IN')}} &rsaquo;</span></div>
+    <div class="cbody">
+      <div class="split" style="margin-top:0"><div data-testid="jcd-div-049" class="sbox" (click)="onBoxClick('less30Product')"><div class="k">&lt; 30 days</div><div class="v">{{originalData['lessthan30daysjourneynotstarted'].count.toLocaleString('en-IN')}}</div></div><div data-testid="jcd-div-050" class="sbox" (click)="onBoxClick('more30Product')"><div class="k">30+ days</div><div class="v">{{originalData['morethan30daysjourneynotstarted'].count.toLocaleString('en-IN')}}</div></div></div>
+      <div style="margin-top:5px">
+        <div data-testid="jcd-div-051" class="lrow" (click)="onBoxClick('productInitiated')"><span class="l">Initiated this month</span><span class="badge">{{originalData['currentjourneyinitiated'].count.toLocaleString('en-IN')}}</span></div>
+        <div data-testid="jcd-div-052" class="lrow" (click)="onBoxClick('activeEngagement')"><span class="l">Active engagement</span><span class="badge">{{originalData['activeEngagement'].count.toLocaleString('en-IN')}}</span></div>
+        <div data-testid="jcd-div-053" class="lrow" (click)="onBoxClick('less90Engagement')"><span class="l">Ideal 60–90 days</span><span class="badge">{{originalData['less90Engagement'].count.toLocaleString('en-IN')}}</span></div>
+        <div data-testid="jcd-div-054" class="lrow" (click)="onBoxClick('less180Engagement')"><span class="l">More than 3 months</span><span class="badge">{{originalData['less180Engagement'].count.toLocaleString('en-IN')}}</span></div>
+        <div data-testid="jcd-div-055" class="lrow" (click)="onBoxClick('more180Engagement')"><span class="l" style="color:var(--red)">More than 6 months</span><span class="badge" style="color:var(--red)">{{originalData['more180Engagement'].count.toLocaleString('en-IN')}}</span></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ──── ROW 2: Engagement | Subscription | Customer Status | Modes ──── -->
-<div class="row row-mid">
-
-  <!-- JOURNEY ENGAGEMENT -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">Journey Engagement</span></div>
-    <div style="background:var(--bg);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:11px;font-weight:700;color:var(--text-secondary)">Not Started</span>
-        <span data-testid="jcd-span-048" class="badge" style="background:var(--text-muted);cursor:pointer" (click)="onBoxClick('allProduct')">{{originalData['alljourneynotstarted'].count}}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-        <div data-testid="jcd-div-049" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less30Product')">
-          <span style="font-size:10px;color:var(--text-muted);font-weight:500">&lt; 30 Days</span>
-          <span style="font-size:14px;font-weight:900;color:var(--success)">{{originalData['lessthan30daysjourneynotstarted'].count}}</span>
-        </div>
-        <div data-testid="jcd-div-050" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('more30Product')">
-          <span style="font-size:10px;color:var(--text-muted);font-weight:500">30+ Days</span>
-          <span style="font-size:14px;font-weight:900;color:var(--warning)">{{originalData['morethan30daysjourneynotstarted'].count}}</span>
-        </div>
-      </div>
+<!-- ROW 3 -->
+<!-- ROW 3 -->
+<div class="card span4" *ngIf="subscriptionMatrix">
+  <div class="ch"><span class="ct">Subscription End &middot; {{subscriptionMatrix.months.length}} mo &middot; {{subscriptionMatrix.journeys.length}} journeys</span><span class="clink" (click)="onBoxClick('overallEnd')">Total &middot; {{originalData['totalMonth'].count}} &rsaquo;</span></div>
+  <div class="cbody">
+    <div class="split" style="margin-top:0">
+      <div class="sbox" data-testid="jcd-div-056" (click)="onBoxClick('currentMonthEnd')"><div class="k">This</div><div class="v">{{originalData['currentMonth'].count}}</div></div>
+      <div class="sbox" data-testid="jcd-div-057" (click)="onBoxClick('nextMonthEnd')"><div class="k">Next</div><div class="v">{{originalData['nextMonth'].count}}</div></div>
+      <div class="sbox" data-testid="jcd-div-058" (click)="onBoxClick('previousMonthEnd')"><div class="k">Prev</div><div class="v">{{originalData['lastMonth'].count}}</div></div>
+      <div class="sbox" data-testid="jcd-div-059" (click)="onBoxClick('overallEnd')"><div class="k">Total</div><div class="v">{{originalData['totalMonth'].count}}</div></div>
     </div>
-    <div data-testid="jcd-div-051" style="background:var(--primary-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('productInitiated')">
-      <span style="font-size:11px;font-weight:700;color:var(--primary)">Initiated This Month</span>
-      <span class="badge" style="background:var(--accent)">{{originalData['currentjourneyinitiated'].count}}</span>
+    <table class="mx" style="margin-top:11px">
+      <thead><tr><th>Journey</th><th *ngFor="let m of subscriptionMatrix.months">{{ m.label }}</th><th>Tot</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let j of subscriptionMatrix.journeys">
+          <td>{{ j.label }}</td>
+          <td class="n" *ngFor="let m of subscriptionMatrix.months" [class.z]="!getCellData(j.id, m.ym)">
+            <ng-container *ngIf="getCellData(j.id, m.ym) as cell; else sub_empty">
+              <span data-testid="jcd-span-060" style="cursor:pointer" (click)="openSubDialog(cell.docs, j.label + ' &middot; ' + m.label)">{{ cell.count }}</span>
+            </ng-container>
+            <ng-template #sub_empty>&mdash;</ng-template>
+          </td>
+          <td class="n">{{ subscriptionMatrix.journeyTotals[j.id] }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700"><td>Total</td><td class="n" *ngFor="let m of subscriptionMatrix.months">{{ subscriptionMatrix.monthTotals[m.ym] }}</td><td class="n">{{ getGrandTotal() }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+<div class="card span4">
+  <div class="ch"><span class="ct">Customer Status &middot; {{ getJourneyStatusGrandTotal() }}</span><span class="clink" data-testid="jcd-a-069" (click)="openJourneyStatusDialog(nullStatusProfiles,'No Status Profiles')">No status &middot; {{ nullStatusProfiles.length }} &rsaquo;</span></div>
+  <div class="cbody">
+    <div class="tabs">
+      <span class="tab2" data-testid="jcd-span-061" [class.on]="journeyTypeFilter==='all'" (click)="journeyTypeFilter='all'">All</span>
+      <span class="tab2" data-testid="jcd-span-062" [class.on]="journeyTypeFilter==='ecosystem'" (click)="journeyTypeFilter='ecosystem'">Ecosystem</span>
+      <span class="tab2" data-testid="jcd-span-063" [class.on]="journeyTypeFilter==='dfu'" (click)="journeyTypeFilter='dfu'">DFU</span>
     </div>
-    <div data-testid="jcd-div-052" style="background:#f0fdf4;border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('activeEngagement')">
-      <span style="font-size:11px;font-weight:700;color:var(--success)">Active Engagement</span>
-      <span class="badge" style="background:var(--success)">{{originalData['activeEngagement'].count}}</span>
+    <div class="tabs">
+      <span class="tab2" data-testid="jcd-span-064" [class.on]="activeStatusTab==='all'" (click)="activeStatusTab='all'">All &middot; {{ getJourneyStatusGrandTotal() }}</span>
+      <span class="tab2" data-testid="jcd-span-065" [class.on]="activeStatusTab==='active'" (click)="activeStatusTab='active'">Active &middot; {{ getTotalForStatus('active') }}</span>
+      <span class="tab2" data-testid="jcd-span-066" [class.on]="activeStatusTab==='non active'" (click)="activeStatusTab='non active'">Non-act &middot; {{ getTotalForStatus('non active') }}</span>
+      <span class="tab2" data-testid="jcd-span-067" [class.on]="activeStatusTab==='discontinued'" (click)="activeStatusTab='discontinued'">Disc. &middot; {{ getTotalForStatus('discontinued') }}</span>
+      <span class="tab2" data-testid="jcd-span-068" [class.on]="activeStatusTab==='null'" (click)="activeStatusTab='null'">No status &middot; {{ nullStatusProfiles.length }}</span>
     </div>
-    <div data-testid="jcd-div-053" style="background:var(--teal-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less90Engagement')">
-      <span style="font-size:11px;font-weight:700;color:var(--teal)">Ideal for 60–90 days</span>
-      <span class="badge" style="background:var(--teal)">{{originalData['less90Engagement'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-054" style="background:var(--purple-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="onBoxClick('less180Engagement')">
-      <span style="font-size:11px;font-weight:700;color:var(--purple)">More than 3 months</span>
-      <span class="badge" style="background:var(--purple)">{{originalData['less180Engagement'].count}}</span>
-    </div>
-    <div data-testid="jcd-div-055" style="background:var(--danger-light);border-radius:var(--radius-xs);padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:all 0.15s" (click)="onBoxClick('more180Engagement')">
-      <div>
-        <span style="font-size:11px;font-weight:700;color:var(--danger)">More than 6 months</span>
-        <div style="font-size:9px;color:var(--danger);opacity:0.7;margin-top:2px">Tap to view profiles →</div>
-      </div>
-      <span class="badge" style="background:var(--danger);font-size:13px;padding:4px 12px">{{originalData['more180Engagement'].count}}</span>
+    <table class="mx" *ngIf="activeStatusTab !== 'null' && filteredJourneyStatusMatrix.length > 0">
+      <thead>
+        <tr>
+          <th>Journey</th>
+          <th *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">Active</th>
+          <th *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">Non-act</th>
+          <th *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">Disc.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let j of filteredJourneyStatusMatrix">
+          <td>{{ j.journeyName }}<span class="tg" [class.eco]="j.journeyType==='Eco system'" [class.dfu]="j.journeyType==='DFU'">{{ j.journeyType==='Eco system' ? 'Eco' : j.journeyType==='DFU' ? 'DFU' : '' }}</span></td>
+          <td class="n" *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">
+            <span data-testid="jcd-span-070" *ngIf="j.statuses['active']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['active'].profiles, j.journeyName + ' &middot; Active')">{{ j.statuses['active'].profiles.length }}</span>
+            <span *ngIf="!j.statuses['active']?.profiles?.length">&mdash;</span>
+          </td>
+          <td class="n" *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">
+            <span data-testid="jcd-span-071" *ngIf="j.statuses['non active']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['non active'].profiles, j.journeyName + ' &middot; Non Active')">{{ j.statuses['non active'].profiles.length }}</span>
+            <span *ngIf="!j.statuses['non active']?.profiles?.length">&mdash;</span>
+          </td>
+          <td class="n" *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">
+            <span data-testid="jcd-span-072" *ngIf="j.statuses['discontinued']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['discontinued'].profiles, j.journeyName + ' &middot; Discontinued')">{{ j.statuses['discontinued'].profiles.length }}</span>
+            <span *ngIf="!j.statuses['discontinued']?.profiles?.length">&mdash;</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card span4">
+  <div class="ch"><span class="ct">Delivery Modes</span><span class="clink nav" data-testid="jcd-a-073" (click)="navigateToModeDashboard()">Dashboard &rarr;</span></div>
+  <div class="cbody">
+    <div class="lrow" data-testid="jcd-div-074" *ngFor="let mode of modesList" (click)="openDialog(mode)">
+      <span class="l" [style.color]="mode==='No Mode' ? 'var(--mut)' : null">{{ mode }}</span>
+      <span class="badge" [class.z]="mode==='No Mode' || (modeMap[mode]?.length ?? 0) === 0">{{ modeMap[mode]?.length ?? 0 }}</span>
     </div>
   </div>
+</div>
 
-  <!-- SUBSCRIPTION ENDING -->
-  <div class="card" *ngIf="subscriptionMatrix">
-    <div class="card-h">
-      <span class="card-t">Subscription</span>
-      <span class="card-subtitle">{{subscriptionMatrix.months.length}} months &middot; {{subscriptionMatrix.journeys.length}} journeys &middot; <strong style="color:var(--primary)">{{ getGrandTotal() }} total</strong></span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
-      <div data-testid="jcd-div-056" style="text-align:center;padding:8px 4px;background:var(--primary-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('currentMonthEnd')">
-        <div style="font-size:22px;font-weight:800;color:var(--primary);line-height:1">{{originalData['currentMonth'].count}}</div>
-        <div style="font-size:10px;color:var(--primary);font-weight:600;margin-top:2px">This Month</div>
-      </div>
-      <div data-testid="jcd-div-057" style="text-align:center;padding:8px 4px;background:var(--warning-light);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('nextMonthEnd')">
-        <div style="font-size:22px;font-weight:800;color:var(--warning);line-height:1">{{originalData['nextMonth'].count}}</div>
-        <div style="font-size:10px;color:var(--warning);font-weight:600;margin-top:2px">Next Month</div>
-      </div>
-      <div data-testid="jcd-div-058" style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('previousMonthEnd')">
-        <div style="font-size:22px;font-weight:800;color:var(--text-muted);line-height:1">{{originalData['lastMonth'].count}}</div>
-        <div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-top:2px">Prev Month</div>
-      </div>
-      <div data-testid="jcd-div-059" style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:var(--radius-xs);cursor:pointer" (click)="onBoxClick('overallEnd')">
-        <div style="font-size:18px;font-weight:800;color:var(--text);line-height:1">{{originalData['totalMonth'].count}}</div>
-        <div style="font-size:10px;color:var(--text-secondary);font-weight:600;margin-top:2px">Total Ended</div>
-      </div>
-    </div>
-    <div class="scroll-box" style="max-height:320px">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Journey</th>
-            <th class="c" *ngFor="let m of subscriptionMatrix.months">{{ m.label }}</th>
-            <th class="c">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let j of subscriptionMatrix.journeys">
-            <td>{{ j.label }}</td>
-            <td class="c" *ngFor="let m of subscriptionMatrix.months">
-              <ng-container *ngIf="getCellData(j.id, m.ym) as cell; else sub_empty">
-                <span data-testid="jcd-span-060" class="badge" style="background:var(--danger);cursor:pointer;font-size:11px" (click)="openSubDialog(cell.docs, j.label + ' · ' + m.label)">{{ cell.count }}</span>
-              </ng-container>
-              <ng-template #sub_empty>&mdash;</ng-template>
-            </td>
-            <td class="c"><strong>{{ subscriptionMatrix.journeyTotals[j.id] }}</strong></td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td>Total</td>
-            <td class="c" *ngFor="let m of subscriptionMatrix.months"><strong>{{ subscriptionMatrix.monthTotals[m.ym] }}</strong></td>
-            <td class="c"><strong>{{ getGrandTotal() }}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
+<!-- ROW 4 -->
+<!-- ROW 4 · LEFT — Ecosystem Health · Ask AH & Love Letter -->
+<div class="card span6">
+  <div class="ch"><span class="ct">Ecosystem Health &middot; Ask AH &amp; Love Letter</span><span class="clink" data-testid="jcd-btn-084" (click)="openCrossoverMetricsDialog()">Crossover metrics &rsaquo;</span></div>
+  <div class="cbody">
 
-  <!-- CUSTOMER STATUS -->
-  <div class="card" style="display:flex;flex-direction:column">
-    <div class="card-h">
-      <span class="card-t">Customer Status</span>
-      <span class="card-subtitle"><strong style="color:var(--text)">{{ getJourneyStatusGrandTotal() }}</strong> total</span>
-    </div>
-    <div class="pills">
-      <span data-testid="jcd-span-061" class="pill" [class.active]="journeyTypeFilter==='all'" (click)="journeyTypeFilter='all'">All</span>
-      <span data-testid="jcd-span-062" class="pill" [class.active]="journeyTypeFilter==='ecosystem'" (click)="journeyTypeFilter='ecosystem'">Ecosystem</span>
-      <span data-testid="jcd-span-063" class="pill" [class.active]="journeyTypeFilter==='dfu'" (click)="journeyTypeFilter='dfu'">DFU</span>
-    </div>
-    <div class="pills" style="margin-bottom:6px">
-      <span data-testid="jcd-span-064" class="pill" [class.active]="activeStatusTab==='all'" (click)="activeStatusTab='all'">All &middot; {{ getJourneyStatusGrandTotal() }}</span>
-      <span data-testid="jcd-span-065" class="pill" [class.active]="activeStatusTab==='active'" (click)="activeStatusTab='active'">Active &middot; {{ getTotalForStatus('active') }}</span>
-      <span data-testid="jcd-span-066" class="pill" [class.active]="activeStatusTab==='non active'" (click)="activeStatusTab='non active'">Non Active &middot; {{ getTotalForStatus('non active') }}</span>
-      <span data-testid="jcd-span-067" class="pill" [class.active]="activeStatusTab==='discontinued'" (click)="activeStatusTab='discontinued'">Disc. &middot; {{ getTotalForStatus('discontinued') }}</span>
-      <span data-testid="jcd-span-068" class="pill" [class.active]="activeStatusTab==='null'" (click)="activeStatusTab='null'">No Status &middot; {{ nullStatusProfiles.length }}</span>
-    </div>
-    <div *ngIf="(activeStatusTab==='null' || activeStatusTab==='all') && nullStatusProfiles.length > 0" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;background:var(--warning-light);padding:5px 10px;border-radius:var(--radius-xs)">
-      No customer status assigned &mdash; <strong>{{ nullStatusProfiles.length }} profiles</strong>
-      <a data-testid="jcd-a-069" (click)="openJourneyStatusDialog(nullStatusProfiles,'No Status Profiles')" style="color:var(--primary);font-weight:600;text-decoration:none;cursor:pointer;margin-left:4px">View all ›</a>
-    </div>
-    <div class="scroll-box" *ngIf="activeStatusTab !== 'null' && filteredJourneyStatusMatrix.length > 0">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Journey</th>
-            <th class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">Active</th>
-            <th class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">Non Active</th>
-            <th class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">Disc.</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let j of filteredJourneyStatusMatrix">
-            <td>{{ j.journeyName }} <span class="tag" [class.tag-eco]="j.journeyType==='Eco system'" [class.tag-dfu]="j.journeyType==='DFU'">{{ j.journeyType==='Eco system' ? 'Eco' : j.journeyType==='DFU' ? 'DFU' : '' }}</span></td>
-            <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='active'">
-              <span data-testid="jcd-span-070" *ngIf="j.statuses['active']?.profiles?.length > 0" style="color:var(--success);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['active'].profiles, j.journeyName + ' · Active')">{{ j.statuses['active'].profiles.length }}</span>
-              <span *ngIf="!j.statuses['active']?.profiles?.length">&mdash;</span>
-            </td>
-            <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='non active'">
-              <span data-testid="jcd-span-071" *ngIf="j.statuses['non active']?.profiles?.length > 0" style="cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['non active'].profiles, j.journeyName + ' · Non Active')">{{ j.statuses['non active'].profiles.length }}</span>
-              <span *ngIf="!j.statuses['non active']?.profiles?.length">&mdash;</span>
-            </td>
-            <td class="c" *ngIf="activeStatusTab==='all' || activeStatusTab==='discontinued'">
-              <span data-testid="jcd-span-072" *ngIf="j.statuses['discontinued']?.profiles?.length > 0" style="color:var(--danger);font-weight:700;cursor:pointer" (click)="openJourneyStatusDialog(j.statuses['discontinued'].profiles, j.journeyName + ' · Discontinued')">{{ j.statuses['discontinued'].profiles.length }}</span>
-              <span *ngIf="!j.statuses['discontinued']?.profiles?.length">&mdash;</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <!-- Ask AH / Love Letter follows the universal (top toolbar) date filter — no separate filter -->
 
-  <!-- MODES -->
-  <div class="card" style="display:flex;flex-direction:column">
-    <div class="card-h">
-      <span class="card-t">Modes</span>
-      <a data-testid="jcd-a-073" class="card-link" (click)="navigateToModeDashboard()" style="cursor:pointer">Dashboard <mat-icon style="font-size:14px">arrow_forward</mat-icon></a>
-    </div>
-    <div class="modes-grid scroll-box" style="flex:1;max-height:460px">
-      <div data-testid="jcd-div-074" class="mode-item" *ngFor="let mode of modesList" (click)="openDialog(mode)">
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px">{{mode}}</span>
-        <span class="mode-badge" [style.background]="(modeMap[mode]?.length ?? 0) > 0 ? 'var(--primary)' : 'var(--text-muted)'">{{modeMap[mode]?.length ?? 0}}</span>
-      </div>
-    </div>
-  </div>
+    <div *ngIf="isFetchingData" style="padding:20px;text-align:center;color:var(--mut);font-size:13px">Loading&hellip;</div>
 
-</div><!-- /row-mid -->
+    <ng-container *ngIf="!isFetchingData">
+      <ng-container *ngIf="askAHLoveLetterSummary; else noAskAH">
 
-<!-- ──── ROW 3: Ecosystem Health ──── -->
-<div class="row" style="grid-template-columns:1fr" *ngIf="!showTable">
-  <div class="card">
-    <div class="card-h">
-      <span class="card-t">Ecosystem Health</span>
-      <span class="card-subtitle" style="color:var(--text-muted);font-size:11px">{{ dateRangeHint || 'Select range' }}</span>
-    </div>
-    <div class="btn-group" style="justify-content:flex-end;margin-top:-32px;margin-bottom:16px">
-      <button data-testid="jcd-btn-075" class="btn" [class.btn-primary]="filterMode==='months'" (click)="toggleFilterMode('months')">Months</button>
-      <button data-testid="jcd-btn-076" class="btn" [class.btn-primary]="filterMode==='daterange'" (click)="toggleFilterMode('daterange')">Date Range</button>
-      <button data-testid="jcd-btn-077" class="btn" [class.btn-primary]="filterMode==='queue'" (click)="toggleFilterMode('queue')">Queue</button>
-      <div *ngIf="filterMode==='months'" style="display:flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-weight:600;background:var(--card)">
-        MONTHS
-        <input data-testid="jcd-inp-078" type="number" [(ngModel)]="numberOfMonths" min="1" max="24" (change)="onMonthsCountChange()" style="width:32px;border:none;outline:none;text-align:center;font-size:12px;font-weight:700;color:var(--primary);background:transparent">
-        <div style="display:flex;flex-direction:column;line-height:1;cursor:pointer">
-          <span data-testid="jcd-span-079" (click)="stepMonths(1)" style="font-size:9px">▲</span>
-          <span data-testid="jcd-span-080" (click)="stepMonths(-1)" style="font-size:9px">▼</span>
+        <div style="display:flex;gap:7px;margin-bottom:9px">
+          <span class="clink nav" data-testid="jcd-span-079" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH')">Ask AH &middot; {{ askAHLoveLetterSummary.askAH.total }}</span>
+          <span class="clink nav" data-testid="jcd-span-080" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter')">Love Letter &middot; {{ askAHLoveLetterSummary.loveLetter.total }}</span>
         </div>
-      </div>
-      <mat-form-field appearance="outline" style="height:36px;font-size:12px" *ngIf="filterMode==='daterange'">
-        <mat-date-range-input [rangePicker]="rangePicker">
-          <input data-testid="jcd-inp-081" matStartDate [(ngModel)]="filterStartDate" placeholder="Start" (dateChange)="onDateRangeChange()">
-          <input data-testid="jcd-inp-082" matEndDate [(ngModel)]="filterEndDate" placeholder="End" (dateChange)="onDateRangeChange()">
-        </mat-date-range-input>
-        <mat-datepicker-toggle matIconSuffix [for]="rangePicker"></mat-datepicker-toggle>
-        <mat-date-range-picker #rangePicker></mat-date-range-picker>
-      </mat-form-field>
-      <mat-form-field appearance="outline" style="height:36px;font-size:12px" *ngIf="filterMode==='queue'">
-        <mat-select data-testid="jcd-msel-083" [(ngModel)]="selectedQueueIds" multiple (selectionChange)="onQueueSelectionChange()" placeholder="Select queues">
-          <mat-option *ngFor="let q of queueList" [value]="q.id">{{ q.name }}</mat-option>
-        </mat-select>
-      </mat-form-field>
-      <button data-testid="jcd-btn-084" class="btn" style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-color:#fbbf24;color:#92400e;font-weight:700" (click)="openCrossoverMetricsDialog()">Crossover Metrics</button>
-    </div>
 
-    <div class="eco-grid">
-
-      <!-- LEFT: Ask AH & Love Letter -->
-      <div>
-        <!-- Loading state -->
-        <div *ngIf="isFetchingData" style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">
-          <div style="width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:orig-spin 0.8s linear infinite;margin:0 auto 8px"></div>
-          Loading...
-        </div>
-        <!-- Ask AH & Love Letter -->
-        <div *ngIf="!isFetchingData">
-          <ng-container *ngIf="askAHLoveLetterSummary; else noAskAH">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-secondary)">Ask AH &amp; Love Letter</span>
-            <div style="display:flex;gap:6px">
-              <span style="padding:4px 10px;background:var(--primary-light);color:var(--primary);border-radius:12px;font-size:11px;font-weight:700">Ask AH &middot; {{ askAHLoveLetterSummary.askAH.total }}</span>
-              <span style="padding:4px 10px;background:#fce7f3;color:#be185d;border-radius:12px;font-size:11px;font-weight:700">Love Letter &middot; {{ askAHLoveLetterSummary.loveLetter.total }}</span>
-            </div>
-          </div>
-          <table class="tbl">
-            <thead>
-              <tr>
-                <th>Flag</th>
-                <th class="c">Ask AH</th>
-                <th class="c">Love Letter</th>
-                <th class="c">Combined</th>
-                <th class="c" style="background:#ede9fe;color:#5b21b6;border-radius:6px 6px 0 0">Resolved</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span style="color:var(--success);font-weight:600">● Happy</span></td>
-                <td class="c"><span data-testid="jcd-span-085" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'liked','Ask AH · Happy')">{{ askAHLoveLetterSummary.askAH.liked }}</span></td>
-                <td class="c"><span data-testid="jcd-span-086" class="jcd-clickable-num" style="color:var(--success)" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'liked','Love Letter · Happy')">{{ askAHLoveLetterSummary.loveLetter.liked }}</span></td>
-                <td class="c"><span data-testid="jcd-span-087" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Happy · Combined')">{{ askAHLoveLetterSummary.liked }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-088" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'likedResolved','Happy · Resolved')">{{ askAHLoveLetterSummary.resolvedLiked || 0 }}</span></td>
-              </tr>
-              <tr>
-                <td><span style="color:var(--warning);font-weight:600">△ Needs Attention</span></td>
-                <td class="c"><span data-testid="jcd-span-089" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'tagged','Ask AH · Needs Attention')">{{ askAHLoveLetterSummary.askAH.tagged }}</span></td>
-                <td class="c"><span data-testid="jcd-span-090" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'tagged','Love Letter · Needs Attention')">{{ askAHLoveLetterSummary.loveLetter.tagged }}</span></td>
-                <td class="c"><span data-testid="jcd-span-091" class="jcd-clickable-num" style="color:var(--warning)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'tagged','Needs Attention · Combined')">{{ askAHLoveLetterSummary.tagged }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-092" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'taggedResolved','Needs Attention · Resolved')">{{ askAHLoveLetterSummary.resolvedTagged || 0 }}</span></td>
-              </tr>
-              <tr>
-                <td><span style="color:var(--primary);font-weight:600">● Opportunity</span></td>
-                <td class="c"><span data-testid="jcd-span-093" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'opportunity','Ask AH · Opportunity')">{{ askAHLoveLetterSummary.askAH.opportunity }}</span></td>
-                <td class="c"><span data-testid="jcd-span-094" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'opportunity','Love Letter · Opportunity')">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</span></td>
-                <td class="c"><span data-testid="jcd-span-095" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunity','Opportunity · Combined')">{{ askAHLoveLetterSummary.opportunity }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-096" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunityResolved','Opportunity · Resolved')">{{ askAHLoveLetterSummary.resolvedOpportunity || 0 }}</span></td>
-              </tr>
-              <tr>
-                <td><span style="color:var(--danger);font-weight:600">● Critical</span></td>
-                <td class="c"><span data-testid="jcd-span-097" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'critical','Ask AH · Critical')">{{ askAHLoveLetterSummary.askAH.critical }}</span></td>
-                <td class="c"><span data-testid="jcd-span-098" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'critical','Love Letter · Critical')">{{ askAHLoveLetterSummary.loveLetter.critical }}</span></td>
-                <td class="c"><span data-testid="jcd-span-099" class="jcd-clickable-num" style="color:var(--danger)" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'critical','Critical · Combined')">{{ askAHLoveLetterSummary.critical }}</span></td>
-                <td class="c" style="background:#f5f3ff"><span data-testid="jcd-span-100" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalResolved','Critical · Resolved')">{{ askAHLoveLetterSummary.resolvedCritical || 0 }}</span></td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td><strong>Total Flagged</strong></td>
-                <td class="c"><strong data-testid="jcd-strong-101" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</strong></td>
-                <td class="c"><strong data-testid="jcd-strong-102" class="jcd-clickable-num" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</strong></td>
-                <td class="c"><strong data-testid="jcd-strong-103" class="jcd-clickable-num" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</strong></td>
-                <td class="c" style="background:#f5f3ff"><strong data-testid="jcd-strong-104" class="jcd-clickable-num" style="color:#5b21b6" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'anyResolved','All Resolved')">{{ askAHLoveLetterSummary.resolvedTotal || 0 }}</strong></td>
-              </tr>
-            </tfoot>
-          </table>
-          <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div data-testid="jcd-div-105" style="padding:12px;background:linear-gradient(135deg,#fce7f3,#fdf2f8);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'unflagged','Unflagged Profiles')">
-              <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#be185d;letter-spacing:0.4px;margin-bottom:4px">Unflagged</div>
-              <div style="font-size:26px;font-weight:900;color:#be185d;line-height:1">{{ askAHLoveLetterSummary.unflagged }}</div>
-              <div style="font-size:10px;color:#be185d;margin-top:3px">No flag assigned</div>
-            </div>
-            <div data-testid="jcd-div-106" style="padding:12px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Positive Flags · Happy')">
-              <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#065f46;letter-spacing:0.4px;margin-bottom:4px">Positive Flags</div>
-              <div style="font-size:26px;font-weight:900;color:var(--success);line-height:1">{{ askAHLoveLetterSummary.liked }}</div>
-              <div style="font-size:10px;color:#065f46;margin-top:3px">Happy responses</div>
-            </div>
-          </div>
-          <div data-testid="jcd-div-107" style="margin-top:8px;padding:10px 14px;background:var(--warning-light);border-radius:var(--radius-xs);display:flex;justify-content:space-between;align-items:center;cursor:pointer" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalOrTagged','Critical + Needs Attention')">
-            <div>
-              <div style="font-size:10px;font-weight:700;color:#92400e">Critical + Needs Attention</div>
-              <div style="font-size:10px;color:#92400e;margin-top:2px">Requires immediate response</div>
-            </div>
-            <div style="font-size:22px;font-weight:900;color:var(--warning)">{{ askAHLoveLetterSummary.critical + askAHLoveLetterSummary.tagged }}</div>
-          </div>
-        </ng-container>
-        <ng-template #noAskAH>
-          <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.3;display:block;margin:0 auto 8px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-            No Ask AH / Love Letter data for this range
-          </div>
-        </ng-template>
-        </div><!-- /!isFetchingData -->
-        <!-- PROGRESSED/REGRESSED WIDGET — fully commented out
-        <div style="margin-top:16px" *ngIf="!isFetchingData && monthSummaries.length > 0 && activeMonthSummary">
-          <div class="total-banner">
-            <div class="total-top-row">
-              <span class="total-title">{{ activeMonthSummary.monthLabel }}</span>
-              <button data-testid="jcd-btn-108" class="eye-btn" (click)="openAllMonthsDialog()">
-                <svg class="eye-svg" viewBox="0 0 24 24" fill="none"><path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="#9299B0" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="#9299B0" stroke-width="1.8"/></svg>
-              </button>
-            </div>
-            <div class="total-stats">
-              <div class="ts"><div class="ts-num total">{{ activeMonthSummary.totalInterims }}</div><div class="ts-lbl">Total</div></div>
-              <div class="ts"><div data-testid="jcd-div-109" class="ts-num up" (click)="openProgressedDialog()">{{ activeProgressedCount }}</div><div class="ts-lbl">Progressed</div><div class="ts-bar up" [style.width.%]="progressedPercentage"></div></div>
-              <div class="ts"><div data-testid="jcd-div-110" class="ts-num dn" (click)="openRegressedDialog()">{{ activeRegressedCount }}</div><div class="ts-lbl">Regressed</div><div class="ts-bar dn" [style.width.%]="regressedPercentage"></div></div>
-              <div class="ts"><div data-testid="jcd-div-111" class="ts-num nc" (click)="openNoChangeDialog()">{{ activeMonthSummary.noChangeCount }}</div><div class="ts-lbl">No change</div><div class="ts-bar nc" [style.width.%]="noChangePercentage"></div></div>
-            </div>
-          </div>
-          <div class="month-tabs">
-            <div data-testid="jcd-div-112" *ngFor="let ms of monthSummaries; let i = index" class="mtab" [class.active]="i===activeMonthIndex" (click)="switchActiveMonth(i)">{{ getTabLabel(ms) }}</div>
-          </div>
-          <div data-testid="jcd-div-113" class="nc-banner" (click)="openNoChangeDialog()">
-            <div class="nc-left"><div class="nc-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7C5CFC" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div><div class="nc-label">No Change · {{ activeMonthSummary.monthLabel }}</div><div class="nc-pct">{{ noChangePercentage }}% of {{ activeMonthSummary.totalInterims }} · tap to view</div></div></div>
-            <div class="nc-num">{{ activeMonthSummary.noChangeCount }}</div>
-          </div>
-          <div class="cols">
-            <div class="col">
-              <div class="col-head"><div class="col-head-title up"><span class="ch-dot up"></span>Progressed · {{ activeProgressedCount }}</div></div>
-              <div class="area-head">Areas changed</div>
-              <div data-testid="jcd-div-114" *ngFor="let areaKey of AREA_KEYS" class="arow hu" (click)="openAreaDialog('up',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill up" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'up',areaKey),getMaxValue(activeMonthSummary.progressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'up',areaKey) }}</span></div></div>
-              <div class="cat-head">By category</div>
-              <div data-testid="jcd-div-115" *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('up',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill up" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'up',category),getMaxValue(activeMonthSummary.progressedData.categoryBreakdown))"></div></div><span class="crow-num up">{{ getCategoryValue(activeMonthSummary,'up',category) }}</span></div></div>
-            </div>
-            <div class="col">
-              <div class="col-head"><div class="col-head-title dn"><span class="ch-dot dn"></span>Regressed · {{ activeRegressedCount }}</div></div>
-              <div class="area-head">Areas changed</div>
-              <div data-testid="jcd-div-116" *ngFor="let areaKey of AREA_KEYS" class="arow hd" (click)="openAreaDialog('dn',areaKey)"><span class="arow-lbl">{{ getAreaLabel(areaKey) }}</span><div class="arow-right"><div class="arow-bar"><div class="arow-bar-fill dn" [style.width.%]="getBarWidthPercent(getAreaValue(activeMonthSummary,'dn',areaKey),getMaxValue(activeMonthSummary.regressedData.areaBreakdown))"></div></div><span class="arow-num">{{ getAreaValue(activeMonthSummary,'dn',areaKey) }}</span></div></div>
-              <div class="cat-head">By category</div>
-              <div data-testid="jcd-div-117" *ngFor="let category of CATEGORIES" class="crow" (click)="openCategoryDialog('dn',category)"><span class="crow-lbl">{{ category }}</span><div class="crow-right"><div class="crow-bar"><div class="crow-fill dn" [style.width.%]="getBarWidthPercent(getCategoryValue(activeMonthSummary,'dn',category),getMaxValue(activeMonthSummary.regressedData.categoryBreakdown))"></div></div><span class="crow-num dn">{{ getCategoryValue(activeMonthSummary,'dn',category) }}</span></div></div>
-            </div>
-          </div>
-        </div>
-        <div *ngIf="isFetchingData" class="empty-state"><p>Loading...</p></div>
-        <div *ngIf="!isFetchingData && monthSummaries.length === 0" class="empty-state"><p>Change date range to load data</p></div>
-        END PROGRESSED/REGRESSED WIDGET -->
-      </div>
-
-      <!-- RIGHT: Participant Health Overview + Evolution Progress -->
-      <div>
-        <!-- Participant Health -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary)">Participant Health Overview</span>
-          <span style="font-size:10px;color:var(--text-muted)">dominant key per participant</span>
-        </div>
-        <table class="tbl" style="margin-bottom:16px">
-          <thead><tr><th></th><th>Key</th><th class="c">Profiles</th><th class="c">Adjustments</th><th class="c">Percent</th></tr></thead>
+        <table class="fm">
+          <thead><tr><th>Flag</th><th>Ask AH</th><th>Love Letter</th><th>Combined</th><th>Resolved</th></tr></thead>
           <tbody>
-            <div class="hk-table-hd" style="display:none"></div><!-- keep hk classes available -->
-            <tr data-testid="jcd-tr-118" *ngFor="let k of healthKeyData; let i = index" (click)="openHealthKeyDialog(k.key)" style="cursor:pointer">
-              <td style="width:24px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%" [style.background]="k.color"></span></td>
-              <td>{{ k.key }}</td>
-              <td class="c">{{ k.profileCount }}</td>
-              <td class="c">{{ k.count }}</td>
-              <td class="c">{{ k.pct }}%</td>
+            <tr>
+              <td><span class="flagdot" style="background:var(--green)"></span>Happy</td>
+              <td class="n" data-testid="jcd-span-085" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'liked','Ask AH · Happy')">{{ askAHLoveLetterSummary.askAH.liked }}</td>
+              <td class="n" data-testid="jcd-span-086" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'liked','Love Letter · Happy')">{{ askAHLoveLetterSummary.loveLetter.liked }}</td>
+              <td class="n" data-testid="jcd-span-087" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Happy · Combined')">{{ askAHLoveLetterSummary.liked }}</td>
+              <td class="n" data-testid="jcd-span-088" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'likedResolved','Happy · Resolved')">{{ askAHLoveLetterSummary.resolvedLiked || 0 }}</td>
+            </tr>
+            <tr>
+              <td><span class="flagdot" style="background:var(--amber)"></span>Needs Attention</td>
+              <td class="n" data-testid="jcd-span-089" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'tagged','Ask AH · Needs Attention')">{{ askAHLoveLetterSummary.askAH.tagged }}</td>
+              <td class="n" data-testid="jcd-span-090" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'tagged','Love Letter · Needs Attention')">{{ askAHLoveLetterSummary.loveLetter.tagged }}</td>
+              <td class="n" data-testid="jcd-span-091" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'tagged','Needs Attention · Combined')">{{ askAHLoveLetterSummary.tagged }}</td>
+              <td class="n" data-testid="jcd-span-092" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'taggedResolved','Needs Attention · Resolved')">{{ askAHLoveLetterSummary.resolvedTagged || 0 }}</td>
+            </tr>
+            <tr>
+              <td><span class="flagdot" style="background:var(--indigo)"></span>Opportunity</td>
+              <td class="n" data-testid="jcd-span-093" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'opportunity','Ask AH · Opportunity')">{{ askAHLoveLetterSummary.askAH.opportunity }}</td>
+              <td class="n" data-testid="jcd-span-094" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'opportunity','Love Letter · Opportunity')">{{ askAHLoveLetterSummary.loveLetter.opportunity }}</td>
+              <td class="n" data-testid="jcd-span-095" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunity','Opportunity · Combined')">{{ askAHLoveLetterSummary.opportunity }}</td>
+              <td class="n" data-testid="jcd-span-096" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'opportunityResolved','Opportunity · Resolved')">{{ askAHLoveLetterSummary.resolvedOpportunity || 0 }}</td>
+            </tr>
+            <tr>
+              <td><span class="flagdot" style="background:var(--red)"></span>Critical</td>
+              <td class="n" data-testid="jcd-span-097" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'critical','Ask AH · Critical')">{{ askAHLoveLetterSummary.askAH.critical }}</td>
+              <td class="n" data-testid="jcd-span-098" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'critical','Love Letter · Critical')">{{ askAHLoveLetterSummary.loveLetter.critical }}</td>
+              <td class="n" data-testid="jcd-span-099" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'critical','Critical · Combined')">{{ askAHLoveLetterSummary.critical }}</td>
+              <td class="n" data-testid="jcd-span-100" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalResolved','Critical · Resolved')">{{ askAHLoveLetterSummary.resolvedCritical || 0 }}</td>
             </tr>
           </tbody>
-          <tfoot><tr><td></td><td><strong>Total</strong></td><td class="c"><strong>{{ healthTotalProfiles }}</strong></td><td class="c"><strong>{{ healthTotalAdjustments }}</strong></td><td class="c"><strong>100%</strong></td></tr></tfoot>
+          <tfoot>
+            <tr style="font-weight:700">
+              <td>Total Flagged</td>
+              <td class="n" data-testid="jcd-strong-101" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.askAH.docs,'any','Ask AH · All Flagged')">{{ askAHLoveLetterSummary.askAH.liked + askAHLoveLetterSummary.askAH.tagged + askAHLoveLetterSummary.askAH.opportunity + askAHLoveLetterSummary.askAH.critical }}</td>
+              <td class="n" data-testid="jcd-strong-102" (click)="openAskAHProfileDialog(askAHLoveLetterSummary.loveLetter.docs,'any','Love Letter · All Flagged')">{{ askAHLoveLetterSummary.loveLetter.liked + askAHLoveLetterSummary.loveLetter.tagged + askAHLoveLetterSummary.loveLetter.opportunity + askAHLoveLetterSummary.loveLetter.critical }}</td>
+              <td class="n" data-testid="jcd-strong-103" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'any','All Flagged · Combined')">{{ askAHLoveLetterSummary.liked + askAHLoveLetterSummary.tagged + askAHLoveLetterSummary.opportunity + askAHLoveLetterSummary.critical }}</td>
+              <td class="n" data-testid="jcd-strong-104" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'anyResolved','All Resolved')">{{ askAHLoveLetterSummary.resolvedTotal || 0 }}</td>
+            </tr>
+          </tfoot>
         </table>
 
-        <!-- ADJUSTMENT DETAILS — commented out
-        <div style="margin-bottom:12px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:8px">Adjustment details</div>
-          <div class="adj-detail-grid">
-            <div *ngFor="let item of evolutionprogressMap | keyvalue" style="padding:8px 10px;background:var(--bg);border-radius:var(--radius-xs);display:flex;justify-content:space-between;align-items:center;font-size:12px">
-              <span>{{ item.key }}</span><span style="font-weight:700">{{ item.value }}</span>
-            </div>
-          </div>
+        <div class="split">
+          <div class="sbox" data-testid="jcd-div-105" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'unflagged','Unflagged Profiles')"><div class="k">Unflagged</div><div class="v">{{ askAHLoveLetterSummary.unflagged }}</div></div>
+          <div class="sbox pos" data-testid="jcd-div-106" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'liked','Positive Flags · Happy')"><div class="k">Positive flags</div><div class="v">{{ askAHLoveLetterSummary.liked }}</div></div>
+          <div class="sbox" style="background:var(--red-soft)" data-testid="jcd-div-107" (click)="openAskAHProfileDialog(getCombinedAskAHDocs(),'criticalOrTagged','Critical + Needs Attention')"><div class="k" style="color:var(--red)">Critical + Attn</div><div class="v" style="color:var(--red)">{{ askAHLoveLetterSummary.critical + askAHLoveLetterSummary.tagged }}</div></div>
         </div>
-        END ADJUSTMENT DETAILS -->
 
-        <!-- Evolution Progress -->
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin-bottom:8px">Evolution Progress</div>
-        <ng-container *ngIf="evolutionProgressData && evolutionProgressData.keys.length > 0; else noEpData">
-          <div class="scroll-box" style="max-height:220px">
-            <table class="tbl">
-              <thead><tr><th>Key</th><th class="c" style="color:var(--success)">&lt;25%</th><th class="c" style="color:var(--primary)">25-50%</th><th class="c" style="color:var(--warning)">50-75%</th><th class="c" style="color:var(--danger)">75-100%</th></tr></thead>
-              <tbody>
-                <tr *ngFor="let key of evolutionProgressData.keys">
-                  <td>{{ key }}</td>
-                  <td class="c"><span data-testid="jcd-span-119" *ngIf="getEpBandCount(key,0)>0" style="cursor:pointer;color:var(--success);font-weight:700" (click)="openEpDialog(key,'< 25%',0)">{{ getEpBandCount(key,0) }}</span><span *ngIf="!getEpBandCount(key,0)">&mdash;</span></td>
-                  <td class="c"><span data-testid="jcd-span-120" *ngIf="getEpBandCount(key,1)>0" style="cursor:pointer;color:var(--primary);font-weight:700" (click)="openEpDialog(key,'25–50%',1)">{{ getEpBandCount(key,1) }}</span><span *ngIf="!getEpBandCount(key,1)">&mdash;</span></td>
-                  <td class="c"><span data-testid="jcd-span-121" *ngIf="getEpBandCount(key,2)>0" style="cursor:pointer;color:var(--warning);font-weight:700" (click)="openEpDialog(key,'50–75%',2)">{{ getEpBandCount(key,2) }}</span><span *ngIf="!getEpBandCount(key,2)">&mdash;</span></td>
-                  <td class="c"><span data-testid="jcd-span-122" *ngIf="getEpBandCount(key,3)>0" style="cursor:pointer;color:var(--danger);font-weight:700" (click)="openEpDialog(key,'75–100%',3)">{{ getEpBandCount(key,3) }}</span><span *ngIf="!getEpBandCount(key,3)">&mdash;</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </ng-container>
-        <ng-template #noEpData>
-          <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;background:var(--bg);border-radius:var(--radius-xs)">
-            No evolution progress data — select a date range above
-          </div>
-        </ng-template>
-      </div>
-
-    </div><!-- /eco-grid -->
-  </div>
-</div><!-- /row-3 -->
-
-<!-- ──── ROW 4: ATC Analytics | Total Adjustments | Extended Life Impact ──── -->
-<div class="row atc-3col" *ngIf="!showTable">
-
-  <!-- ATC Analytics -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">ATC Analytics</span><span class="card-subtitle">{{ dateRangeHint }}</span></div>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px">ATC Status</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <ng-container *ngIf="(totalATC | keyvalue)?.length > 0; else atcEmpty">
-        <div data-testid="jcd-div-123" *ngFor="let total of totalATC | keyvalue" style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--success);cursor:pointer" (click)="openEcoDialog(total.value,'Total ATC')">
-          <div style="font-size:28px;font-weight:800;color:var(--success)">{{total.key}}</div>
-          <div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px">Validated Total ATC</div>
-          <div data-testid="jcd-div-124" style="margin-top:6px;padding:4px 8px;background:#fff;border-radius:4px;font-size:11px;color:var(--success);font-weight:600;cursor:pointer" (click)="openEcoDialog(percentageCompleted,'Completed ATC');$event.stopPropagation()">&#10003; {{percentageCompleted.length}} Completed</div>
-        </div>
       </ng-container>
-      <ng-template #atcEmpty>
-        <div style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--success)"><div style="font-size:28px;font-weight:800;color:var(--success)">0</div><div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:0.3px">Validated Total ATC</div></div>
+      <ng-template #noAskAH>
+        <div style="padding:20px;text-align:center;color:var(--mut);font-size:13px">No Ask AH / Love Letter data for this range</div>
       </ng-template>
-      <div data-testid="jcd-div-125" style="padding:14px;background:var(--warning-light);border-radius:var(--radius-sm);text-align:center;border-left:4px solid var(--warning);cursor:pointer" (click)="openEcoDialog(unvalidatedATC,'Unvalidated ATC')">
-        <div style="font-size:28px;font-weight:800;color:var(--orange)">{{unvalidatedATC.length}}</div>
-        <div style="font-size:10px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:0.3px">Unvalidated ATC</div>
-        <div style="margin-top:6px;padding:4px 8px;background:#fff;border-radius:4px;font-size:11px;color:var(--warning);font-weight:600">&#9711; Awaiting Review</div>
-      </div>
-    </div>
-    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px">Products <span style="float:right;font-size:13px;font-weight:800;color:var(--text)">{{totalProductCount}}</span></div>
-    <div class="scroll-box" style="max-height:140px;margin-bottom:14px">
-      <div data-testid="jcd-div-126" *ngFor="let impact of productCountMap | keyvalue : compareByValueLengthDesc" style="display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" (click)="openEcoDialog(impact.value, impact.key + ' (' + impact.value.length + ')')">
-        <span>{{impact.key}}</span>
-        <span class="badge" style="background:var(--primary);min-width:34px">{{impact.value.length}}</span>
-      </div>
-      <div *ngIf="(productCountMap | keyvalue)?.length === 0" style="padding:12px;color:var(--text-muted);font-size:12px">No products available</div>
-    </div>
+    </ng-container>
+
   </div>
+</div>
 
-  <!-- Total Adjustments -->
-  <div class="card">
-    <div class="card-h"><span class="card-t">Total Adjustments</span></div>
-    <div data-testid="jcd-div-127" style="text-align:center;padding:20px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border-radius:var(--radius-sm);margin-bottom:16px;border:1px solid #bae6fd;cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Total Adjustment',totalAdjustmentsCompletedMap['count'])">
-      <div style="font-size:48px;font-weight:900;color:var(--teal);line-height:1">{{totalAdjustmentsCompletedMap['count']}}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
-        <div data-testid="jcd-div-128" style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--success);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Aware',totalAdjustmentAwareMap['count']);$event.stopPropagation()">
-          <div style="font-size:20px;font-weight:800;color:var(--success)">{{totalAdjustmentAwareMap['count']}}</div>
-          <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Aware</div>
-        </div>
-        <div data-testid="jcd-div-129" style="padding:8px;background:rgba(255,255,255,0.7);border-radius:var(--radius-xs);border-left:3px solid var(--warning);cursor:pointer" (click)="openEcoDialog(totalAdjustmentsCompletedMap['data'],'Un Aware',totalAdjustmentUnAwareMap['count']);$event.stopPropagation()">
-          <div style="font-size:20px;font-weight:800;color:var(--warning)">{{totalAdjustmentUnAwareMap['count']}}</div>
-          <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Unaware</div>
-        </div>
-      </div>
+<!-- ROW 4 · RIGHT — Participant Health -->
+<div class="card span6">
+  <div class="ch"><span class="ct">Participant Health</span><span class="clink nav" data-testid="jcd-ph-healthboard" (click)="goToHealthBoard()">Health board &rarr;</span></div>
+  <div class="cbody">
+    <div class="hkpi">
+      <div class="hk" data-testid="jcd-ph-needsattn" (click)="goToHealthBoard()"><div class="v" style="color:var(--red)">{{ needsAttnCount }}</div><div class="k">Outreach</div></div>
+      <div class="hk" data-testid="jcd-ph-goingquiet" (click)="onBoxClick('more30Product')"><div class="v" style="color:var(--amber)">{{ originalData['morethan30daysjourneynotstarted'].count }}</div><div class="k">Going quiet</div></div>
+      <div class="hk" data-testid="jcd-ph-paylocked" (click)="onBoxClick('lockedStatus')"><div class="v">{{ originalData['lockedstatus'].count }}</div><div class="k">Pay locked</div></div>
+      <div class="hk" data-testid="jcd-ph-renew" (click)="goToHealthBoard()"><div class="v">{{ renew90Count }}</div><div class="k">Renew 90d</div></div>
+      <div class="hk" data-testid="jcd-ph-tickets" (click)="goToHealthBoard()"><div class="v">{{ ticketsCount }}</div><div class="k">Tickets</div></div>
+      <div class="hk" data-testid="jcd-ph-flagged" (click)="goToHealthBoard()"><div class="v" style="color:var(--red)">{{ askAHLoveLetterSummary?.critical || 0 }}</div><div class="k">Flagged</div></div>
     </div>
-    <div class="lim-sav-grid">
-      <div data-testid="jcd-div-130" style="padding:14px;background:var(--danger-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearWastedMap['data'],'Limitation Years',evolutionYearWastedMap['count'])">
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--danger);letter-spacing:0.4px;margin-bottom:4px">Limitation Years</div>
-        <div style="font-size:26px;font-weight:800;color:var(--danger)">{{evolutionYearWastedMap['count'] || 0}}</div>
-      </div>
-      <div data-testid="jcd-div-131" style="padding:14px;background:var(--success-light);border-radius:var(--radius-sm);text-align:center;cursor:pointer" (click)="openEcoDialog(evolutionYearSavedMap['data'],'Saved Years',evolutionYearSavedMap['count'])">
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--success);letter-spacing:0.4px;margin-bottom:4px">Saved Years</div>
-        <div style="font-size:26px;font-weight:800;color:var(--success)">{{evolutionYearSavedMap['count'] || 0}}</div>
-      </div>
+
+    <div class="ct" style="margin-bottom:5px">Coach-set health</div>
+    <div class="hbar" data-testid="jcd-ph-healthbar" (click)="goToHealthBoard()">
+      <span [style.width.%]="chPct(coachSetHealth.happy)" style="background:var(--green)"></span>
+      <span [style.width.%]="chPct(coachSetHealth.neutral)" style="background:#9ccf8f"></span>
+      <span [style.width.%]="chPct(coachSetHealth.unhappy)" style="background:var(--amber)"></span>
+      <span [style.width.%]="chPct(coachSetHealth.atRisk)" style="background:#e88a3c"></span>
+      <span [style.width.%]="chPct(coachSetHealth.critical)" style="background:var(--red)"></span>
+      <span [style.width.%]="chPct(coachSetHealth.notAssessed)" style="background:var(--soft2)"></span>
     </div>
+    <div class="hleg">
+      <div class="hli" data-testid="jcd-ph-happy" (click)="goToHealthBoard()"><span class="d" style="background:var(--green)"></span>Happy<span class="n">{{ coachSetHealth.happy }}</span></div>
+      <div class="hli" data-testid="jcd-ph-neutral" (click)="goToHealthBoard()"><span class="d" style="background:#9ccf8f"></span>Neutral<span class="n">{{ coachSetHealth.neutral }}</span></div>
+      <div class="hli" data-testid="jcd-ph-unhappy" (click)="goToHealthBoard()"><span class="d" style="background:var(--amber)"></span>Unhappy<span class="n">{{ coachSetHealth.unhappy }}</span></div>
+      <div class="hli" data-testid="jcd-ph-atrisk" (click)="goToHealthBoard()"><span class="d" style="background:#e88a3c"></span>At-risk<span class="n">{{ coachSetHealth.atRisk }}</span></div>
+      <div class="hli" data-testid="jcd-ph-critical" (click)="goToHealthBoard()"><span class="d" style="background:var(--red)"></span>Critical<span class="n">{{ coachSetHealth.critical }}</span></div>
+      <div class="hli" data-testid="jcd-ph-notassessed" (click)="goToHealthBoard()"><span class="d" style="background:var(--soft2)"></span>Not assessed<span class="n">{{ coachSetHealth.notAssessed }}</span></div>
+    </div>
+
+    <div class="ct" style="margin:12px 0 0">Priority band</div>
+    <div class="prio">
+      <div class="pb u" data-testid="jcd-ph-urgent" (click)="goToHealthBoard()"><div class="k">Urgent</div><div class="v">{{ priorityBands.urgent }}</div></div>
+      <div class="pb w" data-testid="jcd-ph-watch" (click)="goToHealthBoard()"><div class="k">Watch</div><div class="v">{{ priorityBands.watch }}</div></div>
+      <div class="pb c" data-testid="jcd-ph-calm" (click)="goToHealthBoard()"><div class="k">Calm</div><div class="v">{{ priorityBands.calm }}</div></div>
+    </div>
+
+    <div class="ch" style="margin:13px 0 3px"><span class="ct">Outreach &middot; top</span><span class="clink" data-testid="jcd-ph-needsattn-all" (click)="goToHealthBoard()">All {{ needsAttnCount }} &rsaquo;</span></div>
+    <ng-container *ngIf="needsAttentionTop.length; else noNeedsAttn">
+      <div class="impact" data-testid="jcd-ph-needsattn-row" *ngFor="let p of needsAttentionTop" (click)="profileNavigation(p.id)">
+        <span class="imav" [style.background]="p.color">{{ p.initials }}</span>
+        <span class="imn"><b>{{ p.name }}</b><em>{{ p.statusLine }}</em></span>
+        <span class="tab2" [style.background]="p.urgency==='Urgent' ? 'var(--red-soft)' : 'var(--amber-soft)'" [style.color]="p.urgency==='Urgent' ? 'var(--red)' : 'var(--amber)'">{{ p.urgency }}</span>
+      </div>
+    </ng-container>
+    <ng-template #noNeedsAttn>
+      <div class="impact" (click)="goToHealthBoard()"><span class="imav" style="background:var(--soft2)">&mdash;</span><span class="imn"><b>&mdash;</b><em>No data &mdash; open the health board</em></span></div>
+    </ng-template>
   </div>
+</div>
 
-  <!-- Extended Life Impact -->
-  <div class="card">
-    <div class="card-h">
-      <span class="card-t">Extended Life Impact</span>
-      <span style="padding:3px 10px;background:var(--danger);color:#fff;border-radius:12px;font-size:11px;font-weight:700">TOTAL {{extendedLifeImpactTotal}}</span>
-    </div>
-    <div class="scroll-box" style="max-height:400px">
-      <ng-container *ngFor="let impact of extendedLifeImpactMap | keyvalue: compareByValueDesc">
-        <div data-testid="jcd-div-132" *ngIf="mapprofile[impact.key] != null"
-          style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
-          (click)="profileNavigation(impact.key)">
-
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <app-profile-picture
-              [profileId]="impact.key"
-              [name]="mapprofile[impact.key] || ''"
-              [size]="30">
-            </app-profile-picture>
-            <span style="font-size:13px;font-weight:500">{{mapprofile[impact.key] || 'No Name'}}</span>
-          </div>
-
-          <span class="badge" style="background:var(--success)">{{impact.value}}</span>
-        </div>
-      </ng-container>
-      <div *ngIf="(extendedLifeImpactMap | keyvalue)?.length === 0" style="padding:20px;color:var(--text-muted);text-align:center;font-size:13px">No impact data available</div>
-    </div>
-  </div>
-
-</div><!-- /row-4 -->
-
-</div><!-- /main -->
+</div><!-- /content -->
 
 
 <!-- ══════ TABLE SECTION ══════ -->
