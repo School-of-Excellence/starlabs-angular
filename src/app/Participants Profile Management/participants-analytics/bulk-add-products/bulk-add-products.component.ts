@@ -1,42 +1,82 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Inject } from '@angular/core';
-import { collection, doc, Firestore, getDocs, orderBy, query, setDoc, where } from '@angular/fire/firestore';
-import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, inject, Inject, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import {
+  collection,
+  doc,
+  documentId,
+  Firestore,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from '@angular/fire/firestore';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { AuthguardService } from '../../../authguard.service';
-import { LoadingProgressComponent } from '../../../loading-progress/loading-progress.component';
-import * as XLSX from 'xlsx';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
-interface purchaseProduct {
-  productref: any
-  packageref: any
-  minimumpayment: any
-  tentativestart: any
-  status: any
-  unlimited: any
-  participantproductid: any
-  deliverytype: any
+export const DESCRIPTION_MIN_LENGTH = 10;
+const HISTORY_PAGE_SIZE = 20;
+const BULK_JOBS_COLLECTION = 'bulkProductJobs';
+const CHUNK_SIZE = 100;
+/** A claim older than this (ms) is treated as dead — the job can be Reset. Matches the CF guard. */
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+
+interface BulkJobParticipant {
+  profileid: string;
+  name?: string;
+  email?: string;
 }
 
-interface ParticipantPurchase {
-  purchasetype: any
-  participantjourneyproductref: any
-  journeystatus: any
-  purchaseref: any
-  subscriptionstart: any
-  subscriptionend: any
-  journeyref: any
-  productref: any
-  watsonpurchaseid: any
-  watsonpurchaselabel: any
-  products: Array<purchaseProduct>
+/** A failed participant on the lean job doc. */
+interface FailureEntry {
+  profileid: string;
+  reason: string;
 }
 
+/** Participant metadata resolved at DISPLAY time (not stored on the job doc). */
+export interface ParticipantMeta {
+  name?: string | null;
+  email?: string | null;
+  phonenumber?: string | null;
+  countrycode?: string | null;
+  participantmode?: string | null;
+  customerstatus?: string | null;
+}
+
+interface BulkJobDoc {
+  docid: string;
+  batchId: string;
+  createdat: any;
+  createdby: string;
+  description: string;
+  productref: string;
+  packageref: string | null;
+  minimumpayment: number | null;
+  profiles: string[];
+  retry: boolean;
+  processing: boolean;
+  claimedAt: any;
+  success: string[]; // profileids only
+  failures: FailureEntry[]; // { profileid, reason }
+  totalcount: number;
+}
+
+/**
+ * Bulk Add Products — queue front end. This dialog no longer reads/writes participant
+ * product data itself; it creates `bulkProductJobs` docs (chunked by 100) and a Cloud
+ * Function does the work. See specs/plans/2026-09-22-bulk-add-products-queue.md.
+ */
 @Component({
   selector: 'app-bulk-add-products',
   imports: [
@@ -47,706 +87,443 @@ interface ParticipantPurchase {
     FormsModule,
     MatInputModule,
     MatIconModule,
-    MatButtonModule
+    MatButtonModule,
+    MatProgressSpinnerModule,
+    MatDialogModule,
+    NgxMatSelectSearchModule,
   ],
   templateUrl: './bulk-add-products.component.html',
-  styleUrl: './bulk-add-products.component.css'
+  styleUrl: './bulk-add-products.component.css',
 })
-export class BulkAddProductsComponent {
+export class BulkAddProductsComponent implements OnInit, OnDestroy {
+  // Reference data for the two dropdowns
+  productsList: any[] = [];
+  allpackageList: any[] = [];
+  mapMinimumRequiredAmount: Record<string, any> = {};
 
-  // Array declarations 
-  productsList: any = [];
-  allpackageList: any = [];
-  addonpackageList: any = [];
-  requiredJourneyKey = ["subscriptionstart", "subscriptionend"];
-  requiredProductKey = ["productref", "packageref"];
+  selectedProduct: string | null = null;
+  productFilter = '';
+  tab = 0;
 
-  // String declarations 
-  selectedProduct = null;
+  @ViewChild('bapParticipantsTpl') participantsTpl!: TemplateRef<any>;
 
-  // Object declarations 
-  mapMinimumRequiredAmount: any = {};
-  mapParticipantProducts: any = {};
-  mapJourney: any = {};
+  form: FormGroup;
 
-  productForm: FormGroup;
-
-  // productrefId when we call fromo initiateeventproduct
-  participants: any[] = [];
+  participants: BulkJobParticipant[] = [];
+  createdby = '';
   productrefId: string | null = null;
+
+  // Submit state
+  submitting = false;
+  lastBatch: { batchId: string; total: number } | null = null;
+  batchProgress: { success: number; failures: number; total: number } | null = null;
+  private batchUnsub?: () => void;
+
+  // History tab state (live)
+  jobs: BulkJobDoc[] = [];
+  historyLoading = false;
+  historyDone = false;
+  private historyLimit = HISTORY_PAGE_SIZE;
+  private historyUnsub?: () => void;
+  /** profileid → metadata, resolved client-side at display time (the job doc stores only ids). */
+  metaCache = new Map<string, ParticipantMeta>();
 
   private firestore = inject(Firestore);
 
   constructor(
-    @Inject(MAT_DIALOG_DATA) public data:any, 
-  public dialogRef: MatDialogRef<BulkAddProductsComponent>,
-  private fb: FormBuilder,
-  public guard: AuthguardService,
-  private dialog: MatDialog) {
-  if (Array.isArray(data)) {
-    this.participants = data;
-    this.productrefId = null;
-  } else {
-    this.participants = data.participants ?? [];
-    this.productrefId = data.productrefId ?? null;
-  }
+    @Inject(MAT_DIALOG_DATA) public data: any,
+    public dialogRef: MatDialogRef<BulkAddProductsComponent>,
+    private fb: FormBuilder,
+    private dialog: MatDialog
+  ) {
+    if (Array.isArray(data)) {
+      this.participants = data ?? [];
+      this.productrefId = null;
+      this.createdby = '';
+    } else {
+      this.participants = data?.participants ?? [];
+      this.productrefId = data?.productrefId ?? null;
+      this.createdby = data?.loggedInProfileId ?? '';
+    }
 
-  this.productForm = this.fb.group({
-    products: this.fb.array([])
-  });
-}
+    // With no selection, the Add tab is disabled — open straight to History.
+    this.tab = this.participants.length ? 0 : 1;
+
+    this.form = this.fb.group({
+      productref: [null, Validators.required],
+      packageref: [null, Validators.required],
+      minimumpayment: [null, Validators.required],
+      description: [
+        '',
+        [Validators.required, Validators.minLength(DESCRIPTION_MIN_LENGTH)],
+      ],
+    });
+  }
 
   ngOnInit() {
+    getDocs(query(collection(this.firestore, 'products'), orderBy('product', 'asc'))).then(
+      (products) => {
+        let docs = products.docs;
+        if (this.productrefId) {
+          docs = docs.filter((d) => d.id === this.productrefId);
+        }
+        for (const d of docs) {
+          const productdata: any = d.data();
+          productdata['id'] = productdata['id'] ?? d.id;
+          this.mapMinimumRequiredAmount[productdata['id']] = productdata['minimumrequiredamount'];
+          this.productsList.push(productdata);
+        }
+        // Pre-select when the dialog was opened for a single product
+        if (this.productrefId) {
+          this.selectedProduct = this.productrefId;
+          this.onProductChange();
+        }
+      }
+    );
 
-  getDocs(collection(this.firestore, "journey")).then(snap => {
-    for (let i = 0; i < snap.docs.length; i++) {
-      const element = snap.docs[i].data();
-        this.mapJourney[element['id']] = element['journey']
-    }
-    })
-
-  getDocs(query(collection(this.firestore, "products"), orderBy("product", "asc"))).then((products) => {
-    let docs = products.docs;
-
-    if (this.productrefId) {
-      docs = docs.filter(d => d.id === this.productrefId);
-    }
-
-    for (let i = 0; i < docs.length; i++) {
-      const productref = docs[i].ref;
-      const productdata = docs[i].data();
-      productdata['productref'] = productref;
-      this.mapMinimumRequiredAmount[productdata["id"]] = productdata["minimumrequiredamount"];
-      this.productsList.push(productdata);
-    }
-  });
-
-  getDocs(query(collection(this.firestore, "package"), orderBy("package"))).then(packagelist => {
-    this.allpackageList = packagelist.docs.map((doc) => {
-      const data = doc.data();
-        data['docid'] = doc.id; // Add document ID
-      return data;
+    getDocs(query(collection(this.firestore, 'package'), orderBy('package'))).then((packagelist) => {
+      this.allpackageList = packagelist.docs.map((d) => {
+        const data: any = d.data();
+        data['docid'] = d.id;
+        return data;
+      });
     });
 
-      var addonOption = []
-    for (let i = 0; i < packagelist.docs.length; i++) {
-        const value = packagelist.docs[i].data()
-        value['docid'] = packagelist.docs[i].id; // Add document ID
-      if (value["nonjourney"] ?? false) {
-          addonOption.push(value)
-        }
-      }
-      this.addonpackageList = addonOption
-    })
-}
-
-  get productsArray(): FormArray {
-    return this.productForm.get('products') as FormArray;
+    // Opened with no selection → History is the only tab; start it live immediately.
+    if (this.tab === 1) this.startHistory();
   }
 
-  get isFormValid(): boolean {
-    return this.productForm.valid && this.productsArray.length > 0;
+  ngOnDestroy() {
+    this.batchUnsub?.();
+    this.historyUnsub?.();
   }
 
-  get loading() {
-    return this.dialog.open(LoadingProgressComponent, { data: { msg: "Processing Please wait" }, disableClose: true })
+  get selectedCount(): number {
+    return this.participants.length;
   }
 
-  async fetchPurchase(product) {
-
-    var profileid = product.profileid;
-    var PurchaseboxList: Array<ParticipantPurchase> = []
-
-    await getDocs(query(collection(this.firestore, "participantsproduct"), where("profileid", "==", profileid))).then(clientproduct => {
-      const participantProducts = clientproduct.docs.map(e => e.data())
-      for (let i = 0; i < participantProducts.length; i++) {
-        const product = participantProducts[i];
-        this.mapParticipantProducts[product["docid"]] = product
-      }
-    })
-
-    var mapPurchase = {}
-    await getDocs(query(collection(this.firestore, "journeyproductpurchase"), where("profileid", "==", profileid))).then(purchase => {
-      for (let i = 0; i < purchase.docs.length; i++) {
-        const doc = purchase.docs[i];
-        mapPurchase[doc.id] = doc.data()
-      }
-    })
-
-    await getDocs(query(collection(this.firestore, "participantjourneyproduct"), where("profileid", "==", profileid))).then(clientjourney => {
-      for (let i = 0; i < clientjourney.docs.length; i++) {
-        const journeyproduct = clientjourney.docs[i];
-        const journeyproductdata = journeyproduct.data();
-        var productList: Array<purchaseProduct> = [];
-        if (journeyproductdata["participantproducts"].length == 0) {
-          productList.push({
-            productref: null,
-            packageref: null,
-            minimumpayment: null,
-            tentativestart: null,
-            status: null,
-            unlimited: false,
-            participantproductid: null,
-            deliverytype: null
-          })
-        }
-        for (let j = 0; j < journeyproductdata["participantproducts"].length; j++) {
-          const product = journeyproductdata["participantproducts"][j];
-          var mapProduct = this.mapParticipantProducts[product["participantproductid"]] ?? {}
-          productList.push({
-            productref: product["productref"]?.id ?? null,
-            packageref: mapProduct["packageref"]?.id ?? null,
-            minimumpayment: mapProduct["minimumpayment"] ?? (this.mapMinimumRequiredAmount[product["productref"]?.id] ?? null),
-            tentativestart: mapProduct["tentativestart"]?.toDate() ?? null,
-            status: mapProduct["status"] ?? null,
-            unlimited: mapProduct["unlimited"] ?? false,
-            participantproductid: mapProduct["docid"],
-            deliverytype: mapProduct["deliverytype"] ?? null
-          })
-        }
-        PurchaseboxList.push({
-          purchasetype: journeyproductdata["journeyref"] != null ? "journey" : "product",
-          participantjourneyproductref: journeyproductdata["docid"],
-          journeystatus: journeyproductdata["journeystatus"] ?? null,
-          journeyref: journeyproductdata["journeyref"]?.id ?? null,
-          productref: journeyproductdata["participantproducts"].map(e => e["productref"]?.id),
-          purchaseref: journeyproductdata["purchaseref"]?.id ?? null,
-          subscriptionstart: journeyproductdata["subscriptionstart"]?.toDate() ?? null,
-          subscriptionend: journeyproductdata["subscriptionend"]?.toDate() ?? null,
-          products: productList,
-          watsonpurchaseid: journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaseid"] : null,
-          watsonpurchaselabel: journeyproductdata["purchaseref"] != null ? mapPurchase[journeyproductdata["purchaseref"].id]["watsonpurchaselabel"] : null,
-        })
-      }
-      PurchaseboxList.sort((a, b) => a.purchasetype.localeCompare(b.purchasetype));
-
-      let index = PurchaseboxList.findIndex((e)=> e['journeyref'] == product['journeyref']);
-
-      PurchaseboxList[index].products.push({
-        productref: product["productref"],
-        packageref: product["packageref"],
-        minimumpayment: product["minimumpayment"],
-        tentativestart: product["tentativestart"],
-        status: product["status"],
-        unlimited: product["unlimited"],
-        participantproductid: product["participantproductid"],
-        deliverytype: product["deliverytype"]
-      })
-    })
-
-    return PurchaseboxList;
-
+  /** Products filtered by the in-dropdown search box. */
+  filteredProducts(): any[] {
+    const f = (this.productFilter || '').trim().toLowerCase();
+    if (!f) return this.productsList;
+    return this.productsList.filter((p) => (p.product || '').toLowerCase().includes(f));
   }
 
-  // async addProduct() {
-  //   // Clear existing products first
-  //   while (this.productsArray.length !== 0) {
-  //     this.productsArray.removeAt(0);
-  //   }
+  get chunkCount(): number {
+    return Math.ceil(this.participants.length / 100) || 0;
+  }
 
-  //   for (let i = 0; i < this.data.length; i++) {
-  //     const element = this.data[i];
-
-  //     try {
-  //       const pjp = await getDocs(query(
-  //         collection(this.firestore, "participantjourneyproduct"),
-  //         where("profileid", "==", element.profileid),
-  //         where("journeystatus", "in", ['initiated', 'ongoing'])
-  //       ));
-
-  //       if (pjp.docs.length == 1) {
-  //         let journey = pjp.docs[0].data();
-
-  //         const index = this.allpackageList.findIndex((e)=> this.mapJourney[journey['journeyref'].id] == e['package']);
-  //         var packageRef = null;
-
-  //         if(index != -1) {
-  //           packageRef = this.allpackageList[index]['docid']
-  //         }
-
-  //         this.productsArray.push(this.fb.group({
-  //           name: [element.name, Validators.required],
-  //           profileid: [element.profileid, ''],
-  //           journeyref: [journey['journeyref'].id, ''],
-  //           productref: [this.selectedProduct, ''],
-  //           packageref: [packageRef, Validators.required],
-  //           minimumpayment: [this.mapMinimumRequiredAmount[this.selectedProduct], Validators.required],
-  //           participantproductid: [null, ''],
-  //           status: null,
-  //           unlimited: false,
-  //           deliverytype: null,
-  //           tentativestart: null
-  //         }));
-  //       }
-  //     } catch (error) {
-  //       console.error('Error fetching journey data:', error);
-  //     }
-  //   }
-  // }
-
-  async addProduct() {
-    const loading = this.loading;
-    this.productsArray.clear();
-    const profileIds = this.participants.map(element => element.profileid);
-    const BATCH_SIZE = 10;
-    const journeyMap = new Map();
-    const participantsWithoutJourney = []; 
-    
-    for (let i = 0; i < profileIds.length; i += BATCH_SIZE) {
-      const batch = profileIds.slice(i, i + BATCH_SIZE);
-      
-      try {
-        const pjpSnapshot = await getDocs(query(
-          collection(this.firestore, "participantjourneyproduct"),
-          where("profileid", "in", batch),
-          where("journeystatus", "in", ['initiated', 'ongoing', 'completed'])
-        ));
-
-        const profileCounts = new Map();
-        pjpSnapshot.docs.forEach(doc => {
-          const data = doc.data();
-          const profileId = data['profileid'];
-          
-          if (!profileCounts.has(profileId)) {
-            profileCounts.set(profileId, []);
-          }
-          profileCounts.get(profileId).push(data);
-        });
-
-        // Only add profiles with exactly 1 journey
-        batch.forEach(profileId => {
-          const journeys = profileCounts.get(profileId);
-          
-          if (!journeys || journeys.length === 0 || journeys.length > 1) {
-            // No documents found for this profileId
-            const participant = this.participants.find(e => e.profileid === profileId);
-            if (participant) {
-              participantsWithoutJourney.push({
-                "Name": participant['name'],
-                "EMail": participant['email']
-              });
-            }
-          } else if (journeys.length === 1) {
-            // Exactly 1 journey found
-            journeyMap.set(profileId, journeys[0]);
-          }
-        });
-      } catch (error) {
-        console.error('Error fetching journey data:', error);
-      }
+  /** Prefill minimum payment from the product's required amount when a product is picked. */
+  onProductChange() {
+    this.form.patchValue({ productref: this.selectedProduct });
+    const prefill = this.selectedProduct
+      ? this.mapMinimumRequiredAmount[this.selectedProduct]
+      : null;
+    if (prefill != null && (this.form.value.minimumpayment == null || this.form.value.minimumpayment === '')) {
+      this.form.patchValue({ minimumpayment: prefill });
     }
-
-    // Create a lookup map for packages
-    const packageMap = new Map();
-    this.allpackageList.forEach(pkg => {
-      packageMap.set(pkg['package'], pkg['docid']);
-    });
-
-    // Now process all data with lookups instead of queries
-    this.participants.forEach(element => {
-      const journey = journeyMap.get(element.profileid);
-      
-      if (journey && journey['journeyref']) {
-        const journeyPackage = this.mapJourney[journey['journeyref'].id];
-        const packageRef = packageMap.get(journeyPackage) || null;
-
-        this.productsArray.push(this.fb.group({
-          name: [element.name, Validators.required],
-          profileid: [element.profileid, ''],
-          journeyref: [journey['journeyref'].id, ''],
-          productref: [this.selectedProduct, ''],
-          packageref: [packageRef, Validators.required],
-          minimumpayment: [this.mapMinimumRequiredAmount[this.selectedProduct], Validators.required],
-          participantproductid: [null, ''],
-          status: null,
-          unlimited: false,
-          deliverytype: null,
-          tentativestart: null
-        }));
-      }
-    });
-
-    const worksheet = XLSX.utils.json_to_sheet(participantsWithoutJourney);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Not Found Profiles');
-    XLSX.writeFile(workbook, 'Not Found Profiles.xlsx');
-
-    loading.close();
   }
 
-  validateReview(participantPurchase) {
-    var value: boolean = true
-    let participantProductList = [];
-    for (let i = 0; i < participantPurchase.length; i++) {
-      const purchase = participantPurchase[i];
-      purchase["productref"] = purchase["products"].map(e => e["productref"])
-      if (purchase.purchasetype == "journey") {
-        if (purchase.journeyref == null) {
-          value = false
-          break;
-        }
-      } else if (purchase.purchasetype == "product") {
-        if ((purchase.productref ?? []).length == 0) {
-          value = false
-          break;
-        }
-      } else {
-        value = false
-        break;
-      }
-      for (let a = 0; a < this.requiredJourneyKey.length; a++) {
-        const field = this.requiredJourneyKey[a];
-        if ((purchase[field] ?? null) == null) {
-          value = false
-          i = participantPurchase.length + 1
-          break;
-        }
-      }
-      var purchaseProduct = purchase["products"]
-      for (let j = 0; j < purchaseProduct.length; j++) {
-        const product = purchaseProduct[j];
-        if (product.participantproductid == null) {
-          var productIndex = this.productsList.findIndex(e => e.id == product.productref)
-          if (productIndex != -1) {
-            product.unlimited = this.productsList[productIndex]["unlimited"] ?? false
-          } else {
-            console.log("Thappu nae")
-          }
-        }
-        participantProductList.push({
-          purchaseindex: i,
-          participantproductid: product.participantproductid ?? null,
-          joureyref: purchase.journeyref ?? null,
-          productref: product.productref,
-          packageref: product.packageref,
-          tentativestart: product.tentativestart ?? null,
-          minimumpayment: product.minimumpayment ?? null,
-          status: product.status,
-          sequenceorder: ((this.mapParticipantProducts[product.participantproductid] ?? {})["sequenceorder"]) ?? 1000,
-          subscriptionstart: purchase.subscriptionstart,
-          subscriptionend: purchase.subscriptionend,
-          unlimited: product.unlimited ?? false,
-          deliverytype: product['deliverytype'] ?? null
-        })
+  get canSubmit(): boolean {
+    return this.form.valid && this.participants.length > 0 && !this.submitting;
+  }
 
-        for (let a = 0; a < this.requiredProductKey.length; a++) {
-          const field = this.requiredProductKey[a];
-          if ((product[field] ?? null) == null) {
-            value = false
-            i = participantPurchase.length + 1
-            j = purchaseProduct.length + 1
-            break;
-          }
-        }
-      }
+  async submit() {
+    if (!this.canSubmit) {
+      this.form.markAllAsTouched();
+      return;
     }
-    return { value, participantProductList }
-  }
-
-  reviewPurchase(participantPurchase) {
-    const data = this.validateReview(participantPurchase);
-    let value = data.value;
-    let participantProductList = data.participantProductList ?? [];
-
-    if (value) {
-      participantProductList.sort((a, b) => a["sequenceorder"] - b["sequenceorder"])
-    } else {
-      console.log("Review", participantPurchase)
-    }
-
-    return participantProductList;
-  }
-
-  loadingDialog(): MatDialogRef<any> {
-    var loading = this.dialog.open(LoadingProgressComponent, {
-      disableClose: true,
-      data: {
-        msg: "Updating ....."
-      }
-    })
-    return loading
-  }
-
-  async updateProduct(value) {
-    // Progress tracking
-    let totalOperations = 0;
-    let completedOperations = 0;
-    let loadingWidget = this.loadingDialog();
-
-    // First, calculate total operations needed
-    for (let j = 0; j < value.products.length; j++) {
-      const productdata = value.products[j];
-      let participantPurchase = await this.fetchPurchase(productdata);
-      let participantProductList = this.reviewPurchase(participantPurchase);
-
-      totalOperations += participantProductList.length; // participantsproduct docs
-      totalOperations += participantPurchase.length * 2; // journeyproductpurchase + participantjourneyproduct
-      totalOperations += 1; // delivery sequence update
-    }
-
-    console.log(`Total operations to perform: ${totalOperations}`);
-
-    // Collect all operations before executing
-    const allOperations = [];
-    const allProfileUpdates = [];
-
+    this.submitting = true;
+    this.batchUnsub?.();
+    this.batchProgress = null;
     try {
-      // Phase 1: Prepare all operations
-      for (let j = 0; j < value.products.length; j++) {
-        const productdata = value.products[j];
-        let participantPurchase = await this.fetchPurchase(productdata);
-        let participantProductList = this.reviewPurchase(participantPurchase);
-
-        // Prepare participant product operations
-        for (let i = 0; i < participantProductList.length; i++) {
-          const product = participantProductList[i];
-
-          var productData = {
-            journeyref: product["journeyref"] != null ? doc(this.firestore, "journey", product["journeyref"]) : null,
-            productref: product["productref"] != null ? doc(this.firestore, "products", product["productref"]) : null,
-            packageref: product["packageref"] != null ? doc(this.firestore, "package", product["packageref"]) : null,
-            tentativestart: product["tentativestart"] ?? null,
-            minimumpayment: product["minimumpayment"] ?? null,
-            status: product["status"],
-            sequenceorder: i,
-            subscriptionstart: product["subscriptionstart"] ?? null,
-            subscriptionend: product["subscriptionend"] ?? null,
-            unlimited: product["unlimited"] ?? false,
-            profileid: productdata.profileid,
-            deliverytype: product["deliverytype"]
-          };
-
-          if (product["participantproductid"] == null) {
-            product["participantproductid"] = doc(collection(this.firestore, 'participantsproduct')).id;
-            var additionalData = {
-              docid: product["participantproductid"],
-            }
-            productData = { ...productData, ...additionalData };
-          }
-
-          allOperations.push({
-            type: 'participantsproduct',
-            docId: product["participantproductid"],
-            data: productData,
-            profileId: productdata.profileid
-          });
-        }
-
-        // Prepare purchase operations
-        for (let i = 0; i < participantPurchase.length; i++) {
-          const purchase = participantPurchase[i];
-          var purchaseproduct = participantProductList.filter(e => e["purchaseindex"] == i);
-          var productRefList = purchaseproduct.map(e => doc(this.firestore, "products", e["productref"]));
-          var productParticipantList = [];
-
-          purchaseproduct.forEach(p => {
-            productParticipantList.push({
-              participantproductid: p["participantproductid"],
-              productref: doc(this.firestore, "products", p["productref"])
-            });
-          });
-
-          var purchaseData = {
-            productref: productRefList,
-            watsonpurchaseid: purchase["watsonpurchaseid"],
-            watsonpurchaselabel: purchase["watsonpurchaselabel"],
-          };
-
-          var journeyproductData = {
-            journeystatus: purchase["journeystatus"],
-            productref: productRefList,
-            participantproducts: productParticipantList,
-            subscriptionstart: purchase["subscriptionstart"] ?? null,
-            subscriptionend: purchase["subscriptionend"] ?? null,
-          };
-
-          purchase["participantjourneyproductref"] = purchase["participantjourneyproductref"] ?? doc(collection(this.firestore, 'participantjourneyproduct')).id;
-
-          if (purchase["purchaseref"] == null) {
-            purchase["purchaseref"] = doc(collection(this.firestore, 'journeyproductpurchase')).id;
-            var additionalPurchase = {
-              docid: purchase["purchaseref"],
-              journeyref: purchase["journeyref"] != null ? doc(this.firestore, "journey", purchase["journeyref"]) : null,
-              participantjourneyproductref: doc(this.firestore, "participantjourneyproduct", purchase["participantjourneyproductref"]),
-              profileid: productdata.profileid,
-              purchasetype: purchase["purchasetype"]
-            };
-            purchaseData = { ...purchaseData, ...additionalPurchase };
-
-            var additionaljourneyproductData = {
-              docid: purchase["participantjourneyproductref"],
-              journeyref: purchase["journeyref"] != null ? doc(this.firestore, "journey", purchase["journeyref"]) : null,
-              purchaseref: doc(this.firestore, "journeyproductpurchase", purchase["purchaseref"]),
-              profileid: productdata.profileid,
-            };
-            journeyproductData = { ...journeyproductData, ...additionaljourneyproductData };
-          }
-
-          allOperations.push({
-            type: 'journeyproductpurchase',
-            docId: purchase["purchaseref"],
-            data: purchaseData,
-            profileId: productdata.profileid
-          });
-
-          allOperations.push({
-            type: 'participantjourneyproduct',
-            docId: purchase["participantjourneyproductref"],
-            data: journeyproductData,
-            profileId: productdata.profileid
-          });
-        }
-
-        // Store for delivery sequence update
-        allProfileUpdates.push({
-          profileId: productdata.profileid,
-          participantProductList: participantProductList
-        });
-      }
-
-      // Phase 2: Execute all Firestore operations with error tracking
-      console.log(`Starting execution of ${allOperations.length} Firestore operations...`);
-      const operationPromises = [];
-
-      for (const operation of allOperations) {
-        const promise = setDoc(
-          doc(this.firestore, operation.type, operation.docId),
-          operation.data,
-          { merge: true }
-        ).then(() => {
-          completedOperations++;
-          console.log(`Progress: ${completedOperations}/${totalOperations} operations completed (${Math.round((completedOperations / totalOperations) * 100)}%)`);
-          return { success: true, operation };
-        }).catch(error => {
-          console.error(`Failed operation:`, operation, error);
-          return { success: false, operation, error };
-        });
-
-        operationPromises.push(promise);
-      }
-
-      // Wait for all Firestore operations
-      const results = await Promise.all(operationPromises);
-
-      // Check if any operation failed
-      const failedOperations = results.filter(result => !result.success);
-
-      if (failedOperations.length > 0) {
-        console.error(`${failedOperations.length} operations failed:`, failedOperations);
-        throw new Error(`Failed to update ${failedOperations.length} documents. No delivery sequences will be updated.`);
-      }
-
-      console.log('All Firestore operations completed successfully. Starting delivery sequence updates...');
-
-      // Phase 3: Update delivery sequences only if all Firestore operations succeeded
-      const deliveryPromises = allProfileUpdates.map(async (profileUpdate) => {
-        try {
-          await this.guard.updateDeliverySequence(profileUpdate.profileId, profileUpdate.participantProductList);
-          completedOperations++;
-          console.log(`Progress: ${completedOperations}/${totalOperations} operations completed (${Math.round((completedOperations / totalOperations) * 100)}%)`);
-          return { success: true, profileId: profileUpdate.profileId };
-        } catch (error) {
-          console.error(`Failed to update delivery sequence for profile ${profileUpdate.profileId}:`, error);
-          return { success: false, profileId: profileUpdate.profileId, error };
-        }
+      const v = this.form.value;
+      const { batchId } = await this.createJobs({
+        participants: this.participants,
+        productref: v.productref,
+        packageref: v.packageref ?? null,
+        minimumpayment: v.minimumpayment ?? null,
+        description: (v.description ?? '').trim(),
+        createdby: this.createdby,
       });
 
-      const deliveryResults = await Promise.all(deliveryPromises);
-      const failedDeliveryUpdates = deliveryResults.filter(result => !result.success);
+      this.lastBatch = { batchId, total: this.participants.length };
+      // Non-blocking: watch the batch's chunks fill in.
+      this.batchUnsub = this.watchBatch(batchId, (chunks) => {
+        const success = chunks.reduce((n, j) => n + (j.success?.length ?? 0), 0);
+        const failures = chunks.reduce((n, j) => n + (j.failures?.length ?? 0), 0);
+        const total = chunks.reduce((n, j) => n + (j.totalcount ?? 0), 0);
+        this.batchProgress = { success, failures, total };
+      });
 
-      if (failedDeliveryUpdates.length > 0) {
-        console.error(`${failedDeliveryUpdates.length} delivery sequence updates failed:`, failedDeliveryUpdates);
-        // Note: At this point, Firestore docs are already updated, but some delivery sequences failed
-        // You might want to implement a cleanup mechanism or log for manual intervention
-      }
-
-      console.log('All operations completed successfully!');
-      loadingWidget.close();
-      this.dialogRef.close();
-
-    } catch (error) {
-      console.error('Critical error during update process:', error);
-      // Since we're using Promise.all with proper error handling, 
-      // any failure in Firestore operations will prevent delivery sequence updates
-      throw error;
+      // Reset the add form so a second product can be queued immediately.
+      this.selectedProduct = null;
+      this.form.reset();
+    } catch (err) {
+      console.error('Failed to create bulk product jobs', err);
+    } finally {
+      this.submitting = false;
     }
   }
 
-  updatePurchase(participantProductList, participantPurchase, product) {
-    console.log("Purchase.......")
-    var write = 0
-    for (let i = 0; i < participantPurchase.length; i++) {
-      const purchase = participantPurchase[i];
-      var purchaseproduct = participantProductList.filter(e => e["purchaseindex"] == i)
-      var productRefList = purchaseproduct.map(e => doc(this.firestore, "products", e["productref"]))
-      var productParticipantList = []
-      purchaseproduct.forEach(p => {
-        productParticipantList.push({
-          participantproductid: p["participantproductid"],
-          productref: doc(this.firestore, "products", p["productref"])
-        })
-      })
-      var purchaseData = {
-        productref: productRefList,
-        watsonpurchaseid: purchase["watsonpurchaseid"],
-        watsonpurchaselabel: purchase["watsonpurchaselabel"],
+  /** True when nothing is selected — the Add tab is then disabled (History only). */
+  get addDisabled(): boolean {
+    return this.selectedCount === 0;
+  }
+
+  setTab(index: number) {
+    if (index === 0 && this.addDisabled) return; // can't add with no selection
+    this.tab = index;
+    this.onTabChange(index);
+  }
+
+  onTabChange(index: number) {
+    if (index === 1 && !this.historyUnsub) this.startHistory();
+  }
+
+  /** Subscribe to a live history page of `historyLimit` jobs. */
+  private startHistory() {
+    this.historyUnsub?.();
+    this.historyLoading = true;
+    this.historyUnsub = this.watchJobs(this.historyLimit, (jobs, reachedEnd) => {
+      this.jobs = jobs;
+      this.historyDone = reachedEnd;
+      this.historyLoading = false;
+      const creatorIds = jobs
+        .filter((j) => j.createdby && !this.metaCache.has(j.createdby))
+        .map((j) => j.createdby);
+      if (creatorIds.length) {
+        this.getMeta(creatorIds).then((m) => m.forEach((v, k) => this.metaCache.set(k, v)));
       }
-      var journeyproductData = {
-        journeystatus: purchase["journeystatus"],
-        productref: productRefList,
-        participantproducts: productParticipantList,
-        subscriptionstart: purchase["subscriptionstart"] ?? null,
-        subscriptionend: purchase["subscriptionend"] ?? null,
-      }
-      purchase["participantjourneyproductref"] = purchase["participantjourneyproductref"] ?? doc(collection(this.firestore, 'participantjourneyproduct')).id
-      if (purchase["purchaseref"] == null) {
-        purchase["purchaseref"] = doc(collection(this.firestore, 'journeyproductpurchase')).id
-        var additionalPurchase = {
-          docid: purchase["purchaseref"],
-          journeyref: purchase["journeyref"] != null ? doc(this.firestore, "journey", purchase["journeyref"]) : null,
-          participantjourneyproductref: doc(this.firestore, "participantjourneyproduct", purchase["participantjourneyproductref"]),
-          profileid: product.profileid,
-          purchasetype: purchase["purchasetype"]
-        }
-        purchaseData = { ...purchaseData, ...additionalPurchase }
-        var additionaljourneyproductData = {
-          docid: purchase["participantjourneyproductref"],
-          journeyref: purchase["journeyref"] != null ? doc(this.firestore, "journey", purchase["journeyref"]) : null,
-          purchaseref: doc(this.firestore, "journeyproductpurchase", purchase["purchaseref"]),
-          profileid: product.profileid,
-        }
-        journeyproductData = { ...journeyproductData, ...additionaljourneyproductData }
-      }
-      console.log("journeyproductpurchase", "-----", purchaseData)
-      console.log("participantjourneyproduct", "-----", journeyproductData)
-      setDoc(doc(this.firestore, "journeyproductpurchase", purchase["purchaseref"]), purchaseData, { merge: true }).then(async() => {
-        write += 1
-        if (write == (participantPurchase.length * 2)) {
-          await this.updateDeliverySequence(participantProductList, product)
-        }
-      }).catch(err => {
-        console.log(err)
-        i = participantPurchase.length + 1
-        // this.loadingWidget?.close()
-      })
-      setDoc(doc(this.firestore, "participantjourneyproduct", purchase["participantjourneyproductref"]), journeyproductData, { merge: true }).then(async() => {
-        write += 1
-        if (write == (participantPurchase.length * 2)) {
-          await this.updateDeliverySequence(participantProductList, product)
-        }
-      }).catch(err => {
-        console.log(err)
-        i = participantPurchase.length + 1
-        // this.loadingWidget?.close()
-      })
+    });
+  }
+
+  /** Re-open the live history (used by the post-submit "view history" link). */
+  loadHistory(_reset = false) {
+    this.startHistory();
+  }
+
+  /** Grow the live window by one page. */
+  loadMore() {
+    this.historyLimit += HISTORY_PAGE_SIZE;
+    this.startHistory();
+  }
+
+  /** Manual retry: re-arm the flag. The CF re-fires and drains `failures`. */
+  async retry(job: BulkJobDoc) {
+    await updateDoc(doc(this.firestore, BULK_JOBS_COLLECTION, job.docid), { retry: true });
+    job.retry = true; // optimistic — disables the button until the CF re-runs
+  }
+
+  /** Clear a dead claim (crashed run) so the job can run again. */
+  async reset(job: BulkJobDoc) {
+    await updateDoc(doc(this.firestore, BULK_JOBS_COLLECTION, job.docid), {
+      processing: false,
+      retry: true,
+    });
+    job.processing = false;
+    job.retry = true;
+  }
+
+  // --- template helpers ---
+  statusOf(job: BulkJobDoc): 'queued' | 'running' | 'done' | 'attention' | 'stuck' {
+    if (this.isStuck(job)) return 'stuck';
+    if (job.processing) return 'running';
+    if (job.retry) return 'queued';
+    return (job.failures?.length ?? 0) > 0 ? 'attention' : 'done';
+  }
+  /** Retry is offered only when there is something to retry and nothing is running. */
+  canRetry(job: BulkJobDoc): boolean {
+    return (job.failures?.length ?? 0) > 0 && !job.retry && !job.processing;
+  }
+  /** A job is "stuck" when a claim is held but older than the stale threshold. */
+  isStuck(job: BulkJobDoc): boolean {
+    if (!job.processing || !job.claimedAt) return false;
+    const claimedMs = typeof job.claimedAt?.toMillis === 'function' ? job.claimedAt.toMillis() : 0;
+    return claimedMs > 0 && Date.now() - claimedMs > STALE_CLAIM_MS;
+  }
+  productName(id: string): string {
+    const p = this.productsList.find((x) => x.id === id);
+    return p?.product ?? id;
+  }
+  packageName(id: string | null): string {
+    if (!id) return '—';
+    const p = this.allpackageList.find((x) => x.docid === id);
+    return p?.package ?? id;
+  }
+  createdLabel(job: BulkJobDoc): string {
+    const ts = job.createdat;
+    const d = ts && typeof ts.toDate === 'function' ? ts.toDate() : ts ? new Date(ts) : null;
+    if (!d) return '';
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+  /** Open the participant list for a job in its own overlay dialog (not an inline panel). */
+  async openParticipants(job: BulkJobDoc) {
+    // Resolve participant metadata for this job's ids at display time.
+    const ids = [
+      ...(job.success || []),
+      ...(job.failures || []).map((f) => f.profileid),
+    ].filter((id) => id && !this.metaCache.has(id));
+    if (ids.length) {
+      const m = await this.getMeta(ids);
+      m.forEach((v, k) => this.metaCache.set(k, v));
     }
+    this.dialog.open(this.participantsTpl, {
+      data: job,
+      panelClass: 'bap-overlay',
+      width: '560px',
+      maxHeight: '82vh',
+      autoFocus: false,
+    });
   }
 
-  async updateDeliverySequence(participantProductList, product) {
-    console.log("done")
-    await this.guard.updateDeliverySequence(product.profileid, participantProductList).catch(err => {
-      console.log(err)
-    })
+  /** Render helpers. `success` entries are plain profileid strings; `failures` are {profileid, reason}. */
+  pId(p: any): string {
+    return p && typeof p === 'object' ? p.profileid : p;
+  }
+  metaOf(p: any): ParticipantMeta {
+    return this.metaCache.get(this.pId(p)) || {};
+  }
+  pName(p: any): string {
+    return this.metaOf(p).name || this.pId(p) || '';
+  }
+  reasonOf(p: any): string {
+    // Every entry in the failures list is a failure; show the specific reason when the doc has one
+    // (current CF stores {profileid, reason}), else a generic tag for older/lean data.
+    if (p && typeof p === 'object') return p.reason || p.error || 'failed';
+    return 'failed';
   }
 
+  /** Failures grouped by reason, so the participants modal can show one section per reason. */
+  failureGroups(job: BulkJobDoc): { reason: string; items: any[] }[] {
+    const map = new Map<string, any[]>();
+    for (const p of job.failures || []) {
+      const r = this.reasonOf(p);
+      if (!map.has(r)) map.set(r, []);
+      map.get(r)!.push(p);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([reason, items]) => ({ reason, items }));
+  }
+  creatorLabel(job: BulkJobDoc): string {
+    return this.metaCache.get(job.createdby)?.name || job.createdby || '—';
+  }
+  donePct(job: BulkJobDoc): number {
+    const total = job.totalcount || (job.success?.length ?? 0) + (job.failures?.length ?? 0);
+    if (!total) return 0;
+    return Math.round(((job.success?.length ?? 0) / total) * 100);
+  }
+  trackByDocid(_i: number, job: BulkJobDoc) {
+    return job.docid;
+  }
+  trackByProfile(_i: number, r: any) {
+    return r && typeof r === 'object' ? r.profileid : r;
+  }
+
+  // --- Firestore access (formerly BulkProductJobService) -----------------
+
+  /** Split `items` into contiguous chunks of at most `size`. */
+  private chunkArr<T>(items: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+    return out;
+  }
+
+  /**
+   * Create one job doc per chunk of `CHUNK_SIZE` participants, all sharing a `batchId`.
+   * Each doc is created `retry:true` — the "please process me" signal + refire guard the CF clears.
+   */
+  private async createJobs(params: {
+    participants: BulkJobParticipant[];
+    productref: string;
+    packageref: string | null;
+    minimumpayment: number | null;
+    description: string;
+    createdby: string;
+  }): Promise<{ batchId: string; jobIds: string[] }> {
+    const col = collection(this.firestore, BULK_JOBS_COLLECTION);
+    const batchId = doc(col).id;
+    const jobIds: string[] = [];
+    await Promise.all(
+      this.chunkArr(params.participants, CHUNK_SIZE).map((chunkParticipants) => {
+        const jobRef = doc(col);
+        const payload: BulkJobDoc = {
+          docid: jobRef.id,
+          batchId,
+          createdat: serverTimestamp(),
+          createdby: params.createdby,
+          description: params.description,
+          productref: params.productref,
+          packageref: params.packageref,
+          minimumpayment: params.minimumpayment,
+          profiles: chunkParticipants.map((p) => p.profileid),
+          retry: true,
+          processing: false,
+          claimedAt: null,
+          success: [],
+          failures: [],
+          totalcount: chunkParticipants.length,
+        };
+        jobIds.push(jobRef.id);
+        return setDoc(jobRef, payload as any);
+      })
+    );
+    return { batchId, jobIds };
+  }
+
+  /** Live updates for the chunks of one submit (drives the post-submit toast/badge). */
+  private watchBatch(batchId: string, cb: (jobs: BulkJobDoc[]) => void): () => void {
+    const q = query(collection(this.firestore, BULK_JOBS_COLLECTION), where('batchId', '==', batchId));
+    return onSnapshot(q, (snap) => cb(snap.docs.map((d) => d.data() as BulkJobDoc)));
+  }
+
+  /** Live history: newest first, up to `pageLimit`. Callback re-fires on any change. */
+  private watchJobs(
+    pageLimit: number,
+    cb: (jobs: BulkJobDoc[], reachedEnd: boolean) => void
+  ): () => void {
+    const q = query(
+      collection(this.firestore, BULK_JOBS_COLLECTION),
+      orderBy('createdat', 'desc'),
+      limit(pageLimit)
+    );
+    return onSnapshot(q, (snap) => cb(snap.docs.map((d) => d.data() as BulkJobDoc), snap.size < pageLimit));
+  }
+
+  /**
+   * Resolve profileids → participant metadata from `participant metadata` (docid = profileid),
+   * at DISPLAY time (the job doc stores only ids). Batched by 30 (Firestore `in` limit).
+   */
+  private async getMeta(ids: string[]): Promise<Map<string, ParticipantMeta>> {
+    const map = new Map<string, ParticipantMeta>();
+    const uniq = Array.from(new Set(ids.filter(Boolean)));
+    for (let i = 0; i < uniq.length; i += 30) {
+      const batch = uniq.slice(i, i + 30);
+      try {
+        const snap = await getDocs(
+          query(collection(this.firestore, 'participant metadata'), where(documentId(), 'in', batch))
+        );
+        snap.docs.forEach((d) => {
+          const m = d.data() as any;
+          map.set(d.id, {
+            name: m?.name ?? null,
+            email: m?.email ?? null,
+            phonenumber: m?.phonenumber ?? m?.number ?? null,
+            countrycode: m?.countrycode ?? null,
+            participantmode: m?.participantmode ?? null,
+            customerstatus: m?.customerstatus ?? null,
+          });
+        });
+      } catch (e) {
+        console.warn('getMeta batch failed', e);
+      }
+    }
+    return map;
+  }
 }

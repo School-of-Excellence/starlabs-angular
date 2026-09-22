@@ -1,54 +1,218 @@
-<div class="bulk-products-container">
-    <!-- Dialog Header -->
-    <div class="dialog-header">
-        <h2 class="dialog-title">Bulk Add Products</h2>
-        <button mat-icon-button class="close-button" (click)="dialogRef.close()">
+<div class="bap-dialog">
+    <!-- Header -->
+    <header class="bap-head">
+        <div class="bap-head-text">
+            <span class="bap-eyebrow">Participant operations</span>
+            <h2 class="bap-title">Bulk Add Products</h2>
+        </div>
+        <button class="bap-close" (click)="dialogRef.close()" data-testid="bap-header-close" aria-label="Close">
             <mat-icon>close</mat-icon>
         </button>
-    </div>
+    </header>
 
-    <mat-form-field class="product-select-field" appearance="outline">
-        <mat-label>Select Product</mat-label>
-        <mat-select [(ngModel)]="selectedProduct" (selectionChange)="addProduct()">
-            <mat-option *ngFor="let product of productsList" [value]="product.id">
-                {{product.product}}
-            </mat-option>
-        </mat-select>
-    </mat-form-field>
+    <!-- Tabs -->
+    <nav class="bap-tabs" role="tablist">
+        <button class="bap-tab" [class.is-active]="tab === 0" [class.is-disabled]="addDisabled"
+            [disabled]="addDisabled" (click)="setTab(0)" role="tab"
+            [title]="addDisabled ? 'Select at least one participant to add products' : ''">
+            <mat-icon>add_shopping_cart</mat-icon> Add products
+        </button>
+        <button class="bap-tab" [class.is-active]="tab === 1" (click)="setTab(1)" role="tab">
+            <mat-icon>history</mat-icon> History
+        </button>
+    </nav>
 
-    <div *ngIf="selectedProduct != null" class="products-form-section">
-        <div [formGroup]="productForm" class="form-container">
-            <div formArrayName="products" class="products-array">
-                <div *ngFor="let productsGroup of productsArray.controls; let i = index" 
-                     [formGroupName]="i" 
-                     class="product-item">
-                    <div class="product-fields">
-                        <p>{{i+1}}. </p>
-                        <mat-form-field class="name-field" appearance="outline">
-                            <mat-label>Name</mat-label>
-                            <input matInput formControlName="name" readonly>
-                        </mat-form-field>
-                        <mat-form-field class="package-field" appearance="outline">
-                            <mat-label>Package</mat-label>
-                            <mat-select formControlName="packageref">
-                                <mat-option *ngFor="let option of allpackageList" [value]="option.docid">
-                                    {{option.package}}
-                                </mat-option>
-                            </mat-select>
-                        </mat-form-field>
-                        <mat-form-field class="payment-field" appearance="outline">
-                            <mat-label>Minimum Payment</mat-label>
-                            <input matInput type="number" formControlName="minimumpayment" autocomplete="off">
-                        </mat-form-field>
+    <!-- ============ TAB 1: ADD ============ -->
+    <section *ngIf="tab === 0" class="bap-panel" data-testid="bap-add-panel">
+        <div class="bap-panel-scroll">
+            <div class="bap-count-banner" data-testid="bap-add-selectedcount">
+                <span class="bap-count-num">{{ selectedCount }}</span>
+                <span class="bap-count-label">participant{{ selectedCount === 1 ? '' : 's' }} selected</span>
+                <span *ngIf="chunkCount > 1" class="bap-chip">{{ chunkCount }} background batches</span>
+            </div>
+
+            <div class="bap-people" data-testid="bap-add-participants">
+                <span class="bap-people-chip" *ngFor="let p of participants; trackBy: trackByProfile">
+                    {{ p.name || p.profileid }}
+                </span>
+            </div>
+
+            <form [formGroup]="form" class="bap-form">
+                <div class="bap-field bap-field-wide">
+                    <label>Product</label>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                        <mat-select [(ngModel)]="selectedProduct" [ngModelOptions]="{ standalone: true }"
+                            (selectionChange)="onProductChange()" placeholder="Choose a product"
+                            data-testid="bap-add-product-select">
+                            <mat-option>
+                                <ngx-mat-select-search [(ngModel)]="productFilter" [ngModelOptions]="{ standalone: true }"
+                                    [placeholderLabel]="'Search products'"
+                                    [noEntriesFoundLabel]="'No matching products'" ngDefaultControl></ngx-mat-select-search>
+                            </mat-option>
+                            <mat-option *ngFor="let product of filteredProducts()" [value]="product.id">{{ product.product }}</mat-option>
+                        </mat-select>
+                    </mat-form-field>
+                </div>
+
+                <div class="bap-field">
+                    <label>Package</label>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                        <mat-select formControlName="packageref" placeholder="Select package"
+                            data-testid="bap-add-package-select">
+                            <mat-option *ngFor="let option of allpackageList" [value]="option.docid">{{ option.package }}</mat-option>
+                        </mat-select>
+                    </mat-form-field>
+                </div>
+
+                <div class="bap-field">
+                    <label>Minimum payment</label>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                        <input matInput type="number" formControlName="minimumpayment" autocomplete="off" placeholder="0"
+                            data-testid="bap-add-minimumpayment-input">
+                    </mat-form-field>
+                </div>
+
+                <div class="bap-field bap-field-wide">
+                    <label>Why are you adding this product? <span class="bap-req">required</span></label>
+                    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                        <textarea matInput formControlName="description" rows="2"
+                            placeholder="A short note the team will see in history (min 10 characters)"
+                            data-testid="bap-add-description-input"></textarea>
+                        <mat-error *ngIf="form.get('description')?.hasError('minlength')">
+                            Please give a bit more detail (min 10 characters).
+                        </mat-error>
+                    </mat-form-field>
+                </div>
+            </form>
+
+            <div *ngIf="batchProgress" class="bap-progress" data-testid="bap-add-progress">
+                <div class="bap-progress-bar">
+                    <span class="bap-progress-fill"
+                        [style.width.%]="lastBatch?.total ? (batchProgress.success + batchProgress.failures) / lastBatch!.total * 100 : 0"></span>
+                </div>
+                <p>
+                    <strong>{{ batchProgress.success }}</strong> added ·
+                    <strong>{{ batchProgress.failures }}</strong> need attention
+                    of {{ lastBatch?.total }}
+                    <a (click)="setTab(1)" class="bap-link" data-testid="bap-add-viewhistory">View history →</a>
+                </p>
+            </div>
+        </div>
+
+        <footer class="bap-actions">
+            <button class="bap-btn bap-btn-primary" [disabled]="!canSubmit" (click)="submit()"
+                data-testid="bap-add-submit">
+                <mat-spinner *ngIf="submitting" diameter="16"></mat-spinner>
+                <span>{{ submitting ? 'Queuing…' : 'Add to ' + selectedCount + ' participant' + (selectedCount === 1 ? '' : 's') }}</span>
+            </button>
+        </footer>
+    </section>
+
+    <!-- ============ TAB 2: HISTORY ============ -->
+    <section *ngIf="tab === 1" class="bap-panel" data-testid="bap-history-panel">
+        <div class="bap-panel-scroll">
+            <div *ngIf="!historyLoading && jobs.length === 0" class="bap-empty" data-testid="bap-history-empty">
+                <mat-icon>inbox</mat-icon>
+                <p>No bulk product jobs yet.</p>
+            </div>
+
+            <div class="bap-jobs">
+                <article *ngFor="let job of jobs; trackBy: trackByDocid" class="bap-job" data-testid="bap-history-row">
+                    <div class="bap-job-head">
+                        <span class="bap-badge bap-badge-{{ statusOf(job) }}" data-testid="bap-history-status">
+                            {{ statusOf(job) }}
+                        </span>
+                        <div class="bap-job-title">
+                            <strong>{{ productName(job.productref) }}</strong>
+                            <span class="bap-job-desc">{{ job.description }}</span>
+                        </div>
+                        <span class="bap-job-time">{{ createdLabel(job) }}</span>
                     </div>
+
+                    <div class="bap-job-row">
+                        <div class="bap-job-meta">
+                            <span><em>By</em> {{ creatorLabel(job) }}</span>
+                            <span><em>Pkg</em> {{ packageName(job.packageref) }}</span>
+                            <span class="bap-counts" data-testid="bap-history-counts">
+                                <b class="bap-count-ok-txt">{{ job.success?.length || 0 }}</b> added ·
+                                <b class="bap-count-fail-txt" [class.zero]="!(job.failures?.length)">{{ job.failures?.length || 0 }}</b> failed
+                                / {{ job.totalcount || 0 }}
+                            </span>
+                        </div>
+                        <div class="bap-job-actions">
+                            <button class="bap-expand-link" (click)="openParticipants(job)">View participants</button>
+                            <button *ngIf="canRetry(job)" class="bap-btn bap-btn-warn bap-btn-sm" (click)="retry(job)"
+                                data-testid="bap-history-retry">
+                                <mat-icon>refresh</mat-icon> Retry {{ job.failures.length }}
+                            </button>
+                            <button *ngIf="isStuck(job)" class="bap-btn bap-btn-ghost bap-btn-sm" (click)="reset(job)"
+                                data-testid="bap-history-reset">
+                                <mat-icon>lock_reset</mat-icon> Reset
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <footer class="bap-history-foot">
+            <mat-spinner *ngIf="historyLoading" diameter="22"></mat-spinner>
+            <button *ngIf="!historyDone && !historyLoading && jobs.length > 0" class="bap-btn bap-btn-ghost"
+                (click)="loadMore()" data-testid="bap-history-loadmore">Load more</button>
+        </footer>
+    </section>
+</div>
+
+<!-- Participants overlay dialog (opened from a History card) -->
+<ng-template #bapParticipantsTpl let-job>
+    <div class="bap-dialog">
+        <header class="bap-head">
+            <div class="bap-head-text">
+                <span class="bap-eyebrow">{{ productName(job.productref) }}</span>
+                <h2 class="bap-title">Participants</h2>
+            </div>
+            <button class="bap-close" matDialogClose aria-label="Close"><mat-icon>close</mat-icon></button>
+        </header>
+        <div class="bap-panel">
+            <div class="bap-panel-scroll" data-testid="bap-participants-list">
+                <div *ngIf="job.failures?.length" class="bap-detail-group">
+                    <h4 class="bap-detail-title bap-detail-fail">Needs attention ({{ job.failures.length }})</h4>
+                    <div class="bap-reason-group" *ngFor="let g of failureGroups(job)">
+                        <div class="bap-reason-head">
+                            <span class="bap-reason">{{ g.reason }}</span>
+                            <span class="bap-reason-count">{{ g.items.length }}</span>
+                        </div>
+                        <div class="bap-person" *ngFor="let p of g.items; trackBy: trackByProfile">
+                            <ng-container *ngIf="metaOf(p) as m">
+                                <div class="bap-person-main"><strong>{{ pName(p) }}</strong></div>
+                                <div class="bap-person-meta">
+                                    <span *ngIf="m.email">{{ m.email }}</span>
+                                    <span *ngIf="m.phonenumber">{{ m.countrycode }} {{ m.phonenumber }}</span>
+                                    <span *ngIf="m.participantmode" class="bap-tag">{{ m.participantmode }}</span>
+                                    <span *ngIf="m.customerstatus" class="bap-tag">{{ m.customerstatus }}</span>
+                                </div>
+                            </ng-container>
+                        </div>
+                    </div>
+                </div>
+                <div *ngIf="job.success?.length" class="bap-detail-group">
+                    <h4 class="bap-detail-title bap-detail-ok">Added ({{ job.success.length }})</h4>
+                    <div class="bap-person" *ngFor="let p of job.success; trackBy: trackByProfile">
+                        <ng-container *ngIf="metaOf(p) as m">
+                            <div class="bap-person-main"><strong>{{ pName(p) }}</strong></div>
+                            <div class="bap-person-meta">
+                                <span *ngIf="m.email">{{ m.email }}</span>
+                                <span *ngIf="m.phonenumber">{{ m.countrycode }} {{ m.phonenumber }}</span>
+                                <span *ngIf="m.participantmode" class="bap-tag">{{ m.participantmode }}</span>
+                                <span *ngIf="m.customerstatus" class="bap-tag">{{ m.customerstatus }}</span>
+                            </div>
+                        </ng-container>
+                    </div>
+                </div>
+                <div *ngIf="!job.success?.length && !job.failures?.length" class="bap-empty">
+                    <p>No participant records on this job.</p>
                 </div>
             </div>
         </div>
     </div>
-    <div class="form-actions">
-        <button mat-stroked-button color="primary" [disabled]="!productForm.valid"
-            (click)="updateProduct(productForm.value)">
-            SUBMIT
-        </button>
-    </div>
-</div>
+</ng-template>

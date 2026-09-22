@@ -33,7 +33,7 @@
       <!-- <button mat-menu-item (click)="sendWatiMessage()" [disabled]="selection.selected.length === 0">Send Wati Messages</button> -->
       <button mat-menu-item data-testid="pa-act-wati-config" (click)="openWatiConfig()">Wati Configuration</button>
       <button mat-menu-item data-testid="pa-act-add-remarks" (click)="addremarks(selection.selected)" [disabled]="selection.selected.length === 0">Add Remarks</button>
-      <button mat-menu-item data-testid="pa-act-add-products" (click)="bulkAddProducts()" [disabled]="selection.selected.length === 0">Add Products</button>
+      <button mat-menu-item data-testid="pa-act-add-products" (click)="bulkAddProducts()">Add Products</button>
       <button mat-menu-item data-testid="pa-act-tags" (click)="tagParticipants()">Tags</button>
       <!-- <button mat-menu-item (click)="addSegments()">Create Segments</button> -->
       <button mat-menu-item data-testid="pa-act-communication" mat-menu-item [mat-menu-trigger-for]="communication">Send Communication</button>
