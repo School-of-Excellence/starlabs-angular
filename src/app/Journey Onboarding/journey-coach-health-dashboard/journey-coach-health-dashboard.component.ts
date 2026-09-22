@@ -124,7 +124,7 @@ type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged
 
 /** One completed JC: an `appointments` doc with journeycoach == true AND attended == true.
  *  `coachId` is the first entry of the doc's `hosts[]` — the coach who ran the session. */
-interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; }
+interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; onboarding?: boolean; }
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -1032,7 +1032,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
         if (data['attended'] !== true) {
           // booked and live: future = pending, past = overdue (the slot passed unattended).
-          pending.push({ profileid: pid, coachId: host, ms: dt.getTime() });
+          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: data['onboarding'] === true });
           return;
         }
         // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
@@ -1167,24 +1167,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     return { today, week, month, ready };
   });
 
-  // ---- "Coming up": scheduled / overdue JCs (booked journey-coach appointments not yet attended) ----
-  /** Which window the Coming-up list shows. */
-  comingWindow = signal<'today' | 'week' | 'overdue'>('today');
-  setComingWindow(w: 'today' | 'week' | 'overdue'): void { this.comingWindow.set(w); }
-
-  /** Date span each Coming-up tile covers, for the small caption under the number. */
-  comingRange(w: 'today' | 'week'): { from: Date; to: Date } {
-    const now = new Date();
-    const dayMs = 86400000;
-    if (w === 'today') return { from: this.startOfDay(now), to: this.endOfDay(now) };
-    const endToday = this.endOfDay(now).getTime();
-    return { from: new Date(endToday + 1000), to: new Date(endToday + 7 * dayMs) };
-  }
-
-  /** Scheduled JC sessions for the current scope, from jcPendingEvents (booked, not cancelled, not
-   *  attended). Today = still to come today; next 7 days = the week after today; overdue = the slot's
-   *  time passed and it was never marked attended. Same scope + readiness as the JC pipeline. */
-  jcScheduled = computed<{ today: number; week: number; overdue: number; ready: boolean }>(() => {
+  // ---- Schedule (doc item 1): Journey Coaching vs Onboarding, shown as two SEPARATE schedules ----
+  //  Source = jcPendingEvents (booked journey-coach appointments not yet attended). Each pending
+  //  event carries an `onboarding` flag (set in loadContactEvents) so the same array partitions into
+  //  the two schedules with no extra read. Scope + readiness match the JC pipeline (rosterIds /
+  //  contactDataLoaded). Replaces the old single "Coming up" card.
+  /** Today / next-7-days / overdue counts for one schedule (JC when onboarding=false, else Onboarding). */
+  private schedCounts(onboarding: boolean): { today: number; week: number; overdue: number; ready: boolean } {
     const ready = this.contactDataLoaded();
     const now = Date.now();
     const endToday = this.endOfDay(new Date()).getTime();
@@ -1192,31 +1181,37 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const inScope = new Set(this.rosterIds());
     let today = 0, week = 0, overdue = 0;
     for (const e of this.jcPendingEvents()) {
+      if ((e.onboarding === true) !== onboarding) continue;   // JC vs Onboarding partition
       if (!inScope.has(e.profileid)) continue;
-      if (e.ms < now) { overdue++; continue; }   // slot passed, never marked attended
+      if (e.ms < now) { overdue++; continue; }                // slot passed, never marked attended
       if (e.ms <= endToday) today++;
       else if (e.ms <= week7) week++;
     }
     return { today, week, overdue, ready };
-  });
+  }
+  jcSchedCounts = computed(() => this.schedCounts(false));
+  obSchedCounts = computed(() => this.schedCounts(true));
 
-  /** The sessions behind the selected Coming-up tile — participant + host coach + when. */
-  jcScheduledList = computed<{ profileid: string; participant: string; coach: string; date: Date }[]>(() => {
-    const now = Date.now();
-    const endToday = this.endOfDay(new Date()).getTime();
-    const week7 = endToday + 7 * 86400000;
-    const w = this.comingWindow();
+  /** One schedule's booked sessions grouped by day (overdue days first, then today, then the next 7
+   *  days — same horizon as the tiles). Each row = participant + host coach + time. */
+  private schedList(onboarding: boolean): { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }[] {
+    const todayStart = this.startOfDay(new Date()).getTime();
+    const week7 = this.endOfDay(new Date()).getTime() + 7 * 86400000;
     const inScope = new Set(this.rosterIds());
-    return this.jcPendingEvents()
-      .filter(e => {
-        if (!inScope.has(e.profileid)) return false;
-        if (w === 'overdue') return e.ms < now;
-        if (w === 'today') return e.ms >= now && e.ms <= endToday;
-        return e.ms > endToday && e.ms <= week7;   // next 7 days
-      })
-      .sort((a, b) => a.ms - b.ms)
-      .map(e => ({ profileid: e.profileid, participant: this.nameOf(e.profileid), coach: this.jcCoachName(e.coachId), date: new Date(e.ms) }));
-  });
+    const rows = this.jcPendingEvents()
+      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && e.ms <= week7)
+      .sort((a, b) => a.ms - b.ms);
+    const groups = new Map<number, { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }>();
+    for (const e of rows) {
+      const dayKey = this.startOfDay(new Date(e.ms)).getTime();
+      let g = groups.get(dayKey);
+      if (!g) { g = { day: new Date(dayKey), overdue: dayKey < todayStart, items: [] }; groups.set(dayKey, g); }
+      g.items.push({ profileid: e.profileid, participant: this.nameOf(e.profileid), coach: this.jcCoachName(e.coachId), date: new Date(e.ms) });
+    }
+    return [...groups.values()].sort((a, b) => a.day.getTime() - b.day.getTime());
+  }
+  jcSchedList = computed(() => this.schedList(false));
+  obSchedList = computed(() => this.schedList(true));
 
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);

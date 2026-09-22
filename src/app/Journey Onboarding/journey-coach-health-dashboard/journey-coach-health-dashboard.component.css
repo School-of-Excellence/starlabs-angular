@@ -3079,6 +3079,18 @@ td.mat-mdc-cell span {
 /* JC pipeline card (doc item 8) — completed journey coaches, today / last week / last month. */
 .jc-pipeline { margin-bottom: 12px; }
 .jc-coming { margin-bottom: 12px; }
+/* Schedule (doc item 1): two side-by-side JC / Onboarding schedules */
+.jc-schedule { margin-bottom: 12px; }
+.jcs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.jcs-col { min-width: 0; }
+.jc-schedule .jcp-tile { cursor: default; }
+.jcs-colhead { display: flex; align-items: center; margin: 2px 0 8px; }
+.jcs-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 7px; }
+.jcs-tag-jc { background: rgba(0,122,255,0.12); color: #0060df; }
+.jcs-tag-ob { background: rgba(120,120,128,0.14); color: #6c6c70; }
+.jcs-day { display: flex; align-items: center; gap: 8px; padding: 10px 4px 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8e8e93; }
+.jcs-day.is-overdue { color: #d70015; }
+@media (max-width: 720px) { .jcs-cols { grid-template-columns: 1fr; } }
 .jcp-tile.jcp-overdue .jcp-num { color: #d70015; }
 .jcp-tile.jcp-overdue.is-on { box-shadow: inset 0 0 0 2px #d70015; }
 .jcp-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-top: 10px; }

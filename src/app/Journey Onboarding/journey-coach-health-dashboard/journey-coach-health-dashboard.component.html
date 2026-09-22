@@ -190,49 +190,58 @@
         </button>
       </div>
 
-      <!-- Coming up: scheduled / overdue JC sessions = booked journey-coach appointments not yet
-           attended, scoped to the current view. Mirrors the JC pipeline (same source + readiness). -->
-      <section class="ios2-card jc-coming">
+      <!-- Schedule (doc item 1): Journey Coaching and Onboarding as two SEPARATE booked schedules,
+           scoped to the current view. Source = pending journey-coach appointments (onboarding flag).
+           Replaces the old single "Coming up" card. -->
+      <section class="ios2-card jc-schedule">
         <div class="ios2-head">
           <span class="ios2-app ap-blue"><mat-icon>event_upcoming</mat-icon></span>
-          <span class="ios2-title">Coming up</span>
-          <span class="fb-hint" *ngIf="!jcScheduled().ready">loading…</span>
+          <span class="ios2-title">Schedule</span>
+          <span class="fb-hint" *ngIf="!jcSchedCounts().ready">loading…</span>
         </div>
-        <div class="jcp-row">
-          <button type="button" class="jcp-tile" [class.is-on]="comingWindow()==='today'" (click)="setComingWindow('today')"
-                  matTooltip="Booked JC sessions still to come today">
-            <span class="jcp-num">{{ jcScheduled().today }}</span>
-            <span class="jcp-label">Scheduled today</span>
-            <span class="jcp-range">{{ comingRange('today').from | date:'d MMM' }}</span>
-          </button>
-          <button type="button" class="jcp-tile" [class.is-on]="comingWindow()==='week'" (click)="setComingWindow('week')"
-                  matTooltip="Booked over the next 7 days">
-            <span class="jcp-num">{{ jcScheduled().week }}</span>
-            <span class="jcp-label">Next 7 days</span>
-            <span class="jcp-range">{{ comingRange('week').from | date:'d MMM' }} – {{ comingRange('week').to | date:'d MMM' }}</span>
-          </button>
-          <button type="button" class="jcp-tile jcp-overdue" [class.is-on]="comingWindow()==='overdue'" (click)="setComingWindow('overdue')"
-                  matTooltip="Slot passed but never marked attended">
-            <span class="jcp-num">{{ jcScheduled().overdue }}</span>
-            <span class="jcp-label">Overdue</span>
-            <span class="jcp-range">not marked done</span>
-          </button>
-        </div>
+        <div class="jcs-cols">
 
-        <div class="jcp-list" *ngIf="jcScheduledList().length; else noComing">
-          <div class="jcp-item" *ngFor="let s of jcScheduledList()" (click)="openJcParticipant(s.profileid)"
-               matTooltip="Open participant">
-            <span class="ios-avatar av-xs" [ngClass]="avatarClass(s.profileid)">{{ initials(s.participant) }}</span>
-            <span class="jcp-who">
-              <span class="jcp-p">{{ s.participant }}</span>
-              <span class="jcp-c">with {{ s.coach }}</span>
-            </span>
-            <span class="jcp-when">{{ s.date | date:'d MMM y, h:mm a' }}</span>
+          <div class="jcs-col">
+            <div class="jcs-colhead"><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></div>
+            <div class="jcp-row">
+              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
+              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
+              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+            </div>
+            <div class="jcp-list" *ngIf="jcSchedList().length; else noJcSched">
+              <ng-container *ngFor="let g of jcSchedList()">
+                <div class="jcs-day" [class.is-overdue]="g.overdue"><span *ngIf="g.overdue">Overdue · </span>{{ g.day | date:'EEE d MMM' }}</div>
+                <div class="jcp-item" *ngFor="let s of g.items" (click)="openJcParticipant(s.profileid)" matTooltip="Open participant">
+                  <span class="ios-avatar av-xs" [ngClass]="avatarClass(s.profileid)">{{ initials(s.participant) }}</span>
+                  <span class="jcp-who"><span class="jcp-p">{{ s.participant }}</span><span class="jcp-c">with {{ s.coach }}</span></span>
+                  <span class="jcp-when">{{ s.date | date:'h:mm a' }}</span>
+                </div>
+              </ng-container>
+            </div>
+            <ng-template #noJcSched><p class="ios2-empty" *ngIf="jcSchedCounts().ready">Nothing scheduled.</p></ng-template>
           </div>
+
+          <div class="jcs-col">
+            <div class="jcs-colhead"><span class="jcs-tag jcs-tag-ob">Onboarding</span></div>
+            <div class="jcp-row">
+              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
+              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
+              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+            </div>
+            <div class="jcp-list" *ngIf="obSchedList().length; else noObSched">
+              <ng-container *ngFor="let g of obSchedList()">
+                <div class="jcs-day" [class.is-overdue]="g.overdue"><span *ngIf="g.overdue">Overdue · </span>{{ g.day | date:'EEE d MMM' }}</div>
+                <div class="jcp-item" *ngFor="let s of g.items" (click)="openJcParticipant(s.profileid)" matTooltip="Open participant">
+                  <span class="ios-avatar av-xs" [ngClass]="avatarClass(s.profileid)">{{ initials(s.participant) }}</span>
+                  <span class="jcp-who"><span class="jcp-p">{{ s.participant }}</span><span class="jcp-c">with {{ s.coach }}</span></span>
+                  <span class="jcp-when">{{ s.date | date:'h:mm a' }}</span>
+                </div>
+              </ng-container>
+            </div>
+            <ng-template #noObSched><p class="ios2-empty" *ngIf="obSchedCounts().ready">Nothing scheduled.</p></ng-template>
+          </div>
+
         </div>
-        <ng-template #noComing>
-          <p class="ios2-empty" *ngIf="jcScheduled().ready">{{ comingWindow()==='overdue' ? 'No overdue JCs.' : 'Nothing scheduled in this window.' }}</p>
-        </ng-template>
       </section>
 
       <!-- JC pipeline (doc item 8): completed JCs = attended journey-coach appointments, scoped to
