@@ -1,4 +1,4 @@
-<div class="jchd-wrap" [ngClass]="'jchd-view-' + view">
+<div class="jchd-wrap" [ngClass]="'jchd-view-' + view" [attr.data-theme]="theme">
 
   <header class="jchd-header">
     <div class="header-left">
@@ -15,6 +15,11 @@
         <mat-button-toggle value="base">Participants</mat-button-toggle>
         <mat-button-toggle value="scoreboard">Coaches</mat-button-toggle>
       </mat-button-toggle-group>
+
+      <button type="button" class="jchd-theme-toggle" (click)="toggleTheme()"
+        [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
+        <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
 
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
@@ -146,7 +151,7 @@
         </section>
       </div>
 
-      <!-- Row 2: six KPI tiles -->
+      <!-- Row 2: eight KPI tiles (finance: Payments locked · Defaulted · Missed) -->
       <div class="ios2-tiles">
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('goingQuiet')">
           <span class="ios2-app ap-orange"><mat-icon>notifications_paused</mat-icon></span>
@@ -155,6 +160,14 @@
         <button type="button" class="ios2-tile" (click)="goToPaymentsLocked()">
           <span class="ios2-app ap-red"><mat-icon>lock</mat-icon></span>
           <span class="ios2-n">{{ summary.paymentsLocked }}</span><span class="ios2-l">Payments locked</span>
+        </button>
+        <button type="button" class="ios2-tile" (click)="goToDefaulted()">
+          <span class="ios2-app ap-purple"><mat-icon>money_off</mat-icon></span>
+          <span class="ios2-n">{{ summary.defaulted }}</span><span class="ios2-l">Defaulted</span>
+        </button>
+        <button type="button" class="ios2-tile" (click)="goToMissed()">
+          <span class="ios2-app ap-orange"><mat-icon>schedule</mat-icon></span>
+          <span class="ios2-n">{{ summary.missed }}</span><span class="ios2-l">Missed</span>
         </button>
         <button type="button" class="ios2-tile" (click)="goToParticipantsWithLever('renewalWindow')">
           <span class="ios2-app ap-blue"><mat-icon>autorenew</mat-icon></span>
@@ -173,6 +186,60 @@
           <span class="ios2-n">{{ unassignedCount }}</span><span class="ios2-l">Unassigned</span>
         </button>
       </div>
+
+      <!-- Schedule (doc item 1): Journey Coaching and Onboarding as two SEPARATE booked schedules,
+           scoped to the current view. Source = pending journey-coach appointments (onboarding flag).
+           Replaces the old single "Coming up" card. -->
+      <section class="ios2-card jc-schedule">
+        <div class="ios2-head">
+          <span class="ios2-app ap-blue"><mat-icon>event_upcoming</mat-icon></span>
+          <span class="ios2-title">Schedule</span>
+          <span class="fb-hint" *ngIf="!jcSchedCounts().ready">loading…</span>
+        </div>
+        <div class="jcs-cols">
+
+          <div class="jcs-col">
+            <div class="jcs-colhead"><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></div>
+            <div class="jcp-row">
+              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
+              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
+              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+            </div>
+            <div class="jcp-list" *ngIf="jcSchedList().length; else noJcSched">
+              <ng-container *ngFor="let g of jcSchedList()">
+                <div class="jcs-day" [class.is-overdue]="g.overdue"><span *ngIf="g.overdue">Overdue · </span>{{ g.day | date:'EEE d MMM' }}</div>
+                <div class="jcp-item" *ngFor="let s of g.items" (click)="openJcParticipant(s.profileid)" matTooltip="Open participant">
+                  <span class="ios-avatar av-xs" [ngClass]="avatarClass(s.profileid)">{{ initials(s.participant) }}</span>
+                  <span class="jcp-who"><span class="jcp-p">{{ s.participant }}</span><span class="jcp-c">with {{ s.coach }}</span></span>
+                  <span class="jcp-when">{{ s.date | date:'h:mm a' }}</span>
+                </div>
+              </ng-container>
+            </div>
+            <ng-template #noJcSched><p class="ios2-empty" *ngIf="jcSchedCounts().ready">Nothing scheduled.</p></ng-template>
+          </div>
+
+          <div class="jcs-col">
+            <div class="jcs-colhead"><span class="jcs-tag jcs-tag-ob">Onboarding</span></div>
+            <div class="jcp-row">
+              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
+              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
+              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+            </div>
+            <div class="jcp-list" *ngIf="obSchedList().length; else noObSched">
+              <ng-container *ngFor="let g of obSchedList()">
+                <div class="jcs-day" [class.is-overdue]="g.overdue"><span *ngIf="g.overdue">Overdue · </span>{{ g.day | date:'EEE d MMM' }}</div>
+                <div class="jcp-item" *ngFor="let s of g.items" (click)="openJcParticipant(s.profileid)" matTooltip="Open participant">
+                  <span class="ios-avatar av-xs" [ngClass]="avatarClass(s.profileid)">{{ initials(s.participant) }}</span>
+                  <span class="jcp-who"><span class="jcp-p">{{ s.participant }}</span><span class="jcp-c">with {{ s.coach }}</span></span>
+                  <span class="jcp-when">{{ s.date | date:'h:mm a' }}</span>
+                </div>
+              </ng-container>
+            </div>
+            <ng-template #noObSched><p class="ios2-empty" *ngIf="obSchedCounts().ready">Nothing scheduled.</p></ng-template>
+          </div>
+
+        </div>
+      </section>
 
       <!-- Row 3: coach-set health + by journey -->
       <div class="ios2-bot">
@@ -519,6 +586,11 @@
                 </span>
                 <span class="cp-email" *ngIf="r.email">{{ r.email }}</span>
                 <span class="cp-id">{{ r.number || '—' }}</span>
+                <span class="cp-ah" *ngIf="r.llCritical || r.llAttention || r.llOpportunity">
+                  <span class="chip chip-bad" *ngIf="r.llCritical" matTooltip="Unresolved A&H critical tag">A&amp;H critical</span>
+                  <span class="chip chip-warn" *ngIf="r.llAttention" matTooltip="A&H needs-attention tag">A&amp;H attention</span>
+                  <span class="chip" *ngIf="r.llOpportunity" matTooltip="A&H opportunity tag">A&amp;H opportunity</span>
+                </span>
               </span>
             </span>
           </td>
@@ -622,7 +694,7 @@
                 <mat-icon *ngIf="r.coachname === c.name">check</mat-icon>
                 <span [class.assign-current]="r.coachname === c.name">{{ c.name }}</span>
               </button>
-              <button mat-menu-item class="assign-unassign" *ngIf="r.coachname && r.coachname !== '—'"
+              <button mat-menu-item class="assign-unassign" *ngIf="rowHasCoachRef(r)"
                       (click)="unassignCoach(r)">
                 <mat-icon>person_remove</mat-icon>
                 <span>Unassign (remove coach)</span>

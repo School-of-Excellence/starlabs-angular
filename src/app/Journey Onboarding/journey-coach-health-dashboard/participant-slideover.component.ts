@@ -103,6 +103,7 @@ interface ReportItem { types: string; status: string; date: Date | null; }
 interface BreakthroughItem { message: string; date: Date | null; }
 interface AelItem { status: string; date: Date | null; }
 interface CoachNoteItem { text: string; author: string; date: Date | null; }
+interface LoveNoteItem { text: string; tags: string[]; date: Date | null; }
 
 /** Composer type switch options. */
 type ComposerType = 'call' | 'health' | 'schedule' | 'note';
@@ -409,6 +410,58 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
                 {{ isShowAll('interim') ? 'Show less' : 'Show all (' + reports.length + ')' }}
               </button>
               <ng-template #noReports><p class="so-empty">No interim reports.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Recent Love Letter (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('loveletters')" (click)="toggleCollapsed('loveletters')">
+            <span>Recent Love Letter <span class="so-count" *ngIf="!loveLettersLoading">{{ loveLetters.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('loveletters')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('loveletters')">
+            <div *ngIf="loveLettersLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!loveLettersLoading">
+              <ul class="so-list" *ngIf="loveLetters.length; else noLoveLetters">
+                <li *ngFor="let x of (loveLetters | slice:0:(isShowAll('loveletters') ? loveLetters.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Love letter' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="loveLetters.length > 3" (click)="toggleShowAll('loveletters')">
+                {{ isShowAll('loveletters') ? 'Show less' : 'Show all (' + loveLetters.length + ')' }}
+              </button>
+              <ng-template #noLoveLetters><p class="so-empty">No love letters yet.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Recent Ask A&H (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('askah')" (click)="toggleCollapsed('askah')">
+            <span>Recent Ask A&amp;H <span class="so-count" *ngIf="!askAHLoading">{{ askAH.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('askah')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('askah')">
+            <div *ngIf="askAHLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!askAHLoading">
+              <ul class="so-list" *ngIf="askAH.length; else noAskAH">
+                <li *ngFor="let x of (askAH | slice:0:(isShowAll('askah') ? askAH.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Ask A&H' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="askAH.length > 3" (click)="toggleShowAll('askah')">
+                {{ isShowAll('askah') ? 'Show less' : 'Show all (' + askAH.length + ')' }}
+              </button>
+              <ng-template #noAskAH><p class="so-empty">No Ask A&amp;H entries yet.</p></ng-template>
             </ng-container>
           </div>
         </section>
@@ -934,6 +987,11 @@ export class ParticipantSlideoverComponent implements OnInit {
   formsLoading = true;
   reports: ReportItem[] = [];
   reportsLoading = true;
+  // A&H feedback (doc item 7): recent Love Letter / Ask A&H entries for this participant, with tags.
+  loveLetters: LoveNoteItem[] = [];
+  loveLettersLoading = true;
+  askAH: LoveNoteItem[] = [];
+  askAHLoading = true;
   breakthroughs: BreakthroughItem[] = [];
   breakthroughsLoading = true;
   ael: AelItem[] = [];
@@ -1006,6 +1064,8 @@ export class ParticipantSlideoverComponent implements OnInit {
     void this.loadAppointments();
     void this.loadForms();
     void this.loadReports();
+    void this.loadLoveLetters();
+    void this.loadAskAH();
     void this.loadBreakthroughs();
     void this.loadAel();
     void this.loadCoachNotes();
@@ -1191,6 +1251,55 @@ export class ParticipantSlideoverComponent implements OnInit {
       console.warn('slideover interim reports read failed', e);
     } finally {
       this.reportsLoading = false;
+    }
+  }
+
+  /** RECENT LOVE LETTER / ASK A&H (doc item 7) — the participant's own A&H feedback docs, newest
+   *  first, with their tag chips. Same one-shot getDocs pattern as the other intel sections (the
+   *  DEFAULT firestore, not the forms DB). The aggregate unresolved/non-happy tags that feed Needs
+   *  Attention are computed on the dashboard side; here we simply surface recent entries. */
+  private toLoveNote(data: any): LoveNoteItem {
+    const tags: string[] = [];
+    if (data['critical']) tags.push('critical');
+    if (data['tagged']) tags.push('needs attention');
+    if (data['opportunity']) tags.push('opportunity');
+    if (data['liked']) tags.push('happy');
+    if (data['resolved']) tags.push('resolved');
+    const text = (data['message'] ?? data['content'] ?? data['loveletter'] ?? data['letter'] ?? data['note'] ?? data['text'] ?? '').toString().trim();
+    return { text, tags, date: this.toDate(data['created']) };
+  }
+
+  private async loadLoveLetters(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'love letter'),
+        where('profileid', '==', pid),
+      ));
+      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      this.loveLetters = items.slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover love letter read failed', e);
+    } finally {
+      this.loveLettersLoading = false;
+    }
+  }
+
+  private async loadAskAH(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'ask AH'),
+        where('profileid', '==', pid),
+      ));
+      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      this.askAH = items.slice(0, this.sectionCap);
+    } catch (e) {
+      console.warn('slideover ask A&H read failed', e);
+    } finally {
+      this.askAHLoading = false;
     }
   }
 
