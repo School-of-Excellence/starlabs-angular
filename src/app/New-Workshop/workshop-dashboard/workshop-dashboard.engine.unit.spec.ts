@@ -414,12 +414,48 @@ describe('workshop-dashboard.engine', () => {
       expect(b.participantsByStatus.get('notstarted')).toEqual(['fresh']);
     });
 
-    it('counts "ready to start" as a SUBSET of "not started", not a sibling', () => {
-      // The not-started total must stay whole — it is the number a facilitator reports — while the
-      // dashboard can still highlight the ones who could start right now.
+    it('on the FIRST challenge nobody is "ready to start" — everyone not started is simply not started', () => {
+      // Nothing precedes the first challenge, so "ready" would just repeat "not started"; the overview
+      // showed the same people twice (operator, 2026-09-21).
       const b = challengeStatusBuckets(participants, wch(), 0, [wch()]);
       expect(b.participantsByStatus.get('notstarted')).toEqual(['fresh']);
-      expect(b.participantsByStatus.get('notstartedcurrent')).toEqual(['fresh']);
+      expect(b.participantsByStatus.get('notstartedcurrent')).toEqual([]);
+    });
+
+    it('on a later challenge "ready to start" and "not started" are EXCLUSIVE and add up', () => {
+      // ready: previous challenge completed; blocked: previous challenge still in progress.
+      const later = [
+        { profileid: 'ready', challenges: [ch(['completed'], 'completed'), ch([undefined])] },
+        { profileid: 'blocked', challenges: [ch(['ongoing']), ch([undefined])] },
+        { profileid: 'busy', challenges: [ch(['completed'], 'completed'), ch(['ongoing'])] },
+      ];
+      const b = challengeStatusBuckets(later, wch(), 1, [wch(), wch()]);
+      expect(b.participantsByStatus.get('notstartedcurrent')).toEqual(['ready']);
+      expect(b.participantsByStatus.get('notstarted')).toEqual(['blocked']);
+      expect(b.participantsByStatus.get('inprogress')).toEqual(['busy']);
+      const total = CHALLENGE_STATUSES.reduce((n, s) => n + (b.participantsByStatus.get(s)?.length || 0), 0);
+      expect(total).toBe(later.length);
+    });
+
+    it('sub-challenges split ready / not started the same way, and the very first step is never "ready"', () => {
+      const two = wch({ challenges: [{ name: 'a' }, { name: 'b' }] });
+      const p = [
+        { profileid: 'onB', challenges: [ch(['completed', undefined])] },   // did a → ready for b
+        { profileid: 'onA', challenges: [ch([undefined, undefined])] },     // untouched → not started on both
+      ];
+      const b = challengeStatusBuckets(p, two, 0, [two]);
+      const subA = b.subChallengeStats[0].participantsByStatus, subB = b.subChallengeStats[1].participantsByStatus;
+      expect(subA.get('notstarted')).toEqual(['onA']);
+      expect(subA.get('notstartedcurrent')).toEqual([]);                     // first step of the workshop
+      expect(subB.get('notstartedcurrent')).toEqual(['onB']);
+      expect(subB.get('notstarted')).toEqual(['onA']);                       // blocked by a, not double-counted
+    });
+
+    it('a challenge that only follows zoom calls counts as the first', () => {
+      const p = [{ profileid: 'x', challenges: [zoom(), ch([undefined])] }];
+      const b = challengeStatusBuckets(p, wch(), 1, [{ type: 'zoomcall' }, wch()]);
+      expect(b.participantsByStatus.get('notstarted')).toEqual(['x']);
+      expect(b.participantsByStatus.get('notstartedcurrent')).toEqual([]);
     });
 
     it('does NOT call a challenge completed just because every sub-challenge is', () => {
