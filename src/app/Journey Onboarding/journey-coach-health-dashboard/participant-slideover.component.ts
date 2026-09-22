@@ -3,7 +3,7 @@ import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs,
+  Firestore, collection, query, where, getDocs, orderBy, limit,
   doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -93,6 +93,9 @@ export interface SlideoverData {
   addressed: boolean;
   needsAttention: boolean;
   onMarkAddressed: (next: boolean) => void;
+  // resolved dashboard theme (the slide-over + its composer render in CDK overlays outside .jchd-wrap,
+  // so they can't inherit the dashboard's [data-theme]; used to add the dark overlay panelClass).
+  isDark?: boolean;
 }
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
@@ -741,10 +744,10 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-body::-webkit-scrollbar { width: 9px; }
     .so-body::-webkit-scrollbar-thumb {
-      background: #cdd6e3; border-radius: 999px;
+      background: var(--so-border); border-radius: 999px;
       border: 2px solid var(--so-bg); background-clip: padding-box;
     }
-    .so-body::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+    .so-body::-webkit-scrollbar-thumb:hover { background: var(--so-muted); background-clip: padding-box; }
     .so-body::-webkit-scrollbar-track { background: transparent; }
 
     .so-sec { padding: 14px 20px; border-top: 1px solid var(--so-border-soft); }
@@ -894,7 +897,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-coach-current { font-size: 13px; font-weight: 600; color: var(--so-ink); }
     .so-coach-select {
       font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink); cursor: pointer;
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink); cursor: pointer;
       max-width: 55%;
     }
 
@@ -914,7 +917,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       --so-bg: #ffffff; --so-ink: #1c1c1e; --so-ink2: rgba(60,60,67,.6); --so-muted: rgba(60,60,67,.45);
       --so-border: rgba(60,60,67,.12); --so-border-soft: rgba(60,60,67,.08);
       --so-accent: #007aff; --so-accent-soft: rgba(0,122,255,.08);
-      background: #ffffff; color: var(--so-ink); padding: 22px 24px 22px;
+      background: var(--so-bg); color: var(--so-ink); padding: 22px 24px 22px;
       font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     }
     .so-comp-top {
@@ -936,7 +939,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       transition: color .2s ease, background-color .2s ease, transform .06s ease;
     }
     .so-seg-btn.on {
-      background: #fff; color: var(--so-ink); font-weight: 600;
+      background: var(--so-bg); color: var(--so-ink); font-weight: 600;
       box-shadow: 0 3px 8px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.04);
     }
     .so-seg-btn:active { transform: scale(.97); }
@@ -959,7 +962,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-input::placeholder { color: var(--so-muted); }
     .so-input:focus {
-      outline: none; background-color: #fff; border-color: var(--so-accent);
+      outline: none; background-color: var(--so-bg); border-color: var(--so-accent);
       box-shadow: 0 0 0 3px var(--so-accent-soft);
     }
     select.so-input {
@@ -969,7 +972,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     textarea.so-input { resize: vertical; min-height: 64px; line-height: 1.4; }
     .so-state-pick { display: flex; flex-wrap: wrap; gap: 8px; }
     .so-state-opt {
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink2);
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink2);
       font: inherit; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px; cursor: pointer;
       transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
     }
@@ -1315,20 +1318,38 @@ export class ParticipantSlideoverComponent implements OnInit {
     if (data['opportunity']) tags.push('opportunity');
     if (data['liked']) tags.push('happy');
     if (data['resolved']) tags.push('resolved');
-    const text = (data['message'] ?? data['content'] ?? data['loveletter'] ?? data['letter'] ?? data['note'] ?? data['text'] ?? '').toString().trim();
+    // love letter -> 'loveletter', ask A&H -> 'askah' (fallback 'installationaskah'); first non-empty.
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) { const v = data[k]; if (typeof v === 'string' && v.trim()) return v.trim(); }
+      return '';
+    };
+    const text = pick('loveletter', 'askah', 'installationaskah', 'message', 'content', 'letter', 'note', 'text');
     return { text, tags, date: this.toDate(data['created']) };
+  }
+
+  /** Latest 1 doc for a participant from an A&H collection: prefers the indexed
+   *  orderBy(created desc)+limit(1); falls back to an index-free fetch + client-side latest-1 when
+   *  the (profileid, created) composite index isn't deployed yet (so the section never breaks). */
+  private async latestOne(coll: string, pid: string): Promise<LoveNoteItem[]> {
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, coll), where('profileid', '==', pid), orderBy('created', 'desc'), limit(1),
+      ));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any));
+    } catch {
+      const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', '==', pid)));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any))
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0)).slice(0, 1);
+    }
   }
 
   private async loadLoveLetters(): Promise<void> {
     const pid = this.row.profileid;
     try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'love letter'),
-        where('profileid', '==', pid),
-      ));
-      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
-      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-      this.loveLetters = items.slice(0, this.sectionCap);
+      // Latest 1 only (item 5). Prefer the indexed orderBy+limit(1); if the ('love letter':
+      // profileid ASC, created DESC) composite index isn't deployed yet, fall back to an index-free
+      // fetch + client-side latest-1 so the section still shows the latest note (no breakage).
+      this.loveLetters = await this.latestOne('love letter', pid);
     } catch (e) {
       console.warn('slideover love letter read failed', e);
     } finally {
@@ -1339,13 +1360,8 @@ export class ParticipantSlideoverComponent implements OnInit {
   private async loadAskAH(): Promise<void> {
     const pid = this.row.profileid;
     try {
-      const snap = await getDocs(query(
-        collection(this.firestore, 'ask AH'),
-        where('profileid', '==', pid),
-      ));
-      const items = snap.docs.map(d => this.toLoveNote(d.data() as any));
-      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-      this.askAH = items.slice(0, this.sectionCap);
+      // Latest 1 only (item 5) — indexed orderBy+limit(1) with an index-free client-side fallback.
+      this.askAH = await this.latestOne('ask AH', pid);
     } catch (e) {
       console.warn('slideover ask A&H read failed', e);
     } finally {
@@ -1491,8 +1507,23 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
   /** Dropdown change: '__unassign__' -> unassign (null); a coach id -> assign/reassign. */
   onAssignCoach(value: string): void {
-    if (value === '__unassign__') { this.data.onAssignCoach(null); return; }
-    this.data.onAssignCoach(value);
+    // Capture the current coach BEFORE the parent mutates the row.
+    const from = this.currentCoachName || null;
+    const isUnassign = value === '__unassign__';
+    const toName = isUnassign ? null : (this.data.coaches?.find(c => c.id === value)?.name ?? null);
+    const action = isUnassign ? 'unassign' : (from ? 'reassign' : 'assign');
+    // The parent owns the Firestore write (healthtracker_activity coach_change); the timeline is
+    // one-shot loaded at open, so optimistically prepend the coach change here too (mirrors submit()),
+    // otherwise it only appears after the panel is reopened.
+    this.data.activity = [{
+      type: 'coach_change' as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note: '',
+      outcome: null, state: null, flagged: false, dueDate: null,
+      action, fromCoachName: from, toCoachName: toName,
+    }, ...(this.data.activity ?? [])];
+    this.data.onAssignCoach(isUnassign ? null : value);
   }
 
   /** Header flag toggle: prompt for an optional short note, then delegate (parent owns the write). */
@@ -1526,7 +1557,7 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.composerRef = this.dialog.open(this.composerTpl, {
       width: 'min(560px, 92vw)',
       maxHeight: '85vh',
-      panelClass: 'jchd-logcomposer-panel',
+      panelClass: this.data.isDark ? ['jchd-logcomposer-panel', 'jchd-overlay-dark'] : 'jchd-logcomposer-panel',
       autoFocus: false,
       restoreFocus: true,
     });

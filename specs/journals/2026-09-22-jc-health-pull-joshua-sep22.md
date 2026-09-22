@@ -40,3 +40,26 @@ Found while writing JCH-07: in a coach's own scope the Schedule + JC-pipeline ca
 Uncommitted: `git diff -- "src/app/Journey Onboarding/journey-coach-health-dashboard"` shows the whole change.
 Once committed, revert that single commit. Files: component .ts/.html/.css, `participant-slideover.component.ts`,
 `priority.engine.ts`, new `journey-coach-health-dashboard.needs-attention.spec.ts`, new `tsconfig.audit-spec.json`.
+
+## Second pull — Joshua's 16 follow-up commits (279801c5..93c9633e), evening 2026-09-22
+Uncommitted. 3-way merge with base `279801c5` (already merged in 64302575): 11 hunks, all resolved.
+- Kept Charan's coach-card drill buttons (jchd-btn-073..077, Active stat, is-drill) over Joshua's parallel
+  `drillCoachStat` version — same feature; Joshua's method is now unused.
+- Joshua's Schedule tiles are now filter **buttons** — our `jchd-sched-*` hooks moved onto them; A&H chips took
+  Joshua's labels (Critical / Needs Attention / Opportunity) and kept `jchd-ah-*`. All 113 hooks survive.
+- Going quiet now excludes Needs attention (Joshua); also routed Charan's coach drill list through
+  `isGoingQuietBucket` so the list matches the card stat. `priority.engine` reason labels renamed to match.
+- `styles.css`: line merge produced an unclosed block; rebuilt as HEAD + Joshua's appended dark-overlay block.
+- `tsconfig.audit-spec.json`: registered Joshua's going-quiet spec (his branch never did).
+- `firestore.indexes.json`: +2 composite indexes (love letter / ask AH: profileid + created desc).
+Verified: tsc + ngc clean, `ng build` (development) complete, specs 18/18 + 16/16, unit 75/75.
+Open: 21 new unhooked controls in the dashboard + 2 in `ah-flag-list-dialog` → gate will flag; slide-over
+now shows only the latest 1 entry (show-all buttons unreachable). Coach-scope Schedule bug still present.
+Revert: `git diff` over the JC folder + `src/styles.css` + `firestore.indexes.json` + `tsconfig.audit-spec.json`.
+
+## e2e hooks for the second pull (same day)
+23 further literal hooks so the gate's "new elements no spec references" clears: A&H analytics card
+(`jchd-ahsrc-{ask,love}`, `jchd-ahcell-{liked,tagged,opportunity,critical}-{ask,love,both,res}`,
+`jchd-ahmini-{unflagged,positive,critattn}`), NA reason chips (`jchd-na-reason`), and the new
+drill-down dialog under its own prefix `afl` (`afl-row`, `afl-close`, `afl-count`). 138 hooks total,
+hook-diff aligned. Driven by hub JCH-08/09/10 (`journey/coach-health.spec.ts`). Attribute-only.
