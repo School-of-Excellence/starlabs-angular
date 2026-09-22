@@ -851,17 +851,26 @@ export class JourneycoachDashboardComponent {
       const docdata: any = metaRes?.docdata || {};
       const pids = Object.keys(docdata);
 
-      const [hsSnap, tpSnap, apSnap, ciSnap] = await Promise.all([
-        getDocs(collection(this.firestore, 'healthtracker_healthstate')),
-        getDocs(collection(this.firestore, 'healthtracker_touchpoint')),
-        getDocs(query(collection(this.firestore, 'appointments'), where('journeycoach', '==', true))),
-        getDocs(collection(this.firestore, 'clientissue')),
+      // Roster-scoped reads — chunked where-in over the participant pids only; no whole-collection dumps.
+      const chunk = <T>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
+      const scoped = async (coll: string, field: string, values: any[]): Promise<any[]> => {
+        const rows: any[] = [];
+        await Promise.all(chunk(values, 30).map(c =>
+          getDocs(query(collection(this.firestore, coll), where(field, 'in', c))).then(s => s.forEach(d => rows.push(d.data())))
+        ));
+        return rows;
+      };
+      const profileRefs = pids.map(pid => doc(this.firestore, 'profile_data', pid));
+      const [hsRows, tpRows, apRows, ciRows] = await Promise.all([
+        scoped('healthtracker_healthstate', 'profileid', pids),
+        scoped('healthtracker_touchpoint', 'profileid', pids),
+        scoped('appointments', 'bookedby', profileRefs),
+        scoped('clientissue', 'clientid', pids),
       ]);
 
       // latest coach-set health per profileid
       const latestHealth: Record<string, { state: any; date: Date | null }> = {};
-      hsSnap.forEach(d => {
-        const x: any = d.data();
+      hsRows.forEach((x: any) => {
         const st = normalizeCoachHealth(x['state']); if (!st) return;
         const pid = x['profileid']; if (!pid) return;
         const dt = toDate(x['date']);
@@ -871,17 +880,15 @@ export class JourneycoachDashboardComponent {
       // last coach contact (touchpoint + attended journey-coach appointment)
       const lastTouch: Record<string, number> = {};
       const bump = (pid: any, dt: Date | null) => { if (pid && dt) lastTouch[pid] = Math.max(lastTouch[pid] || 0, dt.getTime()); };
-      tpSnap.forEach(d => { const x: any = d.data(); bump(x['profileid'], toDate(x['date'])); });
-      apSnap.forEach(d => {
-        const x: any = d.data();
-        if (x['attended'] !== true || x['cancelled'] === true) return;
+      tpRows.forEach((x: any) => { bump(x['profileid'], toDate(x['date'])); });
+      apRows.forEach((x: any) => {
+        if (x['journeycoach'] !== true || x['attended'] !== true || x['cancelled'] === true) return;
         const ref = x['bookedby']; const pid = typeof ref === 'string' ? ref : ref?.id;
         bump(pid, toDate(x['starttime']) || toDate(x['date']));
       });
       // open tickets per profileid
       const openTix: Record<string, number> = {};
-      ciSnap.forEach(d => {
-        const x: any = d.data();
+      ciRows.forEach((x: any) => {
         if ((x['status']?.status ?? '').toString().toLowerCase() !== 'open') return;
         const cid = x['clientid']; const pid = typeof cid === 'string' ? cid : cid?.id;
         if (pid) openTix[pid] = (openTix[pid] || 0) + 1;

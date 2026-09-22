@@ -311,7 +311,7 @@
   <div class="ch"><span class="ct">Participant Health</span><span class="clink nav" data-testid="jcd-ph-healthboard" (click)="goToHealthBoard()">Health board &rarr;</span></div>
   <div class="cbody">
     <div class="hkpi">
-      <div class="hk" data-testid="jcd-ph-needsattn" (click)="goToHealthBoard()"><div class="v" style="color:var(--red)">{{ needsAttnCount }}</div><div class="k">Needs attn</div></div>
+      <div class="hk" data-testid="jcd-ph-needsattn" (click)="goToHealthBoard()"><div class="v" style="color:var(--red)">{{ needsAttnCount }}</div><div class="k">Outreach</div></div>
       <div class="hk" data-testid="jcd-ph-goingquiet" (click)="onBoxClick('more30Product')"><div class="v" style="color:var(--amber)">{{ originalData['morethan30daysjourneynotstarted'].count }}</div><div class="k">Going quiet</div></div>
       <div class="hk" data-testid="jcd-ph-paylocked" (click)="onBoxClick('lockedStatus')"><div class="v">{{ originalData['lockedstatus'].count }}</div><div class="k">Pay locked</div></div>
       <div class="hk" data-testid="jcd-ph-renew" (click)="goToHealthBoard()"><div class="v">{{ renew90Count }}</div><div class="k">Renew 90d</div></div>
@@ -344,7 +344,7 @@
       <div class="pb c" data-testid="jcd-ph-calm" (click)="goToHealthBoard()"><div class="k">Calm</div><div class="v">{{ priorityBands.calm }}</div></div>
     </div>
 
-    <div class="ch" style="margin:13px 0 3px"><span class="ct">Needs attention &middot; top</span><span class="clink" data-testid="jcd-ph-needsattn-all" (click)="goToHealthBoard()">All {{ needsAttnCount }} &rsaquo;</span></div>
+    <div class="ch" style="margin:13px 0 3px"><span class="ct">Outreach &middot; top</span><span class="clink" data-testid="jcd-ph-needsattn-all" (click)="goToHealthBoard()">All {{ needsAttnCount }} &rsaquo;</span></div>
     <ng-container *ngIf="needsAttentionTop.length; else noNeedsAttn">
       <div class="impact" data-testid="jcd-ph-needsattn-row" *ngFor="let p of needsAttentionTop" (click)="profileNavigation(p.id)">
         <span class="imav" [style.background]="p.color">{{ p.initials }}</span>
