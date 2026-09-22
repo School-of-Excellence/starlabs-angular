@@ -765,7 +765,7 @@
   border: 1px solid var(--hairline);
   border-radius: 20px;
   background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
   padding: 18px 20px;
   margin: 0 0 18px;
   animation: jchd-view-in 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
@@ -1005,20 +1005,20 @@
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 .jchd-table-wrap::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 .jchd-table-wrap::-webkit-scrollbar-thumb {
-  background: #cdd6e3;
+  background: var(--border-strong);
   border-radius: 999px;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--surface);
   background-clip: padding-box;
 }
 .jchd-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: #aebccd;
+  background: var(--faint-2);
   background-clip: padding-box;
 }
 .jchd-table-wrap::-webkit-scrollbar-track {
@@ -1770,7 +1770,7 @@ td.mat-mdc-cell span {
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: 20px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.16s cubic-bezier(0.2, 0.7, 0.3, 1);
   will-change: transform;
@@ -2437,7 +2437,7 @@ td.mat-mdc-cell span {
   background: var(--surface);
   border: none;
   border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
   padding: 11px 14px 12px;
   cursor: pointer;
   text-align: left;
@@ -2803,7 +2803,7 @@ td.mat-mdc-cell span {
 .coach-card {
   background: var(--surface);
   border-radius: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--card-shadow);
   padding: 18px 20px;
   cursor: pointer;
   transition: transform 0.12s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.12s cubic-bezier(0.32, 0.72, 0, 1);
@@ -3022,7 +3022,7 @@ td.mat-mdc-cell span {
 .jchd-progress .jchd-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #5c6bc0, #7c83ff);
+  background: linear-gradient(90deg, var(--sem-indigo), var(--sem-indigo-fg));
   transition: width 0.35s ease;
 }
 
@@ -3062,7 +3062,7 @@ td.mat-mdc-cell span {
   background: var(--surface);
   border: 1px solid rgba(0, 122, 255, 0.18);
   border-radius: 18px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow);
   padding: 12px 16px;
   margin: 0 0 14px;
 }
