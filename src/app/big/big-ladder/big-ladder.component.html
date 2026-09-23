@@ -1,3 +1,15 @@
+<div class="loading-overlay" *ngIf="isLoading">
+    <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+        <div class="loading-progress">
+            <!-- <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+            </div> -->
+        </div>
+    </div>
+</div>
+
 <div class="bl-app">
 
     <!-- sort controls: hidden radios, read by the stylesheet -->
@@ -26,12 +38,18 @@
                                 class="bl-caret">&#9660;</span></label></div>
                     <div class="bl-cell bl-h-att"><label for="bl-sort-att">Attendance<span
                                 class="bl-caret">&#9660;</span></label></div> -->
+                    <div class="bl-cell bl-h-level bl-left"><label for="bl-sort-level">Current level<span
+                                class="bl-caret">&#9660;</span></label></div>
                     <div class="bl-cell bl-h-impact"><label for="bl-sort-impact">Extended impact (yrs)<span
                                 class="bl-caret">&#9660;</span></label></div>
                     <div class="bl-cell bl-h-att"><label for="bl-sort-att">Attendance<span
                                 class="bl-caret">&#9660;</span></label></div> 
-                    <!-- <div class="bl-cell bl-h-eilifiz"><label for="bl-sort-eilifiz">Eilifiz consumption<span
-                                class="bl-caret">&#9660;</span></label></div> -->
+                     <div class="bl-cell bl-h-studio"><label for="bl-sort-studio">Studio log<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-cohortlog"><label for="bl-sort-cohortlog">Cohort Activity log<span
+                                class="bl-caret">&#9660;</span></label></div>
+                    <div class="bl-cell bl-h-eilifiz"><label for="bl-sort-eilifiz">Eiflix consumption<span
+                                class="bl-caret">&#9660;</span></label></div>
                 </div>
 
                 <!-- totals where a total means something, averages where it does not -->
@@ -477,8 +495,21 @@
                                 style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span>
                             <span class="bl-person"><span class="bl-name">{{participant.name}}</span></span>
                         </div>
+                        <div class="bl-cell bl-left">
+                            <div>
+                                <div *ngFor="let level of participant.bigParticipantLevel">
+                                    {{bigLevelMap[level['level'] ?? '']?.level ?? ''}} ( {{ level['atcmodel'] }} )
+                                </div>
+                                <div *ngIf="participant.bigParticipantLevel?.length === 0">
+                                    Field Preparation
+                                </div>
+                            </div>
+                        </div>
                         <div class="bl-cell">{{participant.extendedlifeimpact}}</div>
                         <div class="bl-cell">{{participant.eventAttended}}</div>
+                        <div class="bl-cell">{{participant.queueActivityLog}}</div>
+                        <div class="bl-cell">{{participant.bigActivity.completed}} / {{participant.bigActivity.overAll}}</div>
+                        <div class="bl-cell">{{participant.eiflixConsumption}}</div>
                         <!-- <div class="bl-cell">38</div>
                         <div class="bl-cell">57</div>
                         <div class="bl-cell">97%</div>
