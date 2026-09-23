@@ -1,5 +1,10 @@
 <div class="workshop-config-container">
-  <div *ngIf="workshopData" class="main-content">
+  <!-- Editing is granted in a workshop's Dashboard Access settings. -->
+  <div class="wc-blocked" data-testid="wc-no-edit-access" *ngIf="editBlocked">
+    <h1>You do not have access to edit workshops</h1>
+    <p>Ask someone who manages workshops to give you workshop editing access.</p>
+  </div>
+  <div *ngIf="!editBlocked && workshopData" class="main-content">
     <mat-tab-group [selectedIndex]="selectedTabIndex" mat-align-tabs="center" mat-stretch-tabs="false" (selectedIndexChange)="onTabChange($event)">
       <mat-tab label="Enrollment Page">
         <div class="tab-body">
