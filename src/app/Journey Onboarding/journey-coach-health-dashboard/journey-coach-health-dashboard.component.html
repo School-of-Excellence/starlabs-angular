@@ -1063,7 +1063,7 @@
   </ng-container>
 
   <!-- ===== A&H drill overlay (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
-  <div class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
+  <div data-testid="jchd-ahd-backdrop" class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
     <div class="ahd-panel" data-testid="jchd-ahd-overlay" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <div class="ahd-head">
         <h2 class="ahd-title">{{ drill.title }}<span data-testid="jchd-ahd-count" class="ahd-count">{{ drill.entries.length }}</span></h2>
