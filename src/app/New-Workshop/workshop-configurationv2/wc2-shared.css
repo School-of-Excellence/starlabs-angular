@@ -241,9 +241,14 @@ button.input.pick[disabled] { cursor: not-allowed; background: #f8fafd; color: v
 .pop-row .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
 .pop-row.sel .box { background: var(--primary); border-color: var(--primary); }
 /* Names are shown in full: a cut-off name is useless when the whole point of the
-   row is to pick the right person. Long ones wrap onto a second line instead. */
-.pop-row .n { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
-.pop-row .c { font-size: 11.5px; color: var(--t3); white-space: normal; overflow-wrap: anywhere; text-align: right; }
+   row is to pick the right person. Long ones wrap onto a second line instead.
+   The sizing is load-bearing. `flex: 1` would give the name a basis of 0, so a row
+   carrying a long trailing value (an email) squeezes the NAME first — with a free
+   break point that collapses it to one character per line. `auto` basis plus a floor
+   makes the trailing value give way instead, and `break-word` only breaks a word that
+   could not fit on a line of its own. */
+.pop-row .n { flex: 1 1 auto; min-width: 7em; white-space: normal; overflow-wrap: break-word; }
+.pop-row .c { flex: 0 1 auto; min-width: 0; font-size: 11.5px; color: var(--t3); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pop-row .box { margin-top: 1px; }
 /* Chips carrying a picked name wrap too, rather than pushing past the field. */
 .input.chips .chip { height: auto; min-height: 24px; padding: 3px 10px; white-space: normal; overflow-wrap: anywhere; text-align: left; }
