@@ -63,3 +63,27 @@ Revert: `git diff` over the JC folder + `src/styles.css` + `firestore.indexes.js
 `jchd-ahmini-{unflagged,positive,critattn}`), NA reason chips (`jchd-na-reason`), and the new
 drill-down dialog under its own prefix `afl` (`afl-row`, `afl-close`, `afl-count`). 138 hooks total,
 hook-diff aligned. Driven by hub JCH-08/09/10 (`journey/coach-health.spec.ts`). Attribute-only.
+
+## Third pull — Joshua's 3 fixes (7023d94f, bbe2e3bd) + our JC-pipeline fix, 2026-09-23
+Uncommitted. 3-way merge, base 93c9633e: 6 conflicts (4 html, 2 ts), all resolved.
+- **His fixes:** coach "Viewing" select switched to one-way `[ngModel]` (two-way pre-wrote
+  `selectedCoachId`, so `onCoachChange`'s guard no-op'd and the table never re-scoped); `isOnboardingAppt()`
+  now also recognises an appointment by its appointment-TYPE ref (`onboardingcall`), catching legacy docs;
+  the A&H drill-down became a native in-component overlay and `AhFlagListDialogComponent` was DELETED.
+  Also brought: `qa/` (contract doc + hook map + `qa/checks/jc-health-contract.mjs` structural guard),
+  a Karma contract spec, and `tsconfig.spec.jc.json`.
+- **Hook reconciliation:** kept our gate-aligned names (`jchd-sel-002` stays; his `viewing-coach-select`,
+  `ahd-overlay`, `ahd-row`, `participants-table`, `sched-*-col` renamed under the `jchd` prefix, plus new
+  `jchd-ahd-close` / `-count`). His QA script + `qa/hooks.md` updated to the merged names. The `afl`
+  prefix is retired with the deleted dialog; hub JCH-09 now drives the overlay. 142 hooks, aligned.
+- **JC pipeline fixed (ours):** `JcDoneEvent` now carries `onboarding` (stamped from the SAME
+  `isOnboardingAppt()` the Schedule uses), and all four "JC done" surfaces — the Summary tiles, the list
+  under them, the Coaches-tab Done counts and their drill lists — filter through `isCoachingDone()`.
+  Contact recency is untouched: an onboarding call still keeps a participant out of Going quiet.
+  New revert-guard spec `journey-coach-health-dashboard.jc-pipeline.spec.ts` (9 cases), registered in
+  `tsconfig.audit-spec.json`; verified RED when the predicate is reverted.
+Verified: tsc + ngc clean, `ng build` (development) complete, needs-attention 18/18, going-quiet 16/16,
+jc-pipeline 9/9, Joshua's contract spec 11/11, `qa/checks/jc-health-contract.mjs` 5/5.
+Still open: the Schedule + JC-pipeline cards STILL never load in a coach's own scope (JCH-07 stays
+test.fail); the A&H analytics card remains base-wide, not coach-scoped.
+Revert: `git diff` over the JC folder + `qa/` + `tsconfig.spec.jc.json` + `tsconfig.audit-spec.json`.
