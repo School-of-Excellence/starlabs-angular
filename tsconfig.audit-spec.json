@@ -7,6 +7,8 @@
   "include": [
     "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.needs-attention.spec.ts",
     "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.going-quiet.spec.ts",
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.jc-pipeline.spec.ts",
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.ah-scope.spec.ts",
     "src/**/*.d.ts"
   ]
 }
