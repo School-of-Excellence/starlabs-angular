@@ -31,10 +31,71 @@
                 <span *ngIf="chunkCount > 1" class="bap-chip">{{ chunkCount }} background batches</span>
             </div>
 
-            <div class="bap-people" data-testid="bap-add-participants">
-                <span class="bap-people-chip" *ngFor="let p of participants; trackBy: trackByProfile">
-                    {{ p.name || p.profileid }}
-                </span>
+            <!-- Package mode -->
+            <div class="bap-pkg-mode">
+                <span class="bap-pkg-mode-label">Package</span>
+                <label class="bap-radio"><input type="radio" name="pkgmode" [(ngModel)]="packageMode"
+                        [value]="'auto'" (ngModelChange)="onPackageModeChange()"> Auto from journey</label>
+                <label class="bap-radio"><input type="radio" name="pkgmode" [(ngModel)]="packageMode"
+                        [value]="'all'" (ngModelChange)="onPackageModeChange()"> Same for all</label>
+            </div>
+
+            <!-- Auto mode: resolving / participants needing a manual package (shown first) -->
+            <div *ngIf="packageMode === 'auto' && autoResolving" class="bap-auto-note">
+                <mat-spinner diameter="14"></mat-spinner> Resolving packages from journeys…
+            </div>
+            <div *ngIf="packageMode === 'auto' && !autoResolving && autoUnresolved.length" class="bap-unresolved"
+                data-testid="bap-add-unresolved">
+                <div class="bap-unresolved-head">
+                    <mat-icon>error_outline</mat-icon>
+                    <span>{{ autoUnresolved.length }} participant(s) have no auto package</span>
+                    <button class="bap-expand-link" (click)="exportUnresolved()" data-testid="bap-add-export-unresolved">
+                        <mat-icon>download</mat-icon> Export
+                    </button>
+                </div>
+                <div class="bap-unresolved-hint">Click a name to review their purchase.</div>
+                <div class="bap-unres-group" *ngFor="let g of unresolvedGroups()">
+                    <div class="bap-unres-reason">
+                        <span class="bap-reason">{{ g.reason }}</span>
+                        <span class="bap-reason-count">{{ g.items.length }}</span>
+                    </div>
+                    <div class="bap-people bap-people-warn">
+                        <span class="bap-unres-chip" *ngFor="let p of g.items; trackBy: trackByProfile"
+                            (click)="reviewPurchase(p.profileid)" title="Review purchase">
+                            <span class="bap-unres-name">{{ p.name || p.profileid }}</span>
+                            <button class="bap-unres-remove" (click)="$event.stopPropagation(); removeUnresolved(p)"
+                                title="Remove from list">
+                                <mat-icon>close</mat-icon>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <!-- Selected participants -->
+            <div data-testid="bap-add-participants">
+                <!-- Auto mode: grouped by the package fetched from each journey -->
+                <ng-container *ngIf="packageMode === 'auto' && !autoResolving">
+                    <div class="bap-auto-note ok" *ngIf="autoResolvedCount">
+                        <mat-icon>check_circle</mat-icon> {{ autoResolvedCount }} auto-assigned from journey
+                    </div>
+                    <div class="bap-pkg-group" *ngFor="let g of autoResolvedGroups()">
+                        <div class="bap-pkg-group-head">
+                            <mat-icon>inventory_2</mat-icon>
+                            <span class="bap-pkg-name">{{ g.packageName }}</span>
+                            <span class="bap-pkg-count">{{ g.participants.length }}</span>
+                        </div>
+                        <div class="bap-people">
+                            <span class="bap-people-chip" *ngFor="let p of g.participants; trackBy: trackByProfile">{{ p.name || p.profileid }}</span>
+                        </div>
+                    </div>
+                </ng-container>
+
+                <!-- Same-for-all mode: flat list -->
+                <div class="bap-people" *ngIf="packageMode === 'all'">
+                    <span class="bap-people-chip" *ngFor="let p of participants; trackBy: trackByProfile">
+                        {{ p.name || p.profileid }}
+                    </span>
+                </div>
             </div>
 
             <form [formGroup]="form" class="bap-form">
@@ -54,8 +115,8 @@
                     </mat-form-field>
                 </div>
 
-                <div class="bap-field">
-                    <label>Package</label>
+                <div class="bap-field" *ngIf="packageMode === 'all'">
+                    <label>Package <span class="bap-req">required</span></label>
                     <mat-form-field appearance="outline" subscriptSizing="dynamic">
                         <mat-select formControlName="packageref" placeholder="Select package"
                             data-testid="bap-add-package-select">
@@ -141,6 +202,8 @@
                         </div>
                         <div class="bap-job-actions">
                             <button class="bap-expand-link" (click)="openParticipants(job)">View participants</button>
+                            <button *ngIf="job.failures?.length" class="bap-expand-link" (click)="exportFailures(job)"
+                                data-testid="bap-history-export">Export failed</button>
                             <button *ngIf="canRetry(job)" class="bap-btn bap-btn-warn bap-btn-sm" (click)="retry(job)"
                                 data-testid="bap-history-retry">
                                 <mat-icon>refresh</mat-icon> Retry {{ job.failures.length }}
@@ -171,7 +234,12 @@
                 <span class="bap-eyebrow">{{ productName(job.productref) }}</span>
                 <h2 class="bap-title">Participants</h2>
             </div>
-            <button class="bap-close" matDialogClose aria-label="Close"><mat-icon>close</mat-icon></button>
+            <div class="bap-modal-head-actions">
+                <button *ngIf="job.failures?.length" class="bap-btn bap-btn-ghost bap-btn-sm" (click)="exportFailures(job)">
+                    <mat-icon>download</mat-icon> Export failed
+                </button>
+                <button class="bap-close" matDialogClose aria-label="Close"><mat-icon>close</mat-icon></button>
+            </div>
         </header>
         <div class="bap-panel">
             <div class="bap-panel-scroll" data-testid="bap-participants-list">

@@ -159,6 +159,83 @@
     padding: 3px 10px;
     white-space: nowrap;
 }
+.bap-people-warn { max-height: 66px; margin: 8px 0 0; }
+.bap-people-warn .bap-people-chip { border-color: #f0d6b3; color: var(--warn); }
+
+/* Package mode toggle */
+.bap-pkg-mode { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; font-size: 13px; }
+.bap-pkg-mode-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
+.bap-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink); font-weight: 520; }
+.bap-radio input { accent-color: var(--accent); }
+.bap-auto-note { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+.bap-auto-note.ok { color: var(--ok); }
+.bap-auto-note mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+/* Auto mode — participants needing a manual package */
+.bap-unresolved {
+    background: var(--warn-soft);
+    border: 1px solid #f0d6b3;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+.bap-unresolved-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--warn); }
+.bap-unresolved-head mat-icon { font-size: 17px; width: 17px; height: 17px; }
+.bap-unresolved-head .bap-expand-link { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; }
+.bap-unresolved-head .bap-expand-link mat-icon { font-size: 15px; width: 15px; height: 15px; }
+.bap-unresolved-hint { font-size: 11.5px; color: #8a6a3a; margin: 3px 0 8px; }
+.bap-unres-group { margin-top: 8px; }
+/* Reason header — a distinct band, visually separate from the name badges */
+.bap-unres-reason { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.bap-unres-reason .bap-reason { background: var(--warn); color: #fff; }
+.bap-unres-reason .bap-reason-count { color: var(--warn); font-size: 11px; font-weight: 700; }
+/* Name badges — all visible at once (wrap), each clickable + removable */
+.bap-people-warn { max-height: none; margin: 0; }
+.bap-unres-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid #f0d6b3;
+    border-radius: 999px;
+    padding: 2px 4px 2px 10px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.bap-unres-chip:hover { background: #fff8ef; border-color: var(--warn); }
+.bap-unres-chip:hover .bap-unres-name { text-decoration: underline; }
+.bap-unres-name { color: var(--accent); font-size: 12px; font-weight: 560; white-space: nowrap; }
+.bap-unres-remove {
+    border: none;
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+}
+.bap-unres-remove:hover { background: var(--stuck-soft); color: var(--stuck); }
+.bap-unres-remove mat-icon { font-size: 14px; width: 14px; height: 14px; }
+
+/* Auto-mode: participants grouped by the package fetched from their journey */
+.bap-pkg-group { margin-bottom: 10px; }
+.bap-pkg-group-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.bap-pkg-group-head mat-icon { font-size: 15px; width: 15px; height: 15px; color: var(--accent); }
+.bap-pkg-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.bap-pkg-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 1px 8px;
+}
+.bap-pkg-group .bap-people { max-height: none; margin-bottom: 0; }
+
+/* Participants modal header actions */
+.bap-modal-head-actions { display: flex; align-items: center; gap: 8px; }
 
 /* Form grid */
 .bap-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }

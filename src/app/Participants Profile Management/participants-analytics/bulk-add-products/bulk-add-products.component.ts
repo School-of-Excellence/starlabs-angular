@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { Component, inject, Inject, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   collection,
@@ -23,7 +23,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { Router } from '@angular/router';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import * as XLSX from 'xlsx';
 
 export const DESCRIPTION_MIN_LENGTH = 10;
 const HISTORY_PAGE_SIZE = 20;
@@ -105,6 +107,14 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
   productFilter = '';
   tab = 0;
 
+  // Package selection: 'auto' derives each participant's package from their journey (previous flow);
+  // 'all' applies one chosen package to everyone.
+  packageMode: 'auto' | 'all' = 'auto';
+  autoResolving = false;
+  autoResolved = new Map<string, string>(); // profileid → packageref (from journey)
+  autoUnresolved: Array<BulkJobParticipant & { reason: string }> = []; // couldn't auto-derive + why
+  private mapJourney: Record<string, any> = {}; // journeyid → package-name field
+
   @ViewChild('bapParticipantsTpl') participantsTpl!: TemplateRef<any>;
 
   form: FormGroup;
@@ -134,7 +144,9 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
     @Inject(MAT_DIALOG_DATA) public data: any,
     public dialogRef: MatDialogRef<BulkAddProductsComponent>,
     private fb: FormBuilder,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private router: Router,
+    private location: Location
   ) {
     if (Array.isArray(data)) {
       this.participants = data ?? [];
@@ -151,7 +163,7 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
 
     this.form = this.fb.group({
       productref: [null, Validators.required],
-      packageref: [null, Validators.required],
+      packageref: [null], // optional — validity handled per package mode in canSubmit
       minimumpayment: [null, Validators.required],
       description: [
         '',
@@ -187,10 +199,144 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
         data['docid'] = d.id;
         return data;
       });
+      // Auto mode needs the package list to map journey → package; resolve once it's loaded.
+      if (this.packageMode === 'auto' && this.participants.length) this.resolveAutoPackages();
     });
 
     // Opened with no selection → History is the only tab; start it live immediately.
     if (this.tab === 1) this.startHistory();
+  }
+
+  onPackageModeChange() {
+    if (this.packageMode === 'auto') {
+      this.resolveAutoPackages();
+    } else {
+      this.autoResolved.clear();
+      this.autoUnresolved = [];
+    }
+  }
+
+  /** Open a participant's purchases (participantpurchase route) in a NEW tab, keeping the dialog. */
+  reviewPurchase(profileid: string) {
+    const path = this.router.serializeUrl(this.router.createUrlTree(['/participantpurchase', profileid]));
+    const url = window.location.origin + this.location.prepareExternalUrl(path);
+    window.open(url, '_blank');
+  }
+
+  /** Drop a participant from the working selection (and from the unresolved list). */
+  removeUnresolved(p: BulkJobParticipant) {
+    this.participants = this.participants.filter((x) => x.profileid !== p.profileid);
+    this.autoUnresolved = this.autoUnresolved.filter((x) => x.profileid !== p.profileid);
+  }
+
+  /** Export the not-auto-resolved participants (name/email + reason) to Excel. */
+  exportUnresolved() {
+    if (!this.autoUnresolved.length) return;
+    const rows = this.autoUnresolved.map((p) => ({
+      Name: p.name || p.profileid,
+      Email: p.email || '',
+      Reason: p.reason,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'No Auto Package');
+    XLSX.writeFile(wb, 'No Auto Package.xlsx');
+  }
+
+  /**
+   * Derive each participant's package from their single active journey (previous flow). Participants
+   * we can't resolve (no single active journey, or the journey has no matching package) are collected
+   * in `autoUnresolved` so the UI can surface them at the top for a manual package.
+   */
+  async resolveAutoPackages() {
+    if (!this.allpackageList.length) return; // packages not loaded yet; ngOnInit will re-call
+    this.autoResolving = true;
+    this.autoResolved.clear();
+    this.autoUnresolved = [];
+    try {
+      if (!Object.keys(this.mapJourney).length) {
+        const js = await getDocs(collection(this.firestore, 'journey'));
+        js.docs.forEach((d) => {
+          const x: any = d.data();
+          this.mapJourney[x['id'] ?? d.id] = x['journey'];
+        });
+      }
+      const packageMap = new Map<string, string>();
+      this.allpackageList.forEach((pkg) => packageMap.set(pkg['package'], pkg['docid']));
+
+      const ACTIVE = ['initiated', 'ongoing', 'completed'];
+      const ids = this.participants.map((p) => p.profileid);
+      const journeysByProfile = new Map<string, any[]>();
+      // Only one `in` filter per query: `profileid in (<=30)`. Combining it with a second `in`
+      // (journeystatus) multiplies into >30 disjunctions (Firestore max), so filter status in JS.
+      for (let i = 0; i < ids.length; i += 30) {
+        const batch = ids.slice(i, i + 30);
+        const snap = await getDocs(
+          query(collection(this.firestore, 'participantjourneyproduct'), where('profileid', 'in', batch))
+        );
+        snap.docs.forEach((d) => {
+          const x: any = d.data();
+          if (!ACTIVE.includes(x['journeystatus'])) return; // active-journey filter, client-side
+          const pid = x['profileid'];
+          if (!journeysByProfile.has(pid)) journeysByProfile.set(pid, []);
+          journeysByProfile.get(pid)!.push(x);
+        });
+      }
+
+      for (const p of this.participants) {
+        const js = journeysByProfile.get(p.profileid) || [];
+        if (js.length === 0) {
+          this.autoUnresolved.push({ ...p, reason: 'No active journey' });
+        } else if (js.length > 1) {
+          this.autoUnresolved.push({ ...p, reason: 'Multiple active journeys' });
+        } else if (!js[0]['journeyref']) {
+          this.autoUnresolved.push({ ...p, reason: 'Journey has no reference' });
+        } else {
+          const journeyName = this.mapJourney[js[0]['journeyref'].id];
+          const pkgref = packageMap.get(journeyName) || null;
+          if (pkgref) this.autoResolved.set(p.profileid, pkgref);
+          else this.autoUnresolved.push({ ...p, reason: 'Journey has no matching package' });
+        }
+      }
+    } catch (e) {
+      console.error('auto package resolution failed', e);
+    } finally {
+      this.autoResolving = false;
+    }
+  }
+
+  get autoResolvedCount(): number {
+    return this.autoResolved.size;
+  }
+
+  /** Unresolved participants grouped by the reason no package could be auto-fetched. */
+  unresolvedGroups(): { reason: string; items: Array<BulkJobParticipant & { reason: string }> }[] {
+    const map = new Map<string, Array<BulkJobParticipant & { reason: string }>>();
+    for (const p of this.autoUnresolved) {
+      if (!map.has(p.reason)) map.set(p.reason, []);
+      map.get(p.reason)!.push(p);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([reason, items]) => ({ reason, items }));
+  }
+
+  /** Auto-resolved participants grouped by the package fetched from their journey (for display). */
+  autoResolvedGroups(): { packageref: string; packageName: string; participants: BulkJobParticipant[] }[] {
+    const byPkg = new Map<string, BulkJobParticipant[]>();
+    for (const p of this.participants) {
+      const pkg = this.autoResolved.get(p.profileid);
+      if (!pkg) continue;
+      if (!byPkg.has(pkg)) byPkg.set(pkg, []);
+      byPkg.get(pkg)!.push(p);
+    }
+    return Array.from(byPkg.entries())
+      .map(([packageref, participants]) => ({
+        packageref,
+        packageName: this.packageName(packageref),
+        participants,
+      }))
+      .sort((a, b) => b.participants.length - a.participants.length);
   }
 
   ngOnDestroy() {
@@ -225,7 +371,30 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
   }
 
   get canSubmit(): boolean {
-    return this.form.valid && this.participants.length > 0 && !this.submitting;
+    const base =
+      this.form.get('productref')?.valid &&
+      this.form.get('minimumpayment')?.valid &&
+      this.form.get('description')?.valid;
+    if (!base || this.participants.length === 0 || this.submitting) return false;
+    if (this.packageMode === 'all') return !!this.form.value.packageref;
+    // auto: only participants with an auto-resolved package are added; need at least one.
+    // Unresolved participants are reviewed/removed by the operator, not added here.
+    return this.autoResolved.size > 0;
+  }
+
+  /** Group participants into per-package buckets (one bucket in 'all' mode; by journey in 'auto'). */
+  private buildGroups(allPackage: string | null): { packageref: string | null; participants: BulkJobParticipant[] }[] {
+    if (this.packageMode === 'all') {
+      return [{ packageref: allPackage ?? null, participants: this.participants }];
+    }
+    const byPkg = new Map<string, BulkJobParticipant[]>();
+    for (const p of this.participants) {
+      const pkg = this.autoResolved.get(p.profileid);
+      if (!pkg) continue; // unresolved participants are not added
+      if (!byPkg.has(pkg)) byPkg.set(pkg, []);
+      byPkg.get(pkg)!.push(p);
+    }
+    return Array.from(byPkg.entries()).map(([packageref, participants]) => ({ packageref, participants }));
   }
 
   async submit() {
@@ -239,9 +408,8 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
     try {
       const v = this.form.value;
       const { batchId } = await this.createJobs({
-        participants: this.participants,
+        groups: this.buildGroups(v.packageref ?? null),
         productref: v.productref,
-        packageref: v.packageref ?? null,
         minimumpayment: v.minimumpayment ?? null,
         description: (v.description ?? '').trim(),
         createdby: this.createdby,
@@ -399,6 +567,34 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
     return 'failed';
   }
 
+  /** Export the failed participants of a job (name/email/phone/mode/status + reason) to Excel. */
+  async exportFailures(job: BulkJobDoc) {
+    const failures = job.failures || [];
+    if (!failures.length) return;
+    const need = failures.map((f: any) => this.pId(f)).filter((id) => id && !this.metaCache.has(id));
+    if (need.length) {
+      const m = await this.getMeta(need);
+      m.forEach((v, k) => this.metaCache.set(k, v));
+    }
+    const rows = failures.map((f: any) => {
+      const id = this.pId(f);
+      const m = this.metaCache.get(id) || {};
+      return {
+        Name: m.name || id,
+        Email: m.email || '',
+        Phone: [m.countrycode, m.phonenumber].filter(Boolean).join(' '),
+        Mode: m.participantmode || '',
+        Status: m.customerstatus || '',
+        Reason: this.reasonOf(f),
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Failed Participants');
+    const base = `Failed - ${this.productName(job.productref)}`.replace(/[^\w -]/g, '').trim().slice(0, 80);
+    XLSX.writeFile(wb, `${base || 'Failed Participants'}.xlsx`);
+  }
+
   /** Failures grouped by reason, so the participants modal can show one section per reason. */
   failureGroups(job: BulkJobDoc): { reason: string; items: any[] }[] {
     const map = new Map<string, any[]>();
@@ -440,9 +636,8 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
    * Each doc is created `retry:true` — the "please process me" signal + refire guard the CF clears.
    */
   private async createJobs(params: {
-    participants: BulkJobParticipant[];
+    groups: { packageref: string | null; participants: BulkJobParticipant[] }[];
     productref: string;
-    packageref: string | null;
     minimumpayment: number | null;
     description: string;
     createdby: string;
@@ -450,8 +645,9 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
     const col = collection(this.firestore, BULK_JOBS_COLLECTION);
     const batchId = doc(col).id;
     const jobIds: string[] = [];
-    await Promise.all(
-      this.chunkArr(params.participants, CHUNK_SIZE).map((chunkParticipants) => {
+    const writes: Promise<void>[] = [];
+    for (const group of params.groups) {
+      for (const chunkParticipants of this.chunkArr(group.participants, CHUNK_SIZE)) {
         const jobRef = doc(col);
         const payload: BulkJobDoc = {
           docid: jobRef.id,
@@ -460,7 +656,7 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
           createdby: params.createdby,
           description: params.description,
           productref: params.productref,
-          packageref: params.packageref,
+          packageref: group.packageref,
           minimumpayment: params.minimumpayment,
           profiles: chunkParticipants.map((p) => p.profileid),
           retry: true,
@@ -471,9 +667,10 @@ export class BulkAddProductsComponent implements OnInit, OnDestroy {
           totalcount: chunkParticipants.length,
         };
         jobIds.push(jobRef.id);
-        return setDoc(jobRef, payload as any);
-      })
-    );
+        writes.push(setDoc(jobRef, payload as any));
+      }
+    }
+    await Promise.all(writes);
     return { batchId, jobIds };
   }
 
