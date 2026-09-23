@@ -602,6 +602,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // full mode scopes coach-set health to the coach's base (inside loadFullPortfolio)
       await this.loadFullPortfolio();
     }
+    this.computeAhSummary();   // roster now exists — scope the A&H card to it (loadAHSummary may
+                               // have resolved before the roster was known)
   }
 
   /** Background full-base index finished → refresh the off-page match set and base-wide summary,
@@ -679,6 +681,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
     this.computeRows();
     this.setProgress(100, 'Ready');
+
+    // Schedule + JC pipeline need the appointments read, which used to run ONLY in the All/Unassigned
+    // background load and when the Coaches tab opened — so in a coach's own scope both cards sat on
+    // "loading…" with zeros forever. Same loader, in the background, after first paint: it is guarded
+    // by contactDataLoaded / fullIndexBuilt and its paged-only branch is skipped here.
+    void this.loadAttentionDataInBackground();
   }
 
   /** Distinct profileids in the selected coach's base — from the METADATA roster (coachedby lives
@@ -1340,6 +1348,22 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  can drill to the exact participants that make up its count (list length reconciles the cell). */
   private ahDocs: { profileid: string; coll: 'ask' | 'love'; liked: boolean; tagged: boolean;
     opportunity: boolean; critical: boolean; resolved: boolean; created: number }[] = [];
+  /** profileids the A&H card is allowed to count, or null in the ALL view (= no filter, the whole
+   *  ecosystem — what the Coaches/admin view is for). In any OTHER scope (one coach, or Unassigned)
+   *  the card must follow the Viewing selector like every other card: a coach was otherwise shown
+   *  org-wide counts and could drill into participants on someone else's base. */
+  private ahScopeIds(): Set<string> | null {
+    if (this.selectedCoachId === this.ALL) return null;
+    return new Set(this.rosterIds());
+  }
+  /** The scoped subset of the one base-wide A&H read. A doc with no profileid cannot be attributed to
+   *  a base, so it counts only in the unscoped ALL view. */
+  private ahDocsInScope(): typeof this.ahDocs {
+    const ids = this.ahScopeIds();
+    if (!ids) return this.ahDocs;
+    return this.ahDocs.filter(d => d.profileid && ids.has(d.profileid));
+  }
+
   private async loadAHSummary(): Promise<void> {
     if (this.ahSummaryLoaded) return;
     this.ahSummaryLoaded = true;
@@ -1364,6 +1388,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       created: this.toDate(d['created'])?.getTime() ?? 0,
     });
     this.ahDocs = [...ask.map(d => mapDoc(d, 'ask')), ...love.map(d => mapDoc(d, 'love'))];
+    this.computeAhSummary();
+  }
+
+  /** Recompute the A&H card from the cached docs for the CURRENT scope — no re-read. Called after the
+   *  one base-wide load and on every scope change. */
+  private computeAhSummary(): void {
+    const docs = this.ahDocsInScope();
+    const ask = docs.filter(d => d.coll === 'ask');
+    const love = docs.filter(d => d.coll === 'love');
     const count = (docs: any[]): AHFlagCounts => ({
       total: docs.length,
       tagged: docs.filter(d => d['tagged'] === true).length,
@@ -1400,7 +1433,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   ): void {
     const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
       d.liked || d.tagged || d.opportunity || d.critical;
-    const docs = this.ahDocs.filter(d => {
+    const docs = this.ahDocsInScope().filter(d => {
       if (coll !== 'both' && d.coll !== coll) return false;
       if (resolvedOnly && !d.resolved) return false;
       switch (flag) {
@@ -3250,6 +3283,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (this.paginator) this.paginator.firstPage();
       await this.loadFullPortfolio();   // roster is in memory; this only re-scopes the joins
     }
+    this.computeAhSummary();   // A&H card follows the Viewing scope too (cached docs, no re-read)
   }
 
   /** Map a KPI card key to its lever. 'total' resets the board to 'all'. */

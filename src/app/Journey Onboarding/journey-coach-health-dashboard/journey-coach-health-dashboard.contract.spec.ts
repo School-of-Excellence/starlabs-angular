@@ -66,6 +66,14 @@ describe('JourneyCoachHealthDashboard · openAhDrill / pickAhDrill (native A&H o
       { coll: 'love', tagged: true,  liked: false, opportunity: false, critical: false, resolved: false, profileid: 'p3', created: 200 },
       { coll: 'ask',  tagged: false, liked: true,  opportunity: false, critical: false, resolved: false, profileid: 'p4', created: 400 },
     ] as Any[],
+    // openAhDrill routes through ahDocsInScope() since 2026-09-23 (the card follows the Viewing
+    // scope). These cases are about the overlay, not the scope, so the context runs in the ALL view
+    // where no filter applies — the real helpers, not stubs.
+    ALL: 'ALL',
+    selectedCoachId: 'ALL',
+    rosterIds: () => [],
+    ahScopeIds: proto.ahScopeIds,
+    ahDocsInScope: proto.ahDocsInScope,
     nameOf: (id: string) => 'Name ' + id,
     ahDrill: signal<any>(null),
     dialog: { open: jasmine.createSpy('dialog.open') },
@@ -118,6 +126,8 @@ describe('JourneyCoachHealthDashboard · onCoachChange (coach-scope guard)', () 
     applyPaginatorBinding() {}, setProgress() {}, loadProgress: 0,
     paginator: null, fullPjpData: null,
     loadFullPortfolio: jasmine.createSpy('loadFullPortfolio').and.resolveTo(undefined),
+    // onCoachChange also re-scopes the A&H analytics card (2026-09-23).
+    computeAhSummary: jasmine.createSpy('computeAhSummary'),
     ...over,
   });
 

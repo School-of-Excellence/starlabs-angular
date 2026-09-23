@@ -87,3 +87,31 @@ jc-pipeline 9/9, Joshua's contract spec 11/11, `qa/checks/jc-health-contract.mjs
 Still open: the Schedule + JC-pipeline cards STILL never load in a coach's own scope (JCH-07 stays
 test.fail); the A&H analytics card remains base-wide, not coach-scoped.
 Revert: `git diff` over the JC folder + `qa/` + `tsconfig.spec.jc.json` + `tsconfig.audit-spec.json`.
+
+## Two fixes on top (2026-09-23, after merging origin/development)
+`origin/development` merged first (`2873e1df`) — it carried only merges of THIS branch (PRs #298/#301),
+so no file changed; the branch is simply not behind any more.
+
+**Fix A — Schedule + JC pipeline never loaded in a coach's own scope.** `loadContactEvents()` ran only
+from the All/Unassigned background load and from the Coaches tab, so for a coach both cards sat on
+"loading…" with zeros. `loadFullPortfolio()` now kicks the same `loadAttentionDataInBackground()` after
+first paint: guarded by `contactDataLoaded` / `fullIndexBuilt`, its paged-only branch skipped, so it is
+idempotent and non-blocking. COST, stated: a coach view now pays the same full `appointments` +
+touchpoints read the All view already paid — that read is the only source for these cards.
+Hub JCH-07 loses its `test.fail()`, and JCH-12 moves from the admin to the coach's own scope.
+
+**Fix B — the A&H analytics card ignored the Viewing scope.** `loadAHSummary` read both collections
+base-wide and the card counted everything, so a coach saw ecosystem numbers and could drill into other
+coaches' participants. The single base-wide read STAYS (one read, cached in `ahDocs`); the counts and
+the drill list now go through `ahDocsInScope()`:
+  ALL -> no filter (the ecosystem view the admin/Coaches tab is for)
+  one coach / Unassigned -> only docs whose profileid is in that roster (an orphan doc with no
+  profileid can't be attributed, so it counts only in ALL).
+`computeAhSummary()` re-runs from the cache on every scope change (no re-read) and after the roster
+lands. New revert-guard spec `journey-coach-health-dashboard.ah-scope.spec.ts` (9 cases).
+Joshua's contract spec needed its minimal `this` contexts widened (openAhDrill now calls
+ahDocsInScope, onCoachChange calls computeAhSummary) — his assertions are untouched, still 11/11.
+
+Verified: tsc (app + spec.jc) clean, ngc clean, `ng build` (development) complete, needs-attention
+18/18, going-quiet 16/16, jc-pipeline 9/9, ah-scope 9/9, contract 11/11, qa guard 5/5. 142 hooks aligned.
+Hub: JCH-07 un-failed, JCH-08/09 re-expected at the SCOPED numbers (2, not 3), JCH-12 now runs as the coach.
