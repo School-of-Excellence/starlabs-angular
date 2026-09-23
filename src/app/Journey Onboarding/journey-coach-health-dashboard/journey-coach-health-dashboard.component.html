@@ -23,7 +23,7 @@
 
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
-        <select [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
+        <select data-testid="viewing-coach-select" [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
           <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
@@ -198,12 +198,12 @@
         </div>
         <div class="jcs-cols">
 
-          <div class="jcs-col">
+          <div class="jcs-col" data-testid="sched-jc-col">
             <div class="jcs-colhead"><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></div>
             <div class="jcp-row">
               <button type="button" class="jcp-tile" [class.is-on]="jcSchedBucket()==='today'" (click)="setSchedBucket(false,'today')" matTooltip="Filter to today"><span class="jcp-num">{{ jcSchedCounts().today }}</span><span class="jcp-label">Today</span></button>
               <button type="button" class="jcp-tile" [class.is-on]="jcSchedBucket()==='week'" (click)="setSchedBucket(false,'week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ jcSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></button>
-              <button type="button" class="jcp-tile jcp-overdue" [class.is-on]="jcSchedBucket()==='overdue'" (click)="setSchedBucket(false,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
+              <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-jc-overdue" [class.is-on]="jcSchedBucket()==='overdue'" (click)="setSchedBucket(false,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
             </div>
             <div class="jcp-list" *ngIf="jcSchedList().length; else noJcSched">
               <ng-container *ngFor="let g of jcSchedList()">
@@ -218,12 +218,12 @@
             <ng-template #noJcSched><p class="ios2-empty" *ngIf="jcSchedCounts().ready">Nothing scheduled.</p></ng-template>
           </div>
 
-          <div class="jcs-col">
+          <div class="jcs-col" data-testid="sched-ob-col">
             <div class="jcs-colhead"><span class="jcs-tag jcs-tag-ob">Onboarding</span></div>
             <div class="jcp-row">
               <button type="button" class="jcp-tile" [class.is-on]="obSchedBucket()==='today'" (click)="setSchedBucket(true,'today')" matTooltip="Filter to today"><span class="jcp-num">{{ obSchedCounts().today }}</span><span class="jcp-label">Today</span></button>
               <button type="button" class="jcp-tile" [class.is-on]="obSchedBucket()==='week'" (click)="setSchedBucket(true,'week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ obSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></button>
-              <button type="button" class="jcp-tile jcp-overdue" [class.is-on]="obSchedBucket()==='overdue'" (click)="setSchedBucket(true,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
+              <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-ob-overdue" [class.is-on]="obSchedBucket()==='overdue'" (click)="setSchedBucket(true,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
             </div>
             <div class="jcp-list" *ngIf="obSchedList().length; else noObSched">
               <ng-container *ngFor="let g of obSchedList()">
@@ -269,7 +269,7 @@
                 <td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td>
                 <td><button type="button" class="ah-num" (click)="openAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')">{{ s.askAH.tagged }}</button></td>
                 <td><button type="button" class="ah-num" (click)="openAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')">{{ s.loveLetter.tagged }}</button></td>
-                <td><button type="button" class="ah-num" (click)="openAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="ah-needsattention-combined" (click)="openAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
                 <td class="ah-res"><button type="button" class="ah-num" (click)="openAhDrill('both', 'tagged', true, 'Resolved · Needs Attention')">{{ s.resolvedTagged }}</button></td>
               </tr>
               <tr>
@@ -630,7 +630,7 @@
     <div class="sr-only" aria-live="polite">{{ focusedRowName }}</div>
 
     <div class="jchd-table-wrap ios-table-card">
-      <table mat-table [dataSource]="dataSource" [trackBy]="trackByProfileId" matSort matSortActive="priority" matSortDirection="desc"
+      <table mat-table data-testid="participants-table" [dataSource]="dataSource" [trackBy]="trackByProfileId" matSort matSortActive="priority" matSortDirection="desc"
              class="jchd-table ios-grid-t">
 
         <!-- Participant: initials avatar + bold name (+ flag glyph when flagged) + masked mono id -->
@@ -942,14 +942,14 @@
 
   <!-- ===== A&H drill overlay (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
   <div class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
-    <div class="ahd-panel" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <div class="ahd-panel" data-testid="ahd-overlay" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <div class="ahd-head">
         <h2 class="ahd-title">{{ drill.title }}<span class="ahd-count">{{ drill.entries.length }}</span></h2>
         <button type="button" class="ahd-close" aria-label="Close" (click)="closeAhDrill()">&times;</button>
       </div>
       <div class="ahd-body">
         <p *ngIf="!drill.entries.length" class="ahd-empty">No records in this window.</p>
-        <button *ngFor="let e of drill.entries" type="button" class="ahd-row" [disabled]="!e.profileid" (click)="pickAhDrill(e)">
+        <button *ngFor="let e of drill.entries" type="button" class="ahd-row" data-testid="ahd-row" [disabled]="!e.profileid" (click)="pickAhDrill(e)">
           <span class="ahd-name">{{ e.name }}</span>
           <span class="ahd-date" *ngIf="e.created">{{ e.created | date:'d MMM y' }}</span>
           <span class="ahd-chev" *ngIf="e.profileid" aria-hidden="true">&rsaquo;</span>

@@ -1,0 +1,17 @@
+/* Scoped test config: compiles ONLY the Journey Coach Health specs, so an isolated Karma run is not
+   blocked by pre-existing TS errors in unrelated specs elsewhere in the repo (gate 1.5). */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec-jc",
+    "types": [
+      "jasmine"
+    ]
+  },
+  "include": [
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.contract.spec.ts",
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.going-quiet.spec.ts",
+    "src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.needs-attention.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}
