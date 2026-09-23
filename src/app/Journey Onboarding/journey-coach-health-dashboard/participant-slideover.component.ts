@@ -3,7 +3,7 @@ import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs,
+  Firestore, collection, query, where, getDocs, orderBy, limit,
   doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -93,6 +93,9 @@ export interface SlideoverData {
   addressed: boolean;
   needsAttention: boolean;
   onMarkAddressed: (next: boolean) => void;
+  // resolved dashboard theme (the slide-over + its composer render in CDK overlays outside .jchd-wrap,
+  // so they can't inherit the dashboard's [data-theme]; used to add the dark overlay panelClass).
+  isDark?: boolean;
 }
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
@@ -103,6 +106,7 @@ interface ReportItem { types: string; status: string; date: Date | null; }
 interface BreakthroughItem { message: string; date: Date | null; }
 interface AelItem { status: string; date: Date | null; }
 interface CoachNoteItem { text: string; author: string; date: Date | null; }
+interface LoveNoteItem { text: string; tags: string[]; date: Date | null; }
 
 /** Composer type switch options. */
 type ComposerType = 'call' | 'health' | 'schedule' | 'note';
@@ -432,6 +436,58 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           </div>
         </section>
 
+        <!-- Recent Love Letter (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button data-testid="jcso-ll-toggle" type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('loveletters')" (click)="toggleCollapsed('loveletters')">
+            <span>Recent Love Letter <span class="so-count" *ngIf="!loveLettersLoading">{{ loveLetters.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('loveletters')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('loveletters')">
+            <div *ngIf="loveLettersLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!loveLettersLoading">
+              <ul class="so-list" *ngIf="loveLetters.length; else noLoveLetters">
+                <li data-testid="jcso-ll-row" *ngFor="let x of (loveLetters | slice:0:(isShowAll('loveletters') ? loveLetters.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Love letter' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button data-testid="jcso-ll-showall" type="button" class="so-showall" *ngIf="loveLetters.length > 3" (click)="toggleShowAll('loveletters')">
+                {{ isShowAll('loveletters') ? 'Show less' : 'Show all (' + loveLetters.length + ')' }}
+              </button>
+              <ng-template #noLoveLetters><p class="so-empty">No love letters yet.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Recent Ask A&H (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button data-testid="jcso-ah-toggle" type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('askah')" (click)="toggleCollapsed('askah')">
+            <span>Recent Ask A&amp;H <span class="so-count" *ngIf="!askAHLoading">{{ askAH.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('askah')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('askah')">
+            <div *ngIf="askAHLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!askAHLoading">
+              <ul class="so-list" *ngIf="askAH.length; else noAskAH">
+                <li data-testid="jcso-ah-row" *ngFor="let x of (askAH | slice:0:(isShowAll('askah') ? askAH.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Ask A&H' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button data-testid="jcso-ah-showall" type="button" class="so-showall" *ngIf="askAH.length > 3" (click)="toggleShowAll('askah')">
+                {{ isShowAll('askah') ? 'Show less' : 'Show all (' + askAH.length + ')' }}
+              </button>
+              <ng-template #noAskAH><p class="so-empty">No Ask A&amp;H entries yet.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
         <!-- Breakthroughs -->
         <section class="so-sec" aria-live="polite">
           <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('breakthroughs')" (click)="toggleCollapsed('breakthroughs')">
@@ -688,10 +744,10 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-body::-webkit-scrollbar { width: 9px; }
     .so-body::-webkit-scrollbar-thumb {
-      background: #cdd6e3; border-radius: 999px;
+      background: var(--so-border); border-radius: 999px;
       border: 2px solid var(--so-bg); background-clip: padding-box;
     }
-    .so-body::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+    .so-body::-webkit-scrollbar-thumb:hover { background: var(--so-muted); background-clip: padding-box; }
     .so-body::-webkit-scrollbar-track { background: transparent; }
 
     .so-sec { padding: 14px 20px; border-top: 1px solid var(--so-border-soft); }
@@ -841,7 +897,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-coach-current { font-size: 13px; font-weight: 600; color: var(--so-ink); }
     .so-coach-select {
       font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink); cursor: pointer;
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink); cursor: pointer;
       max-width: 55%;
     }
 
@@ -861,7 +917,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       --so-bg: #ffffff; --so-ink: #1c1c1e; --so-ink2: rgba(60,60,67,.6); --so-muted: rgba(60,60,67,.45);
       --so-border: rgba(60,60,67,.12); --so-border-soft: rgba(60,60,67,.08);
       --so-accent: #007aff; --so-accent-soft: rgba(0,122,255,.08);
-      background: #ffffff; color: var(--so-ink); padding: 22px 24px 22px;
+      background: var(--so-bg); color: var(--so-ink); padding: 22px 24px 22px;
       font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     }
     .so-comp-top {
@@ -883,7 +939,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       transition: color .2s ease, background-color .2s ease, transform .06s ease;
     }
     .so-seg-btn.on {
-      background: #fff; color: var(--so-ink); font-weight: 600;
+      background: var(--so-bg); color: var(--so-ink); font-weight: 600;
       box-shadow: 0 3px 8px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.04);
     }
     .so-seg-btn:active { transform: scale(.97); }
@@ -906,7 +962,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-input::placeholder { color: var(--so-muted); }
     .so-input:focus {
-      outline: none; background-color: #fff; border-color: var(--so-accent);
+      outline: none; background-color: var(--so-bg); border-color: var(--so-accent);
       box-shadow: 0 0 0 3px var(--so-accent-soft);
     }
     select.so-input {
@@ -916,7 +972,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     textarea.so-input { resize: vertical; min-height: 64px; line-height: 1.4; }
     .so-state-pick { display: flex; flex-wrap: wrap; gap: 8px; }
     .so-state-opt {
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink2);
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink2);
       font: inherit; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px; cursor: pointer;
       transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
     }
@@ -958,6 +1014,11 @@ export class ParticipantSlideoverComponent implements OnInit {
   formsLoading = true;
   reports: ReportItem[] = [];
   reportsLoading = true;
+  // A&H feedback (doc item 7): recent Love Letter / Ask A&H entries for this participant, with tags.
+  loveLetters: LoveNoteItem[] = [];
+  loveLettersLoading = true;
+  askAH: LoveNoteItem[] = [];
+  askAHLoading = true;
   breakthroughs: BreakthroughItem[] = [];
   breakthroughsLoading = true;
   ael: AelItem[] = [];
@@ -1055,6 +1116,8 @@ export class ParticipantSlideoverComponent implements OnInit {
     void this.loadAppointments();
     void this.loadForms();
     void this.loadReports();
+    void this.loadLoveLetters();
+    void this.loadAskAH();
     void this.loadBreakthroughs();
     void this.loadAel();
     void this.loadCoachNotes();
@@ -1244,6 +1307,68 @@ export class ParticipantSlideoverComponent implements OnInit {
     }
   }
 
+  /** RECENT LOVE LETTER / ASK A&H (doc item 7) — the participant's own A&H feedback docs, newest
+   *  first, with their tag chips. Same one-shot getDocs pattern as the other intel sections (the
+   *  DEFAULT firestore, not the forms DB). The aggregate unresolved/non-happy tags that feed Needs
+   *  Attention are computed on the dashboard side; here we simply surface recent entries. */
+  private toLoveNote(data: any): LoveNoteItem {
+    const tags: string[] = [];
+    if (data['critical']) tags.push('critical');
+    if (data['tagged']) tags.push('needs attention');
+    if (data['opportunity']) tags.push('opportunity');
+    if (data['liked']) tags.push('happy');
+    if (data['resolved']) tags.push('resolved');
+    // love letter -> 'loveletter', ask A&H -> 'askah' (fallback 'installationaskah'); first non-empty.
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) { const v = data[k]; if (typeof v === 'string' && v.trim()) return v.trim(); }
+      return '';
+    };
+    const text = pick('loveletter', 'askah', 'installationaskah', 'message', 'content', 'letter', 'note', 'text');
+    return { text, tags, date: this.toDate(data['created']) };
+  }
+
+  /** Latest 1 doc for a participant from an A&H collection: prefers the indexed
+   *  orderBy(created desc)+limit(1); falls back to an index-free fetch + client-side latest-1 when
+   *  the (profileid, created) composite index isn't deployed yet (so the section never breaks). */
+  private async latestOne(coll: string, pid: string): Promise<LoveNoteItem[]> {
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, coll), where('profileid', '==', pid), orderBy('created', 'desc'), limit(1),
+      ));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any));
+    } catch {
+      const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', '==', pid)));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any))
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0)).slice(0, 1);
+    }
+  }
+
+  private async loadLoveLetters(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      // Latest 1 only (item 5). Prefer the indexed orderBy+limit(1); if the ('love letter':
+      // profileid ASC, created DESC) composite index isn't deployed yet, fall back to an index-free
+      // fetch + client-side latest-1 so the section still shows the latest note (no breakage).
+      this.loveLetters = await this.latestOne('love letter', pid);
+    } catch (e) {
+      console.warn('slideover love letter read failed', e);
+    } finally {
+      this.loveLettersLoading = false;
+    }
+  }
+
+  private async loadAskAH(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      // Latest 1 only (item 5) — indexed orderBy+limit(1) with an index-free client-side fallback.
+      this.askAH = await this.latestOne('ask AH', pid);
+    } catch (e) {
+      console.warn('slideover ask A&H read failed', e);
+    } finally {
+      this.askAHLoading = false;
+    }
+  }
+
   /** BREAKTHROUGHS — `Achievements/posts/postcollection` where profileid == pid. Short snippet + date. */
   private async loadBreakthroughs(): Promise<void> {
     const pid = this.row.profileid;
@@ -1382,8 +1507,23 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
   /** Dropdown change: '__unassign__' -> unassign (null); a coach id -> assign/reassign. */
   onAssignCoach(value: string): void {
-    if (value === '__unassign__') { this.data.onAssignCoach(null); return; }
-    this.data.onAssignCoach(value);
+    // Capture the current coach BEFORE the parent mutates the row.
+    const from = this.currentCoachName || null;
+    const isUnassign = value === '__unassign__';
+    const toName = isUnassign ? null : (this.data.coaches?.find(c => c.id === value)?.name ?? null);
+    const action = isUnassign ? 'unassign' : (from ? 'reassign' : 'assign');
+    // The parent owns the Firestore write (healthtracker_activity coach_change); the timeline is
+    // one-shot loaded at open, so optimistically prepend the coach change here too (mirrors submit()),
+    // otherwise it only appears after the panel is reopened.
+    this.data.activity = [{
+      type: 'coach_change' as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note: '',
+      outcome: null, state: null, flagged: false, dueDate: null,
+      action, fromCoachName: from, toCoachName: toName,
+    }, ...(this.data.activity ?? [])];
+    this.data.onAssignCoach(isUnassign ? null : value);
   }
 
   /** Header flag toggle: prompt for an optional short note, then delegate (parent owns the write). */
@@ -1417,7 +1557,7 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.composerRef = this.dialog.open(this.composerTpl, {
       width: 'min(560px, 92vw)',
       maxHeight: '85vh',
-      panelClass: 'jchd-logcomposer-panel',
+      panelClass: this.data.isDark ? ['jchd-logcomposer-panel', 'jchd-overlay-dark'] : 'jchd-logcomposer-panel',
       autoFocus: false,
       restoreFocus: true,
     });
