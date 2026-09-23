@@ -372,3 +372,290 @@ body:has(#zmmtg-root) { background: #000; }
 }
 .update-snackbar .mat-mdc-snack-bar-label,
 .update-snackbar .mdc-snackbar__label { padding: 0; color: #EAEDF2; flex: 0 0 auto; }
+
+/* ============================================================================
+   Journey Coach Dashboard — DARK MODE for CDK / Angular Material overlays
+   ----------------------------------------------------------------------------
+   The journeycoach-dashboard has a component-scoped dark theme, but CDK
+   overlays (dialogs, menus, select/autocomplete panels, datepickers, tooltips,
+   snackbars) mount at <body> in `.cdk-overlay-container`, OUTSIDE the
+   component's DOM/shadow scope. To dark-theme them, the component toggles the
+   class `jcd-dark` on `.cdk-overlay-container` while dark mode is on.
+
+   EVERY rule below is scoped under `.cdk-overlay-container.jcd-dark` so it only
+   fires when that dashboard is in dark mode — light mode and all other screens
+   are 100% untouched. Both MDC (`mat-mdc-*`) and legacy (`mat-*`) selectors are
+   included defensively. Angular Material 19.2.x (MDC) is the current version.
+
+   Palette (from the dashboard component):
+     bg #0a0a0c · panel/card #161619 · nested surface #1e1e22
+     text #f4f4f6 · text-secondary #a6a6ad · text-muted #6d6d75
+     border/divider rgba(255,255,255,.08) · accent #0a84ff
+   ============================================================================ */
+
+/* ---- Generic overlay pane: any panel / card / table that opens inside ---- */
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-card,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-card {
+  background: #161619 !important;
+  color: #f4f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, .7);
+}
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-table,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane table.mat-mdc-table,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-table {
+  background: #161619 !important;
+  color: #f4f4f6 !important;
+}
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-header-cell,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-cell,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-header-cell,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-cell {
+  background: transparent !important;
+  color: #f4f4f6 !important;
+  border-bottom-color: rgba(255, 255, 255, .08) !important;
+}
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-header-cell,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-header-cell {
+  color: #a6a6ad !important;
+}
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-divider,
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane .mat-mdc-divider {
+  border-top-color: rgba(255, 255, 255, .08) !important;
+}
+
+/* ---- Material dialogs ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mdc-dialog__surface,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-surface,
+.cdk-overlay-container.jcd-dark .mat-dialog-container {
+  --mdc-dialog-container-color: #161619;
+  --mdc-dialog-subhead-color: #f4f4f6;
+  --mdc-dialog-supporting-text-color: #a6a6ad;
+  background: #161619 !important;
+  color: #f4f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, .8) !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-dialog-title,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mdc-dialog__title,
+.cdk-overlay-container.jcd-dark .mat-dialog-container .mat-dialog-title {
+  color: #f4f4f6 !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-dialog-content,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mdc-dialog__content,
+.cdk-overlay-container.jcd-dark .mat-dialog-container .mat-dialog-content {
+  color: #a6a6ad !important;
+}
+
+/* ---- Inputs / selects INSIDE dialogs → dark field bg, light text ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-form-field,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-text-field-wrapper {
+  --mdc-filled-text-field-container-color: #1e1e22;
+  --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, .08);
+  --mdc-outlined-text-field-hover-outline-color: rgba(255, 255, 255, .18);
+  --mdc-filled-text-field-input-text-color: #f4f4f6;
+  --mdc-outlined-text-field-input-text-color: #f4f4f6;
+  --mdc-filled-text-field-label-text-color: #a6a6ad;
+  --mdc-outlined-text-field-label-text-color: #a6a6ad;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-text-field-wrapper {
+  background-color: #1e1e22 !important;
+  border-radius: 8px;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-input-element,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container input.mat-mdc-input-element,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container textarea.mat-mdc-input-element,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-select-value-text,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-select-min-line {
+  color: #f4f4f6 !important;
+  caret-color: #0a84ff;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-input-element::placeholder,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container textarea.mat-mdc-input-element::placeholder {
+  color: #6d6d75 !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-select-arrow,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-form-field-icon-suffix,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-form-field-icon-prefix {
+  color: #a6a6ad !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-form-field-hint,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-form-field-subscript-wrapper {
+  color: #6d6d75 !important;
+}
+
+/* ---- Menus ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-panel,
+.cdk-overlay-container.jcd-dark .mat-menu-panel {
+  --mat-menu-container-color: #161619;
+  --mat-menu-item-label-text-color: #f4f4f6;
+  --mat-menu-item-icon-color: #a6a6ad;
+  background: #161619 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, .7) !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item,
+.cdk-overlay-container.jcd-dark .mat-menu-item,
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item .mat-mdc-menu-item-text,
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item span {
+  color: #f4f4f6 !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item .mat-icon,
+.cdk-overlay-container.jcd-dark .mat-menu-item .mat-icon {
+  color: #a6a6ad !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item:hover:not([disabled]),
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item.cdk-focused,
+.cdk-overlay-container.jcd-dark .mat-mdc-menu-item.mat-mdc-menu-item-highlighted,
+.cdk-overlay-container.jcd-dark .mat-menu-item:hover:not([disabled]) {
+  background: rgba(255, 255, 255, .06) !important;
+}
+
+/* ---- Select panels & options (also autocomplete uses mat-mdc-option) ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-select-panel,
+.cdk-overlay-container.jcd-dark .mat-mdc-autocomplete-panel,
+.cdk-overlay-container.jcd-dark .mat-select-panel,
+.cdk-overlay-container.jcd-dark .mat-autocomplete-panel {
+  background: #161619 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, .7) !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-option,
+.cdk-overlay-container.jcd-dark .mat-mdc-option .mdc-list-item__primary-text,
+.cdk-overlay-container.jcd-dark .mat-option,
+.cdk-overlay-container.jcd-dark .mat-option .mat-option-text {
+  color: #f4f4f6 !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-option:hover:not(.mdc-list-item--disabled),
+.cdk-overlay-container.jcd-dark .mat-mdc-option.mat-mdc-option-active,
+.cdk-overlay-container.jcd-dark .mat-option:hover:not(.mat-option-disabled),
+.cdk-overlay-container.jcd-dark .mat-option.mat-active {
+  background: rgba(255, 255, 255, .06) !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-option.mdc-list-item--selected .mdc-list-item__primary-text,
+.cdk-overlay-container.jcd-dark .mat-option.mat-selected .mat-option-text {
+  color: #0a84ff !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-option.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
+  background: rgba(10, 132, 255, .14) !important;
+}
+/* Optgroup labels / muted option text */
+.cdk-overlay-container.jcd-dark .mat-mdc-optgroup-label,
+.cdk-overlay-container.jcd-dark .mat-optgroup-label {
+  color: #a6a6ad !important;
+}
+
+/* ---- Datepicker + date-range popup surface ---- */
+.cdk-overlay-container.jcd-dark .mat-datepicker-content {
+  --mat-datepicker-calendar-container-background-color: #161619;
+  --mat-datepicker-calendar-container-text-color: #f4f4f6;
+  background: #161619 !important;
+  color: #f4f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 16px 50px -16px rgba(0, 0, 0, .8) !important;
+}
+
+/* ---- mat-calendar internals ---- */
+.cdk-overlay-container.jcd-dark .mat-calendar {
+  background: #161619 !important;
+  color: #f4f4f6 !important;
+}
+/* Header controls (month/year button + prev/next arrows) */
+.cdk-overlay-container.jcd-dark .mat-calendar-controls .mat-mdc-button,
+.cdk-overlay-container.jcd-dark .mat-calendar-period-button,
+.cdk-overlay-container.jcd-dark .mat-calendar-previous-button,
+.cdk-overlay-container.jcd-dark .mat-calendar-next-button,
+.cdk-overlay-container.jcd-dark .mat-calendar-arrow {
+  color: #f4f4f6 !important;
+}
+.cdk-overlay-container.jcd-dark .mat-calendar-arrow {
+  fill: #f4f4f6 !important;
+}
+/* Weekday header row + week/label text = secondary */
+.cdk-overlay-container.jcd-dark .mat-calendar-table-header,
+.cdk-overlay-container.jcd-dark .mat-calendar-table-header th,
+.cdk-overlay-container.jcd-dark .mat-calendar-body-label {
+  color: #a6a6ad !important;
+}
+.cdk-overlay-container.jcd-dark .mat-calendar-table-header-divider::after {
+  background: rgba(255, 255, 255, .08) !important;
+}
+/* Day cells = light text */
+.cdk-overlay-container.jcd-dark .mat-calendar-body-cell-content {
+  color: #f4f4f6 !important;
+  border-color: transparent !important;
+}
+.cdk-overlay-container.jcd-dark .mat-calendar-body-cell.mat-calendar-body-disabled > .mat-calendar-body-cell-content {
+  color: #6d6d75 !important;
+}
+/* Hover / focus = subtle white wash */
+.cdk-overlay-container.jcd-dark .mat-calendar-body-cell:not(.mat-calendar-body-disabled):hover
+  > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-comparison-identical),
+.cdk-overlay-container.jcd-dark .cdk-keyboard-focused .mat-calendar-body-active
+  > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-comparison-identical),
+.cdk-overlay-container.jcd-dark .cdk-program-focused .mat-calendar-body-active
+  > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-comparison-identical) {
+  background: rgba(255, 255, 255, .06) !important;
+}
+/* Today marker — readable ring */
+.cdk-overlay-container.jcd-dark .mat-calendar-body-today:not(.mat-calendar-body-selected):not(.mat-calendar-body-comparison-identical) {
+  border-color: rgba(255, 255, 255, .5) !important;
+}
+/* Selected day — accent bg, white text */
+.cdk-overlay-container.jcd-dark .mat-calendar-body-selected {
+  background-color: #0a84ff !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+.cdk-overlay-container.jcd-dark .mat-calendar-body-today.mat-calendar-body-selected {
+  border-color: #ffffff !important;
+}
+/* Date-range in-range band */
+.cdk-overlay-container.jcd-dark .mat-calendar-body-in-range::before,
+.cdk-overlay-container.jcd-dark .mat-calendar-body-comparison-identical,
+.cdk-overlay-container.jcd-dark .mat-calendar-body-in-comparison-range::before {
+  background: rgba(10, 132, 255, .18) !important;
+}
+
+/* ---- Tooltips ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-tooltip .mdc-tooltip__surface,
+.cdk-overlay-container.jcd-dark .mat-mdc-tooltip,
+.cdk-overlay-container.jcd-dark .mat-tooltip {
+  --mdc-plain-tooltip-container-color: #1e1e22;
+  --mdc-plain-tooltip-supporting-text-color: #f4f4f6;
+  background: #1e1e22 !important;
+  color: #f4f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+/* ---- Snackbars ---- */
+.cdk-overlay-container.jcd-dark .mat-mdc-snack-bar-container .mdc-snackbar__surface,
+.cdk-overlay-container.jcd-dark .mat-snack-bar-container {
+  --mdc-snackbar-container-color: #1e1e22;
+  --mdc-snackbar-supporting-text-color: #f4f4f6;
+  background: #1e1e22 !important;
+  color: #f4f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, .7) !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-snack-bar-container .mat-mdc-snack-bar-label,
+.cdk-overlay-container.jcd-dark .mat-mdc-snack-bar-container .mdc-snackbar__label {
+  color: #f4f4f6 !important;
+}
+
+/* ---- Hyperlinks & primary/text-button actions keep the accent ---- */
+.cdk-overlay-container.jcd-dark .cdk-overlay-pane a,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container a,
+.cdk-overlay-container.jcd-dark .mat-mdc-snack-bar-container .mat-mdc-button,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-button {
+  color: #0a84ff !important;
+}
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-unelevated-button.mat-primary,
+.cdk-overlay-container.jcd-dark .mat-mdc-dialog-container .mat-mdc-raised-button.mat-primary {
+  --mdc-filled-button-container-color: #0a84ff;
+  --mdc-filled-button-label-text-color: #ffffff;
+  --mdc-protected-button-container-color: #0a84ff;
+  --mdc-protected-button-label-text-color: #ffffff;
+}
+/* End Journey Coach Dashboard dark-mode overlay block */
