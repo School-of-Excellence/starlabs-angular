@@ -30,3 +30,29 @@ NOT verified in a browser — the redesign's visual result is unreviewed here.
 
 ## Revert
 `git diff` over `src/app/Journey Onboarding/journeycoach-dashboard` + the appended `src/styles.css` block.
+
+## Second pull — Joshua's 6 JE-dashboard fixes (`c5477756`), 2026-09-23 evening
+Merged with base `c67aae29`; component `.ts`/`.css` only (0 conflicts). Operator asked for the component
+alone, so his `qa/je-dashboard-jc-fixes.*` harness and his `qa/CONTRACTS.md` / `qa/hooks.md` edits were
+NOT taken (his hooks.md also listed `jcd-name-link`, which is a CSS class, not a hook).
+
+| # | Fix | Effect on reads/writes |
+|---|---|---|
+| 1 | Dark-mode rules for the preserved drill table (48 `jcd-dark` rules) | none |
+| 2 | The 3 `getAtcAlpha()` call sites removed | **2 reads gone** — `atc_alpha` / `atc_to_validate` no longer read at all |
+| 3 | Health board opens in a NEW TAB (`serializeUrl` + `window.open`) | none |
+| 5 | Tickets = OPEN-only `getCountFromServer`, roster-scoped, chunked | doc fetch → server-side count |
+| 6 | Outreach row reason = `scorePriority().reason` (shared with JC Health) | none |
+| 7 | Appointments filtered IN the query (journeycoach + attended + not cancelled) | fewer docs fetched |
+
+Still no write / update / delete on this screen. `getAtcAlpha()` itself and its four unreachable filter
+handlers remain in the file as dead code.
+
+**Indexes needed, NOT added:** `clientissue(clientid + status.status)` for fix 5 and
+`appointments(bookedby + journeycoach + attended + cancelled)` for fix 7. Both paths catch and fall back
+(tickets → metadata people-count; appointments → unfiltered roster read), so the fixes are correct but
+buy nothing until the indexes exist.
+
+**e2e:** no template change, so hooks are untouched (214, aligned). JCD-01 was rewritten — it asserted
+the OLD metadata people-count and would now read 0, because the seed had no `clientissue` docs at all.
+Hub JCD-01/02/03 now cover open-only tickets, the new tab, and the reason string.
