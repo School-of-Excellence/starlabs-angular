@@ -23,7 +23,7 @@
 
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
-        <select [(ngModel)]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
+        <select [ngModel]="selectedCoachId" (ngModelChange)="onCoachChange($event)" aria-label="Viewing scope">
           <option [value]="ALL">All participants</option>
           <option *ngFor="let c of coaches" [value]="c.id">{{ c.name }}</option>
           <option [value]="UNASSIGNED">Unassigned · no coach ({{ unassignedCount }})</option>
@@ -939,4 +939,22 @@
     <!-- ===== /Today's Worklist ===== -->
 
   </ng-container>
+
+  <!-- ===== A&H drill overlay (native; themed by the .jchd-wrap design tokens, dark included) ===== -->
+  <div class="ahd-backdrop" *ngIf="ahDrill() as drill" (click)="closeAhDrill()">
+    <div class="ahd-panel" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <div class="ahd-head">
+        <h2 class="ahd-title">{{ drill.title }}<span class="ahd-count">{{ drill.entries.length }}</span></h2>
+        <button type="button" class="ahd-close" aria-label="Close" (click)="closeAhDrill()">&times;</button>
+      </div>
+      <div class="ahd-body">
+        <p *ngIf="!drill.entries.length" class="ahd-empty">No records in this window.</p>
+        <button *ngFor="let e of drill.entries" type="button" class="ahd-row" [disabled]="!e.profileid" (click)="pickAhDrill(e)">
+          <span class="ahd-name">{{ e.name }}</span>
+          <span class="ahd-date" *ngIf="e.created">{{ e.created | date:'d MMM y' }}</span>
+          <span class="ahd-chev" *ngIf="e.profileid" aria-hidden="true">&rsaquo;</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

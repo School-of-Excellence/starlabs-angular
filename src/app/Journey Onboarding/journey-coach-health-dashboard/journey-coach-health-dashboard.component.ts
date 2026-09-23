@@ -33,7 +33,6 @@ import { AuthguardService } from '../../authguard.service';
 import { computeHealth, normalizeTier, recencyScore, HealthState, ParticipantSignals } from './health-score.engine';
 import { LogCallDialogComponent, LogCallResult } from './log-call-dialog.component';
 import { SetHealthStateDialogComponent, SetHealthStateResult } from './set-health-state-dialog.component';
-import { AhFlagListDialogComponent, AhFlagListEntry } from './ah-flag-list-dialog.component';
 import { ParticipantSlideoverComponent, SlideoverData, SlideoverActivityItem, SlideoverLogPayload } from './participant-slideover.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import {
@@ -160,6 +159,7 @@ interface JourneyGroup { id: string; name: string; journeys: string[]; }
 /** A booked, not-yet-attended journey-coach appointment for the Schedule split (doc item 1).
  *  `onboarding` partitions the JC schedule from the Onboarding schedule. */
 interface JcSchedEvent { profileid: string; coachId: string | null; ms: number; onboarding: boolean; }
+interface AhDrillEntry { profileid: string; name: string; created: number; }
 
 /** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
 interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
@@ -390,6 +390,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private openTicketCounts: Record<string, number> = {};
   private touchpointByProfile: Record<string, number> = {};
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
+  // Appointment-type ids whose type is an ONBOARDING call (appointmenttype.onboardingcall === true).
+  // Authoritative discriminator so a legacy onboarding appointment missing the onboarding/journeyid/pjp
+  // markers is still recognised by its type ref and kept OUT of the Journey-Coaching schedule.
+  private onboardingApptTypeIds = new Set<string>();
   // profileid -> unresolved, non-happy A&H love-letter / ask-A&H tags (doc item 5), recent 180d window.
   private llTagsByProfile: Record<string, { critical: boolean; attention: boolean; opportunity: boolean }> = {};
   // profileid -> most-recent event participation request {eventName, date, status}
@@ -1102,6 +1106,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private async loadContactEvents(): Promise<void> {
     const map: Record<string, number> = {};
     const pending: JcSchedEvent[] = [];
+    await this.loadOnboardingApptTypes();
     try {
       // ONE read of EVERY journey-coach appointment (the `attended` filter is applied client-side).
       // From the one snapshot: attended non-cancelled → contact recency (onboarding INCLUDED, so an
@@ -1119,13 +1124,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (data['cancelled'] === true) return;   // cancelled JCs never count (operator directive)
         const hosts: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
         const host = hosts.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
-        // Onboarding detection hardened (item 4): the schedule dialog sets onboarding===true AND a
+        // Onboarding detection hardened: the schedule dialog sets onboarding===true AND a
         // journeyid + participantjourneyproductid ONLY for onboarding calls (coach calls leave both
-        // null — schedule-dialog.component.ts:616-618/623), so an onboarding appointment that is
-        // missing the onboarding flag is still kept OUT of Journey Coaching by its journey/pjp ref.
+        // null — schedule-dialog.component.ts:616-618/623). Legacy onboarding appointments missing all
+        // three markers are still caught by their appointment-type ref (onboardingApptTypeIds), the
+        // authoritative discriminator, so onboarding never leaks into the Journey-Coaching schedule.
+        const apptTypeId = data['appointment']?.id ?? null;
         const isOnboarding = data['onboarding'] === true
           || data['journeyid'] != null
-          || data['participantjourneyproductid'] != null;
+          || data['participantjourneyproductid'] != null
+          || (apptTypeId != null && this.onboardingApptTypeIds.has(apptTypeId));
         if (data['attended'] === true) {
           map[pid] = Math.max(map[pid] ?? 0, dt.getTime());   // recency: onboarding included (feature 9)
         } else {
@@ -1139,6 +1147,29 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     this.contactEventByProfile = map;
     this.jcPendingEvents.set(pending);
+  }
+
+  /** Load (once) the set of appointment-type ids that are ONBOARDING calls, so onboarding appointments
+   *  missing the onboarding / journeyid / pjp markers (legacy data) are still recognised by their type
+   *  ref and kept out of the Journey-Coaching schedule. One read of the small appointmenttype reference
+   *  collection, cached for the session. */
+  private async loadOnboardingApptTypes(): Promise<void> {
+    if (this.onboardingApptTypeIds.size) return;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'appointmenttype'),
+        where('onboardingcall', '==', true),
+      ));
+      const ids = new Set<string>();
+      snap.forEach(d => {
+        ids.add(d.id);
+        const fid = (d.data() as any)['id'];
+        if (typeof fid === 'string' && fid) ids.add(fid);
+      });
+      this.onboardingApptTypeIds = ids;
+    } catch (e) {
+      console.warn('appointmenttype (onboarding) load failed (non-fatal)', e);
+    }
   }
 
   // ---- Schedule (doc item 1): Journey Coaching vs Onboarding, shown as two SEPARATE schedules ----
@@ -1290,6 +1321,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   //  over a recent window, base-wide. One-shot read of 'ask AH' + 'love letter' (single 'created' filter,
   //  no composite index). tagged = Needs Attention · opportunity = Opportunity · liked = Happy · critical = Critical.
   ahSummary = signal<AHSummary | null>(null);
+
+  /** Native (in-component) A&H drill overlay — replaces the former AhFlagListDialogComponent MatDialog
+   *  so the list renders inside .jchd-wrap and themes with the dashboard tokens (dark included). */
+  ahDrill = signal<{ title: string; entries: AhDrillEntry[] } | null>(null);
   private ahSummaryLoaded = false;
   /** One row per source A&H / Love Letter document kept behind the analytics card, so a clicked cell
    *  can drill to the exact participants that make up its count (list length reconciles the cell). */
@@ -1366,16 +1401,27 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       }
     });
     if (!docs.length) return;
-    const entries: AhFlagListEntry[] = docs
+    const entries: AhDrillEntry[] = docs
       .slice()
       .sort((a, b) => b.created - a.created)
       .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
-    const ref = this.dialog.open(AhFlagListDialogComponent, {
-      data: { title, entries }, autoFocus: false, maxHeight: '80vh',
-      panelClass: this.isDark ? 'jchd-overlay-dark' : undefined,
-    });
-    ref.afterClosed().subscribe((pid: string | undefined) => { if (pid) this.openJcParticipant(pid); });
+    this.ahDrill.set({ title, entries });
   }
+
+  /** Close the native A&H drill overlay. */
+  closeAhDrill(): void { this.ahDrill.set(null); }
+
+  /** Row click in the A&H drill: close the overlay and open that participant's slide-over. */
+  pickAhDrill(e: AhDrillEntry): void {
+    if (!e.profileid) return;
+    this.ahDrill.set(null);
+    this.openJcParticipant(e.profileid);
+  }
+
+  /** Escape closes the drill. Kept SEPARATE from onKeydown (which early-returns off the base view and
+   *  when a MatDialog is open) because the drill opens from the Summary tab. */
+  @HostListener('document:keydown.escape')
+  onAhDrillEscape(): void { if (this.ahDrill()) this.closeAhDrill(); }
 
   private async loadLoveLetterTagsFor(profileIds: string[]): Promise<void> {
     const ids = profileIds.filter(id => id && !(id in this.llTagsByProfile));
