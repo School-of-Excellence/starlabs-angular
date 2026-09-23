@@ -7,6 +7,7 @@ ONE-PREFIX-PER-COMPONENT rule the readiness gate enforces (`jchd` = dashboard, `
 the hub specs reference them by those names. The ids below were therefore mapped onto the existing
 names rather than added alongside; `qa/checks/jc-health-contract.mjs` greps the merged names.
 
+## journey-coach-health-dashboard (JC Health)
 | testid | element | contract |
 |---|---|---|
 | jchd-sel-002 | Summary/Participants "Viewing" coach `<select>` (was viewing-coach-select) | jc-health-3fixes |
@@ -18,3 +19,13 @@ names rather than added alongside; `qa/checks/jc-health-contract.mjs` greps the 
 | jchd-ahd-overlay | Native A&H drill overlay panel (was ahd-overlay) | jc-health-3fixes |
 | jchd-ahd-row | A&H drill overlay row (was ahd-row) | jc-health-3fixes |
 | jchd-ahd-close / jchd-ahd-count | overlay close button / header count (added in the merge) | jc-health-3fixes |
+
+## journeycoach-dashboard (JE Dashboard) — Participant Health + drill table
+- jcd-btn-theme          theme toggle button
+- jcd-lnk-gross-table    Gross "Open table" link
+- jcd-lnk-assured-table  Assured "Open table" link
+- jcd-ph-healthboard     Participant Health "Health board" link (opens new tab)
+- jcd-ph-tickets         Tickets tile (open-ticket count; click -> health board)
+- jcd-ph-needsattn-row   Outreach·top row (shows reason)
+- jcd-ph-needsattn-all   Outreach·top "All N" link
+- jcd-name-link          drill-table participant name link
