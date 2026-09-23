@@ -221,10 +221,23 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get canEnroll(): boolean { return this.can('enroll'); }
   /** The forms sheet needs both: the right to export, and the right to see the forms. */
   get canExportForms(): boolean { return this.can('export') && this.can('allforms'); }
-  /** Move next and Review disappear with the right to open a participant. */
+  /**
+   * Move next and Review disappear with the right to open a participant.
+   *
+   * The result is cached by identity: mat-table treats a new array as a column change and
+   * rebuilds every row, and this getter is read on every change-detection pass. The `type`
+   * column is spliced into displayedColumns at runtime, so the cache is keyed on the source
+   * array's identity and length rather than computed once.
+   */
+  private columnsCache: { src: string[]; len: number; allowed: boolean; out: string[] } | null = null;
   get visibleColumns(): string[] {
-    if (this.can('participantprogress')) return this.displayedColumns;
-    return this.displayedColumns.filter(c => c !== 'action' && c !== 'assignment');
+    const allowed = this.can('participantprogress');
+    const src = this.displayedColumns;
+    const c = this.columnsCache;
+    if (c && c.src === src && c.len === src.length && c.allowed === allowed) return c.out;
+    const out = allowed ? src : src.filter(x => x !== 'action' && x !== 'assignment');
+    this.columnsCache = { src, len: src.length, allowed, out };
+    return out;
   }
   /** Nobody picked this person for this workshop: the dashboard is closed to them. */
   get accessDenied(): boolean { return this.accessResolved && this.access.isLockedOut; }

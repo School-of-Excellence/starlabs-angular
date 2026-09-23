@@ -957,9 +957,20 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   accessNameFor(id: string): string { return this.accessNameMap[id] || this.profileNameMap[id] || id; }
   accessEmailFor(id: string): string { return this.accessPeople.find(p => p.id === id)?.email || ''; }
 
-  /** The picker list, filtered by the search box and capped. */
+  /**
+   * The picker list, filtered by the search box and capped.
+   *
+   * Memoised: the template reads this inside *ngFor AND for an empty check, in three pickers
+   * at once, and every read is a scan of the whole participant directory. Without the cache
+   * that is six full scans on every change-detection pass while a popover is open. The key
+   * covers everything the result depends on.
+   */
+  private pickerCache = new Map<string, WorkshopPerson[]>();
   accessPickerList(excludeAdmins: boolean): WorkshopPerson[] {
     const q = this.popSearch.trim().toLowerCase();
+    const key = `${excludeAdmins ? 1 : 0}|${this.accessPeople.length}|${this.adminLists.dashboardAdmins.join(',')}|${q}`;
+    const hit = this.pickerCache.get(key);
+    if (hit) return hit;
     const admins = new Set(this.adminLists.dashboardAdmins);
     const out: WorkshopPerson[] = [];
     for (const p of this.accessPeople) {
@@ -968,6 +979,9 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       out.push(p);
       if (out.length >= this.accessPickerLimit) break;
     }
+    // One entry per (list, search) pair; typing drops the old ones rather than growing forever.
+    if (this.pickerCache.size > 24) this.pickerCache.clear();
+    this.pickerCache.set(key, out);
     return out;
   }
   get accessPickerTruncated(): boolean {
