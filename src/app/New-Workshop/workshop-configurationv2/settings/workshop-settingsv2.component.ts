@@ -13,10 +13,21 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthguardService } from '../../../authguard.service';
 import { WorkshopCategoryComponent } from '../../workshop-category/workshop-category.component';
+import { WorkshopAccessService, WorkshopPerson } from '../../workshop-access/workshop-access.service';
+import {
+  EMPTY_ADMIN_LISTS,
+  WORKSHOP_ACCESS_KEYS,
+  WorkshopAccessGrants,
+  WorkshopAccessKey,
+  WorkshopAdminLists,
+} from '../../workshop-access/workshop-access.model';
+
+/** The three lists that live in one shared document and apply to every workshop. */
+type AdminListKey = keyof WorkshopAdminLists;
 
 type SaveState = 'idle' | 'dirty' | 'blocked' | 'saving' | 'saved' | 'error';
 
-interface SectionDef { id: string; title: string; group: 'General' | 'Access' | 'Communication'; controls: string[]; }
+interface SectionDef { id: string; title: string; group: 'General' | 'Access' | 'Communication' | 'Dashboard'; controls: string[]; }
 
 /**
  * Workshop Configuration v2 — Settings tab.
@@ -113,9 +124,13 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     { id: 'mail', title: 'Mail template', group: 'Communication', controls: ['mailTemplate'] },
     { id: 'messages', title: 'Messages', group: 'Communication', controls: ['enrollwattimessage', 'enrolledcongrats', 'enrollmentnotallowedmessage', 'enrollmentnotallowedmessagenew'] },
     { id: 'hero', title: 'Hero', group: 'Communication', controls: ['hero', 'heromobile', 'heroeiflixmobile', 'heroHeading', 'heroDescription', 'heroshowtype', 'heroImage', 'heroImageMobile', 'heroVideo', 'heroAccent'] },
+    // No form controls: this section saves itself, into its own documents.
+    { id: 'access', title: 'Dashboard Access', group: 'Dashboard', controls: [] },
   ];
-  readonly groups: SectionDef['group'][] = ['General', 'Access', 'Communication'];
-  collapsed = new Set<string>();
+  readonly groups: SectionDef['group'][] = ['General', 'Access', 'Communication', 'Dashboard'];
+  // Dashboard Access starts closed: opening it reads the whole participant
+  // directory, and most visits to Settings never touch it.
+  collapsed = new Set<string>(['access']);
   activeSection = 'mode';
 
   // ───────────────────────── UI state ─────────────────────────
@@ -134,6 +149,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private guard: AuthguardService,
+    private accessService: WorkshopAccessService,
     private zone: NgZone,
     private host: ElementRef<HTMLElement>,
   ) {
@@ -145,6 +161,9 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   ngOnInit(): void {
     this.cpwelcomeFields.forEach(f => { this.cpwelcomeeditors[f.key] = new Editor(); });
     this.loadReferenceData();
+    // Warm the people list in the background so Dashboard Access opens ready.
+    // It is cached for ten minutes, so this normally costs nothing at all.
+    this.accessService.getParticipantDirectory().catch(() => { });
     this.settingsForm.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       if (this.justSaved && this.settingsForm.dirty) this.justSaved = false;
       if (this.saveError && this.settingsForm.dirty) this.saveError = false;
@@ -654,12 +673,16 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   }
   closePopover(): void { this.openPopover = null; this.popSearch = ''; }
   isCollapsed(id: string): boolean { return this.collapsed.has(id); }
-  toggleSection(id: string): void { this.collapsed.has(id) ? this.collapsed.delete(id) : this.collapsed.add(id); }
+  toggleSection(id: string): void {
+    this.collapsed.has(id) ? this.collapsed.delete(id) : this.collapsed.add(id);
+    if (id === 'access' && !this.collapsed.has(id)) this.ensureAccessLoaded();
+  }
   collapseAll(): void { this.sections.forEach(s => this.collapsed.add(s.id)); }
-  expandAll(): void { this.collapsed.clear(); }
+  expandAll(): void { this.collapsed.clear(); this.ensureAccessLoaded(); }
   sectionsIn(group: string): SectionDef[] { return this.sections.filter(s => s.group === group); }
   jumpTo(id: string): void {
     this.collapsed.delete(id);
+    if (id === 'access') this.ensureAccessLoaded();
     this.activeSection = id;
     // Expanding a collapsed section changes the height of everything below it, so a
     // scroll measured in this same tick lands in the wrong place — the reason a rail
@@ -677,6 +700,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
       case 'audience': return `${this.countOn(['activeparticipants', 'newusersonly', 'journeybased', 'tierbased', 'facilitator'])} on`;
       case 'category': return this.v('categorybased') ? 'On' : 'Off';
       case 'evergreen': return this.v('evergreenWorkshop') ? 'On' : 'Off';
+      case 'access': return this.accessSummary;
       case 'hero': {
         const a: string[] = [];
         if (this.v('hero')) a.push('Web');
@@ -688,6 +712,7 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
     }
   }
   railHasContent(id: string): boolean {
+    if (id === 'access') return this.accessAnyone;
     const s = this.sections.find(x => x.id === id)!;
     return s.controls.some(k => { const val = this.v(k); return Array.isArray(val) ? val.length > 0 : typeof val === 'object' && val ? Object.values(val).some(x => Array.isArray(x) ? x.length : !!x) : !!val; });
   }
@@ -868,5 +893,174 @@ export class WorkshopSettingsv2Component implements OnInit, AfterViewInit, OnDes
   removeHeroAsset(field: 'heroImage' | 'heroImageMobile' | 'heroVideo'): void {
     this.settingsForm.get(field)?.setValue('');   // config only; the Storage file stays, as legacy
     this.settingsForm.get(field)?.markAsDirty();
+  }
+
+  // ═══════════════════════════ Dashboard Access ═══════════════════════════
+  // Two independent things are edited here.
+  //  · Three lists that are shared by EVERY workshop (full dashboard access,
+  //    workshop editing, the new users screen). They live in one document; the
+  //    section says so on screen, because they are edited from inside a single
+  //    workshop but are not about that workshop.
+  //  · What each person may do on THIS workshop's dashboard. Stored beside the
+  //    workshop under the workshop's own id, so one workshop has exactly one.
+  // The section saves itself — it writes different documents from the rest of
+  // Settings, and it must stay usable on a workshop that has not been saved yet.
+  readonly accessKeys = WORKSHOP_ACCESS_KEYS;
+  readonly accessListDefs: { key: AdminListKey; title: string; hint: string }[] = [
+    { key: 'dashboardAdmins', title: 'Full dashboard access', hint: 'Everything on every workshop dashboard. People here are not given actions one by one.' },
+    { key: 'editAccess', title: 'Workshop editing', hint: 'Create, edit and duplicate a workshop, and change its Active, Web Active and Completed switches.' },
+    { key: 'newUsersAccess', title: 'New users screen', hint: 'Open the new users screen from the workshops list.' },
+  ];
+  accessLoading = false;
+  accessLoaded = false;
+  accessSaving = false;
+  accessJustSaved = false;
+  accessError = '';
+  accessDirty = false;
+  adminLists: WorkshopAdminLists = { ...EMPTY_ADMIN_LISTS };
+  /** People with something ticked, plus anyone just added and not ticked yet. */
+  accessRows: string[] = [];
+  accessGrants: WorkshopAccessGrants = {};
+  accessPeople: WorkshopPerson[] = [];
+  private accessNameMap: Record<string, string> = {};
+  private accessSavedTimer: any = null;
+  /** Long lists are cut off in the popover — searching is faster than scrolling. */
+  private readonly accessPickerLimit = 200;
+
+  /** Read the two access documents and the directory, once, when first opened. */
+  async ensureAccessLoaded(): Promise<void> {
+    if (this.accessLoaded || this.accessLoading) return;
+    this.accessLoading = true;
+    try {
+      const [people, lists, grants] = await Promise.all([
+        this.accessService.getParticipantDirectory(),
+        this.accessService.refreshAdminLists(),
+        this.workshopId ? this.accessService.getWorkshopGrants(this.workshopId) : Promise.resolve({}),
+      ]);
+      this.zone.run(() => {
+        this.accessPeople = people;
+        this.accessNameMap = people.reduce((acc: Record<string, string>, p) => { acc[p.id] = p.name; return acc; }, {});
+        this.adminLists = { dashboardAdmins: [...lists.dashboardAdmins], editAccess: [...lists.editAccess], newUsersAccess: [...lists.newUsersAccess] };
+        this.accessGrants = Object.keys(grants).reduce((acc: WorkshopAccessGrants, id) => { acc[id] = [...grants[id]]; return acc; }, {});
+        this.accessRows = Object.keys(this.accessGrants).sort((a, b) => this.accessNameFor(a).localeCompare(this.accessNameFor(b)));
+        this.accessDirty = false;
+        this.accessLoaded = true;
+      });
+    } catch (err) {
+      console.error('Could not load dashboard access:', err);
+      this.zone.run(() => { this.accessError = 'Could not load access. Reopen this section to try again.'; });
+    } finally {
+      this.zone.run(() => { this.accessLoading = false; });
+    }
+  }
+
+  accessNameFor(id: string): string { return this.accessNameMap[id] || this.profileNameMap[id] || id; }
+  accessEmailFor(id: string): string { return this.accessPeople.find(p => p.id === id)?.email || ''; }
+
+  /** The picker list, filtered by the search box and capped. */
+  accessPickerList(excludeAdmins: boolean): WorkshopPerson[] {
+    const q = this.popSearch.trim().toLowerCase();
+    const admins = new Set(this.adminLists.dashboardAdmins);
+    const out: WorkshopPerson[] = [];
+    for (const p of this.accessPeople) {
+      if (excludeAdmins && admins.has(p.id)) continue;
+      if (q && !(p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))) continue;
+      out.push(p);
+      if (out.length >= this.accessPickerLimit) break;
+    }
+    return out;
+  }
+  get accessPickerTruncated(): boolean {
+    return this.accessPickerList(false).length >= this.accessPickerLimit;
+  }
+
+  // ── the three shared lists ──
+  adminList(key: AdminListKey): string[] { return this.adminLists[key] || []; }
+  inAdminList(key: AdminListKey, id: string): boolean { return this.adminList(key).includes(id); }
+  toggleAdminList(key: AdminListKey, id: string): void {
+    const cur = this.adminList(key);
+    this.adminLists = { ...this.adminLists, [key]: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] };
+    // Someone with access to everything is no longer given actions one by one.
+    if (key === 'dashboardAdmins' && this.adminLists.dashboardAdmins.includes(id)) this.removeAccessPerson(id);
+    this.markAccessDirty();
+  }
+  removeFromAdminList(key: AdminListKey, id: string): void {
+    this.adminLists = { ...this.adminLists, [key]: this.adminList(key).filter(x => x !== id) };
+    this.markAccessDirty();
+  }
+
+  // ── this workshop's people ──
+  /** Admins are filtered out: they already have everything. */
+  get accessRowsShown(): string[] {
+    const admins = new Set(this.adminLists.dashboardAdmins);
+    return this.accessRows.filter(id => !admins.has(id));
+  }
+  addAccessPerson(id: string): void {
+    if (!id || this.accessRows.includes(id)) return;
+    this.accessRows = [...this.accessRows, id];
+    if (!this.accessGrants[id]) this.accessGrants = { ...this.accessGrants, [id]: [] };
+    this.markAccessDirty();
+  }
+  removeAccessPerson(id: string): void {
+    this.accessRows = this.accessRows.filter(x => x !== id);
+    const next = { ...this.accessGrants };
+    delete next[id];
+    this.accessGrants = next;
+    this.markAccessDirty();
+  }
+  hasGrant(id: string, key: WorkshopAccessKey): boolean { return (this.accessGrants[id] || []).includes(key); }
+  toggleGrant(id: string, key: WorkshopAccessKey): void {
+    const cur = this.accessGrants[id] || [];
+    this.accessGrants = { ...this.accessGrants, [id]: cur.includes(key) ? cur.filter(k => k !== key) : [...cur, key] };
+    this.markAccessDirty();
+  }
+  grantAll(id: string): void {
+    this.accessGrants = { ...this.accessGrants, [id]: this.accessKeys.map(k => k.key) };
+    this.markAccessDirty();
+  }
+  grantNone(id: string): void {
+    this.accessGrants = { ...this.accessGrants, [id]: [] };
+    this.markAccessDirty();
+  }
+  grantCount(id: string): number { return (this.accessGrants[id] || []).length; }
+
+  private markAccessDirty(): void {
+    this.accessDirty = true;
+    this.accessJustSaved = false;
+    this.accessError = '';
+  }
+
+  /** Nothing is open by default: somebody has to be picked before anyone gets in. */
+  get accessAnyone(): boolean {
+    return this.adminLists.dashboardAdmins.length > 0 || this.accessRowsShown.length > 0;
+  }
+  get accessSummary(): string {
+    if (!this.accessLoaded) return '';
+    if (!this.accessAnyone) return 'Nobody yet';
+    const n = this.accessRowsShown.length;
+    return `${this.adminLists.dashboardAdmins.length} full · ${n} ${n === 1 ? 'person' : 'people'}`;
+  }
+
+  async saveDashboardAccess(): Promise<void> {
+    if (this.accessSaving || !this.accessLoaded) return;
+    this.accessSaving = true;
+    this.accessError = '';
+    try {
+      const savedBy = await this.accessService.currentProfileId();
+      await this.accessService.saveAdminLists(this.adminLists);
+      if (this.workshopId) await this.accessService.saveWorkshopGrants(this.workshopId, this.accessGrants, savedBy);
+      this.zone.run(() => {
+        this.accessDirty = false;
+        this.accessJustSaved = true;
+        if (this.accessSavedTimer) clearTimeout(this.accessSavedTimer);
+        this.accessSavedTimer = setTimeout(() => { this.accessJustSaved = false; }, 4000);
+        this.snackBar.open('Dashboard access saved', 'Close', { duration: 2000, panelClass: 'sx-snack' });
+      });
+    } catch (err) {
+      console.error('Error saving dashboard access:', err);
+      this.zone.run(() => { this.accessError = 'Could not save access. Please try again.'; });
+    } finally {
+      this.zone.run(() => { this.accessSaving = false; });
+    }
   }
 }

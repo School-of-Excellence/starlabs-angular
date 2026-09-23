@@ -688,6 +688,178 @@
           <div class="help">Uploads go to workshops/&lt;workshop id&gt;/hero_&lt;timestamp&gt;. Remove clears the link only; the file stays in storage.</div>
         </div>
       </section>
+
+      <!-- ── DASHBOARD · who can use the workshop dashboard ── -->
+      <section class="card" id="st-access">
+        <div data-testid="ws-access-section" class="sec-head" [class.closed]="isCollapsed('access')" (click)="toggleSection('access')">
+          <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('access') ? icChevRight : icChevDown"></ng-container></span>
+          <h2 class="sec-title">Dashboard Access</h2>
+          <span class="count" *ngIf="accessLoaded" [class.on]="accessAnyone" [class.zero]="!accessAnyone">{{ accessSummary }}</span>
+          <span class="grow"></span>
+          <span class="sec-hint">Dashboard &middot; who can open and use the workshop dashboard</span>
+        </div>
+
+        <div class="sec-body" *ngIf="!isCollapsed('access')">
+          <div class="help" *ngIf="accessLoading">Getting the list of people&hellip;</div>
+          <div class="help warn" *ngIf="accessError">{{ accessError }}</div>
+
+          <ng-container *ngIf="accessLoaded">
+            <!-- ── shared across every workshop ── -->
+            <div class="acc-banner" data-testid="ws-access-global-note">
+              <ng-container [ngTemplateOutlet]="icAlert"></ng-container>
+              <span>The three lists below are <b>not about this workshop</b> &mdash; they are shared by every workshop. They are edited here for convenience, so a change here changes every workshop at once. Nobody has access unless they are picked. What each person may do on <b>this</b> dashboard is set further down.</span>
+            </div>
+
+            <div class="grid3">
+              <div class="field pop-anchor" data-pop>
+                <div class="label"><span>Full dashboard access</span><span class="counter">{{ adminList('dashboardAdmins').length }} selected</span></div>
+                <div data-testid="ws-access-admins-picker" class="input chips" (click)="togglePopover('acc:admins')">
+                  <span class="chip soft in" *ngFor="let id of adminList('dashboardAdmins')">
+                    {{ accessNameFor(id) }}
+                    <button data-testid="ws-access-admins-remove" type="button" class="chip-x" (click)="$event.stopPropagation(); removeFromAdminList('dashboardAdmins', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                  </span>
+                  <span class="txt ph">Add a person&hellip;</span>
+                  <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                </div>
+                <div class="pop" *ngIf="openPopover === 'acc:admins'">
+                  <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search by name or email&hellip;"></div>
+                  <div class="pop-list">
+                    <button data-testid="ws-access-admins-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('dashboardAdmins', p.id)" (click)="toggleAdminList('dashboardAdmins', p.id)">
+                      <span class="box"><ng-container *ngIf="inAdminList('dashboardAdmins', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                    </button>
+                    <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
+                  </div>
+                  <div class="hrow between"><span class="help">{{ accessPickerTruncated ? 'Showing the first matches \u2014 keep typing to narrow it' : 'Participants only' }}</span><button data-testid="ws-access-admins-done" type="button" class="link" (click)="closePopover()">Done</button></div>
+                </div>
+                <div class="help">Everything on every workshop dashboard. People here are not given actions one by one.</div>
+              </div>
+
+              <div class="field pop-anchor" data-pop>
+                <div class="label"><span>Workshop editing</span><span class="counter">{{ adminList('editAccess').length }} selected</span></div>
+                <div data-testid="ws-access-edit-picker" class="input chips" (click)="togglePopover('acc:edit')">
+                  <span class="chip soft in" *ngFor="let id of adminList('editAccess')">
+                    {{ accessNameFor(id) }}
+                    <button data-testid="ws-access-edit-remove" type="button" class="chip-x" (click)="$event.stopPropagation(); removeFromAdminList('editAccess', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                  </span>
+                  <span class="txt ph">Add a person&hellip;</span>
+                  <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                </div>
+                <div class="pop" *ngIf="openPopover === 'acc:edit'">
+                  <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search by name or email&hellip;"></div>
+                  <div class="pop-list">
+                    <button data-testid="ws-access-edit-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('editAccess', p.id)" (click)="toggleAdminList('editAccess', p.id)">
+                      <span class="box"><ng-container *ngIf="inAdminList('editAccess', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                    </button>
+                    <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
+                  </div>
+                  <div class="hrow between"><span class="help">Participants only</span><button data-testid="ws-access-edit-done" type="button" class="link" (click)="closePopover()">Done</button></div>
+                </div>
+                <div class="help">Create, edit and duplicate a workshop, and change its Active, Web Active and Completed switches. Only the people picked here can &mdash; everyone else is blocked.</div>
+              </div>
+
+              <div class="field pop-anchor" data-pop>
+                <div class="label"><span>New users screen</span><span class="counter">{{ adminList('newUsersAccess').length }} selected</span></div>
+                <div data-testid="ws-access-newusers-picker" class="input chips" (click)="togglePopover('acc:newusers')">
+                  <span class="chip soft in" *ngFor="let id of adminList('newUsersAccess')">
+                    {{ accessNameFor(id) }}
+                    <button data-testid="ws-access-newusers-remove" type="button" class="chip-x" (click)="$event.stopPropagation(); removeFromAdminList('newUsersAccess', id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                  </span>
+                  <span class="txt ph">Add a person&hellip;</span>
+                  <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                </div>
+                <div class="pop" *ngIf="openPopover === 'acc:newusers'">
+                  <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search by name or email&hellip;"></div>
+                  <div class="pop-list">
+                    <button data-testid="ws-access-newusers-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('newUsersAccess', p.id)" (click)="toggleAdminList('newUsersAccess', p.id)">
+                      <span class="box"><ng-container *ngIf="inAdminList('newUsersAccess', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                    </button>
+                    <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
+                  </div>
+                  <div class="hrow between"><span class="help">Participants only</span><button data-testid="ws-access-newusers-done" type="button" class="link" (click)="closePopover()">Done</button></div>
+                </div>
+                <div class="help">Open the new users screen from the workshops list. Only the people picked here can &mdash; everyone else is blocked.</div>
+              </div>
+            </div>
+
+            <div class="acc-state" data-testid="ws-access-state" [class.off]="!accessAnyone">
+              <span class="pill" [class.pill-ok]="accessAnyone" [class.pill-err]="!accessAnyone">{{ accessAnyone ? 'Only the people picked can open this dashboard' : 'Nobody can open this dashboard' }}</span>
+              <span class="help">{{ accessAnyone ? 'Everyone else is blocked, including from the actions below.' : 'Nobody has been picked, so this dashboard is closed to everyone. Add a person to Full dashboard access, or pick someone under This workshop.' }}</span>
+            </div>
+
+            <!-- ── this workshop ── -->
+            <div class="acc-sub">
+              <div class="acc-sub-head">
+                <div>
+                  <div class="s-sub">This workshop</div>
+                  <div class="help">Pick a person, then tick what they can do on this workshop&rsquo;s dashboard. People with full access are not listed here.</div>
+                </div>
+                <div class="field pop-anchor acc-add" data-pop>
+                  <button data-testid="ws-access-person-picker" type="button" class="input pick" (click)="togglePopover('acc:person')">
+                    <span class="txt ph">Add a person&hellip;</span>
+                    <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                  </button>
+                  <div class="pop" *ngIf="openPopover === 'acc:person'">
+                    <div class="input sm"><span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span><input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search by name or email&hellip;"></div>
+                    <div class="pop-list">
+                      <button data-testid="ws-access-person-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(true)" [class.sel]="accessRows.includes(p.id)" (click)="addAccessPerson(p.id)">
+                        <span class="box"><ng-container *ngIf="accessRows.includes(p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                        <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                      </button>
+                      <div class="help pad" *ngIf="!accessPickerList(true).length">Nobody matches.</div>
+                    </div>
+                    <div class="hrow between"><span class="help">Participants only</span><button data-testid="ws-access-person-done" type="button" class="link" (click)="closePopover()">Done</button></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="help pad" data-testid="ws-access-empty" *ngIf="!accessRowsShown.length">Nobody has been given access to this dashboard yet.</div>
+
+              <div class="acc-row" data-testid="ws-access-row" *ngFor="let id of accessRowsShown">
+                <div class="acc-row-head">
+                  <span class="acc-name">{{ accessNameFor(id) }}</span>
+                  <span class="acc-mail" *ngIf="accessEmailFor(id)">{{ accessEmailFor(id) }}</span>
+                  <span class="grow"></span>
+                  <span class="counter">{{ grantCount(id) }} of {{ accessKeys.length }}</span>
+                  <button data-testid="ws-access-grant-all" type="button" class="link" (click)="grantAll(id)">All</button>
+                  <button data-testid="ws-access-grant-none" type="button" class="link" (click)="grantNone(id)">None</button>
+                  <button data-testid="ws-access-row-remove" type="button" class="chip-x" (click)="removeAccessPerson(id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                </div>
+                <div class="acc-ticks">
+                  <ng-container *ngFor="let k of accessKeys">
+                    <button data-testid="ws-access-tick" type="button" class="acc-tick" *ngIf="!k.evergreenOnly || v('evergreenWorkshop')"
+                            [class.on]="hasGrant(id, k.key)" [title]="k.help" (click)="toggleGrant(id, k.key)">
+                      <span class="box"><ng-container *ngIf="hasGrant(id, k.key)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                      <span class="n">{{ k.label }}</span>
+                    </button>
+                  </ng-container>
+                </div>
+              </div>
+
+              <details class="acc-legend">
+                <summary data-testid="ws-access-legend">What each one allows</summary>
+                <ul>
+                  <li *ngFor="let k of accessKeys"><b>{{ k.label }}</b> &mdash; {{ k.help }}</li>
+                </ul>
+              </details>
+            </div>
+
+            <div class="acc-save">
+              <span class="pill pill-warn" *ngIf="accessDirty">Unsaved access changes</span>
+              <span class="pill pill-ok" *ngIf="!accessDirty && accessJustSaved">Access saved</span>
+              <span class="help warn" *ngIf="accessError">{{ accessError }}</span>
+              <span class="grow"></span>
+              <span class="help">Saves on its own &mdash; the Save Settings button below does not include access.</span>
+              <button data-testid="ws-access-save" type="button" class="btn btn-primary" [disabled]="!accessDirty || accessSaving" (click)="saveDashboardAccess()">
+                <span class="spin" *ngIf="accessSaving"></span>
+                <span>{{ accessSaving ? 'Saving' : 'Save Access' }}</span>
+              </button>
+            </div>
+          </ng-container>
+        </div>
+      </section>
     </form>
 
     <!-- ═══════════════ sticky save bar ═══════════════ -->

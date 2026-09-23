@@ -17,7 +17,14 @@
         </mat-card-content>
       </mat-card>
     </div>
-    <div *ngIf="!loading && !error && workshopData" class="dashboard-content">
+    <!-- Access to a workshop dashboard is given in that workshop's settings.
+         Someone who was not picked never reaches the data at all. -->
+    <div *ngIf="accessDenied" class="wd-no-access" data-testid="wdash-no-access">
+      <mat-icon>lock</mat-icon>
+      <h3>You do not have access to this dashboard</h3>
+      <p>Ask someone who manages this workshop to give you access to it.</p>
+    </div>
+    <div *ngIf="!loading && !error && !accessDenied && workshopData" class="dashboard-content">
       <!-- ═════ Workshop header — redesigned compact presentation.
            Data, bindings, action handlers and ID gates are IDENTICAL to the
            previous gradient card; only markup/styling changed. ═════ -->
@@ -35,22 +42,29 @@
         </div>
         <div class="whd-actions">
           <button type="button" class="whd-btn" data-testid="wdash-comm-open-btn" (click)="openCommunicationDialog()"
+                  *ngIf="can('sendcommunication')"
                   matTooltip="Email, WhatsApp or notify anyone — enrolled in this workshop or not">
             <mat-icon>forum</mat-icon>Communication
           </button>
-          <button data-testid="wd-open-qadialog-2" type="button" class="whd-btn" (click)="openQADialog()">
+          <button data-testid="wd-open-qadialog-2" type="button" class="whd-btn" (click)="openQADialog()" *ngIf="can('qanda')">
             <mat-icon>help_outline</mat-icon>Q &amp; A
           </button>
           <button data-testid="wd-open-diagnose-dialog-3" type="button" class="whd-btn" (click)="openDiagnoseDialog()"
+                  *ngIf="can('diagnose')"
                   matTooltip="Check why a profile can or cannot enroll in this workshop">
             <mat-icon>troubleshoot</mat-icon>Diagnose
           </button>
-          <button data-testid="wd-open-clear-dialog-4" type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || loggedinProfile === 'iBMwpJMbysfW3I5gvhGI' || loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ'">
+          <button data-testid="wd-open-clear-dialog-4" type="button" class="whd-btn whd-btn-danger" (click)="openClearDialog()" *ngIf="canClear">
             <mat-icon>delete</mat-icon>Clear
           </button>
-          <button data-testid="wd-manualenroll-5" type="button" class="whd-btn whd-btn-primary" (click)="manualenroll()" *ngIf="loggedinProfile !== null && loggedinProfile === '3LVxKXuyxldYoRDEpx5s'|| loggedinProfile === 'iBMwpJMbysfW3I5gvhGI'">
+          <button data-testid="wd-manualenroll-5" type="button" class="whd-btn whd-btn-primary" (click)="manualenroll()" *ngIf="canEnroll">
             <mat-icon>person_add</mat-icon>Enroll
           </button>
+          <!-- Says why buttons are missing, instead of leaving a limited user guessing. -->
+          <span class="whd-access-pill" data-testid="wdash-access-notice" *ngIf="accessNotice"
+                matTooltip="Your access to this dashboard was set in the workshop's settings.">
+            <mat-icon>lock</mat-icon>{{ accessNotice }}
+          </span>
         </div>
       </header>
     <div class="metrics-section">
@@ -821,6 +835,7 @@
           <button data-testid="wd-export-participants-to-csv-35" mat-raised-button 
             color="primary" 
             (click)="exportParticipantsToCSV()"
+            *ngIf="can('export')"
             [disabled]="loading || enrolledParticipants.length === 0"
           >
             <mat-icon>download</mat-icon>
@@ -1030,10 +1045,11 @@
                 </td>
               </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-header-row *matHeaderRowDef="visibleColumns"></tr>
               <tr data-testid="wd-on-participant-click-39" mat-row 
-                *matRowDef="let row; columns: displayedColumns;" 
-                class="participant-row clickable-row"
+                *matRowDef="let row; columns: visibleColumns;" 
+                class="participant-row"
+                [class.clickable-row]="can('participantprogress')"
                 (click)="onParticipantClick(row)"
                 [class.selected-row]="selectedParticipantData?.profileid === row.profileid">
             </tr>
@@ -1051,7 +1067,7 @@
       <!-- ═════ Participant Data — redesigned presentation (grid layout).
            Data, bindings and click handlers are IDENTICAL to the previous
            accordion/list; only markup/styling changed. ═════ -->
-      <section class="pd" id="participantDataCard" #participantDataSection>
+      <section class="pd" id="participantDataCard" #participantDataSection *ngIf="can('participantprogress')">
         <div class="pd-head">
           <div>
             <h2 class="pd-title">Participant Data</h2>
@@ -1334,7 +1350,7 @@
      presentation. Data, bindings and click handlers are IDENTICAL to the
      previous accordions; only markup/styling changed. ═════ -->
 
-<section class="arc">
+<section class="arc" *ngIf="can('allassignments')">
   <div class="arc-head">
     <div>
       <h2 class="arc-title">All Assignments</h2>
@@ -1423,7 +1439,7 @@
   </div>
 </section>
 
-<section class="arc">
+<section class="arc" *ngIf="can('allforms')">
   <div class="arc-head">
     <div>
       <h2 class="arc-title">All Forms</h2>
@@ -1431,6 +1447,7 @@
     </div>
     <button data-testid="wd-export-forms-to-excel-52" mat-stroked-button color="primary" class="forms-export-btn"
             (click)="exportFormsToExcel()"
+            *ngIf="canExportForms"
             [disabled]="isExportingForms || challengeForms.length === 0">
       <mat-icon>download</mat-icon>
       {{ isExportingForms ? 'Exporting…' : 'Export Excel' }}
@@ -1487,7 +1504,7 @@
   </div>
 </section>
 
-<section class="arc">
+<section class="arc" *ngIf="can('allvideoask')">
   <div class="arc-head">
     <div>
       <h2 class="arc-title">All VideoAsk</h2>
@@ -1636,13 +1653,13 @@
           <mat-icon>group_add</mat-icon>{{ chatAddAllBusy ? 'Adding…' : 'Add all to group' }}
           <span class="chat-add-all-n" *ngIf="!chatAddAllBusy">{{ chatAddableCount }}</span>
         </button>
-        <button data-testid="wd-send-email-to-selected-paricipant-58" mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()">
+        <button data-testid="wd-send-email-to-selected-paricipant-58" mat-icon-button class="close-button" (click)="sendEmailToSelectedParicipant()" *ngIf="can('sendcommunication')">
           <i class="fa-solid fa-envelope"></i>
         </button>
-        <button data-testid="wd-send-watti-59" mat-icon-button class="close-button" (click)="sendWatti()">
+        <button data-testid="wd-send-watti-59" mat-icon-button class="close-button" (click)="sendWatti()" *ngIf="can('sendcommunication')">
           <i class="fa-brands fa-whatsapp"></i>
         </button>
-        <button data-testid="wd-send-notificationin-breakthrough-60" mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+        <button data-testid="wd-send-notificationin-breakthrough-60" mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()" *ngIf="can('sendcommunication')">
           <mat-icon>notifications_active</mat-icon>
         </button>
         <button data-testid="wd-close-participant-panel-61" mat-icon-button class="close-button" (click)="closeParticipantPanel()">
@@ -1657,9 +1674,9 @@
       <div class="participant-count">
         <span class="count">{{ filteredParticipants.length }}</span>
         <span class="label">participants</span><br>
-        <span class="label" style="font-size: 10px;">*click to export</span> 
+        <span class="label" style="font-size: 10px;" *ngIf="can('export')">*click to export</span> 
       </div>
-      <button data-testid="wd-export-participants-62" class="export-btn" (click)="exportParticipants()">
+      <button data-testid="wd-export-participants-62" class="export-btn" (click)="exportParticipants()" *ngIf="can('export')">
         <mat-icon>file_download</mat-icon>
       </button>
     </div>
@@ -2091,7 +2108,7 @@
         <mat-card class="participant-card" *ngFor="let participant of filteredParticipants">
           <mat-card-content>
             <a data-testid="wd-a-84"
-              *ngIf="!selectedStatusInfo?.evergreenCompleted"
+              *ngIf="!selectedStatusInfo?.evergreenCompleted || !can('extend')"
               class="participant-item"
               [href]="'/userprofile/' + participant.profileid"
               target="_blank"
@@ -2139,7 +2156,7 @@
 
             <!-- Evergreen Completed panel: no profile navigation — clicking a
                  participant opens the extend-until date picker instead. -->
-            <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted">
+            <ng-container *ngIf="selectedStatusInfo?.evergreenCompleted && can('extend')">
               <button data-testid="wd-toggle-extend-target-85" type="button" class="participant-item extend-item"
                       (click)="toggleExtendTarget(participant.profileid)">
                 <mat-icon class="participant-avatar">person</mat-icon>

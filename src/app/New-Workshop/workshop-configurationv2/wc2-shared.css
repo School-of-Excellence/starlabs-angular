@@ -234,14 +234,19 @@ button.input.pick[disabled] { cursor: not-allowed; background: #f8fafd; color: v
 .ic:hover { border-color: var(--primary); }
 .ic.sel { border: 2px solid var(--primary); background: #eef3f9; }
 .pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
-.pop-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 13px; color: var(--t1); cursor: pointer; }
+.pop-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 34px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 13px; line-height: 1.45; color: var(--t1); cursor: pointer; }
 .pop-row:hover:not([disabled]) { background: #eef3f9; }
 .pop-row.sel { color: var(--primary); font-weight: 600; }
 .pop-row[disabled] { opacity: .4; cursor: not-allowed; }
 .pop-row .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
 .pop-row.sel .box { background: var(--primary); border-color: var(--primary); }
-.pop-row .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pop-row .c { font-size: 11.5px; color: var(--t3); }
+/* Names are shown in full: a cut-off name is useless when the whole point of the
+   row is to pick the right person. Long ones wrap onto a second line instead. */
+.pop-row .n { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.pop-row .c { font-size: 11.5px; color: var(--t3); white-space: normal; overflow-wrap: anywhere; text-align: right; }
+.pop-row .box { margin-top: 1px; }
+/* Chips carrying a picked name wrap too, rather than pushing past the field. */
+.input.chips .chip { height: auto; min-height: 24px; padding: 3px 10px; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 
 /* ── workshop type: the main field, highlighted at the top of the Enrollment tab ── */
 .type-badge { display: inline-flex; align-items: center; height: 26px; padding: 0 12px; border-radius: 13px; background: var(--primary); color: #fff; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }

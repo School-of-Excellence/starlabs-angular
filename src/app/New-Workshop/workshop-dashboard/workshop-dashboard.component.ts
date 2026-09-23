@@ -36,6 +36,8 @@ import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment.development';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { SnackbarService } from '../../shared/snackbar.service';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import { NO_ACCESS, WorkshopAccess, WorkshopAccessKey } from '../workshop-access/workshop-access.model';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -94,6 +96,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   expandedArchiveGroups = new Set<string>();
 
   toggleArchiveGroup(key: string): void {
+    // The three archive sections are granted separately; the key says which one.
+    if (key.startsWith('assign-') && !this.can('allassignments')) return;
+    if (key.startsWith('form-') && !this.can('allforms')) return;
+    if (key.startsWith('va-') && !this.can('allvideoask')) return;
     if (this.expandedArchiveGroups.has(key)) this.expandedArchiveGroups.delete(key);
     else this.expandedArchiveGroups.add(key);
   }
@@ -116,6 +122,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
   /** One click handler for a participant card: text answers expand in place, files/forms open their viewer. */
   onAssignmentCardClick(assignment: any, assignmentIndex: number, participant: any): void {
+    if (!this.can('allassignments')) return;
     if (this.isTextSubmission(participant)) { this.toggleAssignmentText(assignmentIndex, participant); return; }
     if (participant?.hasResult) this.viewParticipantAssignment(assignment, participant);
   }
@@ -201,6 +208,29 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
   filteredParticipants: any[] = [];
   loggedinProfile: string = null;
+
+  // ───────── who may do what on this dashboard ─────────
+  // Nobody has anything until the access documents say so; this starts closed
+  // and is replaced once they are read.
+  access: WorkshopAccess = NO_ACCESS;
+  /** False until the access documents have been read — the screen waits rather than flashing. */
+  accessResolved = false;
+
+  can(key: WorkshopAccessKey): boolean { return this.access.can(key); }
+  get canClear(): boolean { return this.can('clear'); }
+  get canEnroll(): boolean { return this.can('enroll'); }
+  /** The forms sheet needs both: the right to export, and the right to see the forms. */
+  get canExportForms(): boolean { return this.can('export') && this.can('allforms'); }
+  /** Move next and Review disappear with the right to open a participant. */
+  get visibleColumns(): string[] {
+    if (this.can('participantprogress')) return this.displayedColumns;
+    return this.displayedColumns.filter(c => c !== 'action' && c !== 'assignment');
+  }
+  /** Nobody picked this person for this workshop: the dashboard is closed to them. */
+  get accessDenied(): boolean { return this.accessResolved && this.access.isLockedOut; }
+  /** Shown in the header so a limited user can see why buttons are missing. */
+  get accessNotice(): string { return this.access.isPartial ? 'Limited access' : ''; }
+
   mapProfile: any = {};
   mapProfileNew: any = {};
   loading = true;
@@ -311,6 +341,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private http: HttpClient,
     private snackbarService: SnackbarService,
+    private accessService: WorkshopAccessService,
   ) {
     this.initializeProfileData();
     this.initializeJourneyData();
@@ -401,6 +432,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
 
     if (this.workshopId) {
+      // Resolve permissions before the first render of the header, so the
+      // action buttons never flash into view and then disappear.
+      try {
+        this.access = await this.accessService.accessFor(this.workshopId);
+      } catch (error) {
+        console.error('Error loading dashboard access:', error);
+      }
+      this.accessResolved = true;
+      // Nothing is read for someone who was not given access to this workshop.
+      if (this.access.isLockedOut) { this.loading = false; return; }
       console.log('load dashboard....');
       this.loadWorkshopDashboard();
       this.loadSubscriberCodes();
@@ -722,6 +763,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   /** Email — the side panel's button; `recipients` lets the Communication dialog reuse it. */
   sendEmailToSelectedParicipant(recipients?: any[]) {
+    if (!this.can('sendcommunication')) return;
     const recipients_ = recipients ? this.toEmailRecipients(recipients) : this.emailRecipients;
     return this.sendEmailTo(recipients_);
   }
@@ -794,6 +836,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   /** WhatsApp — same contract as sendMail(recipients?). */
   async sendWatti(recipients?: any[]) {
+    if (!this.can('sendcommunication')) return;
     const list = recipients ?? this.filteredParticipants;
     const { SendmessagesComponent } = await import('./sendmessages/sendmessages.component');
     const ref = this.dialog.open(SendmessagesComponent, {
@@ -1074,6 +1117,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   /** In-app notification — same contract as sendMail(recipients?). */
   async sendNotificationinBreakthrough(recipients?: any[]) {
+    if (!this.can('sendcommunication')) return;
     const list = recipients ?? this.filteredParticipants;
     const { AhNotificationComponent } = await import(
       '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component'
@@ -1379,6 +1423,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   onParticipantClick(participant: any) {
+    if (!this.can('participantprogress')) return;
     const enrolledParticipant = this.enrolledParticipants.find(
       ep => ep.profileid === participant.profileid
     );
@@ -1952,6 +1997,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   // ---- evergreen workshop extension (Completed panel) ----
   toggleExtendTarget(profileid: string): void {
+    if (!this.can('extend')) return;
     this.extendTargetProfileId = this.extendTargetProfileId === profileid ? null : profileid;
     this.extendDate = null;
   }
@@ -1961,6 +2007,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   // pinned to 11:59 pm of the chosen day; created is now. The live participant
   // workshop snapshot then moves the user from Completed to Extended.
   async confirmExtend(participant: any): Promise<void> {
+    if (!this.can('extend')) return;
     if (!this.extendDate || this.extendSaving) return;
     const enrolled = this.enrolledParticipants.find(e => e.profileid === participant.profileid);
     const ref = enrolled?.participantworkshopref;
@@ -2077,6 +2124,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * progress flow are shared rather than duplicated.
    */
   async openCommunicationDialog() {
+    if (!this.can('sendcommunication')) return;
     if (this.communicationOpening || !this.workshopId) return;
     this.communicationOpening = true;
     try {
@@ -2103,6 +2151,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   async openQADialog() {
+    if (!this.can('qanda')) return;
     const { QuestionandanswerComponent } = await import('./questionandanswer/questionandanswer.component');
     this.dialog.open(QuestionandanswerComponent, {
       width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh',
@@ -2119,6 +2168,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * browser console.
    */
   async openDiagnoseDialog() {
+    if (!this.can('diagnose')) return;
     const { EnrollDiagnosticsComponent } = await import('./enroll-diagnostics/enroll-diagnostics.component');
     this.dialog.open(EnrollDiagnosticsComponent, {
       data: { workshopId: this.workshopId, workshopTitle: this.workshopTitle },
@@ -2127,6 +2177,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   async openClearDialog() {
+    if (!this.canClear) return;
     const { ClearWorkshopComponent } = await import('./clear-workshop/clear-workshop.component');
     this.dialog.open(ClearWorkshopComponent, {
       data: { participants: this.enrolledParticipants, mapProfile: this.mapProfile },
@@ -2168,6 +2219,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   async reviewAssignment(participant: any) {
+    if (!this.can('participantprogress')) return;
     try {
       const enrolledParticipant = this.enrolledParticipants.find(ep => ep.profileid === participant.profileid);
       if (!enrolledParticipant) return;
@@ -2382,6 +2434,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   async moveParticipantToNext(participant: any) {
+    if (!this.can('participantprogress')) return;
     if (this.loggedinProfile !== null && (this.loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || this.loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || this.loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ')) {
       if (participant.progressPercentage === 100) return;
       try {
@@ -3151,6 +3204,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   exportParticipantsToCSV() {
+    if (!this.can('export')) return;
     const confirmDownload = window.confirm("Are you sure you want to export participants as CSV?");
     if (!confirmDownload) return;
     const csvData = this.prepareCSVData();
@@ -3302,6 +3356,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   exportParticipants() {
+    if (!this.can('export')) return;
     if (!this.filteredParticipants || this.filteredParticipants.length === 0) {
       alert("No participants selected to export."); return;
     }
@@ -3329,6 +3384,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   //   dialogRef.afterClosed().subscribe(result => { });
   // }
   async manualenroll() {
+    if (!this.canEnroll) return;
     const { EnrollComponent } = await import('./enroll/enroll.component');
     const dialogRef = this.dialog.open(EnrollComponent, {
       width: '400px',
@@ -3372,6 +3428,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   openChallengeFormReview(form: any, participant: any): void {
+    if (!this.can('allforms')) return;
     const enrolledParticipant = this.enrolledParticipants.find(ep => ep.profileid === participant.profileid);
     if (!enrolledParticipant) { console.error('Enrolled participant not found'); return; }
     const participantProgress = this.participantProgressList.find(p => p.profileid === participant.profileid);
@@ -3432,6 +3489,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * player's native control).
    */
   async playVideoAsk(va: any, participant: any): Promise<void> {
+    if (!this.can('allvideoask')) return;
     if (participant.vaLoading || participant.vaPlaying) return;
     participant.vaLoading = true;
     try {
@@ -3465,6 +3523,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
    * fetched in parallel (the old serial per-participant awaits made this crawl).
    */
   async exportFormsToExcel(): Promise<void> {
+    if (!this.canExportForms) return;
     if (this.isExportingForms) return;
     if (!this.challengeForms || this.challengeForms.length === 0) {
       alert('No forms to export.'); return;
