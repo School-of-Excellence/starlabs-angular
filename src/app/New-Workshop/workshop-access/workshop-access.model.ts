@@ -9,10 +9,14 @@
  *  2. **Per-workshop grants** (one document per workshop, same id as the
  *     workshop). A person gets exactly the actions ticked for them.
  *
- * **Nothing is open by default.** A person who has not been picked gets nothing:
- * an empty list blocks everyone, not no-one. The only exception is the small set
- * of founding profiles below, which always pass every gate — without them an
- * empty list would lock the very screen where the lists are filled in.
+ * **Nothing is open by default, with no exceptions.** A person who has not been
+ * picked gets nothing: an empty list blocks everyone, not no-one. There is no
+ * built-in account and no hard-coded id anywhere in here — every answer comes
+ * from the two documents these screens read.
+ *
+ * The consequence is deliberate: while both lists are empty, nobody can open the
+ * editor either. The first names have to be put into the shared document
+ * directly, once, before anyone can use these screens.
  *
  * No Firestore reads live here on purpose: everything below is a pure function
  * so the rules can be unit-tested without a database.
@@ -71,23 +75,6 @@ export const WORKSHOP_ACCESS_KEYS: WorkshopAccessKeyDef[] = [
   { key: 'allforms', label: 'All Forms', help: 'Expand and read every form submission.' },
   { key: 'allvideoask', label: 'All VideoAsk', help: 'Expand and play every VideoAsk reply.' },
 ];
-
-/**
- * The profiles that could always clear and enroll on a workshop dashboard, kept
- * as the permanent way in. Because nothing is open by default, some account has
- * to be able to reach the screen that grants access in the first place, and
- * these are the accounts that already held the most destructive rights.
- */
-export const WORKSHOP_SUPER_PROFILES: readonly string[] = [
-  '3LVxKXuyxldYoRDEpx5s',
-  'iBMwpJMbysfW3I5gvhGI',
-  'gtZHayfR3UpMbmKP9Uet',
-  'SFrMh3ntKtNOo6MYN7dZ',
-];
-
-export function isSuperProfile(profileId: string | null | undefined): boolean {
-  return !!profileId && WORKSHOP_SUPER_PROFILES.includes(profileId);
-}
 
 export const WORKSHOP_ACCESS_KEY_SET: ReadonlySet<string> =
   new Set(WORKSHOP_ACCESS_KEYS.map(k => k.key));
@@ -175,9 +162,9 @@ export class WorkshopAccess {
     this.granted = new Set(this.profileId ? (grants?.[this.profileId] || []) : []);
   }
 
-  /** Everything on this dashboard, on every workshop. */
+  /** Everything on this dashboard, on every workshop. Only the picked people. */
   get isAdmin(): boolean {
-    return isSuperProfile(this.profileId) || (!!this.profileId && this.admins.includes(this.profileId));
+    return !!this.profileId && this.admins.includes(this.profileId);
   }
 
   can(key: WorkshopAccessKey): boolean {
@@ -203,12 +190,10 @@ export const NO_ACCESS = new WorkshopAccess(null, {}, []);
 
 /** Create, edit, duplicate a workshop and flip its switches. Only the people picked. */
 export function canEditWorkshops(profileId: string | null | undefined, lists: WorkshopAdminLists): boolean {
-  if (isSuperProfile(profileId)) return true;
   return !!profileId && (lists?.editAccess || []).includes(profileId);
 }
 
 /** Open the new users screen. Only the people picked. */
 export function canOpenNewUsers(profileId: string | null | undefined, lists: WorkshopAdminLists): boolean {
-  if (isSuperProfile(profileId)) return true;
   return !!profileId && (lists?.newUsersAccess || []).includes(profileId);
 }

@@ -22,7 +22,7 @@ import { WC2_TOOLBAR_FULL, WC2_TOOLBAR_TITLE, WC2_TOOLBAR_ITEM, resetToParagraph
 import { FIELD_HINTS } from './wc2-help';
 import { AuthguardService } from '../../authguard.service';
 import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
-import { canEditWorkshops as canEditWorkshopsRule, isSuperProfile } from '../workshop-access/workshop-access.model';
+import { canEditWorkshops as canEditWorkshopsRule } from '../workshop-access/workshop-access.model';
 
 import { EnrollmentDateAdapter, WC2_MONTHS as MONTHS } from './wc2-date-adapter';
 import { WorkshopChallengesv2Component } from './challenges/workshop-challengesv2.component';
@@ -202,16 +202,14 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
   }
 
   private async checkEditAccess(): Promise<boolean> {
-    let profileId: string | null = null;
     try {
-      profileId = await this.accessService.currentProfileId();
+      const profileId = await this.accessService.currentProfileId();
       const lists = await this.accessService.getAdminLists();
       return canEditWorkshopsRule(profileId, lists);
     } catch (error) {
-      // Nothing is open by default, so a failed read closes the editor — except
-      // for the founding profiles, which must always be able to grant access.
+      // Nothing is open by default, so a failed read closes the editor too.
       console.error('Error checking workshop edit access:', error);
-      return isSuperProfile(profileId);
+      return false;
     }
   }
 

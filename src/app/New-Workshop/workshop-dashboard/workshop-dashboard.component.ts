@@ -2435,53 +2435,49 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
   async moveParticipantToNext(participant: any) {
     if (!this.can('participantprogress')) return;
-    if (this.loggedinProfile !== null && (this.loggedinProfile === '3LVxKXuyxldYoRDEpx5s' || this.loggedinProfile === 'gtZHayfR3UpMbmKP9Uet' || this.loggedinProfile === 'SFrMh3ntKtNOo6MYN7dZ')) {
-      if (participant.progressPercentage === 100) return;
-      try {
-        this.isMovingParticipant = participant.profileid;
-        const enrolledParticipant = this.enrolledParticipants.find(ep => ep.profileid === participant.profileid);
-        if (!enrolledParticipant) throw new Error('Enrolled participant record not found');
+    if (participant.progressPercentage === 100) return;
+    try {
+      this.isMovingParticipant = participant.profileid;
+      const enrolledParticipant = this.enrolledParticipants.find(ep => ep.profileid === participant.profileid);
+      if (!enrolledParticipant) throw new Error('Enrolled participant record not found');
 
-        let challenges = [...participant.challenges];
-        const now = Timestamp.now();
+      let challenges = [...participant.challenges];
+      const now = Timestamp.now();
 
-        while (challenges.length <= participant.currentChallengeIndex) challenges.push({});
+      while (challenges.length <= participant.currentChallengeIndex) challenges.push({});
 
-        const currentChallenge = { ...challenges[participant.currentChallengeIndex] };
-        const workshopChallenge = this.workshopData!.challenges[participant.currentChallengeIndex];
+      const currentChallenge = { ...challenges[participant.currentChallengeIndex] };
+      const workshopChallenge = this.workshopData!.challenges[participant.currentChallengeIndex];
 
-        if (workshopChallenge.type === 'zoomcall') {
-          console.log(`Skipping zoomcall challenge for participant ${participant.profileid}`);
-          return;
-        } else if (workshopChallenge.type === 'challenge') {
-          this.updateChallengeProgress(currentChallenge, participant, workshopChallenge, now);
-        }
-
-        challenges[participant.currentChallengeIndex] = currentChallenge;
-        await updateDoc(enrolledParticipant.participantworkshopref, { challenges });
-        const pwData = this.participantWorkshopMap.get(participant.profileid);
-        if (pwData) {
-          pwData['challenges'] = challenges;
-          this.participantWorkshopMap.set(participant.profileid, pwData);
-        }
-        const progress = this.calculateParticipantProgress(participant.profileid, challenges);
-        this.participantDataCache.set(participant.profileid, { progress, challenges });
-        const idx = this.participantProgressList.findIndex(p => p.profileid === participant.profileid);
-        if (idx >= 0) this.participantProgressList[idx] = progress;
-        this.triggerRecalculation();
-
-        if (this.selectedParticipantData?.profileid === participant.profileid) {
-          this.participantWorkshopData = pwData;
-          this.updateParticipantDisplayData();
-        }
-      } catch (error) {
-        console.error('Error moving participant to next challenge:', error);
-        this.error = `Failed to move participant: ${error}`;
-      } finally {
-        this.isMovingParticipant = null;
+      if (workshopChallenge.type === 'zoomcall') {
+        console.log(`Skipping zoomcall challenge for participant ${participant.profileid}`);
+        return;
+      } else if (workshopChallenge.type === 'challenge') {
+        this.updateChallengeProgress(currentChallenge, participant, workshopChallenge, now);
       }
-    } else {
-      alert('No Access');
+
+      challenges[participant.currentChallengeIndex] = currentChallenge;
+      await updateDoc(enrolledParticipant.participantworkshopref, { challenges });
+      const pwData = this.participantWorkshopMap.get(participant.profileid);
+      if (pwData) {
+        pwData['challenges'] = challenges;
+        this.participantWorkshopMap.set(participant.profileid, pwData);
+      }
+      const progress = this.calculateParticipantProgress(participant.profileid, challenges);
+      this.participantDataCache.set(participant.profileid, { progress, challenges });
+      const idx = this.participantProgressList.findIndex(p => p.profileid === participant.profileid);
+      if (idx >= 0) this.participantProgressList[idx] = progress;
+      this.triggerRecalculation();
+
+      if (this.selectedParticipantData?.profileid === participant.profileid) {
+        this.participantWorkshopData = pwData;
+        this.updateParticipantDisplayData();
+      }
+    } catch (error) {
+      console.error('Error moving participant to next challenge:', error);
+      this.error = `Failed to move participant: ${error}`;
+    } finally {
+      this.isMovingParticipant = null;
     }
   }
 
