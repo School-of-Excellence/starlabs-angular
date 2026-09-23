@@ -2455,3 +2455,46 @@ mat-dialog-actions,
 .jcd-root .card.span8 .cbody{overflow:visible}
 /* optical tracking on mid-size metric numbers */
 .jcd-root .orc .v, .jcd-root .obhero .v, .jcd-root .pcell .v, .jcd-root .obt .v, .jcd-root .pb .v{letter-spacing:-.01em}
+
+/* ============================================================================
+   (item 1) Drill table — DARK MODE. The preserved drill table carried no dark
+   rules, so in dark mode cell text used a light --ink on a light table surface
+   and was invisible. Force dark surfaces + legible text on every table class.
+   ============================================================================ */
+.jcd-root.jcd-dark .jcd-table-section { background: var(--bg); }
+.jcd-root.jcd-dark .jcd-table-container,
+.jcd-root.jcd-dark .jcd-table-container[class*="-theme"] {
+  background: var(--panel) !important; color: var(--ink); border-color: var(--line) !important;
+}
+.jcd-root.jcd-dark .jcd-table-header { background: var(--panel); border-bottom-color: var(--line); }
+.jcd-root.jcd-dark .jcd-table-title { color: var(--ink); }
+.jcd-root.jcd-dark .jcd-table-count { color: var(--ink2); background: var(--soft); }
+.jcd-root.jcd-dark .jcd-table { background: var(--panel); }
+.jcd-root.jcd-dark .jcd-table thead th,
+.jcd-root.jcd-dark .jcd-th,
+.jcd-root.jcd-dark .jcd-th-sno { background: var(--tblhead) !important; color: var(--ink2) !important; border-bottom-color: var(--line) !important; }
+.jcd-root.jcd-dark .jcd-table tbody tr { background: transparent; }
+.jcd-root.jcd-dark .jcd-table tbody tr:nth-child(even) { background: var(--stripe); }
+.jcd-root.jcd-dark .jcd-table tbody tr:hover { background: var(--hover); }
+.jcd-root.jcd-dark .jcd-td { color: var(--ink) !important; border-bottom-color: var(--line2) !important; }
+.jcd-root.jcd-dark .jcd-td-sno { color: var(--mut) !important; }
+.jcd-root.jcd-dark .jcd-name-link { color: var(--accent) !important; }
+/* filters + search + date controls */
+.jcd-root.jcd-dark .jcd-filter-bar,
+.jcd-root.jcd-dark .jcd-filter-row { background: var(--panel); border-color: var(--line); }
+.jcd-root.jcd-dark .jcd-filter-field,
+.jcd-root.jcd-dark .jcd-filter-search,
+.jcd-root.jcd-dark .jcd-filter-date,
+.jcd-root.jcd-dark .jcd-table-actions select,
+.jcd-root.jcd-dark .jcd-table-actions input,
+.jcd-root.jcd-dark .jcd-table-section select,
+.jcd-root.jcd-dark .jcd-table-section input { background: var(--soft) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+.jcd-root.jcd-dark .jcd-filter-field option,
+.jcd-root.jcd-dark .jcd-table-section option { background: var(--soft2); color: var(--ink); }
+/* pagination */
+.jcd-root.jcd-dark .jcd-pagination-bar { background: var(--panel); color: var(--ink2); border-top-color: var(--line); }
+.jcd-root.jcd-dark .jcd-pagination-info { color: var(--ink2); }
+.jcd-root.jcd-dark .jcd-pg-btn,
+.jcd-root.jcd-dark .jcd-pg-num,
+.jcd-root.jcd-dark .jcd-pg-size { background: var(--soft) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+.jcd-root.jcd-dark .jcd-pg-num.active { background: var(--accent) !important; color: #fff !important; border-color: var(--accent) !important; }
