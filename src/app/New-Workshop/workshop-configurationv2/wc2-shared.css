@@ -234,6 +234,10 @@ button.input.pick[disabled] { cursor: not-allowed; background: #f8fafd; color: v
 .ic:hover { border-color: var(--primary); }
 .ic.sel { border: 2px solid var(--primary); background: #eef3f9; }
 .pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+/* A flex column with a max-height shrinks its children by default, so a row whose text
+   wraps to two lines gets compressed back to one line's worth of box and its second line
+   is painted over the row below. The list scrolls; the rows keep their own height. */
+.pop-list > * { flex-shrink: 0; }
 .pop-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 34px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; text-align: left; font-size: 13px; line-height: 1.45; color: var(--t1); cursor: pointer; }
 .pop-row:hover:not([disabled]) { background: #eef3f9; }
 .pop-row.sel { color: var(--primary); font-weight: 600; }

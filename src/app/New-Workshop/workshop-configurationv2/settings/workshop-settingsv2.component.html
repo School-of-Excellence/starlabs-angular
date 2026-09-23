@@ -726,7 +726,7 @@
                   <div class="pop-list">
                     <button data-testid="ws-access-admins-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('dashboardAdmins', p.id)" (click)="toggleAdminList('dashboardAdmins', p.id)">
                       <span class="box"><ng-container *ngIf="inAdminList('dashboardAdmins', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
-                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                      <span class="n">{{ p.name || p.email }}</span>
                     </button>
                     <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
                   </div>
@@ -750,7 +750,7 @@
                   <div class="pop-list">
                     <button data-testid="ws-access-edit-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('editAccess', p.id)" (click)="toggleAdminList('editAccess', p.id)">
                       <span class="box"><ng-container *ngIf="inAdminList('editAccess', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
-                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                      <span class="n">{{ p.name || p.email }}</span>
                     </button>
                     <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
                   </div>
@@ -774,7 +774,7 @@
                   <div class="pop-list">
                     <button data-testid="ws-access-newusers-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(false)" [class.sel]="inAdminList('newUsersAccess', p.id)" (click)="toggleAdminList('newUsersAccess', p.id)">
                       <span class="box"><ng-container *ngIf="inAdminList('newUsersAccess', p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
-                      <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                      <span class="n">{{ p.name || p.email }}</span>
                     </button>
                     <div class="help pad" *ngIf="!accessPickerList(false).length">Nobody matches.</div>
                   </div>
@@ -806,7 +806,7 @@
                     <div class="pop-list">
                       <button data-testid="ws-access-person-option" type="button" class="pop-row" *ngFor="let p of accessPickerList(true)" [class.sel]="accessRows.includes(p.id)" (click)="addAccessPerson(p.id)">
                         <span class="box"><ng-container *ngIf="accessRows.includes(p.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
-                        <span class="n">{{ p.name || p.email }}</span><span class="c">{{ p.email }}</span>
+                        <span class="n">{{ p.name || p.email }}</span>
                       </button>
                       <div class="help pad" *ngIf="!accessPickerList(true).length">Nobody matches.</div>
                     </div>
