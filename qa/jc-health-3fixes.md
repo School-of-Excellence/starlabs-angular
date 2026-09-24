@@ -47,6 +47,22 @@ URL: http://localhost:4201/journey-coach-health
 - Command: npx ng test --include "src/app/Journey Onboarding/journey-coach-health-dashboard/*.spec.ts" --ts-config tsconfig.spec.jc.json --watch=false --browsers=ChromeHeadless
 - Command: node qa/checks/jc-health-contract.mjs
 - Fail if reverted: yes
-- Last run: PASS (Karma, 45/45) | PASS (Node) — 2026-09-24
+- Last run: PASS (Karma 45/45) | PASS (Node 7/7) — 2026-09-24
+
+## Evidence (live, 2026-09-24)
+- Env: starlabs-test (non-prod), Chrome, authenticated session
+- URL: http://localhost:4200/journey-coach-health
+- Fix 1 coach scope: Viewing "All participants" -> paginator "1 – 50 of 291";
+  Viewing a single coach -> "1 – 50 of 53", 1 distinct value in the Coach column,
+  **0** rows not belonging to that coach. Re-picking the same coach is a no-op.
+- Fix 2 JC / Onboarding: the two Schedule columns are separate bands with their own
+  tiles (sched-jc-overdue / sched-ob-overdue). NOT RECONCILED — every Schedule tile
+  read 0 in this dataset, so tile == list is unproven here and still owed.
+- Fix 3 A&H drill: clicking the "Needs Attention - combined" value 7 opened the NATIVE
+  overlay (data-testid ahd-overlay, .ahd-backdrop) with exactly **7** rows;
+  mat-dialog-container count **0**. Escape closes it.
+- Regression found and fixed on this run (b671f043): loadAHSummary() was defined but
+  never called, so the card's *ngIf never rendered and the drill had no trigger.
+  The node + Karma checks all passed over it; only the browser caught it.
 - Note: --ts-config ALONE does not scope the karma run (the builder globs every *.spec.ts);
   --include scopes what runs, --ts-config scopes the TS program. Both are required.
