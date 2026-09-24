@@ -6,7 +6,7 @@
  * component (ParticipantIntelligenceComponent).
  */
 
-import { ChangeDetectionStrategy, Component, Injectable, Injector, OnInit, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injectable, Injector, OnInit, computed, effect, inject, output, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -14,18 +14,28 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogConfig, MatDialogRef } from '@angu
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Firestore, arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, writeBatch } from '@angular/fire/firestore';
+import { Firestore, arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from '@angular/fire/storage';
-import { Observable, forkJoin, from } from 'rxjs';
+import { Observable, firstValueFrom, forkJoin, from } from 'rxjs';
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
+import { CPM_PRODUCT_IDS, UP_LIVE_PRODUCT_IDS } from '../../Participants Profile Management/participants-analytics/participants-analytics.engine';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { SendInterimReportComponent } from '../../Participants Profile Management/participants-analytics/send-interim-report/send-interim-report.component';
 import { EvolutionWishlistLogComponent } from '../../Participants Profile Management/participants-analytics/evolution-wishlist-log/evolution-wishlist-log.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
+import { BroadcastComponent } from '../../Participants Profile Management/participants-analytics/broadcast/broadcast.component';
+import { BulkAddProductsComponent } from '../../Participants Profile Management/participants-analytics/bulk-add-products/bulk-add-products.component';
+import { ManageParticipantlistDialogComponent } from '../../Participants Profile Management/participants-analytics/manage-participantlist-dialog/manage-participantlist-dialog.component';
+import { MapRecommendedplaylistToparticipantComponentComponent } from '../../Participants Profile Management/participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
+import { WatiConfigDialogComponent } from '../../Participants Profile Management/participants-analytics/wati-config-dialog/wati-config-dialog.component';
+import { SendmessagesComponent } from '../../New-Workshop/workshop-dashboard/sendmessages/sendmessages.component';
+import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../../New-Workshop/whatsapp-progress-dialog.component';
+import { AddPendingActionComponent } from '../../AppEngagement/app-action-pending/add-pending-action/add-pending-action.component';
 
 // ================================================================================================
 // Models
@@ -41,10 +51,13 @@ export type CustomerStatus =
   | 'banned'
   | 'none';
 
+// Watson status; values are matched exactly.
 export type FinancialStatus =
   | 'regular'
+  | 'fully paid'
   | 'locked'
   | 'defaulted'
+  | 'late'
   | 'discontinued'
   | 'banned'
   | 'none';
@@ -89,12 +102,28 @@ export interface Participant {
   lastpaymentdate: string | null;
   purchasedate: string | null;
   dateofbirth: string | null;
+  age: number | null;
+  // journey for the participant's status: active → current, non active → last completed,
+  // discontinued → last subscribed (cancelled); null otherwise
+  journey: string | null;
+  upcount: number; // consumed uP! products
+  cpmcount: number; // consumed CPM products
+  purchasevalue: number | null;
+  paid: number | null;
+  balance: number | null; // purchasevalue − paid
+  paymentplan: string | null;
   emiStatus: EmiStatus;
   productevent: Record<string, string[]>; // productId -> event ids
   queueevent: Record<string, string[]>; // productId -> queue ids
   // participantjourneyproduct doc that holds the subscription: purchaseref (active) or
   // lastsubscribedpurchaseref (non active); null for any other status
   subscriptionPurchaseId: string | null;
+  // recommended playlists (ids resolved through the playlist collections)
+  eiflix: string[];
+  solarvoice: string[];
+  generalcontent: string[];
+  // the untouched participant metadata doc — the analytics dialogs reused here expect it
+  raw: Dict;
 }
 
 export interface NamedRef {
@@ -135,6 +164,35 @@ export interface DateRange {
 
 export type RegisteredFilter = 'registered' | 'non-registered';
 
+export type UpStatus = 'new' | 'returning';
+
+// attended = participant metadata.productevent; confirmed = approved event participation requests
+export type EventStatus = 'attended' | 'confirmed';
+
+// completed = participant metadata.queueevent; live = active + approved queue_token
+export type QueueStatus = 'completed' | 'live';
+
+// Checkbox sections: each supports include (OR within the group) and exclude.
+export const CHECK_GROUPS = [
+  'customerstatus',
+  'financialstatus',
+  'registered',
+  'customersupport',
+  'activejourney',
+  'lastcompletedjourney',
+  'activeproduct',
+  'tier',
+  'participantmode',
+  'profiletags',
+  'addons',
+  'gifts',
+  'bonus',
+  'events',
+  'queues',
+  'upStatus',
+] as const;
+export type CheckGroup = (typeof CHECK_GROUPS)[number];
+
 // The single source of truth for what the user has filtered by.
 export interface FilterModel {
   search: string;
@@ -154,6 +212,14 @@ export interface FilterModel {
   registered: RegisteredFilter[];
   customersupport: SupportStatus[];
   atcCountMin: number | null;
+  upCountMin: number | null;
+  cpmCountMin: number | null;
+  upStatus: UpStatus[];
+  ageMin: number | null;
+  ageMax: number | null;
+  eventStatus: EventStatus;
+  queueStatus: QueueStatus;
+  exclude: Partial<Record<CheckGroup, string[]>>;
   subscriptionStart: DateRange;
   subscriptionEnd: DateRange;
   consumed: ProductCountRule[];
@@ -179,6 +245,14 @@ function emptyFilter(): FilterModel {
     registered: [],
     customersupport: [],
     atcCountMin: null,
+    upCountMin: null,
+    cpmCountMin: null,
+    upStatus: [],
+    ageMin: null,
+    ageMax: null,
+    eventStatus: 'attended',
+    queueStatus: 'completed',
+    exclude: {},
     subscriptionStart: { start: null, end: null },
     subscriptionEnd: { start: null, end: null },
     consumed: [],
@@ -196,7 +270,6 @@ export interface Audience {
   isDefault: boolean;
   createdBy: string;
   createdDate: string;
-  count: number;
   filter?: FilterModel; // kind === 'filter'
   profileIds?: string[]; // kind === 'list'
   memberAudienceIds?: string[]; // kind === 'segment'
@@ -208,6 +281,7 @@ export type ColumnType =
   | 'text'
   | 'date'
   | 'number'
+  | 'money'
   | 'array'
   | 'tags'
   | 'status'
@@ -218,7 +292,7 @@ export interface ColumnDef {
   label: string;
   type: ColumnType;
   // how to resolve array/id columns to display text
-  resolve?: 'journey' | 'product' | 'tag' | 'tier' | 'mode';
+  resolve?: 'journey' | 'product' | 'tag' | 'tier' | 'mode' | 'playlist';
 }
 
 // A removable filter pill shown above the table.
@@ -226,6 +300,7 @@ export interface FilterChip {
   group: keyof FilterModel;
   label: string;
   value: string; // identifies the specific value to remove (or '' for whole-group resets)
+  exclude?: boolean;
 }
 
 // --- communications analytics (email / whatsapp / notification) ---
@@ -265,6 +340,7 @@ const COLUMN_CATALOG: ColumnDef[] = [
   { key: 'name', label: 'Participant', type: 'name' },
   { key: 'customerstatus', label: 'Customer status', type: 'status' },
   { key: 'financialstatus', label: 'Financial status', type: 'status' },
+  { key: 'journey', label: 'Journey', type: 'text', resolve: 'journey' },
   { key: 'activejourney', label: 'Active journey', type: 'text', resolve: 'journey' },
   { key: 'lastcompletedjourney', label: 'Last completed journey', type: 'text', resolve: 'journey' },
   { key: 'higherorderpurchase', label: 'Higher-order purchase', type: 'text', resolve: 'journey' },
@@ -278,6 +354,13 @@ const COLUMN_CATALOG: ColumnDef[] = [
   { key: 'profiletags', label: 'Tags', type: 'tags', resolve: 'tag' },
   { key: 'participantmode', label: 'Mode', type: 'text', resolve: 'mode' },
   { key: 'atccount', label: 'ATC count', type: 'number' },
+  { key: 'upcount', label: 'uP! count', type: 'number' },
+  { key: 'cpmcount', label: 'CPM count', type: 'number' },
+  { key: 'purchasevalue', label: 'Purchase value', type: 'money' },
+  { key: 'paid', label: 'Paid', type: 'money' },
+  { key: 'balance', label: 'Balance', type: 'money' },
+  { key: 'paymentplan', label: 'Payment plan', type: 'text' },
+  { key: 'age', label: 'Age', type: 'number' },
   { key: 'registered', label: 'Registered', type: 'status' },
   { key: 'emiStatus', label: 'EMI status', type: 'status' },
   { key: 'customersupport', label: 'Support', type: 'status' },
@@ -289,7 +372,12 @@ const COLUMN_CATALOG: ColumnDef[] = [
   { key: 'lastpaymentdate', label: 'Last payment', type: 'date' },
   { key: 'dateofbirth', label: 'Date of birth', type: 'date' },
   { key: 'remarks', label: 'Remarks', type: 'remarks' },
+  { key: 'eiflix', label: 'EIFLIX (recommended)', type: 'array', resolve: 'playlist' },
+  { key: 'solarvoice', label: 'SolarVoice (recommended)', type: 'array', resolve: 'playlist' },
+  { key: 'generalcontent', label: 'General content (recommended)', type: 'array', resolve: 'playlist' },
 ];
+
+const PLAYLIST_COLUMNS = ['eiflix', 'solarvoice', 'generalcontent'];
 
 const COLUMN_DEF_MAP: Record<string, ColumnDef> = COLUMN_CATALOG.reduce(
   (acc, c) => ((acc[c.key] = c), acc),
@@ -317,25 +405,38 @@ const DEFAULT_PINNED_COLUMNS = ['name', 'financialstatus'];
 
 // Pure AND-combination filter over the loaded participants.
 
-function inAny<T>(selected: T[], value: T | null): boolean {
-  if (!selected.length) return true;
-  if (value === null) return false;
-  return selected.includes(value);
+// Values of a productId -> ids map, flattened. Map values may be a single id or a list, so they are
+// concatenated the way the analytics screen does.
+function mapValues(map: Record<string, string[] | string> | undefined): string[] {
+  return map ? ([] as string[]).concat(...Object.values(map)) : [];
 }
 
-function arrayIntersects<T>(selected: T[], values: T[]): boolean {
-  if (!selected.length) return true;
-  return values.some((v) => selected.includes(v));
+// Data that doesn't live on the participant record, used by the event / queue status filters.
+export interface FilterContext {
+  confirmedByEvent?: Record<string, Set<string>>; // eventId -> profile ids with an approved request
+  liveByQueue?: Record<string, Set<string>>; // queueId -> profile ids with an active, approved token
 }
 
-// True if the productId->ids[] map contains any of the selected ids (used for events/queues).
-function mapHasAny(selected: string[], map: Record<string, string[]> | undefined): boolean {
-  if (!selected.length) return true;
-  if (!map) return false;
-  for (const ids of Object.values(map)) {
-    if (Array.isArray(ids) && ids.some((id) => selected.includes(id))) return true;
+// Does participant p have value v in a checkbox group?
+function hasValue(p: Participant, f: FilterModel, g: CheckGroup, v: string, ctx: FilterContext): boolean {
+  switch (g) {
+    case 'registered':
+      return v === (p.registered ? 'registered' : 'non-registered');
+    case 'customersupport':
+      return p.customersupport.status === v;
+    case 'upStatus':
+      return v === (p.upcount > 0 ? 'returning' : 'new');
+    case 'events':
+      return f.eventStatus === 'confirmed'
+        ? !!ctx.confirmedByEvent?.[v]?.has(p.profileid)
+        : mapValues(p.productevent).includes(v);
+    case 'queues':
+      return f.queueStatus === 'live' ? !!ctx.liveByQueue?.[v]?.has(p.profileid) : mapValues(p.queueevent).includes(v);
+    default: {
+      const value = p[g];
+      return Array.isArray(value) ? value.includes(v) : value === v;
+    }
   }
-  return false;
 }
 
 function dateInRange(value: string | null, start: string | null, end: string | null): boolean {
@@ -371,28 +472,26 @@ function matchesSearch(p: Participant, term: string): boolean {
   );
 }
 
-function applyFilters(participants: Participant[], f: FilterModel): Participant[] {
+// Checkbox groups: included values are OR'd, excluded values remove matches. Then the number,
+// date and product-count rules are AND'd on top.
+function applyFilters(participants: Participant[], f: FilterModel, ctx: FilterContext = {}): Participant[] {
+  const groups = CHECK_GROUPS.map((g) => ({ g, inc: f[g] as string[], exc: f.exclude[g] ?? [] })).filter(
+    (x) => x.inc.length || x.exc.length
+  );
   return participants.filter((p) => {
     if (!matchesSearch(p, f.search)) return false;
-    if (!inAny(f.participantmode, p.participantmode)) return false;
-    if (!inAny(f.customerstatus, p.customerstatus)) return false;
-    if (!inAny(f.financialstatus, p.financialstatus)) return false;
-    if (!inAny(f.activejourney, p.activejourney)) return false;
-    if (!inAny(f.lastcompletedjourney, p.lastcompletedjourney)) return false;
-    if (!arrayIntersects(f.activeproduct, p.activeproduct)) return false;
-    if (!arrayIntersects(f.addons, p.addons)) return false;
-    if (!arrayIntersects(f.gifts, p.gifts)) return false;
-    if (!arrayIntersects(f.bonus, p.bonus)) return false;
-    if (!mapHasAny(f.events, p.productevent)) return false;
-    if (!mapHasAny(f.queues, p.queueevent)) return false;
-    if (!arrayIntersects(f.profiletags, p.profiletags)) return false;
-    if (!arrayIntersects(f.tier, p.tier)) return false;
-    if (f.registered.length) {
-      const flag = p.registered ? 'registered' : 'non-registered';
-      if (!f.registered.includes(flag)) return false;
+    for (const { g, inc, exc } of groups) {
+      if (inc.length && !inc.some((v) => hasValue(p, f, g, v, ctx))) return false;
+      if (exc.some((v) => hasValue(p, f, g, v, ctx))) return false;
     }
-    if (f.customersupport.length && !f.customersupport.includes(p.customersupport.status)) return false;
     if (f.atcCountMin != null && p.atccount < f.atcCountMin) return false;
+    if (f.upCountMin != null && p.upcount < f.upCountMin) return false;
+    if (f.cpmCountMin != null && p.cpmcount < f.cpmCountMin) return false;
+    if (f.ageMin != null || f.ageMax != null) {
+      if (p.age == null) return false;
+      if (f.ageMin != null && p.age < f.ageMin) return false;
+      if (f.ageMax != null && p.age > f.ageMax) return false;
+    }
     if (!dateInRange(p.subscriptionstart, f.subscriptionStart.start, f.subscriptionStart.end)) return false;
     if (!dateInRange(p.subscriptionend, f.subscriptionEnd.start, f.subscriptionEnd.end)) return false;
     for (const rule of f.consumed) if (!matchesProductCount(p.consumedproducts, rule)) return false;
@@ -406,33 +505,38 @@ function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   const chips: FilterChip[] = [];
   const journeyName = (id: string) => ref.journeys.find((j) => j.id === id)?.name ?? id;
   const productName = (id: string) => ref.products.find((p) => p.id === id)?.name ?? id;
-  const modeName = (id: string) => ref.modes.find((m) => m.id === id)?.name ?? id;
   const tierName = (id: string) => ref.tiers.find((t) => t.id === id)?.name ?? id;
   const tagName = (id: string) => ref.tags.find((t) => t.id === id)?.name ?? id;
   const eventName = (id: string) => ref.events.find((e) => e.id === id)?.name ?? id;
   const queueName = (id: string) => ref.queues.find((q) => q.id === id)?.name ?? id;
 
-  const addEach = (group: keyof FilterModel, values: string[], prefix: string, fmt: (v: string) => string = (v) => v) => {
+  const addEach = (group: CheckGroup, values: string[], prefix: string, fmt: (v: string) => string = (v) => v) => {
     for (const v of values) chips.push({ group, value: v, label: `${prefix}: ${fmt(v)}` });
+    for (const v of f.exclude[group] ?? []) chips.push({ group, value: v, label: `${prefix}: not ${fmt(v)}`, exclude: true });
   };
 
   addEach('customerstatus', f.customerstatus, 'Status');
   addEach('financialstatus', f.financialstatus, 'Financial');
-  addEach('participantmode', f.participantmode, 'Mode', modeName);
+  addEach('participantmode', f.participantmode, 'Mode', (v) => (v === 'none' ? 'None' : v));
   addEach('activejourney', f.activejourney, 'Journey', journeyName);
   addEach('lastcompletedjourney', f.lastcompletedjourney, 'Completed', journeyName);
   addEach('activeproduct', f.activeproduct, 'Product', productName);
   addEach('addons', f.addons, 'Add-on', productName);
   addEach('gifts', f.gifts, 'Gift', productName);
   addEach('bonus', f.bonus, 'Bonus', productName);
-  addEach('events', f.events, 'Event', eventName);
-  addEach('queues', f.queues, 'Queue', queueName);
+  addEach('events', f.events, f.eventStatus === 'confirmed' ? 'Confirmed for' : 'Attended', eventName);
+  addEach('queues', f.queues, f.queueStatus === 'live' ? 'Live in queue' : 'Completed queue', queueName);
   addEach('tier', f.tier, 'Tier', tierName);
   addEach('profiletags', f.profiletags, 'Tag', tagName);
   addEach('registered', f.registered, 'Registered');
   addEach('customersupport', f.customersupport, 'Support');
+  addEach('upStatus', f.upStatus, 'uP!', (v) => (v === 'new' ? 'New' : 'Already attended'));
 
   if (f.atcCountMin != null) chips.push({ group: 'atcCountMin', value: '', label: `ATC ≥ ${f.atcCountMin}` });
+  if (f.upCountMin != null) chips.push({ group: 'upCountMin', value: '', label: `uP! ≥ ${f.upCountMin}` });
+  if (f.cpmCountMin != null) chips.push({ group: 'cpmCountMin', value: '', label: `CPM ≥ ${f.cpmCountMin}` });
+  if (f.ageMin != null || f.ageMax != null)
+    chips.push({ group: 'ageMin', value: '', label: `Age ${f.ageMin ?? 0}–${f.ageMax ?? '∞'}` });
   if (f.subscriptionStart.start || f.subscriptionStart.end)
     chips.push({ group: 'subscriptionStart', value: '', label: 'Subscription start range' });
   if (f.subscriptionEnd.start || f.subscriptionEnd.end)
@@ -453,6 +557,60 @@ function toNameMap(items: { id: string; name: string }[]): Record<string, string
 function cmp(c: string): string {
   return c === 'eq' ? '=' : c === 'gte' ? '≥' : '≤';
 }
+
+// ================================================================================================
+// Watson status rules
+// ================================================================================================
+
+// financialstatus is Watson's customer status; customerstatus is the Star Labs subscription status.
+export interface WatsonRule {
+  id: string;
+  label: string;
+  description: string;
+  violates: (p: Participant) => boolean; // true = participant breaks the rule
+}
+
+const FULLY_PAID_MAX_BALANCE = 1000;
+const WATSON_LIVE: FinancialStatus[] = ['regular', 'defaulted', 'locked', 'fully paid'];
+
+const WATSON_RULES: WatsonRule[] = [
+  {
+    id: 'watson-r1',
+    label: 'R1 · Regular / defaulted / locked / fully paid',
+    description: 'Watson status regular, defaulted, locked or fully paid must have subscription active or non active.',
+    violates: (p) => WATSON_LIVE.includes(p.financialstatus) && p.customerstatus !== 'active' && p.customerstatus !== 'non active',
+  },
+  {
+    id: 'watson-r2',
+    label: 'R2 · Discontinued',
+    description: 'Watson status discontinued must have subscription discontinued.',
+    violates: (p) => p.financialstatus === 'discontinued' && p.customerstatus !== 'discontinued',
+  },
+  {
+    id: 'watson-r3',
+    label: 'R3 · Banned',
+    description: 'Watson status banned must have subscription banned.',
+    violates: (p) => p.financialstatus === 'banned' && p.customerstatus !== 'banned',
+  },
+  {
+    id: 'watson-r4',
+    label: 'R4 · Late',
+    description: 'Watson status late must have subscription late.',
+    violates: (p) => p.financialstatus === 'late' && p.customerstatus !== 'late',
+  },
+  {
+    id: 'watson-r5',
+    label: 'R5 · Fully paid ⇔ balance ≤ 1000',
+    description:
+      'Balance ≤ 1000 must be Watson fully paid, and fully paid must have balance ≤ 1000. Discontinued / banned / late are skipped, as are participants with no purchase value.',
+    violates: (p) => {
+      if (p.financialstatus === 'discontinued' || p.financialstatus === 'banned' || p.financialstatus === 'late') return false;
+      if (p.balance == null) return false;
+      const lowBalance = p.balance <= FULLY_PAID_MAX_BALANCE;
+      return lowBalance !== (p.financialstatus === 'fully paid');
+    },
+  },
+];
 
 // ================================================================================================
 // Signals
@@ -476,19 +634,12 @@ export interface SignalDef {
 // thresholds — single place to tune the intelligence
 const HIGH_ATC = 8;
 const VALUE_CONSUMED = 3;
-const IDLE_DAYS = 90;
-const EXPIRING_DAYS = 30;
-const LAPSED_DAYS = 30;
+const LAPSED_DAYS = 183; // ~6 months
 
 const daysUntil = (iso: string | null): number | null =>
   iso ? (new Date(iso).getTime() - Date.now()) / 86_400_000 : null;
 const daysSince = (iso: string | null): number | null =>
   iso ? (Date.now() - new Date(iso).getTime()) / 86_400_000 : null;
-const recentMoney = (p: Participant, days: number): boolean => {
-  const a = daysSince(p.lastpaymentdate);
-  const b = daysSince(p.purchasedate);
-  return (a != null && a <= days) || (b != null && b <= days);
-};
 
 const SIGNALS: SignalDef[] = [
   // --- integrity: contradictory states to fix ---
@@ -517,14 +668,6 @@ const SIGNALS: SignalDef[] = [
     predicate: (p) => (p.financialstatus === 'defaulted' || p.financialstatus === 'banned') && p.customerstatus === 'active',
   },
   {
-    id: 'active-no-product',
-    label: 'Active, but no active product',
-    description: 'Paying/active status with nothing currently to deliver.',
-    category: 'integrity',
-    severity: 'warn',
-    predicate: (p) => p.customerstatus === 'active' && p.activeproduct.length === 0,
-  },
-  {
     id: 'status-none-engaged',
     label: 'No customer status, but engaged',
     description: 'Has an active product or journey yet customer status is unset.',
@@ -541,35 +684,25 @@ const SIGNALS: SignalDef[] = [
     predicate: (p) => p.activeproduct.length > 0 && p.consumedproducts.length === 0,
   },
 
+  {
+    id: 'watson-mismatch',
+    label: 'Watson status mismatch',
+    description: 'Breaks at least one Watson status rule (R1–R5) — see Checklists → Watson status.',
+    category: 'integrity',
+    severity: 'critical',
+    predicate: (p) => WATSON_RULES.some((r) => r.violates(p)),
+  },
+
   // --- retention: churn risk / revive ---
   {
-    id: 'idle-active-product',
-    label: 'Active product, idle a long time',
-    description: `No coach activity and no purchase/payment in ${IDLE_DAYS} days while a product is active.`,
-    category: 'retention',
-    severity: 'warn',
-    predicate: (p) => p.activeproduct.length > 0 && p.atccount === 0 && !recentMoney(p, IDLE_DAYS),
-  },
-  {
-    id: 'expiring-soon',
-    label: `Subscription expiring in ${EXPIRING_DAYS} days`,
-    description: 'Active subscription ends soon — reach out before it lapses.',
-    category: 'retention',
-    severity: 'warn',
-    predicate: (p) => {
-      const d = daysUntil(p.subscriptionend);
-      return p.customerstatus === 'active' && d != null && d >= 0 && d <= EXPIRING_DAYS;
-    },
-  },
-  {
     id: 'recently-lapsed',
-    label: 'Lapsed recently, not renewed',
-    description: `Subscription ended within ${LAPSED_DAYS} days and they are no longer active — warm win-back.`,
+    label: 'Lapsed in the last 6 months (non active), not renewed',
+    description: `Non active (discontinued excluded) and the subscription ended within the last ${LAPSED_DAYS} days — warm win-back.`,
     category: 'retention',
     severity: 'critical',
     predicate: (p) => {
       const d = daysSince(p.subscriptionend);
-      return d != null && d > 0 && d <= LAPSED_DAYS && p.customerstatus !== 'active';
+      return p.customerstatus === 'non active' && d != null && d > 0 && d <= LAPSED_DAYS;
     },
   },
   {
@@ -597,23 +730,29 @@ const SIGNALS: SignalDef[] = [
     predicate: (p) => p.customerstatus === 'active' && !p.registered,
   },
 
-  // --- financial ---
   {
-    id: 'finance-overdue',
-    label: 'Overdue / defaulted payment',
-    description: 'EMI overdue or financial status defaulted.',
-    category: 'financial',
-    severity: 'critical',
-    predicate: (p) => p.emiStatus === 'overdue' || p.financialstatus === 'defaulted',
-  },
-  {
-    id: 'finance-locked',
-    label: 'Finance locked',
-    description: 'Financial standing locked.',
-    category: 'financial',
+    id: 'status-none',
+    label: 'Customer status None',
+    description: 'No Star Labs customer status set.',
+    category: 'retention',
     severity: 'warn',
-    predicate: (p) => p.financialstatus === 'locked',
+    predicate: (p) => p.customerstatus === 'none',
   },
+  {
+    id: 'higher-order-mismatch',
+    label: 'Higher-order purchase ≠ current journey',
+    description:
+      'Active: higher-order purchase differs from the current journey. Non active: differs from the last completed journey. A missing value on one side counts as a mismatch (same rule as analytics).',
+    category: 'retention',
+    severity: 'warn',
+    predicate: (p) =>
+      p.customerstatus === 'active'
+        ? p.higherorderpurchase !== p.activejourney
+        : p.customerstatus === 'non active'
+          ? p.higherorderpurchase !== p.lastcompletedjourney
+          : false,
+  },
+
 
   // --- opportunity: upsell / relationship ---
   {
@@ -664,11 +803,21 @@ const SIGNAL_CATEGORIES: { key: SignalCategory; label: string }[] = [
 export interface ChecklistDef {
   id: string;
   label: string;
+  watson?: boolean; // show Watson / subscription / balance columns
   description: string;
   wired: boolean;
   predicate?: (p: Participant) => boolean;
   note?: string;
 }
+
+const WATSON_CHECKLISTS: ChecklistDef[] = WATSON_RULES.map((r) => ({
+  id: r.id,
+  label: r.label,
+  description: r.description,
+  wired: true,
+  watson: true,
+  predicate: r.violates,
+}));
 
 const NOT_WIRED = 'Not wired in this build — requires data outside the loaded participant base.';
 
@@ -734,6 +883,15 @@ const tsToIso = (x: any): string | null => {
   return null;
 };
 const dateStr = (iso: string | null): string | null => (iso ? iso.slice(0, 10) : null);
+const num = (x: unknown): number | null => (x == null || x === '' || Number.isNaN(Number(x)) ? null : Number(x));
+const ageFrom = (iso: string | null): number | null => {
+  if (!iso) return null;
+  const dob = new Date(iso);
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+};
 
 // ================================================================================================
 // Data service
@@ -745,6 +903,10 @@ export class ParticipantDataService {
   private readonly firestore = inject(Firestore);
   private readonly authguard = inject(AuthguardService);
   private loggedInProfileId = '';
+
+  get profileId(): string {
+    return this.loggedInProfileId;
+  }
 
   constructor() {
     this.authguard
@@ -851,7 +1013,8 @@ export class ParticipantDataService {
     return {
       journeys: named(journeys, 'journey'),
       products: named(products, 'product'),
-      modes: named(modes, 'mode'),
+      // participant metadata stores the mode NAME, so the name is also the id
+      modes: modes ? [...new Set<string>(modes.docs.map((d: any) => String(d.data()['mode'] ?? '')).filter(Boolean))].map((m) => ({ id: m, name: m })) : [],
       tiers: named(tiers, 'tier'),
       tags: tagList,
       events: named(events, 'name'),
@@ -870,6 +1033,12 @@ export class ParticipantDataService {
     const useLast = status === 'discontinued' || status === 'non active';
     const subStart = tsToIso(useLast ? d['lastsubscriptionstart'] : d['subscriptionstart']);
     const subEnd = tsToIso(useLast ? d['lastsubscriptionend'] : d['subscriptionend']);
+    const consumed = arr(d['consumedproducts']);
+    const dob = tsToIso(d['dateofbirth']);
+    const purchasevalue = num(d['pp_totalpurchasevalue']);
+    const paid = num(d['pp_totalpaid']);
+    const journey =
+      status === 'active' ? d['activejourney'] : status === 'non active' ? d['lastcompletedjourney'] : status === 'discontinued' ? d['lastsubscribedjourney'] : null;
 
     return {
       profileid: d['profileid'] ?? id,
@@ -878,14 +1047,14 @@ export class ParticipantDataService {
       phonenumber: d['phonenumber'] != null ? String(d['phonenumber']) : '',
       countrycode: d['countryCode'] ?? d['countrycode'] ?? '',
       registered: d['firebaseuserref'] != null,
-      participantmode: d['participantmode'] ?? '',
+      participantmode: d['participantmode'] || 'none',
       customerstatus: status,
       financialstatus: this.normFinancial(d['financialstatus']),
       activejourney: d['activejourney'] ?? null,
       lastcompletedjourney: d['lastcompletedjourney'] ?? null,
       higherorderpurchase: d['higherorderpurchase'] ?? null,
       activeproduct: arr(d['activeproduct']),
-      consumedproducts: arr(d['consumedproducts']),
+      consumedproducts: consumed,
       unconsumedproducts: arr(d['unconsumedproducts']),
       addons: arr(d['addons']),
       gifts: arr(d['gifts']),
@@ -899,19 +1068,31 @@ export class ParticipantDataService {
       subscriptionend: subEnd,
       lastpaymentdate: tsToIso(d['lastpaymentdate']),
       purchasedate: tsToIso(d['purchasedate']),
-      dateofbirth: tsToIso(d['dateofbirth']),
+      dateofbirth: dob,
+      age: ageFrom(dob),
+      journey: journey ?? null,
+      upcount: consumed.filter((id) => UP_LIVE_PRODUCT_IDS.includes(id)).length,
+      cpmcount: consumed.filter((id) => CPM_PRODUCT_IDS.includes(id)).length,
+      purchasevalue,
+      paid,
+      balance: purchasevalue == null ? null : purchasevalue - (paid ?? 0),
+      paymentplan: d['paymentplan'] ? String(d['paymentplan']) : null,
       emiStatus: this.mapEmi(d['financedata']?.['paymentstatus']),
       productevent: d['productevent'] && typeof d['productevent'] === 'object' ? d['productevent'] : {},
       queueevent: d['queueevent'] && typeof d['queueevent'] === 'object' ? d['queueevent'] : {},
       subscriptionPurchaseId:
         (status === 'active' ? d['purchaseref']?.id : status === 'non active' ? d['lastsubscribedpurchaseref']?.id : null) ?? null,
+      eiflix: arr(d['eiflix']),
+      solarvoice: arr(d['solarvoice']),
+      generalcontent: arr(d['generalcontent']),
+      raw: d,
     };
   }
 
   private normFinancial(v: unknown): FinancialStatus {
     const s = (v ?? '').toString();
-    const allowed = ['regular', 'locked', 'defaulted', 'discontinued', 'banned'];
-    return (allowed.includes(s) ? s : 'none') as FinancialStatus;
+    const allowed: FinancialStatus[] = ['regular', 'fully paid', 'locked', 'defaulted', 'late', 'discontinued', 'banned'];
+    return allowed.includes(s as FinancialStatus) ? (s as FinancialStatus) : 'none';
   }
 
   private collapseSupport(map: unknown): { status: SupportStatus; category: string | null } {
@@ -957,7 +1138,6 @@ export class ParticipantDataService {
         isDefault: false,
         createdBy: data['createdby'] ?? '—',
         createdDate: '',
-        count: 0,
         filter: this.mapSavedFilter(data),
       });
     });
@@ -970,7 +1150,6 @@ export class ParticipantDataService {
         isDefault: false,
         createdBy: '—',
         createdDate: tsToIso(data['createddate']) ?? '',
-        count: arr(data['profilelist']).length,
         live: data['live'] ?? false,
         profileIds: arr(data['profilelist']),
       });
@@ -984,7 +1163,6 @@ export class ParticipantDataService {
         isDefault: false,
         createdBy: '—',
         createdDate: tsToIso(data['createddate']) ?? '',
-        count: 0,
         memberAudienceIds: arr(data['participantlistid']),
       });
     });
@@ -1004,6 +1182,16 @@ export class ParticipantDataService {
     if (d['atccount'] != null && d['atccount'] !== '') f.atcCountMin = Number(d['atccount']);
     f.subscriptionStart = this.range(d['subscriptionstart']);
     f.subscriptionEnd = this.range(d['subscriptionend']);
+    const pi = (d['pifilter'] ?? {}) as Dict;
+    f.upCountMin = num(pi['upCountMin']);
+    f.cpmCountMin = num(pi['cpmCountMin']);
+    f.upStatus = arr(pi['upStatus']) as UpStatus[];
+    f.ageMin = num(pi['ageMin']);
+    f.ageMax = num(pi['ageMax']);
+    f.events = arr(pi['events']);
+    f.eventStatus = pi['eventStatus'] === 'confirmed' ? 'confirmed' : 'attended';
+    f.queueStatus = pi['queueStatus'] === 'live' ? 'live' : 'completed';
+    f.exclude = (pi['exclude'] && typeof pi['exclude'] === 'object' ? pi['exclude'] : {}) as FilterModel['exclude'];
     return f;
   }
 
@@ -1062,6 +1250,141 @@ export class ParticipantDataService {
     );
   }
 
+  // Playlist id -> name, from the collections the analytics screen uses for its recommended columns.
+  async loadPlaylistNames(): Promise<Record<string, string>> {
+    const sources: Record<string, string> = {
+      series: 'seriesName',
+      'recommended mix playlist': 'title',
+      'solar voice playlist': 'name',
+      content_urls: 'title',
+    };
+    const out: Record<string, string> = {};
+    await Promise.all(
+      Object.entries(sources).map(async ([coll, field]) => {
+        const snap = await getDocs(collection(this.firestore, coll));
+        for (const d of snap.docs) out[d.id] = (d.data() as Dict)[field] ?? d.id;
+      })
+    );
+    return out;
+  }
+
+  async loadContentAnalytics(): Promise<Dict[]> {
+    const snap = await getDocs(collection(this.firestore, 'content analytics'));
+    return snap.docs.map((d) => d.data() as Dict);
+  }
+
+  // Broadcast in Breakthroughs (analytics' sendChatBroadcast, with its bugs fixed): for every selected
+  // participant with an app account, upsert their `supportdesk` thread, add the message, and log a
+  // `broadcast_participants` row. Returns how many were sent / skipped (no app account).
+  async sendBroadcast(template: Dict, people: Participant[]): Promise<{ sent: number; skipped: number }> {
+    const me = this.loggedInProfileId;
+    const ids = [...new Set([...people.map((p) => p.profileid), me].filter(Boolean))];
+    const uid: Record<string, string> = {};
+    let senderEmail = '';
+    for (const group of this.chunk(ids, 30)) {
+      const snap = await getDocs(query(collection(this.firestore, 'profile_data'), where('profileid', 'in', group)));
+      for (const d of snap.docs) {
+        const data = d.data() as Dict;
+        if (data['user_ref']) uid[data['profileid']] = data['user_ref'].id;
+        if (data['profileid'] === me) senderEmail = data['email'] ?? '';
+      }
+    }
+    const senderUid = uid[me] ?? null;
+    const analyticsRef = doc(collection(this.firestore, 'broadcast_analytics'));
+    await setDoc(analyticsRef, { docid: analyticsRef.id });
+
+    const reachable = people.filter((p) => uid[p.profileid]);
+    const personalise = (body: string, p: Participant) =>
+      String(body ?? '')
+        .replace(/{{name}}/g, p.name)
+        .replace(/{{email}}/g, p.email)
+        .replace(/{{number}}/g, p.phonenumber);
+
+    // 3 writes per participant, well under the 500-write batch limit
+    for (const group of this.chunk(reachable, 150)) {
+      const batch = writeBatch(this.firestore);
+      for (const p of group) {
+        const userUid = uid[p.profileid];
+        const deskRef = doc(this.firestore, 'supportdesk', userUid);
+        const msgRef = doc(collection(this.firestore, 'supportdesk', userUid, 'messages'));
+        const bapRef = doc(collection(this.firestore, 'broadcast_participants'));
+        batch.set(
+          deskRef,
+          {
+            email: p.email,
+            files: template['files'] ?? [],
+            last_message: template['body'],
+            last_modification: new Date(),
+            last_pending: ['user'],
+            last_read_by: ['admin'],
+            last_sender_uid: senderUid,
+            uid: userUid,
+          },
+          { merge: true }
+        );
+        batch.set(msgRef, {
+          files: template['files'] ?? [],
+          buttonlink: template['link'] ?? null,
+          buttonname: template['buttonname'] ?? null,
+          message: personalise(template['body'], p),
+          messageid: msgRef.id,
+          pending: ['user'],
+          read_by: ['admin'],
+          sender_email: senderEmail,
+          sender_uid: senderUid,
+          time: new Date(),
+        });
+        batch.set(bapRef, {
+          docid: bapRef.id,
+          profile_id: userUid,
+          profile_uid: userUid,
+          date: new Date(),
+          broadcast_templateid: template['docid'] ?? null,
+          broadcastname: template['broadcastname'] ?? null,
+        });
+      }
+      await batch.commit();
+    }
+    return { sent: reachable.length, skipped: people.length - reachable.length };
+  }
+
+  // Participants currently in a queue: active + approved tokens, queueId -> profile ids (as analytics).
+  async loadLiveQueues(): Promise<Record<string, string[]>> {
+    const snap = await getDocs(
+      query(collection(this.firestore, 'queue_token'), where('stagestatus', '==', 'Approved'), where('tokenstatus', '==', 'Active'))
+    );
+    const out: Record<string, string[]> = {};
+    for (const d of snap.docs) {
+      const data = d.data() as Dict;
+      const queueId = data['queueref']?.id;
+      if (queueId && data['profile_id']) (out[queueId] ??= []).push(data['profile_id']);
+    }
+    return out;
+  }
+
+  // Profile ids with an approved (confirmed) request, per event. `in` takes at most 30 values.
+  async loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>> {
+    const out: Record<string, string[]> = {};
+    for (const id of eventIds) out[id] = [];
+    for (const group of this.chunk(eventIds, 30)) {
+      const refs = group.map((id) => doc(this.firestore, 'event collection', id));
+      const snap = await getDocs(
+        query(collection(this.firestore, 'event participation request'), where('eventref', 'in', refs), where('status', '==', 'approved'))
+      );
+      for (const d of snap.docs) {
+        const data = d.data() as Dict;
+        const eventId = data['eventref']?.id;
+        if (eventId && data['profileid'] && out[eventId]) out[eventId].push(data['profileid']);
+      }
+    }
+    return out;
+  }
+
+  async renameAudience(aud: Audience, name: string): Promise<void> {
+    if (aud.kind === 'filter') await updateDoc(doc(this.firestore, 'searchquery', aud.id), { label: name });
+    else if (aud.kind === 'list') await updateDoc(doc(this.firestore, 'participant list', aud.id), { listname: name });
+  }
+
   async persistNewTag(tag: Tag): Promise<void> {
     await setDoc(doc(this.firestore, 'participant tags', tag.id), {
       id: tag.id,
@@ -1092,6 +1415,17 @@ export class ParticipantDataService {
         atccount: f.atcCountMin ?? null,
         subscriptionstart: { start: dateStr(f.subscriptionStart.start), end: dateStr(f.subscriptionStart.end) },
         subscriptionend: { start: dateStr(f.subscriptionEnd.start), end: dateStr(f.subscriptionEnd.end) },
+        pifilter: {
+          upCountMin: f.upCountMin,
+          cpmCountMin: f.cpmCountMin,
+          upStatus: f.upStatus,
+          ageMin: f.ageMin,
+          ageMax: f.ageMax,
+          events: f.events,
+          eventStatus: f.eventStatus,
+          queueStatus: f.queueStatus,
+          exclude: f.exclude,
+        },
       },
       { merge: true }
     );
@@ -1142,9 +1476,41 @@ export class ParticipantStore {
   readonly pinned = signal<Set<string>>(new Set(DEFAULT_PINNED_COLUMNS));
   readonly selectedIds = signal<Set<string>>(new Set());
 
+  // approved (confirmed) profile ids per event, loaded on demand for the selected events
+  private readonly confirmedByEvent = signal<Record<string, string[]>>({});
+  readonly confirmedLoading = signal(false);
+  // active + approved queue tokens, loaded with the page (as analytics)
+  private readonly liveByQueue = signal<Record<string, string[]>>({});
+  // playlist id -> name, loaded the first time a recommended-playlist column is shown
+  readonly playlistNames = signal<Record<string, string>>({});
+  private playlistNamesRequested = false;
+
+  constructor() {
+    effect(() => {
+      const f = this.filter();
+      const events = [...f.events, ...(f.exclude.events ?? [])];
+      if (f.eventStatus !== 'confirmed' || !events.length) return;
+      untracked(() => this.loadConfirmed(events));
+    });
+    effect(() => {
+      if (this.playlistNamesRequested || !this.columnOrder().some((c) => PLAYLIST_COLUMNS.includes(c))) return;
+      this.playlistNamesRequested = true;
+      this.data
+        .loadPlaylistNames()
+        .then((m) => this.playlistNames.set(m))
+        .catch((e) => console.warn('playlist names load failed', e));
+    });
+  }
+
   // --- derived state ---
+  private readonly filterContext = computed<FilterContext>(() => {
+    const toSets = (m: Record<string, string[]>) =>
+      Object.fromEntries(Object.entries(m).map(([k, ids]) => [k, new Set(ids)])) as Record<string, Set<string>>;
+    return { confirmedByEvent: toSets(this.confirmedByEvent()), liveByQueue: toSets(this.liveByQueue()) };
+  });
+
   readonly filtered = computed<Participant[]>(() => {
-    let result = applyFilters(this.all(), this.filter());
+    let result = applyFilters(this.all(), this.filter(), this.filterContext());
     const sigId = this.signalId();
     if (sigId && SIGNAL_MAP[sigId]) result = result.filter(SIGNAL_MAP[sigId].predicate);
     const member = this.membership();
@@ -1176,6 +1542,13 @@ export class ParticipantStore {
   readonly queuedTotal = computed<number>(() => {
     const c = this.commsAnalytics();
     return c ? c.email.queued + c.whatsapp.queued + c.notification.queued : 0;
+  });
+
+  // live member count per audience over the loaded participants
+  readonly audienceCounts = computed<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    for (const a of this.audiences()) counts[a.id] = this.resolveAudienceIds(a).size;
+    return counts;
   });
 
   readonly chips = computed<FilterChip[]>(() => deriveChips(this.filter(), this.reference()));
@@ -1228,7 +1601,7 @@ export class ParticipantStore {
       next: ({ reference, participants, audiences }) => {
         this.reference.set(reference);
         this.all.set(participants);
-        this.audiences.set(this.withCounts(audiences, participants));
+        this.audiences.set(audiences);
         this.loading.set(false);
       },
       error: (e) => {
@@ -1237,6 +1610,12 @@ export class ParticipantStore {
         this.loading.set(false);
       },
     });
+
+    this.confirmedByEvent.set({});
+    this.data
+      .loadLiveQueues()
+      .then((m) => this.liveByQueue.set(m))
+      .catch((e) => console.warn('live queue load failed', e));
 
     // comms analytics loads independently so it never blocks the table
     this.data.getCommsAnalytics().subscribe({
@@ -1289,14 +1668,24 @@ export class ParticipantStore {
       const next: FilterModel = structuredClone(f);
       const g = chip.group;
       if (g === 'atcCountMin') next.atcCountMin = null;
-      else if (g === 'subscriptionStart') next.subscriptionStart = { start: null, end: null };
+      else if (g === 'upCountMin') next.upCountMin = null;
+      else if (g === 'cpmCountMin') next.cpmCountMin = null;
+      else if (g === 'ageMin') {
+        next.ageMin = null;
+        next.ageMax = null;
+      } else if (g === 'subscriptionStart') next.subscriptionStart = { start: null, end: null };
       else if (g === 'subscriptionEnd') next.subscriptionEnd = { start: null, end: null };
       else if (g === 'consumed') next.consumed = next.consumed.filter((r) => r.productId !== chip.value);
       else if (g === 'unconsumed') next.unconsumed = next.unconsumed.filter((r) => r.productId !== chip.value);
-      else {
+      else if (chip.exclude) {
+        const cg = g as CheckGroup;
+        next.exclude = { ...next.exclude, [cg]: (next.exclude[cg] ?? []).filter((v) => v !== chip.value) };
+      } else {
         const rec = next as unknown as Record<string, string[]>;
         rec[g as string] = (rec[g as string] ?? []).filter((v) => v !== chip.value);
       }
+      if (!next.events.length && !next.exclude.events?.length) next.eventStatus = 'attended';
+      if (!next.queues.length && !next.exclude.queues?.length) next.queueStatus = 'completed';
       return next;
     });
     this.activeAudienceId.set(null);
@@ -1365,6 +1754,12 @@ export class ParticipantStore {
     });
   }
 
+  // "View recommended": show / hide the three recommended-playlist columns (as analytics)
+  toggleRecommendedColumns(): void {
+    const shown = PLAYLIST_COLUMNS.every((c) => this.columnOrder().includes(c));
+    this.columnOrder.update((o) => (shown ? o.filter((c) => !PLAYLIST_COLUMNS.includes(c)) : [...o, ...PLAYLIST_COLUMNS.filter((c) => !o.includes(c))]));
+  }
+
   resetColumns(): void {
     this.columnOrder.set([...DEFAULT_VISIBLE_COLUMNS]);
     this.pinned.set(new Set(DEFAULT_PINNED_COLUMNS));
@@ -1385,15 +1780,20 @@ export class ParticipantStore {
     this.clearSelection();
   }
 
+  // Names are unique within their own kind (case-insensitive, trimmed).
+  nameTaken(kind: AudienceKind, name: string, exceptId: string | null = null): boolean {
+    const key = name.trim().toLowerCase();
+    return this.audiences().some((a) => a.kind === kind && a.id !== exceptId && a.name.trim().toLowerCase() === key);
+  }
+
   saveCurrentAsAudience(name: string): Audience {
     const aud: Audience = {
       id: `aud-${Date.now()}`,
-      name,
+      name: name.trim(),
       kind: 'filter',
       isDefault: false,
       createdBy: 'You',
       createdDate: new Date().toISOString(),
-      count: this.filteredCount(),
       filter: structuredClone(this.filter()),
     };
     this.audiences.update((list) => [...list, aud]);
@@ -1406,18 +1806,34 @@ export class ParticipantStore {
     const ids = this.selectedProfileIds();
     const aud: Audience = {
       id: `aud-${Date.now()}`,
-      name,
+      name: name.trim(),
       kind: 'list',
       isDefault: false,
       createdBy: 'You',
       createdDate: new Date().toISOString(),
-      count: ids.length,
       live: false,
       profileIds: ids,
     };
     this.audiences.update((list) => [...list, aud]);
     this.data.persistList(aud).catch((e) => console.error('persistList failed', e));
     return aud;
+  }
+
+  renameAudience(id: string, name: string): void {
+    const aud = this.audiences().find((a) => a.id === id);
+    if (!aud) return;
+    this.audiences.update((list) => list.map((a) => (a.id === id ? { ...a, name: name.trim() } : a)));
+    this.data.renameAudience(aud, name.trim()).catch((e) => console.error('renameAudience failed', e));
+  }
+
+  // Overwrites a saved filter with the current filter model.
+  updateAudienceFilter(id: string): void {
+    const aud = this.audiences().find((a) => a.id === id && a.kind === 'filter');
+    if (!aud) return;
+    const updated: Audience = { ...aud, filter: structuredClone(this.filter()) };
+    this.audiences.update((list) => list.map((a) => (a.id === id ? updated : a)));
+    this.activeAudienceId.set(id);
+    this.data.persistAudience(updated).catch((e) => console.error('persistAudience failed', e));
   }
 
   deleteAudience(id: string): void {
@@ -1435,7 +1851,7 @@ export class ParticipantStore {
 
   private resolveAudienceIds(aud: Audience): Set<string> {
     if (aud.kind === 'filter' && aud.filter) {
-      return new Set(applyFilters(this.all(), aud.filter).map((p) => p.profileid));
+      return new Set(applyFilters(this.all(), aud.filter, this.filterContext()).map((p) => p.profileid));
     }
     if (aud.kind === 'list') {
       return new Set(aud.profileIds ?? []);
@@ -1449,11 +1865,18 @@ export class ParticipantStore {
     return out;
   }
 
-  private withCounts(audiences: Audience[], participants: Participant[]): Audience[] {
-    return audiences.map((a) => {
-      if (a.kind === 'filter' && a.filter) return { ...a, count: applyFilters(participants, a.filter).length };
-      return a;
-    });
+  private async loadConfirmed(eventIds: string[]): Promise<void> {
+    const missing = eventIds.filter((id) => !(id in this.confirmedByEvent()));
+    if (!missing.length) return;
+    this.confirmedLoading.set(true);
+    try {
+      const loaded = await this.data.loadConfirmed(missing);
+      this.confirmedByEvent.update((c) => ({ ...c, ...loaded }));
+    } catch (e) {
+      console.error('loading confirmed event requests failed', e);
+    } finally {
+      this.confirmedLoading.set(false);
+    }
   }
 
   // --- bulk mutations (optimistic local update + persisted via the data service) ---
@@ -1520,11 +1943,21 @@ export interface PromptData {
   confirmText?: string;
   icon?: string;
   value?: string;
+  // returns an error message to block saving (e.g. a duplicate name), or null
+  validate?: (value: string) => string | null;
 }
 
 @Component({
   selector: 'app-prompt-dialog',
   imports: [FormsModule],
+  styles: `
+    .dlg-error {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--pi-status-banned);
+    }
+  `,
   template: `
     <div class="dlg">
       <div class="dlg-head">
@@ -1547,11 +1980,14 @@ export interface PromptData {
             (keyup.enter)="confirm()"
             autofocus
           />
+          @if (error()) {
+            <span class="dlg-error">{{ error() }}</span>
+          }
         </div>
       </div>
       <div class="dlg-foot">
         <button class="btn btn-ghost" (click)="ref.close()">Cancel</button>
-        <button class="btn btn-primary" [disabled]="value.trim().length < 2" (click)="confirm()">
+        <button class="btn btn-primary" [disabled]="!!error() || value.trim().length < 2" (click)="confirm()">
           {{ data.confirmText || 'Save' }}
         </button>
       </div>
@@ -1563,9 +1999,14 @@ export class PromptDialogComponent {
   readonly data = inject<PromptData>(MAT_DIALOG_DATA);
   value = this.data.value ?? '';
 
+  error(): string | null {
+    const v = this.value.trim();
+    return v.length >= 2 ? this.data.validate?.(v) ?? null : null;
+  }
+
   confirm(): void {
     const v = this.value.trim();
-    if (v.length >= 2) this.ref.close(v);
+    if (v.length >= 2 && !this.error()) this.ref.close(v);
   }
 }
 
@@ -1882,24 +2323,30 @@ export class SubscriptionDialogComponent {
         <span class="ic"><span class="material-symbols-rounded">tune</span></span>
         <div>
           <h2>Manage audiences</h2>
-          <p>Saved filters, lists and segments in one place.</p>
+          <p>Saved filters, lists and segments.</p>
         </div>
         <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
       </div>
 
       <div class="dlg-body">
+        <div class="tabs">
+          @for (k of kinds; track k.key) {
+            <button data-testid="pi-manage-tab" class="tab" [class.on]="tab() === k.key" (click)="tab.set(k.key)">
+              {{ k.label }} <span class="tab-count">{{ ofKind(k.key).length }}</span>
+            </button>
+          }
+        </div>
         <table class="aud-table">
           <thead>
             <tr>
               <th>Name</th>
-              <th>Type</th>
               <th class="num">Members</th>
               <th>Created by</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            @for (a of store.audiences(); track a.id) {
+            @for (a of ofKind(tab()); track a.id) {
               <tr>
                 <td>
                   <button class="link" (click)="load(a.id)">{{ a.name }}</button>
@@ -1907,10 +2354,19 @@ export class SubscriptionDialogComponent {
                     <span class="pi-badge live">Live</span>
                   }
                 </td>
-                <td><span class="kind">{{ kindLabel(a.kind) }}</span></td>
-                <td class="num">{{ a.count }}</td>
+                <td class="num">{{ store.audienceCounts()[a.id] ?? 0 }}</td>
                 <td class="by">{{ a.createdBy }}</td>
                 <td class="row-actions">
+                  @if (a.kind !== 'segment') {
+                    <button data-testid="pi-manage-rename" class="ic" matTooltip="Rename" (click)="rename(a)">
+                      <span class="material-symbols-rounded">edit</span>
+                    </button>
+                  }
+                  @if (a.kind === 'filter') {
+                    <button data-testid="pi-manage-update" class="ic" matTooltip="Update with current filters" (click)="updateFilter(a)">
+                      <span class="material-symbols-rounded">save_as</span>
+                    </button>
+                  }
                   <button class="ic" [class.on]="a.isDefault" matTooltip="Set as default" (click)="store.setDefaultAudience(a.id)">
                     <span class="material-symbols-rounded">star</span>
                   </button>
@@ -1927,8 +2383,8 @@ export class SubscriptionDialogComponent {
             }
           </tbody>
         </table>
-        @if (store.audiences().length === 0) {
-          <div class="empty">No audiences yet. Build a filter and save it as an audience.</div>
+        @if (ofKind(tab()).length === 0) {
+          <div class="empty">No {{ tabLabel().toLowerCase() }} yet.</div>
         }
       </div>
 
@@ -1996,12 +2452,30 @@ export class SubscriptionDialogComponent {
       color: var(--pi-status-active);
       margin-left: 8px;
     }
-    .kind {
-      font-size: 12px;
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+    .tab {
+      border: none;
+      background: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
       color: var(--pi-text-2);
-      background: var(--pi-surface-3);
-      padding: 3px 9px;
-      border-radius: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tab.on {
+      background: var(--pi-accent-bg);
+      color: var(--pi-accent-text);
+    }
+    .tab-count {
+      font-size: 11.5px;
+      color: var(--pi-text-3);
+      margin-left: 2px;
     }
     .row-actions {
       display: flex;
@@ -2041,168 +2515,52 @@ export class SubscriptionDialogComponent {
 export class ManageAudiencesDialogComponent {
   readonly ref = inject(MatDialogRef<ManageAudiencesDialogComponent>);
   readonly store = inject(ParticipantStore);
+  private readonly dialog = inject(MatDialog);
+  private readonly injector = inject(Injector);
+  private readonly snack = inject(MatSnackBar);
 
-  kindLabel(k: AudienceKind): string {
-    return k === 'filter' ? 'Saved filter' : k === 'list' ? 'List' : 'Segment';
+  readonly kinds: { key: AudienceKind; label: string }[] = [
+    { key: 'filter', label: 'Saved filters' },
+    { key: 'list', label: 'Lists' },
+    { key: 'segment', label: 'Segments' },
+  ];
+  readonly tab = signal<AudienceKind>('filter');
+  readonly tabLabel = computed(() => this.kinds.find((k) => k.key === this.tab())?.label ?? '');
+
+  ofKind(kind: AudienceKind): Audience[] {
+    return this.store.audiences().filter((a) => a.kind === kind);
   }
+
+  rename(a: Audience): void {
+    const noun = a.kind === 'filter' ? 'saved filter' : 'list';
+    this.dialog
+      .open(PromptDialogComponent, {
+        panelClass: 'pi-dialog',
+        width: '440px',
+        injector: this.injector,
+        data: {
+          title: `Rename ${noun}`,
+          label: 'Name',
+          value: a.name,
+          confirmText: 'Rename',
+          icon: 'edit',
+          validate: (v: string) => (this.store.nameTaken(a.kind, v, a.id) ? `A ${noun} named “${v}” already exists.` : null),
+        } as PromptData,
+      })
+      .afterClosed()
+      .subscribe((name?: string) => {
+        if (name && name !== a.name) this.store.renameAudience(a.id, name);
+      });
+  }
+
+  updateFilter(a: Audience): void {
+    this.store.updateAudienceFilter(a.id);
+    this.snack.open(`Updated "${a.name}" with the current filters`, 'Dismiss', { duration: 3000 });
+  }
+
   load(id: string): void {
     this.store.loadAudience(id);
     this.ref.close();
-  }
-}
-
-// ================================================================================================
-// Dialog: quick compose
-// ================================================================================================
-
-export interface QuickField {
-  key: string;
-  label: string;
-  type: 'text' | 'textarea' | 'multiselect';
-  placeholder?: string;
-  options?: { value: string; label: string }[];
-}
-export interface QuickComposeData {
-  icon: string;
-  title: string;
-  subtitle: string;
-  fields: QuickField[];
-  confirmText: string;
-  confirmIcon: string;
-  note?: string;
-}
-
-@Component({
-  selector: 'app-quick-compose-dialog',
-  imports: [FormsModule],
-  template: `
-    <div class="dlg">
-      <div class="dlg-head">
-        <span class="ic"><span class="material-symbols-rounded">{{ data.icon }}</span></span>
-        <div>
-          <h2>{{ data.title }}</h2>
-          <p>{{ data.subtitle }}</p>
-        </div>
-        <button class="x" (click)="ref.close()"><span class="material-symbols-rounded">close</span></button>
-      </div>
-
-      <div class="dlg-body">
-        @for (f of data.fields; track f.key) {
-          <div class="dlg-field">
-            <label class="dlg-label">{{ f.label }}</label>
-            @switch (f.type) {
-              @case ('text') {
-                <input class="dlg-input" [placeholder]="f.placeholder || ''" [(ngModel)]="values[f.key]" />
-              }
-              @case ('textarea') {
-                <textarea class="dlg-textarea" [placeholder]="f.placeholder || ''" [(ngModel)]="values[f.key]"></textarea>
-              }
-              @case ('multiselect') {
-                <div class="ms">
-                  @for (o of f.options; track o.value) {
-                    <button class="mschip" [class.on]="isOn(f.key, o.value)" (click)="toggle(f.key, o.value)">
-                      {{ o.label }}
-                      @if (isOn(f.key, o.value)) {
-                        <span class="material-symbols-rounded">check</span>
-                      }
-                    </button>
-                  }
-                </div>
-              }
-            }
-          </div>
-        }
-        @if (data.note) {
-          <div class="note"><span class="material-symbols-rounded">info</span>{{ data.note }}</div>
-        }
-      </div>
-
-      <div class="dlg-foot">
-        <button class="btn btn-ghost" (click)="ref.close()">Cancel</button>
-        <button class="btn btn-primary" [disabled]="!valid()" (click)="confirm()">
-          <span class="material-symbols-rounded">{{ data.confirmIcon }}</span> {{ data.confirmText }}
-        </button>
-      </div>
-    </div>
-  `,
-  styles: `
-    .ms {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .mschip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      border: 1px solid var(--pi-border-strong);
-      background: #fff;
-      color: var(--pi-text);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      padding: 7px 12px;
-      border-radius: 999px;
-      cursor: pointer;
-    }
-    .mschip:hover {
-      border-color: var(--pi-accent);
-    }
-    .mschip.on {
-      background: var(--pi-accent);
-      border-color: var(--pi-accent);
-      color: #fff;
-    }
-    .mschip .material-symbols-rounded {
-      font-size: 16px;
-    }
-    .note {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      font-size: 12.5px;
-      color: var(--pi-text-2);
-      background: var(--pi-surface-3);
-      border-radius: 9px;
-      padding: 10px 12px;
-    }
-    .note .material-symbols-rounded {
-      font-size: 17px;
-      color: var(--pi-accent);
-    }
-  `,
-})
-export class QuickComposeDialogComponent {
-  readonly ref = inject(MatDialogRef<QuickComposeDialogComponent>);
-  readonly data = inject<QuickComposeData>(MAT_DIALOG_DATA);
-
-  values: Record<string, string> = {};
-  private readonly multi = signal<Record<string, Set<string>>>({});
-
-  isOn(key: string, value: string): boolean {
-    return this.multi()[key]?.has(value) ?? false;
-  }
-  toggle(key: string, value: string): void {
-    this.multi.update((m) => {
-      const next = { ...m };
-      const set = new Set(next[key] ?? []);
-      set.has(value) ? set.delete(value) : set.add(value);
-      next[key] = set;
-      return next;
-    });
-  }
-
-  valid(): boolean {
-    return this.data.fields.every((f) => {
-      if (f.type === 'multiselect') return (this.multi()[f.key]?.size ?? 0) > 0;
-      return (this.values[f.key]?.trim().length ?? 0) > 0;
-    });
-  }
-
-  confirm(): void {
-    const out: Record<string, unknown> = { ...this.values };
-    for (const [k, set] of Object.entries(this.multi())) out[k] = [...set];
-    this.ref.close(out);
   }
 }
 
@@ -2361,6 +2719,7 @@ export class EvolutionDialogComponent {
 
 @Component({
   selector: 'app-checklist-viewer-dialog',
+  imports: [DecimalPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="dlg wide">
@@ -2387,17 +2746,31 @@ export class EvolutionDialogComponent {
         } @else {
           <div class="cnt">{{ data.participants.length }} participant{{ data.participants.length === 1 ? '' : 's' }} to review</div>
           <table class="cl">
-            <thead><tr><th>Participant</th><th>Status</th><th>Journey</th><th>Products</th></tr></thead>
-            <tbody>
-              @for (p of data.participants.slice(0, 250); track p.profileid) {
-                <tr>
-                  <td><div class="nm">{{ p.name }}</div><div class="em">{{ p.email }}</div></td>
-                  <td>{{ p.customerstatus === 'none' ? '—' : p.customerstatus }}</td>
-                  <td>{{ p.activejourney ? journeyMap()[p.activejourney] : '—' }}</td>
-                  <td>{{ p.activeproduct.length }}</td>
-                </tr>
-              }
-            </tbody>
+            @if (data.def.watson) {
+              <thead><tr><th>Participant</th><th>Watson status</th><th>Subscription</th><th class="num">Balance</th></tr></thead>
+              <tbody>
+                @for (p of data.participants.slice(0, 250); track p.profileid) {
+                  <tr>
+                    <td><div class="nm">{{ p.name }}</div><div class="em">{{ p.email }}</div></td>
+                    <td>{{ label(p.financialstatus) }}</td>
+                    <td>{{ label(p.customerstatus) }}</td>
+                    <td class="num">{{ p.balance == null ? '—' : (p.balance | number) }}</td>
+                  </tr>
+                }
+              </tbody>
+            } @else {
+              <thead><tr><th>Participant</th><th>Status</th><th>Journey</th><th>Products</th></tr></thead>
+              <tbody>
+                @for (p of data.participants.slice(0, 250); track p.profileid) {
+                  <tr>
+                    <td><div class="nm">{{ p.name }}</div><div class="em">{{ p.email }}</div></td>
+                    <td>{{ label(p.customerstatus) }}</td>
+                    <td>{{ p.activejourney ? journeyMap()[p.activejourney] : '—' }}</td>
+                    <td>{{ p.activeproduct.length }}</td>
+                  </tr>
+                }
+              </tbody>
+            }
           </table>
           @if (data.participants.length > 250) {
             <p class="more">Showing first 250 of {{ data.participants.length }}.</p>
@@ -2406,11 +2779,17 @@ export class EvolutionDialogComponent {
       </div>
 
       <div class="dlg-foot">
+        @if (data.def.watson && data.participants.length) {
+          <button data-testid="pi-watson-export" class="btn btn-ghost spacer" (click)="exportCsv()">
+            <span class="material-symbols-rounded">download</span> Export CSV
+          </button>
+        }
         <button class="btn btn-primary" (click)="ref.close()">Done</button>
       </div>
     </div>
   `,
   styles: `
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
     .cnt { font-size: 13px; color: var(--pi-text-2); margin-bottom: 10px; }
     .cl { width: 100%; border-collapse: collapse; font-size: 13px; }
     th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--pi-text-3); padding: 0 12px 8px; border-bottom: 1px solid var(--pi-border); }
@@ -2429,6 +2808,20 @@ export class ChecklistViewerDialogComponent {
   private readonly store = inject(ParticipantStore);
 
   readonly journeyMap = computed(() => toNameMap(this.store.reference().journeys));
+
+  label(status: string): string {
+    return status === 'none' ? '—' : status;
+  }
+
+  exportCsv(): void {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Name', 'Email', 'Watson status', 'Subscription', 'Purchase value', 'Paid', 'Balance'];
+    const lines = this.data.participants.map((p) =>
+      [p.name, p.email, p.financialstatus, p.customerstatus, p.purchasevalue, p.paid, p.balance].map(esc).join(',')
+    );
+    const csv = '\ufeff' + [header.join(','), ...lines].join('\n');
+    saveAs(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${this.data.def.id}.csv`);
+  }
 }
 
 // ================================================================================================
@@ -2455,7 +2848,9 @@ const STATUS_OPTS: FilterOption[] = [
 ];
 const FIN_OPTS: FilterOption[] = [
   { value: 'regular', label: 'Regular' },
+  { value: 'fully paid', label: 'Fully paid' },
   { value: 'locked', label: 'Locked' },
+  { value: 'late', label: 'Late' },
   { value: 'defaulted', label: 'Defaulted' },
   { value: 'discontinued', label: 'Discontinued' },
   { value: 'banned', label: 'Banned' },
@@ -2474,11 +2869,26 @@ const FIN_OPTS: FilterOption[] = [
           <span class="count">{{ store.activeFilterCount() }}</span>
         }
       </div>
-      <button class="reset" [disabled]="!store.activeFilterCount()" (click)="store.clearFilter()">Reset</button>
+      <div class="head-actions">
+        <button data-testid="pi-filter-toggle-all" class="icon" [title]="allOpen() ? 'Collapse all' : 'Expand all'" (click)="toggleAll()">
+          <span class="material-symbols-rounded">{{ allOpen() ? 'unfold_less' : 'unfold_more' }}</span>
+        </button>
+        <button class="reset" [disabled]="!store.activeFilterCount()" (click)="store.clearFilter()">Reset</button>
+      </div>
+    </div>
+
+    <div class="rail-search">
+      <span class="material-symbols-rounded">search</span>
+      <input data-testid="pi-filter-search" type="text" placeholder="Search filters…" [value]="query()" (input)="query.set($any($event.target).value)" />
+      @if (query()) {
+        <button class="clear" (click)="query.set('')" aria-label="Clear filter search">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      }
     </div>
 
     <div class="rail-body">
-      @for (sec of sections(); track sec.group) {
+      @for (sec of visibleSections(); track sec.group) {
         <div class="section" [class.open]="isOpen(sec.group)">
           <button class="sec-head" (click)="toggleSection(sec.group)">
             <span class="sec-label">{{ sec.label }}</span>
@@ -2490,11 +2900,19 @@ const FIN_OPTS: FilterOption[] = [
           @if (isOpen(sec.group)) {
             <div class="sec-body">
               @for (o of sec.options; track o.value) {
-                <label class="opt">
-                  <input type="checkbox" [checked]="isChecked(sec.group, o.value)" (change)="toggle(sec.group, o.value)" />
+                <button
+                  data-testid="pi-filter-option"
+                  class="opt"
+                  role="checkbox"
+                  [attr.aria-checked]="state(sec.group, o.value) === 'in' ? 'true' : state(sec.group, o.value) === 'out' ? 'mixed' : 'false'"
+                  [class.in]="state(sec.group, o.value) === 'in'"
+                  [class.out]="state(sec.group, o.value) === 'out'"
+                  [title]="cycleHint(sec.group, o.value)"
+                  (click)="cycle(sec.group, o.value)"
+                >
                   <span class="box"></span>
                   <span class="opt-label">{{ o.label }}</span>
-                </label>
+                </button>
               }
             </div>
           }
@@ -2502,84 +2920,215 @@ const FIN_OPTS: FilterOption[] = [
       }
 
       <!-- ATC count -->
-      <div class="section" [class.open]="isOpen('atc')">
-        <button class="sec-head" (click)="toggleSection('atc')">
-          <span class="sec-label">ATC count</span>
-          @if (atc != null) {
-            <span class="sec-count">1</span>
-          }
-          <span class="material-symbols-rounded chev">{{ isOpen('atc') ? 'expand_less' : 'expand_more' }}</span>
-        </button>
-        @if (isOpen('atc')) {
-          <div class="sec-body">
-            <div class="field-row">
-              <span class="field-lead">At least</span>
-              <input class="num-input" type="number" min="0" [value]="atc ?? ''" (input)="setAtc($any($event.target).value)" placeholder="0" />
+      @if (showCustom('atc')) {
+        <div class="section" [class.open]="isOpen('atc')">
+          <button class="sec-head" (click)="toggleSection('atc')">
+            <span class="sec-label">ATC count</span>
+            @if (atc != null) {
+              <span class="sec-count">1</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('atc') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('atc')) {
+            <div class="sec-body">
+              <div class="field-row">
+                <span class="field-lead">At least</span>
+                <input class="num-input" type="number" min="0" [value]="atc ?? ''" (input)="setNum('atcCountMin', $any($event.target).value)" placeholder="0" />
+              </div>
             </div>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      }
+
+      <!-- uP! / CPM -->
+      @if (showCustom('programs')) {
+        <div class="section" [class.open]="isOpen('programs')">
+          <button class="sec-head" (click)="toggleSection('programs')">
+            <span class="sec-label">uP! &amp; CPM</span>
+            @if (programCount()) {
+              <span class="sec-count">{{ programCount() }}</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('programs') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('programs')) {
+            <div class="sec-body">
+              <span class="mini-label">uP! attendance</span>
+              @for (o of upStatusOpts; track o.value) {
+                <button
+                  data-testid="pi-filter-up-status"
+                  class="opt"
+                  role="checkbox"
+                  [attr.aria-checked]="state('upStatus', o.value) === 'in' ? 'true' : state('upStatus', o.value) === 'out' ? 'mixed' : 'false'"
+                  [class.in]="state('upStatus', o.value) === 'in'"
+                  [class.out]="state('upStatus', o.value) === 'out'"
+                  [title]="cycleHint('upStatus', o.value)"
+                  (click)="cycle('upStatus', o.value)"
+                >
+                  <span class="box"></span>
+                  <span class="opt-label">{{ o.label }}</span>
+                </button>
+              }
+              <div class="field-row">
+                <span class="field-lead grow">uP! count at least</span>
+                <input data-testid="pi-filter-up-count" class="num-input" type="number" min="0" [value]="store.filter().upCountMin ?? ''" (input)="setNum('upCountMin', $any($event.target).value)" placeholder="0" />
+              </div>
+              <div class="field-row">
+                <span class="field-lead grow">CPM count at least</span>
+                <input data-testid="pi-filter-cpm-count" class="num-input" type="number" min="0" [value]="store.filter().cpmCountMin ?? ''" (input)="setNum('cpmCountMin', $any($event.target).value)" placeholder="0" />
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- event status: applies to the events ticked under Event -->
+      @if (showCustom('eventstatus')) {
+        <div class="section" [class.open]="isOpen('eventstatus')">
+          <button class="sec-head" (click)="toggleSection('eventstatus')">
+            <span class="sec-label">Event status</span>
+            @if (store.filter().eventStatus === 'confirmed') {
+              <span class="sec-count">1</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('eventstatus') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('eventstatus')) {
+            <div class="sec-body">
+              <div class="seg">
+                <button data-testid="pi-filter-event-attended" [class.on]="store.filter().eventStatus === 'attended'" (click)="setEventStatus('attended')">Attended</button>
+                <button data-testid="pi-filter-event-confirmed" [class.on]="store.filter().eventStatus === 'confirmed'" (click)="setEventStatus('confirmed')">Confirmed</button>
+              </div>
+              <span class="hint">
+                @if (!store.filter().events.length && !store.filter().exclude.events?.length) {
+                  Tick one or more events under Event.
+                } @else if (store.confirmedLoading()) {
+                  Loading confirmed participants…
+                } @else {
+                  {{ store.filter().eventStatus === 'confirmed' ? 'Approved requests' : 'Attended' }} for {{ store.filter().events.length }} event(s).
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- queue status: applies to the queues ticked under Queue -->
+      @if (showCustom('queuestatus')) {
+        <div class="section" [class.open]="isOpen('queuestatus')">
+          <button class="sec-head" (click)="toggleSection('queuestatus')">
+            <span class="sec-label">Queue status</span>
+            @if (store.filter().queueStatus === 'live') {
+              <span class="sec-count">1</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('queuestatus') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('queuestatus')) {
+            <div class="sec-body">
+              <div class="seg">
+                <button data-testid="pi-filter-queue-completed" [class.on]="store.filter().queueStatus === 'completed'" (click)="setQueueStatus('completed')">Completed</button>
+                <button data-testid="pi-filter-queue-live" [class.on]="store.filter().queueStatus === 'live'" (click)="setQueueStatus('live')">Live</button>
+              </div>
+              <span class="hint">
+                @if (!store.filter().queues.length && !store.filter().exclude.queues?.length) {
+                  Tick one or more queues under Queue.
+                } @else {
+                  {{ store.filter().queueStatus === 'live' ? 'Currently in' : 'Completed' }} the selected queue(s).
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- age -->
+      @if (showCustom('age')) {
+        <div class="section" [class.open]="isOpen('age')">
+          <button class="sec-head" (click)="toggleSection('age')">
+            <span class="sec-label">Age</span>
+            @if (store.filter().ageMin != null || store.filter().ageMax != null) {
+              <span class="sec-count">1</span>
+            }
+            <span class="material-symbols-rounded chev">{{ isOpen('age') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('age')) {
+            <div class="sec-body">
+              <div class="field-row two">
+                <input data-testid="pi-filter-age-min" class="num-input wide" type="number" min="0" placeholder="Min" [value]="store.filter().ageMin ?? ''" (input)="setNum('ageMin', $any($event.target).value)" />
+                <input data-testid="pi-filter-age-max" class="num-input wide" type="number" min="0" placeholder="Max" [value]="store.filter().ageMax ?? ''" (input)="setNum('ageMax', $any($event.target).value)" />
+              </div>
+              <span class="hint">Participants without a date of birth are excluded.</span>
+            </div>
+          }
+        </div>
+      }
 
       <!-- subscription dates -->
-      <div class="section" [class.open]="isOpen('dates')">
-        <button class="sec-head" (click)="toggleSection('dates')">
-          <span class="sec-label">Subscription dates</span>
-          <span class="material-symbols-rounded chev">{{ isOpen('dates') ? 'expand_less' : 'expand_more' }}</span>
-        </button>
-        @if (isOpen('dates')) {
-          <div class="sec-body">
-            <span class="mini-label">Start between</span>
-            <div class="field-row two">
-              <input class="date-input" type="date" [value]="dateVal('subscriptionStart','start')" (change)="setDate('subscriptionStart','start',$any($event.target).value)" />
-              <input class="date-input" type="date" [value]="dateVal('subscriptionStart','end')" (change)="setDate('subscriptionStart','end',$any($event.target).value)" />
+      @if (showCustom('dates')) {
+        <div class="section" [class.open]="isOpen('dates')">
+          <button class="sec-head" (click)="toggleSection('dates')">
+            <span class="sec-label">Subscription dates</span>
+            <span class="material-symbols-rounded chev">{{ isOpen('dates') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('dates')) {
+            <div class="sec-body">
+              <span class="mini-label">Start between</span>
+              <div class="field-row two">
+                <input class="date-input" type="date" [value]="dateVal('subscriptionStart','start')" (change)="setDate('subscriptionStart','start',$any($event.target).value)" />
+                <input class="date-input" type="date" [value]="dateVal('subscriptionStart','end')" (change)="setDate('subscriptionStart','end',$any($event.target).value)" />
+              </div>
+              <span class="mini-label">End between</span>
+              <div class="field-row two">
+                <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','start')" (change)="setDate('subscriptionEnd','start',$any($event.target).value)" />
+                <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','end')" (change)="setDate('subscriptionEnd','end',$any($event.target).value)" />
+              </div>
             </div>
-            <span class="mini-label">End between</span>
-            <div class="field-row two">
-              <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','start')" (change)="setDate('subscriptionEnd','start',$any($event.target).value)" />
-              <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','end')" (change)="setDate('subscriptionEnd','end',$any($event.target).value)" />
-            </div>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      }
 
       <!-- product activity -->
-      <div class="section" [class.open]="isOpen('activity')">
-        <button class="sec-head" (click)="toggleSection('activity')">
-          <span class="sec-label">Product activity</span>
-          @if (rules('consumed').length + rules('unconsumed').length) {
-            <span class="sec-count">{{ rules('consumed').length + rules('unconsumed').length }}</span>
-          }
-          <span class="material-symbols-rounded chev">{{ isOpen('activity') ? 'expand_less' : 'expand_more' }}</span>
-        </button>
-        @if (isOpen('activity')) {
-          <div class="sec-body">
-            @for (kind of ['consumed','unconsumed']; track kind) {
-              <span class="mini-label">{{ kind === 'consumed' ? 'Consumed count' : 'Unconsumed count' }}</span>
-              @for (rule of rules($any(kind)); track $index) {
-                <div class="rule">
-                  <select class="rule-sel" [value]="rule.productId" (change)="updateRule($any(kind), $index, { productId: $any($event.target).value })">
-                    @for (p of products(); track p.id) {
-                      <option [value]="p.id">{{ p.name }}</option>
-                    }
-                  </select>
-                  <select class="rule-cmp" [value]="rule.comparison" (change)="updateRule($any(kind), $index, { comparison: $any($event.target).value })">
-                    @for (c of comparisons; track c.value) {
-                      <option [value]="c.value">{{ c.label }}</option>
-                    }
-                  </select>
-                  <input class="rule-num" type="number" min="0" [value]="rule.count" (input)="updateRule($any(kind), $index, { count: asNum($any($event.target).value) })" />
-                  <button class="rule-del" (click)="removeRule($any(kind), $index)">
-                    <span class="material-symbols-rounded">close</span>
-                  </button>
-                </div>
-              }
-              <button class="add-rule" (click)="addRule($any(kind))">
-                <span class="material-symbols-rounded">add</span> Add rule
-              </button>
+      @if (showCustom('activity')) {
+        <div class="section" [class.open]="isOpen('activity')">
+          <button class="sec-head" (click)="toggleSection('activity')">
+            <span class="sec-label">Product activity</span>
+            @if (rules('consumed').length + rules('unconsumed').length) {
+              <span class="sec-count">{{ rules('consumed').length + rules('unconsumed').length }}</span>
             }
-          </div>
-        }
-      </div>
+            <span class="material-symbols-rounded chev">{{ isOpen('activity') ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+          @if (isOpen('activity')) {
+            <div class="sec-body">
+              @for (kind of ['consumed','unconsumed']; track kind) {
+                <span class="mini-label">{{ kind === 'consumed' ? 'Consumed count' : 'Unconsumed count' }}</span>
+                @for (rule of rules($any(kind)); track $index) {
+                  <div class="rule">
+                    <select class="rule-sel" [value]="rule.productId" (change)="updateRule($any(kind), $index, { productId: $any($event.target).value })">
+                      @for (p of products(); track p.id) {
+                        <option [value]="p.id">{{ p.name }}</option>
+                      }
+                    </select>
+                    <select class="rule-cmp" [value]="rule.comparison" (change)="updateRule($any(kind), $index, { comparison: $any($event.target).value })">
+                      @for (c of comparisons; track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                    <input class="rule-num" type="number" min="0" [value]="rule.count" (input)="updateRule($any(kind), $index, { count: asNum($any($event.target).value) })" />
+                    <button class="rule-del" (click)="removeRule($any(kind), $index)">
+                      <span class="material-symbols-rounded">close</span>
+                    </button>
+                  </div>
+                }
+                <button class="add-rule" (click)="addRule($any(kind))">
+                  <span class="material-symbols-rounded">add</span> Add rule
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (query() && !visibleSections().length && !anyCustomVisible()) {
+        <div class="no-match">No filters match “{{ query() }}”.</div>
+      }
     </div>
 
     <div class="rail-foot">
@@ -2630,6 +3179,27 @@ const FIN_OPTS: FilterOption[] = [
       justify-content: center;
       padding: 0 5px;
     }
+    .head-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .icon {
+      border: none;
+      background: none;
+      color: var(--pi-text-3);
+      cursor: pointer;
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 6px;
+    }
+    .icon:hover {
+      background: var(--pi-surface-3);
+      color: var(--pi-text);
+    }
+    .icon .material-symbols-rounded {
+      font-size: 19px;
+    }
     .reset {
       border: none;
       background: none;
@@ -2638,6 +3208,87 @@ const FIN_OPTS: FilterOption[] = [
       font-size: 12.5px;
       font-weight: 600;
       cursor: pointer;
+    }
+    .rail-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 10px 12px 4px;
+      padding: 0 10px;
+      height: 34px;
+      background: var(--pi-surface-3);
+      border: 1px solid transparent;
+      border-radius: var(--pi-radius-sm);
+      flex-shrink: 0;
+    }
+    .rail-search:focus-within {
+      background: #fff;
+      border-color: var(--pi-accent);
+    }
+    .rail-search > .material-symbols-rounded {
+      font-size: 18px;
+      color: var(--pi-text-3);
+    }
+    .rail-search input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--pi-text);
+    }
+    .rail-search .clear {
+      border: none;
+      background: none;
+      color: var(--pi-text-3);
+      cursor: pointer;
+      display: inline-flex;
+      padding: 0;
+    }
+    .rail-search .clear .material-symbols-rounded {
+      font-size: 16px;
+    }
+    .no-match {
+      padding: 18px 16px;
+      font-size: 12.5px;
+      color: var(--pi-text-3);
+    }
+    .field-lead.grow {
+      flex: 1;
+    }
+    .num-input.wide {
+      width: 100%;
+    }
+    .field-row + .field-row {
+      margin-top: 6px;
+    }
+    .hint {
+      font-size: 11.5px;
+      color: var(--pi-text-3);
+      margin-top: 6px;
+    }
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: 8px;
+      overflow: hidden;
+      align-self: flex-start;
+    }
+    .seg button {
+      border: none;
+      background: #fff;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+    .seg button.on {
+      background: var(--pi-accent);
+      color: #fff;
     }
     .reset:disabled {
       color: var(--pi-text-3);
@@ -2702,20 +3353,20 @@ const FIN_OPTS: FilterOption[] = [
       display: flex;
       align-items: center;
       gap: 9px;
+      width: 100%;
       padding: 5px 6px;
+      border: none;
+      background: none;
       border-radius: 7px;
       cursor: pointer;
+      font-family: inherit;
       font-size: 13px;
       color: var(--pi-text-2);
+      text-align: left;
+      user-select: none;
     }
     .opt:hover {
       background: var(--pi-surface-3);
-    }
-    .opt input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
     }
     .opt .box {
       width: 16px;
@@ -2727,11 +3378,12 @@ const FIN_OPTS: FilterOption[] = [
       flex-shrink: 0;
       transition: all 0.1s ease;
     }
-    .opt input:checked + .box {
+    /* include: blue tick */
+    .opt.in .box {
       background: var(--pi-accent);
       border-color: var(--pi-accent);
     }
-    .opt input:checked + .box::after {
+    .opt.in .box::after {
       content: '';
       position: absolute;
       left: 4.5px;
@@ -2742,9 +3394,35 @@ const FIN_OPTS: FilterOption[] = [
       border-width: 0 2px 2px 0;
       transform: rotate(45deg);
     }
-    .opt input:checked ~ .opt-label {
+    .opt.in .opt-label {
       color: var(--pi-text);
       font-weight: 500;
+    }
+    /* exclude: red cross, struck-through label */
+    .opt.out .box {
+      background: var(--pi-status-banned);
+      border-color: var(--pi-status-banned);
+    }
+    .opt.out .box::before,
+    .opt.out .box::after {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 2px;
+      width: 1.8px;
+      height: 9px;
+      background: #fff;
+      border-radius: 1px;
+    }
+    .opt.out .box::before {
+      transform: rotate(45deg);
+    }
+    .opt.out .box::after {
+      transform: rotate(-45deg);
+    }
+    .opt.out .opt-label {
+      color: var(--pi-status-banned);
+      text-decoration: line-through;
     }
 
     .mini-label {
@@ -2884,8 +3562,27 @@ export class FilterRailComponent {
     { value: 'lte', label: '≤' },
   ];
 
-  // sections expanded by default; others start collapsed to avoid a wall of options
-  readonly open = signal<Set<string>>(new Set(['customerstatus', 'activejourney', 'activeproduct', 'dates']));
+  // every section starts collapsed; clicking its name expands it
+  readonly open = signal<Set<string>>(new Set());
+
+  // filter-panel search: hides non-matching options and opens every section with a match
+  readonly query = signal('');
+
+  // hand-built sections (not option lists), matched by label
+  private readonly customLabels: Record<string, string> = {
+    atc: 'ATC count',
+    programs: 'uP! & CPM count attendance new already attended',
+    eventstatus: 'Event status attended confirmed',
+    queuestatus: 'Queue status completed live',
+    age: 'Age',
+    dates: 'Subscription dates start end',
+    activity: 'Product activity consumed unconsumed count',
+  };
+
+  readonly upStatusOpts: FilterOption[] = [
+    { value: 'new', label: 'New (no uP! yet)' },
+    { value: 'returning', label: 'Already attended uP!' },
+  ];
 
   private opt = (arr: { id: string; name: string }[]): FilterOption[] => arr.map((a) => ({ value: a.id, label: a.name }));
 
@@ -2914,7 +3611,7 @@ export class FilterRailComponent {
       { group: 'lastcompletedjourney', label: 'Last completed journey', options: this.opt(ref.journeys) },
       { group: 'activeproduct', label: 'Active products', options: this.opt(ref.products) },
       { group: 'tier', label: 'Tier', options: this.opt(ref.tiers) },
-      { group: 'participantmode', label: 'Mode', options: this.opt(ref.modes) },
+      { group: 'participantmode', label: 'Mode', options: [...this.opt(ref.modes), { value: 'none', label: 'None' }] },
       { group: 'profiletags', label: 'Tags', options: ref.tags.map((t) => ({ value: t.id, label: t.name })) },
       { group: 'addons', label: 'Add-ons', options: this.opt(ref.products) },
       { group: 'gifts', label: 'Gifts', options: this.opt(ref.products) },
@@ -2926,6 +3623,32 @@ export class FilterRailComponent {
 
   readonly products = computed(() => this.store.reference().products);
 
+  readonly visibleSections = computed<FilterSection[]>(() => {
+    const q = this.query().trim().toLowerCase();
+    if (!q) return this.sections();
+    return this.sections()
+      .map((sec) =>
+        sec.label.toLowerCase().includes(q) ? sec : { ...sec, options: sec.options.filter((o) => o.label.toLowerCase().includes(q)) }
+      )
+      .filter((sec) => sec.options.length > 0);
+  });
+
+  private readonly allKeys = computed(() => [...this.sections().map((s) => s.group as string), ...Object.keys(this.customLabels)]);
+  readonly allOpen = computed(() => this.allKeys().every((k) => this.open().has(k)));
+
+  readonly programCount = computed(() => {
+    const f = this.store.filter();
+    return f.upStatus.length + (f.exclude.upStatus?.length ?? 0) + (f.upCountMin != null ? 1 : 0) + (f.cpmCountMin != null ? 1 : 0);
+  });
+
+  showCustom(key: string): boolean {
+    const q = this.query().trim().toLowerCase();
+    return !q || this.customLabels[key].toLowerCase().includes(q);
+  }
+  anyCustomVisible(): boolean {
+    return Object.keys(this.customLabels).some((k) => this.showCustom(k));
+  }
+
   toggleSection(key: string): void {
     this.open.update((s) => {
       const next = new Set(s);
@@ -2933,32 +3656,58 @@ export class FilterRailComponent {
       return next;
     });
   }
+  toggleAll(): void {
+    this.open.set(this.allOpen() ? new Set() : new Set(this.allKeys()));
+  }
+  // while searching, every visible section is open; clearing the search restores the user's layout
   isOpen(key: string): boolean {
-    return this.open().has(key);
+    return !!this.query().trim() || this.open().has(key);
   }
 
-  selectedArr(group: keyof FilterModel): string[] {
-    return (this.store.filter()[group] as unknown as string[]) ?? [];
-  }
-  isChecked(group: keyof FilterModel, value: string): boolean {
-    return this.selectedArr(group).includes(value);
+  // include / exclude state of one option
+  state(group: keyof FilterModel, value: string): 'in' | 'out' | null {
+    const f = this.store.filter();
+    const g = group as CheckGroup;
+    if ((f[g] as string[]).includes(value)) return 'in';
+    if (f.exclude[g]?.includes(value)) return 'out';
+    return null;
   }
   countFor(group: keyof FilterModel): number {
-    return this.selectedArr(group).length;
+    const f = this.store.filter();
+    const g = group as CheckGroup;
+    return (f[g] as string[]).length + (f.exclude[g]?.length ?? 0);
   }
-  toggle(group: keyof FilterModel, value: string): void {
-    const cur = this.selectedArr(group);
-    const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
-    this.store.patchFilter({ [group]: next } as Partial<FilterModel>);
+  cycleHint(group: keyof FilterModel, value: string): string {
+    const st = this.state(group, value);
+    return st === 'in' ? 'Included — click to exclude' : st === 'out' ? 'Excluded — click to clear' : 'Click to include';
+  }
+  // click cycle: off → include → exclude → off
+  cycle(group: keyof FilterModel, value: string): void {
+    const f = this.store.filter();
+    const g = group as CheckGroup;
+    const inc = f[g] as string[];
+    const exc = f.exclude[g] ?? [];
+    const st = this.state(group, value);
+    const nextInc = st === null ? [...inc, value] : inc.filter((v) => v !== value);
+    const nextExc = st === 'in' ? [...exc, value] : exc.filter((v) => v !== value);
+    const patch = { [g]: nextInc, exclude: { ...f.exclude, [g]: nextExc } } as Partial<FilterModel>;
+    if (g === 'events' && !nextInc.length && !nextExc.length) patch.eventStatus = 'attended';
+    if (g === 'queues' && !nextInc.length && !nextExc.length) patch.queueStatus = 'completed';
+    this.store.patchFilter(patch);
   }
 
-  // ATC count
   get atc(): number | null {
     return this.store.filter().atcCountMin;
   }
-  setAtc(value: string): void {
+  setNum(key: 'atcCountMin' | 'upCountMin' | 'cpmCountMin' | 'ageMin' | 'ageMax', value: string): void {
     const n = value === '' ? null : Math.max(0, Number(value));
-    this.store.patchFilter({ atcCountMin: Number.isNaN(n as number) ? null : n });
+    this.store.patchFilter({ [key]: n == null || Number.isNaN(n) ? null : n });
+  }
+  setQueueStatus(status: QueueStatus): void {
+    this.store.patchFilter({ queueStatus: status });
+  }
+  setEventStatus(status: EventStatus): void {
+    this.store.patchFilter({ eventStatus: status });
   }
 
   // date ranges
@@ -3012,7 +3761,7 @@ export class FilterRailComponent {
         @if (store.chips().length) {
           <span class="lead">Filters</span>
           @for (chip of store.chips(); track chip.label) {
-            <button class="chip" (click)="store.removeChip(chip)">
+            <button class="chip" [class.exclude]="chip.exclude" (click)="store.removeChip(chip)">
               <span class="txt">{{ chip.label }}</span>
               <span class="material-symbols-rounded">close</span>
             </button>
@@ -3063,6 +3812,11 @@ export class FilterRailComponent {
     .chip .material-symbols-rounded {
       font-size: 15px;
     }
+    .chip.exclude {
+      border-color: var(--pi-status-banned);
+      color: var(--pi-status-banned);
+      background: var(--pi-status-banned-bg);
+    }
     .chip.signal {
       border-color: var(--pi-accent);
       color: var(--pi-accent-text);
@@ -3112,24 +3866,41 @@ export class ActiveFilterChipsComponent {
       <span class="material-symbols-rounded chev">expand_more</span>
     </button>
 
-    <mat-menu #menu="matMenu" class="aud-menu" xPosition="before">
-      <div class="menu-head" (click)="$event.stopPropagation()">Audiences</div>
-      @for (kind of kinds; track kind.key) {
-        @if (byKind(kind.key).length) {
-          <div class="group-label" (click)="$event.stopPropagation()">
-            <span class="material-symbols-rounded">{{ kind.icon }}</span>{{ kind.label }}
-          </div>
-          @for (aud of byKind(kind.key); track aud.id) {
-            <button mat-menu-item class="aud-item" (click)="store.loadAudience(aud.id)">
-              <span class="dot" [class.on]="store.activeAudienceId() === aud.id"></span>
-              <span class="aud-name">{{ aud.name }}</span>
-              <span class="aud-count">{{ aud.count }}</span>
-              @if (aud.isDefault) {
-                <span class="material-symbols-rounded star" matTooltip="Default">star</span>
-              }
+    <mat-menu #menu="matMenu" class="aud-menu" xPosition="before" (closed)="query.set('')">
+      <div class="menu-top" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+        <div class="tabs">
+          @for (kind of kinds; track kind.key) {
+            <button data-testid="pi-aud-tab" class="tab" [class.on]="tab() === kind.key" (click)="tab.set(kind.key)">
+              <span class="material-symbols-rounded">{{ kind.icon }}</span>{{ kind.label }}
+              <span class="tab-count">{{ byKind(kind.key).length }}</span>
             </button>
           }
-        }
+        </div>
+        <div class="search">
+          <span class="material-symbols-rounded">search</span>
+          <input data-testid="pi-aud-search" type="text" placeholder="Search {{ tabLabel() }}…" [value]="query()" (input)="query.set($any($event.target).value)" />
+        </div>
+      </div>
+      @if (store.activeAudienceId()) {
+        <button mat-menu-item class="aud-item" (click)="store.clearFilter()">
+          <span class="material-symbols-rounded all-ic">groups</span>
+          <span class="aud-name">All participants</span>
+          <span class="aud-count">{{ store.totalCount() }}</span>
+        </button>
+      }
+      @for (aud of visible(); track aud.id) {
+        <button mat-menu-item class="aud-item" (click)="store.loadAudience(aud.id)">
+          <span class="dot" [class.on]="store.activeAudienceId() === aud.id"></span>
+          <span class="aud-name">{{ aud.name }}</span>
+          <span class="aud-count">{{ store.audienceCounts()[aud.id] ?? 0 }}</span>
+          @if (aud.isDefault) {
+            <span class="material-symbols-rounded star" matTooltip="Default">star</span>
+          }
+        </button>
+      } @empty {
+        <div class="none" (click)="$event.stopPropagation()">
+          {{ query() ? 'No ' + tabLabel().toLowerCase() + ' match “' + query() + '”.' : 'No ' + tabLabel().toLowerCase() + ' yet.' }}
+        </div>
       }
       <div class="menu-foot">
         <button mat-menu-item (click)="manage.emit()">
@@ -3172,25 +3943,75 @@ export class ActiveFilterChipsComponent {
       color: var(--pi-text-3);
       margin-left: auto;
     }
-    .menu-head {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--pi-text-3);
-      padding: 12px 16px 6px;
+    .menu-top {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--pi-border);
+      position: sticky;
+      top: 0;
+      background: var(--pi-surface);
+      z-index: 1;
     }
-    .group-label {
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: none;
+      background: none;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+      padding: 5px 8px;
+      border-radius: 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab .material-symbols-rounded {
+      font-size: 15px;
+    }
+    .tab.on {
+      background: var(--pi-accent-bg);
+      color: var(--pi-accent-text);
+    }
+    .tab-count {
+      font-size: 11px;
+      color: var(--pi-text-3);
+    }
+    .search {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--pi-text-2);
-      padding: 8px 16px 4px;
+      height: 32px;
+      padding: 0 9px;
+      background: var(--pi-surface-3);
+      border-radius: var(--pi-radius-sm);
     }
-    .group-label .material-symbols-rounded {
-      font-size: 15px;
+    .search .material-symbols-rounded {
+      font-size: 17px;
+      color: var(--pi-text-3);
+    }
+    .search input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .none {
+      padding: 14px 16px;
+      font-size: 12.5px;
+      color: var(--pi-text-3);
+    }
+    .all-ic {
+      font-size: 17px;
+      color: var(--pi-text-3);
     }
     .aud-item {
       display: flex;
@@ -3240,10 +4061,20 @@ export class AudienceSwitcherComponent {
     { key: 'segment', label: 'Segments', icon: 'donut_small' },
   ];
 
+  readonly tab = signal<AudienceKind>('filter');
+  readonly query = signal('');
+
   readonly activeName = computed(() => {
     const id = this.store.activeAudienceId();
     if (!id) return 'All participants';
     return this.store.audiences().find((a) => a.id === id)?.name ?? 'All participants';
+  });
+
+  readonly tabLabel = computed(() => this.kinds.find((k) => k.key === this.tab())?.label ?? '');
+
+  readonly visible = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    return this.byKind(this.tab()).filter((a) => !q || a.name.toLowerCase().includes(q));
   });
 
   byKind(kind: AudienceKind): Audience[] {
@@ -3309,7 +4140,7 @@ export type SortDir = 'asc' | 'desc' | null;
             @for (def of columnDefs(); track def.key) {
               <div
                 class="th"
-                [class.num]="def.type === 'number'"
+                [class.num]="def.type === 'number' || def.type === 'money'"
                 [class.frozen]="isFrozen(def.key)"
                 [class.frozen-edge]="lastFrozenKey() === def.key"
                 [style.left.px]="leftOf(def.key)"
@@ -3347,7 +4178,7 @@ export type SortDir = 'asc' | 'desc' | null;
               @for (def of columnDefs(); track def.key) {
                 <div
                   class="td"
-                  [class.num]="def.type === 'number'"
+                  [class.num]="def.type === 'number' || def.type === 'money'"
                   [class.frozen]="isFrozen(def.key)"
                   [class.frozen-edge]="lastFrozenKey() === def.key"
                   [style.left.px]="leftOf(def.key)"
@@ -3373,6 +4204,16 @@ export type SortDir = 'asc' | 'desc' | null;
                   @case ('array') {
                     @if (arrayValues(p, def).length === 0) {
                       <span class="muted">—</span>
+                    } @else if (def.resolve === 'product') {
+                      <!-- products: grouped with counts, up to 3 lines -->
+                      <span class="plist" [matTooltip]="productTooltip(p, def)" matTooltipClass="pi-multiline-tip">
+                        @for (line of productLines(p, def).slice(0, 3); track line.name) {
+                          <span class="pline">{{ line.name }} ({{ line.count }})</span>
+                        }
+                        @if (productLines(p, def).length > 3) {
+                          <span class="pmore">+{{ productLines(p, def).length - 3 }} more</span>
+                        }
+                      </span>
                     } @else {
                       <span class="chips">
                         @for (v of arrayValues(p, def).slice(0, 2); track v) {
@@ -3493,8 +4334,8 @@ export type SortDir = 'asc' | 'desc' | null;
 
     .tr {
       display: grid;
-      align-items: center;
-      height: 46px;
+      align-items: stretch;
+      min-height: 46px;
       border-bottom: 0.5px solid var(--pi-border);
       cursor: pointer;
       transition: background 0.08s ease;
@@ -3513,11 +4354,29 @@ export type SortDir = 'asc' | 'desc' | null;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 0 14px;
+      padding: 6px 14px;
       font-size: 13px;
       color: var(--pi-text);
       min-width: 0;
       overflow: hidden;
+    }
+    .plist {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      line-height: 1.3;
+    }
+    .pline {
+      font-size: 12.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pmore {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--pi-accent-text);
     }
     .td.num {
       justify-content: flex-end;
@@ -3899,7 +4758,7 @@ export class ParticipantTableComponent {
 
   private sortValue(p: Participant, key: string, def: ColumnDef): string | number {
     const raw = (p as unknown as Record<string, unknown>)[key];
-    if (def?.type === 'number') return (raw as number) ?? -1;
+    if (def?.type === 'number' || def?.type === 'money') return (raw as number) ?? -1;
     if (def?.type === 'date') return raw ? new Date(raw as string).getTime() : 0;
     if (Array.isArray(raw)) return raw.length;
     return this.cellText(p, def).toLowerCase();
@@ -3917,6 +4776,8 @@ export class ParticipantTableComponent {
         return this.modeMap()[id] ?? id;
       case 'tag':
         return this.tagMap()[id] ?? id;
+      case 'playlist':
+        return this.store.playlistNames()[id] ?? id;
       default:
         return id;
     }
@@ -3932,6 +4793,29 @@ export class ParticipantTableComponent {
       .toUpperCase();
   }
 
+  // Product ids grouped by name with counts, most frequent first. Cached per participant object
+  // (rows are replaced, not mutated, when their data changes).
+  private readonly productLineCache = new WeakMap<Participant, Record<string, { name: string; count: number }[]>>();
+
+  productLines(p: Participant, def: ColumnDef): { name: string; count: number }[] {
+    const cached = this.productLineCache.get(p) ?? {};
+    if (!cached[def.key]) {
+      const counts = new Map<string, number>();
+      for (const name of this.arrayValues(p, def)) counts.set(name, (counts.get(name) ?? 0) + 1);
+      cached[def.key] = [...counts]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      this.productLineCache.set(p, cached);
+    }
+    return cached[def.key];
+  }
+
+  productTooltip(p: Participant, def: ColumnDef): string {
+    return this.productLines(p, def)
+      .map((l) => `${l.name} (${l.count})`)
+      .join('\n');
+  }
+
   arrayValues(p: Participant, def: ColumnDef): string[] {
     const raw = (p as unknown as Record<string, unknown>)[def.key];
     if (!Array.isArray(raw)) return [];
@@ -3942,7 +4826,8 @@ export class ParticipantTableComponent {
     if (!def) return '';
     const raw = (p as unknown as Record<string, unknown>)[def.key];
     if (def.type === 'date') return raw ? this.formatDate(raw as string) : '—';
-    if (def.type === 'number') return raw == null ? '0' : String(raw);
+    if (def.type === 'number') return raw == null ? '—' : String(raw);
+    if (def.type === 'money') return raw == null ? '—' : Number(raw).toLocaleString('en-IN', { maximumFractionDigits: 2 });
     if (def.resolve && typeof raw === 'string') return this.resolve(def.resolve, raw);
     if (def.key === 'customersupport') return p.customersupport.status === 'none' ? '—' : p.customersupport.status;
     if (def.key === 'registered') return p.registered ? 'Registered' : 'Guest';
@@ -3967,6 +4852,7 @@ export class ParticipantTableComponent {
     switch (value) {
       case 'active':
       case 'regular':
+      case 'fully paid':
       case 'on-track':
       case 'registered':
         return 'active';
@@ -4004,16 +4890,24 @@ export type BulkAction =
   | 'email'
   | 'whatsapp'
   | 'notify'
+  | 'watiMessages'
+  | 'broadcast'
+  | 'watiConfig'
   | 'tag'
   | 'addToList'
-  | 'subscription'
-  | 'remarks'
-  | 'products'
+  | 'manageLists'
   | 'playlist'
-  | 'evolution'
-  | 'broadcast'
+  | 'viewRecommended'
   | 'interim'
-  | 'wishlist';
+  | 'wishlist'
+  | 'appActionPending'
+  | 'remarks'
+  | 'subscription'
+  | 'products'
+  | 'evolution'
+  | 'exportSelection'
+  | 'exportTable'
+  | 'contentConsumption';
 
 @Component({
   selector: 'app-bulk-action-bar',
@@ -4032,72 +4926,104 @@ export type BulkAction =
         </div>
 
         <div class="actions">
-          <button class="act" [matMenuTriggerFor]="comm">
-            <span class="material-symbols-rounded">campaign</span> Communicate
+          <button data-testid="pi-bulk-comm" class="act" [matMenuTriggerFor]="comm">
+            <span class="material-symbols-rounded">campaign</span> Communication
             <span class="material-symbols-rounded chev">expand_more</span>
           </button>
-          <button class="act" [matMenuTriggerFor]="org">
+          <button data-testid="pi-bulk-org" class="act" [matMenuTriggerFor]="org">
             <span class="material-symbols-rounded">label</span> Organize
             <span class="material-symbols-rounded chev">expand_more</span>
           </button>
-          <button class="act" [matMenuTriggerFor]="upd">
+          <button data-testid="pi-bulk-app" class="act" [matMenuTriggerFor]="app">
+            <span class="material-symbols-rounded">smartphone</span> App Actions
+            <span class="material-symbols-rounded chev">expand_more</span>
+          </button>
+          <button data-testid="pi-bulk-upd" class="act" [matMenuTriggerFor]="upd">
             <span class="material-symbols-rounded">edit_note</span> Update
             <span class="material-symbols-rounded chev">expand_more</span>
           </button>
-          <button class="act primary" (click)="action.emit('evolution')">
-            <span class="material-symbols-rounded">insights</span> Evolution
-          </button>
-          <button class="act" [matMenuTriggerFor]="more" aria-label="More actions">
-            <span class="material-symbols-rounded">more_horiz</span>
+          <button data-testid="pi-bulk-reports" class="act primary" [matMenuTriggerFor]="reports">
+            <span class="material-symbols-rounded">summarize</span> Reports
+            <span class="material-symbols-rounded chev">expand_more</span>
           </button>
         </div>
       </div>
 
-      <mat-menu #more="matMenu">
-        <button mat-menu-item (click)="action.emit('broadcast')">
-          <span class="material-symbols-rounded mi">podcasts</span> Broadcast in Breakthroughs
-        </button>
-        <button mat-menu-item (click)="action.emit('interim')">
-          <span class="material-symbols-rounded mi">description</span> Manage interim report
-        </button>
-        <button mat-menu-item (click)="action.emit('wishlist')">
-          <span class="material-symbols-rounded mi">favorite</span> Evolution wishlist
-        </button>
-      </mat-menu>
-
       <mat-menu #comm="matMenu">
-        <button mat-menu-item (click)="action.emit('email')">
-          <span class="material-symbols-rounded mi">mail</span> Send email
+        <button data-testid="pi-bulk-email" mat-menu-item (click)="action.emit('email')">
+          <span class="material-symbols-rounded mi">mail</span> Send Email
         </button>
-        <button mat-menu-item (click)="action.emit('whatsapp')">
+        <button data-testid="pi-bulk-whatsapp" mat-menu-item (click)="action.emit('whatsapp')">
           <span class="material-symbols-rounded mi">chat</span> Send WhatsApp
         </button>
-        <button mat-menu-item (click)="action.emit('notify')">
-          <span class="material-symbols-rounded mi">notifications</span> In-app notification
+        <button data-testid="pi-bulk-notify" mat-menu-item (click)="action.emit('notify')">
+          <span class="material-symbols-rounded mi">notifications</span> Send In-App Notification
+        </button>
+        <button data-testid="pi-bulk-wati-messages" mat-menu-item (click)="action.emit('watiMessages')">
+          <span class="material-symbols-rounded mi">forum</span> Send Wati Messages
+        </button>
+        <button data-testid="pi-bulk-broadcast" mat-menu-item (click)="action.emit('broadcast')">
+          <span class="material-symbols-rounded mi">podcasts</span> Send Broadcast in Breakthroughs
+        </button>
+        <button data-testid="pi-bulk-wati-config" mat-menu-item (click)="action.emit('watiConfig')">
+          <span class="material-symbols-rounded mi">settings</span> Wati Configuration
         </button>
       </mat-menu>
 
       <mat-menu #org="matMenu">
-        <button mat-menu-item (click)="action.emit('tag')">
-          <span class="material-symbols-rounded mi">sell</span> Manage tags
+        <button data-testid="pi-bulk-tags" mat-menu-item (click)="action.emit('tag')">
+          <span class="material-symbols-rounded mi">sell</span> Manage Tags
         </button>
-        <button mat-menu-item (click)="action.emit('addToList')">
-          <span class="material-symbols-rounded mi">playlist_add</span> Save as list
+        <button data-testid="pi-bulk-make-list" mat-menu-item (click)="action.emit('addToList')">
+          <span class="material-symbols-rounded mi">playlist_add</span> Make as List
         </button>
-        <button mat-menu-item (click)="action.emit('playlist')">
-          <span class="material-symbols-rounded mi">queue_music</span> Recommend playlist
+        <button data-testid="pi-bulk-manage-lists" mat-menu-item (click)="action.emit('manageLists')">
+          <span class="material-symbols-rounded mi">format_list_bulleted</span> Manage Lists &amp; Segments
+        </button>
+      </mat-menu>
+
+      <mat-menu #app="matMenu">
+        <button data-testid="pi-bulk-recommend" mat-menu-item (click)="action.emit('playlist')">
+          <span class="material-symbols-rounded mi">queue_music</span> Recommend Playlist
+        </button>
+        <button data-testid="pi-bulk-view-recommended" mat-menu-item (click)="action.emit('viewRecommended')">
+          <span class="material-symbols-rounded mi">visibility</span> View Recommended
+        </button>
+        <button data-testid="pi-bulk-interim" mat-menu-item (click)="action.emit('interim')">
+          <span class="material-symbols-rounded mi">description</span> Manage Interim Report
+        </button>
+        <button data-testid="pi-bulk-wishlist" mat-menu-item (click)="action.emit('wishlist')">
+          <span class="material-symbols-rounded mi">favorite</span> Manage Evolution Wishlist
+        </button>
+        <button data-testid="pi-bulk-app-action-pending" mat-menu-item (click)="action.emit('appActionPending')">
+          <span class="material-symbols-rounded mi">pending_actions</span> App Action Pending
         </button>
       </mat-menu>
 
       <mat-menu #upd="matMenu">
-        <button mat-menu-item (click)="action.emit('remarks')">
-          <span class="material-symbols-rounded mi">sticky_note_2</span> Add remark
+        <button data-testid="pi-bulk-remarks" mat-menu-item (click)="action.emit('remarks')">
+          <span class="material-symbols-rounded mi">sticky_note_2</span> Add Remarks
         </button>
-        <button mat-menu-item (click)="action.emit('subscription')">
-          <span class="material-symbols-rounded mi">event_repeat</span> Extend subscription
+        <button data-testid="pi-bulk-subscription" mat-menu-item (click)="action.emit('subscription')">
+          <span class="material-symbols-rounded mi">event_repeat</span> Extend Subscription
         </button>
-        <button mat-menu-item (click)="action.emit('products')">
-          <span class="material-symbols-rounded mi">inventory_2</span> Add products
+        <button data-testid="pi-bulk-add-product" mat-menu-item (click)="action.emit('products')">
+          <span class="material-symbols-rounded mi">inventory_2</span> Add Product
+        </button>
+      </mat-menu>
+
+      <mat-menu #reports="matMenu">
+        <button data-testid="pi-bulk-evolution" mat-menu-item (click)="action.emit('evolution')">
+          <span class="material-symbols-rounded mi">insights</span> Participant Evolution Summary
+        </button>
+        <button data-testid="pi-bulk-export-selection" mat-menu-item (click)="action.emit('exportSelection')">
+          <span class="material-symbols-rounded mi">download</span> Export Selection
+        </button>
+        <button data-testid="pi-bulk-export-table" mat-menu-item (click)="action.emit('exportTable')">
+          <span class="material-symbols-rounded mi">table_view</span> Export Table
+        </button>
+        <button data-testid="pi-bulk-content" mat-menu-item (click)="action.emit('contentConsumption')">
+          <span class="material-symbols-rounded mi">play_circle</span> Content Consumption
         </button>
       </mat-menu>
     }
@@ -4518,7 +5444,8 @@ export class ColumnConfigComponent {
 })
 export class SignalsPanelComponent {
   readonly store = inject(ParticipantStore);
-  readonly categories = SIGNAL_CATEGORIES;
+  // categories with no cards (e.g. Financial) are hidden
+  readonly categories = SIGNAL_CATEGORIES.filter((c) => SIGNALS.some((s) => s.category === c.key));
 
   byCat(cat: SignalCategory): SignalDef[] {
     return SIGNALS.filter((s) => s.category === cat);
@@ -4750,6 +5677,34 @@ export class CommsAnalyticsPanelComponent {
 // Page component
 // ================================================================================================
 
+// "Send Wati Messages" cloud function per Firebase project (as analytics' getWhatsAppFunctionUrl)
+const WHATSAPP_FUNCTION_URL: Record<string, string> = {
+  'test-environment-841c3': 'https://us-central1-test-environment-841c3.cloudfunctions.net/workshopprogressmessage',
+  'starlabs-test': 'https://us-central1-starlabs-test.cloudfunctions.net/workshopprogressmessage',
+  'fir-sample-aae4a': 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/workshopprogressmessage',
+};
+const WHATSAPP_CHUNK_SIZE = 200;
+const WHATSAPP_CHUNK_DELAY_MS = 1000;
+
+// One export cell: ids resolved to names, dates as yyyy-mm-dd, lists joined.
+function exportValue(p: Participant, def: ColumnDef, names: Record<string, Record<string, string>>): string | number {
+  const raw = (p as unknown as Record<string, unknown>)[def.key];
+  const name = (id: string) => (def.resolve ? names[def.resolve]?.[id] ?? id : id);
+  switch (def.key) {
+    case 'registered':
+      return p.registered ? 'Registered' : 'Guest';
+    case 'customersupport':
+      return p.customersupport.status === 'none' ? '' : p.customersupport.status;
+    case 'remarks':
+      return p.remarks.map((r) => r.note).join(' | ');
+  }
+  if (raw == null || raw === 'none') return '';
+  if (Array.isArray(raw)) return (raw as string[]).map(name).join(', ');
+  if (def.type === 'date') return String(raw).slice(0, 10);
+  if (typeof raw === 'number') return raw;
+  return name(String(raw));
+}
+
 @Component({
   selector: 'app-participant-intelligence',
   imports: [
@@ -4773,6 +5728,7 @@ export class CommsAnalyticsPanelComponent {
 })
 export class ParticipantIntelligenceComponent implements OnInit {
   readonly store = inject(ParticipantStore);
+  private readonly data = inject(ParticipantDataService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
   private readonly injector = inject(Injector);
@@ -4788,6 +5744,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
   readonly railOpen = signal(true);
   readonly insightsOpen = signal(true);
   readonly checklists = CHECKLISTS;
+  readonly watsonChecklists = WATSON_CHECKLISTS;
 
   ngOnInit(): void {
     this.store.init();
@@ -4829,7 +5786,8 @@ export class ParticipantIntelligenceComponent implements OnInit {
           placeholder: 'e.g. Active gold-tier renewals',
           confirmText: 'Save audience',
           icon: 'bookmark_add',
-        },
+          validate: (v: string) => (this.store.nameTaken('filter', v) ? `A saved filter named “${v}” already exists.` : null),
+        } as PromptData,
       })
       .afterClosed()
       .subscribe((name?: string) => {
@@ -4846,6 +5804,15 @@ export class ParticipantIntelligenceComponent implements OnInit {
 
   // ---- bulk actions ----
   handleBulk(action: BulkAction): void {
+    // actions that don't need a selection
+    switch (action) {
+      case 'exportTable':
+        return this.exportExcel(false);
+      case 'contentConsumption':
+        return void this.exportContentConsumption();
+      case 'viewRecommended':
+        return this.store.toggleRecommendedColumns();
+    }
     const count = this.store.selectedCount();
     if (count === 0) return;
     switch (action) {
@@ -4855,58 +5822,240 @@ export class ParticipantIntelligenceComponent implements OnInit {
         return this.composeWhatsapp();
       case 'notify':
         return this.notify();
+      case 'watiMessages':
+        return this.sendWatiMessages();
+      case 'broadcast':
+        return this.broadcast();
+      case 'watiConfig':
+        this.dialog.open(WatiConfigDialogComponent, { data: this.rawSelected(), width: '70vw', height: '80vh', disableClose: true });
+        return;
       case 'tag':
         this.dialog.open(TagManagerDialogComponent, { ...this.dlg('520px'), data: { count } });
         return;
       case 'addToList':
         return this.saveAsList();
-      case 'subscription':
-        return this.extendSubscription();
+      case 'manageLists':
+        this.dialog.open(ManageParticipantlistDialogComponent, { width: '80vw', height: '85vh', data: this.rawSelected(), autoFocus: false });
+        return;
+      case 'playlist':
+        this.dialog.open(MapRecommendedplaylistToparticipantComponentComponent, {
+          data: { participantlist: this.rawSelected() },
+          minWidth: '500px',
+          disableClose: true,
+        });
+        return;
+      case 'interim':
+        return this.interimReport();
+      case 'wishlist':
+        return this.evolutionWishlist();
+      case 'appActionPending':
+        this.dialog.open(AddPendingActionComponent, {
+          disableClose: true,
+          autoFocus: false,
+          data: {
+            profilelist: this.store.selectedParticipants().map((p) => p.profileid),
+            formlist: [],
+            mandatoryaction: [],
+            videoask: [],
+            data: null,
+            bulk: true,
+          },
+        });
+        return;
       case 'remarks':
         return this.addRemark();
+      case 'subscription':
+        return this.extendSubscription();
       case 'products':
-        return this.addProducts();
-      case 'playlist':
-        return this.recommendPlaylist();
+        this.dialog.open(BulkAddProductsComponent, {
+          panelClass: 'bap-overlay',
+          maxHeight: '92vh',
+          width: '640px',
+          data: { participants: this.rawSelected(), loggedInProfileId: this.data.profileId },
+        });
+        return;
       case 'evolution':
         this.dialog.open(EvolutionDialogComponent, {
           ...this.dlg('760px'),
           data: { participants: this.store.selectedParticipants() },
         });
         return;
-      case 'broadcast':
-        return this.broadcast();
-      case 'interim':
-        return this.interimReport();
-      case 'wishlist':
-        return this.evolutionWishlist();
-      default:
-        return;
+      case 'exportSelection':
+        return this.exportExcel(true);
     }
   }
 
-  private composeStub(data: QuickComposeData, doneMsg: string): void {
+  // the analytics dialogs expect the raw participant metadata docs
+  private rawSelected(): Dict[] {
+    return this.store.selectedParticipants().map((p) => p.raw);
+  }
+
+  // Send Wati Messages: template picker, then the chunked send with progress (as analytics'
+  // sendWattiWorkshop / workshopmessageChunked).
+  private sendWatiMessages(): void {
+    const people = this.store.selectedParticipants();
     this.dialog
-      .open(QuickComposeDialogComponent, { ...this.dlg('480px'), data })
+      .open(SendmessagesComponent, {
+        width: '1000px',
+        maxWidth: '95vw',
+        maxHeight: '90vh',
+        data: { type: 'whatsapp', selectedprofiles: people.map((p) => p.raw) },
+      })
       .afterClosed()
-      .subscribe((r) => {
-        if (r) this.snack.open(doneMsg.replace('{n}', String(this.store.selectedCount())), 'Dismiss', { duration: 3500 });
+      .subscribe((result) => void this.sendWhatsappChunked(result, people));
+  }
+
+  private async sendWhatsappChunked(result: any, people: Participant[]): Promise<void> {
+    if (result?.action !== 'sent' || result.type !== 'whatsapp') {
+      if (result?.action === 'sent' && result.type === 'mail') this.snack.open('Only WhatsApp is supported here', 'Dismiss', { duration: 3000 });
+      return;
+    }
+    const { templateName, customParams } = result;
+    const recipients = people
+      .filter((p) => p.phonenumber && p.name)
+      .map((p) => {
+        let cc = (p.countrycode || '').trim();
+        if (cc && !cc.startsWith('+')) cc = '+' + cc;
+        const phone = p.phonenumber.trim().replace(/^\+/, '');
+        return {
+          phonenumber: cc ? `${cc}${phone}` : phone,
+          name: p.name,
+          customParams: (customParams ?? []).map((param: any) => ({
+            name: param.name,
+            value: String(param.value ?? '').replace(/\{\{name\}\}/g, p.name),
+          })),
+        };
+      });
+    if (!recipients.length) {
+      this.snack.open('No participants with a phone number', 'Dismiss', { duration: 3000 });
+      return;
+    }
+    const url = WHATSAPP_FUNCTION_URL[environment.firebase?.projectId ?? ''] ?? '';
+    const progressDialog = this.dialog.open(WhatsappProgressDialogComponent, {
+      width: '500px',
+      maxWidth: '95vw',
+      disableClose: true,
+      data: { totalParticipants: recipients.length, templateName } as WhatsAppProgressData,
+    });
+    const progress = progressDialog.componentInstance;
+    const chunks: (typeof recipients)[] = [];
+    for (let i = 0; i < recipients.length; i += WHATSAPP_CHUNK_SIZE) chunks.push(recipients.slice(i, i + WHATSAPP_CHUNK_SIZE));
+    progress.updateProgress({ totalChunks: chunks.length });
+    let success = 0;
+    let failed = 0;
+    let cancelled = false;
+    const cancelSub = progress.cancel$.subscribe(() => (cancelled = true));
+    for (let i = 0; i < chunks.length && !cancelled; i++) {
+      const chunk = chunks[i];
+      progress.updateProgress({ currentChunk: i + 1, isProcessingChunk: true });
+      try {
+        const response = await firstValueFrom(
+          this.http.post<any>(url, {
+            type: 'whatsapp',
+            templateName,
+            participants: chunk,
+            chunkInfo: { chunkIndex: i + 1, totalChunks: chunks.length, chunkSize: chunk.length },
+          })
+        );
+        success += response.successCount || chunk.length;
+        failed += response.failureCount || 0;
+        progress.updateProgress({
+          processedCount: success + failed,
+          successCount: success,
+          failedCount: failed,
+          isProcessingChunk: false,
+          errors: response.errors || [],
+          watiErrors: response.watiErrors || [],
+        });
+      } catch (e: any) {
+        failed += chunk.length;
+        progress.updateProgress({
+          processedCount: success + failed,
+          successCount: success,
+          failedCount: failed,
+          isProcessingChunk: false,
+          errors: [`Chunk ${i + 1} failed: ${e?.message || 'Unknown error'}`],
+        });
+      }
+      if (i < chunks.length - 1 && !cancelled) await new Promise((r) => setTimeout(r, WHATSAPP_CHUNK_DELAY_MS));
+    }
+    cancelSub.unsubscribe();
+    progress.complete(cancelled ? (success ? 'partial' : 'error') : !failed ? 'success' : success ? 'partial' : 'error');
+  }
+
+  // Broadcast in Breakthroughs: template picker (analytics' BroadcastComponent), confirm, then send.
+  private broadcast(): void {
+    const people = this.store.selectedParticipants();
+    this.dialog
+      .open(BroadcastComponent, { data: {}, minWidth: '50vw', maxWidth: '70vw', disableClose: true })
+      .afterClosed()
+      .subscribe(async (template) => {
+        if (!template) return;
+        if (!confirm(`Send the broadcast to ${people.length} selected participants?`)) return;
+        try {
+          const { sent, skipped } = await this.data.sendBroadcast(template, people);
+          const note = skipped ? ` (${skipped} skipped — no app account)` : '';
+          this.snack.open(`Broadcast sent to ${sent} participants${note}`, 'Dismiss', { duration: 4000 });
+        } catch (e) {
+          console.error('broadcast failed', e);
+          this.snack.open('Sending the broadcast failed', 'Dismiss', { duration: 4000 });
+        }
       });
   }
 
-  private broadcast(): void {
-    this.composeStub(
-      {
-        icon: 'podcasts',
-        title: 'Broadcast in Breakthroughs',
-        subtitle: `Send an in-app broadcast to ${this.store.selectedCount()} participants.`,
-        fields: [{ key: 'message', label: 'Message', type: 'textarea', placeholder: 'What do you want to broadcast?' }],
-        confirmText: 'Queue broadcast',
-        confirmIcon: 'send',
-        note: 'Broadcast delivery is not wired up yet — nothing is sent.',
-      },
-      'Broadcast drafted for {n} — delivery isn’t wired up yet'
-    );
+  // ---- export (as analytics: visible columns, filtered or selected rows) ----
+  exportExcel(selectedOnly: boolean): void {
+    const rows = selectedOnly ? this.store.selectedParticipants() : this.store.filtered();
+    if (!rows.length) {
+      this.snack.open('Nothing to export', '', { duration: 2000 });
+      return;
+    }
+    const keys = this.store.columnOrder().filter((k) => k !== 'name' && k !== 'email' && k !== 'phonenumber');
+    const ref = this.store.reference();
+    const names: Record<string, Record<string, string>> = {
+      journey: toNameMap(ref.journeys),
+      product: toNameMap(ref.products),
+      tier: toNameMap(ref.tiers),
+      mode: toNameMap(ref.modes),
+      tag: toNameMap(ref.tags),
+      playlist: this.store.playlistNames(),
+    };
+    const data = rows.map((p) => {
+      const row: Record<string, string | number> = { Name: p.name, Email: p.email, Phone: `${p.countrycode} ${p.phonenumber}`.trim() };
+      for (const key of keys) {
+        const def = COLUMN_DEF_MAP[key];
+        if (def) row[def.label] = exportValue(p, def, names);
+      }
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+    XLSX.writeFile(wb, `participants_${selectedOnly ? 'selection_' : ''}${new Date().toISOString().slice(0, 10)}.xlsx`);
+    this.snack.open(`Exported ${data.length} participants`, 'Dismiss', { duration: 2500 });
+  }
+
+  // `content analytics` rows for the filtered participants, as CSV (analytics built this but never saved it).
+  async exportContentConsumption(): Promise<void> {
+    const byId = new Map(this.store.filtered().map((p) => [p.profileid, p]));
+    try {
+      const rows = (await this.data.loadContentAnalytics()).filter((r) => byId.has(r['profileid']));
+      if (!rows.length) {
+        this.snack.open('No content consumption for these participants', 'Dismiss', { duration: 3000 });
+        return;
+      }
+      const headers = ['name', ...new Set(rows.flatMap((r) => Object.keys(r)))].filter((h, i, a) => a.indexOf(h) === i);
+      const cell = (v: unknown) => {
+        const text = v && typeof v === 'object' && 'toDate' in (v as any) ? (v as any).toDate().toISOString() : typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
+        return `"${text.replace(/"/g, '""')}"`;
+      };
+      const lines = rows.map((r) => headers.map((h) => cell(h === 'name' ? byId.get(r['profileid'])?.name : r[h])).join(','));
+      const csv = '\ufeff' + [headers.join(','), ...lines].join('\n');
+      saveAs(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `content-consumption_${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch (e) {
+      console.error('content consumption export failed', e);
+      this.snack.open('Content consumption export failed', 'Dismiss', { duration: 3000 });
+    }
   }
 
   // Reuses the production interim-report dialog (writes `interimreport log` itself). Takes profile IDs.
@@ -4937,7 +6086,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
   // and/or triggers the sendBatchEmail cloud function (mirrors the old screen's afterClosed).
   private composeEmail(): void {
     this.dialog
-      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: this.store.selectedParticipants() })
+      .open(EmailInputComponent, { panelClass: 'pi-dialog', minWidth: '600px', disableClose: true, data: this.rawSelected() })
       .afterClosed()
       .subscribe(async (result: any) => {
         if (!result) return;
@@ -4972,7 +6121,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
         width: '70vw',
         height: '80vh',
         disableClose: true,
-        data: this.store.selectedParticipants(),
+        data: this.rawSelected(),
       })
       .afterClosed()
       .subscribe((r: any) => {
@@ -5000,7 +6149,7 @@ export class ParticipantIntelligenceComponent implements OnInit {
         maxHeight: '90vh',
         disableClose: true,
         autoFocus: false,
-        data: this.store.selectedParticipants(),
+        data: this.rawSelected(),
       })
       .afterClosed()
       .subscribe(async (result: any) => {
@@ -5042,7 +6191,8 @@ export class ParticipantIntelligenceComponent implements OnInit {
           placeholder: 'e.g. March outreach',
           confirmText: 'Create list',
           icon: 'playlist_add',
-        },
+          validate: (v: string) => (this.store.nameTaken('list', v) ? `A list named “${v}” already exists.` : null),
+        } as PromptData,
       })
       .afterClosed()
       .subscribe((name?: string) => {
@@ -5080,56 +6230,4 @@ export class ParticipantIntelligenceComponent implements OnInit {
       });
   }
 
-  private addProducts(): void {
-    const data: QuickComposeData = {
-      icon: 'inventory_2',
-      title: 'Add products',
-      subtitle: `Add products to ${this.store.selectedCount()} participants.`,
-      fields: [
-        {
-          key: 'products',
-          label: 'Products',
-          type: 'multiselect',
-          options: this.store.reference().products.map((p) => ({ value: p.id, label: p.name })),
-        },
-      ],
-      confirmText: 'Add products',
-      confirmIcon: 'check',
-    };
-    this.dialog
-      .open(QuickComposeDialogComponent, { ...this.dlg('480px'), data })
-      .afterClosed()
-      .subscribe((r) => {
-        if (r) this.snack.open(`Added products to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
-      });
-  }
-
-  private recommendPlaylist(): void {
-    const data: QuickComposeData = {
-      icon: 'queue_music',
-      title: 'Recommend playlist',
-      subtitle: `Curate content for ${this.store.selectedCount()} participants.`,
-      fields: [
-        { key: 'title', label: 'Playlist title', type: 'text', placeholder: 'e.g. Momentum reset' },
-        {
-          key: 'content',
-          label: 'Content',
-          type: 'multiselect',
-          options: [
-            { value: 'eiflix', label: 'EIFLIX series' },
-            { value: 'solar', label: 'SolarVoice' },
-            { value: 'general', label: 'General content' },
-          ],
-        },
-      ],
-      confirmText: 'Recommend',
-      confirmIcon: 'check',
-    };
-    this.dialog
-      .open(QuickComposeDialogComponent, { ...this.dlg('480px'), data })
-      .afterClosed()
-      .subscribe((r) => {
-        if (r) this.snack.open(`Recommended playlist to ${this.store.selectedCount()} participants`, 'Dismiss', { duration: 3000 });
-      });
-  }
 }

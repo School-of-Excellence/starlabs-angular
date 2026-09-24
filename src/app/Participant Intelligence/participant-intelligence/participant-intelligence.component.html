@@ -50,6 +50,11 @@
         <span class="lbl">Checklists</span>
       </button>
 
+      <button data-testid="pi-export" class="tbtn" [matMenuTriggerFor]="exportMenu" matTooltip="Export">
+        <span class="material-symbols-rounded">download</span>
+        <span class="lbl">Export</span>
+      </button>
+
       <span class="sep"></span>
 
       <button class="iconbtn" matTooltip="Communications analytics" [matMenuTriggerFor]="commsMenu">
@@ -88,7 +93,27 @@
   <app-comms-analytics-panel />
 </mat-menu>
 
+<mat-menu #exportMenu="matMenu" xPosition="before">
+  <button data-testid="pi-export-table" mat-menu-item (click)="exportExcel(false)">
+    <span class="material-symbols-rounded mi">table_view</span> Export Table
+  </button>
+  <button data-testid="pi-export-selection" mat-menu-item [disabled]="!store.selectedCount()" (click)="exportExcel(true)">
+    <span class="material-symbols-rounded mi">download</span> Export Selection
+  </button>
+  <button data-testid="pi-export-content" mat-menu-item (click)="exportContentConsumption()">
+    <span class="material-symbols-rounded mi">play_circle</span> Content Consumption
+  </button>
+</mat-menu>
+
 <mat-menu #checklistsMenu="matMenu" xPosition="before">
+  <div class="menu-group" (click)="$event.stopPropagation()">Watson status</div>
+  @for (c of watsonChecklists; track c.id) {
+    <button data-testid="pi-watson-checklist-item" mat-menu-item (click)="openChecklist(c)">
+      <span class="material-symbols-rounded mi">rule</span>
+      {{ c.label }}
+    </button>
+  }
+  <div class="menu-group" (click)="$event.stopPropagation()">Reconciliation</div>
   @for (c of checklists; track c.id) {
     <button mat-menu-item (click)="openChecklist(c)">
       <span class="material-symbols-rounded mi">{{ c.wired ? 'fact_check' : 'lock' }}</span>
