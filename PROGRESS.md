@@ -1,49 +1,51 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
+_Last updated: 2026-09-23 (workshop Dashboard Access)_
 · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
+`specs/journals/2026-09-23-workshop-dashboard-access.md`.
 
 ## Current state
-- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
-  documentation added this session plus one pre-existing, unrelated
-  `group-chat-screen.component.css` edit. Nothing committed, nothing
-  pushed, nothing deployed — operator commits manually (standing directive).
-- **No queue code was changed.** The slot/capacity flow is documented and
-  frozen as a baseline so a planned logic change can be made and reverted
-  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
+- Branch `nanda-development` @ `29c4e88b` + one uncommitted build fix. Builds clean.
+  **Not pushed** — the operator pushes `starlabs-angular` manually.
+- `starlabs-e2e-tests` `main` @ `9772ace` — **pushed**. 125 workshop-suite tests; the CI
+  readiness gate reports **MATCHED** for this diff (1193 selectors resolve).
+- Workshop screens now deny by default. Nothing in production is gated yet because
+  `static meta data/Workshop Admin` does not exist — see Pending.
 
-## Last session changes (2026-08-31)
-- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
-  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
-  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
-  paths** across Angular `queue-planner` / `queue-planner-review` and the
-  three Flutter cards, three mermaid flowcharts, a **divergence register
-  D-01…D-10**, six invariants, and the change/revert protocol.
-- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
-  four surprises, an append-only change log (CL-000) and the per-screen +
-  data-side revert playbook.
-- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
-  rendered reference artifact for the operator.
-- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
-  `usedslot = matching-token count` and every planner mutation auto-saves,t
-  so it overwrites the counter that the four transactional booking paths
-  maintain — erasing Flutter self-service bookings and B!G pre-placements
-  that have no `queue_token` yet. Paired with D-01 (review offers slots
-  from a *derived* count while the transaction gates on the *stored* one),
-  this is the double-booking root cause.
+## Last session changes (2026-09-23)
+- **Dashboard Access** — per-person permissions for the workshop screens.
+  - New `src/app/New-Workshop/workshop-access/` — `workshop-access.model.ts` (pure rules,
+    11 action keys) and `workshop-access.service.ts` (reads/writes + session and IndexedDB
+    caches).
+  - New **Dashboard Access** section in workshop config › Settings (after Communication).
+    Writes `workshopsettings/{workshop id}.dashboardaccess` (profileid → actions) and the
+    three shared lists in `static meta data/Workshop Admin`. People are picked from
+    `participant metadata` only. The section saves itself, separately from Settings.
+  - Gated: the dashboard header (Communication / Q&A / Diagnose / Clear / Enroll), the side
+    panel's send and export actions, the progress-table export, row click, Move next and
+    Review, the evergreen extend flow, and the three archive sections; the workshops list's
+    New/Edit/Duplicate and three switches; the New Users button and `/newusersprofile`; both
+    workshop editor URLs.
+  - **Deny by default, no bypass** — two operator corrections. The first cut used
+    "empty list = unrestricted"; the second added four founding profileids as a recovery
+    path. Both were rejected: access now comes only from the two documents. Two hard-coded
+    allow-lists were deleted in the process, including the private one inside
+    `moveParticipantToNext()` that popped `alert('No Access')`.
+  - **Why the picker was slow:** `participant metadata` has no cached reader (unlike
+    `profile_data`, which `getProfileMap` caches), so it re-read the whole collection each
+    time. Now cached as a compact list in the same IndexedDB store and warmed in the
+    background. Picker rows also wrap instead of ellipsising a name.
+- **e2e:** `workshops/seed-workshops.js` §6c seeds both access documents (without them
+  every workshop spec would be blocked), plus a `limited` actor — same roles and route
+  grants as `admin`, on no shared list, two actions on `W_DASH`.
+  `workshops/workshop-dashboard-access.spec.ts` WDA-00…WDA-15.
 
 ## Pending
-- **The logic change itself is unspecified** — awaiting the operator's
-  statement of the new rule. Recommended first target: D-02 + D-01
-  (one agreed source of truth for capacity). Follow §7 of the flow doc:
-  delta vs the register → check the six invariants → name the blast radius
-  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
-- Before any write-shape change: export the affected `queue planning`
-  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
-  fields have no history. First run against `starlabs-test` only.
-- Carried from 2026-08-27: operator visual pass of the redesigned
-  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
-  consumers to wire; newusertags backfill; `eiflixcampaign` rules
-  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
-  route guard; episode-delete gaps.
+- **Production bootstrap, by hand, once.** Create `static meta data/Workshop Admin` with
+  `workshopeditaccess`, `workshopdashboardadmin` and `workshopnewusersaccess` arrays
+  containing at least the operator's profileid. Until then nobody can open either workshop
+  editor — there is no in-app way in, deliberately.
+- Operator to commit + push `starlabs-angular` (`nanda-development`).
+- The workshops suite has not been run against this branch yet.
+- Carried: `workshopprogressmessagev2` still runs Charan's 2026-09-22 15:48 build (old code,
+  same latent `watitoken` bug) if anything calls it.

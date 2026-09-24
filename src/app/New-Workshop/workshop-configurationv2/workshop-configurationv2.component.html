@@ -55,7 +55,14 @@
 <div class="page">
   <div class="loading" *ngIf="loading"><span class="spin dark"></span></div>
 
-  <ng-container *ngIf="!loading">
+  <!-- Editing is granted in a workshop's Dashboard Access settings. -->
+  <div class="wc2-blocked" data-testid="wc2-no-edit-access" *ngIf="!loading && editBlocked">
+    <h1>You do not have access to edit workshops</h1>
+    <p>Ask someone who manages workshops to give you workshop editing access.</p>
+    <button data-testid="wc2-blocked-back" type="button" class="btn" (click)="backToWorkshops()">Back to Workshops</button>
+  </div>
+
+  <ng-container *ngIf="!loading && !editBlocked">
 
     <!-- ═══════════════ header ═══════════════ -->
     <div class="hdr">
