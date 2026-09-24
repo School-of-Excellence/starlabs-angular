@@ -9,7 +9,7 @@
         <mat-icon>web_asset</mat-icon>
         <span>Popup Banner</span>
       </button>
-      <button data-testid="wor-open-new-users-tab-2" mat-stroked-button class="action-btn secondary-btn" (click)="openNewUsersTab()">
+      <button data-testid="wor-open-new-users-tab-2" mat-stroked-button class="action-btn secondary-btn" (click)="openNewUsersTab()" *ngIf="canNewUsers">
         <span>New Users</span>
         <!-- <span>{{'New Users ( ' + objectKeys(mapProfileNew).length + ' )'}}</span> -->
       </button>
@@ -25,7 +25,7 @@
         <mat-icon>storefront</mat-icon>
         <span>Products</span>
       </button>
-      <button data-testid="wor-route-6" mat-flat-button class="action-btn primary-btn" (click)="route('create')">
+      <button data-testid="wor-route-6" mat-flat-button class="action-btn primary-btn" (click)="route('create')" *ngIf="canEdit">
         <mat-icon>add</mat-icon>
         <span>New Workshop</span>
       </button>
@@ -94,6 +94,7 @@
             <td mat-cell *matCellDef="let workshop" class="col-center col-active">
               <mat-slide-toggle data-testid="wor-change-on-workshop-status-change-14"
                 [checked]="workshop.active"
+                [disabled]="!canEdit"
                 (change)="onWorkshopStatusChange(workshop, $event)"
                 color="primary">
               </mat-slide-toggle>
@@ -105,6 +106,7 @@
             <td mat-cell *matCellDef="let workshop" class="col-center col-active">
               <mat-slide-toggle data-testid="wor-change-on-workshop-web-status-change-15"
                 [checked]="workshop.webactive"
+                [disabled]="!canEdit"
                 (change)="onWorkshopWebStatusChange(workshop, $event)"
                 color="primary">
               </mat-slide-toggle>
@@ -166,6 +168,7 @@
               <div class="status-cell">
                 <mat-slide-toggle data-testid="wor-change-on-workshop-completed-change-16"
                   [checked]="workshop.workshopcompleted"
+                  [disabled]="!canEdit"
                   (change)="onWorkshopCompletedChange(workshop, $event)"
                   color="accent">
                 </mat-slide-toggle>
@@ -185,11 +188,11 @@
                   matTooltip="Open Dashboard" (click)="dashboardNavigation(workshop)">
                   <mat-icon>dashboard</mat-icon>
                 </button>
-                <button data-testid="wor-route-18" mat-icon-button class="icon-btn edit-btn"
+                <button data-testid="wor-route-18" mat-icon-button class="icon-btn edit-btn" *ngIf="canEdit"
                   matTooltip="Edit Workshop" (click)="route('edit', workshop)">
                   <mat-icon>edit</mat-icon>
                 </button>
-                <button data-testid="wor-duplicate-workshop-19" mat-icon-button class="icon-btn duplicate-btn"
+                <button data-testid="wor-duplicate-workshop-19" mat-icon-button class="icon-btn duplicate-btn" *ngIf="canEdit"
                   matTooltip="Duplicate" (click)="duplicateWorkshop(workshop)">
                   <mat-icon>content_copy</mat-icon>
                 </button>
@@ -210,7 +213,7 @@
           <mat-icon class="empty-icon">event_busy</mat-icon>
           <h3>No workshops found</h3>
           <p>Try adjusting your filters or create a new workshop.</p>
-          <button data-testid="wor-route-20" mat-flat-button class="primary-btn" (click)="route('create')">
+          <button data-testid="wor-route-20" mat-flat-button class="primary-btn" (click)="route('create')" *ngIf="canEdit">
             <mat-icon>add</mat-icon> Create Workshop
           </button>
         </div>

@@ -5,17 +5,24 @@
     </div>
   </div>
 
-  <div class="loading" *ngIf="loading">
+  <!-- Access is granted in a workshop's Dashboard Access settings. -->
+  <div class="empty-state" data-testid="new-no-access" *ngIf="accessChecked && !accessAllowed">
+    <mat-icon>lock</mat-icon>
+    <h3>You do not have access to this screen</h3>
+    <p>Ask someone who manages workshops to give you access to the new users screen.</p>
+  </div>
+
+  <div class="loading" *ngIf="accessAllowed && loading">
     <mat-spinner diameter="36"></mat-spinner>
   </div>
 
-  <div class="empty-state" *ngIf="!loading && dataSource.data.length === 0">
+  <div class="empty-state" *ngIf="accessAllowed && !loading && dataSource.data.length === 0">
     <mat-icon>group_off</mat-icon>
     <h3>No users yet</h3>
     <p>New users will appear here.</p>
   </div>
 
-  <div class="content-row" *ngIf="!loading && dataSource.data.length > 0"
+  <div class="content-row" *ngIf="accessAllowed && !loading && dataSource.data.length > 0"
     [class.with-panel]="selection.hasValue()">
   <div class="content-main">
   <div class="table-card">
