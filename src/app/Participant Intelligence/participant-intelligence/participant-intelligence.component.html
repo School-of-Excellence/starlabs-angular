@@ -18,7 +18,7 @@
       <span class="material-symbols-rounded">search</span>
       <input type="text" [(ngModel)]="search" placeholder="Search name, email or phone…" />
       @if (search) {
-        <button class="clear" (click)="search = ''" aria-label="Clear search">
+        <button data-testid="pi-search-clear" class="clear" (click)="search = ''" aria-label="Clear search">
           <span class="material-symbols-rounded">close</span>
         </button>
       }
@@ -27,7 +27,7 @@
     <div class="tools">
       <app-audience-switcher (manage)="openManageAudiences()" />
 
-      <button class="tbtn" [class.active]="insightsOpen()" (click)="toggleInsights()" matTooltip="Toggle insights">
+      <button data-testid="pi-toggle-insights" class="tbtn" [class.active]="insightsOpen()" (click)="toggleInsights()" matTooltip="Toggle insights">
         <span class="material-symbols-rounded">insights</span>
         <span class="lbl">Insights</span>
         @if (store.attentionCount()) {
@@ -35,7 +35,7 @@
         }
       </button>
 
-      <button class="tbtn" [class.active]="railOpen()" (click)="toggleRail()" matTooltip="Toggle filters">
+      <button data-testid="pi-toggle-rail" class="tbtn" [class.active]="railOpen()" (click)="toggleRail()" matTooltip="Toggle filters">
         <span class="material-symbols-rounded">filter_alt</span>
         <span class="lbl">Filters</span>
         @if (store.activeFilterCount()) {
@@ -45,20 +45,20 @@
 
       <app-column-config />
 
-      <button class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
+      <button data-testid="pi-checklists" class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
         <span class="material-symbols-rounded">checklist</span>
         <span class="lbl">Checklists</span>
       </button>
 
       <span class="sep"></span>
 
-      <button class="iconbtn" matTooltip="Communications analytics" [matMenuTriggerFor]="commsMenu">
+      <button data-testid="pi-comms" class="iconbtn" matTooltip="Communications analytics" [matMenuTriggerFor]="commsMenu">
         <span class="material-symbols-rounded">campaign</span>
         @if (store.queuedTotal()) {
           <span class="badge">{{ store.queuedTotal() }}</span>
         }
       </button>
-      <button class="iconbtn" matTooltip="Refresh" (click)="refresh()">
+      <button data-testid="pi-refresh" class="iconbtn" matTooltip="Refresh" (click)="refresh()">
         <span class="material-symbols-rounded">refresh</span>
       </button>
     </div>
@@ -90,7 +90,7 @@
 
 <mat-menu #checklistsMenu="matMenu" xPosition="before">
   @for (c of checklists; track c.id) {
-    <button mat-menu-item (click)="openChecklist(c)">
+    <button data-testid="pi-checklist-item" mat-menu-item (click)="openChecklist(c)">
       <span class="material-symbols-rounded mi">{{ c.wired ? 'fact_check' : 'lock' }}</span>
       {{ c.label }}
     </button>
