@@ -11,19 +11,19 @@
     <nav class="nav">
       <a data-testid="jted-a-001" href="javascript:void(0)" [class.active]="currentView === 'dashboard'" (click)="goToView('dashboard')">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>
-        Overview <span class="count">{{ journeys.length }}</span>
+        Overview
       </a>
       <a data-testid="jted-a-002" href="javascript:void(0)" [class.active]="currentView === 'participants'" (click)="goToView('participants')">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 6M17.5 20a5.5 5.5 0 0 0-3-4.9"/></svg>
-        Participants <span class="count">{{ memberOptions.length }}</span>
+        Participants 
       </a>
       <a data-testid="jted-a-003" href="javascript:void(0)" [class.active]="currentView === 'specialists'" (click)="goToView('specialists')">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
-        Specialists <span class="count">{{ specialistIds.length }}</span>
+        Specialists
       </a>
       <a data-testid="jted-a-004" href="javascript:void(0)" [class.active]="currentView === 'planning'" (click)="goToView('planning')">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9zM9 11h6M9 15h4"/></svg>
-        Planning <span class="count">{{ planningCount }}</span>
+        Planning 
       </a>
     </nav>
     <div class="side-foot">
@@ -59,80 +59,14 @@
     </header> -->
 
     <div class="content">
-
-      <!-- ===== DASHBOARD ===== -->
-      <section class="view" [class.active]="currentView === 'dashboard'" *ngIf="currentView === 'dashboard'">
-
-        <div class="alarm" role="alert" *ngIf="alarmJourneys.length">
-          <div class="ab-ic">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:25px;height:25px"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/></svg>
-          </div>
-          <div class="ab-txt">
-            <h3>{{ alarmJourneys.length }} journey{{ alarmJourneys.length > 1 ? 's' : '' }} need acceleration now</h3>
-            <p>
-              <ng-container *ngFor="let j of alarmJourneys; let last = last">{{ member(j.pid).name }} — {{ stageLabel(j) }} · {{ j.days }}d overdue<span *ngIf="!last">&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;</span></ng-container>
-            </p>
-          </div>
-          <button data-testid="jted-btn-009" class="btn-crit" (click)="kpiFilter = 'needsAttention'">Review now →</button>
-        </div>
-
-        <div class="toolbar">
-          <div class="field">
-            <label>Member</label>
-            <select data-testid="jted-sel-010" [(ngModel)]="fMember">
-              <option>All members</option>
-              <option *ngFor="let mbr of memberOptions">{{ mbr.name }}</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Age group</label>
-            <select data-testid="jted-sel-011" [(ngModel)]="fAge">
-              <option>All ages</option>
-              <option>20–29</option>
-              <option>30–39</option>
-              <option>40–49</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Category</label>
-            <select data-testid="jted-sel-012" [(ngModel)]="fCat">
-              <option>All categories</option>
-              <option>Pioneer</option>
-              <option>Partner</option>
-              <option>Consistent performer</option>
-              <option>Operator</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Product</label>
-            <select data-testid="jted-sel-013" [(ngModel)]="fProduct">
-              <option>All products</option>
-              <optgroup label="Major products (B!G › LYL › uP!)">
-                <option *ngFor="let p of majorProducts" [value]="p.id">{{ p.name }}</option>
-              </optgroup>
-              <optgroup label="Done-For-You">
-                <option *ngFor="let p of dfuProducts" [value]="p.id">{{ p.name }}</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="note">Cards &amp; table update live · click a card to filter</div>
-        </div>
-
         <!-- ===== PRODUCT PICKER ===== -->
-        <div class="sect" style="margin-top:0"><span class="eyebrow">STEP 1</span><h2>Choose a DFU product</h2></div>
-        <div class="cards">
-          <div class="empty" *ngIf="!(dfuProductsMap | keyvalue).length">No DFU products found.</div>
-          <div class="mcard"
-              *ngFor="let entry of dfuProductsMap | keyvalue"
-              [class.selected]="selectedProductId === entry.key"
-              (click)="selectProduct(entry.key, entry.value.product || entry.key)">
-            <div class="top">
-              <div class="avatar" [style.background]="tokColor(entry.key)">{{ (entry.value.product || entry.key).substring(0,2).toUpperCase() }}</div>
-              <div class="name-strong">{{ entry.value.product || entry.key }}</div>
-            </div>
+          <div class="field" style="max-width:320px;">
+            <label>DFU Product</label>
+            <select data-testid="jted-sel-dfuproduct" [ngModel]="selectedProductId" (ngModelChange)="onProductDropdownChange($event)">
+              <option [ngValue]="null" disabled>Select a product</option>
+              <option *ngFor="let entry of dfuProductsMap | keyvalue" [ngValue]="entry.key">{{ entry.value.product || entry.key }}</option>
+            </select>
           </div>
-        </div>
-
         <!-- ===== STATS (only after a product is selected) ===== -->
         <ng-container *ngIf="selectedProductId">
 
@@ -241,7 +175,6 @@
           </ng-container>
 
         </ng-container>
-      </section>
 
       <!-- ===== PARTICIPANTS ===== -->
       <section class="view" [class.active]="currentView === 'participants'" *ngIf="currentView === 'participants'">
@@ -253,14 +186,17 @@
         </div>
 
         <div class="cards">
-          <div class="empty" *ngIf="!(dfuProductsMap | keyvalue).length">No DFU products found.</div>
-          <div class="mcard"
-              *ngFor="let entry of dfuProductsMap | keyvalue"
-              [class.selected]="selectedProductId === entry.key"
-              (click)="selectProduct(entry.key, entry.value.product || entry.key)">
+          <div class="empty" *ngIf="!ahParticipantCards.length">No participants found.</div>
+          <div class="mcard" *ngFor="let p of ahParticipantCards">
             <div class="top">
-              <div class="avatar" [style.background]="tokColor(entry.key)">{{ (entry.value.product || entry.key).substring(0,2).toUpperCase() }}</div>
-              <div class="name-strong">{{ entry.value.product || entry.key }}</div>
+              <div class="avatar" [style.background]="tokColor(p.profileid)">{{ p.name.substring(0,2).toUpperCase() }}</div>
+              <div class="name-strong">
+                <a href="javascript:void(0)" (click)="openUserProfile(p.profileid)" style="color:var(--accent-ink);text-decoration:underline;">{{ p.name }}</a>
+                <small>{{ p.email }}</small>
+              </div>
+            </div>
+            <div class="chips" *ngIf="p.products.length">
+              <span class="tag" style="background:var(--surface-3);color:var(--muted)" *ngFor="let prod of p.products">{{ prod }}</span>
             </div>
           </div>
         </div>

@@ -246,7 +246,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     'Critical Support Diagnostics',
     'A&H Light Diagnostics'
   ];
-  selectedProductIds: string[] = [];
 
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
@@ -255,7 +254,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     [profileId: string]: {
       name: string;
       email: string;
-      activeproduct: string[];
       participantproducts?: any[];   
       notstartedparticipant?: boolean;
       needsattention?: boolean;
@@ -263,7 +261,12 @@ export class TeamEvolutionDashboardComponent implements OnInit {
       awaitingsignoff?: boolean;
     };
   } = {};
-  
+  fetchedProduct: { [productId: string]: typeof this.ongoingparticipants } = {};
+
+  // set/map declarations
+  private fetchedProductData = new Set<string>();
+  private fetchDeliverables = new Map<string, any>();
+
   constructor(
     private firestore : Firestore,
     private router : Router
@@ -272,9 +275,10 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   async ngOnInit() {
     await Promise.all([
       this.getDfuProducts(),
-      this.getParticipantMetadata(),
       this.getAhMembers()
     ]);
+
+    await this.getParticipantMetadata();
   }
   // get ahmember from users_roles
   async getAhMembers(){
@@ -292,18 +296,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
   }
 
-  async selectProduct(docId: string, displayName: string = docId, docIds: string[] = [docId]): Promise<void> {
-    this.selectedProductId = docId;
-    this.selectedProductName = displayName;
-    this.selectedProductIds = docIds;
-    this.statusView = 'ongoing';
-    this.loadingParticipants = true;
-    this.buildOngoingParticipants(docIds);
-    await this.fetchParticipantProducts();
-    this.loadingParticipants = false;
-  }
-
-  // fetch the DFU products type from products collection
+    // fetch the DFU products type from products collection
   async getDfuProducts(){
     try {
       const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
@@ -321,116 +314,165 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   }
 
   // fetch the participant metadata from participant metadata collection
-  async getParticipantMetadata(){
-    try {
-      const participantsRef = collection(this.firestore,'participant metadata');
-      const participants = await firstValueFrom(collectionData(query(participantsRef), { idField: 'id' }));
-      this.participantMetadata = participants;
-      console.log('Participant metadata fetched:', this.participantMetadata);
-    } catch (error) {
-      console.error('Error fetching participant metadata:', error);
+  async getParticipantMetadata() {
+  try {
+    const profileIds = Array.from(this.ahMemberProfileIds);
+    const participantsRef = collection(this.firestore,'participant metadata');
+    const chunks = [];
+    for (let i = 0; i < profileIds.length; i += 30) {
+      chunks.push(profileIds.slice(i, i + 30));
     }
+    const participantMetadata: any[] = [];
+    for (const chunk of chunks) {
+      const participants = await firstValueFrom(collectionData(query(participantsRef,where('profileid', 'in', chunk)), { idField: 'id' }));
+      participantMetadata.push(...participants);
+    }
+    this.participantMetadata = participantMetadata;
+    console.log('AH member participant metadata fetched:',this.participantMetadata);
+  } catch (error) {
+    console.error('Error fetching participant metadata:',error);
+  }
+}
+
+  async selectProduct(docId: string, displayName: string = docId): Promise<void> {
+    this.selectedProductId = docId;
+    this.selectedProductName = displayName;
+    this.statusView = 'ongoing';
+
+    const cachedParticipants = this.fetchedProduct[docId];
+    if (cachedParticipants) {
+      this.ongoingparticipants = cachedParticipants;
+      return;
+    }
+
+    this.loadingParticipants = true;
+    this.buildOngoingParticipants(docId);
+
+    const productRef = doc(this.firestore, 'products', docId);
+    await Promise.all([
+      this.getProductToDeliverySequence(docId, productRef),
+      this.fetchParticipantData(productRef)
+    ]);
+
+    this.fetchedProduct[docId] = this.ongoingparticipants;
+    this.loadingParticipants = false;
   }
 
-  buildOngoingParticipants(productIds: string[]): void {
+
+  buildOngoingParticipants(productId: string): void {
     const localMap: typeof this.ongoingparticipants = {};
-    const ids = productIds ?? [];
 
     this.participantMetadata.forEach(participant => {
-      const isAhMember = this.ahMemberProfileIds.has(participant.profileid);
-      const activeProducts: string[] = participant.activeproduct || [];
-      const hasChosenProduct = activeProducts.some((id: string) => ids.includes(id));
-
-      if (!isAhMember || !hasChosenProduct) {
+      const activeProducts: any[] = participant.activeproduct || [];
+      const consumedProducts: any[] = participant.consumedproducts || [];
+      const hasChosenProduct = activeProducts.some(value => this.matchesProductId(value, productId));
+      if (!hasChosenProduct) {
         return;
       }
+
+      const hasConsumedProduct = consumedProducts.some(value => this.matchesProductId(value, productId));
 
       localMap[participant.profileid] = {
         name: participant.name,
         email: participant.email,
-        activeproduct: participant.activeproduct
+        completed: hasConsumedProduct
       };
     });
 
     this.ongoingparticipants = localMap;
   }
 
-  async fetchParticipantProducts(): Promise<void> {
+  async getProductToDeliverySequence(productId: string, productRef: any): Promise<void> {
+    if (this.fetchedProductData.has(productId)) {
+      return;
+    }
+    this.fetchedProductData.add(productId);
+
+    try {
+      const q = query(collection(this.firestore, 'productToDeliverySequence'), where('product', '==', productRef));
+      const snapshot = await getDocs(q);
+
+      const activityRefs: any[] = [];
+      for (const docSnap of snapshot.docs) {
+        const deliveryOptions = docSnap.data()['deliveryoptions'] || [];
+        for (const option of deliveryOptions) {
+          const steps = option.deliverysequence || [];
+          for (const step of steps) {
+            if (step.activity) { activityRefs.push(step.activity); }
+          }
+        }
+      }
+
+      await Promise.all(activityRefs.map(ref => this.getCachedDocData(ref)));
+    } catch (error) {
+      console.error('Error fetching product delivery sequence template:', error);
+    }
+  }
+
+  async fetchParticipantData(productRef: any): Promise<void> {
     const profileIds = Object.keys(this.ongoingparticipants);
     const chunkSize = 30;
 
+    const participantProductChunks: Promise<any>[] = [];
+    const deliverySequenceChunks: Promise<any>[] = [];
+
     for (let i = 0; i < profileIds.length; i += chunkSize) {
       const chunk = profileIds.slice(i, i + chunkSize);
-      const q = query(
+
+      const participantProductQuery = query(
         collection(this.firestore, 'participantsproduct'),
+        where('profileid', 'in', chunk),
+        where('productref', '==', productRef),
+        where('status', 'in', ['ongoing', 'initiated'])
+      );
+      participantProductChunks.push(getDocs(participantProductQuery));
+
+      const deliverySequenceQuery = query(
+        collection(this.firestore, 'participantdeliverysequence'),
         where('profileid', 'in', chunk)
       );
-      const snapshot = await getDocs(q);
+      deliverySequenceChunks.push(getDocs(deliverySequenceQuery));
+    }
 
-      snapshot.docs.forEach(docSnap => {
+    const [participantProductSnapshots, deliverySequenceSnapshots] = await Promise.all([
+      Promise.all(participantProductChunks),
+      Promise.all(deliverySequenceChunks)
+    ]);
+
+    this.processParticipantProducts(participantProductSnapshots);
+
+    const deliveryDocs: any[] = [];
+    for (const snapshot of deliverySequenceSnapshots) {
+      deliveryDocs.push(...snapshot.docs);
+    }
+    await this.processDeliverySequences(deliveryDocs);
+  }
+
+  processParticipantProducts(snapshots: any[]): void {
+    for (const snapshot of snapshots) {
+      for (const docSnap of snapshot.docs) {
         const data = docSnap.data();
-        const productRefId = data['productref']?.id;
-        const status = data['status'];
-        const isSelectedProduct = this.selectedProductIds.includes(productRefId);
-        const isActiveStatus = status === 'ongoing' || status === 'initiated' || status === 'completed';
-
-        if (!isSelectedProduct || !isActiveStatus) {
-          return;
-        }
-
         const participantProduct = { participantproductid: docSnap.id, ...data };
         const profileid = participantProduct['profileid'];
         const participant = this.ongoingparticipants[profileid];
+        if (!participant) { continue; }
 
-        if (!participant) {
-          return;
-        }
-
-        if (!participant.participantproducts) {
-          participant.participantproducts = [];
-        }
+        if (!participant.participantproducts) { participant.participantproducts = []; }
         participant.participantproducts.push(participantProduct);
-
-        const completedTimestamp = data['statusdate']?.['completed'];
-        const isCompletedProduct = !!completedTimestamp;
-
-        if (isCompletedProduct) {
-          participant.completed = true;
-          const completedDate = completedTimestamp.toDate();
-          const daysSinceCompletion = this.daysSince(completedDate);
-          const isAwaitingSignoff = daysSinceCompletion > 30;
-          if (isAwaitingSignoff) {
-            participant.awaitingsignoff = true;
-          }
-        }
-      });
+      }
     }
-
-    await this.fetchDeliverySequences();
   }
 
-  async fetchDeliverySequences(): Promise<void> {
+  async processDeliverySequences(deliveryDocs: any[]): Promise<void> {
     const profileIds = Object.keys(this.ongoingparticipants);
 
     for (const profileid of profileIds) {
-      await this.fetchDeliverySequenceForParticipant(profileid);
-    }
-  }
-
-  async fetchDeliverySequenceForParticipant(profileid: string): Promise<void> {
-    const participant = this.ongoingparticipants[profileid];
-    const participantProducts = participant.participantproducts || [];
-
-    if (!participantProducts.length) {
-      return;
-    }
-
-    const deliverysequenceQuery = query(collection(this.firestore, 'participantdeliverysequence'), where('profileid', '==', profileid));
-    const deliverySnapshot = await getDocs(deliverysequenceQuery);
-
-    for (const participantProduct of participantProducts) {
-      const deliverySteps = this.findDeliverySteps(deliverySnapshot, participantProduct.participantproductid);
-      participantProduct.deliverysequence = await this.buildStepList(deliverySteps, participant);
+      const participant = this.ongoingparticipants[profileid];
+      const myDocs = deliveryDocs.filter(d => d.data()['profileid'] === profileid);
+      for (const pp of participant.participantproducts || []) {
+        const steps = this.findDeliverySteps({ docs: myDocs } as any, pp.participantproductid);
+        pp.deliverysequence = await this.buildStepList(steps, participant);
+      }
     }
   }
 
@@ -451,68 +493,83 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   }
 
   async buildStepList(deliverySteps: any[], participant: any): Promise<{ step: number; deliveryname: string; status: string }[]> {
+    const sequenceDataList = await Promise.all(
+      deliverySteps.map(s => this.getCachedDocData(s.sequenceref))
+    );
+
+    const secondLevelPromises = sequenceDataList.map(async (deliverableData) => {
+      const deliveryType = deliverableData?.['type'];
+      const isResolvable = deliveryType === 'appointment' || deliveryType === 'form';
+      const refData = isResolvable ? await this.getCachedDocData(deliverableData['deliveryref']) : null;
+      return { deliverableData, deliveryType, refData };
+    });
+
+    const resolved = await Promise.all(secondLevelPromises);
+
     const stepList: { step: number; deliveryname: string; status: string }[] = [];
     let previousCompletedDate: Date | null = null;
 
-    for (let i = 0; i < deliverySteps.length; i++) {
+    resolved.forEach((r, i) => {
       const seqStep = deliverySteps[i];
       const deliveryStatus = seqStep.status || '';
-      const deliverableDoc = await getDoc(seqStep.sequenceref);
-      const deliverableData = deliverableDoc.data();
-      const deliveryType = deliverableData?.['type'];
       let deliveryName = '';
       let appointmentType = '';
       let completedDate: Date | null = null;
 
-      if (deliveryType === 'appointment') {
-        const appointmentDoc = await getDoc(deliverableData['deliveryref']);
-        const appointmentData = appointmentDoc.data();
-        appointmentType = appointmentData?.['appointmenttype'] || '';
+      if (r.deliveryType === 'appointment') {
+        appointmentType = r.refData?.['appointmenttype'] || '';
         deliveryName = appointmentType;
-
-        const isCompletedAppointment = deliveryStatus === 'completed';
-        if (isCompletedAppointment) {
-          const endTimestamp = appointmentData?.['appointmentend'] || appointmentData?.['endtime'];
+        if (deliveryStatus === 'completed') {
+          const endTimestamp = r.refData?.['appointmentend'] || r.refData?.['endtime'];
           completedDate = endTimestamp ? endTimestamp.toDate() : null;
         }
-      } else if (deliveryType === 'form') {
-        const form = await getDoc(deliverableData['deliveryref']);
-        deliveryName = form.data()?.['formname'] || '';
+      } else if (r.deliveryType === 'form') {
+        deliveryName = r.refData?.['formname'] || '';
       } else {
-        deliveryName = deliveryType || '';
+        deliveryName = r.deliveryType || '';
       }
 
-      stepList.push({
-        step: i + 1,
-        deliveryname: deliveryName,
-        status: deliveryStatus
-      });
+      stepList.push({ step: i + 1, deliveryname: deliveryName, status: deliveryStatus });
 
-      const isDiagnosticsAppointment = this.diagnosticsArray.includes(appointmentType);
-      const isReady = deliveryStatus === 'ready';
-
-      if (isDiagnosticsAppointment && isReady) {
+      if (this.diagnosticsArray.includes(appointmentType) && deliveryStatus === 'ready') {
         participant.notstartedparticipant = true;
       }
-
-      const isWaitingOnNextAppointment = isReady && previousCompletedDate !== null;
-      if (isWaitingOnNextAppointment) {
-        const daysSinceLastCompletion = this.daysSince(previousCompletedDate!);
-        const isOverdue = daysSinceLastCompletion > 7;
-        if (isOverdue) {
+      if (deliveryStatus === 'ready' && previousCompletedDate !== null) {
+        if (this.daysSince(previousCompletedDate) > 7) {
           participant.needsattention = true;
         }
       }
-
-      if (completedDate) {
-        previousCompletedDate = completedDate;
-      }
-    }
+      if (completedDate) previousCompletedDate = completedDate;
+    });
 
     return stepList;
   }
 
   // Helper functions
+  private matchesProductId(value: any, targetId: string): boolean {
+    if (typeof value === 'string') {
+      const lastSegment = value.includes('/') ? value.split('/').pop() : value;
+      return lastSegment === targetId;
+    }
+    return value?.id === targetId;
+  }
+
+  private async getCachedDocData(ref: any): Promise<any> {
+    if (!ref) { return null; }
+    const cached = this.fetchDeliverables.get(ref.path);
+    if (cached) { return cached; }
+
+    const docSnap = await getDoc(ref);
+    const data = docSnap.data();
+    this.fetchDeliverables.set(ref.path, data);
+    return data;
+  }
+
+  onProductDropdownChange(docId: string): void {
+    const displayName = this.dfuProductsMap[docId]?.product || docId;
+    this.selectProduct(docId, displayName);
+  }
+
   private daysSince(date: Date): number {
     return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
   }
