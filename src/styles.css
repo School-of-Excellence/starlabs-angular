@@ -187,6 +187,20 @@ body {
   .jchd-slideover-panel { width: 100vw !important; }
 }
 
+/* Bulk Add Products — centered modal; zero the MDC padding so the component controls
+   its own edge-to-edge layout, and cap height so the pinned footer never clips. */
+.bap-overlay .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18), 0 30px 60px -20px rgba(0, 0, 0, 0.28);
+}
+.bap-overlay .mat-mdc-dialog-container .mdc-dialog__surface,
+.bap-overlay .mat-mdc-dialog-container,
+.bap-overlay .mdc-dialog__content {
+  padding: 0 !important;
+}
+
 /* Journey Coach Health Dashboard — Log composer (centered modal popup) */
 .jchd-logcomposer-panel .mat-mdc-dialog-surface {
   border-radius: 20px !important;
