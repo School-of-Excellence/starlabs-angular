@@ -30,6 +30,18 @@ export interface StageDataEntry {
 
 export type StageData = Record<string /* stageName */, StageDataEntry>;
 
+/**
+ * Operator-authored note on a generation doc. This is a UI/ops field — NOT part
+ * of the generation-pipeline backend contract — appended (never overwritten) via
+ * arrayUnion, so the array is an append-only log.
+ */
+export interface OpsNote {
+  text: string;
+  author?: string; // operator email at time of writing
+  authorUid?: string; // operator uid
+  at?: any; // Firestore Timestamp
+}
+
 /** A queue_atc_generation document as read by the UI (only rendered fields typed). */
 export interface AtcGenDoc {
   docid: string; // firestore doc id (injected client-side)
@@ -53,6 +65,7 @@ export interface AtcGenDoc {
   raw_output?: string;
   stagedata?: StageData;
   failureCategory?: FailureCategory | null;
+  opsNotes?: OpsNote[]; // operator notes (append-only log; UI/ops field)
 }
 
 /**
@@ -178,6 +191,30 @@ export interface RebuildOk {
   status: 'pending';
   requeued: boolean;
   promptChars: number;
+}
+
+/**
+ * attachOfflineStudioSession({docid, stage, dropboxLink, profileName?}) — for a
+ * stage with NO queue-stage-log "instudio" entry at all (the session happened
+ * OFFLINE, no Zoom). Creates a `live assignment` doc carrying dropboxLink
+ * (fires the deployed seLiveTranscribeSubmit pipeline, same WhisperX/RunPod
+ * path as the normal paste-a-link flow) and records a durable pointer
+ * (`offlineStudioOverride.<stage>`) on the gen doc. regenerateAtcDoc then
+ * resolves that stage from the pointer whenever the real queue-stage-log path
+ * is still empty — a genuine queue-stage-log entry, if one later appears,
+ * always takes precedence.
+ */
+export interface AttachOfflineReq {
+  docid: string;
+  stage: string;
+  dropboxLink: string;
+  profileName?: string;
+}
+export interface AttachOfflineOk {
+  ok: true;
+  liveassignmentid: string;
+  stage: string;
+  profileName: string | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,43 +1,45 @@
 <div class="mainscreen">
-    <h4 class="title">Arena Live Studio</h4>
-    <div>
-        <mat-form-field class="w-100" appearance="outline">
-            <mat-label>Select Queue</mat-label>
-            <mat-select (selectionChange)="onQueueSelect($event.value)" data-testid="arena-queue-select">
-                <mat-option>
-                    <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
-                </mat-option>
-                <mat-option *ngFor="let list of filterQueue()" [value]="list.docid">
-                    {{list.queuename}}
-                </mat-option>
-            </mat-select>
-          </mat-form-field>
-    </div>
-    <!-- <div>
-        <mat-list *ngFor="let item of arenaparticipant;let i = index;">
-            <mat-list-item>
-                {{i + 1}})&nbsp;EIS : &nbsp;<span *ngFor="let eis of item['pairing']"><b>{{mapProfile[eis]}}</b>&nbsp;,</span>&nbsp;&nbsp;&nbsp;
-                Client : &nbsp;<b>{{mapProfile[item['participantid']]}}</b>&nbsp;&nbsp;&nbsp;
-                Stage : &nbsp;<b>{{item['stagename']}}</b>&nbsp;&nbsp;&nbsp;
-                Zoom : &nbsp;<b>{{item['zoomdata'] != null && item['zoomdata'] != undefined ? item['zoomdata']["host_email"] : "Unknown"}}</b>
-                <button *ngIf="developer" mat-stroked-button class="ml-2" (click)="closeStudio(item)">Close Studio</button>
-            </mat-list-item>
-        </mat-list>
-    </div> -->
-    <div class="zoom-section">
-        <span class="count-badge" data-testid="arena-zoom-available-count">{{ zoomNotInUseEmails.length }} Available</span>
-        
+    <header class="page-head">
+      <span class="live-dot"></span>
+      <div class="page-head__text">
+        <h1 class="title">Arena <span class="accent">Live Studios</span></h1>
+        <p class="subtitle">Live studio monitor — conflicts, Zoom seats &amp; link controls.</p>
+      </div>
+      <div class="kpi-strip">
+        <div class="kpi"><b>{{ statActive }}</b><span>Active</span></div>
+        <div class="kpi kpi--live"><b>{{ statInCall }}</b><span>In&nbsp;call</span></div>
+        <div class="kpi kpi--ok"><b>{{ statZoomFree }}</b><span>Zoom&nbsp;free</span></div>
+        <div class="kpi kpi--amber"><b>{{ statMismatch }}</b><span>Mismatch</span></div>
+        <div class="kpi kpi--red"><b>{{ statDuplicates }}</b><span>Duplicate</span></div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <mat-form-field class="queue-field" appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Select Queue</mat-label>
+        <mat-select (selectionChange)="onQueueSelect($event.value)" data-testid="arena-queue-select">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let list of filterQueue()" [value]="list.docid">{{list.queuename}}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="zoom-section">
+        <span class="count-badge" data-testid="arena-zoom-available-count">{{ zoomNotInUseEmails.length }} Zoom free</span>
         <mat-chip-set class="email-chips">
-            <mat-chip *ngFor="let email of zoomNotInUseEmails">
+          <mat-chip *ngFor="let email of zoomNotInUseEmails">
             <mat-icon matChipAvatar>videocam</mat-icon>
             {{ email?.email || email }}
-            </mat-chip>
+          </mat-chip>
         </mat-chip-set>
+      </div>
     </div>
 </div>
 
 <div class="arena-participants-container">
-  <mat-card *ngFor="let item of arenaparticipant; let i = index" 
+  <div class="eyebrow" *ngIf="arenaparticipant?.length">Active studios · {{ arenaparticipant.length }}</div>
+  <mat-card *ngFor="let item of arenaparticipant; let i = index"
             class="participant-card" data-testid="arena-participant-card" [attr.data-participant-id]="item['participantid']"
             [ngClass]="{
               'stage-mismatch': mapParticipantToToken[item['participantid']]?.['currentstage'] !== item['stagename'],
@@ -112,10 +114,30 @@
               Available
             </mat-chip>
           </span>
+          <div class="copy-links">
+            <button type="button" class="copy-chip" matTooltip="Copy HOST Zoom link to clipboard"
+                    (click)="copyLink('host', item)" data-testid="arena-copy-host-btn">
+              <mat-icon>content_copy</mat-icon> Host
+            </button>
+            <button type="button" class="copy-chip" matTooltip="Copy PARTICIPANT Zoom link to clipboard"
+                    (click)="copyLink('participant', item)" data-testid="arena-copy-participant-btn">
+              <mat-icon>content_copy</mat-icon> Participant
+            </button>
+          </div>
         </div>
         
         <!-- Actions -->
         <div class="actions" *ngIf="developer">
+          <!-- Regenerate is ALWAYS enabled; it flags + hard-confirms if a call is live. -->
+          <button mat-raised-button color="primary" (click)="regenerateLink(item)" data-testid="arena-regen-link-btn">
+            <mat-icon>autorenew</mat-icon>
+            Regenerate Link
+          </button>
+          <span class="call-live-flag" *ngIf="isCallHappening(item)"
+                matTooltip="A call is currently in progress — regenerating will end it and drop everyone">
+            <mat-icon>sensors</mat-icon>
+            Call in progress
+          </span>
           <button mat-raised-button color="warn" (click)="closeStudio(item)" data-testid="arena-close-studio-btn">
             <mat-icon>close</mat-icon>
             Close Studio

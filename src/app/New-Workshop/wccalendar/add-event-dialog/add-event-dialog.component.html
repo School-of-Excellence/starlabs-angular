@@ -1,0 +1,89 @@
+<div class="md-body">
+  <div class="md-top">
+    <div class="md-title">📅 {{ isEdit ? 'Edit Event' : 'Add Event' }}</div>
+    <button type="button" class="md-x" (click)="cancel()" aria-label="Close">✕</button>
+  </div>
+
+  <div>
+    <div class="ml">Event Title</div>
+    <input class="mi" [(ngModel)]="title" placeholder="e.g. B!G Excellence Workshop — Chennai" />
+  </div>
+
+  <div>
+    <div class="ml-row">
+      <div class="ml">Type</div>
+      <button type="button" class="ml-link" (click)="showNewType = !showNewType">
+        {{ showNewType ? 'Cancel' : '+ New Type' }}
+      </button>
+    </div>
+    <select class="mi mi-select" [(ngModel)]="type" [disabled]="loadingTypes">
+      <option value="" disabled>{{ loadingTypes ? 'Loading types…' : 'Select type...' }}</option>
+      @for (opt of typeOptions; track opt.id) {
+        <option [value]="opt.id">{{ opt.name }}</option>
+      }
+    </select>
+    @if (showNewType) {
+      <div class="new-type-row">
+        <input class="mi" [(ngModel)]="newTypeName" placeholder="e.g. Bootcamp"
+               (keydown.enter)="createType()" />
+        <button type="button" class="add-type-btn" (click)="createType()"
+                [disabled]="!canCreateType || isCreatingType">
+          {{ isCreatingType ? '…' : '+ Add' }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="mr">
+    <div>
+      <div class="ml">Start Date</div>
+      <input class="mi mi-date" type="date" [(ngModel)]="start" />
+    </div>
+    <div>
+      <div class="ml">End Date</div>
+      <input class="mi mi-date" type="date" [(ngModel)]="end" [min]="start" />
+    </div>
+  </div>
+
+  <div>
+    <div class="ml-row">
+      <div class="ml">Location (optional)</div>
+      <button type="button" class="ml-link" (click)="showNewLocation = !showNewLocation">
+        {{ showNewLocation ? 'Cancel' : '+ New Location' }}
+      </button>
+    </div>
+    <select class="mi mi-select" [(ngModel)]="location" [disabled]="loadingTypes">
+      <option value="">{{ loadingTypes ? 'Loading locations…' : 'Select location...' }}</option>
+      @for (opt of locationOptions; track opt.id) {
+        <option [value]="opt.id">{{ opt.name }}</option>
+      }
+    </select>
+    @if (showNewLocation) {
+      <div class="new-type-row">
+        <input class="mi" [(ngModel)]="newLocationName" placeholder="e.g. Chennai"
+               (keydown.enter)="createLocation()" />
+        <button type="button" class="add-type-btn" (click)="createLocation()"
+                [disabled]="!canCreateLocation || isCreatingLocation">
+          {{ isCreatingLocation ? '…' : '+ Add' }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div>
+    <div class="ml">Notes (optional)</div>
+    <input class="mi" [(ngModel)]="note" placeholder="e.g. 120 seats" />
+  </div>
+
+  <div class="toggle-row">
+    <div class="ml toggle-lbl">Show in App</div>
+    <label class="switch">
+      <input type="checkbox" [(ngModel)]="showinapp" />
+      <span class="switch-track"></span>
+    </label>
+  </div>
+
+  <button type="button" class="btn-primary" (click)="save()" [disabled]="isSaving">
+    {{ isSaving ? 'Saving…' : (isEdit ? 'Update Event' : 'Add to Calendar') }}
+  </button>
+</div>

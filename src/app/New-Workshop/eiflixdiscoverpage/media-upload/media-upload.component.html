@@ -1,0 +1,103 @@
+<div class="media-upload" [class.is-video]="isVideo">
+  <!-- hidden native picker, type-filtered -->
+  <input
+    #fileInput
+    type="file"
+    class="hidden-input"
+    [attr.accept]="acceptAttr"
+    (change)="onFileSelected($event)" />
+
+  <!-- EMPTY STATE: dropzone + choose button -->
+  <div
+    *ngIf="!value && !isUploading"
+    class="dropzone"
+    [class.dragging]="dragging"
+    (click)="openPicker()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)">
+    <div class="dz-icon"><mat-icon>{{ emptyIcon }}</mat-icon></div>
+    <div class="dz-text">
+      <strong>{{ chooseLabel }}</strong>
+      <span>Drag &amp; drop or click to browse · {{ formatHint }}</span>
+    </div>
+    <button type="button" mat-flat-button color="primary" class="dz-btn" (click)="openPicker(); $event.stopPropagation()">
+      <mat-icon>upload</mat-icon> {{ chooseLabel }}
+    </button>
+  </div>
+
+  <!-- UPLOADING STATE -->
+  <div *ngIf="isUploading" class="uploading">
+    <div class="up-row">
+      <mat-icon class="spin">progress_activity</mat-icon>
+      <span class="up-name" [title]="fileName">Uploading {{ fileName }}</span>
+      <span class="up-pct">{{ uploadProgress }}%</span>
+    </div>
+    <div class="up-bar"><div class="up-bar-fill" [style.width.%]="uploadProgress"></div></div>
+  </div>
+
+  <!-- FILLED STATE: preview + actions -->
+  <div *ngIf="value && !isUploading" class="preview">
+    <div class="preview-media">
+      <video *ngIf="isVideo" [src]="value" controls preload="metadata"></video>
+      <img *ngIf="!isVideo" [src]="value" [alt]="'preview'" />
+    </div>
+
+    <div class="preview-side">
+      <div class="preview-badge">
+        <mat-icon>check_circle</mat-icon>
+        {{ isVideo ? 'Video' : 'Image' }} set
+      </div>
+
+      <div class="preview-actions">
+        <button type="button" mat-stroked-button class="replace-btn" (click)="openPicker()" [disabled]="disabled">
+          <mat-icon>swap_horiz</mat-icon> Replace
+        </button>
+        <button type="button" mat-stroked-button class="remove-btn" (click)="remove()" [disabled]="disabled">
+          <mat-icon>delete_outline</mat-icon> Remove
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- URL ENTRY: the alternative to uploading — always available -->
+  <div class="url-entry-wrap" *ngIf="!isUploading">
+    <div class="url-or" *ngIf="!value"><span>or paste a link</span></div>
+
+    <div class="url-entry" [class.dirty]="urlDirty">
+      <mat-icon>link</mat-icon>
+      <input
+        #urlBox
+        class="url-input"
+        type="text"
+        [value]="urlDraft"
+        [placeholder]="urlPlaceholder"
+        [disabled]="disabled"
+        autocomplete="off"
+        (input)="onUrlDraftChange(urlBox.value)"
+        (blur)="applyUrl()"
+        (keydown.enter)="onUrlEnter($event)" />
+
+      <button
+        *ngIf="urlDirty"
+        type="button"
+        mat-flat-button
+        color="primary"
+        class="url-use"
+        (click)="applyUrl()"
+        [disabled]="disabled">
+        Use
+      </button>
+
+      <button
+        *ngIf="value && !urlDirty"
+        type="button"
+        mat-icon-button
+        class="url-copy"
+        (click)="copyUrl()"
+        matTooltip="Copy URL">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>

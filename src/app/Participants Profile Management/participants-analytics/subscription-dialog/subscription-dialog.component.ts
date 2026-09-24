@@ -33,7 +33,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 })
 export class SubscriptionDialogComponent {
 
-  participantdata = ["select", "participant", "activejourney", "subscriptionend", "customerstatus"]
+  participantdata = ["select", "participant", "activejourney", "subscriptionend","reviseddate", "customerstatus"]
   dataSource: MatTableDataSource<any> = new MatTableDataSource()
   selection = new SelectionModel(true, []);
   subscriptionform: FormGroup;
@@ -70,14 +70,14 @@ export class SubscriptionDialogComponent {
 
   isAllSelected() {
     const numSelected = this.selection.selected.length;
-    const numRows = this.dataSource.data.length;
+    const numRows = this.data.length;
     return numSelected === numRows;
   }
 
 
   masterToggle() {
     console.log(this.isAllSelected());
-    this.isAllSelected() ? this.selection.clear() : this.dataSource.data.forEach(row => this.selection.select(row));
+    this.isAllSelected() ? this.selection.clear() : this.data.forEach(row => this.selection.select(row));
     this.updateProfilesNeedAttention();
   }
 
@@ -151,7 +151,7 @@ export class SubscriptionDialogComponent {
   get displayColumns() : string[] {
     const extendType = this.subscriptionform.get('extendtype').value;
     const cond = ![null , undefined , ''].includes(extendType) &&  ![null , undefined , ''].includes(this.subscriptionform.get(extendType).value)
-    return cond ? [...this.participantdata , 'extendeddate'] : this.participantdata
+    return cond ? this.participantdata : this.participantdata.filter((col)=>!['reviseddate'].includes(col))
   }
 
   updateProfilesNeedAttention(){
@@ -161,8 +161,7 @@ export class SubscriptionDialogComponent {
       const subscriptionEndDate = this.getParticipantSubscriptionStatus(element);
       const extendType = this.subscriptionform.get('extendtype').value;
       let value = this.subscriptionform.get(extendType).value
-      const extendDateCond = extendType === 'date' && value && value?.getTime() < subscriptionEndDate?.getTime()
-      if( subscriptionEndDate === '' || extendDateCond){
+      if( subscriptionEndDate === '' || (extendType === 'date' && value && value?.getTime() < subscriptionEndDate?.getTime())){
         arr.push(element['profileid']);
       }
 
@@ -170,6 +169,8 @@ export class SubscriptionDialogComponent {
     this.profilesNeedAttention = arr;
     if(arr.length === 0){
       this.filterTable(false)
+    } else {
+      this.filterTable(this.showProfilesNeedAttention)
     }
   }
 

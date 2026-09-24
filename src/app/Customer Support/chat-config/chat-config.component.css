@@ -277,6 +277,13 @@
     margin-bottom: 8px;
 }
 
+.category-description {
+    font-size: 14px;
+    color: #777;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+}
+
 .category-subcategories {
     display: flex;
     flex-wrap: wrap;

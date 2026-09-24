@@ -314,6 +314,13 @@
                   {{ sp.name }}
                   <span class="kc__role-act" *ngIf="sp.activity">· {{ sp.activity }}</span>
                 </span>
+                <!-- per-specialist join status (each specialist has their own) -->
+                <span class="kc__role-pres"
+                      [class.kc__role-pres--ok]="specialistPresentById(a, sp.id)"
+                      [class.kc__role-pres--off]="!specialistPresentById(a, sp.id)"
+                      [matTooltip]="specialistPresentById(a, sp.id) ? 'In the call' : (specialistJoinedById(a, sp.id) ? 'Left the call' : 'Not joined yet')">
+                  <mat-icon>{{ specialistPresentById(a, sp.id) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                </span>
               </div>
               <div class="kc__role" *ngFor="let bs of bonusSpecialists(a)">
                 <span class="kc__role-label">Bonus</span>
@@ -321,17 +328,18 @@
                   {{ bs.name }}
                   <span class="kc__role-act" *ngIf="bs.activity">· {{ bs.activity }}</span>
                 </span>
+                <span class="kc__role-pres"
+                      [class.kc__role-pres--ok]="specialistPresentById(a, bs.id)"
+                      [class.kc__role-pres--off]="!specialistPresentById(a, bs.id)"
+                      [matTooltip]="specialistPresentById(a, bs.id) ? 'In the call' : (specialistJoinedById(a, bs.id) ? 'Left the call' : 'Not joined yet')">
+                  <mat-icon>{{ specialistPresentById(a, bs.id) ? 'check_circle' : 'remove_circle' }}</mat-icon>
+                </span>
               </div>
             </div>
 
-            <!-- Who is in the meet right now -->
+            <!-- Who is in the meet right now. Specialist status is now per-specialist
+                 above (kc__role-pres); this row shows the participant. -->
             <div class="kc__presence">
-              <span class="kc__pres"
-                    [class.kc__pres--ok]="specialistInCall(a)"
-                    [class.kc__pres--off]="!specialistInCall(a)">
-                <mat-icon>{{ specialistInCall(a) ? 'check_circle' : 'remove_circle' }}</mat-icon>
-                Specialist
-              </span>
               <span class="kc__pres"
                     [class.kc__pres--ok]="participantInCall(a)"
                     [class.kc__pres--off]="!participantInCall(a)">
@@ -376,7 +384,7 @@
             </div>
 
             <!-- Live session — show the call start clock time inline -->
-            <div class="kc__started" *ngIf="!callEnded(a) && a.specialistJoinedAt">
+            <div class="kc__started" *ngIf="!callEnded(a) && specialistJoined(a)">
               <mat-icon>play_circle</mat-icon>
               <span>Call started at <b>{{ callStartedClock(a) }}</b></span>
             </div>

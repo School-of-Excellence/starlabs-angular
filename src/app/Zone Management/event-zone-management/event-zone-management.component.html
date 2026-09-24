@@ -59,7 +59,7 @@
               <div class="stat-value">{{ unassignedCohortsCount }}</div>
               <div class="stat-label">Unassigned</div>
             </div>
-            <div class="stat-mini highlight" (click)="returnMappedParticipants()">
+            <div class="stat-mini highlight" [class.all-mapped]="isAllMapped" (click)="openUnmappedParticipants()">
               <div class="stat-value">{{ participantsMapped }}/{{ totalParticipants }}</div>
               <div class="stat-label">Mapped</div>
             </div>
@@ -86,25 +86,32 @@
             <div class="section-header">
               <h3 class="section-title">Event Zones</h3>
               <div class="section-actions">
-                <button mat-raised-button color="accent" class="create-zone-btn" (click)="openCreateZoneDialog(null)">
+                <button mat-stroked-button color="primary" class="create-zone-btn" (click)="openCreateZoneDialog(null)">
                   <mat-icon>add</mat-icon>
                   Create Zone
                 </button>
-                <button 
-                  mat-raised-button 
+                <button
+                  mat-stroked-button
+                  color="accent"
                   class="view-participant-btn"
                   (click)="openParticipantZoneOverlay()">
                   <mat-icon>visibility</mat-icon>
                   View Participant Zone
                 </button>
-                <button 
-                  mat-raised-button 
-                  color="primary" 
-                  class="submit-btn"
-                  (click)="submitConfiguration()">
-                  <mat-icon>check_circle</mat-icon>
-                  Update Participant Zone
-                </button>
+                <div class="submit-with-reminder">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    class="submit-btn"
+                    (click)="submitConfiguration()">
+                    <mat-icon>check_circle</mat-icon>
+                    Update Participant Zone
+                  </button>
+                  <div class="submit-reminder" *ngIf="needsSubmission">
+                    <mat-icon>info</mat-icon>
+                    <span>Changes not applied yet — click Update Participant Zone to apply.</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -119,7 +126,7 @@
 
               <!-- Zones Grid -->
               <div class="zones-grid">
-                <div class="zone-card" *ngFor="let zone of eventZoneList">
+                <div class="zone-card" *ngFor="let zone of eventZoneList; trackBy: trackByZoneId">
                   
                   <!-- Zone Header -->
                   <div class="zone-header">
@@ -164,7 +171,7 @@
                     </div>
 
                     <div class="cohorts-names-list" *ngIf="zone['_assignedCohorts'] && zone['_assignedCohorts'].length > 0">
-                      <div class="cohort-name-item" *ngFor="let cohort of zone['_assignedCohorts']">
+                      <div class="cohort-name-item" *ngFor="let cohort of zone['_assignedCohorts']; trackBy: trackByCohortId">
                         <div class="cohort-line-1">
                           <span class="cohort-name">{{ cohort["name"] }}</span>
                           <button mat-icon-button class="cohort-remove-btn" (click)="removeCohortFromZone(cohort['docid'], zone['docid'])">
@@ -175,7 +182,7 @@
                           <span class="cohort-badge" [ngClass]="getCategoryBadgeClass(cohort['cohortCategory'])">
                             {{ cohort["cohortCategory"] | uppercase }}
                           </span>
-                          <span class="cohort-count">{{ getCohortParticipantCount(cohort) }} participants</span>
+                          <span class="cohort-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">{{ getCohortParticipantCount(cohort) }} participants</span>
                         </div>
                       </div>
                     </div>
@@ -257,7 +264,7 @@
               </div>
 
               <!-- One section per category present in the unassigned list -->
-              <div class="cohort-category-section" *ngFor="let group of getUnassignedCohortsGrouped()">
+              <div class="cohort-category-section" *ngFor="let group of getUnassignedCohortsGrouped(); trackBy: trackByCategory">
                 <div class="cohort-category-header">
                   <span
                     class="cohort-badge"
@@ -269,7 +276,7 @@
 
                 <div
                   class="cohort-item"
-                  *ngFor="let cohort of group.cohorts"
+                  *ngFor="let cohort of group.cohorts; trackBy: trackByCohortId"
                   [class.selected]="isCohortSelected(cohort['docid'])"
                   (click)="toggleCohortSelection(cohort['docid'])">
 
@@ -286,7 +293,7 @@
                   <div class="cohort-item-details">
                     <div class="cohort-item-name">{{ cohort["name"] }}</div>
                     <div class="cohort-item-meta">
-                      <span class="cohort-item-count">
+                      <span class="cohort-item-count clickable-count" (click)="$event.stopPropagation(); openCohortParticipants(cohort)">
                         {{ getCohortParticipantCount(cohort) }} participants
                       </span>
                     </div>
@@ -422,6 +429,34 @@
                   <mat-icon>{{ participant.addedflow === 'manual' ? 'touch_app' : 'auto_mode' }}</mat-icon>
                   {{ participant.addedflow === 'manual' ? 'Manual Assignment' : 'Auto Assignment' }}
                 </span>
+
+                <button class="trail-toggle" (click)="toggleTrail(participant)" [disabled]="participant.trailLoading">
+                  <mat-icon>{{ participant.trailLoading ? 'hourglass_empty' : (participant.showTrail ? 'expand_less' : 'timeline') }}</mat-icon>
+                  {{ participant.trailLoading ? 'Loading...' : (participant.showTrail ? 'Hide Zone Trail' : 'View Zone Trail') }}
+                </button>
+              </div>
+
+              <!-- Zone Trail: chronological history of zone changes (oldest -> newest), fetched on demand -->
+              <div class="zone-trail" *ngIf="participant.showTrail && participant.zoneTrail">
+                <div class="trail-empty" *ngIf="participant.zoneTrail?.length === 0">No zone history found</div>
+                <div class="trail-step" *ngFor="let step of participant.zoneTrail; let last = last">
+                  <div class="trail-marker">
+                    <span class="trail-dot" [class.current]="last"></span>
+                    <span class="trail-line" *ngIf="!last"></span>
+                  </div>
+                  <div class="trail-content">
+                    <div class="trail-zone">
+                      {{ step.zoneName }}
+                      <span class="trail-current-badge" *ngIf="last">Current</span>
+                    </div>
+                    <div class="trail-meta">
+                      <span class="trail-date">{{ formatTime(step.date) }}</span>
+                      <span class="trail-flow" [class.manual]="step.addedflow === 'manual'">
+                        {{ step.addedflow === 'manual' ? 'Manual' : 'Auto' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

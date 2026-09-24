@@ -1,21 +1,49 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-07-07 (Events stage-data screen)_ · **New session? Read `specs/ORIENTATION.md` first**, then today's journal `specs/journals/2026-07-07-events-stage-data-screen.md`.
+_Last updated: 2026-08-31 (queue slot/capacity flow — baseline before logic change)_
+· **New session? Read `specs/ORIENTATION.md` first**, then
+`specs/QUEUE-SLOT-BOOKING-FLOW.md` + `specs/journals/2026-08-31-queue-slot-flow-baseline.md`.
 
 ## Current state
-- **New screen `events-stage-data` added** — a **3-step wizard** (Event ▸ Arena event ▸ Participants). Shows the chosen arena event's participants' **name, email, phone, customer status** — all from `participant metadata` (doc id = profileid).
-  - Files: `src/app/Events/events-stage-data/events-stage-data.component.{ts,html,css}`
-  - Route: `events-stage-data` (lazy, `authGuard`) in `src/app/app.routes.ts`. **URL: `/events-stage-data`**.
-  - Flow: **Step 1** `event collection` (events only) → **Step 2** `arena events` where `eventref == event.ref` → **Step 3** map queue (`queue generation` where `arenaeventidlist array-contains arena.docid`) + `event participation request` where `arenaeventid == arena.docid` → distinct `profileid`s → `participant metadata` doc per id.
-- Angular 19 SSR PWA on Firebase, auth-gated. Branch: `dynamic-studio-update`. **Uncommitted** — changes are local.
+- Branch `dynamic-studio-update` @ `65992247`. Working tree carries only
+  documentation added this session plus one pre-existing, unrelated
+  `group-chat-screen.component.css` edit. Nothing committed, nothing
+  pushed, nothing deployed — operator commits manually (standing directive).
+- **No queue code was changed.** The slot/capacity flow is documented and
+  frozen as a baseline so a planned logic change can be made and reverted
+  safely. `breakthroughs-flutter` @ `development` `8cc6b02` was read only.
 
-## Last session changes (2026-07-07) — why
-- Built the screen. First cut bulk-loaded all events/queues joined to arenas; operator asked for **stepwise selection**, so rebuilt as the Event ▸ Arena ▸ Participants wizard (breadcrumb nav, per-step loads).
-- Took **all four columns from metadata** per the request (note: sibling `product-funnel` sources email from `profile_data` instead — deliberately different here).
-- Used per-doc `getDoc('participant metadata', profileid)` because the request specified "profileid is the docid of metadata"; confirmed via `authguard.getParticipantMetaMap()` which keys its map by `doc.id`. Rows with no metadata doc are flagged (amber) but still listed.
-- Verified with `ng build --configuration development` — compiles clean; only pre-existing warnings in unrelated components.
+## Last session changes (2026-08-31)
+- Added `specs/QUEUE-SLOT-BOOKING-FLOW.md` — the cross-repo as-is flow:
+  the slot atom (`queue planning.planning[].segments[].slots[]`, no id,
+  identified by a 5-tuple on exact-ms equality), **7 write paths + 3 read
+  paths** across Angular `queue-planner` / `queue-planner-review` and the
+  three Flutter cards, three mermaid flowcharts, a **divergence register
+  D-01…D-10**, six invariants, and the change/revert protocol.
+- Added `specs/journals/2026-08-31-queue-slot-flow-baseline.md` — WHY, the
+  four surprises, an append-only change log (CL-000) and the per-screen +
+  data-side revert playbook.
+- Indexed both in `specs/ORIENTATION.md` doc map. Also published as a
+  rendered reference artifact for the operator.
+- **Headline finding (D-02):** `queue-planner.savePlanning()` assigns
+  `usedslot = matching-token count` and every planner mutation auto-saves,
+  so it overwrites the counter that the four transactional booking paths
+  maintain — erasing Flutter self-service bookings and B!G pre-placements
+  that have no `queue_token` yet. Paired with D-01 (review offers slots
+  from a *derived* count while the transaction gates on the *stored* one),
+  this is the double-booking root cause.
 
-## Pending / next
-- **Not linked from any nav/menu** — reachable only by direct URL `/events-stage-data`. Add a menu entry if operators need discoverability.
-- For very large events, per-doc metadata reads could be slow — switch to chunked `where('profileid','in',…)` (as `product-funnel.loadMeta` does) if needed.
-- Commit + push are operator-gated. Branch is `dynamic-studio-update`; do not touch `main` without approval.
+## Pending
+- **The logic change itself is unspecified** — awaiting the operator's
+  statement of the new rule. Recommended first target: D-02 + D-01
+  (one agreed source of truth for capacity). Follow §7 of the flow doc:
+  delta vs the register → check the six invariants → name the blast radius
+  across W1–W7 / R1–R3 → Angular and Flutter as separately revertable commits.
+- Before any write-shape change: export the affected `queue planning`
+  doc(s) to `specs/journals/2026-08-31-queue-slot-flow-artifacts/`; array
+  fields have no history. First run against `starlabs-test` only.
+- Carried from 2026-08-27: operator visual pass of the redesigned
+  `/eiflixhomeconfig` tab 1 and of `/videodashboard[/upload]`; EiFlix
+  consumers to wire; newusertags backfill; `eiflixcampaign` rules
+  unverified; eiflix register backfill + `/eiflixoperationsdashboard`
+  route guard; episode-delete gaps.

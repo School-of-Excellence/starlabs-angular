@@ -12,6 +12,10 @@
       <button mat-button class="recipient-button" (click)="onShowRecipients()" *ngIf="getRecipientCount() > 0">
         <mat-icon>people</mat-icon>
         <span>{{getRecipientCount()}} Recipient{{getRecipientCount() > 1 ? 's' : ''}}</span>
+        <span class="hold-count-badge" *ngIf="heldRecipients.length > 0"
+          [matTooltip]="heldRecipients.length + ' on delivery hold — will be skipped'">
+          <mat-icon>block</mat-icon>{{heldRecipients.length}}
+        </span>
         <mat-icon>{{showRecipients ? 'expand_less' : 'expand_more'}}</mat-icon>
       </button>
       <button mat-icon-button class="close-btn" (click)="closeDialog()"><mat-icon>close</mat-icon></button>
@@ -24,15 +28,43 @@
       <span>{{isQueuedTemplate ? 'Queued Recipients' : 'Campaign Recipients'}}</span>
       <mat-progress-spinner *ngIf="isLoadingQueuedRecipients" diameter="18" mode="indeterminate"></mat-progress-spinner>
     </div>
+    <!-- Will be sent -->
+    <div class="rc-group-head rc-group-send" *ngIf="heldRecipients.length > 0">
+      <mat-icon>send</mat-icon>
+      <span>Will be sent</span>
+      <span class="rc-group-count">{{sendableRecipients.length}}</span>
+    </div>
     <div class="recipients-grid">
-      <div class="recipient-chip" *ngFor="let recipient of getRecipientList()">
+      <div class="recipient-chip" *ngFor="let recipient of sendableRecipients; trackBy: trackRecipient">
         <div class="recipient-avatar-sm">
           <img *ngIf="recipient.profile" [src]="recipient.profile" [alt]="recipient.name">
           <mat-icon *ngIf="!recipient.profile">account_circle</mat-icon>
         </div>
         <div><div class="rc-name">{{recipient.name || 'Unknown'}}</div><div class="rc-email">{{recipient.email}}</div></div>
       </div>
+      <div class="rc-empty-note" *ngIf="sendableRecipients.length === 0">
+        No sendable recipients — every selected profile is on delivery hold.
+      </div>
     </div>
+
+    <!-- On delivery hold -->
+    <ng-container *ngIf="heldRecipients.length > 0">
+      <div class="rc-group-head rc-group-hold">
+        <mat-icon>block</mat-icon>
+        <span>On delivery hold — excluded from this send</span>
+        <span class="rc-group-count">{{heldRecipients.length}}</span>
+      </div>
+      <div class="recipients-grid">
+        <div class="recipient-chip on-hold" *ngFor="let recipient of heldRecipients; trackBy: trackRecipient"
+          matTooltip="deliveryonhold is set on this profile — clear it in Update Profile to send to them again">
+          <div class="recipient-avatar-sm">
+            <img *ngIf="recipient.profile" [src]="recipient.profile" [alt]="recipient.name">
+            <mat-icon *ngIf="!recipient.profile">account_circle</mat-icon>
+          </div>
+          <div><div class="rc-name">{{recipient.name || 'Unknown'}}</div><div class="rc-email">{{recipient.email}}</div></div>
+        </div>
+      </div>
+    </ng-container>
   </div>
 
   <div class="broadcast-row">
@@ -262,6 +294,65 @@
 
   <div class="queued-notice-bar" *ngIf="isQueuedTemplate"><mat-icon>schedule</mat-icon><div><strong>Queued template</strong><p>Ready to send to {{getRecipientCount()}} recipient(s).</p></div></div>
 
+  <!-- ═══════ WATI CATEGORY TAG ═══════ -->
+  <div class="step-card category-tag-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
+    <div class="step-header">
+      <div class="step-badge"><mat-icon style="font-size:16px;line-height:1">category</mat-icon></div>
+      <span>Tag Broadcast Category</span>
+      <span class="step-hint required-hint"><mat-icon style="font-size:14px;vertical-align:middle">error_outline</mat-icon> Required</span>
+    </div>
+    <div class="category-tag-row">
+      <mat-form-field appearance="outline" class="category-tag-field">
+        <mat-label>Category <span style="color:red">*</span></mat-label>
+        <mat-icon matPrefix>category</mat-icon>
+        <mat-select [(ngModel)]="selectedWatiCategory" required>
+          <mat-option value="">None</mat-option>
+          <mat-option *ngFor="let c of watiCategories" [value]="c.id">{{ c.name }}</mat-option>
+        </mat-select>
+        <mat-hint *ngIf="!selectedWatiCategory" style="color: #e53935;">Select a category to enable sending</mat-hint>
+      </mat-form-field>
+      <button mat-icon-button color="primary" (click)="manageCategoryDialogOpen = true"
+        matTooltip="Manage categories" class="add-cat-btn">
+        <mat-icon>add_circle_outline</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════ MANAGE WATI CATEGORIES ═══════ -->
+  <div class="manage-overlay" *ngIf="manageCategoryDialogOpen" (click)="manageCategoryDialogOpen = false">
+    <div class="manage-dialog" (click)="$event.stopPropagation()">
+      <div class="manage-header">
+        <h3>Manage Categories</h3>
+        <button mat-icon-button (click)="manageCategoryDialogOpen = false">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="manage-add-row">
+        <mat-form-field appearance="outline" class="manage-input">
+          <mat-label>New Category</mat-label>
+          <input matInput [(ngModel)]="newWatiCategoryName" (keyup.enter)="addWatiCategory()"
+            placeholder="Enter name…">
+        </mat-form-field>
+        <button mat-raised-button color="primary" [disabled]="!newWatiCategoryName.trim() || isAddingCategory"
+          (click)="addWatiCategory()">
+          <mat-progress-spinner *ngIf="isAddingCategory" diameter="16" mode="indeterminate"
+            style="display:inline-flex;margin-right:6px;"></mat-progress-spinner>
+          <mat-icon *ngIf="!isAddingCategory">add</mat-icon> Add
+        </button>
+      </div>
+
+      <div class="manage-list">
+        <div class="manage-item" *ngFor="let c of watiCategories">
+          <mat-chip color="primary" selected>{{ c.name }}</mat-chip>
+        </div>
+        <div *ngIf="watiCategories.length === 0" class="manage-empty-state">
+          No categories yet.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══════ SCHEDULE ═══════ -->
   <div class="step-card schedule-card" *ngIf="isTemplatePresent() && !isQueuedTemplate">
     <div class="schedule-header" [class.schedule-header-active]="isScheduled" (click)="isScheduled = !isScheduled; onScheduleToggle()">
@@ -324,9 +415,9 @@
   <div class="footer-actions" *ngIf="isTemplatePresent()">
     <button mat-stroked-button (click)="dialogRef.close()" class="cancel-btn">Cancel</button>
     <div class="footer-right">
-      <button mat-stroked-button color="primary" *ngIf="!isScheduled" [disabled]="isQueuedTemplate || isUploadingFile" (click)="addtoQueueFunction()" class="queue-btn"><mat-icon>playlist_add</mat-icon> Add to Queue</button>
-      <button mat-raised-button class="schedule-send-btn" *ngIf="isScheduled && !isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || !isScheduleValid() || !isParamConfigValid()" (click)="onScheduleSubmit()"><mat-icon>schedule_send</mat-icon> Schedule for {{scheduleHour}}:{{scheduleMinute}} {{schedulePeriod}}</button>
-      <button mat-raised-button color="primary" *ngIf="!isScheduled || isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued" (click)="onSubmit()" class="send-btn">
+      <button mat-stroked-button color="primary" *ngIf="!isScheduled" [disabled]="isQueuedTemplate || isUploadingFile || (!isQueuedTemplate && !selectedWatiCategory)" (click)="addtoQueueFunction()" class="queue-btn"><mat-icon>playlist_add</mat-icon> Add to Queue</button>
+      <button mat-raised-button class="schedule-send-btn" *ngIf="isScheduled && !isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || !isScheduleValid() || !isParamConfigValid() || !selectedWatiCategory" (click)="onScheduleSubmit()"><mat-icon>schedule_send</mat-icon> Schedule for {{scheduleHour}}:{{scheduleMinute}} {{schedulePeriod}}</button>
+      <button mat-raised-button color="primary" *ngIf="!isScheduled || isQueuedTemplate" [disabled]="!isTemplatePresent() || isUploadingFile || (!isQueuedTemplate && !isParamConfigValid()) || isSendingQueued || (!isQueuedTemplate && !selectedWatiCategory)" (click)="onSubmit()" class="send-btn">
         <mat-progress-spinner *ngIf="isSendingQueued" diameter="18" mode="indeterminate" color="accent" style="display:inline-flex;margin-right:8px;"></mat-progress-spinner>
         <mat-icon *ngIf="!isSendingQueued">send</mat-icon> {{isQueuedTemplate ? (isSendingQueued ? 'Sending…' : 'Send to Recipients') : 'Send Now'}}
       </button>

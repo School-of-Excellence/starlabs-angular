@@ -116,7 +116,7 @@
         <ng-container *ngIf="!snippetView" matColumnDef="event">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Event</th>
           <td mat-cell *matCellDef="let row">
-            <span *ngIf="row['arenaevent'] != null && row['arenaevent'] != undefined">
+            <span *ngIf="row['arenaevent'] != null && row['arenaevent'] != undefined && row['arenaevent']?.parent.id == 'event collection'">
               {{mapEvents[row["arenaevent"].id] != undefined && mapEvents[row["arenaevent"].id] != null ? mapEvents[row["arenaevent"].id]['name'] : row["arenaevent"].id}} (Live Event)
             </span>
             <span *ngIf="row['workshopref'] != null && row['workshopref'] != undefined">
@@ -129,9 +129,9 @@
             <th  mat-header-cell *matHeaderCellDef mat-sort-header>Video</th>
             <td  mat-cell *matCellDef="let row">
               <div *ngIf="row.fileurl">
-                <video controls width="170" height="300">
+                <!-- <video controls width="170" height="300">
                   <source [src]="row.fileurl" type="video/mp4">
-                </video>
+                </video> -->
               </div>
             </td>
         </ng-container>

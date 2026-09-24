@@ -38,6 +38,13 @@
     </div>
 
     <div class="kpi"
+         (click)="onKpiClick('initiated')"
+         [class.active]="activeKpiFilter==='initiated'">
+      <div class="kpi-value">{{ dashboard.initiated }}</div>
+      <div class="kpi-label">Initiated</div>
+    </div>
+
+    <div class="kpi"
          (click)="onKpiClick('ongoing')"
          [class.active]="activeKpiFilter==='ongoing'">
       <div class="kpi-value">{{ dashboard.ongoing }}</div>
@@ -87,7 +94,8 @@
         <button
           class="btn-fix-all"
           *ngIf="activeKpiFilter === 'invalid_event_status'"
-          (click)="fixAllInvalidEventStatus()">
+          (click)="fixAllInvalidEventStatus()"
+          [disabled]="selectedCount === 0">
           Fix All
         </button>
       </div>
@@ -98,6 +106,73 @@
         [class.active]="activeView === 'initiated_not_in_queue'">
       <div class="kpi-value">{{ dashboard.initiatedNotInQueue }}</div>
       <div class="kpi-label">Initiated — Not In Queue</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('given')"
+        [class.active]="activeAtcListType==='given'">
+      <div class="kpi-value">{{ atcGivenCount }}</div>
+      <div class="kpi-label">ATC Given</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('partially_unvalidated')"
+        [class.active]="activeAtcListType==='partially_unvalidated'">
+      <div class="kpi-value">{{ atcPartiallyUnvalidatedCount }}</div>
+      <div class="kpi-label">ATC Partially Unvalidated</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('fully_unvalidated')"
+        [class.active]="activeAtcListType==='fully_unvalidated'">
+      <div class="kpi-value">{{ atcFullyUnvalidatedCount }}</div>
+      <div class="kpi-label">ATC Fully Unvalidated</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('not_given')"
+        [class.active]="activeAtcListType==='not_given'">
+      <div class="kpi-value">{{ atcNotGivenCount }}</div>
+      <div class="kpi-label">ATC Not Given</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onAtcCountClick('no_queue')"
+        [class.active]="activeAtcListType==='no_queue'">
+      <div class="kpi-value">{{ atcNoQueueCount }}</div>
+      <div class="kpi-label">ATC — No Queue ID
+        <button
+          class="btn-fix-all"
+          *ngIf="activeAtcListType === 'no_queue'"
+          (click)="$event.stopPropagation(); fixSelectedNoQueueAtcs()"
+          [disabled]="fixingNoQueueAtcs || !hasSelectedNoQueueAtcs">
+          {{ fixingNoQueueAtcs ? 'Fixing...' : 'Fix All' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showAttendedModal">
+    <div class="attended-modal">
+      <h3>Mark {{ attendedModalRecordCount }} participant(s) as Attended?</h3>
+
+      <p class="modal-message">
+        This will:<br>
+        • Set Event Participation → attended<br>
+        • Set Product Status → <strong>{{ attendedStatusSelection }}</strong><br><br>
+        This action cannot be undone.
+      </p>
+
+      <label>Product status to update:</label>
+      <select [(ngModel)]="attendedStatusSelection">
+        <option value="completed">Completed</option>
+        <option value="shifted">Shifted</option>
+      </select>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="attendedStatusResolver && attendedStatusResolver(null)">Cancel</button>
+        <button class="btn-confirm" (click)="attendedStatusResolver && attendedStatusResolver(attendedStatusSelection)">Confirm</button>
+      </div>
     </div>
   </div>
 
@@ -136,12 +211,12 @@
         class="search-input"
         placeholder="Search..."
         [(ngModel)]="searchText"
-        (input)="applyFilters()"
+        (input)="applyFilters(); atcListCurrentPage = 1"
       />
     </div>
 
     <!-- Right side button -->
-    <button class="btn-primary" (click)="exportCSV()">
+    <button class="btn-primary" (click)="exportCSV()" [disabled]="showAtcNameList">
       Export CSV
     </button>
 
@@ -150,16 +225,26 @@
   <button
     *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
     (click)="bulkMarkUnattended()"
-    class="bulk-btn">
+    [disabled]="selectedCount === 0"
+    class="bulk-btn"
+    style="margin-right: 12px;">
     Mark As Unattended ({{ selectedCount }})
   </button>
 
+  <button
+    *ngIf="reportLoaded && (allRecords.length > 0 && activeView === 'main') || (activeView === 'initiated_not_in_queue' && initiatedNotInQueueRecords.length > 0)"
+    (click)="bulkMarkAttended()"
+    [disabled]="selectedCount === 0"
+    class="bulk-btn">
+    Mark As Attended ({{ selectedCount }})
+  </button>
+
 <!-- ALL TOKENS TABLE -->
-  <div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0 && activeView === 'main'">
+  <div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0 && activeView === 'main' && !showAtcNameList">
     <table>
       <thead>
         <tr>
-          <th>Select</th>
+          <th><input type="checkbox" (change)="toggleSelectAll($event)" /></th>
           <th>Participant Name</th>
           <th>Token Number</th>
           <th>Token Status</th>
@@ -232,7 +317,7 @@
   </div>
 
   <!-- INITIATED NOT IN QUEUE TABLE -->
-  <div *ngIf="activeView === 'initiated_not_in_queue' && reportLoaded">
+  <div *ngIf="activeView === 'initiated_not_in_queue' && reportLoaded && !showAtcNameList">
 
     <ng-container *ngIf="initiatedNotInQueueRecords.length > 0">
       <table>
@@ -267,11 +352,142 @@
     </ng-container>
   </div>
 
+  <!-- ATC NAMELIST TABLE -->
+  <div class="table-wrapper" *ngIf="showAtcNameList">
+    <div class="atc-list-header">
+      <h3>
+        {{ activeAtcListType === 'given' ? 'ATC Given'
+          : activeAtcListType === 'not_given' ? 'ATC Not Given'
+          : activeAtcListType === 'partially_unvalidated' ? 'ATC Partially Unvalidated'
+          : activeAtcListType === 'fully_unvalidated' ? 'ATC Fully Unvalidated'
+          : 'ATC — No Queue ID' }}
+      </h3>
+      <button class="btn-primary" (click)="exportAtcListCSV()">
+        Export CSV
+      </button>
+    </div>
+
+    <div *ngIf="activeAtcListType === 'no_queue'" style="margin-bottom:10px;">
+      <label>
+        <input type="checkbox" (change)="toggleSelectAllNoQueueAtcs($event)" />
+        Select All
+      </label>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Participant Name</th>
+          <th class="filter-header">
+            <span>Product Name</span>
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleAtcFilter('product')">▼</span>
+              <div class="filter-dropdown" *ngIf="atcActiveFilter === 'product'">
+                <div class="filter-option" (click)="selectAtcProductFilter('')">All</div>
+                <div class="filter-option" *ngFor="let product of atcProductOptions"
+                  (click)="selectAtcProductFilter(product.value)">
+                  {{ product.value }} ({{ product.count }})
+                </div>
+              </div>
+            </div>
+          </th>
+          <th>Token Number</th>
+          <th class="filter-header">
+            <span>Current Stage</span>
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleAtcFilter('stage')">▼</span>
+              <div class="filter-dropdown" *ngIf="atcActiveFilter === 'stage'">
+                <div class="filter-option" (click)="selectAtcStageFilter('')">All</div>
+                <div class="filter-option" *ngFor="let stage of atcStageOptions"
+                  (click)="selectAtcStageFilter(stage.value)">
+                  {{ stage.value }} ({{ stage.count }})
+                </div>
+              </div>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let r of paginatedAtcList">
+          <tr>
+            <td>{{ r.participantName }}</td>
+            <td>{{ r.productName }}</td>
+            <td>{{ r.TokenID }}</td>
+            <td>{{ r.tokenStage }}</td>
+          </tr>
+          <tr>
+            <td colspan="4" style="background:#f8f9fb; padding: 10px 20px;">
+              <table style="width:100%; border-collapse:collapse;">
+                <tbody>
+                  <tr *ngFor="let a of profileAtcDetailsMap.get(r.profileid)"
+                      [style.background]="a.noQueue ? '#fdecea' : 'transparent'">
+                    <td style="padding:6px 10px; width:30px;" *ngIf="activeAtcListType === 'no_queue'">
+                      <input type="checkbox" *ngIf="a.noQueue" [(ngModel)]="a.selected" />
+                    </td>
+                    <td style="padding:6px 10px;">
+                      {{ a.prescriptionDate | date:'medium' }} by {{ a.authorNames }}
+                      ({{ a.isValidated ? 'validated' : 'not_validated' }})
+                      <span *ngIf="a.mentorNames && a.mentorNames !== '-'"> Mentor: {{ a.mentorNames }}</span>
+                      <span> · Model: {{ a.atcmodel }}</span>
+                      <span *ngIf="a.noQueue">— ATC not mapped to any queue</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      <button (click)="prevAtcListPage()" [disabled]="atcListCurrentPage === 1">Prev</button>
+      Page {{ atcListCurrentPage }} / {{ atcListTotalPages }}
+      <button (click)="nextAtcListPage()" [disabled]="atcListCurrentPage === atcListTotalPages">Next</button>
+
+      <label style="margin-left:16px;">
+        Records per page:
+        <select [ngModel]="atcListPageSize" (change)="onAtcListPageSizeChange($event)">
+          <option *ngFor="let size of atcListPageSizeOptions" [value]="size">{{ size }}</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <!-- ATC DETAIL DRILLDOWN -->
+  <div class="table-wrapper" *ngIf="showAtcDetailModal">
+    <button (click)="showAtcDetailModal = false">Close</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Prescription Date</th>
+          <th>Specialist</th>
+          <th>Validation</th>
+          <th>Queue Mapping</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of selectedProfileAtcList">
+          <td>{{ a.prescriptionDate | date:'medium' }}</td>
+          <td>{{ a.authorNames }}</td>
+          <td>{{ a.isValidated ? 'Validated' : 'Not Validated' }}</td>
+          <td>{{ a.noQueue ? 'Not mapped to queue' : 'Mapped' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <!-- PAGINATION — shared for both views -->
-  <div class="pagination" *ngIf="reportLoaded && totalPages > 1">
+  <div class="pagination" *ngIf="reportLoaded && totalPages > 1 && !showAtcNameList">
     <button (click)="prevPage()" [disabled]="currentPage === 1">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
     <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+
+    <label style="margin-left:16px;">
+      Records per page:
+      <select [ngModel]="pageSize" (change)="onPageSizeChange($event)">
+        <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+      </select>
+    </label>
   </div>
 
 </div>

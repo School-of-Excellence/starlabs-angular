@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
-import { collection, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore } from '@angular/fire/firestore';
+import { collection, writeBatch, collectionChanges, collectionData, CollectionReference, collectionSnapshots, doc, docSnapshots, Firestore, and, getDoc, getDocs, limit, or, orderBy, Query, query, QueryDocumentSnapshot, QueryFieldFilterConstraint, QueryLimitConstraint, QueryOrderByConstraint, updateDoc, where, DocumentSnapshot, QueryConstraint, QueryFilterConstraint, DocumentReference, getFirestore } from '@angular/fire/firestore';
 import { BehaviorSubject, combineLatestWith, debounceTime, firstValueFrom, map, Subject, Subscription, takeUntil } from 'rxjs';
 import { SelectValidatorComponent } from '../select-validator/select-validator.component';
 import { FormsModule } from '@angular/forms';
@@ -78,12 +78,12 @@ export class ViewPrescribedATCComponent {
   participantList: Array<any> = [];
   queueList: Array<any> = [];
   mentoringActivityList: Array<any> = [];
-  selectedProducts: string[] = [];  
+  selectedProducts: string[] = [];
   selectedPrescribers: string[] = [];
   selectedParticipants: string[] = [];
   selectedMentors: string[] = [];
 
-  // ATC data management 
+  // ATC data management
   reportATC: QueryDocumentSnapshot<any>[] = [];
   sourceReportATC: QueryDocumentSnapshot<any>[] = [];
 
@@ -130,20 +130,22 @@ export class ViewPrescribedATCComponent {
   atcModelList:any[] = []
   startDate!: Date;
   endDate!: Date;
+  updateProductPath = null
+  newProductValue: string | null = null
 
   firestoreDefault = getFirestore() // Default Firestore
   firestoreATC = getFirestore("firestore-atc") // ATC Firestore
-  
+
   constructor(
     // public firestore: Firestore,
     public router: Router,
     public guard: AuthguardService,
     public matdialog: MatDialog,
-    public datepipe: DatePipe  
-  ) { 
+    public datepipe: DatePipe
+  ) {
     this.guard.getProfileMap().then(e => {
       this.profileMap = e.docdata;
-    });  
+    });
   }
 
   ngOnInit(): void {
@@ -183,6 +185,8 @@ export class ViewPrescribedATCComponent {
   clearUpdateEdit() {
     this.updateAdjustmentPath = null
     this.updateProcedurePath = null
+    this.updateProductPath = null
+    this.newProductValue = null
     this.newAwarenessValue = {
       awarenessdetail: null,
       potentialyears: null
@@ -318,7 +322,7 @@ export class ViewPrescribedATCComponent {
       }
     });
 
-    //atcmodel 
+    //atcmodel
     const atcModelRef = collection(this.firestoreDefault,"atc model")
     getDocs(atcModelRef).then(snap => {
       if(snap.docs.length != 0){
@@ -1132,6 +1136,58 @@ export class ViewPrescribedATCComponent {
     this.clearUpdateEdit()
   }
 
+  onSelectProductEdit(atc: QueryDocumentSnapshot<any>) {
+    var atcData = atc.data()
+    this.newProductValue = atcData['product'] ?? null
+    this.updateProductPath = atc.ref.path
+  }
+
+  async updateProductValue(atc: QueryDocumentSnapshot<any>) {
+    if ([null, undefined].includes(this.newProductValue) || (this.newProductValue as string).trim().length == 0) {
+      alert("Select a valid ATC Model")
+      return
+    }
+
+    try {
+      const batch = writeBatch(this.firestoreATC)
+
+      // 1. Current doc
+      var collectionName = atc.ref.parent.id
+      batch.update(doc(this.firestoreATC, collectionName, atc.id), {
+        product: this.newProductValue
+      })
+
+      // 2. Cached version chain (no new fetch)
+      var oldVersions = this.mapAtcVersionDoc[atc.ref.path] || []
+      for (let i = 0; i < oldVersions.length; i++) {
+        var versionPath = oldVersions[i]['atcPath']
+        if (versionPath) {
+          batch.update(doc(this.firestoreATC, versionPath), {
+            product: this.newProductValue
+          })
+          oldVersions[i]['product'] = this.newProductValue
+        }
+      }
+
+      // 3. Only atc_alpha docs can have a twin in atc_to_validate (never the reverse)
+      if (collectionName === "atc_alpha") {
+        var toValidateRef = doc(this.firestoreATC, "atc_to_validate", atc.id)
+        var toValidateSnap = await getDoc(toValidateRef)
+        if (toValidateSnap.exists()) {
+          batch.update(toValidateRef, {
+            product: this.newProductValue
+          })
+        }
+      }
+
+      await batch.commit()
+      this.clearUpdateEdit()
+    } catch (err) {
+      console.log("Error updating product", err)
+      alert("Failed to update ATC model. Please try again.")
+    }
+  }
+
   // Compare function for complex objects
   compareMapItems(item1: any, item2: any): boolean {
     return item1 && item2 && item1.value === item2.value;
@@ -1271,7 +1327,7 @@ export class ViewPrescribedATCComponent {
   //           background-color: #FFFFFF;
   //           color: black;
   //         }
-          
+
   //         .highlight{
   //           font-weight: bold;
   //           display: inline-block;
@@ -1324,14 +1380,14 @@ export class ViewPrescribedATCComponent {
   //             background-color: #FFFFFF;
   //             color: black;
   //           }
-            
+
   //           .highlight{
   //             font-weight: bold;
   //             display: inline-block;
   //             margin-right: 5px;
   //             color: black;
   //           }
-  
+
   //           .mainscreen{
   //             padding: 20px;
   //           }

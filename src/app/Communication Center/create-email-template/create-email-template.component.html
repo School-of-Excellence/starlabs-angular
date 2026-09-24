@@ -514,7 +514,10 @@
               <mat-option value="">Select Category</mat-option>
               <mat-option *ngFor="let cat of categories" [value]="cat">{{cat}}</mat-option>
             </mat-select>
-            <mat-icon matSuffix>category</mat-icon>
+            <button matSuffix mat-icon-button type="button"
+              (click)="openManageDialog('categories', $event)" matTooltip="Manage categories">
+              <mat-icon>add_circle</mat-icon>
+            </button>
             <mat-error *ngIf="category?.hasError('required')">Category is required</mat-error>
           </mat-form-field>
 
@@ -524,7 +527,10 @@
               <mat-option value="">Select Sub-Category</mat-option>
               <mat-option *ngFor="let subCat of subCategories" [value]="subCat">{{subCat}}</mat-option>
             </mat-select>
-            <mat-icon matSuffix>label</mat-icon>
+            <button matSuffix mat-icon-button type="button"
+              (click)="openManageDialog('subcategories', $event)" matTooltip="Manage sub-categories">
+              <mat-icon>add_circle</mat-icon>
+            </button>
             <mat-error *ngIf="subCategory?.hasError('required')">Sub-category is required</mat-error>
           </mat-form-field>
 

@@ -1,0 +1,91 @@
+<div class="dialog-wrap">
+  <div class="dialog-head">
+    <h2>{{ isEditMode ? 'Edit Home Series' : 'Add Home Series' }}</h2>
+    <button mat-icon-button type="button" (click)="cancel()" aria-label="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <mat-dialog-content class="dialog-body">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Title</mat-label>
+        <input matInput formControlName="title" placeholder="Enter series title" />
+        <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Episodes</mat-label>
+        <mat-select formControlName="selectedEpisodes" multiple
+          (selectionChange)="onEpisodesChange($event.value)">
+          <mat-option>
+            <ngx-mat-select-search [(ngModel)]="episodeSearch" [ngModelOptions]="{ standalone: true }"
+              [placeholderLabel]="'Search episodes'" [noEntriesFoundLabel]="'No matching episodes'"
+              ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let ep of filteredEpisodes()" [value]="ep.id">{{ ep.title }}</mat-option>
+        </mat-select>
+        <mat-hint *ngIf="loadingEpisodes">Loading episodes…</mat-hint>
+        <mat-hint *ngIf="!loadingEpisodes">{{ (selectedEpisodesControl?.value || []).length }} selected</mat-hint>
+      </mat-form-field>
+
+      <div class="episode-list" formArrayName="homeseries" cdkDropList cdkDropListOrientation="mixed"
+        (cdkDropListDropped)="dropEpisode($event)">
+        <div class="episode-card" *ngFor="let group of homeseries.controls; let i = index" [formGroupName]="i"
+          cdkDrag>
+          <div class="episode-drag-preview" *cdkDragPreview>
+            {{ episodeTitle(group.get('episodeId')?.value) }}
+          </div>
+
+          <div class="episode-card-head">
+            <button mat-icon-button type="button" class="drag-btn" cdkDragHandle
+              matTooltip="Drag to reorder" aria-label="Drag to reorder">
+              <mat-icon>drag_indicator</mat-icon>
+            </button>
+            <span class="episode-index">{{ i + 1 }}</span>
+            <span class="episode-name">{{ episodeTitle(group.get('episodeId')?.value) }}</span>
+            <button mat-icon-button type="button" class="remove-btn" (click)="removeEpisode(i)"
+              matTooltip="Remove episode" aria-label="Remove episode">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <!-- Per-episode fields hidden per request: show selected episodes only.
+               Keeping the markup so it can be re-enabled later.
+          <div class="episode-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Title</mat-label>
+              <input matInput formControlName="title" placeholder="Enter title" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Subtitle</mat-label>
+              <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Head Tag</mat-label>
+              <input matInput formControlName="headtag" placeholder="Enter head tag" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Footer</mat-label>
+              <input matInput formControlName="footer" placeholder="Enter footer" />
+            </mat-form-field>
+          </div>
+          -->
+        </div>
+
+        <div class="episode-empty" *ngIf="homeseries.length === 0 && !loadingEpisodes">
+          <mat-icon>subscriptions</mat-icon>
+          <p>Select episodes above to configure each one.</p>
+        </div>
+      </div>
+    </mat-dialog-content>
+
+    <mat-dialog-actions align="end" class="dialog-actions">
+      <button mat-stroked-button type="button" (click)="cancel()" [disabled]="isSaving">Cancel</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="isSaving">
+        <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+        <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Save' }}</span>
+      </button>
+    </mat-dialog-actions>
+  </form>
+</div>

@@ -2,40 +2,33 @@ import { Component, ViewChild } from '@angular/core';
 import { collection, collectionSnapshots, Firestore, orderBy, query } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
+import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { Subject, takeUntil } from 'rxjs';
+import { Router } from '@angular/router';
 import { AddEpisodeComponent } from './add-episode/add-episode.component';
-import { UploadEpisodeDialogComponent } from './upload-episode-dialog/upload-episode-dialog.component';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatChipsModule } from '@angular/material/chips';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
 import { AuthguardService } from '../../authguard.service';
-import { MatSortModule } from '@angular/material/sort';
+
+type ChipFilter = 'all' | 'hlspending' | 'nosrt';
 
 @Component({
   selector: 'app-episodes-dashboard',
   imports: [
     MatTableModule,
-    MatFormFieldModule,
     MatPaginatorModule,
-    MatInputModule,
-    MatChipsModule,
     CommonModule,
     MatIconModule,
-    MatButtonModule,
     FormsModule,
     MatSortModule
   ],
   templateUrl: './episodes-dashboard.component.html',
-  styleUrls: ['../../content-upload-version2/content-upload-shared.css']
+  styleUrls: ['./episodes-dashboard.component.css']
 })
 export class EpisodesDashboardComponent {
-  displayedColumns: string[] = ['Title', 'Referencetitle', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'Series', 'Edit', 'Delete'];
+  displayedColumns: string[] = ['Title', 'Duration', 'added', 'convertedtohls', 'srt', 'videosize', 'imagesize', 'actions'];
   dataSource = new MatTableDataSource();
 
   @ViewChild(MatPaginator) paginator: MatPaginator | any;
@@ -43,12 +36,17 @@ export class EpisodesDashboardComponent {
 
   mapTaxonomy: { [key: string]: string } = {};
 
+  searchText = '';
+  activeChip: ChipFilter = 'all';
+  stats = { total: 0, sizeBytes: 0, hlsPct: 0, hlsPending: 0, srtPct: 0, srtMissing: 0 };
+
   private subscription = new Subject<void>();
 
   constructor(
     public dialog: MatDialog,
     private firestore: Firestore,
     public authguard: AuthguardService,
+    private router: Router,
   ) {
     const episodesRef = collection(this.firestore, 'episodes');
     const episodeQuery = query(episodesRef, orderBy('date', 'desc'));
@@ -60,14 +58,16 @@ export class EpisodesDashboardComponent {
       this.dataSource.sortingDataAccessor = (item: any, headerSort: string) => {
         switch (headerSort) {
           case 'Title': return item.title?.toLowerCase() ?? '';
-          case 'Referencetitle': return item.reftitle?.toLowerCase() ?? '';
           case 'Duration': return item.duration ?? 0;
           case 'added': return item.date?.toDate().getTime() ?? 0;
           case 'srt': return item.srt ? 1 : 0;
-          case 'videosize': return item.videoSize ?? 0;
-          case 'Series': return item.imagesize ?? 0;
+          case 'videosize': return item.videoSizeBytes ?? 0;
+          case 'imagesize': return item.imagesize ?? 0;
         }
       };
+      this.dataSource.filterPredicate = (row: any) => this.matchesFilters(row);
+      this.computeStats(snapshotData);
+      this.refreshFilter();
     });
 
     const atctaxonomyRef = collection(this.firestore, 'atc taxonomy');
@@ -80,30 +80,66 @@ export class EpisodesDashboardComponent {
     });
   }
 
-  ngOnInit(): void {}
-
   ngOnDestroy(): void {
     this.subscription.next();
     this.subscription.complete();
   }
 
-  openUploadDialog() {
-    this.dialog.open(UploadEpisodeDialogComponent, {
-      width: '95vw',
-      maxWidth: '1400px',
-      height: '90vh',
-      panelClass: 'upload-episode-dialog-panel',
-    });
+  private computeStats(rows: any[]): void {
+    const total = rows.length;
+    const sizeBytes = rows.reduce((s, r) => s + (r.videoSizeBytes ?? 0) + (r.imagesize ?? 0), 0);
+    const hlsDone = rows.filter(r => r.convertedtohls).length;
+    const srtDone = rows.filter(r => r.srt).length;
+    this.stats = {
+      total,
+      sizeBytes,
+      hlsPct: total ? Math.round(hlsDone / total * 100) : 0,
+      hlsPending: total - hlsDone,
+      srtPct: total ? Math.round(srtDone / total * 100) : 0,
+      srtMissing: total - srtDone,
+    };
   }
 
-  openEditDialog(row: any) {
-    this.dialog.open(UploadEpisodeDialogComponent, {
-      width: '95vw',
-      maxWidth: '1400px',
-      height: '90vh',
-      panelClass: 'upload-episode-dialog-panel',
-      data: { edit: true, row },
-    });
+  private matchesFilters(row: any): boolean {
+    const text = this.searchText.trim().toLowerCase();
+    const matchesText = !text
+      || (row.title ?? '').toLowerCase().includes(text)
+      || (row.reftitle ?? '').toLowerCase().includes(text);
+    const matchesChip = this.activeChip === 'all'
+      || (this.activeChip === 'hlspending' && !row.convertedtohls)
+      || (this.activeChip === 'nosrt' && !row.srt);
+    return matchesText && matchesChip;
+  }
+
+  refreshFilter(): void {
+    // MatTableDataSource skips the predicate on an empty filter string, so feed
+    // it a composite key whenever any filter is active
+    this.dataSource.filter = (!this.searchText.trim() && this.activeChip === 'all')
+      ? '' : `${this.activeChip}::${this.searchText.trim().toLowerCase()}`;
+    if (this.dataSource.paginator) this.dataSource.paginator.firstPage();
+  }
+
+  setChip(chip: ChipFilter): void {
+    this.activeChip = chip;
+    this.refreshFilter();
+  }
+
+  fmtSize(bytes: number | null | undefined, kbBelowMb = false): string {
+    if (!bytes && bytes !== 0) return '—';
+    const GB = 1024 * 1024 * 1024, MB = 1024 * 1024;
+    if (bytes >= GB) return (bytes / GB).toFixed(2) + ' GB';
+    if (bytes >= MB) return (bytes / MB).toFixed(kbBelowMb ? 2 : 1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+
+  openUploadStudio(): void {
+    const base = this.router.url.startsWith('/content-upload-v2') ? '/content-upload-v2/videodashboard' : '/videodashboard';
+    this.router.navigate([base + '/upload']);
+  }
+
+  openEditInStudio(row: any): void {
+    const base = this.router.url.startsWith('/content-upload-v2') ? '/content-upload-v2/videodashboard' : '/videodashboard';
+    this.router.navigate([base + '/upload'], { queryParams: { edit: row.id } });
   }
 
   openDeleteDialog(id: any, srt: any, imageUrl: any, videoUrl: any, screenshot: string) {
@@ -117,10 +153,5 @@ export class EpisodesDashboardComponent {
         screenshot,
       },
     });
-  }
-
-  ApplyFilter(event: Event) {
-    const filterValue = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = filterValue.trim().toLowerCase();
   }
 }

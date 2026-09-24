@@ -1,7 +1,8 @@
-import { Component, Input, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import {
   Firestore, collection, query, where, getDocs,
-  doc, getDoc, writeBatch, serverTimestamp, updateDoc, setDoc
+  doc, writeBatch, serverTimestamp, updateDoc, setDoc,
+  collectionData
 } from '@angular/fire/firestore';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
@@ -29,12 +30,13 @@ import { BulkAddProductsComponent } from '../../Participants Profile Management/
 import { WatiInputComponent } from '../../Participants Profile Management/participants-analytics/wati-input/wati-input.component';
 import { AhNotificationComponent } from '../../Participants Profile Management/participants-analytics/ah-notification/ah-notification.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
+import { Subscription } from 'rxjs';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'overallRequested';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
 
 interface ImportPreviewRow { name: string; email: string; }
 interface Split { key: string; label: string; count: number; }
-interface JourneyRow { key: string; label: string; total: number; first: number; repeat: number; }
+interface JourneyRow { key: string; label: string; total: number; first: number; repeat: number; members?: string[]; isGroup?: boolean; }
 
 interface PRow {
   profileid: string;
@@ -52,10 +54,13 @@ interface PRow {
   isInQueueReq: boolean;
   isNotRequested: boolean;
   isUnattended: boolean;
+  isRevoked: boolean;
   inQueue: boolean;
   attended: boolean;
   scanned: boolean;
   attendanceState: string;
+  revokedBy: string;      // resolved display name (or raw profile id) of who revoked
+  revokedDate: number;    // millis
   reason: string;
   requestedDate: number;
   journey: string;
@@ -66,6 +71,7 @@ interface PRow {
   purchaseValue: number | null;
   paid: number | null;
   customerStatus: string;
+  completedProduct?: boolean;   // this product's id is in the participant's consumedproducts → "repeat"
   metaLoaded: boolean;
   subLoaded: boolean;
   metaError: boolean;
@@ -89,7 +95,7 @@ interface PRow {
   templateUrl: './product-funnel.component.html',
   styleUrl: './product-funnel.component.css'
 })
-export class ProductFunnelComponent implements OnInit {
+export class ProductFunnelComponent implements OnInit , OnDestroy{
 
   @Input() arena: any;
   @Input() eventName = '';
@@ -117,9 +123,10 @@ export class ProductFunnelComponent implements OnInit {
     { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
-    { key: 'attended', label: 'Attended', cls: 'att', desc: 'scanned or marked', tip: 'Of the approved, how many attended (scanned or marked)' },
+    { key: 'attended', label: 'Attended', cls: 'att', desc: 'marked attended', tip: 'Of the approved, how many have request status “attended”' },
     { key: 'noShow', label: 'No-show', cls: 'ns', desc: 'did not attend', tip: 'Approved but did not attend — set when you finalize attendance after the event. Product is kept.' },
-    { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' }
+    { key: 'unattended', label: 'Unattended', cls: 'un', desc: 'cancelled — product pulled', tip: 'Manually marked not attended during the event — the product is cancelled (status “unattended”).' },
+    { key: 'revoked', label: 'Revoked', cls: 'rv', desc: 'cancelled — product pulled', tip: 'Manually revoked — the product is cancelled and the event profile removed (status “revoked”).' }
   ];
 
   // Card lookup + a grouped breakdown tree (depth = indentation; bar = share of the group total).
@@ -141,7 +148,8 @@ export class ProductFunnelComponent implements OnInit {
         { key: 'approved', depth: 0 },
         { key: 'attended', depth: 1 },
         { key: 'noShow', depth: 1 },
-        { key: 'unattended', depth: 1 }
+        { key: 'unattended', depth: 1 },
+        { key: 'revoked', depth: 1 }
       ]
     }
   ];
@@ -178,7 +186,7 @@ export class ProductFunnelComponent implements OnInit {
     return this.statusPalette[(idx >= 0 ? idx : 0) % this.statusPalette.length];
   }
   private computeSplits(rows: PRow[]): void {
-    const keys: SegmentKey[] = ['potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended'];
+    const keys: SegmentKey[] = ['potential', 'requested', 'notRequested', 'eligible', 'noProduct', 'inQueue', 'approved', 'attended', 'noShow', 'unattended', 'revoked'];
     const out = {} as Record<SegmentKey, Split[]>;
     const allStatuses = new Map<string, string>();
     for (const k of keys) {
@@ -204,10 +212,11 @@ export class ProductFunnelComponent implements OnInit {
       const label = (r.journey || '').trim() || 'Not set';
       const e = jm.get(label) ?? { key: label, label, total: 0, first: 0, repeat: 0 };
       e.total++;
-      if (this.completedByPid.has(r.profileid)) e.repeat++; else e.first++;
+      if (r.completedProduct) e.repeat++; else e.first++;
       jm.set(label, e);
     }
     this.approvedByJourney = [...jm.values()].sort((a, b) => b.total - a.total);
+    this.rebuildDisplayedJourneys();
   }
 
   mapProfile: Record<string, any> = {};
@@ -235,12 +244,16 @@ export class ProductFunnelComponent implements OnInit {
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, overallRequested: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, revoked: 0, overallRequested: 0
   };
 
-  // Everyone who ever raised their hand for this event. `requested` excludes the approved
-  // cohort (see loadData), so this is a clean total, not a double-count.
-  get overallRequested(): number { return this.counts.requested + this.counts.approved; }
+  // Everyone who ever raised their hand for this event — including the terminal outcomes
+  // (unattended / revoked), who were approved once and then had their product cancelled.
+  // `requested` excludes the approved cohort, and terminal rows are excluded from both
+  // (see loadData), so these four buckets are disjoint — no double-count.
+  get overallRequested(): number {
+    return this.counts.requested + this.counts.approved + this.counts.unattended + this.counts.revoked;
+  }
 
   // Customer-status split of the Potential pool (Active / Non-Active / Discontinued), shown as
   // clickable chips below the Potential card. Counts come from the precomputed statusSplits.
@@ -258,31 +271,148 @@ export class ProductFunnelComponent implements OnInit {
 
   // Approved cohort broken down by journey, each split into first-timer vs repeat — for the
   // "Approved by journey" cross-tab card (computed in computeSplits once journeys are loaded).
-  // Repeat = the participant has a prior Completed participantsproduct for this product (completedByPid).
+  // Repeat = this product's id is in the participant's `consumedproducts` (participant metadata),
+  // captured per-row as PRow.completedProduct during loadMeta.
   approvedByJourney: JourneyRow[] = [];
-  journeyFilter = 'all';   // 'all' or a journey label
+  journeyFilter = 'all';   // 'all', a journey label, or a group key ('grp:<name>')
+  journeyFilterMembers = new Set<string>();  // journey labels the current filter covers (union for groups)
   frFilter = 'all';        // 'all' | 'first' | 'repeat'
-  private completedByPid = new Set<string>();
+  // Persisted per-event grouping: journey label → group name. Stored in localStorage keyed by arenaevent id.
+  journeyGroups: Record<string, string> = {};
+  groupEditMode = false;
+  journeySel = new Set<string>();   // journeys ticked in edit mode, waiting to be grouped
+  groupNameInput = '';              // name to apply when grouping the current selection
   private readonly journeyPalette = ['#1f8a3b', '#0060df', '#534ab7', '#c25e00', '#0f6e56', '#d4537e', '#185fa5'];
   journeyColor(key: string): string {
-    const i = this.approvedByJourney.findIndex(j => j.key === key);
+    const i = this.displayedJourneys.findIndex(j => j.key === key);
     return this.journeyPalette[(i < 0 ? 0 : i) % this.journeyPalette.length];
   }
-  // Click a journey row → filter the table to that whole journey (clears the first/repeat sub-filter).
-  setJourneyChip(key: string): void {
+
+  private journeyGroupsKey(): string { return 'epc_journey_groups_' + (this.arena?.['docid'] ?? 'unknown'); }
+  private loadJourneyGroups(): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(this.journeyGroupsKey());
+      this.journeyGroups = raw ? (JSON.parse(raw) || {}) : {};
+    } catch { this.journeyGroups = {}; }
+    this.rebuildDisplayedJourneys();
+  }
+  private saveJourneyGroups(): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(this.journeyGroupsKey(), JSON.stringify(this.journeyGroups));
+    } catch { /* storage unavailable — grouping just won't persist */ }
+    this.rebuildDisplayedJourneys();
+  }
+  toggleGroupEdit(): void {
+    this.groupEditMode = !this.groupEditMode;
+    this.journeySel = new Set();   // clear any pending selection when entering/leaving edit mode
+    this.groupNameInput = '';
+  }
+  // Distinct group names already in use, for the datalist / add-to-existing.
+  get existingGroupNames(): string[] {
+    return [...new Set(Object.values(this.journeyGroups).map(g => (g || '').trim()).filter(Boolean))].sort();
+  }
+  isJourneySel(label: string): boolean { return this.journeySel.has(label); }
+  toggleJourneySel(label: string): void {
+    if (this.journeySel.has(label)) this.journeySel.delete(label); else this.journeySel.add(label);
+  }
+  // Group the ticked journeys under the typed name (creates the group or adds to an existing one). Persists.
+  groupSelected(): void {
+    const name = (this.groupNameInput || '').trim();
+    if (!name || !this.journeySel.size) return;
+    this.journeySel.forEach(label => { this.journeyGroups[label] = name; });
+    this.saveJourneyGroups();
+    this.journeySel = new Set();
+    this.groupNameInput = '';
+  }
+  // Remove the ticked journeys from whatever group they're in. Persists.
+  ungroupSelected(): void {
+    if (!this.journeySel.size) return;
+    this.journeySel.forEach(label => { delete this.journeyGroups[label]; });
+    this.saveJourneyGroups();
+    this.journeySel = new Set();
+  }
+  // Disband a whole group (all its journeys become ungrouped). Persists.
+  ungroupGroup(groupName: string): void {
+    Object.keys(this.journeyGroups).forEach(label => { if (this.journeyGroups[label] === groupName) delete this.journeyGroups[label]; });
+    this.saveJourneyGroups();
+  }
+
+  // The rows actually shown in the card: journeys sharing a group name collapse into one aggregated
+  // row (summing total/first/repeat, members = the grouped journey labels); ungrouped journeys stay as-is.
+  //
+  // This MUST be a cached field, not a getter. As a getter it returned fresh objects on every change
+  // detection pass, so *ngFor (identity tracking) destroyed and rebuilt every row continuously — a real
+  // mouse click then never fired, because mousedown and mouseup landed on different DOM nodes.
+  // Rebuilt only when the journeys or the grouping actually change. trackBy below is a second guard.
+  displayedJourneys: JourneyRow[] = [];
+  private rebuildDisplayedJourneys(): void {
+    const groups = new Map<string, JourneyRow>();
+    const singles: JourneyRow[] = [];
+    for (const j of this.approvedByJourney) {
+      const g = (this.journeyGroups[j.label] || '').trim();
+      if (!g) { singles.push({ ...j, members: [j.label] }); continue; }
+      const key = 'grp:' + g;
+      const e = groups.get(key) ?? { key, label: g, total: 0, first: 0, repeat: 0, members: [], isGroup: true };
+      e.total += j.total; e.first += j.first; e.repeat += j.repeat; e.members!.push(j.label);
+      groups.set(key, e);
+    }
+    this.displayedJourneys = [...groups.values(), ...singles].sort((a, b) => b.total - a.total);
+  }
+  trackJourneyKey = (_: number, j: JourneyRow) => j.key;
+  trackBreakdown = (_: number, b: { journey: string }) => b.journey;
+  trackParticipant = (_: number, p: PRow) => p.profileid;
+
+  // Participants for a journey/group are shown in a mat-menu overlay (see the card template),
+  // so the card itself stays compact regardless of how many people are in a group.
+  private journeyLabelOf(r: PRow): string { return (r.journey || '').trim() || 'Not set'; }
+  // The approved participants whose journey falls inside this group, sorted by name.
+  groupParticipants(row: JourneyRow): PRow[] {
+    const members = new Set(row.members ?? [row.label]);
+    return this.rows
+      .filter(r => r.isApproved && members.has(this.journeyLabelOf(r)))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  // Which journeys are inside this group, and who is approved under each — powers the overlay panels.
+  // Every member journey is listed even if it currently has no matching participants.
+  // `fr` narrows to first-timers ('first') or repeats ('repeat'); 'all' is the whole approved cohort.
+  groupJourneyBreakdown(row: JourneyRow, fr: 'all' | 'first' | 'repeat' = 'all'): { journey: string; participants: PRow[] }[] {
+    const members = row.members ?? [row.label];
+    const byJourney = new Map<string, PRow[]>();
+    members.forEach(m => byJourney.set(m, []));
+    for (const r of this.rows) {
+      if (!r.isApproved) continue;
+      const isRepeat = !!r.completedProduct;
+      if (fr === 'first' && isRepeat) continue;
+      if (fr === 'repeat' && !isRepeat) continue;
+      const lbl = this.journeyLabelOf(r);
+      if (byJourney.has(lbl)) byJourney.get(lbl)!.push(r);
+    }
+    return [...members].sort((a, b) => a.localeCompare(b)).map(m => ({
+      journey: m,
+      participants: (byJourney.get(m) ?? []).sort((a, b) => a.name.localeCompare(b.name))
+    }));
+  }
+
+  // Click a journey/group row → filter the table to the union of its journeys (clears the first/repeat sub-filter).
+  // The participant list lives in the overlay opened by the people icon, not here.
+  setJourneyChip(row: JourneyRow): void {
     this.segment = 'approved';
-    const same = this.journeyFilter === key && this.frFilter === 'all';
-    this.journeyFilter = same ? 'all' : key;
+    const same = this.journeyFilter === row.key && this.frFilter === 'all';
+    this.journeyFilter = same ? 'all' : row.key;
+    this.journeyFilterMembers = same ? new Set() : new Set(row.members ?? [row.label]);
     this.frFilter = 'all';
     this.pageIndex = 0;
     this.defaultSelection();
     this.refreshMeta();
   }
-  // Click a first-timer/repeat pill under a journey → filter to that journey ∩ that group (toggles off if repeated).
-  setJourneyFr(jKey: string, frKey: string): void {
+  // Click a first-timer/repeat pill under a journey/group → filter to that union ∩ that group (toggles off if repeated).
+  setJourneyFr(row: JourneyRow, frKey: string): void {
     this.segment = 'approved';
-    const same = this.journeyFilter === jKey && this.frFilter === frKey;
-    this.journeyFilter = same ? 'all' : jKey;
+    const same = this.journeyFilter === row.key && this.frFilter === frKey;
+    this.journeyFilter = same ? 'all' : row.key;
+    this.journeyFilterMembers = same ? new Set() : new Set(row.members ?? [row.label]);
     this.frFilter = same ? 'all' : frKey;
     this.pageIndex = 0;
     this.defaultSelection();
@@ -290,22 +420,18 @@ export class ProductFunnelComponent implements OnInit {
   }
   private journeyMatches(r: PRow): boolean {
     if (this.journeyFilter === 'all') return true;
-    return ((r.journey || '').trim() || 'Not set') === this.journeyFilter;
+    return this.journeyFilterMembers.has((r.journey || '').trim() || 'Not set');
   }
   private frMatches(r: PRow): boolean {
     if (this.frFilter === 'all') return true;
-    const isRepeat = this.completedByPid.has(r.profileid);
+    const isRepeat = !!r.completedProduct;
     return this.frFilter === 'repeat' ? isRepeat : !isRepeat;
   }
 
-  // Post-approval checks (Clearance / Venue / Contract / Queue stage) — shown only on the approved cohort.
-  productMinimum: number | null = null;                 // product.minimumrequiredamount, for the auto finance hint
-  financeClearedByPid = new Map<string, boolean>();     // manual finance sign-off, from the finance_clearance collection
-  venuePaidByPid = new Map<string, boolean>();          // manual venue-fee sign-off, from the venue_clearance collection
+  // Post-approval checks (Queue stage) — shown only on the approved cohort.
   queueStageByPid = new Map<string, string>();          // queue_token.currentstage per participant (queue events)
   queueStagesLoaded = false;
   private queueStagesLoading = false;
-  private currentUserId: string | null = null;          // for the venue_clearance audit field
 
   // owner email → row, and active-queue profile ids — used by bulk import categorisation
   private ownerByEmail = new Map<string, PRow>();
@@ -321,6 +447,8 @@ export class ProductFunnelComponent implements OnInit {
 
   // progress dialog state
   progress = { msg: '', value: 0, total: 0, eta: '' };
+  mapEligibility = {};
+  eticketEligibilitySubscription : Subscription | null = null
 
   constructor(
     public firestore: Firestore,
@@ -337,9 +465,14 @@ export class ProductFunnelComponent implements OnInit {
     this.mapEmailData = profile.mapEmailData;
     this.mapProduct = await this.guard.getProductMap();
     this.mapJourney = await this.guard.getJourneyMap();
-    const u: any = await this.guard.getUser();
-    this.currentUserId = u?.email ?? u?.uid ?? null;
     await this.loadData();
+    this.loadETicketEligibilty();
+  }
+
+  ngOnDestroy(): void {
+    if (this.eticketEligibilitySubscription) {
+      this.eticketEligibilitySubscription.unsubscribe();
+    }
   }
 
   get productName() { return this.mapProduct[this.arena?.['productref']?.id] ?? 'Product'; }
@@ -355,35 +488,17 @@ export class ProductFunnelComponent implements OnInit {
     this.queueStageByPid = new Map<string, string>();
     this.queueStagesLoaded = false;
     const arena = this.arena;
+    this.loadJourneyGroups();   // per-event journey grouping from localStorage (keyed by arenaevent id)
     try {
-      const [ownSnap, eprSnap, scanSnap, financeSnap, venueSnap, productSnap, completedSnap] = await Promise.all([
+      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
         getDocs(query(collection(this.firestore, 'participantsproduct'),
           where('productref', '==', arena['productref']), where('status', '==', null))),
         getDocs(query(collection(this.firestore, 'event participation request'),
           where('arenaeventid', '==', arena['docid']),
-          where('status', 'in', ['requested', 'approved', 'attended', 'unattended']))),
+          where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']))),
         getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref']))),
-        // Finance + venue clearance are isolated collections — tolerate them being absent / not yet ruled.
-        getDocs(query(collection(this.firestore, 'finance_clearance'),
-          where('arenaeventid', '==', arena['docid']))).catch(() => null),
-        getDocs(query(collection(this.firestore, 'venue_clearance'),
-          where('arenaeventid', '==', arena['docid']))).catch(() => null),
-        getDoc(arena['productref']).catch(() => null),
-        // Prior completed cycles of THIS product (both casings) — for first-timer vs repeat.
-        getDocs(query(collection(this.firestore, 'participantsproduct'),
-          where('productref', '==', arena['productref']), where('status', 'in', ['Completed', 'completed']))).catch(() => null)
+          where('eventref', '==', arena['eventref'])))
       ]);
-
-      // Product minimum (for the auto finance hint) + the two manual sign-off maps.
-      this.productMinimum = (productSnap && productSnap.exists()) ? Number(productSnap.data()?.['minimumrequiredamount'] ?? 0) : 0;
-      this.financeClearedByPid = new Map<string, boolean>();
-      financeSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.financeClearedByPid.set(x['profileid'], x['financeCleared'] === true); });
-      this.venuePaidByPid = new Map<string, boolean>();
-      venueSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.venuePaidByPid.set(x['profileid'], x['venuePaid'] === true); });
-      // Profiles who have completed this product before → they are "repeat" (else first-timer).
-      this.completedByPid = new Set<string>();
-      completedSnap?.docs.forEach(d => { const x = d.data(); if (x['profileid']) this.completedByPid.add(x['profileid']); });
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -395,6 +510,9 @@ export class ProductFunnelComponent implements OnInit {
       const approvedReq = new Map<string, string>();
       const attendedIds = new Set<string>();
       const unattendedIds = new Set<string>();
+      const revokedIds = new Set<string>();
+      const revokedByPid = new Map<string, string>();
+      const revokedDatePid = new Map<string, number>();
       const attendanceStateByPid = new Map<string, string>();
       const bucketByPid = new Map<string, string>();
       const reqDateByPid = new Map<string, number>();
@@ -407,10 +525,16 @@ export class ProductFunnelComponent implements OnInit {
         if (x['status'] == 'approved') { approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? ''); }
         else if (x['status'] == 'attended') { attendedIds.add(pid); approvedReq.set(pid, x['docid'] ?? d.id); attendanceStateByPid.set(pid, x['attendance_state'] ?? 'attended'); }
         else if (x['status'] == 'unattended') { unattendedIds.add(pid); attendanceStateByPid.set(pid, 'unattended'); }
+        else if (x['status'] == 'revoked') {
+          revokedIds.add(pid); attendanceStateByPid.set(pid, 'revoked');
+          if (x['revoked_by']) revokedByPid.set(pid, x['revoked_by']);
+          const rd = this.toMillis(x['revoked_date']); if (rd) revokedDatePid.set(pid, rd);
+        }
         else if (x['status'] == 'requested') { requestedData.set(pid, { ...x, docid: x['docid'] ?? d.id }); if (x['epc_bucket']) bucketByPid.set(pid, x['epc_bucket']); }
       });
-      // Unattended participants are terminal (product cancelled) — they never belong to any live bucket.
-      unattendedIds.forEach(p => requestedData.delete(p));
+      // NOTE: unattended/revoked are NO LONGER terminal — by operator directive they stay visible in every
+      // live bucket they still qualify for (owner / requested), in ADDITION to their own
+      // terminal segment. So we intentionally do NOT strip them from requestedData/cohort/owner sets here.
 
       // Eligibility buckets are precomputed by the rollup (epc_bucket on each requested doc).
       // When every requested participant carries one, use them and SKIP the queue_token scan;
@@ -429,31 +553,44 @@ export class ProductFunnelComponent implements OnInit {
       const scanned = new Set<string>();
       scanSnap.docs.forEach(d => { const x = d.data(); if (x['profileid']) scanned.add(x['profileid']); });
 
-      // Approved cohort = EPR approved/attended OR physically scanned (a scan means they were ticketed).
-      // Cohort members are not "requested", so attended is always a subset of approved.
-      const cohort = new Set<string>([...approvedReq.keys(), ...scanned]);
+      // Approved cohort = `event participation request` with status 'approved' or 'attended', ONLY.
+      // (operator directive) A physical e-ticket scan no longer confers membership of any bucket — it is
+      // kept solely as the `· scanned` badge on the row. Every 'attended' EPR doc also lands in
+      // approvedReq, so attended stays a subset of approved.
+      // Cohort members are not "requested" — they are removed from requestedData below.
+      const cohort = new Set<string>([...approvedReq.keys()]);
       cohort.forEach(p => requestedData.delete(p));
 
-      // Unattended are terminal — drop them from the live cohort/owner sets so they only show as "Unattended".
-      unattendedIds.forEach(p => { approvedReq.delete(p); attendedIds.delete(p); });
+      // (removed) previously unattended/revoked were dropped from cohort/owner sets so they only showed in
+      // their terminal segment. Per operator directive they now stay in every live bucket they qualify for.
+      // Consequence: a revoked person who still owns the product is in BOTH `potential` and `revoked`; the
+      // counts and the `overallRequested` aggregate are computed from de-duplicated rows below to avoid
+      // inflation.
 
-      const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds]);
+      const ids = new Set<string>([...owners.keys(), ...requestedData.keys(), ...cohort, ...unattendedIds, ...revokedIds]);
       const rows: PRow[] = [];
       ids.forEach(pid => {
         const prof = this.mapProfile[pid] ?? {};
         const isUnattended = unattendedIds.has(pid);
-        const isOwner = !isUnattended && owners.has(pid);
-        const isScanned = !isUnattended && scanned.has(pid);
-        const isAttended = !isUnattended && (attendedIds.has(pid) || isScanned);
-        const inCohort = !isUnattended && (approvedReq.has(pid) || isScanned);
-        const isRequested = !isUnattended && requestedData.has(pid);
+        const isRevoked = revokedIds.has(pid);
+        // Terminal states (unattended/revoked) are no longer gated out of the live buckets: a person keeps
+        // whatever live membership their source data still gives them AND retains their terminal flag.
+        const isOwner = owners.has(pid);
+        const isScanned = scanned.has(pid);
+        // Approval and attendance are both EPR-only (operator directive): a row is approved when its
+        // `event participation request` doc has status 'approved' or 'attended', and attended only when
+        // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
+        // `· scanned` badge and nothing else.
+        const isAttended = attendedIds.has(pid);
+        const inCohort = approvedReq.has(pid);
+        const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
-        const isEligible = isUnattended ? false : (bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue));
-        const isNoProduct = isUnattended ? false : (bucket ? (bucket === 'noProduct') : (isRequested && !isOwner));
-        const isInQueueReq = isUnattended ? false : (bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue));
-        const isNotRequested = !isUnattended && isOwner && !isRequested && !inCohort;
-        const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : (isUnattended ? 'Product cancelled' : ''));
+        const isEligible = bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue);
+        const isNoProduct = bucket ? (bucket === 'noProduct') : (isRequested && !isOwner);
+        const isInQueueReq = bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue);
+        const isNotRequested = isOwner && !isRequested && !inCohort;
+        const reason = isNoProduct ? 'No product' : (isInQueueReq ? 'In active queue' : (isUnattended ? 'Product cancelled' : (isRevoked ? 'Revoked — product cancelled' : '')));
         rows.push({
           profileid: pid,
           name: prof['name'] ?? 'Unknown',
@@ -463,10 +600,12 @@ export class ProductFunnelComponent implements OnInit {
           approvedRequestId: approvedReq.get(pid) ?? null,
           requestData: requestedData.get(pid) ?? null,
           isOwner, isRequested, isApproved: inCohort,
-          isEligible, isNoProduct, isInQueueReq, isNotRequested, isUnattended, inQueue,
+          isEligible, isNoProduct, isInQueueReq, isNotRequested, isUnattended, isRevoked, inQueue,
           attended: isAttended,
           scanned: isScanned,
           attendanceState: attendanceStateByPid.get(pid) ?? '',
+          revokedBy: (() => { const rb = revokedByPid.get(pid); return rb ? (this.mapProfile[rb]?.['name'] ?? rb) : ''; })(),
+          revokedDate: revokedDatePid.get(pid) ?? 0,
           reason,
           requestedDate: reqDateByPid.get(pid) ?? 0,
           journey: '', subEnd: 0, subActive: false, finance: '',
@@ -486,7 +625,9 @@ export class ProductFunnelComponent implements OnInit {
       this.counts = {
         potential: owners.size,
         requested: requestedData.size,
-        notRequested: [...owners.keys()].filter(o => !requestedData.has(o) && !cohort.has(o)).length,
+        // Row-derived (de-duplicated): a terminal person can now also be an owner, so counting owner keys
+        // directly would mis-classify them. `isNotRequested` already excludes requested/cohort membership.
+        notRequested: rows.filter(r => r.isNotRequested).length,
         eligible: rows.filter(r => r.isEligible).length,
         noProduct: rows.filter(r => r.isNoProduct).length,
         inQueue: rows.filter(r => r.isInQueueReq).length,
@@ -494,7 +635,11 @@ export class ProductFunnelComponent implements OnInit {
         attended: rows.filter(r => r.attended).length,
         noShow: rows.filter(r => r.attendanceState === 'no_show').length,
         unattended: rows.filter(r => r.isUnattended).length,
-        overallRequested: requestedData.size + cohort.size
+        revoked: rows.filter(r => r.isRevoked).length,
+        // De-duplicated union — a revoked person who still owns the product / has a live request sits in
+        // more than one source set, so a raw sum would double-count. Count unique rows matching the same
+        // predicate as the segment filter.
+        overallRequested: rows.filter(r => r.isRequested || r.isApproved || r.isUnattended || r.isRevoked).length
       };
 
       this.deliverySetList = await this.loadDeliverySets(arena);
@@ -538,6 +683,7 @@ export class ProductFunnelComponent implements OnInit {
   private async loadMeta(rows: PRow[]) {
     const pending = rows.filter(r => !r.metaLoaded);
     if (pending.length === 0) return;
+    const productId = this.arena?.['productref']?.id;   // for the consumedproducts "repeat" check
     const byId = new Map<string, PRow>();
     pending.forEach(r => byId.set(r.profileid, r));
     const ids = [...byId.keys()];
@@ -552,11 +698,20 @@ export class ProductFunnelComponent implements OnInit {
           const row = byId.get(pid);
           if (!row) return;
           const m = metaById[pid] ?? {};
-          row.journey = this.mapJourney[m['activejourney']] ?? '';
+          // Current journey depends on customer status: active → activejourney,
+          // non active → lastcompletedjourney, otherwise → lastsubscribedjourney.
+          const cs = (m['customerstatus'] ?? '').toString().trim().toLowerCase();
+          const journeyId = cs === 'active' ? m['activejourney']
+            : cs === 'non active' ? m['lastcompletedjourney']
+            : m['lastsubscribedjourney'];
+          row.journey = this.mapJourney[journeyId] ?? '';
           row.finance = m['financialstatus'] ?? '';
           row.purchaseValue = m['pp_totalpurchasevalue'] ?? null;
           row.paid = m['pp_totalpaid'] ?? null;
           row.customerStatus = m['customerstatus'] ?? '';
+          // "Repeat" = this product is already in the participant's consumedproducts (product ids).
+          row.completedProduct = !!productId && Array.isArray(m['consumedproducts'])
+            && m['consumedproducts'].some((p: any) => String(p) === String(productId));
           // Name + number come from participant metadata (profile_data value stays only as fallback).
           if (m['name']) row.name = m['name'];
           const metaNum = m['phonenumber'] ?? m['number'];
@@ -610,10 +765,39 @@ export class ProductFunnelComponent implements OnInit {
     if (this.financeFilter !== 'all' || this.customerFilter !== 'all' || this.journeyFilter !== 'all') this.loadMeta(this.segmentMembers());
   }
 
+  // functoin to load e-tickes eligibility 
+  async loadETicketEligibilty() {
+    const eventid = this.arena?.['eventref']?.id;
+    if(!eventid) return
+    const eligibilityCollRef = collection(this.firestore, "e-ticket eligibility");
+    const eligibilityQuery = query(eligibilityCollRef, where("eventid", "==", eventid));
+    this.eticketEligibilitySubscription = collectionData(eligibilityQuery).subscribe(eligibilitysnap => {
+      this.mapEligibility = {}
+      for (let i = 0; i < eligibilitysnap.length; i++) {
+        const element = eligibilitysnap[i];
+        this.mapEligibility[element['eventparticipationid']] = element
+      }
+    });
+  }
+
+  // Venue fee column — exempted / paid / not paid, from the e-ticket eligibility mirror
+  getVenueFeeStatus(row: any): string {
+    const eventParticipationId = row['approvedRequestId'];
+    const eligibility = this.mapEligibility[eventParticipationId];
+    if ([null, undefined].includes(eligibility)) {
+      return 'Not paid'
+    }
+    if (eligibility['exempted'] === true) {
+      return 'Exempted'
+    }
+    return eligibility['venue_fee_paid'] === true ? 'Paid' : 'Not paid'
+  }
+
   // ---- Segments ----
   setSegment(s: SegmentKey) {
     this.segment = s;
     this.journeyFilter = 'all';   // the journey filter is scoped to the Approved-by-journey card; clear it on navigation
+    this.journeyFilterMembers = new Set();
     this.frFilter = 'all';        // same for the first-timer/repeat filter
     this.pageIndex = 0;
     this.defaultSelection();
@@ -621,16 +805,18 @@ export class ProductFunnelComponent implements OnInit {
     if (this.showApprovalChecks) this.ensureQueueStages();
   }
 
-  // ---- Post-approval checks (Clearance / Venue / Contract / Queue stage) ----
+  // ---- Post-approval checks (Queue stage) ----
   get showApprovalChecks(): boolean {
     return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow';
   }
-  get colSpan(): number {
-    return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 4 : 0);
+
+  // ---- Post-approval checks ----
+  get showAfterApprovalChecks(): boolean {
+    return this.segment === 'approved' || this.segment === 'attended' || this.segment === 'noShow' || this.segment === 'unattended' || this.segment === 'revoked' || this.segment === 'overallRequested';
   }
-  // Auto hint beside the Finance checkbox: has the participant paid at least the product minimum?
-  meetsMinPayment(r: PRow): boolean {
-    return (+(r.paid || 0)) >= (this.productMinimum ?? 0);
+
+  get colSpan(): number {
+    return (this.showSelect ? 1 : 0) + 8 + (this.showApprovalChecks ? 1 : 0);
   }
   // Lazily load queue_token.currentstage for the whole event once (queue events only).
   async ensureQueueStages() {
@@ -647,40 +833,6 @@ export class ProductFunnelComponent implements OnInit {
       this.queueStagesLoading = false;
     }
   }
-  // Manual AR toggle — persisted to the isolated venue_clearance collection (optimistic, reverts on failure).
-  async toggleVenuePaid(r: PRow, checked: boolean) {
-    const prev = this.venuePaidByPid.get(r.profileid) === true;
-    this.venuePaidByPid.set(r.profileid, checked);
-    try {
-      const id = `${this.arena['docid']}_${r.profileid}`;
-      await setDoc(doc(this.firestore, 'venue_clearance', id), {
-        arenaeventid: this.arena['docid'], profileid: r.profileid,
-        venuePaid: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
-      }, { merge: true });
-    } catch (e) {
-      console.log('venue clearance write failed', e);
-      this.venuePaidByPid.set(r.profileid, prev);
-      this.snackbar.open('Could not save venue status', 'OK', { duration: 4000 });
-    }
-  }
-
-  // Manual finance sign-off — persisted to the isolated finance_clearance collection (optimistic, reverts on failure).
-  async toggleFinanceCleared(r: PRow, checked: boolean) {
-    const prev = this.financeClearedByPid.get(r.profileid) === true;
-    this.financeClearedByPid.set(r.profileid, checked);
-    try {
-      const id = `${this.arena['docid']}_${r.profileid}`;
-      await setDoc(doc(this.firestore, 'finance_clearance', id), {
-        arenaeventid: this.arena['docid'], profileid: r.profileid,
-        financeCleared: checked, updatedAt: serverTimestamp(), updatedBy: this.currentUserId
-      }, { merge: true });
-    } catch (e) {
-      console.log('finance clearance write failed', e);
-      this.financeClearedByPid.set(r.profileid, prev);
-      this.snackbar.open('Could not save finance status', 'OK', { duration: 4000 });
-    }
-  }
-
   private inSegment(r: PRow): boolean { return this.matchesSegment(r, this.segment); }
 
   private matchesSegment(r: PRow, key: SegmentKey): boolean {
@@ -695,7 +847,8 @@ export class ProductFunnelComponent implements OnInit {
       case 'attended': return r.attended;
       case 'noShow': return r.attendanceState === 'no_show';
       case 'unattended': return r.isUnattended;
-      case 'overallRequested': return r.isRequested || r.isApproved;
+      case 'revoked': return r.isRevoked;
+      case 'overallRequested': return r.isRequested || r.isApproved || r.isUnattended || r.isRevoked;
     }
     return false;
   }
@@ -765,6 +918,8 @@ export class ProductFunnelComponent implements OnInit {
   get readyCount() { return this.selection.selected.filter(r => this.isApprovable(r)).length; }
   get selectedToMark() { return this.selection.selected.filter(r => r.isApproved && !r.attended); }
   get selectedToUnattend() { return this.selection.selected.filter(r => r.isApproved); }
+  // Requested (not yet approved) rows that have an actual request doc to revoke.
+  get selectedToRevokeRequested() { return this.selection.selected.filter(r => !!r.requestData?.['docid'] && !r.isApproved); }
 
   // ---- Display helpers ----
   formatMonthYear(ms: number): string {
@@ -918,8 +1073,7 @@ export class ProductFunnelComponent implements OnInit {
       const batch = writeBatch(this.firestore);
       targets.forEach((r, i) => {
         batch.update(refList[i], {
-          status: 'attended', attendance_state: 'attended',
-          attendance_source: 'manual', attendance_marked_at: serverTimestamp()
+          status: 'attended'
         });
         batch.set(doc(collection(this.firestore, 'events_profiles')), {
           event_ref: this.arena['eventref'],
@@ -971,8 +1125,7 @@ export class ProductFunnelComponent implements OnInit {
       const batch = writeBatch(this.firestore);
       const reqRefs = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
       targets.forEach((r, i) => {
-        batch.update(reqRefs[i], { status: 'unattended', attendance_state: 'unattended', attendance_source: 'manual', attendance_marked_at: serverTimestamp() });
-        if (r.participantproductid) batch.update(doc(this.firestore, 'participantsproduct', r.participantproductid), { status: 'cancelled' });
+        batch.update(reqRefs[i], { status: 'unattended' });
       });
       // Delete the events_profiles record for each (profile + event).
       for (const r of targets) {
@@ -981,12 +1134,18 @@ export class ProductFunnelComponent implements OnInit {
           where('event_ref', '==', this.arena['eventref'])));
         epSnap.docs.forEach(d => batch.delete(d.ref));
       }
-      // Null the deliverables that point at these requests.
+      // Cancel the product from the deliverable (matches event-participation-approve), then null the deliverables.
       for (let i = 0; i < reqRefs.length; i += 10) {
         const sub = reqRefs.slice(i, i + 10);
         const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'),
           where('fileref', 'array-contains-any', sub)));
-        delSnap.docs.forEach(d => batch.update(d.ref, { status: null }));
+        delSnap.docs.forEach(d => {
+          const dd = d.data();
+          if (dd['participantproductid']) {
+            batch.update(doc(this.firestore, 'participantsproduct', dd['participantproductid']), { status: 'cancelled' });
+          }
+          batch.update(d.ref, { status: null });
+        });
       }
       await batch.commit();
       this.snackbar.open(`Marked ${targets.length} not attended`, 'OK', { duration: 4000 });
@@ -995,6 +1154,133 @@ export class ProductFunnelComponent implements OnInit {
     } catch (e) {
       console.log(e);
       this.snackbar.open('Could not mark not attended', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
+  }
+
+  // ---- Revoke (destructive): status -> 'revoked' AND cancel the product, then re-assign a product ----
+  // Same writes as markUnattended EXCEPT the request status is 'revoked' (not 'unattended'). On success we
+  // auto-open the shared bulk-add-products dialog, pre-loaded with the revoked profiles + this event's product,
+  // so an admin can create a fresh product for them in one flow.
+  get selectedToRevoke() { return this.selection.selected.filter(r => r.isApproved); }
+
+  async markRevoked(rows: PRow[]) {
+    const targets = rows.filter(r => r.approvedRequestId);
+    if (!targets.length) return;
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '440px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Revoke participation',
+        body: `Revoke ${targets.length} participant(s). Their current product will be cancelled, then you can assign a new one.`,
+        warn: 'This cancels the product, removes their event profile, and clears deliverables. It cannot be undone.',
+        confirm: `Revoke ${targets.length}`
+      }
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Revoking…', value: 0, total: targets.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    let committed = false;
+    try {
+      const batch = writeBatch(this.firestore);
+      const reqRefs = targets.map(r => doc(this.firestore, 'event participation request', r.approvedRequestId!));
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      targets.forEach((r, i) => {
+        batch.update(reqRefs[i], { status: 'revoked', revoked_by: revokedBy, revoked_date: serverTimestamp() });
+      });
+      // Delete the events_profiles record for each (profile + event).
+      for (const r of targets) {
+        const epSnap = await getDocs(query(collection(this.firestore, 'events_profiles'),
+          where('profile_ref', '==', doc(this.firestore, 'profile_data', r.profileid)),
+          where('event_ref', '==', this.arena['eventref'])));
+        epSnap.docs.forEach(d => batch.delete(d.ref));
+      }
+      // Cancel the product from the deliverable, then null the deliverables.
+      for (let i = 0; i < reqRefs.length; i += 10) {
+        const sub = reqRefs.slice(i, i + 10);
+        const delSnap = await getDocs(query(collection(this.firestore, 'deliverables'),
+          where('fileref', 'array-contains-any', sub)));
+        delSnap.docs.forEach(d => {
+          const dd = d.data();
+          if (dd['participantproductid']) {
+            batch.update(doc(this.firestore, 'participantsproduct', dd['participantproductid']), { status: 'cancelled' });
+          }
+          batch.update(d.ref, { status: null });
+        });
+      }
+      await batch.commit();
+      committed = true;
+      this.snackbar.open(`Revoked ${targets.length}`, 'OK', { duration: 4000 });
+      this.selection.clear();
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not revoke', 'OK', { duration: 4000 });
+    } finally {
+      pref.close();
+    }
+    if (!committed) return;
+
+    // Auto-open the bulk-add dialog with the revoked profiles + this event's product to create a new product.
+    const participants = targets.map(r => ({ profileid: r.profileid, name: r.name, email: r.email }));
+    console.log('REVOKE→bulk-add', {
+      productrefId: this.arena?.['productref']?.id,
+      productrefResolvesToName: this.mapProduct[this.arena?.['productref']?.id],
+      participants
+    });
+    this.dialog.open(BulkAddProductsComponent, {
+      data: { participants, productrefId: this.arena?.['productref']?.id },
+      width: '70vw', disableClose: true, panelClass: 'sx-dialog-surface'
+    }).afterClosed().subscribe(async () => {
+      const seq = this.selectedDeliverySet, variation = this.selectedQueueVariation;
+      await this.loadData();
+      this.selectedDeliverySet = seq;
+      this.selectedQueueVariation = variation;
+    });
+  }
+
+  // Single per-row entry point: approved rows take the heavy path (cancel product etc.),
+  // requested rows take the lightweight status-only path.
+  revoke(row: PRow) {
+    if (row.isApproved) this.markRevoked([row]);
+    else this.markRevokedRequested([row]);
+  }
+
+  // ---- Revoke a still-REQUESTED participant (lightweight): status -> 'revoked' only. ----
+  // Requested people have no initiated product / event profile / deliverables yet, so unlike
+  // markRevoked() this ONLY flips the request status and records who/when — nothing else is touched.
+  async markRevokedRequested(rows: PRow[]) {
+    const targets = rows.filter(r => r.requestData?.['docid'] && !r.isApproved);
+    if (!targets.length) return;
+    const ref = this.dialog.open(this.confirmTpl, {
+      width: '440px', autoFocus: false, panelClass: 'sx-dialog',
+      data: {
+        title: 'Revoke requested participation',
+        body: `Revoke ${targets.length} requested participant(s). Their request will be cancelled.`,
+        warn: 'This cancels the participation request. It cannot be undone.',
+        confirm: `Revoke ${targets.length}`
+      }
+    });
+    const ok = await ref.afterClosed().toPromise();
+    if (!ok) return;
+
+    this.progress = { msg: 'Revoking…', value: 0, total: targets.length, eta: '' };
+    const pref = this.dialog.open(this.progressTpl, { width: '380px', disableClose: true, autoFocus: false, panelClass: 'sx-dialog' });
+    try {
+      const batch = writeBatch(this.firestore);
+      const revokedBy = (this.guard.loggedinProfile as any)?.['profileid'] ?? null;
+      for (const r of targets) {
+        batch.update(doc(this.firestore, 'event participation request', r.requestData['docid']),
+          { status: 'revoked', revoked_by: revokedBy, revoked_date: serverTimestamp() });
+      }
+      await batch.commit();
+      this.snackbar.open(`Revoked ${targets.length}`, 'OK', { duration: 4000 });
+      this.selection.clear();
+      await this.loadData();
+    } catch (e) {
+      console.log(e);
+      this.snackbar.open('Could not revoke', 'OK', { duration: 4000 });
     } finally {
       pref.close();
     }
@@ -1291,7 +1577,8 @@ export class ProductFunnelComponent implements OnInit {
           'Customer status': r.customerStatus || '',
           Eligibility: this.eligibilityLabel(r),
           Reason: r.reason || '',
-          Attended: r.attended ? 'Yes' : 'No'
+          Attended: r.attended ? 'Yes' : 'No',
+          'Venue Fee' : this.getVenueFeeStatus(r)
         };
       });
       const ws = XLSX.utils.json_to_sheet(data, { cellDates: true, dateNF: 'yyyy-mm-dd' });

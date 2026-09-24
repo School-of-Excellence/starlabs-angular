@@ -1,0 +1,683 @@
+<!-- ═══════════════ shared inline icons ═══════════════ -->
+<ng-template #icChevDown><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></ng-template>
+<ng-template #icChevRight><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></ng-template>
+<ng-template #icTrash><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></ng-template>
+<ng-template #icPlus><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></ng-template>
+<ng-template #icUpload><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg></ng-template>
+<ng-template #icCal><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg></ng-template>
+<ng-template #icClock><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></ng-template>
+<ng-template #icX><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></ng-template>
+<ng-template #icGrip><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></ng-template>
+<ng-template #icImage><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg></ng-template>
+<ng-template #icSearch><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg></ng-template>
+<ng-template #icAlert><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg></ng-template>
+<ng-template #icCheck><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></ng-template>
+<ng-template #icVideo><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"></rect><path d="M17 10l4-2v8l-4-2"></path></svg></ng-template>
+
+<!-- ═══════════════ icon picker (used by icon sections and block items) ═══════════════ -->
+<ng-template #iconPicker let-control="control" let-pid="pid" let-wide="wide">
+  <div class="pop-anchor" [class.w220]="wide" data-pop>
+    <button type="button" class="input pick" (click)="togglePopover(pid)">
+      <span class="thumb xs">
+        <img *ngIf="control?.value" [src]="control.value" alt="">
+        <ng-container *ngIf="!control?.value" [ngTemplateOutlet]="icImage"></ng-container>
+      </span>
+      <span class="txt" [class.ph]="!control?.value">{{ control?.value ? iconName(control.value) : 'Choose icon' }}</span>
+      <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+    </button>
+    <div class="pop" *ngIf="openPopover === pid">
+      <div class="input sm">
+        <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+        <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search icons…" autofocus>
+      </div>
+      <div class="grid-icons" *ngIf="filteredIcons.length; else noIcons">
+        <button type="button" class="ic" *ngFor="let ic of filteredIcons" [class.sel]="ic.imageUrl === control?.value"
+          [title]="ic.description" (click)="pickIcon(control, ic.imageUrl)">
+          <img [src]="ic.imageUrl" alt="">
+        </button>
+      </div>
+      <ng-template #noIcons><div class="help pad">No icons match.</div></ng-template>
+      <div class="hrow between">
+        <span class="help">Selected: {{ control?.value ? iconName(control.value) : 'none' }}</span>
+        <button type="button" class="link" (click)="openImageUpload()">Manage icons ↗</button>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<div class="page">
+  <div class="loading" *ngIf="loading"><span class="spin dark"></span></div>
+
+  <ng-container *ngIf="!loading">
+
+    <!-- ═══════════════ header ═══════════════ -->
+    <div class="hdr">
+      <div class="hdr-left">
+        <div class="eyebrow">Workshop configuration</div>
+        <div class="hrow" style="gap:10px;align-items:baseline;flex-wrap:wrap;">
+          <h1 class="title">{{ loadError ? 'Could not load this workshop' : notFound ? 'Workshop not found' : title }}</h1>
+          <span class="type-badge" *ngIf="!loadError && !notFound" [class.missing]="!workshoptypeCtrl.value">{{ workshoptypeCtrl.value ? workshopTypeLabel(workshoptypeCtrl.value) : 'No workshop type yet' }}</span>
+        </div>
+        <div class="sub" *ngIf="!notFound"><span>{{ tabs[activeTab] }}</span><span class="pill pill-warn" *ngIf="isNew" style="margin-left:10px;">New workshop · not saved yet</span></div>
+      </div>
+      <div class="hrow" style="gap:8px;">
+        <button type="button" class="btn" (click)="backToWorkshops()">
+          <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+          <span>Workshops</span>
+        </button>
+        <button type="button" class="btn" (click)="openImageUpload()" *ngIf="!notFound">
+          <ng-container [ngTemplateOutlet]="icImage"></ng-container>
+          <span>Icons &amp; images</span>
+          <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M20 14v6H4V4h6"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════ tabs ═══════════════ -->
+    <div class="tabs" *ngIf="!notFound && !loadError">
+      <button type="button" *ngFor="let tab of tabs; let i = index" class="tab" [class.on]="activeTab === i" [disabled]="saving || !!challengesCmp?.saving || !!settingsCmp?.saving" (click)="selectTab(i)">{{ tab }}</button>
+    </div>
+
+    <div class="card placeholder" *ngIf="loadError">
+      <div class="ph-title">Could not load this workshop</div>
+      <p class="ph-text">The configuration document could not be read. Check your connection and reload the page before editing.</p>
+    </div>
+
+    <!-- ═══════════════ Challenges tab (child component, kept mounted) ═══════════════ -->
+    <app-workshop-challengesv2 *ngIf="!notFound && !loadError" [hidden]="activeTab !== 1"
+      [workshopId]="workshopId" [workshopData]="workshopData" [isNew]="isNew" [iconData]="iconData" [thumbnailData]="thumbnailData"
+      [documentsize]="documentsize" [docPercent]="docPercent"></app-workshop-challengesv2>
+
+    <!-- ═══════════════ Settings tab (child component, kept mounted) ═══════════════ -->
+    <app-workshop-settingsv2 *ngIf="!notFound && !loadError" [hidden]="activeTab !== 2"
+      [workshopId]="workshopId" [workshopData]="workshopData" [isNew]="isNew"
+      [documentsize]="documentsize" [docPercent]="docPercent"></app-workshop-settingsv2>
+
+    <!-- ═══════════════ Enrollment page ═══════════════ -->
+    <div class="layout" *ngIf="!notFound && !loadError" [hidden]="activeTab !== 0">
+
+      <!-- section rail -->
+      <aside class="card rail">
+        <div class="rail-label">On this page</div>
+        <ng-container *ngFor="let g of groups">
+          <div class="rail-group">{{ g }}</div>
+          <button type="button" class="rail-item" *ngFor="let s of sectionsIn(g)"
+            [class.on]="activeSection === s.id" [class.attn]="sectionNeedsAttention(s)" (click)="jumpTo(s.id)">
+            <span class="dot" [class.ok]="sectionHasContent(s) && !sectionNeedsAttention(s)" [class.attn]="sectionNeedsAttention(s)"></span>
+            <span class="n">{{ s.title }}</span>
+            <span class="c" *ngIf="sectionCount(s)">{{ sectionCount(s) }}</span>
+          </button>
+        </ng-container>
+        <div class="rail-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="collapseAll()">Collapse all</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="expandAll()">Expand all</button>
+        </div>
+        <div class="rail-meter">
+          <div class="label"><span class="meter-label">Document size</span><span class="counter">{{ documentsize }}</span></div>
+          <div class="meter"><div [style.width.%]="docPercent"></div></div>
+        </div>
+      </aside>
+
+      <!-- main column -->
+      <main class="main">
+        <form [formGroup]="detailPageForm" (ngSubmit)="saveDetailPage()" class="main-form" novalidate>
+          <!-- icon + text section card (Sneak peak, Know info, Overview) -->
+          <ng-template #iconSectionCard let-sec="sec">
+          <section class="card" [id]="'sec-' + sec.key" [formArrayName]="sec.key">
+            <div class="sec-head" [class.closed]="isCollapsed(sec.key)" (click)="toggleSection(sec.key)">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed(sec.key) ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">{{ sec.title }}</h2>
+              <span class="count" [class.zero]="!getFormArray(sec.key).length" [class.full]="getFormArray(sec.key).length >= sec.maxItems">{{ getFormArray(sec.key).length }} / {{ sec.maxItems }}</span>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ isCollapsed(sec.key) ? summary(sec.key) : (getFormArray(sec.key).length ? 'Icon + one line, up to ' + sec.maxLength + ' characters' : 'No items yet') }}</span>
+              <button type="button" class="btn btn-sm" [disabled]="getFormArray(sec.key).length >= sec.maxItems"
+                (click)="$event.stopPropagation(); collapsed.delete(sec.key); addIconWithText(sec.key, sec.maxItems)">
+                <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add item</span>
+              </button>
+            </div>
+            <div class="sec-body gap10" *ngIf="!isCollapsed(sec.key) && getFormArray(sec.key).length">
+              <div class="list-row" *ngFor="let c of getFormArray(sec.key).controls; let i = index" [formGroupName]="i">
+                <ng-container [ngTemplateOutlet]="iconPicker" [ngTemplateOutletContext]="{ control: c.get('question'), pid: 'ic:' + sec.key + ':' + i, wide: true }"></ng-container>
+                <div class="input">
+                  <input class="txt" formControlName="answer" [maxlength]="sec.maxLength" [placeholder]="sec.placeholder">
+                  <span class="counter">{{ answerLen(sec.key, i) }} / {{ sec.maxLength }}</span>
+                </div>
+                <button type="button" class="icon-btn" (click)="removeIconWithText(sec.key, i)" title="Remove"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+              </div>
+              <div class="help warn" *ngIf="getFormArray(sec.key).length >= sec.maxItems">Maximum of {{ sec.maxItems }} items reached. Remove one to add another.</div>
+            </div>
+          </section>
+          </ng-template>
+
+
+          <!-- 0. Workshop type — the main field; drives everything else in workshop creation -->
+          <section class="card type-card" id="sec-workshoptype" [class.attn]="workshoptypeCtrl.invalid && (workshoptypeCtrl.touched || submitAttempted || !isNew)">
+            <div class="type-row">
+              <div class="type-text">
+                <div class="eyebrow">Workshop type</div>
+                <div class="type-title">{{ workshoptypeCtrl.value ? workshopTypeLabel(workshoptypeCtrl.value) : 'Choose the workshop type first' }}</div>
+                <div class="help">Required. This decides how the workshop is created and delivered, and is stored on the workshop itself (not inside the enrollment page).</div>
+                <div class="err" *ngIf="workshoptypeCtrl.invalid && (workshoptypeCtrl.touched || submitAttempted || !isNew)"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Workshop type is required before the Enrollment page can be saved</div>
+              </div>
+              <div class="type-pick pop-anchor" data-pop>
+                <div class="seg type-seg">
+                  <button type="button" *ngFor="let t of workshopTypes" [class.on]="workshoptypeCtrl.value === t.value" (click)="setWorkshopType(t.value)">{{ t.label }}</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 1. Workshop information -->
+          <section class="card" id="sec-info">
+            <div class="sec-head" [class.closed]="isCollapsed('info')" (click)="toggleSection('info')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('info') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Workshop information</h2>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ headHint('info', 'Identity and media') }}</span>
+            </div>
+            <div class="sec-body" *ngIf="!isCollapsed('info')">
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Workshop title</span><span class="counter">{{ len('title') }} / 100</span></div>
+                  <div class="input"><input class="txt" formControlName="title" maxlength="100" placeholder="Enter workshop title"></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Short description</span><span class="counter">{{ len('shortdescription') }} / 100</span></div>
+                  <div class="input"><input class="txt" formControlName="shortdescription" maxlength="100" placeholder="Enter short description"></div>
+                </div>
+              </div>
+              <div class="field">
+                <div class="label"><span>Why this workshop?</span><span class="counter">{{ len('whyworkshop') }} / 100</span></div>
+                <div class="input"><input class="txt" formControlName="whyworkshop" maxlength="100" placeholder="Why Workshop?"></div>
+              </div>
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Thumbnail image</span></div>
+                  <div class="hrow">
+                    <span class="prev-img">
+                      <img *ngIf="ctrl('thumbnailImage').value" [src]="ctrl('thumbnailImage').value" alt="">
+                      <ng-container *ngIf="!ctrl('thumbnailImage').value" [ngTemplateOutlet]="icImage"></ng-container>
+                    </span>
+                    <div class="input grow">
+                      <input class="txt mono" formControlName="thumbnailImage" placeholder="Paste an image URL or upload">
+                      <button type="button" class="suffix" (click)="uploadThumbnail()" title="Upload image"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
+                    </div>
+                  </div>
+                  <div class="help">Paste a URL or upload. Uploads go to workshop/thumbnail/.</div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Title video</span></div>
+                  <div class="input">
+                    <input class="txt mono" formControlName="titleVideo" placeholder="Paste a video URL or upload">
+                    <button type="button" class="suffix" (click)="uploadVideo()" title="Upload video"><ng-container [ngTemplateOutlet]="icUpload"></ng-container></button>
+                  </div>
+                  <div class="help">Uploads go to workshop/video/.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Pricing & CTA -->
+          <section class="card" id="sec-pricing">
+            <div class="sec-head" [class.closed]="isCollapsed('pricing')" (click)="toggleSection('pricing')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('pricing') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Pricing &amp; CTA</h2>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ headHint('pricing', 'What the enroll button and price line say') }}</span>
+            </div>
+            <div class="sec-body" *ngIf="!isCollapsed('pricing')">
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Duration label</span><span class="counter">{{ len('day') }} / 100</span></div>
+                  <div class="input"><input class="txt" formControlName="day" maxlength="100" placeholder="E.g., 14 Day Workshop"></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Enroll button text</span><span class="counter">{{ len('enrollbuttonname') }} / 20</span></div>
+                  <div class="input"><input class="txt" formControlName="enrollbuttonname" maxlength="20" placeholder="Button name"></div>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Price, struck through</span><span class="counter">{{ len('pricestriked') }} / 50</span></div>
+                  <div class="input"><input class="txt" formControlName="pricestriked" maxlength="50" placeholder="Price striked"></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Price, shown</span><span class="counter">{{ len('price') }} / 50</span></div>
+                  <div class="input"><input class="txt" formControlName="price" maxlength="50" placeholder="Price"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3. Schedule -->
+          <section class="card" id="sec-schedule">
+            <div class="sec-head" [class.closed]="isCollapsed('schedule')" (click)="toggleSection('schedule')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('schedule') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Schedule</h2>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ headHint('schedule', 'Each date + time pair is saved as one timestamp') }}</span>
+            </div>
+            <div class="sec-body" *ngIf="!isCollapsed('schedule')">
+              <div class="grid2 windows">
+                <div class="field">
+                  <div class="label"><span>Registration window</span><span class="counter">{{ spanText('registrationStartDate', 'registrationStartTime', 'registrationEndDate', 'registrationEndTime') }}</span></div>
+                  <div class="win">
+                    <div class="input date">
+                      <button type="button" class="prefix" (click)="rsd.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                      <input class="txt" [matDatepicker]="rsd" formControlName="registrationStartDate" placeholder="Start date">
+                      <mat-datepicker #rsd></mat-datepicker>
+                    </div>
+                    <div class="input time">
+                      <button type="button" class="prefix" (click)="rst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                      <input class="txt" [matTimepicker]="rst" formControlName="registrationStartTime" placeholder="Time">
+                      <mat-timepicker #rst></mat-timepicker>
+                    </div>
+                    <span class="to">to</span>
+                    <div class="input date">
+                      <button type="button" class="prefix" (click)="red.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                      <input class="txt" [matDatepicker]="red" formControlName="registrationEndDate" placeholder="End date">
+                      <mat-datepicker #red></mat-datepicker>
+                    </div>
+                    <div class="input time">
+                      <button type="button" class="prefix" (click)="ret.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                      <input class="txt" [matTimepicker]="ret" formControlName="registrationEndTime" placeholder="Time">
+                      <mat-timepicker #ret></mat-timepicker>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Workshop window</span><span class="counter">{{ spanText('workshopStartDate', 'workshopStartTime', 'workshopEndDate', 'workshopEndTime') }}</span></div>
+                  <div class="win">
+                    <div class="input date">
+                      <button type="button" class="prefix" (click)="wsd.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                      <input class="txt" [matDatepicker]="wsd" formControlName="workshopStartDate" placeholder="Start date">
+                      <mat-datepicker #wsd></mat-datepicker>
+                    </div>
+                    <div class="input time">
+                      <button type="button" class="prefix" (click)="wst.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                      <input class="txt" [matTimepicker]="wst" formControlName="workshopStartTime" placeholder="Time">
+                      <mat-timepicker #wst></mat-timepicker>
+                    </div>
+                    <span class="to">to</span>
+                    <div class="input date">
+                      <button type="button" class="prefix" (click)="wed.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                      <input class="txt" [matDatepicker]="wed" formControlName="workshopEndDate" placeholder="End date">
+                      <mat-datepicker #wed></mat-datepicker>
+                    </div>
+                    <div class="input time">
+                      <button type="button" class="prefix" (click)="wet.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                      <input class="txt" [matTimepicker]="wet" formControlName="workshopEndTime" placeholder="Time">
+                      <mat-timepicker #wet></mat-timepicker>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. Page blocks -->
+          <section class="card" id="sec-blocks" formArrayName="dynamicenrollment">
+            <div class="sec-head" [class.closed]="isCollapsed('blocks')" (click)="toggleSection('blocks')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('blocks') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Page blocks</h2>
+              <span class="count" [class.zero]="!dynamicBlocks.length">{{ dynamicBlocks.length }} {{ dynamicBlocks.length === 1 ? 'block' : 'blocks' }}</span>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ isCollapsed('blocks') ? summary('blocks') : (dynamicBlocks.length ? 'Drag to set the order shown on the enrollment page' : 'No blocks yet') }}</span>
+              <button type="button" class="btn btn-sm" (click)="$event.stopPropagation(); collapsed.delete('blocks'); addDynBlock()">
+                <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add block</span>
+              </button>
+            </div>
+            <div class="sec-body gap10" *ngIf="!isCollapsed('blocks') && dynamicBlocks.length" cdkDropList (cdkDropListDropped)="drop($event, 'dynamicenrollment')">
+              <div class="block" *ngFor="let block of dynamicBlocks.controls; let bi = index; trackBy: trackDynBlock" [formGroupName]="bi" cdkDrag
+                [class.open]="!isBlockCollapsed(block)">
+                <div class="drop-line" *cdkDragPlaceholder></div>
+                <div class="block-head" (click)="toggleBlockCollapsed(block)">
+                  <span class="drag" cdkDragHandle (click)="$event.stopPropagation()"><ng-container [ngTemplateOutlet]="icGrip"></ng-container></span>
+                  <span class="chev"><ng-container [ngTemplateOutlet]="isBlockCollapsed(block) ? icChevRight : icChevDown"></ng-container></span>
+                  <span class="badge" [class.badge-icon]="block.get('type')?.value === 'icontext'" [class.badge-rich]="block.get('type')?.value !== 'icontext'">
+                    {{ block.get('type')?.value === 'icontext' ? 'Icon text' : 'Rich text' }}
+                  </span>
+                  <span class="name">{{ blockSummary(block) }}</span>
+                  <button type="button" class="icon-btn" (click)="$event.stopPropagation(); removeDynBlock(bi)" title="Remove block"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+                </div>
+                <div class="block-body" *ngIf="!isBlockCollapsed(block)">
+                  <div class="hrow between wrap">
+                    <div class="field">
+                      <div class="label"><span>Block type</span></div>
+                      <div class="seg sm">
+                        <button type="button" [class.on]="block.get('type')?.value === 'richtext'" (click)="setDynType(bi, 'richtext')">Rich text</button>
+                        <button type="button" [class.on]="block.get('type')?.value === 'icontext'" (click)="setDynType(bi, 'icontext')">Icon text</button>
+                      </div>
+                    </div>
+                    <div class="hrow" style="gap:10px;">
+                      <span class="toggle-label">Full border</span>
+                      <button type="button" class="toggle" [class.on]="block.get('border')?.value" (click)="toggleControl(block.get('border'))" aria-label="Full border"></button>
+                    </div>
+                  </div>
+                  <div class="grid2">
+                    <div class="field">
+                      <div class="label"><span>Title 1</span></div>
+                      <div class="rt">
+                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title1'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
+                        <ngx-editor class="rt-sm" [editor]="getDynEditor(deKey(block, 'title1'))" formControlName="title1" [outputFormat]="'html'" placeholder="Title 1"></ngx-editor>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <div class="label"><span>Title 2</span></div>
+                      <div class="rt">
+                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'title2'))" [toolbar]="toolbarTitle"></ngx-editor-menu>
+                        <ngx-editor class="rt-sm" [editor]="getDynEditor(deKey(block, 'title2'))" formControlName="title2" [outputFormat]="'html'" placeholder="Title 2"></ngx-editor>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ng-container *ngIf="block.get('type')?.value === 'richtext'">
+                    <div class="field">
+                      <div class="label"><span>Content</span></div>
+                      <div class="rt">
+                        <ngx-editor-menu [editor]="getDynEditor(deKey(block, 'content'))" [toolbar]="toolbarFull"></ngx-editor-menu>
+                        <ngx-editor [editor]="getDynEditor(deKey(block, 'content'))" formControlName="content" [outputFormat]="'html'" placeholder="Content"></ngx-editor>
+                      </div>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngIf="block.get('type')?.value === 'icontext'">
+                    <div class="label"><span>Items</span><span class="counter">{{ dynIcons(bi).length }} {{ dynIcons(bi).length === 1 ? 'item' : 'items' }} · at least 1</span></div>
+                    <div formArrayName="icontext" class="items">
+                      <div class="item" *ngFor="let item of dynIcons(bi).controls; let ii = index; trackBy: trackDynIcon" [formGroupName]="ii">
+                        <div class="hrow between">
+                          <span class="item-n">Item {{ ii + 1 }}</span>
+                          <button type="button" class="icon-btn xs" (click)="removeDynIcon(bi, ii)" title="Remove item" [disabled]="dynIcons(bi).length <= 1"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                        </div>
+                        <div class="item-grid">
+                          <div class="field">
+                            <div class="label"><span>Icon</span></div>
+                            <ng-container [ngTemplateOutlet]="iconPicker" [ngTemplateOutletContext]="{ control: item.get('value1'), pid: 'blk:' + deIconKey(block, item, 'value1'), wide: false }"></ng-container>
+                          </div>
+                          <div class="field">
+                            <div class="label"><span>Text</span></div>
+                            <div class="rt">
+                              <ngx-editor-menu [editor]="getDynEditor(deIconKey(block, item, 'value2'))" [toolbar]="toolbarItem"></ngx-editor-menu>
+                              <ngx-editor class="rt-sm" [editor]="getDynEditor(deIconKey(block, item, 'value2'))" formControlName="value2" [outputFormat]="'html'" placeholder="Text"></ngx-editor>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn-sm self-start" (click)="addDynIcon(bi)"><ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add item</span></button>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 5. Description & Join us -->
+          <section class="card" id="sec-description">
+            <div class="sec-head" [class.closed]="isCollapsed('description')" (click)="toggleSection('description')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('description') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Description &amp; Join us</h2>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ headHint('description', 'Rich text shown on the enrollment page') }}</span>
+            </div>
+            <div class="sec-body" *ngIf="!isCollapsed('description')">
+              <div class="field">
+                <div class="label"><span class="hrow" style="gap:8px;">Workshop description <span class="tag-req">Required</span></span></div>
+                <div class="rt" [class.error]="ctrl('description').invalid && (ctrl('description').touched || submitAttempted)">
+                  <ngx-editor-menu [editor]="editors['description']" [toolbar]="toolbarFull"></ngx-editor-menu>
+                  <ngx-editor class="rt-lg" [editor]="editors['description']" formControlName="description" [outputFormat]="'html'" placeholder="Enter a detailed workshop description…"></ngx-editor>
+                </div>
+                <div class="err" *ngIf="ctrl('description').invalid && (ctrl('description').touched || submitAttempted)">
+                  <ng-container [ngTemplateOutlet]="icAlert"></ng-container>Workshop description is required
+                </div>
+              </div>
+              <div class="field">
+                <div class="label"><span>Join us section</span><span class="counter">Optional</span></div>
+                <div class="rt">
+                  <ngx-editor-menu [editor]="editors['joinus']" [toolbar]="toolbarFull"></ngx-editor-menu>
+                  <ngx-editor class="rt-md" [editor]="editors['joinus']" formControlName="joinus" [outputFormat]="'html'" placeholder="Enter join us content…"></ngx-editor>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 6–7. Sneak peak, Know info (Overview is rendered last) -->
+          <ng-container *ngFor="let key of iconSectionsTop" [ngTemplateOutlet]="iconSectionCard" [ngTemplateOutletContext]="{ sec: iconSectionByKey(key) }"></ng-container>
+
+          <!-- 9. FAQ -->
+          <section class="card" id="sec-faq" formArrayName="faq">
+            <div class="sec-head" [class.closed]="isCollapsed('faq')" (click)="toggleSection('faq')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('faq') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">FAQ</h2>
+              <span class="count" [class.zero]="!getFormArray('faq').length" [class.full]="getFormArray('faq').length >= faqMax">{{ getFormArray('faq').length }} / {{ faqMax }}</span>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ isCollapsed('faq') ? summary('faq') : (getFormArray('faq').length ? 'Answers up to ' + faqAnswerMax + ' characters' : 'No questions yet') }}</span>
+              <button type="button" class="btn btn-sm" [disabled]="getFormArray('faq').length >= faqMax"
+                (click)="$event.stopPropagation(); collapsed.delete('faq'); addIconWithText('faq', faqMax)">
+                <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add question</span>
+              </button>
+            </div>
+            <div class="sec-body gap12" *ngIf="!isCollapsed('faq') && getFormArray('faq').length">
+              <div class="faq-row" *ngFor="let c of getFormArray('faq').controls; let i = index" [formGroupName]="i">
+                <span class="faq-n">{{ i + 1 }}</span>
+                <div class="faq-fields">
+                  <div class="input"><input class="txt bold" formControlName="question" placeholder="Enter FAQ question"></div>
+                  <div class="input textarea">
+                    <textarea class="txt" formControlName="answer" [maxlength]="faqAnswerMax" placeholder="Enter FAQ answer" rows="2"></textarea>
+                    <span class="counter">{{ answerLen('faq', i) }} / {{ faqAnswerMax }}</span>
+                  </div>
+                </div>
+                <button type="button" class="icon-btn" (click)="removeIconWithText('faq', i)" title="Remove"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+              </div>
+              <div class="help warn" *ngIf="getFormArray('faq').length >= faqMax">Maximum of {{ faqMax }} questions reached. Remove one to add another.</div>
+            </div>
+          </section>
+
+          <!-- 10. Lists -->
+          <div class="grid2">
+            <section class="card" *ngFor="let sec of fieldSections" [id]="'sec-' + sec.key" [formArrayName]="sec.key">
+              <div class="sec-head" [class.closed]="isCollapsed(sec.key)" (click)="toggleSection(sec.key)">
+                <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed(sec.key) ? icChevRight : icChevDown"></ng-container></span>
+                <h2 class="sec-title">{{ sec.title }}</h2>
+                <span class="count" [class.zero]="!getFormArray(sec.key).length">{{ getFormArray(sec.key).length }}</span>
+                <span class="grow"></span>
+                <span class="sec-hint" *ngIf="isCollapsed(sec.key)">{{ summary(sec.key) }}</span>
+                <button type="button" class="btn btn-sm" [disabled]="!isAllFilled(sec.key)"
+                  (click)="$event.stopPropagation(); collapsed.delete(sec.key); addField(sec.key)">
+                  <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add</span>
+                </button>
+              </div>
+              <div class="sec-body gap8 tight" *ngIf="!isCollapsed(sec.key)" cdkDropList (cdkDropListDropped)="drop($event, sec.key)">
+                <div class="list-row" *ngFor="let c of getFormArray(sec.key).controls; let j = index" cdkDrag>
+                  <div class="drop-line" *cdkDragPlaceholder></div>
+                  <span class="drag" cdkDragHandle><ng-container [ngTemplateOutlet]="icGrip"></ng-container></span>
+                  <div class="input h36"><input class="txt" [formControlName]="j" [placeholder]="sec.placeholder"></div>
+                  <button type="button" class="icon-btn" (click)="removeField(sec.key, j)" title="Remove"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+                </div>
+                <div class="help" *ngIf="!getFormArray(sec.key).length">Empty. Add the first row.</div>
+                <div class="help" *ngIf="getFormArray(sec.key).length && !isAllFilled(sec.key)">Fill the empty row before adding another.</div>
+              </div>
+            </section>
+          </div>
+
+          <!-- 11. Outcomes + 12. Skills taught -->
+          <div class="grid2">
+            <section class="card" id="sec-outcome" formArrayName="outcome">
+              <div class="sec-head" [class.closed]="isCollapsed('outcome')" (click)="toggleSection('outcome')">
+                <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('outcome') ? icChevRight : icChevDown"></ng-container></span>
+                <h2 class="sec-title">Outcomes</h2>
+                <span class="count" [class.zero]="!outcomeArray.length">{{ outcomeArray.length }}</span>
+                <span class="grow"></span>
+                <span class="sec-hint">{{ headHint('outcome', 'Value + title pairs') }}</span>
+                <button type="button" class="btn btn-sm" (click)="$event.stopPropagation(); collapsed.delete('outcome'); addOutcome()">
+                  <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add</span>
+                </button>
+              </div>
+              <div class="sec-body gap8 tight" *ngIf="!isCollapsed('outcome')">
+                <div class="list-row" *ngFor="let g of outcomeArray.controls; let i = index" [formGroupName]="i">
+                  <div class="input h36 w110"><input class="txt bold" formControlName="value" placeholder="Value"></div>
+                  <div class="input h36"><input class="txt" formControlName="title" placeholder="Title"></div>
+                  <button type="button" class="icon-btn" (click)="removeOutcome(i)" title="Remove"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+                </div>
+                <div class="help" *ngIf="!outcomeArray.length">Empty. Add a value + title pair, e.g. 500+ / Participants.</div>
+              </div>
+            </section>
+
+            <section class="card" id="sec-primarylyTaught">
+              <div class="sec-head" [class.closed]="isCollapsed('primarylyTaught')" (click)="toggleSection('primarylyTaught')">
+                <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('primarylyTaught') ? icChevRight : icChevDown"></ng-container></span>
+                <h2 class="sec-title">Skills taught</h2>
+                <span class="count" [class.zero]="!primarylyTaughtArray.length">{{ primarylyTaughtArray.length }}</span>
+                <span class="grow"></span>
+                <span class="sec-hint">{{ headHint('primarylyTaught', 'Type a skill, press Enter') }}</span>
+              </div>
+              <div class="sec-body tight" *ngIf="!isCollapsed('primarylyTaught')">
+                <div class="input chips">
+                  <span class="chip soft in" *ngFor="let skill of primarylyTaughtArray.value; let i = index">
+                    {{ skill }}
+                    <button type="button" class="chip-x" (click)="removeSkill(i)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                  </span>
+                  <input class="txt chip-input" type="text" [(ngModel)]="skillDraft" [ngModelOptions]="{standalone: true}"
+                    (keydown)="onSkillKey($event)" (blur)="addSkill(skillDraft)" placeholder="Add a skill…">
+                </div>
+                <div class="help">Duplicates are ignored.</div>
+              </div>
+            </section>
+          </div>
+
+          <!-- 13. Testimonials -->
+          <section class="card" id="sec-testimonials">
+            <div class="sec-head" [class.closed]="isCollapsed('testimonials')" (click)="toggleSection('testimonials')">
+              <span class="chev"><ng-container [ngTemplateOutlet]="isCollapsed('testimonials') ? icChevRight : icChevDown"></ng-container></span>
+              <h2 class="sec-title">Testimonials</h2>
+              <span class="count" [class.zero]="!getTestimonialsFromMap().length">{{ getTestimonialsFromMap().length }} selected</span>
+              <span class="grow"></span>
+              <span class="sec-hint">{{ headHint('testimonials', 'Pick VideoAsk templates, then the answers to feature') }}</span>
+            </div>
+            <div class="sec-body" *ngIf="!isCollapsed('testimonials')">
+              <div class="grid2">
+                <div class="field pop-anchor" data-pop>
+                  <div class="label"><span>Templates</span><span class="counter">{{ selectedTemplatesForFilter.length }} / {{ templatesMax }}</span></div>
+                  <div class="input chips" (click)="togglePopover('templates')">
+                    <span class="chip soft in" *ngFor="let id of selectedTemplatesForFilter">
+                      {{ templateTitle(id) }}
+                      <button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleTemplate(id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                    </span>
+                    <span class="txt ph">{{ selectedTemplatesForFilter.length >= templatesMax ? 'Maximum reached' : 'Add template…' }}</span>
+                    <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                  </div>
+                  <div class="pop" *ngIf="openPopover === 'templates'">
+                    <div class="input sm">
+                      <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+                      <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search templates…">
+                    </div>
+                    <div class="pop-list">
+                      <button type="button" class="pop-row" *ngFor="let t of filteredTemplates" [class.sel]="isTemplateSelected(t.id)"
+                        [disabled]="!isTemplateSelected(t.id) && selectedTemplatesForFilter.length >= templatesMax" (click)="toggleTemplate(t.id)">
+                        <span class="box"><ng-container *ngIf="isTemplateSelected(t.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                        <span class="n">{{ t.title }}</span>
+                      </button>
+                      <div class="help pad" *ngIf="!filteredTemplates.length">No templates match.</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="field pop-anchor" data-pop>
+                  <div class="label"><span>Testimonials from those templates</span><span class="counter">{{ selectedTemplatesForFilter.length ? testimonialData.length + ' available' : 'Select templates first' }}</span></div>
+                  <button type="button" class="input pick" [disabled]="!selectedTemplatesForFilter.length" (click)="togglePopover('testimonials')">
+                    <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+                    <span class="txt ph">Search participants…</span>
+                    <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                  </button>
+                  <div class="pop" *ngIf="openPopover === 'testimonials'">
+                    <div class="input sm">
+                      <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+                      <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search participants…">
+                    </div>
+                    <div class="pop-list">
+                      <button type="button" class="pop-row" *ngFor="let t of filteredTestimonials" [class.sel]="isTestimonialSelected(t.id)" (click)="toggleTestimonial(t.id)">
+                        <span class="box"><ng-container *ngIf="isTestimonialSelected(t.id)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                        <span class="n">{{ testimonialName(t.profileid) }}</span>
+                        <span class="c">{{ formatUploadedDate(t.uploaded) }}</span>
+                      </button>
+                      <div class="help pad" *ngIf="!filteredTestimonials.length">{{ testimonialData.length ? 'No participants match.' : 'No answers for the selected templates yet.' }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <div class="label"><span>Featured on the page</span></div>
+                <div class="hrow wrap" style="gap:8px;" *ngIf="getTestimonialsFromMap().length; else noFeatured">
+                  <span class="chip" *ngFor="let t of getTestimonialsFromMap(); trackBy: trackByTestimonialId">
+                    <ng-container [ngTemplateOutlet]="icVideo"></ng-container>
+                    {{ testimonialName(t.profileid) }} · {{ formatUploadedDate(t.uploaded) }}
+                    <button type="button" class="chip-x" (click)="removeTestimonialFromMap(t.id)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                  </span>
+                </div>
+                <ng-template #noFeatured><div class="help">None featured yet.</div></ng-template>
+              </div>
+            </div>
+          </section>
+
+          <!-- 14. Overview (last, per operator) -->
+          <ng-container [ngTemplateOutlet]="iconSectionCard" [ngTemplateOutletContext]="{ sec: iconSectionByKey('workshopoverview') }"></ng-container>
+
+        </form>
+
+        <!-- ═══════════════ sticky save bar ═══════════════ -->
+        <div class="savebar" [class.ok]="saveState === 'saved'" [class.bad]="saveState === 'error'">
+          <ng-container [ngSwitch]="saveState">
+            <ng-container *ngSwitchCase="'idle'">
+              <span class="pill pill-mute">No changes</span>
+              <span class="grow"></span>
+              <button type="button" class="btn btn-primary" disabled>Save Enrollment</button>
+            </ng-container>
+            <ng-container *ngSwitchCase="'dirty'">
+              <span class="pill pill-warn"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Unsaved changes</span>
+              <span class="help edited">{{ editedSectionsText }}</span>
+              <span class="grow"></span>
+              <span class="help">Saves the Enrollment page only. Challenges and Settings save separately.</span>
+              <button type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
+              <button type="button" class="btn btn-primary" (click)="saveDetailPage()">
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 3v5h7V3M8 21v-7h8v7"></path></svg>
+                <span>Save Enrollment</span>
+              </button>
+            </ng-container>
+            <ng-container *ngSwitchCase="'saving'">
+              <span class="pill pill-warn">Saving…</span>
+              <span class="grow"></span>
+              <button type="button" class="btn btn-primary" disabled style="opacity:.8;"><span class="spin"></span>Saving</button>
+            </ng-container>
+            <ng-container *ngSwitchCase="'blocked'">
+              <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>{{ blockedReason }}</span>
+              <span class="grow"></span>
+              <button type="button" class="btn btn-ghost" *ngIf="hasUnsavedChanges()" (click)="discardChanges()">Discard</button>
+              <button type="button" class="btn btn-primary" disabled>Save Enrollment</button>
+            </ng-container>
+            <ng-container *ngSwitchCase="'saved'">
+              <span class="pill pill-ok"><ng-container [ngTemplateOutlet]="icCheck"></ng-container>Saved just now</span>
+              <span class="grow"></span>
+              <button type="button" class="btn btn-primary" disabled>Save Enrollment</button>
+            </ng-container>
+            <ng-container *ngSwitchCase="'error'">
+              <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Could not save</span>
+              <span class="help">Check your connection and try again.</span>
+              <span class="grow"></span>
+              <button type="button" class="btn btn-primary" (click)="saveDetailPage()">Retry</button>
+            </ng-container>
+          </ng-container>
+        </div>
+      </main>
+    </div>
+  </ng-container>
+
+  <!-- ═══════════════ leave guard dialog ═══════════════ -->
+  <div class="overlay" *ngIf="leaveDialog">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+      <div class="dlg-title" id="leave-title">Leave without saving?</div>
+      <div class="dlg-text">You have unsaved changes<ng-container *ngIf="leaveDialog.sections"> in <strong>{{ leaveDialog.sections }}</strong></ng-container>. They will be lost if you leave now.</div>
+      <div class="hrow end" style="gap:8px;margin-top:4px;">
+        <button type="button" class="btn" (click)="answerLeave(false)">Stay</button>
+        <button type="button" class="btn btn-danger" (click)="answerLeave(true)">Leave without saving</button>
+      </div>
+    </div>
+  </div>
+</div>

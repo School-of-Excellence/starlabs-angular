@@ -134,25 +134,33 @@
               </button>
             </div>
           </div>
-          <div class="col-auto d-flex gap-2">
-            <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
-              <mat-icon>upload_file</mat-icon> Import
-            </button>
-            <input type="file" #fileInput style="display: none" (change)="onImportData($event)"
-              accept=".csv,.xlsx,.xls" />
+          <div class="col-auto d-flex flex-column gap-2">
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon> Import
+              </button>
+              <input type="file" #fileInput style="display: none" (change)="onImportData($event)"
+                accept=".csv,.xlsx,.xls" />
 
-            <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
-              [disabled]="getSelectedTokens().length === 0">
-              <mat-icon>local_offer</mat-icon> Add Tag
-            </button>
-            <button
-              class="btn btn-outline-primary"
-              mat-stroked-button
-              (click)="openBulkMovePanel()"
-              [disabled]="getSelectedTokens().length === 0">
-              <mat-icon>multiple_stop</mat-icon>
-              Bulk Move ({{getSelectedTokens().length}}/10)
-            </button>
+              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>local_offer</mat-icon> Add Participant Tag
+              </button>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkQueueTags()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>local_offer</mat-icon> Add Queue Tag
+              </button>
+              <button
+                class="btn btn-outline-primary"
+                mat-stroked-button
+                (click)="openBulkMovePanel()"
+                [disabled]="getSelectedTokens().length === 0">
+                <mat-icon>multiple_stop</mat-icon>
+                Bulk Move ({{getSelectedTokens().length}}/10)
+              </button>
+            </div>
           </div>
         </section>
 
@@ -172,12 +180,12 @@
               Participants ({{ selectedStages.length > 0 ? getMergedParticipants().length :
               (getStageParticipants(selectedChatStage)?.['tokenlist']?.length || 0) }})
             </h5>
-            <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
+            <!-- <div class="select-all-wrapper" (click)="toggleSelectAll()" data-testid="qm-comms-selectall">
               <div class="custom-checkbox" [class.checked]="areAllSelected()">
                 <i class="bi bi-check" *ngIf="areAllSelected()"></i>
               </div>
               <span class="select-all-text">Select All</span>
-            </div>
+            </div> -->
           </div>
           <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->
@@ -383,8 +391,8 @@
         <!-- SEGMENT ROW -->
         <div class="fsb-expandable" *ngIf="availableSegments.length > 0">
           <div class="fsb-row" [class.fsb-row-active]="selectedSegments.length > 0"
-            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
-            (click)="!dfuFilterActive && !selectedStageSlot && (segmentDropdownOpen=!segmentDropdownOpen); !dfuFilterActive && !selectedStageSlot && segmentDropdownOpen && onSegmentDropdownOpen()">
+            [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
+            (click)="!dfuFilterActive && !isStageSlotFilterActive && (segmentDropdownOpen=!segmentDropdownOpen); !dfuFilterActive && !isStageSlotFilterActive && segmentDropdownOpen && onSegmentDropdownOpen()">
             <mat-icon class="fsb-icon">group</mat-icon>
             <span class="fsb-label">
               <span *ngIf="selectedSegments.length === 0">Filter by Segment</span>
@@ -393,8 +401,7 @@
             <span class="fsb-count" *ngIf="selectedSegments.length > 0">{{selectedSegments.length}}</span>
             <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="segmentDropdownOpen">expand_more</mat-icon>
           </div>
-          <div class="fsb-dropdown" *ngIf="segmentDropdownOpen && !dfuFilterActive && !selectedStageSlot">
-            <div class="fsb-dropdown-search">
+            <div class="fsb-dropdown" *ngIf="segmentDropdownOpen && !dfuFilterActive && !isStageSlotFilterActive">            <div class="fsb-dropdown-search">
               <mat-icon>search</mat-icon>
               <input type="text" [(ngModel)]="segmentSearchTerm" (input)="filterSegments()"
                 (click)="$event.stopPropagation()" placeholder="Search segments...">
@@ -422,17 +429,17 @@
         <!-- TAGS ROW -->
         <div class="fsb-expandable" *ngIf="availableTags.length > 0">
           <div class="fsb-row" [class.fsb-row-active]="selectedTags.length > 0"
-            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
-            (click)="!dfuFilterActive && !selectedStageSlot && (tagDropdownOpen=!tagDropdownOpen); !dfuFilterActive && !selectedStageSlot && tagDropdownOpen && onTagDropdownOpen()">
+            [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
+            (click)="!dfuFilterActive && !isStageSlotFilterActive && (tagDropdownOpen=!tagDropdownOpen); !dfuFilterActive && !isStageSlotFilterActive && tagDropdownOpen && onTagDropdownOpen()">
             <mat-icon class="fsb-icon">local_offer</mat-icon>
             <span class="fsb-label">
-              <span *ngIf="selectedTags.length === 0">Filter by Tags</span>
+              <span *ngIf="selectedTags.length === 0">Filter by Participant Tags</span>
               <span *ngIf="selectedTags.length > 0">{{selectedTags.length}} Tag(s)</span>
             </span>
             <span class="fsb-count" *ngIf="selectedTags.length > 0">{{selectedTags.length}}</span>
             <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="tagDropdownOpen">expand_more</mat-icon>
           </div>
-          <div class="fsb-dropdown" *ngIf="tagDropdownOpen && !dfuFilterActive && !selectedStageSlot">
+          <div class="fsb-dropdown" *ngIf="tagDropdownOpen && !dfuFilterActive && !isStageSlotFilterActive">
             <div class="fsb-dropdown-search">
               <mat-icon>search</mat-icon>
               <input type="text" [(ngModel)]="tagSearchTerm" (input)="filterTags()" (click)="$event.stopPropagation()"
@@ -457,10 +464,49 @@
           </div>
         </div>
 
+        <!-- QUEUE TAGS ROW -->
+        <div class="fsb-expandable" *ngIf="availableQueueTags.length > 0">
+          <div class="fsb-row" [class.fsb-row-active]="selectedQueueTags.length > 0"
+            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
+            (click)="toggleQueueTagDropdown()">
+            <mat-icon class="fsb-icon">sell</mat-icon>
+            <span class="fsb-label">
+              <span *ngIf="selectedQueueTags.length === 0">Filter by Queue Tags</span>
+              <span *ngIf="selectedQueueTags.length > 0">{{selectedQueueTags.length}} Queue Tag(s)</span>
+            </span>
+            <span class="fsb-count" *ngIf="selectedQueueTags.length > 0">{{selectedQueueTags.length}}</span>
+            <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="queueTagDropdownOpen">expand_more</mat-icon>
+          </div>
+          <div class="fsb-dropdown" *ngIf="queueTagDropdownOpen && !dfuFilterActive && !selectedStageSlot">
+            <div class="fsb-dropdown-search">
+              <mat-icon>search</mat-icon>
+              <input type="text" [(ngModel)]="queueTagSearchTerm" (input)="filterQueueTags()"
+                (click)="$event.stopPropagation()" placeholder="Search queue tags...">
+              <button *ngIf="queueTagSearchTerm" (click)="clearQueueTagSearch(); $event.stopPropagation()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <div class="fsb-dropdown-options">
+              <div class="fsb-option" *ngFor="let tag of filteredQueueTags"
+                [class.fsb-option-selected]="isQueueTagSelected(tag.id)"
+                (click)="toggleQueueTagSelection(tag.id); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{isQueueTagSelected(tag.id) ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
+                <span>{{tag.name}}</span>
+              </div>
+              <div class="fsb-empty" *ngIf="filteredQueueTags.length === 0">No queue tags found</div>
+            </div>
+            <div class="fsb-dropdown-footer" *ngIf="selectedQueueTags.length > 0">
+              <button (click)="selectedQueueTags=[]; onQueueTagFilterChange(); $event.stopPropagation()">Clear
+                selection</button>
+            </div>
+          </div>
+        </div>
+
         <!-- PREASSIGNED ROW -->
         <div class="fsb-expandable">
           <div class="fsb-row" [class.fsb-row-active]="preassignedFilter !== 'all'"
-            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot" (click)="togglePreassignedDropdown()">
+            [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive" (click)="togglePreassignedDropdown()">
             <mat-icon class="fsb-icon">assignment_ind</mat-icon>
             <span class="fsb-label">Preassigned</span>
             <span class="fsb-value-text" *ngIf="preassignedFilter === 'all'">All participants</span>
@@ -496,7 +542,7 @@
         <!-- APPROVED ROW -->
         <div class="fsb-expandable">
           <div class="fsb-row" [class.fsb-row-active]="approvedFilter !== 'all'"
-            [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot" (click)="toggleApprovedDropdown()">
+            [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive" (click)="toggleApprovedDropdown()">
             <mat-icon class="fsb-icon">check_circle</mat-icon>
             <span class="fsb-label">Approved</span>
             <span class="fsb-value-text" *ngIf="approvedFilter === 'all'">All participants</span>
@@ -531,34 +577,43 @@
 
         <!-- STAGE SLOT ROW -->
         <div class="fsb-expandable">
-          <div class="fsb-row" [class.fsb-row-active]="!!selectedStageSlot" [class.fsb-row-disabled]="dfuFilterActive"
+          <div class="fsb-row" [class.fsb-row-active]="isStageSlotFilterActive" [class.fsb-row-disabled]="dfuFilterActive"
             (click)="toggleStageSlotDropdown()">
             <mat-icon class="fsb-icon">layers</mat-icon>
             <span class="fsb-label">Stage Slot</span>
-            <span class="fsb-value-text" *ngIf="!selectedStageSlot">Filter by Stage Slot</span>
-            <span class="fsb-value-text fsb-value-active" *ngIf="selectedStageSlot">{{selectedStageSlot}}</span>
+            <span class="fsb-value-text" *ngIf="!isStageSlotFilterActive">Filter by Stage Slot</span>
+            <span class="fsb-value-text fsb-value-active" *ngIf="isStageSlotFilterActive">{{getStageSlotDisplayLabel()}}</span>
             <mat-icon class="fsb-chevron" [class.fsb-chevron-open]="stageSlotDropdownOpen">expand_more</mat-icon>
           </div>
           <div class="fsb-dropdown" *ngIf="stageSlotDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" [class.fsb-option-selected]="!selectedStageSlot"
-                (click)="selectedStageSlot=null; onStageSlotChange(); stageSlotDropdownOpen=false; $event.stopPropagation()">
-                <mat-icon class="fsb-option-check">{{!selectedStageSlot ? 'radio_button_checked' :
-                  'radio_button_unchecked'}}</mat-icon>
-                <span>All stages</span>
+              <div class="fsb-option" [class.fsb-option-selected]="!isStageSlotFilterActive"
+                (click)="onStageSlotChange([]); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{!isStageSlotFilterActive ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
+                <span>No filter</span>
+              </div>
+              <div class="fsb-option" [class.fsb-option-selected]="selectedStageSlots.length === availableStagesFromSlot.length && isStageSlotFilterActive"
+                (click)="onStageSlotChange(selectedStageSlots.length === availableStagesFromSlot.length ? [] : availableStagesFromSlot); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{selectedStageSlots.length === availableStagesFromSlot.length && isStageSlotFilterActive ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
+                <span>All stages (combined)</span>
               </div>
               <div class="fsb-option" *ngFor="let stage of availableStagesFromSlot"
-                [class.fsb-option-selected]="selectedStageSlot === stage"
-                (click)="selectedStageSlot=stage; onStageSlotChange(); stageSlotDropdownOpen=false; $event.stopPropagation()">
-                <mat-icon class="fsb-option-check">{{selectedStageSlot === stage ? 'radio_button_checked' :
-                  'radio_button_unchecked'}}</mat-icon>
+                [class.fsb-option-selected]="selectedStageSlots.includes(stage)"
+                (click)="onStageSlotChange(undefined, stage); $event.stopPropagation()">
+                <mat-icon class="fsb-option-check">{{selectedStageSlots.includes(stage) ? 'check_box' :
+                  'check_box_outline_blank'}}</mat-icon>
                 <span>{{stage}}</span>
               </div>
+            </div>
+            <div class="fsb-dropdown-footer" *ngIf="selectedStageSlots.length > 0">
+              <button (click)="onStageSlotChange([]); $event.stopPropagation()">Clear selection</button>
             </div>
           </div>
 
           <!-- Date range — shown when stage slot selected -->
-          <div class="fsb-sub-section" *ngIf="selectedStageSlot">
+          <div class="fsb-sub-section" *ngIf="isStageSlotFilterActive">
             <div class="fsb-row fsb-row-sub" [class.fsb-row-active]="dateRangeStart && dateRangeEnd">
               <mat-icon class="fsb-icon">date_range</mat-icon>
               <mat-form-field appearance="outline" class="fsb-date-field">
@@ -574,8 +629,30 @@
               </mat-form-field>
             </div>
 
+            <!-- Booking status -->
+            <div class="fsb-row fsb-row-sub fsb-row-label-only">
+              <mat-icon class="fsb-icon">event_available</mat-icon>
+              <span class="fsb-label">Booking status</span>
+            </div>
+            <div class="fsb-timeslot-list">
+              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'booked'"
+                (click)="selectBookingStatus('booked')">
+                <mat-icon class="fsb-option-check">
+                  {{stageSlotBookingFilter === 'booked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                </mat-icon>
+                <span>Booked</span>
+              </div>
+              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'notbooked'"
+                (click)="selectBookingStatus('notbooked')">
+                <mat-icon class="fsb-option-check">
+                  {{stageSlotBookingFilter === 'notbooked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
+                </mat-icon>
+                <span>Not booked ({{notBookedSlotCountCached}})</span>
+              </div>
+            </div>
+
             <!-- Time slots -->
-            <ng-container *ngIf="availableTimeSlots.length > 0">
+            <ng-container *ngIf="stageSlotBookingFilter === 'booked' && availableTimeSlots.length > 0">
               <div class="fsb-row fsb-row-sub fsb-row-label-only">
                 <mat-icon class="fsb-icon">schedule</mat-icon>
                 <span class="fsb-label">Time slot</span>
@@ -589,10 +666,10 @@
                   <span>All times ({{getTotalSlotCount()}})</span>
                 </div>
                 <div class="fsb-option" *ngFor="let slot of availableTimeSlots"
-                  [class.fsb-option-selected]="selectedTimeSlots.includes(slot.timeRange)"
-                  (click)="selectTimeSlot(slot.timeRange)">
+                  [class.fsb-option-selected]="selectedTimeSlots.includes(slot.slotKey)"
+                  (click)="selectTimeSlot(slot.slotKey)">
                   <mat-icon class="fsb-option-check">
-                    {{selectedTimeSlots.includes(slot.timeRange) ? 'check_box' : 'check_box_outline_blank'}}
+                    {{selectedTimeSlots.includes(slot.slotKey) ? 'check_box' : 'check_box_outline_blank'}}
                   </mat-icon>
                   <span>
                     <span *ngIf="slot.title" style="font-weight:600; color:#234C58;">{{slot.title}} · </span>
@@ -855,7 +932,7 @@
 
         <!-- DFU ROW -->
         <div class="fsb-row fsb-toggle-row" [class.fsb-row-active]="dfuFilterActive"
-          [class.fsb-row-disabled]="!!selectedStageSlot" (click)="!selectedStageSlot && toggleDFUFilter()">
+          [class.fsb-row-disabled]="isStageSlotFilterActive" (click)="!isStageSlotFilterActive && toggleDFUFilter()">
           <mat-icon class="fsb-icon">priority_high</mat-icon>
           <span class="fsb-label">DFU participants only</span>
           <span class="fsb-count" *ngIf="getTotalDFUCount() > 0">{{getTotalDFUCount()}}</span>
@@ -893,8 +970,8 @@
         <!-- TODAY REMINDERS ROW -->
         <div class="fsb-row fsb-toggle-row" *ngIf="todayReminders.length > 0"
           [class.fsb-row-active]="reminderTodayFilterActive"
-          [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
-          (click)="!dfuFilterActive && !selectedStageSlot && toggleReminderTodayFilter()">
+          [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
+          (click)="!dfuFilterActive && !isStageSlotFilterActive && toggleReminderTodayFilter()">
           <mat-icon class="fsb-icon">alarm</mat-icon>
           <span class="fsb-label">Today's reminders</span>
           <span class="fsb-count">{{todayReminders.length}}</span>
@@ -1128,7 +1205,7 @@
           <input #searchBox
             style="border:none; background:transparent; outline:none; flex:1; font-size:14px; color:#333;"
             [(ngModel)]="searchFilter" (ngModelChange)="onSearchChange()" placeholder="Search participants..."
-            [disabled]="dfuFilterActive || !!selectedStageSlot">
+            [disabled]="dfuFilterActive">
           <span style="font-size:12px; color:#1976d2; font-weight:500;"
             *ngIf="searchFilter && searchMatches.length > 0">
             {{getMatchPositionText()}}
@@ -1154,13 +1231,16 @@
           <mat-chip *ngFor="let tagId of selectedTags" (removed)="removeTag(tagId)" data-testid="qm-tag-chip" [attr.data-tag-id]="tagId">
             {{getTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
+          <mat-chip *ngFor="let tagId of selectedQueueTags" (removed)="removeQueueTag(tagId)">
+            {{getQueueTagName(tagId)}}<mat-icon matChipRemove>cancel</mat-icon>
+          </mat-chip>
           <mat-chip *ngIf="preassignedFilter !== 'all'"
             (removed)="preassignedFilter='all'; onPreassignedFilterChange()">
             {{preassignedFilter === 'preassigned' ? 'Pre-assigned only' : 'Not pre-assigned'}}
             <mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
-          <mat-chip *ngIf="selectedStageSlot" (removed)="clearStageSlotFilter()">
-            Stage: {{selectedStageSlot}}<mat-icon matChipRemove>cancel</mat-icon>
+          <mat-chip *ngIf="isStageSlotFilterActive" (removed)="clearStageSlotFilter()">
+            Stage: {{getStageSlotDisplayLabel()}}{{stageSlotBookingFilter === 'notbooked' ? ' — Not booked' : ''}}<mat-icon matChipRemove>cancel</mat-icon>
           </mat-chip>
           <mat-chip *ngIf="dfuFilterActive" (removed)="toggleDFUFilter()">
             DFU only<mat-icon matChipRemove>cancel</mat-icon>
@@ -1507,12 +1587,12 @@
                         undefined ? token["avtest"] : 'Test Now'}}</span>
                     </div>
 
-                    <div *ngIf="selectedStageSlot && getBookedSlot(token)">
+                    <div *ngIf="isStageSlotFilterActive && getBookedSlot(token)">
                       <span class="label">Slot Booked:&nbsp;</span>
                       <span>
-                        <span *ngIf="slotTitleMap[selectedStageSlot + '_' + getBookedSlot(token)!.start.getTime() + '_' + getBookedSlot(token)!.end.getTime()]"
+                        <span *ngIf="getBookedSlotTitle(token)"
                           style="font-weight:600; color:#234C58;">
-                          {{ slotTitleMap[selectedStageSlot + '_' + getBookedSlot(token)!.start.getTime() + '_' + getBookedSlot(token)!.end.getTime()] }}
+                          {{ getBookedSlotTitle(token) }}
                         </span>
                         [{{ getBookedSlot(token)!.start | date:'h:mm a' }} - {{ getBookedSlot(token)!.end | date:'h:mm a' }}]
                       </span>
@@ -2029,10 +2109,14 @@
           diameter="16"
           class="btn-spinner">
         </mat-spinner>
-        <span *ngIf="!bulkMoveInProgress">
+        <span *ngIf="!bulkMoveInProgress && bulkMoveTargetStageKey !== 'Unattended Participants'">
           Move {{bulkMovableCount}} Participant(s)
         </span>
-        <span *ngIf="bulkMoveInProgress">Moving...</span>
+        <span *ngIf="bulkMoveInProgress && bulkMoveTargetStageKey !== 'Unattended Participants'">Moving...</span>
+        <span *ngIf="!bulkMoveInProgress && bulkMoveTargetStageKey === 'Unattended Participants'">
+          Mark {{bulkMoveResults.length}} Unattended
+        </span>
+        <span *ngIf="bulkMoveInProgress && bulkMoveTargetStageKey === 'Unattended Participants'">Marking...</span>
       </button>
     </div>
 
@@ -2042,7 +2126,7 @@
         [style.color]="bulkMoveFailed ? '#d32f2f' : '#388e3c'">
         {{bulkMoveFailed ? 'error' : 'check_circle'}}
       </mat-icon>
-      <p *ngIf="!bulkMoveFailed" class="done-ok">
+      <p *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey !== 'Unattended Participants'" class="done-ok">
         ✓ {{bulkMovableCount}} participant(s) moved successfully
         <span *ngIf="bulkMoveComputedResult.skippedDFU.length > 0">
           &nbsp;({{bulkMoveComputedResult.skippedDFU.length}} DFU skipped)
@@ -2050,6 +2134,10 @@
         <span *ngIf="bulkMoveComputedResult.skippedVariation.length > 0">
           &nbsp;({{bulkMoveComputedResult.skippedVariation.length}} variation skipped)
         </span>
+      </p>
+
+      <p *ngIf="!bulkMoveFailed && bulkMoveTargetStageKey === 'Unattended Participants'" class="done-ok">
+        ✓ {{bulkMoveResults.length}} participant(s) marked unattended
       </p>
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.

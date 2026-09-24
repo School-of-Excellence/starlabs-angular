@@ -95,13 +95,23 @@ export class SalesleadComponent {
 
       // if (roles.admin || roles.ah || roles.integrator) {
         const salesleadsRef = collection(this.firestore, "salesleads")
-        const salesleadsQuery = query(salesleadsRef, orderBy('date', 'desc'))
-        collectionSnapshots(salesleadsQuery).pipe(takeUntil(this.subscription)).subscribe(async leadsnap => {
+        // NOTE: do NOT use a server-side orderBy('date') here. Firestore silently
+        // drops every document that is missing the ordered field, so leads written
+        // without a `date` never reached the table (and therefore never reached the
+        // export). Fetch everything and sort client-side instead, with undated leads last.
+        collectionSnapshots(query(salesleadsRef)).pipe(takeUntil(this.subscription)).subscribe(async leadsnap => {
           this.listOfSalesLeadsDoc = leadsnap.map(doc => {
             let id = doc.id
             let element = doc.data();
             element['id'] = id
             return element
+          }).sort((a, b) => {
+            const adate = this.toJsDate(a['date'])?.getTime();
+            const bdate = this.toJsDate(b['date'])?.getTime();
+            if (adate === undefined && bdate === undefined) return 0;
+            if (adate === undefined) return 1;
+            if (bdate === undefined) return -1;
+            return bdate - adate;
           });
           this.originalData = [...this.listOfSalesLeadsDoc];
           this.ngAfterViewInit()
@@ -160,6 +170,28 @@ export class SalesleadComponent {
 
   typecheck(value: any): string {
     return typeof value;
+  }
+
+  // Firestore Timestamp | JS Date | ISO string | epoch millis -> Date (or undefined).
+  // Rows carry a mix of all four, and a bare `.toDate()` on a non-Timestamp used to
+  // throw and abort the whole export, producing a partial/empty file.
+  toJsDate(value: any): Date | undefined {
+    if (value === null || value === undefined || value === '') return undefined;
+    let date: Date;
+    if (typeof value?.toDate === 'function') {
+      date = value.toDate();
+    } else if (value instanceof Date) {
+      date = value;
+    } else if (typeof value === 'number') {
+      date = new Date(value);
+    } else if (typeof value === 'string') {
+      date = new Date(value);
+    } else if (typeof value?.seconds === 'number') {
+      date = new Date(value.seconds * 1000);
+    } else {
+      return undefined;
+    }
+    return isNaN(date.getTime()) ? undefined : date;
   }
 
   // Filter functions
@@ -306,6 +338,15 @@ export class SalesleadComponent {
     this.updateJourneyTypeCounts();
   }
 
+  // Rows the table is actually rendering. MatTableDataSource keeps `filteredData` in
+  // sync with `data` even when no filter is set (it is assigned in the data source's
+  // constructor), so it is always the correct source. Do NOT fall back to `data` when
+  // it is empty — a filter that matches nothing would then report the full unfiltered
+  // counts instead of 0.
+  get visibleData(): any[] {
+    return this.tableData.filteredData ?? [];
+  }
+
   // Dashboard functions
   updateJourneyTypeCounts() {
     // Reset all counts
@@ -318,9 +359,7 @@ export class SalesleadComponent {
     };
 
     // Count each journey type from current filtered data, not originalData
-    const currentData = this.tableData.filteredData.length > 0 ? this.tableData.filteredData : this.tableData.data;
-
-    currentData.forEach(row => {
+    this.visibleData.forEach(row => {
       if (row.journeytype) {
         switch (row.journeytype) {
           case 'new':
@@ -361,7 +400,7 @@ export class SalesleadComponent {
   }
 
   getPercentage(type: string): number {
-    const total = this.tableData.filteredData?.length || this.tableData.data.length;
+    const total = this.visibleData.length;
     if (total === 0) return 0;
 
     let count = 0;
@@ -388,7 +427,7 @@ export class SalesleadComponent {
   }
 
   getFilteredPercentage(): number {
-    const filteredCount = this.tableData.filteredData?.length || this.tableData.data.length;
+    const filteredCount = this.visibleData.length;
     const totalCount = this.originalData.length;
 
     if (totalCount === 0) return 0;
@@ -397,73 +436,91 @@ export class SalesleadComponent {
 
   // Export to Excel
   exportToExcel() {
-    const data = this.tableData.data.map(row => {
-      const journey = row.journey ? this.mapJourney[row.journey] : '';
-      const addons = row.addons ? row.addons.map((addon: string) => this.mapProduct[addon]).join(', ') : '';
-      const bonus = row.bonus ? row.bonus.map((bonus: string) => this.mapProduct[bonus]).join(', ') : '';
+    // Export exactly what the table is showing. `tableData.data` is the *unfiltered*
+    // backing array, so it ignores the quick-search box; `visibleData` (filteredData)
+    // is the set actually rendered, and is what the count card reports.
+    const rows = this.visibleData;
 
-      let purchaseDate = '';
-      if (row.purchasedate) {
-        if (typeof row.purchasedate === 'string') {
-          purchaseDate = row.purchasedate.substring(0, 10);
-        } else {
-          const formatter = new Intl.DateTimeFormat('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          });
-          purchaseDate = formatter.format(row.purchasedate.toDate());
-        }
-      }
+    const productNames = (list: any) => Array.isArray(list)
+      ? list.map((id: string) => this.mapProduct[id] ?? id).filter(Boolean).join(', ')
+      : '';
 
-      let date = '';
-      if (row.date) {
-        date = row.date.toDate().toLocaleDateString();
-      }
+    const data = rows.map(row => {
+      const journey = row.journey ? (this.mapJourney[row.journey] ?? row.journey) : '';
+
+      const purchaseDateValue = this.toJsDate(row.purchasedate);
+      const purchaseDate = purchaseDateValue
+        ? new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(purchaseDateValue)
+        : '';
+
+      const createdDateValue = this.toJsDate(row.date);
+      const date = createdDateValue ? createdDateValue.toLocaleDateString() : '';
+
+      const installmentStartValue = this.toJsDate(row.installmentstartdate);
+      const paymentPlanAssuredValue = this.toJsDate(row.paymentplanassureddate);
 
       let status = 'Pending';
       if (row.status) {
         status = row.status;
-      } 
-      // else if (row.initialpaymentapproved === true) {
-      //   status = 'Approved';
-      // } else if (row.initialpaymentapproved === false) {
-      //   status = 'Not Approved';
-      // }
+      }
+
+      let initialPaymentStatus = 'Pending';
+      if (row.initialpaymentapproved === true) {
+        initialPaymentStatus = 'Approved';
+      } else if (row.initialpaymentapproved === false) {
+        initialPaymentStatus = 'Not Approved';
+      }
 
       return {
-        'Name': row.name,
-        'Email': row.email,
-        'Phone': row.phonenumber,
+        'Name': row.name ?? '',
+        'Email': row.email ?? '',
+        'Phone': row.phonenumber ?? '',
         'Purchase Date': purchaseDate,
         'Sales Person': row.salespersonname ?? 'NA',
+        'Pre Sales Person': row.presalespersonname ?? '',
         'Journey': journey,
-        'Addons': addons,
-        'Bonus': bonus,
+        'Addons': productNames(row.addons),
+        'Bonus': productNames(row.bonus),
         'Date': date,
-        'Journey Type': row.journeytype ? row.journeytype.toUpperCase() : '',
+        'Journey Type': row.journeytype ? String(row.journeytype).toUpperCase() : '',
         'Status': status,
+        'Initial Payment': row.initialpayment ?? '',
+        'Initial Payment Status': initialPaymentStatus,
+        'Total Purchase Value': row.totalpurchasevalue ?? '',
+        'Original Fee': row.originalfee ?? '',
+        'Balance Amount': row.balanceamount ?? '',
+        'Payment Plan': row.paymentplan ?? '',
+        'Installment Amount': row.installmentamount ?? '',
+        'Installment Start Date': installmentStartValue ? installmentStartValue.toLocaleDateString() : '',
+        'Payment Plan Assured Date': paymentPlanAssuredValue ? paymentPlanAssuredValue.toLocaleDateString() : '',
+        'Purchase Label': row.purchaselabel ?? '',
+        'Billing Email': row.billingemail ?? '',
+        'Billing Address': row.billingaddress ?? '',
+        'GST No': row.gstno ?? '',
+        'Payment Id': row.paymentid ?? '',
+        'Profile Id': row.profileid ?? '',
+        'Lead Id': row.id ?? row.docid ?? '',
         'Sales Notes': row.notes ?? ''
       };
     });
 
-    // Create worksheet
-    const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
+    if (!data.length) {
+      this.snackbar.open('There is no data to export.', 'Close', { duration: 3000 });
+      return;
+    }
 
-    // Set column widths
-    const wscols = [
-      { wch: 20 }, // Name
-      { wch: 30 }, // Email
-      { wch: 15 }, // Phone
-      { wch: 15 }, // Purchase Date
-      { wch: 20 }, // Journey
-      { wch: 30 }, // Addons
-      { wch: 30 }, // Bonus
-      { wch: 15 }, // Date
-      { wch: 15 }, // Journey Type
-      { wch: 15 }  // Status
-    ];
-    worksheet['!cols'] = wscols;
+    // Create worksheet. Pass the header list explicitly so columns stay in order and
+    // are never dropped when the first row happens to be missing a field.
+    const header = Object.keys(data[0]);
+    const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data, { header });
+
+    // Set column widths (one entry per header, in header order)
+    worksheet['!cols'] = header.map(name => {
+      if (name === 'Addons' || name === 'Bonus' || name === 'Sales Notes' || name === 'Billing Address') return { wch: 30 };
+      if (name === 'Email' || name === 'Billing Email') return { wch: 30 };
+      if (name === 'Name' || name === 'Journey' || name === 'Sales Person' || name === 'Pre Sales Person') return { wch: 22 };
+      return { wch: 16 };
+    });
 
     // Create workbook
     const workbook: XLSX.WorkBook = XLSX.utils.book_new();

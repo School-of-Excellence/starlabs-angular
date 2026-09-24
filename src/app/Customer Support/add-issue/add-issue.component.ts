@@ -160,6 +160,13 @@ export class AddIssueComponent {
         this.mapProfile[element['profileid']] = element['name'];
         this.profileList.push(element)
       }
+      // A client patched in when the dialog opens (e.g. a ticket raised from a chat message) never
+      // fires (selectionChange), so email / phone / journey stayed blank. Pull them once the
+      // directory is loaded — this could not run earlier, profileList was still empty.
+      const prefilledClient = this.addissue.get('clientid')?.value;
+      if (prefilledClient && !this.addissue.get('email')?.value) {
+        await this.fetchProfileData(prefilledClient);
+      }
     });
 
     const usersrolesRef = collection(this.firestore, 'users_roles')
@@ -612,7 +619,9 @@ export class AddIssueComponent {
 
       this.openSnackBar("Issue Added Successfully", "");
       dialogref.close();
-      this.dialogRef.close();
+      // Hand the created ticket back so callers can act on it (the group chat opens it in a new tab).
+      // The dashboard ignores the result, so this stays backwards compatible.
+      this.dialogRef.close({ id, issueno: issueNumber });
 
     } catch (error) {
       this.openSnackBar("Error processing ticket:", "ok");
@@ -718,6 +727,7 @@ export class AddIssueComponent {
   async fetchProfileData(event) {
 
     const data = this.profileList.filter((e) => e.profileid == event);
+    if (!data.length) return;   // unknown/stale profileid — leave the fields for the user to fill
     let journeyId = '';
     await getDocs(query(collection(this.firestore, 'participantjourneyproduct'), where("profileid", "==", event), where("journeystatus", "in", ["ongoing", "initiated", "completed"]))).then((journey) => {
       if (journey.docs.length > 0 && journey.docs[0].exists()) {

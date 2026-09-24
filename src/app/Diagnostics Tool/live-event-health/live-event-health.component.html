@@ -23,56 +23,66 @@
 <div class="kpi-bar">
 
   <!-- TOTAL -->
-  <div class="kpi-card" (click)="onTotalKpiClick()">
-    <div class="kpi-label">Total</div>
-    <div class="kpi-value">{{ kpiTotal }}</div>
-  </div>
+<div class="kpi-card" [class.active]="kpiFilter.type === 'total'" (click)="onTotalKpiClick()">
+  <div class="kpi-label">Total</div>
+  <div class="kpi-value">{{ kpiTotal ?? 0}}</div>
+</div>
 
-  <!-- VALID -->
-  <div class="kpi-card success" (click)="onValidKpiClick(true)">
-    <div class="kpi-label">Valid</div>
-    <div class="kpi-value">{{ kpiValid }}</div>
-  </div>
+<!-- VALID -->
+<div class="kpi-card success" [class.active]="kpiFilter.type === 'valid'" (click)="onValidKpiClick(true)">
+  <div class="kpi-label">Valid</div>
+  <div class="kpi-value">{{ kpiValid ?? 0}}</div>
+</div>
 
-  <!-- INVALID -->
-  <div class="kpi-card danger" (click)="onValidKpiClick(false)">
-    <div class="kpi-label">Invalid</div>
-    <div class="kpi-value">{{ kpiInvalid }}</div>
-  </div>
+<!-- INVALID -->
+<div class="kpi-card danger" [class.active]="kpiFilter.type === 'invalid'" (click)="onValidKpiClick(false)">
+  <div class="kpi-label">Invalid</div>
+  <div class="kpi-value">{{ kpiInvalid ?? 0}}</div>
+</div>
 
-  <!-- EVENT STATUS KPIs -->
-  <div
-    class="kpi-card neutral"
-    *ngFor="let k of eventStatusKpis"
-    (click)="onEventStatusKpiClick(k.status)">
-    <div class="kpi-label">{{ k.status }}</div>
-    <div class="kpi-value">{{ k.count }}</div>
-  </div>
+<!-- EVENT STATUS KPIs -->
+<div
+  class="kpi-card neutral"
+  [class.active]="kpiFilter.type === 'eventStatus' && kpiFilter.value === k.status"
+  *ngFor="let k of eventStatusKpis"
+  (click)="onEventStatusKpiClick(k.status)">
+  <div class="kpi-label">{{ k.status }}</div>
+  <div class="kpi-value">{{ k.count ?? 0}}</div>
+</div>
 
-  <!-- PRODUCT STATUS KPIs -->
-  <div
-    class="kpi-card neutral"
-    *ngFor="let k of productStatusKpis"
-    (click)="onProductStatusKpiClick(k.status)">
-    <div class="kpi-label">{{ k.status }}</div>
-    <div class="kpi-value">{{ k.count }}</div>
-  </div>
+<!-- PRODUCT STATUS KPIs -->
+<div
+  class="kpi-card neutral"
+  [class.active]="kpiFilter.type === 'productStatus' && kpiFilter.value === k.status"
+  *ngFor="let k of productStatusKpis"
+  (click)="onProductStatusKpiClick(k.status)">
+  <div class="kpi-label">{{ k.status }}</div>
+  <div class="kpi-value">{{ k.count ?? 0 }}</div>
+</div>
 
 </div>
 
+<!-- ================= TOOLBAR (SEARCH + ACTIONS) ================= -->
+<div class="toolbar-row">
+  <div class="toolbar-left">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search</mat-label>
+      <input matInput [formControl]="searchControl" placeholder="Search name, product, status..." />
+    </mat-form-field>
+
+    <button mat-raised-button class="btn-cancel-selected" (click)="cancelSelected()" [disabled]="!selectedRows.length">
+      Cancel Selected Product ({{ selectedRows.length }})
+    </button>
+  </div>
+
+  <button mat-raised-button class="btn-export" (click)="exportToExcel()">Export CSV</button>
+</div>
+
 <!-- ================= TABLE ================= -->
-
-<button mat-raised-button
-        color="warn"
-        (click)="cancelSelected()"
-        [disabled]="!selectedRows.length">
-  Cancel Selected ({{ selectedRows.length }})
-</button>
-
+<div class="table-container">
 <table
   mat-table
   [dataSource]="tableData"
-  *ngIf="tableData.length"
   class="mat-elevation-z1">
 
   <ng-container matColumnDef="select">
@@ -102,7 +112,16 @@
 
   <!-- PRODUCT -->
   <ng-container matColumnDef="product">
-    <th mat-header-cell *matHeaderCellDef>Product</th>
+    <th mat-header-cell *matHeaderCellDef>
+      <div class="header-filter">
+        <span>Product</span>
+        <mat-select multiple [formControl]="productFilter" placeholder="All">
+          <mat-option *ngFor="let p of productOptionCounts" [value]="p.value">
+            {{ p.value }} ({{ p.count }})
+          </mat-option>
+        </mat-select>
+      </div>
+    </th>
     <td mat-cell *matCellDef="let r">{{ r.product }}</td>
   </ng-container>
 
@@ -111,6 +130,11 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Event Status</span>
+        <mat-select multiple [formControl]="eventStatusFilter" placeholder="All">
+          <mat-option *ngFor="let s of eventStatusOptionCounts" [value]="s.value">
+            {{ s.value }} ({{ s.count }})
+          </mat-option>
+        </mat-select>
       </div>
     </th>
     <td mat-cell *matCellDef="let r">{{ r.eventRequestStatus }}</td>
@@ -121,6 +145,11 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Product Status</span>
+        <mat-select multiple [formControl]="productStatusFilter" placeholder="All">
+          <mat-option *ngFor="let s of productStatusOptionCounts" [value]="s.value">
+            {{ s.value }} ({{ s.count }})
+          </mat-option>
+        </mat-select>
       </div>
     </th>
     <td mat-cell *matCellDef="let r">{{ r.participantProductStatus }}</td>
@@ -131,11 +160,11 @@
     <th mat-header-cell *matHeaderCellDef>
       <div class="header-filter">
         <span>Mode</span>
-        <!-- <mat-select multiple [formControl]="modeFilter">
-          <mat-option *ngFor="let m of modeOptions" [value]="m">
-            {{ m }}
+        <mat-select multiple [formControl]="modeFilter" placeholder="All">
+          <mat-option *ngFor="let m of modeOptionCounts" [value]="m.value">
+            {{ m.value }} ({{ m.count }})
           </mat-option>
-        </mat-select> -->
+        </mat-select>
       </div>
     </th>
     <td mat-cell *matCellDef="let r">{{ r.mode }}</td>
@@ -166,19 +195,27 @@
 
   <!-- ROWS -->
   <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr
-    mat-row
-    *matRowDef="let row; columns: displayedColumns"
-    [class.invalid-row]="!row.isValid">
-  </tr>
-</table>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: displayedColumns"
+      [class.invalid-row]="!row.isValid">
+    </tr>
 
-<!-- ================= PAGINATOR ================= -->
-<mat-paginator [length]="kpiTotal" [pageSize]="pageSize" [pageSizeOptions]="[5,10,20]" (page)="onPageChange($event)">
-</mat-paginator>
+    <!-- NO DATA ROW -->
+    <tr class="mat-row no-data-row" *matNoDataRow>
+      <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+        No matching records found.
+      </td>
+    </tr>
+  </table>
+
+  <!-- ================= PAGINATOR ================= -->
+  <mat-paginator [length]="kpiTotal" [pageSize]="pageSize" [pageSizeOptions]="[10,25,50]" (page)="onPageChange($event)">
+  </mat-paginator>
+</div>
 
 <!-- ================= EMPTY STATE ================= -->
 <p *ngIf="selectedEvent && !tableData.length" class="empty-state">
   No participants found.
 </p>
-</div>
+

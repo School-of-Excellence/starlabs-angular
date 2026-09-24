@@ -29,6 +29,7 @@ export class AddTierComponent {
   tiereligibilitymessage: string = '';
   tierUpgrademessage: string = '';
   tierdowngrademessage: string = '';
+  customersupport: string[] = [''];
   tabledata: any = []
   crossmatch: any;
   crossmatcherrormessage: any;
@@ -54,6 +55,7 @@ export class AddTierComponent {
             this.tiereligibilitymessage = tierData?.tiereligibilitymessage || '';
             this.tierUpgrademessage = tierData?.tierUpgrademessage || '';
             this.tierdowngrademessage = tierData?.tierdowngrademessage || '';
+            this.customersupport = tierData?.customersupport?.length ? tierData.customersupport : [''];
           });
         }
         if(this.data.delete) {
@@ -81,6 +83,7 @@ export class AddTierComponent {
       tiereligibilitymessage: this.tiereligibilitymessage || '',
       tierUpgrademessage: this.tierUpgrademessage || '',
       tierdowngrademessage: this.tierdowngrademessage || '',
+      customersupport: this.customersupport.filter(s => (s || '').trim() !== ''),
       date : new Date()
     }
     setDoc(tierRef, data)
@@ -100,6 +103,7 @@ export class AddTierComponent {
       tiereligibilitymessage: this.tiereligibilitymessage || '',
       tierUpgrademessage: this.tierUpgrademessage || '',
       tierdowngrademessage: this.tierdowngrademessage || '',
+      customersupport: this.customersupport.filter(s => (s || '').trim() !== ''),
     })
     .then(() => {
       console.log(this.tier)
@@ -119,6 +123,23 @@ export class AddTierComponent {
     .catch(err => {
       console.error('Error adding tier:', err);
     });
+  }
+
+  addCustomerSupport() {
+    if (this.customersupport.length < 4) {
+      this.customersupport.push('');
+    }
+  }
+
+  removeCustomerSupport(index: number) {
+    this.customersupport.splice(index, 1);
+    if (this.customersupport.length === 0) {
+      this.customersupport.push('');
+    }
+  }
+
+  trackByIndex(index: number) {
+    return index;
   }
 
   onClick() {

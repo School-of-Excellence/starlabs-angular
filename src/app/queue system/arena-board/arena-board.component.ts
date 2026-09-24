@@ -5,7 +5,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import {collection, collectionData, doc, docData, Firestore,query, where, orderBy, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, writeBatch, limit, startAfter, collectionGroup} from '@angular/fire/firestore';
+import {collection, collectionData, doc, docData, documentId, Firestore,query, where, orderBy, getDoc, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, writeBatch, limit, startAfter, collectionGroup} from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Subject, Subscription, takeUntil, catchError, of } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
@@ -121,6 +121,14 @@ export class ArenaBoardComponent implements OnDestroy {
   invitations: ArenaInvitation[] = [];
   liveAssignments: ArenaAssignment[] = [];
   completedAssignments: ArenaAssignment[] = [];
+
+  // Webhook presence truth: `live assignment log` docs keyed by live-assignment id,
+  // for the currently-listed live assignments. `presenceOf()` overlays these onto
+  // each row so the presence helpers read reliable server truth instead of the
+  // client-stamped one-shots. Subscribed via documentId() IN chunks of the live ids.
+  private logByLaId: Record<string, any> = {};
+  private logSubs: Subscription[] = [];
+  private logSubKey = '';
   //chat
   profileid = '';
   chatThreads: { [studioid: string]: any } = {};
@@ -274,6 +282,7 @@ export class ArenaBoardComponent implements OnDestroy {
       { idField: 'docid' }
     ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       this.liveAssignments = rows as ArenaAssignment[];
+      this.subscribeLiveAssignmentLogs();
       this.sortStudiosAndAssignments();
       // Lazy-load profiles for participants and pairing specialists so cards
       // show real names instead of "—" immediately after a participant lands.
@@ -372,16 +381,89 @@ export class ArenaBoardComponent implements OnDestroy {
         invitation: inv,
       }));
   }
+  // Subscribe to `live assignment log` for the currently-listed live assignments,
+  // via documentId() IN chunks (Firestore caps `in` at 30). Re-subscribes only when
+  // the id set changes. Keeps `logByLaId` in sync for presenceOf().
+  private subscribeLiveAssignmentLogs(): void {
+    const ids = Array.from(new Set(this.liveAssignments.map(a => a?.docid).filter(Boolean)));
+    const key = ids.slice().sort().join(',');
+    if (key === this.logSubKey) return;
+    this.logSubKey = key;
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
+    this.logByLaId = {};
+    for (let i = 0; i < ids.length; i += 30) {
+      const chunk = ids.slice(i, i + 30);
+      const sub = collectionData(
+        query(collection(this.firestore, 'live assignment log'), where(documentId(), 'in', chunk)),
+        { idField: 'docid' }
+      ).pipe(takeUntil(this.destroy$)).subscribe(
+        (rows: any[]) => { rows.forEach(r => { this.logByLaId[r['docid']] = r; }); },
+        () => {}
+      );
+      this.logSubs.push(sub);
+    }
+  }
+
+  // Overlay webhook presence (`live assignment log`) onto a live-assignment row so
+  // the presence helpers read reliable server truth. Only fields the log has
+  // override the client one-shots; `participantReadyAt` is never overridden (a
+  // pre-Zoom wait-screen state the webhook can't see). Timestamps are preserved so
+  // .toDate()/.toMillis() keep working.
+  private presenceOf(a: any): any {
+    const log = a?.docid ? this.logByLaId[a.docid] : null;
+    if (!log) return a;
+    const specialists: any = log['specialists'] || {};
+    const specVals: any[] = Object.values(specialists);
+    const present = specVals.some(s => s && s.joinedAt && !s.leftAt);
+    const joinedTs = specVals.map(s => s?.joinedAt).filter(Boolean);
+    const leftTs = specVals.map(s => s?.leftAt).filter(Boolean);
+    const ms = (t: any) => (typeof t?.toMillis === 'function' ? t.toMillis() : 0);
+    const overlay: any = {};
+    if (log['participantInCallAt']) overlay['participantInCallAt'] = log['participantInCallAt'];
+    if (log['participantLeftAt']) overlay['participantLeftAt'] = log['participantLeftAt'];
+    if (joinedTs.length) {
+      overlay['specialistJoinedAt'] = joinedTs.reduce((x, y) => ms(x) <= ms(y) ? x : y); // earliest join
+      overlay['specialistLeftAt'] = present ? null
+        : (leftTs.length ? leftTs.reduce((x, y) => ms(x) >= ms(y) ? x : y) : (log['meetingEndedAt'] || null)); // latest leave
+    }
+    return { ...a, ...overlay };
+  }
+
+  // Specialist has joined the call at some point (log-derived). Template helper so
+  // the HTML never reads the raw `specialistJoinedAt` field directly.
+  specialistJoined(a: ArenaAssignment): boolean {
+    return !!this.presenceOf(a).specialistJoinedAt;
+  }
+
+  // Per-specialist presence (webhook `live assignment log`, `specialists` map keyed
+  // by profile id): is THIS specialist currently in the call (joined && not left)?
+  // Lets the arena show each specialist's own status instead of one collapsed badge.
+  specialistPresentById(a: ArenaAssignment, profileid: string): boolean {
+    void this.nowTick;
+    const log = a?.['docid'] ? this.logByLaId[a['docid']] : null;
+    const s = log?.['specialists']?.[profileid];
+    return !!(s && s.joinedAt && !s.leftAt);
+  }
+
+  // Has THIS specialist joined at some point (joined, may have since left)?
+  specialistJoinedById(a: ArenaAssignment, profileid: string): boolean {
+    void this.nowTick;
+    const log = a?.['docid'] ? this.logByLaId[a['docid']] : null;
+    const s = log?.['specialists']?.[profileid];
+    return !!(s && s.joinedAt);
+  }
+
   // Joined = participant pulled into studio but Zoom not yet started
   get joinedAssignments(): ArenaAssignment[] {
-    return this.liveAssignments.filter(a => !a.specialistJoinedAt);
+    return this.liveAssignments.filter(a => !this.presenceOf(a).specialistJoinedAt);
   }
   // Active = the Zoom call has started OR is ending. We keep ended-but-not-
   // yet-completed sessions in this column so the coordinator can see that the
   // call has wrapped up (vs the card just disappearing). The timer freezes at
   // the last leave timestamp via sessionElapsed().
   get activeAssignments(): ArenaAssignment[] {
-    return this.liveAssignments.filter(a => !!a.specialistJoinedAt);
+    return this.liveAssignments.filter(a => !!this.presenceOf(a).specialistJoinedAt);
   }
 
   // Header counters
@@ -509,13 +591,14 @@ export class ArenaBoardComponent implements OnDestroy {
   // does not stop the timer.
   sessionElapsed(assignment: ArenaAssignment): string {
     void this.nowTick;
-    const ts = assignment?.specialistJoinedAt?.toDate?.();
+    const p = this.presenceOf(assignment);
+    const ts = p?.specialistJoinedAt?.toDate?.();
     if (!ts) return '—';
     let endMs = Date.now();
     if (this.callEnded(assignment)) {
       // End time = whichever party left LAST.
-      const sLeft = assignment?.specialistLeftAt?.toMillis?.();
-      const pLeft = assignment?.participantLeftAt?.toMillis?.();
+      const sLeft = p?.specialistLeftAt?.toMillis?.();
+      const pLeft = p?.participantLeftAt?.toMillis?.();
       const candidates = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
       if (candidates.length) endMs = Math.max(...candidates);
     }
@@ -529,15 +612,16 @@ export class ArenaBoardComponent implements OnDestroy {
 
   // Clock time the specialist joined the Zoom call (e.g. "14:32").
   callStartedClock(a: ArenaAssignment): string {
-    const ts = a?.specialistJoinedAt?.toDate?.();
+    const ts = this.presenceOf(a)?.specialistJoinedAt?.toDate?.();
     if (!ts) return '—';
     return this.formatClock(ts);
   }
 
   // Clock time the call ended (latest of the two leave timestamps).
   callEndedClock(a: ArenaAssignment): string {
-    const sLeft = a?.specialistLeftAt?.toMillis?.();
-    const pLeft = a?.participantLeftAt?.toMillis?.();
+    const p = this.presenceOf(a);
+    const sLeft = p?.specialistLeftAt?.toMillis?.();
+    const pLeft = p?.participantLeftAt?.toMillis?.();
     const cands = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
     if (!cands.length) return '—';
     return this.formatClock(new Date(Math.max(...cands)));
@@ -559,7 +643,9 @@ export class ArenaBoardComponent implements OnDestroy {
   // leave/in-call, so its presence means "on the wait screen now").
   participantPresent(assignment: ArenaAssignment): boolean {
     void this.nowTick;
-    return !!assignment?.participantReadyAt && !assignment?.participantLeftAt;
+    // participantReadyAt stays client-stamped (pre-Zoom); participantLeftAt from log.
+    const p = this.presenceOf(assignment);
+    return !!p?.participantReadyAt && !p?.participantLeftAt;
   }
 
   // ---- ACTIVE-card presence helpers ----------------------------------------
@@ -571,16 +657,18 @@ export class ArenaBoardComponent implements OnDestroy {
   // Specialist is currently inside the Zoom call.
   specialistInCall(a: ArenaAssignment): boolean {
     void this.nowTick;
-    if (!a?.specialistJoinedAt) return false;
-    if (a?.specialistLeftAt) return false; // explicitly left
+    const p = this.presenceOf(a);
+    if (!p?.specialistJoinedAt) return false;
+    if (p?.specialistLeftAt) return false; // explicitly left
     return true;
   }
 
   // Participant is currently inside the Zoom call.
   participantInCall(a: ArenaAssignment): boolean {
     void this.nowTick;
-    if (!a?.participantInCallAt) return false;
-    if (a?.participantLeftAt) return false; // explicitly left
+    const p = this.presenceOf(a);
+    if (!p?.participantInCallAt) return false;
+    if (p?.participantLeftAt) return false; // explicitly left
     return true;
   }
 
@@ -598,7 +686,8 @@ export class ArenaBoardComponent implements OnDestroy {
   // at some point (so we're not flagging a still-loading session as ended).
   callEnded(a: ArenaAssignment): boolean {
     if (this.specialistInCall(a) || this.participantInCall(a)) return false;
-    return !!(a?.specialistJoinedAt || a?.participantInCallAt);
+    const p = this.presenceOf(a);
+    return !!(p?.specialistJoinedAt || p?.participantInCallAt);
   }
 
   // Time since the participant entered the studio (live assignment was created)
@@ -906,6 +995,8 @@ export class ArenaBoardComponent implements OnDestroy {
     this.chatThreadSub?.unsubscribe();
     this.chatUnreadSub?.unsubscribe();
     this.chatLiveSub?.unsubscribe();
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
     this.destroy$.next();
     this.destroy$.complete();
   }

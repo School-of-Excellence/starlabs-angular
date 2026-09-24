@@ -1,103 +1,131 @@
-<div style="padding: 20px;">
-<div *ngIf="add">
-    <div mat-dialog-title>
-      <h2>Add Tier</h2>
+<!-- ADD -->
+<div class="tier-dialog" *ngIf="add">
+  <div class="tier-dialog__head">
+    <h2>Add Tier</h2>
+    <p class="tier-dialog__subtitle">Create a new access tier and its member messaging.</p>
+  </div>
+
+  <form #myForm="ngForm" class="tier-form">
+    <mat-form-field class="full">
+      <input type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
+             ngModel name="name" #name="ngModel" required (keyup)="onSelect()">
+      <mat-error *ngIf="!name.valid && name.touched">Tier name required</mat-error>
+      <mat-hint *ngIf="crossmatch">
+        <span class="tier-error">{{ crossmatcherrormessage }}</span>
+      </mat-hint>
+    </mat-form-field>
+
+    <mat-form-field>
+      <textarea matInput rows="3" placeholder="Tier Eligibility Message"
+                [(ngModel)]="tiereligibilitymessage" name="tiereligibilitymessage"></textarea>
+    </mat-form-field>
+
+    <mat-form-field>
+      <textarea matInput rows="3" placeholder="Tier Upgrade Message"
+                [(ngModel)]="tierUpgrademessage" name="tierUpgrademessage"></textarea>
+    </mat-form-field>
+
+    <mat-form-field class="full">
+      <textarea matInput rows="3" placeholder="Tier Downgrade Message"
+                [(ngModel)]="tierdowngrademessage" name="tierdowngrademessage"></textarea>
+    </mat-form-field>
+
+    <div class="section">
+      <div class="section__head">
+        <h3>Customer Support</h3>
+        <span class="section__count">{{ customersupport.length }}/4</span>
+      </div>
+      <div class="support-grid">
+        <div class="support-row"
+             *ngFor="let support of customersupport; let i = index; trackBy: trackByIndex">
+          <mat-form-field>
+            <input type="text" matInput placeholder="Customer Support"
+                   [(ngModel)]="customersupport[i]" name="customersupport{{ i }}">
+          </mat-form-field>
+          <div class="support-actions">
+            <button mat-mini-fab color="primary" type="button" aria-label="Add"
+                    (click)="addCustomerSupport()" *ngIf="customersupport.length < 4">+</button>
+            <button mat-mini-fab color="warn" type="button" aria-label="Remove"
+                    (click)="removeCustomerSupport(i)" *ngIf="customersupport.length > 1">-</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div mat-dialog-content>
-        <form #myForm="ngForm">
-            <mat-form-field>
-                <input type="text" placeholder="Add Tier" matInput [(ngModel)]="tier"
-                       ngModel
-                       name="name"
-                       #name="ngModel"
-                       required (keyup)="onSelect()">
-                       <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Tier name required</mat-error>
-                       <mat-hint *ngIf="crossmatch">
-                        <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
-                       </mat-hint>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput rows="4"
-                        placeholder="Tier Eligibility Message"
-                        [(ngModel)]="tiereligibilitymessage"
-                        name="tiereligibilitymessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput rows="4"
-                        placeholder="Tier Upgrade Message"
-                        [(ngModel)]="tierUpgrademessage"
-                        name="tierUpgrademessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput rows="4"
-                        placeholder="Tier Downgrade Message"
-                        [(ngModel)]="tierdowngrademessage"
-                        name="tierdowngrademessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-        </form>
-            <button  mat-raised-button color="primary" (click)="onSubmit()" [disabled]="myForm.invalid ? true :crossmatch ? true: false">Add</button>&nbsp;&nbsp;
-            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
-    </div>
+  </form>
+
+  <div class="dialog-actions">
+    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="onSubmit()"
+            [disabled]="myForm.invalid || crossmatch">Add</button>
+  </div>
 </div>
 
-<div *ngIf="edit">
-    <div mat-dialog-title>
-      <h2>Edit Tier</h2>
+<!-- EDIT -->
+<div class="tier-dialog" *ngIf="edit">
+  <div class="tier-dialog__head">
+    <h2>Edit Tier</h2>
+    <p class="tier-dialog__subtitle">Update this access tier and its member messaging.</p>
+  </div>
+
+  <form #myForm="ngForm" class="tier-form">
+    <mat-form-field class="full">
+      <input type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
+             ngModel name="name" required #name="ngModel" (keyup)="onSelect()">
+      <mat-error *ngIf="!name.valid && name.touched">Tier name required</mat-error>
+      <mat-hint *ngIf="crossmatch">
+        <span class="tier-error">{{ crossmatcherrormessage }}</span>
+      </mat-hint>
+    </mat-form-field>
+
+    <mat-form-field>
+      <textarea matInput rows="3" placeholder="Tier Eligibility Message"
+                [(ngModel)]="tiereligibilitymessage" name="tiereligibilitymessage"></textarea>
+    </mat-form-field>
+
+    <mat-form-field>
+      <textarea matInput rows="3" placeholder="Tier Upgrade Message"
+                [(ngModel)]="tierUpgrademessage" name="tierUpgrademessage"></textarea>
+    </mat-form-field>
+
+    <mat-form-field class="full">
+      <textarea matInput rows="3" placeholder="Tier Downgrade Message"
+                [(ngModel)]="tierdowngrademessage" name="tierdowngrademessage"></textarea>
+    </mat-form-field>
+
+    <div class="section">
+      <div class="section__head">
+        <h3>Customer Support</h3>
+        <span class="section__count">{{ customersupport.length }}/4</span>
+      </div>
+      <div class="support-grid">
+        <div class="support-row"
+             *ngFor="let support of customersupport; let i = index; trackBy: trackByIndex">
+          <mat-form-field>
+            <input type="text" matInput placeholder="Customer Support"
+                   [(ngModel)]="customersupport[i]" name="customersupport{{ i }}">
+          </mat-form-field>
+          <div class="support-actions">
+            <button mat-mini-fab color="primary" type="button" aria-label="Add"
+                    (click)="addCustomerSupport()" *ngIf="customersupport.length < 4">+</button>
+            <button mat-mini-fab color="warn" type="button" aria-label="Remove"
+                    (click)="removeCustomerSupport(i)" *ngIf="customersupport.length > 1">-</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <div mat-dialog-content>
-        <form #myForm="ngForm">
-            <mat-form-field>
-                <input type="text" placeholder="Edit Tier" matInput [(ngModel)]="tier"
-                       ngModel
-                       name="name"
-                       required
-                       #name="ngModel" (keyup)="onSelect()">
-                       <mat-error *ngIf="!name.valid && name.touched" style="color: red;">Tier name required</mat-error>
-                       <mat-hint *ngIf="crossmatch">
-                        <mat-error style="color: red;">{{this.crossmatcherrormessage}}</mat-error>
-                       </mat-hint>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput  rows="4"
-                        placeholder="Tier Eligibility Message"
-                        [(ngModel)]="tiereligibilitymessage"
-                        name="tiereligibilitymessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput  rows="4"
-                        placeholder="Tier Upgrade Message"
-                        [(ngModel)]="tierUpgrademessage"
-                        name="tierUpgrademessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-            <mat-form-field style="width:100%;">
-            <textarea matInput  rows="4"
-                        placeholder="Tier Downgrade Message"
-                        [(ngModel)]="tierdowngrademessage"
-                        name="tierdowngrademessage"
-                        rows="3">
-            </textarea>
-            </mat-form-field>
-        </form>
-            <button  mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>&nbsp;&nbsp;
-            <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
-    </div>
+  </form>
+
+  <div class="dialog-actions">
+    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
+  </div>
 </div>
 
-<div *ngIf="delete">
-    <div mat-dialog-title style="width: 350px;">
-        <h3>Are you sure you want to delete?</h3>
-    </div>
-        <button  mat-raised-button color="primary" (click)="onDelete(data.id)">Delete</button>&nbsp;&nbsp;
-        <button  mat-raised-button color="primary" (click)="onClick()">Cancel</button>
-</div>
+<!-- DELETE -->
+<div class="tier-dialog tier-dialog--confirm" *ngIf="delete">
+  <h3>Are you sure you want to delete?</h3>
+  <div class="dialog-actions">
+    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button mat-raised-button color="warn" (click)="onDelete(data.id)">Delete</button>
+  </div>
 </div>

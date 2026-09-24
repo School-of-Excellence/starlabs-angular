@@ -24,6 +24,16 @@
       </div>
     </div>
 
+    <!-- Bulk apply: tick a zone for everyone eligible for it -->
+    <div *ngIf="data.type === 'conflict' && zoneOptions.length" class="apply-zone-bar">
+      <button type="button"
+              class="apply-zone-btn"
+              *ngFor="let zone of zoneOptions"
+              (click)="applyZoneToAll(zone.zoneId)">
+        Apply {{ zone.zoneName }}
+      </button>
+    </div>
+
     <!-- Conflict List (Interactive) -->
     <div *ngIf="data.type === 'conflict'" class="conflicts-list">
       <div class="conflict-item" *ngFor="let participant of data.participants; let i = index">

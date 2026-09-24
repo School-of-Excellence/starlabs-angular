@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CdkDragDrop, moveItemInArray, DragDropModule } from '@angular/cdk/drag-drop';
-import { collection, collectionData, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { collection, collectionData, documentId, Firestore, getDoc, getDocs, orderBy, query, where, doc, deleteDoc, setDoc, updateDoc } from '@angular/fire/firestore';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
@@ -20,6 +20,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-event-opportunity-dashboard',
@@ -81,15 +82,22 @@ export class EventOpportunityDashboardComponent {
   selectedCustomStage: any = null;
   customStageSearchText: string = '';
 
-  selectedQueueList: string[] = []
-  /** Planning tab's OWN, independent queue selection (separate from the Board's). */
-  planningQueues: string[] = []
-  /** Union of Board + Planning selections — the set data is actually loaded for. */
-  get loadedQueues(): string[] { return [...new Set([...this.selectedQueueList, ...this.planningQueues])]; }
-  queueList: any[]
+  selectedQueueList: string[] = [];
+  queueList: any[] = [];
+  selectedEvent : string = null;
+  filterEvent : string = '';
+  liveEventList : string[] = []
   mapQueue = {}
   showQueueSelect: boolean = true
   mapData = {}
+
+  // Webhook presence: `live assignment log` docs (keyed by live-assignment id) for
+  // the live assignments across the selected queues. Used only to decide "has the
+  // call started + how long ago" from the specialist's real join time. Subscribed
+  // via documentId() IN chunks; re-subscribes when the id set changes.
+  private logByLaId: Record<string, any> = {};
+  private logSubs: Subscription[] = [];
+  private logSubKey = '';
   mapLiveAssignmentData = {};
   mapProfile = {}
   mapEmail = {}
@@ -114,7 +122,6 @@ export class EventOpportunityDashboardComponent {
    *  counts become nondeterministic (differ machine-to-machine by click history). */
   private queueTokensSub?: Subscription;
   developerRole:boolean = false;
-  currentProfileId: string = '';
   queueTokenMap: Map<string, any> = new Map();
   selectedProductFilter: string | null = null;
   expandedStages: Set<string> = new Set();
@@ -124,22 +131,6 @@ export class EventOpportunityDashboardComponent {
   arenaeticket:any[]=[]
   mapEvent = {}
 
-  // ===== Studio Watch =====================================================
-  // A right-side panel that surfaces studios which have been occupied too long
-  // and are holding up the queue. Two sources feed it (matching the Arena's
-  // JOINED / ACTIVE columns):
-  //   • JOINED  — participant pulled into the studio (no Zoom start yet) more
-  //               than 4h ago  → measure from the live-assignment `created`.
-  //   • ACTIVE  — the call has started; measure from `specialistJoinedAt`. We
-  //               still flag it even when the call itself has ended (the
-  //               assignment is `live` so the studio is not yet freed).
-  // Only `status === 'live'` assignments count — a completed assignment has
-  // already freed its studio.
-  private readonly STUDIO_WATCH_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
-  studioWatchOpen = false;         // collapsed pill by default; user expands
-  private studioWatchTick = 0;     // bumped by a timer so elapsed labels refresh
-  private studioWatchTimer: any = null;
-
   filteredProfileIds: Set<string> = new Set();
   selectedEventName: string = '';
 
@@ -148,6 +139,12 @@ export class EventOpportunityDashboardComponent {
   hideParticipants: boolean = false;
   private initializedStagesPerQueue: Set<string> = new Set();
   private seenStageKeys: Set<string> = new Set();
+  private readonly STUDIO_WATCH_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
+  private studioWatchTimer: any = null;
+  private studioWatchTick = 0; // bumped by a timer so elapsed labels refresh
+  planningQueues: string[] = []
+  get loadedQueues(): string[] { return [...new Set([...this.selectedQueueList, ...this.planningQueues])]; }
+  studioWatchOpen = false;  
 
   isStageVisibleOnScreen(queueid: string, stage: string): boolean {
     const opp = this.getStageTokenCount(queueid, stage, 'waiting') + this.getStageTokenCount(queueid, stage, 'queued');
@@ -212,28 +209,39 @@ export class EventOpportunityDashboardComponent {
         if (roleData["developer"]) {
           this.developerRole = true;
         }
-        this.currentProfileId = roleData?.['profile_ref']?.id || '';
-        this.getQueueData()
+
+      this.loadEventCohorts();
+        // this.getQueueData();
+      getDocs(query(collection(this.firestore, 'event collection'), orderBy('start_date', 'desc'))).then(snap => {
+        this.eventList = snap.docs.map(e => {
+          let element = e.data()
+          element["id"] = e.id
+          element["ref"] = e.ref
+          this.mapEvent[e.id] = e.data()['name'];
+          return element
+        })
+      this.liveEventList = this.eventList.filter(e => e["start_date"].toDate() <= new Date() && e["end_date"].toDate() >= new Date());
+    })
+        // this.getQueueData()
       // } else {
       //   this.router.navigateByUrl("/")
       // }
     })
-
-    // Refresh Studio Watch elapsed labels every 30s (Xh Ym granularity).
     this.studioWatchTimer = setInterval(() => { this.studioWatchTick++; }, 30000);
   }
 
   ngOnDestroy() {
     if (this.studioWatchTimer) clearInterval(this.studioWatchTimer);
     this.queueTokensSub?.unsubscribe();
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
     this.subscription.complete();
     this.subscription.next();
   }
 
   setActiveTab(tab: 'board' | 'planning'): void {
-    // Both tabs stay alive (toggled via [hidden]) so switching never reloads/refetches.
-    // Data stays fresh through queue-selection changes, not tab switches.
     this.activeTab = tab;
+    if (tab === 'planning') this.planningRefreshKey++;
   }
 
   /** Queue selection coming from the Planning tab's own queue filter. */
@@ -383,9 +391,20 @@ export class EventOpportunityDashboardComponent {
     this.eventCohorts = map;
   }
 
+  onEventSelectForQueue(){
+    if(this.selectedEvent){
+      this.ngOnDestroy();
+      this.selectedQueueList = [];
+      // this.isContainerOpen = false;
+      this.getselectedStages();
+      this.fetchQueueTokens();
+      this.getQueueData();
+    }
+  }
+
   getQueueData() {
-    this.loadEventCohorts();
-    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()))).then(async queueData => {
+    // this.loadEventCohorts();
+    getDocs(query(collection(this.firestore, 'queue generation'), where("queueenddate", ">=", new Date()), where('eventid' , 'array-contains' , this.selectedEvent))).then(async queueData => {
       this.queueList = queueData.docs.map(e => e.data())
       for (let i = 0; i < this.queueList.length; i++) {
         const element = this.queueList[i];
@@ -393,21 +412,27 @@ export class EventOpportunityDashboardComponent {
         this.mapQueue[element['docid']] = element
       }
     })
-    getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
-        this.eventList = snap.docs.map(e => {
-        let element = e.data()
-        element["id"] = e.id 
-        element["ref"] = e.ref 
-        this.mapEvent[e.id] = e.data()['name']
-        return element
-      })
-    })
+    // getDocs(query(collection(this.firestore,'event collection'), orderBy('start_date','desc'))).then(snap =>{
+    //     this.eventList = snap.docs.map(e => {
+    //     let element = e.data()
+    //     element["id"] = e.id 
+    //     element["ref"] = e.ref 
+    //     this.mapEvent[e.id] = e.data()['name']
+    //     return element
+    //   })
+    // })
   }
+
+  getFilteredEvents(){
+    const search = this.filterEvent.toLowerCase().trim();
+    return [null , undefined , ''].includes(search) ? this.eventList : this.eventList.filter((event)=>(event?.name ?? '').toLowerCase().trim().includes(search))
+  }
+
 
   getselectedStages() {
     if (this.selectedQueueList.length !== 0) {
 
-      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).subscribe((queueData) => {
+      collectionData(query(collection(this.firestore, "stage opportunity count"), where("queuelist", "array-contains-any", this.selectedQueueList))).pipe(takeUntil(this.subscription)).subscribe((queueData) => {
         this.customValuesFromSelectedQueues = queueData.filter(e => e['kind'] !== 'phase' && e['queuelist'].every((item: string) => this.selectedQueueList.includes(item))).sort((a, b) => (a['sequence'] ?? 999) - (b['sequence'] ?? 999));
       })
 
@@ -415,21 +440,6 @@ export class EventOpportunityDashboardComponent {
     } else {
       console.log('No queues selected, skipping stage fetch');
     }
-  }
-
-  /** Top "Select queue" picker changed (ngModel gives the full new selection). */
-  onQueueSelectionChange(ids: string[]): void {
-    this.selectedQueueList = [...(ids || [])];
-    this.getselectedStages();
-    this.fetchQueueTokens();
-    this.planningRefreshKey++;
-  }
-
-  /** Planning tab picked its OWN queues (independent of the Board). Loads data for the union. */
-  onPlanningQueuesChange(ids: string[]): void {
-    this.planningQueues = [...(ids || [])];
-    this.fetchQueueTokens();
-    this.planningRefreshKey++;
   }
 
   updateSelectedQueues(docid: any, event: any) {
@@ -495,6 +505,7 @@ export class EventOpportunityDashboardComponent {
 
   handleEventData(eventData: any, queueId: string): void {
     this.mapData[queueId] = eventData;
+    this.subscribeStudioWatchLogs();
     this.mapLiveAssignmentData = eventData["mapLiveStudioToData"];
     this.rebuildCompletedMaps(queueId, eventData["liveAssignmentList"] || []);
     const stages: string[] = eventData["stages"] || [];
@@ -933,7 +944,7 @@ export class EventOpportunityDashboardComponent {
   }
 
   private getShadowCohortParticipants(queueid: string, stage: string): Array<{ profileid: string, bigactivity: string }> {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
+    const eventId = this.selectedEvent;
     const cohorts = eventId ? this.eventCohorts[eventId] : null;
     if (!cohorts?.length) return [];
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
@@ -990,10 +1001,25 @@ export class EventOpportunityDashboardComponent {
       .sort((a, b) => (this.mapProfile[a.profileid] || a.profileid).localeCompare(this.mapProfile[b.profileid] || b.profileid));
   }
 
+  /**
+   * Cohorts for a queue, resolved through the queue's `eventid`. That field is
+   * stored as an ARRAY of event-collection ids (a queue can be mapped to
+   * several Live Events); older docs still carry a bare string. `eventCohorts`
+   * is keyed by a single event id, so index it per id and union the results --
+   * indexing it with the raw array stringifies the key ("a,b") and silently
+   * misses every multi-event queue.
+   */
+  private cohortsForQueue(queueid: string): Array<{ bigactivity: string, participantidlist: string[] }> {
+    const raw = this.mapQueue[queueid]?.['eventid'];
+    const eventIds: string[] = Array.isArray(raw) ? raw : ([null, undefined, ''].includes(raw) ? [] : [raw]);
+    const out: Array<{ bigactivity: string, participantidlist: string[] }> = [];
+    eventIds.forEach(id => out.push(...(this.eventCohorts[id] ?? [])));
+    return out;
+  }
+
   getNoStudioShadowingParticipants(queueid: string, stage: string): Array<{ profileid: string, activity: string }> {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
-    const cohorts = eventId ? this.eventCohorts[eventId] : null;
-    if (!cohorts?.length) return [];
+    const cohorts = this.cohortsForQueue(queueid);
+    if (!cohorts.length) return [];
 
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
     const mapBigActivity = this.mapData[queueid]?.['mapBigActivity'] ?? {};
@@ -1026,9 +1052,8 @@ export class EventOpportunityDashboardComponent {
   }
 
   getNoStudioShadowingCount(queueid: string, stage: string): number {
-    const eventId = this.mapQueue[queueid]?.['eventid'];
-    const cohorts = eventId ? this.eventCohorts[eventId] : null;
-    if (!cohorts?.length) return 0;
+    const cohorts = this.cohortsForQueue(queueid);
+    if (!cohorts.length) return 0;
 
     const shadowSet: Set<string> = this.mapData[queueid]?.['shadowActivityIds'] ?? new Set();
     const compulsory = this.mapQueue[queueid]?.['stageproperty']?.[stage]?.['compulsoryactivity'] ?? {};
@@ -1355,11 +1380,61 @@ export class EventOpportunityDashboardComponent {
     return isNaN(t) ? null : t;
   }
 
+  // Subscribe to `live assignment log` for the LIVE assignments across the selected
+  // queues (documentId() IN, chunks of 30). Re-subscribes only when the id set
+  // changes. Feeds specialistJoinedMs() so "call started" reflects the real join.
+  private subscribeStudioWatchLogs(): void {
+    const ids: string[] = [];
+    for (const queueid of this.selectedQueueList) {
+      const list: any[] = this.mapData[queueid]?.['liveAssignmentList'] || [];
+      for (const a of list) {
+        if (a?.['status'] !== 'live') continue;
+        const id = a?.['id'] || a?.['docid'];
+        if (id) ids.push(id);
+      }
+    }
+    const uniq = Array.from(new Set(ids));
+    const key = uniq.slice().sort().join(',');
+    if (key === this.logSubKey) return;
+    this.logSubKey = key;
+    this.logSubs.forEach(s => s.unsubscribe());
+    this.logSubs = [];
+    this.logByLaId = {};
+    for (let i = 0; i < uniq.length; i += 30) {
+      const chunk = uniq.slice(i, i + 30);
+      const sub = collectionData(
+        query(collection(this.firestore, 'live assignment log'), where(documentId(), 'in', chunk)),
+        { idField: 'docid' }
+      ).subscribe(
+        (rows: any[]) => { rows.forEach(r => { this.logByLaId[r['docid']] = r; }); },
+        () => {}
+      );
+      this.logSubs.push(sub);
+    }
+  }
+
+  // Real "specialist joined" time in ms for an assignment: earliest specialist join
+  // from the webhook log when available (log present but nobody joined → null =
+  // "not started"), else the legacy `specialistJoinedAt` one-shot as a fallback.
+  private specialistJoinedMs(a: any): number | null {
+    const id = a?.['id'] || a?.['docid'];
+    const log = id ? this.logByLaId[id] : null;
+    if (log) {
+      const specialists: any = log['specialists'] || {};
+      const joinedTs = Object.values(specialists).map((s: any) => s?.joinedAt).filter(Boolean);
+      if (!joinedTs.length) return null;
+      const earliest = joinedTs.reduce((x: any, y: any) =>
+        (this.tsToMillis(x) ?? Infinity) <= (this.tsToMillis(y) ?? Infinity) ? x : y);
+      return this.tsToMillis(earliest);
+    }
+    return this.tsToMillis(a?.['specialistJoinedAt']);
+  }
+
   /**
    * Studios flagged by the 4-hour rule across the currently selected board
    * queues. JOINED assignments are measured from `created` (studio entry);
-   * ACTIVE assignments (call started) from `specialistJoinedAt`. Sorted
-   * longest-waiting first.
+   * ACTIVE assignments (call started) from the specialist's real join time
+   * (webhook log, falling back to `specialistJoinedAt`). Sorted longest-waiting first.
    */
   get studioWatchItems(): Array<{
     key: string;
@@ -1386,7 +1461,7 @@ export class EventOpportunityDashboardComponent {
         if (!stage) continue;
         if (!this.isStageSelected(queueid, stage)) continue;
 
-        const joinedMs = this.tsToMillis(a?.['specialistJoinedAt']);
+        const joinedMs = this.specialistJoinedMs(a);
         const type: 'joined' | 'active' = joinedMs != null ? 'active' : 'joined';
         const startMs = joinedMs != null ? joinedMs : this.tsToMillis(a?.['created']);
         if (startMs == null) continue;
@@ -1579,8 +1654,9 @@ export class EventOpportunityDashboardComponent {
       this.queueTokenMap.clear();
       return;
     }
-    const selectedQueueRef = queues.map((e) => this.mapQueue[e]['docref'])
-    this.queueTokensSub = collectionData(query(
+
+    const selectedQueueRef = this.selectedQueueList.map((e) => this.mapQueue[e]['docref'])
+    collectionData(query(
       collection(this.firestore, 'queue_token'),
       where('queueref', 'in', selectedQueueRef)
     )).pipe(takeUntil(this.subscription)).subscribe(tokens => {

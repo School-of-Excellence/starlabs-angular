@@ -6,6 +6,8 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { ATCDraftService } from '../../shared/atc-draft.service';
+import { MediaCacheService } from '../../shared/media-cache.service';
 
 @Component({
   selector: 'app-atc-option',
@@ -27,7 +29,7 @@ export class AtcOptionComponent {
 
   firestoreATC = getFirestore("firestore-atc")
 
-  constructor(@Inject(MAT_DIALOG_DATA) public atc, public dialogRef: MatDialogRef<any>,private ngZone: NgZone) {
+  constructor(@Inject(MAT_DIALOG_DATA) public atc, public dialogRef: MatDialogRef<any>,private ngZone: NgZone, private draftService: ATCDraftService, private mediaCache: MediaCacheService) {
     this.draftOption = atc["drafts"] ?? []
     this.initiatedATC = atc["initiated"] ?? []
     this.mapProfile = atc["mapProfile"] ?? {}
@@ -49,13 +51,23 @@ export class AtcOptionComponent {
     this.dialogRef.close(value)
   }
 
-  deleteDraft(atcdoc, index){
+  async deleteDraft(atcdoc, index){
     if(confirm("Sure, do you want to delete this ATC")){
-      updateDoc(doc(this.firestoreATC, atcdoc.ref.path),{
-        delete: true
-      }).catch(err =>{
+      // derive collection + docId from the wrapper path (e.g. "temporary_edit_ATC/<id>")
+      const docId = atcdoc.id
+      const parts = (atcdoc.ref?.path ?? '').split('/')
+      parts.pop()                              // drop the doc-id segment
+      const collection = parts.join('/')
+      // Soft-delete the SERVER copy. Tolerate failure for a local-only draft whose server doc never existed.
+      try {
+        await updateDoc(doc(this.firestoreATC, atcdoc.ref.path), { delete: true })
+      } catch (err) {
         console.log(err)
-      })
+      }
+      // Remove the LOCAL draft + its cached media so the deleted draft can't reappear from the cache,
+      // nor be resurrected on the next screen open by flushDirty re-pushing a stale local copy.
+      await this.draftService.purgeLocal(collection, docId)
+      await this.mediaCache.deleteByDraft(docId)
       this.draftOption.splice(index, 1)
       if(this.draftOption.length == 0){
         this.close()

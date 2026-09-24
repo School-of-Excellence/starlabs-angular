@@ -1,0 +1,209 @@
+<div class="builder-wrap">
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="34"></mat-spinner>
+  </div>
+
+  <form [formGroup]="form" *ngIf="!loading" (ngSubmit)="save()">
+    <div class="builder">
+
+      <!-- ══ Library rail: everything that can go on the home screen ══ -->
+      <aside class="library">
+        <div class="lib-head">
+          <h3>Library</h3>
+          <span class="lib-hint">Click an item to add it to the home screen</span>
+        </div>
+
+        <label class="lib-search">
+          <mat-icon>search</mat-icon>
+          <input type="text" placeholder="Search widgets, series, ads"
+            [value]="librarySearch" (input)="onSearch($any($event.target).value)" />
+        </label>
+
+        <div class="lib-scroll">
+          <section class="lib-section" *ngIf="filteredStatic.length > 0">
+            <div class="lib-cap">Widgets <span class="cap-count">{{ filteredStatic.length }}</span></div>
+            <button type="button" class="lib-item" *ngFor="let opt of filteredStatic"
+              (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
+              <span class="type-ico type-{{ opt.type }}"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
+              <span class="lib-label">{{ opt.label }}</span>
+              <mat-icon class="lib-add" [class.is-added]="isAdded(opt.key)">
+                {{ isAdded(opt.key) ? 'check' : 'add' }}
+              </mat-icon>
+            </button>
+          </section>
+
+          <section class="lib-section" *ngIf="filteredSeries.length > 0">
+            <div class="lib-cap">Home Series <span class="cap-count">{{ filteredSeries.length }}</span></div>
+            <button type="button" class="lib-item" *ngFor="let opt of filteredSeries"
+              (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
+              <span class="type-ico type-homeseries"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
+              <span class="lib-label">{{ opt.label }}</span>
+              <mat-icon class="lib-add" [class.is-added]="isAdded(opt.key)">
+                {{ isAdded(opt.key) ? 'check' : 'add' }}
+              </mat-icon>
+            </button>
+          </section>
+
+          <section class="lib-section" *ngIf="filteredAds.length > 0">
+            <div class="lib-cap">Ads <span class="cap-note">two share a row</span></div>
+            <button type="button" class="lib-item" *ngFor="let opt of filteredAds"
+              (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
+              <span class="type-ico type-ad"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
+              <span class="lib-label">{{ opt.label }}</span>
+              <mat-icon class="lib-add" [class.is-added]="isAdded(opt.key)">
+                {{ isAdded(opt.key) ? 'check' : 'add' }}
+              </mat-icon>
+            </button>
+          </section>
+
+          <div class="lib-empty" *ngIf="libraryEmpty">
+            No matches for &ldquo;{{ librarySearch }}&rdquo;.
+          </div>
+        </div>
+      </aside>
+
+      <!-- ══ Layout canvas: the home screen, top to bottom ══ -->
+      <section class="canvas">
+        <div class="canvas-bar">
+          <div class="bar-text">
+            <h3>Home screen layout</h3>
+            <span class="bar-meta">
+              {{ groupsView.length }} {{ groupsView.length === 1 ? 'row' : 'rows' }} &middot; shown top to bottom
+            </span>
+          </div>
+          <span class="dirty-pill" *ngIf="dirty && !isSaving">Unsaved changes</span>
+          <button mat-flat-button color="primary" type="submit" class="save-btn" [disabled]="isSaving">
+            <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
+            <ng-container *ngIf="!isSaving"><mat-icon>save</mat-icon> Save</ng-container>
+          </button>
+        </div>
+
+        <div class="rows-card" formArrayName="items" cdkDropList (cdkDropListDropped)="dropGroup($event)">
+
+          <div class="row" *ngFor="let g of groupsView; let gi = index; trackBy: trackGroup"
+            [id]="'grp-' + groupKey(g)" [class.expanded]="isExpanded(g)" [class.row-ads]="g.kind === 'ads'"
+            cdkDrag>
+            <div class="row-drag-preview" *cdkDragPreview>{{ groupLabel(g) }}</div>
+
+            <!-- Collapsed header: always visible, one line per home row. -->
+            <div class="row-head" (click)="toggleGroup(g)">
+              <button mat-icon-button type="button" class="drag-btn" cdkDragHandle
+                (click)="$event.stopPropagation()" matTooltip="Drag to reorder" aria-label="Drag to reorder">
+                <mat-icon>drag_indicator</mat-icon>
+              </button>
+              <span class="row-index">{{ gi + 1 }}</span>
+
+              <ng-container *ngIf="g.kind === 'other'">
+                <span class="type-ico type-{{ typeOf(g.indices[0]) }}">
+                  <mat-icon>{{ typeIcon(typeOf(g.indices[0])) }}</mat-icon>
+                </span>
+                <div class="row-text">
+                  <span class="row-name">{{ nameOf(g.indices[0]) }}</span>
+                  <span class="row-sub">
+                    {{ typeLabel(typeOf(g.indices[0])) }}
+                    <ng-container *ngIf="titleOf(g.indices[0]) && titleOf(g.indices[0]) !== nameOf(g.indices[0])">
+                      &middot; &ldquo;{{ titleOf(g.indices[0]) }}&rdquo;
+                    </ng-container>
+                  </span>
+                </div>
+                <span class="chip chip-tags"
+                  *ngIf="typeOf(g.indices[0]) === 'homeseries' && enabletagOf(g.indices[0]) && tagCount(g.indices[0]) > 0">
+                  <mat-icon>sell</mat-icon>{{ tagCount(g.indices[0]) }}
+                </span>
+                <span class="chip chip-soft">{{ showToLabel(showtoOf(g.indices[0])) }}</span>
+              </ng-container>
+
+              <ng-container *ngIf="g.kind === 'ads'">
+                <span class="type-ico type-ad"><mat-icon>campaign</mat-icon></span>
+                <div class="row-text">
+                  <span class="row-name">Ad row</span>
+                  <span class="row-sub">{{ adNames(g) }}</span>
+                </div>
+                <span class="chip" [class.chip-amber]="g.indices.length < 2" [class.chip-soft]="g.indices.length === 2">
+                  {{ g.indices.length }} of 2 slots
+                </span>
+              </ng-container>
+
+              <button mat-icon-button type="button" class="remove-btn"
+                (click)="$event.stopPropagation(); removeGroup(g)"
+                [matTooltip]="g.kind === 'ads' ? 'Remove ad row' : 'Remove from home'"
+                aria-label="Remove from home screen">
+                <mat-icon>close</mat-icon>
+              </button>
+              <button mat-icon-button type="button" class="chev-btn"
+                (click)="$event.stopPropagation(); toggleGroup(g)"
+                [attr.aria-expanded]="isExpanded(g)" aria-label="Edit row">
+                <mat-icon class="chev" [class.open]="isExpanded(g)">expand_more</mat-icon>
+              </button>
+            </div>
+
+            <!-- Inline editor: opens only for the row being worked on. -->
+            <div class="row-body" *ngIf="isExpanded(g)">
+              <div class="slot" *ngFor="let idx of g.indices" [formGroupName]="idx">
+
+                <div class="slot-head" *ngIf="g.kind === 'ads'">
+                  <span class="slot-num">{{ g.indices.indexOf(idx) + 1 }}</span>
+                  <span class="slot-name">{{ nameOf(idx) }}</span>
+                  <button mat-icon-button type="button" class="remove-btn slot-remove"
+                    (click)="removeItem(idx)" matTooltip="Remove this ad" aria-label="Remove this ad">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+
+                <div class="edit-grid">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Title</mat-label>
+                    <input matInput formControlName="title" placeholder="Enter title" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                    <mat-label>Subtitle</mat-label>
+                    <input matInput formControlName="subtitle" placeholder="Enter subtitle" />
+                  </mat-form-field>
+                  <div class="field-col">
+                    <span class="mini-label">Show to</span>
+                    <div class="seg-group" role="radiogroup" aria-label="Show to">
+                      <button type="button" class="seg" *ngFor="let s of showToOptions"
+                        [class.seg-on]="showtoOf(idx) === s.value"
+                        [attr.aria-pressed]="showtoOf(idx) === s.value"
+                        (click)="setShowTo(idx, s.value)">{{ s.label }}</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Home Series only: tag visibility + up to 3 tags. -->
+                <div class="series-row" *ngIf="typeOf(idx) === 'homeseries'">
+                  <mat-slide-toggle formControlName="enabletag" color="primary" class="tag-toggle">
+                    Show tags
+                  </mat-slide-toggle>
+                  <div class="tag-editor" [class.tag-dim]="!enabletagOf(idx)">
+                    <span class="tag-pill" *ngFor="let tagCtrl of itemTags(idx).controls; let t = index">
+                      {{ tagCtrl.value }}
+                      <button type="button" class="pill-x" (click)="removeTag(idx, t)" aria-label="Remove tag">
+                        <mat-icon>close</mat-icon>
+                      </button>
+                    </span>
+                    <input #tagInput class="tag-input" *ngIf="tagCount(idx) < 3"
+                      placeholder="Add tag &crarr;"
+                      (keydown.enter)="$event.preventDefault(); addTagInput(idx, tagInput)"
+                      (blur)="addTagInput(idx, tagInput)" />
+                    <span class="tag-max" *ngIf="tagCount(idx) >= 3">Max 3 tags</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="slot-note" *ngIf="g.kind === 'ads' && g.indices.length < 2">
+                Add another ad from the library and it fills the second slot of this row.
+              </p>
+            </div>
+          </div>
+
+          <div class="rows-empty" *ngIf="groupsView.length === 0">
+            <mat-icon>dashboard_customize</mat-icon>
+            <h3>Your home screen is empty</h3>
+            <p>Add widgets, series, and ads from the library on the left.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </form>
+</div>

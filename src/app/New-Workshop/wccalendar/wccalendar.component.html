@@ -1,0 +1,73 @@
+<div class="wc-calendar">
+
+  <div class="page-head">
+    <div class="page-title">Workshop &amp; Campaign Calendar</div>
+    <div class="cal-nav">
+      <button type="button" class="cal-nav-btn" (click)="prevMonth()" aria-label="Previous month">&#8249;</button>
+      <button type="button" class="cal-nav-btn cal-nav-today" (click)="goToday()">Today</button>
+      <button type="button" class="cal-nav-btn" (click)="nextMonth()" aria-label="Next month">&#8250;</button>
+      <span class="cal-range">{{ rangeLabel }}</span>
+    </div>
+  </div>
+
+  <!-- Legend + Add button -->
+  <div class="legend-row">
+    <div class="legend-items">
+      <div class="legend-lbl">Legend</div>
+      @for (item of legend; track item.name) {
+        <div class="cal-legend-item"><span class="cal-dot {{ item.dot }}"></span>{{ item.name }}</div>
+      }
+      @if (!legend.length) {
+        <div class="cal-legend-item legend-empty">No event types yet — add one from + Add Event</div>
+      }
+    </div>
+    <button type="button" class="btn-new-camp" (click)="openAddEvent()">+ Add Event</button>
+  </div>
+
+  @if (loading) {
+    <div class="loading-row">Loading calendar…</div>
+  }
+
+  <!-- Stacked month calendars -->
+  <div class="cal-grid">
+    @for (month of months; track month.title) {
+      <div class="cal-month">
+        <div class="cal-month-hdr">
+          <div>
+            <div class="cal-month-title">{{ month.title }}</div>
+            <div class="cal-month-sub">{{ month.sub }}</div>
+          </div>
+          <div class="cal-month-chips">
+            @for (p of month.pills; track p.text) {
+              <span class="mchip {{ p.pill }}">{{ p.text }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="cal-dow">
+          @for (d of dow; track d) {
+            <div class="cal-dow-lbl">{{ d }}</div>
+          }
+        </div>
+
+        <div class="cal-days">
+          @for (day of month.days; track $index) {
+            <div class="cal-day"
+                 [class.cal-other]="!day.inMonth"
+                 [class.cal-today]="day.isToday"
+                 (click)="openDay(day)">
+              <div class="cal-day-num">{{ day.num }}</div>
+              @for (chip of day.chips; track chip.event.id) {
+                <div class="cal-event {{ chip.cls }}" [title]="chip.tooltip" (click)="openChip(chip, $event)">{{ chip.label }}</div>
+              }
+              @if (day.moreCount > 0) {
+                <div class="cal-more" (click)="openMore(day, $event)">+{{ day.moreCount }} more</div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+</div>

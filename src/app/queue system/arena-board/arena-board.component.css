@@ -461,6 +461,16 @@
   word-break: break-word;
 }
 .kc__role-act { font-weight: 500; color: var(--ink-3); }
+/* Per-specialist join status dot, pushed to the right edge of the role row. */
+.kc__role-pres { margin-left: auto; display: inline-flex; align-items: center; }
+.kc__role-pres mat-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+  line-height: 15px;
+}
+.kc__role-pres--ok mat-icon { color: var(--green-2) !important; }
+.kc__role-pres--off mat-icon { color: var(--ink-4) !important; }
 
 /* Idle-card specialist name: allow full name to wrap instead of truncating. */
 .kc__name--wrap {

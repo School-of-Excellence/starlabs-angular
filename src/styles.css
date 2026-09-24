@@ -233,6 +233,17 @@ body {
   --so-bg: #1b1b20; --so-ink: #f5f5f7; --so-ink2: rgba(235, 235, 245, 0.64); --so-muted: rgba(235, 235, 245, 0.45);
   --so-border: rgba(255, 255, 255, 0.12); --so-border-soft: rgba(255, 255, 255, 0.08);
   --so-accent: #0a84ff; --so-accent-soft: rgba(10, 132, 255, 0.16); --so-surface-soft: rgba(235, 235, 245, 0.06);
+/* Workshops — EiFlix popup banner editor. The component paints its own header,
+   body and save bar edge to edge, so the Material surface padding is removed
+   (same treatment as .jchd-logcomposer-panel above). */
+.popup-banner-dialog .mat-mdc-dialog-surface {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  padding: 0;
+}
+.popup-banner-dialog .mat-mdc-dialog-container,
+.popup-banner-dialog .mdc-dialog__content {
+  padding: 0 !important;
 }
 
 .fullscreen-dialog .mat-mdc-dialog-surface {
@@ -659,3 +670,37 @@ body:has(#zmmtg-root) { background: #000; }
   --mdc-protected-button-label-text-color: #ffffff;
 }
 /* End Journey Coach Dashboard dark-mode overlay block */
+/* EiFlix operations dashboard — modal scroll lock (class-based so it beats
+   the body { overflow: auto !important } rule above; works on iOS Safari). */
+body.eod-scroll-lock,
+body.eod-scroll-lock .mat-drawer-content {
+  overflow: hidden !important;
+}
+/* While the dashboard's modal panel is open the app bar sits visually above
+   it (root stacking context) — make it inert so the hamburger can't stack
+   the nav drawer over an aria-modal dialog. */
+body.eod-scroll-lock .toolbar {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* EiFlix operations dashboard — shared dialog (EodDialogService). */
+.eod-dialog-panel .mat-mdc-dialog-container {
+  border-radius: 18px;
+  overflow: hidden;
+}
+.eod-dialog-panel .mat-mdc-dialog-surface {
+  border-radius: 18px !important;
+}
+
+/* Workshop & Campaign Calendar dark dialogs (reference .md modal surface) */
+.wc-dark-panel .mat-mdc-dialog-surface {
+  background: #0C0C14 !important;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .85);
+}
+.wc-dark-backdrop {
+  background: rgba(0, 0, 0, .78);
+  backdrop-filter: blur(8px);
+}

@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
-  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc, setDoc, updateDoc
+  Firestore, collection, query, orderBy, where, getDocs, doc, getDoc
 } from '@angular/fire/firestore';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import * as XLSX from 'xlsx';
@@ -143,7 +143,6 @@ export class EventsStageDataComponent {
 
   // ---- Per-arena journey group config ----
   journeyGroups: { name: string; journeyIds: string[] }[] = [];
-  private groupsDocId: string | null = null;
   groupsEditorOpen = false;
   configOpen = false;
 
@@ -445,19 +444,16 @@ export class EventsStageDataComponent {
     (this.stageRows || []).forEach(r => { if (r.journeyId) this.journeyIdByPid.set(r.profileid, r.journeyId); });
   }
 
-  // Per-arena journey group config, persisted in `stage opportunity count` (kind='journeygroups').
+  // Per-arena journey group config, persisted in localStorage (key esd_journeygroups_<arenaeventid>).
+  // Stored entirely client-side — no `stage opportunity count` (or any Firestore) read/write.
+  private journeyGroupsKey(arenaeventid: string): string { return `esd_journeygroups_${arenaeventid}`; }
   private async loadJourneyGroups(arenaeventid: string): Promise<void> {
-    this.journeyGroups = []; this.groupsDocId = null; this.readyStages = [];
+    this.journeyGroups = []; this.readyStages = [];
     this.stageDefs = []; this.queueEligibility = {}; this.dfuProductIds = [];
     try {
-      const snap = await getDocs(query(collection(this.firestore, 'stage opportunity count'),
-        where('kind', '==', 'journeygroups'), where('arenaeventid', '==', arenaeventid)));
-      if (!snap.empty) {
-        // Multiple docs can exist from earlier saves — always use the most recently updated one.
-        const d = snap.docs.reduce((a, b) =>
-          (((b.data() as any)['updated']?.toMillis?.() ?? 0) >= ((a.data() as any)['updated']?.toMillis?.() ?? 0)) ? b : a);
-        this.groupsDocId = d.id;
-        const data = d.data() as any;
+      const raw = localStorage.getItem(this.journeyGroupsKey(arenaeventid));
+      if (raw) {
+        const data = JSON.parse(raw) || {};
         this.journeyGroups = (data['groups'] || []).map((g: any) => ({ name: g.name || '', journeyIds: g.journeyIds || [] }));
         this.readyStages = (data['readyStages'] || []);
         this.stageDefs = (data['stageDefs'] || []).map((s: any) => ({ id: s.id || ('sd' + (++this.stageDefSeq)), label: s.label || '', byQueue: s.byQueue || {} }));
@@ -466,7 +462,7 @@ export class EventsStageDataComponent {
       }
     } catch (e) { console.error('load journey groups failed', e); }
   }
-  // Persist the arena config doc (journey groups + ready stages) to the single `journeygroups` doc.
+  // Persist the arena config (journey groups, ready stages, stage defs, eligibility) to localStorage.
   private async saveArenaConfig(): Promise<void> {
     const arenaeventid = this.selectedArena?.docid; if (!arenaeventid) return;
     const groups = this.journeyGroups.filter(g => (g.name || '').trim()).map(g => ({ name: g.name.trim(), journeyIds: g.journeyIds || [] }));
@@ -474,14 +470,8 @@ export class EventsStageDataComponent {
     const stageDefs = this.stageDefs.filter(s => (s.label || '').trim()).map(s => ({ id: s.id, label: s.label.trim(), byQueue: s.byQueue || {} }));
     const queueEligibility = this.queueEligibility;
     const dfuProductIds = this.dfuProductIds;
-    const payload: any = { groups, readyStages, stageDefs, queueEligibility, dfuProductIds, updated: new Date() };
-    if (this.groupsDocId) {
-      await updateDoc(doc(this.firestore, 'stage opportunity count', this.groupsDocId), payload);
-    } else {
-      const id = doc(collection(this.firestore, 'stage opportunity count')).id;
-      await setDoc(doc(this.firestore, 'stage opportunity count', id), { kind: 'journeygroups', arenaeventid, ...payload });
-      this.groupsDocId = id;
-    }
+    const payload = { groups, readyStages, stageDefs, queueEligibility, dfuProductIds, updated: new Date().toISOString() };
+    localStorage.setItem(this.journeyGroupsKey(arenaeventid), JSON.stringify(payload));
   }
   async saveJourneyGroups(): Promise<void> {
     if (!this.selectedArena?.docid) return;

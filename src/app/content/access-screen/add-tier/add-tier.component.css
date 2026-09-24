@@ -1,0 +1,141 @@
+:host {
+  display: block;
+}
+
+/* ---- Dialog shell: fills the (wide) panel, taller layout ---- */
+.tier-dialog {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 32px;
+}
+
+/* Form grows to fill the extra height, actions stay pinned at the bottom */
+.tier-dialog .tier-form {
+  flex: 1 1 auto;
+  align-content: start;
+}
+
+.tier-dialog__head {
+  margin-bottom: 18px;
+}
+
+.tier-dialog__head h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.tier-dialog__subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+/* ---- Two-column form grid so fields sit in rows, not one long scroll ---- */
+.tier-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+  row-gap: 2px;
+}
+
+.tier-form mat-form-field {
+  width: 100%;
+}
+
+/* Fields that should span the full width */
+.tier-form .full {
+  grid-column: 1 / -1;
+}
+
+.tier-error {
+  color: #d32f2f;
+}
+
+/* ---- Customer Support section ---- */
+.section {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.section__head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.section__count {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* Support inputs also flow two-per-row */
+.support-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+  row-gap: 2px;
+}
+
+.support-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.support-row mat-form-field {
+  flex: 1;
+}
+
+.support-actions {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 20px; /* align buttons with the input baseline */
+}
+
+/* Compact the mini-fabs so a row stays tidy */
+.support-actions .mat-mdc-mini-fab {
+  width: 34px;
+  height: 34px;
+}
+
+/* ---- Actions ---- */
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* ---- Delete confirm (stays small) ---- */
+.tier-dialog--confirm {
+  width: 380px;
+  min-height: auto;
+}
+
+.tier-dialog--confirm h3 {
+  margin: 0 0 20px;
+  font-weight: 500;
+}
+
+/* ---- Responsive: collapse to single column on narrow screens ---- */
+@media (max-width: 640px) {
+  .tier-dialog {
+    width: 100%;
+    padding: 20px 18px;
+  }
+  .tier-form,
+  .support-grid {
+    grid-template-columns: 1fr;
+  }
+}

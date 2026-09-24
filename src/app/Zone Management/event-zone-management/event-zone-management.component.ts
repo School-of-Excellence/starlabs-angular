@@ -16,9 +16,9 @@ import { AuthguardService } from '../../authguard.service';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ResolveParticipantZoneComponent } from '../resolve-participant-zone/resolve-participant-zone.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { Clipboard } from '@angular/cdk/clipboard';
 import * as XLSX from 'xlsx';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+import { CohortParticipantsDialogComponent } from '../cohort-participants-dialog/cohort-participants-dialog.component';
 
 @Component({
   selector: 'app-event-zone-management',
@@ -91,12 +91,20 @@ export class EventZoneManagementComponent implements OnDestroy {
   participantZoneSearchTerm: string = ''
   isLoadingParticipantZones: boolean = false
 
+  // Drift detection — reminds the user to click "Update Participant Zone" when
+  // the current zone/cohort layout no longer matches the submitted participant
+  // zone records. `storedParticipantZones` is the last-submitted { profileid ->
+  // selectedZoneId } snapshot, loaded once per event and refreshed on submit.
+  storedParticipantZones: { [profileId: string]: string } = {}
+  storedZonesLoaded: boolean = false
+  needsSubmission: boolean = false
+  driftCount: number = 0
+
   constructor(
     public firestore: Firestore,
     public dialog: MatDialog,
     public authguard: AuthguardService,
     public cdr: ChangeDetectorRef,
-    public clipboard: Clipboard
   ) {
     // this.authguard.getRoles().then(value =>{
     //   console.log("Loggedin Profile", value)
@@ -166,6 +174,13 @@ export class EventZoneManagementComponent implements OnDestroy {
     this.selectedCohortIds.clear()
     this.participantZoneList = []
     this.showParticipantZoneOverlay = false
+
+    // Reset drift state and load the last-submitted participant zone snapshot
+    this.storedParticipantZones = {}
+    this.storedZonesLoaded = false
+    this.needsSubmission = false
+    this.driftCount = 0
+    this.loadStoredParticipantZones()
 
     // Create reference to selected event document
     const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
@@ -280,7 +295,90 @@ export class EventZoneManagementComponent implements OnDestroy {
       zone['_participantlist'] = participantIds
       zone['_assignedCohorts'] = cohortDetails
     })
+    // Re-check whether the current layout drifted from the submitted state
+    this.evaluateDriftStatus()
     this.cdr.detectChanges()
+  }
+
+  // ============================================================================
+  // DRIFT DETECTION ("Update Participant Zone" reminder)
+  // ============================================================================
+
+  /**
+   * Load the last-submitted participant zone snapshot for the selected event —
+   * a silent read (no loading dialog) used as the "actual" side of drift
+   * detection. Caches { profileid -> selectedZoneId } and re-evaluates drift.
+   */
+  private async loadStoredParticipantZones(): Promise<void> {
+    try {
+      const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
+      const participantZonesCollection = collection(this.firestore, "event participant zones")
+      const participantZonesQuery = query(participantZonesCollection, where("eventref", "==", eventRef))
+
+      const record = await getDocs(participantZonesQuery)
+      const map: { [profileId: string]: string } = {}
+      record.docs.forEach(d => {
+        const data = d.data()
+        map[data["profileid"]] = data["selectedzone"]
+      })
+
+      this.storedParticipantZones = map
+      this.storedZonesLoaded = true
+      this.evaluateDriftStatus()
+    } catch (error) {
+      console.error("Error loading stored participant zones:", error)
+    }
+  }
+
+  /**
+   * Compare the current zone/cohort layout against the last-submitted snapshot
+   * and set `needsSubmission` / `driftCount`.
+   *
+   * Scope: only MAPPED participants' selectedzone correctness is considered.
+   * Orphaned docs of now-unmapped participants are intentionally ignored — the
+   * submit flow never deletes, so flagging them would make the reminder
+   * impossible to clear. Eligibility metadata is not compared; only the zone.
+   */
+  private evaluateDriftStatus(): void {
+    // Wait until the submitted snapshot has loaded to avoid a false reminder
+    if (!this.storedZonesLoaded) return
+
+    const stored = this.storedParticipantZones
+    const analysis = this.analyzeParticipantAssignments(stored)
+    let count = 0
+
+    // Assigned to exactly one zone -> stored zone must match that zone
+    analysis.assigned.forEach((p: any) => {
+      if (stored[p.participantId] !== p.zoneId) count++ // undefined (new) or wrong zone
+    })
+
+    // Eligible for multiple zones -> in sync only if a stored choice still valid
+    analysis.conflicts.forEach((p: any) => {
+      const chosen = stored[p.participantId]
+      if (!chosen || !(p.eligibleZones || []).includes(chosen)) count++
+    })
+
+    // Unassigned (eligible for no zone) is ignored — orphan scope-out
+
+    this.driftCount = count
+    this.needsSubmission = count > 0
+  }
+
+  // ============================================================================
+  // *ngFor trackBy — reuse DOM by stable key so the cohort/zone lists don't
+  // rebuild (and flicker) on every change-detection cycle
+  // ============================================================================
+
+  trackByZoneId(index: number, zone: any): string {
+    return zone['docid']
+  }
+
+  trackByCohortId(index: number, cohort: any): string {
+    return cohort['docid']
+  }
+
+  trackByCategory(index: number, group: any): string {
+    return group.category
   }
 
   // ============================================================================
@@ -323,7 +421,22 @@ export class EventZoneManagementComponent implements OnDestroy {
     return mappedParticipantIds.size
   }
 
-  returnMappedParticipants(){
+  // Open the read-only "Unassigned Participants" dialog listing everyone who is
+  // in a cohort but NOT in any zone yet (i.e. the unmapped participants — the
+  // difference behind the "Mapped" stat). Reuses the exact same analysis and
+  // dialog as the submit flow; no extra Firestore read is needed since the
+  // unassigned bucket is derived entirely from in-memory cohort/zone data.
+  // True when every participant across all cohorts is mapped to a zone. Drives
+  // the green "success" styling on the Mapped stat and makes it non-interactive.
+  get isAllMapped(): boolean {
+    return this.totalParticipants > 0 && this.participantsMapped >= this.totalParticipants
+  }
+
+  // Open the read-only "Unassigned Participants" dialog listing everyone who is
+  // in a cohort but NOT in any zone yet (the unmapped participants behind the
+  // "Mapped" stat). When all are mapped, the click is a no-op (no alert).
+  openUnmappedParticipants(){
+    // Log the mapped participant names grouped by zone (debugging aid)
     const mappedParticipantIds = {}
     this.eventZoneList.forEach(zone => {
       const cohorts = zone['cohorts'] || []
@@ -338,7 +451,17 @@ export class EventZoneManagementComponent implements OnDestroy {
     })
     console.log(mappedParticipantIds)
 
-    this.clipboard.copy(JSON.stringify(mappedParticipantIds))
+    if (this.isAllMapped) {
+      return
+    }
+
+    const analysis = this.analyzeParticipantAssignments()
+
+    if (analysis.unassigned.length === 0) {
+      return
+    }
+
+    this.showUnassignedDialog(analysis.unassigned)
   }
 
   // Total number of unique participants across all cohorts
@@ -537,6 +660,27 @@ export class EventZoneManagementComponent implements OnDestroy {
   }
 
   /**
+   * Open a dialog listing the participants of a cohort (picture, name, email).
+   * Built from the in-memory participantidlist — no Firestore read.
+   */
+  openCohortParticipants(cohort: any): void {
+    const ids: string[] = cohort['participantidlist'] || []
+    const participants = ids.map(id => ({
+      profileid: id,
+      name: this.mapProfile[id] || id,
+      email: this.mapProfileData[id]?.['email'] || 'N/A'
+    })).sort((a, b) => a.name.localeCompare(b.name))
+
+    this.dialog.open(CohortParticipantsDialogComponent, {
+      width: '480px',
+      data: {
+        cohortName: cohort['name'],
+        participants: participants
+      }
+    })
+  }
+
+  /**
    * Format time for display
    */
   formatTime(timestamp: any): string {
@@ -707,7 +851,7 @@ export class EventZoneManagementComponent implements OnDestroy {
     allParticipants.forEach(participantId => {
       const zones = participantZoneMap[participantId] || [];
       const participantName = this.mapProfile[participantId] || participantId;
-      const participantEmail = this.mapProfileData[participantId]['email']
+      const participantEmail = this.mapProfileData[participantId]?.['email']
       if (zones.length === 0) {
         // Not in any zone
         unassigned.push({
@@ -866,11 +1010,18 @@ export class EventZoneManagementComponent implements OnDestroy {
         const participantLogDocument = doc(this.firestore, "event participant zones logs", logID)
         batch.set(participantLogDocument, {
           ...participantData,
-          logid: logID
+          logid: logID,
+          logdate: serverTimestamp()
         }, {merge: true})
       }
 
       await batch.commit().then(() =>{
+        // Update the in-memory snapshot from what we just wrote so drift clears
+        allAssigned.forEach((a: any) => {
+          this.storedParticipantZones[a["participantId"]] = a["zoneId"]
+        })
+        this.storedZonesLoaded = true
+        this.evaluateDriftStatus()
         alert("Success!")
       })
     } catch (error) {
@@ -905,9 +1056,9 @@ export class EventZoneManagementComponent implements OnDestroy {
       const participantZonesQuery = query(participantZonesCollection, where("eventref", "==", eventRef))
 
       const snapshot = await getDocs(participantZonesQuery)
-      
+
       const participants: any[] = []
-      
+
       snapshot.docs.forEach(docSnap => {
         const data = docSnap.data()
         const profileId = data["profileid"]
@@ -943,7 +1094,10 @@ export class EventZoneManagementComponent implements OnDestroy {
           eligibleZoneNames: eligibleZoneNames,
           eligibleCohortIds: eligibleCohortIds,
           eligibleCohortNames: eligibleCohortNames,
-          addedflow: data["addedflow"] || 'N/A'
+          addedflow: data["addedflow"] || 'N/A',
+          zoneTrail: null, // Zone-change history — lazily fetched on first expand
+          showTrail: false, // Expanded/collapsed state of the trail section
+          trailLoading: false // True while this participant's logs are being fetched
         })
       })
 
@@ -978,11 +1132,100 @@ export class EventZoneManagementComponent implements OnDestroy {
     }
 
     const search = this.participantZoneSearchTerm.toLowerCase()
-    return this.participantZoneList.filter(p => 
+    return this.participantZoneList.filter(p =>
       p.participantName.toLowerCase().includes(search) ||
       p.participantEmail.toLowerCase().includes(search) ||
       p.selectedZoneName.toLowerCase().includes(search)
     )
+  }
+
+  // ============================================================================
+  // ZONE TRAIL (participant zone history)
+  // ============================================================================
+
+  /**
+   * Toggle a participant's zone trail. The log data is fetched lazily — only on
+   * the FIRST expand for that participant — then cached on the object so
+   * re-opening it makes no further reads.
+   */
+  async toggleTrail(participant: any): Promise<void> {
+    // Collapse if already open
+    if (participant.showTrail) {
+      participant.showTrail = false
+      return
+    }
+
+    // Fetch once, then reuse the cached trail on subsequent opens
+    if (participant.zoneTrail === null) {
+      participant.trailLoading = true
+      try {
+        const eventRef = doc(this.firestore, "event collection", this.selectedEvent["docid"])
+        const logsCollection = collection(this.firestore, "event participant zones logs")
+        // Two equality filters (event + participant) — served by single-field
+        // indexes, so no composite index is required.
+        const logsQuery = query(
+          logsCollection,
+          where("eventref", "==", eventRef),
+          where("profileid", "==", participant.profileid)
+        )
+        const logsSnapshot = await getDocs(logsQuery)
+        participant.zoneTrail = this.buildParticipantTrail(logsSnapshot)
+      } catch (error) {
+        console.error('Error loading zone trail:', error)
+        participant.zoneTrail = []
+      }
+      participant.trailLoading = false
+    }
+
+    participant.showTrail = true
+  }
+
+  /**
+   * Build a single participant's "zone trail" from their assignment log rows.
+   *
+   * WHY: `event participant zones logs` records a snapshot on EVERY submit —
+   * even when the participant's zone didn't change — so the raw rows repeat the
+   * same zone many times. A trail should show only the points where they
+   * actually MOVED zones, in chronological order.
+   *
+   * FLOW:
+   * 1. Sort the rows oldest -> newest by logdate (drop rows with no logdate)
+   * 2. Collapse consecutive rows that share the same selectedzone, keeping only
+   *    the first row of each new zone (i.e. the moment the change happened)
+   */
+  private buildParticipantTrail(logsSnapshot: any): any[] {
+    const rows = logsSnapshot.docs
+      .map((d: any) => d.data())
+      .filter((r: any) => r["logdate"])
+      .sort((a: any, b: any) => this.toMillis(a["logdate"]) - this.toMillis(b["logdate"]))
+
+    const trail: any[] = []
+    let lastZoneId: string | null = null
+
+    rows.forEach((r: any) => {
+      const zoneId = r["selectedzone"]
+      // Collapse consecutive identical zones -> only record actual changes
+      if (zoneId === lastZoneId) return
+      lastZoneId = zoneId
+      trail.push({
+        zoneId: zoneId,
+        zoneName: this.mapEventZoneData[zoneId]?.["zonename"] || zoneId || 'N/A',
+        date: r["logdate"].toDate ? r["logdate"].toDate() : new Date(r["logdate"]),
+        addedflow: r["addedflow"] || 'N/A'
+      })
+    })
+
+    return trail
+  }
+
+  /**
+   * Normalize a Firestore Timestamp (or Date / millis) to milliseconds for sorting
+   */
+  private toMillis(ts: any): number {
+    if (!ts) return 0
+    if (ts.toMillis) return ts.toMillis()
+    if (ts.toDate) return ts.toDate().getTime()
+    return new Date(ts).getTime()
   }
 
   /**

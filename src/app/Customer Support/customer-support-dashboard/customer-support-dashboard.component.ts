@@ -825,8 +825,10 @@ export class CustomerSupportDashboardComponent {
     let dialogref = this.dialog.open(AddIssueComponent, {
       data: data,
       autoFocus: false,
-      height: "95%",
-      width: "95%",
+      // Sized to the form rather than a fixed 95% box, which left a large empty area and
+      // scrolled sideways once the three fixed-width columns exceeded the viewport.
+      width: "min(1150px, 96vw)",
+      maxHeight: "92vh",
       disableClose: true
     });
 

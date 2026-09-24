@@ -1,0 +1,31 @@
+<div class="cp-dialog">
+  <!-- Header -->
+  <div class="cp-header">
+    <div class="cp-title-wrap">
+      <h2 class="cp-title">{{ data.cohortName }}</h2>
+      <span class="cp-subtitle">{{ data.participants.length }} participant{{ data.participants.length === 1 ? '' : 's' }}</span>
+    </div>
+    <button class="cp-close" (click)="close()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div class="cp-search">
+    <mat-icon>search</mat-icon>
+    <input type="text" [(ngModel)]="searchTerm" placeholder="Search by name or email" />
+    <mat-icon *ngIf="searchTerm" class="cp-clear" (click)="searchTerm = ''">close</mat-icon>
+  </div>
+
+  <!-- List -->
+  <div class="cp-list">
+    <div class="cp-empty" *ngIf="filtered.length === 0">No participants found</div>
+    <div class="cp-row" *ngFor="let p of filtered; trackBy: trackById">
+      <app-profile-picture [profileId]="p.profileid" [name]="p.name" [size]="36"></app-profile-picture>
+      <div class="cp-info">
+        <span class="cp-name">{{ p.name }}</span>
+        <span class="cp-email">{{ p.email }}</span>
+      </div>
+    </div>
+  </div>
+</div>

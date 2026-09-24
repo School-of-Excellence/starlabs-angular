@@ -1,0 +1,221 @@
+<!--
+  All logs tab. Raw documents, one row per report, with delete.
+-->
+<div class="lg-wrap">
+
+  <!-- Toolbar -->
+  <section class="lg-toolbar" aria-label="Log filters">
+    <div class="lg-toolbar-row">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="lg-search">
+        <mat-icon matPrefix>search</mat-icon>
+        <input
+          matInput
+          type="search"
+          autocomplete="off"
+          placeholder="Search participant by name"
+          [formControl]="searchControl"
+          aria-label="Search logs by participant name" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="lg-select">
+        <mat-label>Participant</mat-label>
+        <mat-select [value]="participantFilter()" (valueChange)="setParticipant($event)">
+          <mat-option value="all">All participants</mat-option>
+          @for (option of participantOptions(); track option.profileid) {
+            <mat-option [value]="option.profileid">{{ option.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="lg-select">
+        <mat-label>Reported</mat-label>
+        <mat-select [value]="dateFilter()" (valueChange)="setDateFilter($event)">
+          @for (option of dateOptions; track option.value) {
+            <mat-option [value]="option.value">{{ option.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="lg-select">
+        <mat-label>Sort by</mat-label>
+        <mat-select [value]="sort()" (valueChange)="setSort($event)">
+          @for (option of sortOptions; track option.value) {
+            <mat-option [value]="option.value">{{ option.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (filtersActive()) {
+        <button mat-stroked-button (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon>
+          Clear
+        </button>
+      }
+
+      <button
+        mat-stroked-button
+        class="lg-reload"
+        [disabled]="loading()"
+        (click)="reload()"
+        matTooltip="Re-read from the newest log">
+        <mat-icon>refresh</mat-icon>
+        Reload
+      </button>
+    </div>
+
+    <!--
+      Says plainly that filters apply to what has been loaded, not the whole
+      collection — otherwise an empty result reads as "no such logs exist".
+    -->
+    <p class="lg-scope">
+      Showing <strong>{{ visibleCount() }}</strong> of <strong>{{ loadedCount() }}</strong> loaded
+      log{{ loadedCount() === 1 ? '' : 's' }}.
+      @if (hasMore()) {
+        Filters apply to loaded logs — use <em>Load more</em> to search further back.
+      }
+    </p>
+  </section>
+
+  <!-- Selection action bar -->
+  @if (selectedCount() > 0) {
+    <div class="lg-selection" role="status">
+      <span class="lg-selection-count">
+        {{ selectedCount() }} selected
+      </span>
+      <button mat-button (click)="clearSelection()">Clear selection</button>
+      <button
+        mat-flat-button
+        color="warn"
+        class="lg-delete-btn"
+        [disabled]="deleting()"
+        (click)="deleteSelected()">
+        <mat-icon>delete_forever</mat-icon>
+        {{ deleting() ? 'Deleting…' : 'Delete selected' }}
+      </button>
+    </div>
+  }
+
+  @if (error(); as message) {
+    <div class="lg-banner" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ message }}</span>
+      <button mat-button (click)="reload()">Try again</button>
+    </div>
+  }
+
+  <!-- Table -->
+  @if (visibleRows().length > 0) {
+    <div class="lg-table-wrap">
+      <table mat-table [dataSource]="visibleRows()" [trackBy]="trackById" class="lg-table">
+
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="lg-col-select">
+            <mat-checkbox
+              [checked]="allVisibleSelected()"
+              [indeterminate]="someVisibleSelected()"
+              (change)="toggleAllVisible()"
+              matTooltip="Select all shown"
+              aria-label="Select all shown logs"></mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row" class="lg-col-select">
+            <mat-checkbox
+              [checked]="isSelected(row.id)"
+              (change)="toggleRow(row.id)"
+              [attr.aria-label]="'Select log for ' + row.name"></mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="participant">
+          <th mat-header-cell *matHeaderCellDef>Participant</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="lg-participant">
+              <span class="lg-avatar" [style.background]="getAvatarGradient(row.profileid)">
+                {{ row.initials }}
+              </span>
+              <span class="lg-name">{{ row.name }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="when">
+          <th mat-header-cell *matHeaderCellDef>Reported</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="lg-when">
+              <span class="lg-when-abs">{{ absoluteTime(row.created) }}</span>
+              <span class="lg-when-rel">{{ relativeTime(row.created) }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="coordinates">
+          <th mat-header-cell *matHeaderCellDef>Coordinates</th>
+          <td mat-cell *matCellDef="let row" class="lg-mono">
+            {{ formatCoordinate(row.latitude) }}, {{ formatCoordinate(row.longitude) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="distance">
+          <th mat-header-cell *matHeaderCellDef>Distance</th>
+          <td mat-cell *matCellDef="let row" class="lg-distance">
+            {{ formatDistance(row.distanceMeters) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="lg-col-actions">Action</th>
+          <td mat-cell *matCellDef="let row" class="lg-col-actions">
+            <button
+              mat-icon-button
+              color="warn"
+              [disabled]="deleting()"
+              matTooltip="Delete this log"
+              [attr.aria-label]="'Delete log for ' + row.name"
+              (click)="deleteRow(row)">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          class="lg-row"
+          [class.lg-row-selected]="isSelected(row.id)"></tr>
+      </table>
+    </div>
+  } @else if (!loading()) {
+    <div class="lg-empty">
+      <mat-icon>inbox</mat-icon>
+      <h3>No logs to show</h3>
+      <p>
+        @if (loadedCount() > 0) {
+          No loaded logs match the current filters.
+        } @else {
+          Nothing has been written to <code>/locationlogs</code> yet.
+        }
+      </p>
+      @if (filtersActive()) {
+        <button mat-stroked-button (click)="clearFilters()">Clear filters</button>
+      }
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="lg-loading" aria-busy="true">
+      <span class="lg-spinner"></span>
+      Loading logs…
+    </div>
+  }
+
+  @if (hasMore() && !loading()) {
+    <div class="lg-more">
+      <button mat-stroked-button (click)="loadMore()">
+        <mat-icon>expand_more</mat-icon>
+        Load more
+      </button>
+    </div>
+  } @else if (!hasMore() && loadedCount() > 0 && !loading()) {
+    <p class="lg-end">That is every log in the collection.</p>
+  }
+</div>

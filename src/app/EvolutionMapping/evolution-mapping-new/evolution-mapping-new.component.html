@@ -420,6 +420,9 @@
           <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
         </div>
         <div class="log-header-actions">
+          <button class="add-video-btn" (click)="openAddVideo(currentLogProfileId)">
+            + Add Video
+          </button>
           <button mat-icon-button (click)="closeLog()">
             <mat-icon>close</mat-icon>
           </button>
@@ -793,27 +796,18 @@
               </mat-form-field>
             </div>
 
-            <div class="form-group">
+            <div class="form-group remarks-separate-section">
               <label class="form-label">Remarks</label>
-              <div class="remarks-list" *ngIf="$any(editVideoForm.get('entries')).at(i).get('remarks').controls.length > 0">
-                <div class="remark-item"
-                     *ngFor="let r of $any(editVideoForm.get('entries')).at(i).get('remarks').controls; let ri = index"
-                     [formGroup]="$any(r)">
+              <div class="remarks-list" *ngIf="separateEditRemarks[i]?.length > 0">
+                <div class="remark-item" *ngFor="let r of separateEditRemarks[i]; let ri = index">
                   <div class="remark-item-body">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <textarea matInput
-                                formControlName="text"
-                                rows="2"
-                                cdkTextareaAutosize
-                                cdkAutosizeMinRows="2"
-                                cdkAutosizeMaxRows="4">
-                      </textarea>
-                    </mat-form-field>
-                    <div class="remark-item-meta" *ngIf="r.get('profileid')?.value">
-                      {{ getProfileName(r.get('profileid')?.value) }} · {{ r.get('updatedon')?.value?.toDate ? (r.get('updatedon')?.value.toDate() | date: 'MMM d, y') : '' }}
+                    <div class="remark-text-preview">{{ r.text }}</div>
+                    <div class="remark-item-meta" *ngIf="r.profileid">
+                      {{ getProfileName(r.profileid) }} · 
+                      {{ r.updatedon?.toDate ? (r.updatedon.toDate() | date: 'MMM d, y') : '' }}
                     </div>
                   </div>
-                  <button class="remark-delete-btn" (click)="manageRemark($any(editVideoForm.get('entries')), i, 'remove', ri)" title="Delete">
+                  <button class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, true)" title="Delete">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -822,13 +816,13 @@
                 <textarea class="remark-textarea"
                           [(ngModel)]="RemarkTexts[i]"
                           [ngModelOptions]="{standalone: true}"
-                          placeholder="Add a new remark..."
+                          placeholder="Add a remark..."
                           rows="2">
                 </textarea>
                 <button class="remark-add-btn"
-                        (click)="manageRemark($any(editVideoForm.get('entries')), i, 'add')"
+                        (click)="saveRemarkForEntry(i, true)"
                         [disabled]="!RemarkTexts[i]?.trim()">
-                  + Add
+                  + Save Remark
                 </button>
               </div>
             </div>
@@ -963,15 +957,14 @@
                 </mat-error>
               </mat-form-field>
             </div>
-            <div class="form-group" *ngIf="entry.get('type')?.value">
+            <div class="form-group remarks-separate-section">
               <label class="form-label">Remarks</label>
-              <div class="remarks-list" *ngIf="$any(entriesArray.at(i).get('remarks')).controls.length > 0">
-                <div class="remark-item"
-                     *ngFor="let r of $any(entriesArray.at(i).get('remarks')).controls; let ri = index">
+              <div class="remarks-list" *ngIf="separateRemarks[i]?.length > 0">
+                <div class="remark-item" *ngFor="let r of separateRemarks[i]; let ri = index">
                   <div class="remark-item-body">
-                    <div class="remark-text-preview">{{ r.get('text')?.value }}</div>
+                    <div class="remark-text-preview">{{ r.text }}</div>
                   </div>
-                  <button class="remark-delete-btn" (click)="manageRemark(entriesArray, i, 'remove', ri)" title="Delete">
+                  <button class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, false)" title="Delete">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -984,9 +977,9 @@
                           rows="2">
                 </textarea>
                 <button class="remark-add-btn"
-                        (click)="manageRemark(entriesArray, i, 'add')"
+                        (click)="saveRemarkForEntry(i, false)"
                         [disabled]="!RemarkTexts[i]?.trim()">
-                  + Add
+                  + Save Remark
                 </button>
               </div>
             </div>
@@ -995,6 +988,11 @@
 
         <div class="add-video-footer">
           <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
+          <button class="save-remarks-only-btn"
+                  (click)="saveRemarksOnly()"
+                  [disabled]="!addVideoForm.get('participantId')?.valid">
+            Save Remarks Only
+          </button>
           <button class="save-video-btn" (click)="saveVideo()">Save</button>
         </div>
       </ng-container>

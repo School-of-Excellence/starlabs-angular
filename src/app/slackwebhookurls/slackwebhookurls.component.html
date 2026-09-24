@@ -1,0 +1,150 @@
+<div class="webhook-panel">
+  <div class="panel-header">
+    <h2>slack webhookurls</h2>
+    <button class="btn btn-primary" (click)="openAddForm()" *ngIf="!showAddForm">
+      + Add webhook
+    </button>
+  </div>
+
+  <div class="error-banner" *ngIf="errorMsg">{{ errorMsg }}</div>
+
+  <!-- Add new webhook form -->
+  <div class="add-form" *ngIf="showAddForm">
+    <!-- Step 1: type of webhook -->
+    <div class="type-choice">
+      <span class="type-label">Type of Webhook</span>
+      <label class="radio">
+        <input type="radio" name="webhookType" value="form" [(ngModel)]="newWebhookType" />
+        Integrate Form
+      </label>
+      <label class="radio">
+        <input type="radio" name="webhookType" value="standard" [(ngModel)]="newWebhookType" />
+        Standard
+      </label>
+    </div>
+
+    <div class="add-form-row" *ngIf="newWebhookType">
+      <!-- Standard: type the webhook name (doc id) -->
+      <label *ngIf="newWebhookType === 'standard'">
+        Webhook name (doc id)
+        <input
+          type="text"
+          [(ngModel)]="newWebhookName"
+          placeholder="e.g. slackNewIntegration"
+        />
+      </label>
+
+      <!-- Form: choose a delivery form; its doc id becomes the webhook name -->
+      <label *ngIf="newWebhookType === 'form'">
+        Form
+        <select [(ngModel)]="selectedFormId">
+          <option value="">Select a form...</option>
+          <option *ngFor="let f of forms" [value]="f.id">{{ f.formname }}</option>
+        </select>
+      </label>
+
+      <label class="url-field">
+        webhookurl
+        <input
+          type="text"
+          [(ngModel)]="newWebhookUrl"
+          placeholder="https://hooks.slack.com/services/..."
+        />
+      </label>
+
+      <label>
+        channel
+        <input
+          type="text"
+          [(ngModel)]="newWebhookChannel"
+          placeholder="e.g. #general"
+        />
+      </label>
+    </div>
+
+    <div class="add-form-actions">
+      <button class="btn btn-primary" (click)="addWebhook()" [disabled]="savingAdd">
+        {{ savingAdd ? 'Saving...' : 'Save' }}
+      </button>
+      <button class="btn btn-secondary" (click)="cancelAdd()" [disabled]="savingAdd">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" *ngIf="loading">Loading webhooks...</div>
+
+  <!-- Table -->
+  <table class="webhook-table" *ngIf="!loading">
+    <thead>
+      <tr>
+        <th class="col-id">Webhook Name</th>
+        <th class="col-url">webhookURL</th>
+        <th class="col-channel">channel</th>
+        <th class="col-actions"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let wh of webhooks">
+        <td class="col-id">{{ webhookName(wh) }}</td>
+        <td class="col-url">
+          <ng-container *ngIf="editingId === wh.id; else viewMode">
+            <input type="text" class="edit-input" [(ngModel)]="editUrlValue" />
+          </ng-container>
+          <ng-template #viewMode>
+            <span class="url-mask-wrap">
+              <span class="url-text">{{ isVisible(wh.id) ? wh.webhookurl : maskUrl(wh.webhookurl) }}</span>
+              <button
+                type="button"
+                class="eye-btn"
+                (click)="toggleVisibility(wh.id)"
+                [attr.aria-label]="isVisible(wh.id) ? 'Hide URL' : 'Show URL'"
+                [title]="isVisible(wh.id) ? 'Hide URL' : 'Show URL'"
+              >
+                <svg *ngIf="!isVisible(wh.id)" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/>
+                </svg>
+                <svg *ngIf="isVisible(wh.id)" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M2 2l20 20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a17.6 17.6 0 0 1-3.2 4.1M6.5 6.6C3.4 8.5 1 12 1 12s4 7 11 7a10.6 10.6 0 0 0 4.2-.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M14.1 14.1a3 3 0 1 1-4.2-4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </span>
+          </ng-template>
+        </td>
+        <td class="col-channel">
+          <ng-container *ngIf="editingId === wh.id; else channelView">
+            <input type="text" class="edit-input" [(ngModel)]="editChannelValue" />
+          </ng-container>
+          <ng-template #channelView>{{ wh.channel }}</ng-template>
+        </td>
+        <td class="col-actions">
+          <ng-container *ngIf="editingId === wh.id; else viewActions">
+            <button class="btn btn-primary btn-sm" (click)="saveEdit(wh)" [disabled]="savingEdit">
+              {{ savingEdit ? 'Saving...' : 'Save' }}
+            </button>
+            <button class="btn btn-secondary btn-sm" (click)="cancelEdit()" [disabled]="savingEdit">
+              Cancel
+            </button>
+          </ng-container>
+          <ng-template #viewActions>
+            <button class="btn btn-secondary btn-sm" (click)="startEdit(wh)">Edit</button>
+            <button
+              class="btn btn-danger btn-sm"
+              (click)="deleteWebhook(wh)"
+              [disabled]="deletingId === wh.id"
+            >
+              {{ deletingId === wh.id ? 'Deleting...' : 'Delete' }}
+            </button>
+          </ng-template>
+        </td>
+      </tr>
+      <tr *ngIf="webhooks.length === 0">
+        <td colspan="4" class="empty-row">No webhooks found.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

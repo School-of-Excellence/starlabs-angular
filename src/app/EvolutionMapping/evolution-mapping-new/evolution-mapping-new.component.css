@@ -385,6 +385,12 @@ mat-paginator {
   position: relative;
   cursor: default;
   transition: box-shadow 0.15s, opacity 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.log-header-actions .add-video-btn {
+  color: #ffffff !important;
 }
 
 .event-name {
@@ -2085,6 +2091,43 @@ mat-paginator {
   font-size: 16px;
   width: 16px;
   height: 16px;
+}
+
+.log-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-note {
+  font-size: 11px;
+  color: #f59e0b;
+  font-style: italic;
+}
+
+.save-remarks-only-btn {
+  padding: 8px 16px;
+  background: #fff;
+  color: #6366f1;
+  border: 1.5px solid #6366f1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.save-remarks-only-btn:hover:not(:disabled) {
+  background: #eef2ff;
+}
+.save-remarks-only-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .ep-filter-wrapper {
   position: relative;

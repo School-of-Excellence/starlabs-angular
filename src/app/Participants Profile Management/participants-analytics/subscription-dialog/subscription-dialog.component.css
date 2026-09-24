@@ -55,15 +55,19 @@ table{
 .header{
     display: flex;
     align-items: center;
-    justify-content: end;
+    justify-content: space-between;
+    gap :10px;
+    margin-bottom: 10px;
+}
+
+.header > .msg-con{
+    display: flex;
+    align-items: center;
     gap :10px;
 }
 
-
-
 .actions-btn{
     display: flex;
-    margin-bottom: 10px;
 }
 
 .actions-btn

@@ -412,9 +412,7 @@
         <h2 class="section-heading">CHANGEWORK BRIEF</h2>
         <div class="audio-container">
           <div *ngFor="let audio of audioBlobURL; let i = index" class="audio-item">
-            <audio controls class="audio-player">
-              <source [src]="sanitize(audio)" type="audio/wav">
-            </audio>
+            <audio controls class="audio-player" [src]="audio"></audio>
             <button class="remove-button" mat-icon-button (click)="removeAudio(i)">
               <mat-icon>close</mat-icon>
             </button>
@@ -424,7 +422,7 @@
             <button *ngIf="!recording" mat-stroked-button class="record-button" (click)="initiateRecording()">
               Add Recording <mat-icon>fiber_manual_record</mat-icon>
             </button>
-            <input #file type="file" accept="audio/*" #fileInput (change)="audioUpload(fileInput.files)" hidden multiple>
+            <input #file type="file" accept="audio/*" (change)="audioUpload(file.files)" hidden multiple>
             <button *ngIf="!recording" mat-stroked-button class="upload-button" (click)="file.click()">
               Upload Audio <mat-icon>record_voice_over</mat-icon>
             </button>
@@ -443,8 +441,8 @@
         <!-- Notes Images -->
         <div class="image-section">
           <h3 class="subsection-heading">Upload Images Notes</h3>
-          <input #fileInput class="file-input" type="file" accept="image/*" multiple 
-            (change)="importImages(fileInput.files)">
+          <input #noteFileInput class="file-input" type="file" accept="image/*" multiple
+            (change)="importImages(noteFileInput.files)">
           <div class="image-previews">
             <div class="preview-item" *ngFor="let preview of previewNoteImages; let imgIndex = index">
               <img [src]="preview" class="preview-img">
@@ -456,7 +454,7 @@
         <!-- ATC Images -->
         <div class="image-section">
           <h3 class="subsection-heading">Upload Prescribed ATC Images</h3>
-          <input class="file-input" type="file" accept="image/*" #fileInput multiple (change)="importATCImages(fileInput.files)">
+          <input class="file-input" type="file" accept="image/*" #atcFileInput multiple (change)="importATCImages(atcFileInput.files)">
           <div class="image-previews">
             <div class="preview-item" *ngFor="let preview of previewATCImages; let imgIndex = index">
               <img [src]="preview" class="preview-img">

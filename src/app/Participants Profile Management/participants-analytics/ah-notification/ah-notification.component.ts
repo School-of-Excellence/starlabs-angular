@@ -111,6 +111,10 @@ export class AhNotificationComponent implements AfterViewInit {
   scheduletime: any = null;
   minDate: Date = new Date();
   profiles: string[] = [];
+  heldProfileIds = new Set<string>();
+  sendableRecipients: any[] = [];
+  heldRecipients: any[] = [];
+  showRecipients = false;
   displayedColumns: string[] = [
     // 'broadcastname',
     'title',
@@ -352,6 +356,7 @@ export class AhNotificationComponent implements AfterViewInit {
     } else {
       console.log('elsesss',this.data);
     }
+    this.loadDeliveryHolds();
     this.loadNotifications();
   }
 
@@ -945,4 +950,36 @@ async toggleScheduleStatus(row: any): Promise<void> {
     }
   }
   */
+
+  // ─── Delivery hold (profile_data.deliveryonhold === true) ───────────────────
+  /** Read fresh rather than from the cached profile map: a hold set minutes ago must apply now. */
+  async loadDeliveryHolds() {
+    try {
+      const snap = await getDocs(query(collection(this.firestore, 'profile_data'), where('deliveryonhold', '==', true)));
+      this.heldProfileIds = new Set<string>(snap.docs.map(d => d.id));
+    } catch (err) {
+      console.error('deliveryonhold check failed', err);
+      this.heldProfileIds = new Set<string>();
+    }
+    this.refreshRecipientBuckets();
+  }
+
+  isDeliveryOnHold(profileid: string): boolean {
+    return !!profileid && this.heldProfileIds.has(profileid);
+  }
+
+  refreshRecipientBuckets() {
+    const all: any[] = Array.isArray(this.data) ? this.data : [];
+    this.sendableRecipients = all.filter(r => !this.isDeliveryOnHold(r?.['profileid']));
+    this.heldRecipients = all.filter(r => this.isDeliveryOnHold(r?.['profileid']));
+    // `profiles` feeds the scheduled-notification doc — keep held profiles out of it.
+    this.profiles = this.sendableRecipients
+      .map(r => r?.['profileid'])
+      .filter((id: any) => id != null);
+  }
+
+  trackRecipient(_: number, r: any) { return r?.['profileid'] ?? _; }
+
+  onShowRecipients() { this.showRecipients = !this.showRecipients; }
+
 }

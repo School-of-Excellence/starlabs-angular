@@ -1,6 +1,7 @@
 import { Component, ElementRef, inject, Inject, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { Firestore,doc,collection,query,getDoc,getDocs, collectionData, collectionSnapshots, setDoc, updateDoc, orderBy } from '@angular/fire/firestore';
-import { FormBuilder, FormGroup, Validators,FormArray, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators,FormArray, ReactiveFormsModule, FormsModule, AbstractControl } from '@angular/forms';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
@@ -30,7 +31,8 @@ import {MatSlideToggleModule} from '@angular/material/slide-toggle';
     MatChipsModule,
     MatDialogModule,
     MatCheckboxModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    DragDropModule
   ],
   templateUrl: './update-delivery.component.html',
   styleUrl: './update-delivery.component.css'
@@ -487,25 +489,171 @@ export class UpdateDeliveryComponent {
     this.formarray.insert(index+1,this.createFormarray())
   }
 
-  removearray(index){this.formarray.removeAt(index)}
+  removearray(index){
+    this.collapsedCards.delete(this.formarray.at(index))
+    this.formarray.removeAt(index)
+  }
 
-  add(event:MatChipInputEvent,i:number,type:string):void {
-    // console.log(type);
-    let condition:boolean = ['video','audio'].includes(type) ? this.formarray.controls[i].get('options').value.length >= 1 ? true : false : false
-    // console.log("condition",condition);
-    if(!condition){
-      this.formarray.controls[i].get('options').value.push(event.value)
-      event.input.value = null
+  // --- card collapse state (keyed by control identity so it survives reorder) ---
+  collapsedCards = new Set<AbstractControl>()
+
+  isCollapsed(control: AbstractControl){
+    return this.collapsedCards.has(control)
+  }
+
+  toggleCollapsed(control: AbstractControl){
+    if(this.collapsedCards.has(control)){
+      this.collapsedCards.delete(control)
     }else{
-      alert("For video and audio type you can't enter more than one url")
-      event.input.value = null;
+      this.collapsedCards.add(control)
     }
   }
-​
-  remove(i:number,j:number) {
-    this.formarray.controls[i].get('options').value.splice(j,1)
+
+  get allCollapsed(){
+    return this.formarray.length > 0 && this.formarray.controls.every(c => this.collapsedCards.has(c))
   }
-​
+
+  toggleAllCollapsed(){
+    if(this.allCollapsed){
+      this.collapsedCards.clear()
+    }else{
+      this.formarray.controls.forEach(c => this.collapsedCards.add(c))
+    }
+  }
+
+  // --- duplicate a field (deep copy, appended at the end) ---
+  duplicateField(index:number){
+    const source = this.formarray.at(index).value
+    const copy = this.createFormarray() as FormGroup
+    copy.patchValue({
+      fieldname: source.fieldname,
+      fielddescription: source.fielddescription ?? null,
+      fieldnotes: source.fieldnotes ?? null,
+      type: source.type,
+      options: [...(source.options ?? [])],
+      maxcount: source.maxcount ?? null,
+      mincount: source.mincount ?? null,
+      maxitems: source.maxitems ?? null,
+      flipping: source.flipping ?? false,
+      required: source.required ?? false,
+    })
+    const subitems = source.array ?? []
+    for (let j = 0; j < subitems.length; j++) {
+      const sub = this.newSubFormControl() as FormGroup
+      sub.patchValue({
+        fieldname: subitems[j].fieldname,
+        type: subitems[j].type,
+        options: [...(subitems[j].options ?? [])],
+        required: subitems[j].required ?? false,
+      })
+      ;(copy.get('array') as FormArray).push(sub)
+    }
+    if(source.flipping && source.flippingquestion){
+      copy.addControl("flippingquestion", this.formbuilder.group({
+        fieldname:[source.flippingquestion.fieldname,{validators:[Validators.required],updateOn:"change"}],
+        fielddescription:[source.flippingquestion.fielddescription ?? null],
+        type:[source.flippingquestion.type,{validators:[Validators.required]}],
+        options:[[...(source.flippingquestion.options ?? [])],],
+        required:[source.flippingquestion.required ?? false,]
+      }))
+    }
+    this.formarray.push(copy)
+    this.openSnackBar("Field duplicated", 1500)
+    setTimeout(() => {
+      const cards = document.querySelectorAll('.fb-card')
+      cards[cards.length - 1]?.scrollIntoView({behavior:'smooth', block:'center'})
+    })
+  }
+
+  // --- drag & drop reorder ---
+  dropField(event: CdkDragDrop<any>){
+    if(event.previousIndex === event.currentIndex){ return }
+    const control = this.formarray.at(event.previousIndex)
+    this.formarray.removeAt(event.previousIndex)
+    this.formarray.insert(event.currentIndex, control)
+  }
+
+  // element-based auto-grow: immune to collapsed cards and conditional rows
+  autoGrow(event: Event){
+    const target = event.target as HTMLTextAreaElement
+    target.style.height = 'auto'
+    target.style.height = target.scrollHeight + 'px'
+  }
+
+  add(event:MatChipInputEvent,i:number,type:string):void {
+    const value = (event.value || '').trim()
+    if(!value){
+      event.chipInput.clear()
+      return
+    }
+    let condition:boolean = ['video','audio'].includes(type) ? this.formarray.controls[i].get('options').value.length >= 1 ? true : false : false
+    if(!condition){
+      this.formarray.controls[i].get('options').value.push(value)
+      this.maybeSuggestSeries(this.formarray.controls[i].get('options').value)
+    }else{
+      this.openSnackBar("Only one URL is allowed for video and audio", 2500)
+    }
+    event.chipInput.clear()
+  }
+
+  // series auto-fill: after consecutive entries like "1","2" or "a","b", offer
+  // (native prompt only, at most once per options list) to fill the rest
+  private seriesPrompted = new WeakSet<object>()
+
+  private maybeSuggestSeries(options:any[]){
+    if(!Array.isArray(options) || options.length < 2 || this.seriesPrompted.has(options)){ return }
+    const prev = String(options[options.length - 2]).trim()
+    const last = String(options[options.length - 1]).trim()
+    const MAX_FILL = 200
+
+    if(/^\d+$/.test(prev) && /^\d+$/.test(last) && parseInt(last,10) === parseInt(prev,10) + 1){
+      this.seriesPrompted.add(options)
+      const lastNum = parseInt(last,10)
+      const answer = prompt(`Series detected (${prev}, ${last}, ...). Auto-fill options until which number? (Cancel to skip)`, String(lastNum + 8))
+      if(answer == null){ return }
+      const until = parseInt(answer.trim(),10)
+      if(isNaN(until) || until <= lastNum){
+        alert("Enter a number greater than " + lastNum)
+        return
+      }
+      const end = Math.min(until, lastNum + MAX_FILL)
+      for(let n = lastNum + 1; n <= end; n++){
+        options.push(String(n))
+      }
+      return
+    }
+
+    const isLetter = (s:string) => /^[a-zA-Z]$/.test(s)
+    if(isLetter(prev) && isLetter(last) && last.charCodeAt(0) === prev.charCodeAt(0) + 1){
+      this.seriesPrompted.add(options)
+      const isUpper = last === last.toUpperCase()
+      const answer = prompt(`Series detected (${prev}, ${last}, ...). Auto-fill options until which letter? (Cancel to skip)`, isUpper ? 'J' : 'j')
+      if(answer == null){ return }
+      const target = answer.trim()
+      if(!isLetter(target)){
+        alert("Enter a single letter")
+        return
+      }
+      const lastCode = last.toLowerCase().charCodeAt(0)
+      const untilCode = target.toLowerCase().charCodeAt(0)
+      if(untilCode <= lastCode){
+        alert("Enter a letter after " + last)
+        return
+      }
+      for(let c = lastCode + 1; c <= untilCode; c++){
+        const ch = String.fromCharCode(c)
+        options.push(isUpper ? ch.toUpperCase() : ch)
+      }
+    }
+  }
+
+  remove(i:number,j:number,optioninput?:HTMLInputElement) {
+    this.formarray.controls[i].get('options').value.splice(j,1)
+    if(optioninput){
+      setTimeout(() => optioninput.focus())
+    }
+  }
+
 
   getSubFormArray(mainindex):FormArray{
     return this.formarray.at(mainindex).get('array') as FormArray;
@@ -529,14 +677,23 @@ export class UpdateDeliveryComponent {
   }
 
   addSubFormOption(event:MatChipInputEvent,mainindex:number,subindex:number):void {
-      this.getSubFormArray(mainindex).controls[subindex].get('options').value.push(event.value.trim())
-      event.value = null;
-      this.submitForm(this.formform.value);
+      const value = (event.value || '').trim()
+      if(value){
+        this.getSubFormArray(mainindex).controls[subindex].get('options').value.push(value)
+        this.maybeSuggestSeries(this.getSubFormArray(mainindex).controls[subindex].get('options').value)
+        this.submitForm(this.formform.value)
+      }
+      event.chipInput.clear()
   }
 
-  removeSubFormOption(mainindex,subindex,optionindex){
+  removeSubFormOption(mainindex,subindex,optionindex,optioninput?:HTMLInputElement){
     this.getSubFormArray(mainindex).controls[subindex].get('options').value.splice(optionindex,1)
     this.submitForm(this.formform.value)
+    // refocus the chip input after the chip is destroyed, so repeated
+    // backspace keeps deleting (Material loses focus to <body> otherwise)
+    if(optioninput){
+      setTimeout(() => optioninput.focus())
+    }
   }
 
   addFlippingGroup(index:number){
@@ -551,14 +708,20 @@ export class UpdateDeliveryComponent {
   }
 
   addFlippingQuestionOption(event:MatChipInputEvent,arrayIndex:number){
-    this.formarray.controls[arrayIndex].get("flippingquestion").get("options").value.push(event.value.trim())
-    event.input.value = null
-    this.submitForm(this.formform.value)
+    const value = (event.value || '').trim()
+    if(value){
+      this.formarray.controls[arrayIndex].get("flippingquestion").get("options").value.push(value)
+      this.submitForm(this.formform.value)
+    }
+    event.chipInput.clear()
   }
 
-  removeFlippingQuestionOption(arrayIndex:number,chipIndex:number){
+  removeFlippingQuestionOption(arrayIndex:number,chipIndex:number,optioninput?:HTMLInputElement){
     this.formarray.controls[arrayIndex].get("flippingquestion").get("options").value.splice(chipIndex,1)
     this.submitForm(this.formform.value)
+    if(optioninput){
+      setTimeout(() => optioninput.focus())
+    }
   }
 
   onFlippingValueChange(arrayIndex:number){
@@ -570,7 +733,12 @@ export class UpdateDeliveryComponent {
     }
   }
 
-  submitForm(value){
+  submitForm(value, notifyInvalid:boolean = false){
+    if(!this.formform.valid && notifyInvalid){
+      this.formform.markAllAsTouched()
+      this.openSnackBar("Fix the highlighted fields before saving", 2500)
+      return
+    }
     if(this.formform.valid){
       console.log("Started Submitting");
       for (let i = 0; i < value.formarray.length; i++) {
@@ -621,15 +789,18 @@ export class UpdateDeliveryComponent {
   }
   // Form Related Function End
 
-  openSnackBar(message:string) {
+  openSnackBar(message:string, duration:number = 500) {
     this._snackBar.open(message,null, {
       horizontalPosition:'center',
       verticalPosition: 'bottom',
-      duration:500
+      duration:duration
     });
   }
 
   deleteForm(){
+    if(!confirm("Delete this form? Participants will no longer see it.")){
+      return
+    }
     let col = "delivery forms"
     this.loading = true
     console.log(this.data);

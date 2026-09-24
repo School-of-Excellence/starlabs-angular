@@ -1,0 +1,1908 @@
+import { Injectable, OnDestroy } from '@angular/core';
+import {
+  addDoc, collection, collectionData, doc, documentId, DocumentReference, getDocs, getFirestore,
+  limit, orderBy, query, serverTimestamp, setDoc, Timestamp, updateDoc, where
+} from '@angular/fire/firestore';
+import { Subject, Subscription } from 'rxjs';
+import { AuthguardService } from '../../authguard.service';
+
+/**
+ * LiveEventDataService — Phase 1 data layer for live-event-dashboard-v3.
+ *
+ * Every subscription/derivation here is LIFTED VERBATIM from an existing
+ * component (cited per-method). No new Firestore queries were introduced.
+ * Sources:
+ *   FT = first-timers-dashboard.component.ts
+ *   V1 = live-event-dashboard.component.ts
+ *   V2 = live-event-dashboard-v2.component.ts
+ *
+ * The service owns the subscriptions; the component subscribes to `changed$`
+ * and runs change detection when data updates (real-time preserved).
+ */
+
+export interface EventData { docref: DocumentReference; name: string; start_date: any; end_date: any; [key: string]: any; }
+export interface QueueData { docref: DocumentReference; name: string; start_date: any; end_date: any; eventref?: DocumentReference; queuestartdate?: any; queueenddate?: any; [key: string]: any; }
+export interface ProcedureStats { totalOpportunities: { count: number; data: any[] }; totalCompleted: { count: number; data: any[] }; doerNotStarted: { count: number; data: string[] }; doerCompleted: { count: number; data: string[] }; beneficierNotStarted: { count: number; data: string[] }; beneficierCompleted: { count: number; data: string[] }; liveChangework: { count: number; data: any[] }; }
+export interface JourneyCount { journeyId: string; journeyName: string; count: number; profileIds: string[]; }
+export interface AtcBuckets {
+  full: number; partial: number; unvalidated: number; none: number;
+  fullIds: string[]; partialIds: string[]; unvalidatedIds: string[]; noneIds: string[];
+}
+export interface PanelParticipant { docref: string; profileid: string; name: string; email: string; phone: string; photo?: string; activejourney?: string; profiletags?: string[]; isPresent: boolean; isSelected: boolean; isNotRegistered: boolean; [key: string]: any; }
+export interface DayAttendance {
+  day: number; date: string; displayLabel: string; count: number; percentage: number;
+  isToday: boolean; isPast: boolean; isFuture: boolean;
+  presentProfileIds: string[]; absentProfileIds: string[];
+}
+export interface ParticipantAtcAgg { adjTotal: number; adjDone: number; adjPending: number; procTotal: number; procDone: number; procPending: number; }
+
+@Injectable()
+export class LiveEventDataService implements OnDestroy {
+  /** Emits whenever any owned state changes so the component can re-render. */
+  changed$ = new Subject<void>();
+
+  firestoreDefault = getFirestore();
+  firestoreATC = getFirestore('firestore-atc');
+
+  // ---- events / queues (FT loadData + loadQueues / V2 identical) --------------
+  eventsList: EventData[] = [];
+  ongoingEvents: EventData[] = [];
+  queuesList: QueueData[] = [];
+  ongoingQueues: QueueData[] = [];
+  selectedEvent: EventData | null = null;
+  selectedQueues: QueueData[] = [];
+  selectedQueueRefs: DocumentReference[] = [];
+  queueRangeStartDate: Date | null = null;
+  queueRangeEndDate: Date | null = null;
+  filterStartDate: Date | null = null;
+  filterEndDate: Date | null = null;
+  atcModels: string[] = [];
+
+  // ---- participants / metadata / journeys (V2) --------------------------------
+  eventParticipantProfileIds: string[] = [];
+  registeredCount = 0;
+  // "Generated" (V2 subscribeToETickets): unique profileids scanned in
+  // (arena e-ticket, active==true) for this event.
+  scannedProfileIds: string[] = [];
+  scannedCount = 0;
+  // full arena e-ticket doc per participant (for manual attendance marking).
+  arenaETicketByProfile: { [profileid: string]: any } = {};
+  notScannedProfileIds: string[] = [];
+  notScannedCount = 0;
+  eventParticipants: PanelParticipant[] = [];
+  // O(1) lookups for buildParticipantFromProfileId (was O(n) find/includes → O(n²)
+  // when called in per-participant loops). Same values, just indexed.
+  private eventParticipantSet: Set<string> = new Set();
+  private registeredByProfileId: { [id: string]: PanelParticipant } = {};
+  // name fallback from the event participation request doc (V2 does this) — used
+  // when a registered participant has no `participant metadata` doc.
+  registeredNames: { [profileid: string]: string } = {};
+  // product per participant from `event participation request` (productref → name via
+  // authguard.getProductMap()). Surfaced in every drill-down list.
+  productMap: { [productDocId: string]: string } = {};
+  registeredProductIds: { [profileid: string]: string[] } = {};   // all eligible product ids
+  participantMetadataMap: { [profileid: string]: any } = {};
+  mapJourneyData: { [key: string]: any } = {};
+  journeyCounts: JourneyCount[] = [];
+  totalJourneyParticipants = 0;
+
+  // ---- procedures (FT calculateProcedureData pipeline) ------------------------
+  mapProcedureNames: { [key: string]: string } = {};
+  mapProcedureData: { [key: string]: ProcedureStats } = {};
+  sortedProcedureIds: string[] = [];
+  atcDocs: any[] = [];
+  private profileAtcMap: { [profileId: string]: any } = {};
+  beneficierProfileIds: string[] = [];
+  firstTimerProfileIds: string[] = [];         // only consulted when participantFilter==='firstTimers'
+  participantFilter: 'all' | 'firstTimers' = 'all';
+  // Day-scoped by the Procedure Tracking day chips (setProcedureDay re-subscribes).
+  liveChangeWorkData: any[] = [];
+  liveChangeworkLiveData: any[] = [];
+  // Event-wide changework, NO day window — the Arena Followup "Not Doing CW" /
+  // "CW Not Received" cards are "Throughout event" and must not move when the
+  // Procedure Tracking day filter changes. Kept separate rather than reusing the
+  // two above, which are deliberately day-scoped.
+  eventChangeWorkDocs: any[] = [];
+  liveChangeworkTotal = 0;
+  doerTotal = 0;
+  beneficierTotal = 0;
+
+  // ---- adjustments (V1 scalar-field sums over atc_alpha) ----------------------
+  totalAdjustmentCount = 0;
+  totalAdjustmentCompletedCount = 0;
+  totalAdjustmentPendingCount = 0;
+  // per-participant ATC scalar aggregate (V1 basis) for the Participant Data table
+  participantAtc: { [profileid: string]: ParticipantAtcAgg } = {};
+
+  // ---- attendance (V2 generateDayWiseStructure + subscribeToAttendance) --------
+  dayWiseAttendance: DayAttendance[] = [];
+  mapAttendence: { [profileid: string]: any[] } = {};
+  allDayAbsentProfileIds: string[] = [];
+  todayAttendence = 0;
+
+  // ---- video ask (V2 subscribeToVideoAsk) -------------------------------------
+  // Participant-tag taxonomy (V2 "participant tags" collection): {docid, name, …}.
+  // Column set for the Video Ask Tags section (labels + palette order).
+  participantTags: any[] = [];
+  // A&H CRM flag-status tags — "participant tags" with tagsfor 'live event'
+  // (first-timers-dashboard source). Grouped by metadata `profiletags`.
+  crmTags: any[] = [];
+  // participantvideoask submissions bucketed by uploaded date → submitter profileids.
+  videoAskByDay: { [date: string]: string[] } = {};
+  // same, but only TAGGED submissions (participantvideoask.tags ∩ taxonomy) — a
+  // tagged videoask counts as "reviewed" (operator rule).
+  videoAskTaggedByDay: { [date: string]: string[] } = {};
+  // per participant: their video-ask tags from submissions (∩ taxonomy). Drives the
+  // frontend Video Ask Tags scroller — SAME source as the backend review.
+  participantVideoAskTags: { [profileid: string]: string[] } = {};
+  videoAskLoaded = false;
+  // CHANGED (operator 2026-07-29): the Video Ask Tags section now buckets by the TAGS
+  // ON EACH SUBMISSION, not by `participant metadata.profiletags`. Tagging writes both
+  // (participant-videoask.component.ts:624-630), but profiletags accumulates across
+  // every event and every day forever, so it could never answer "who was tagged WHAT,
+  // on WHICH day". These are the raw rows, flattened to just what the section needs and
+  // held in memory so switching day is a client-side re-bucket, not a re-query.
+  videoAskTagDocs: { profileid: string; day: string; tags: string[]; addressed: boolean }[] = [];
+  videoAskTagDocsLoaded = false;
+
+  // ---- customer support (event-scoped: reporteddate window + participant filter)
+  clientIssues: any[] = [];              // in-scope tickets (any status), newest-first
+  totalOpenIssues = 0;                   // = supportCounts.open (New-open)
+  issueCategories: any[] = [];           // from chat config `categories`
+  categoryCounts: { category: string; count: number; open: number; inProgress: number; resolved: number; profileIds: string[] }[] = [];
+  supportCounts = { open: 0, inProgress: 0, resolved: 0 };   // open=New · inProgress=Responded · resolved=closed today
+  supportResolutionHours = 0;            // mean open→close hours over closed-in-scope
+
+  // ---- Arena Calling — event_caller_log (v3's ONLY write path) -----------------
+  // Deduped by `${profileid}|${dayKey}`, latest updateAt wins. `day` is normalized
+  // to start-of-day so the equality upsert-by-query matches.
+  callLogMap: { [key: string]: { id: string; profileId: string; dayKey: string; status: string; calledAt: any; callerId: string | null; upd: number } } = {};
+  loggedInProfileId: string | null = null;   // current user (AuthguardService.getRoles().profile_ref.id)
+
+  // ---- Zones (READ-ONLY; Phase 5) — ZM event-zone-management + V2 subscribeToZones
+  // v3 renders LIVE zone occupancy only; zone config / open-close toggle / allocation
+  // editing stay in event-zone-management. NOTHING here writes.
+  // Zone defs (ZM eventZoneList — "event zones"): docid, zonename, coordinators[],
+  // mentors[], cohorts[], status ('open'|'close'). Sorted by zonename.
+  eventZoneList: any[] = [];
+  mapEventZoneData: { [zoneDocId: string]: any } = {};
+  // Cohorts (ZM "big cohorts"): docid → {name, cohortCategory, participantidlist}.
+  mapCohortsData: { [cohortDocId: string]: any } = {};
+  mapCohortParticipants: { [cohortDocId: string]: string[] } = {};
+  // Allocations ("event participant zones"): profileid → {selectedzone, eligiliblecohorts}.
+  // V2 subscribeToZones reads only profileid; we EXTEND with selectedzone +
+  // eligiliblecohorts (both read by ZM) so occupancy can place people in zones/cohorts.
+  zoneAllocationMap: { [profileid: string]: { selectedzone: string; eligiliblecohorts: string[] } } = {};
+  zoneParticipantIds: Set<string> = new Set();       // V2: profileids with any allocation
+  noZoneProfileIds: string[] = [];                   // V2 calculateNoZoneParticipants
+  noZoneCount = 0;
+
+  // ---- procedure tracking filters (FT setFilter / participantFilter) ----------
+  procDayFilter: string = 'all';   // 'all' | 'yyyy-mm-dd'
+
+  // ---- ATC buckets (V2 basis: atc_alpha completed + atc_to_validate) ----------
+  // full = validated only · partial = validated AND to-validate ·
+  // unvalidated = to-validate only · none = neither (event participants).
+  atcToValidateProfileIds: string[] = [];
+  atcBuckets: AtcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
+
+  // ---- ATC in draft (V2 subscribeToDraftAtc) — temporary_ATC drafts -----------
+  // A "draft" = a temporary_ATC doc (delete==false) whose transcript[0] carries an
+  // adjustment and whose lastupdated falls in the queue range; counted as UNIQUE
+  // participants in the registered universe. Read from the firestore-atc DB.
+  draftAtcProfileIds: string[] = [];
+  draftAtcCount = 0;
+
+  isLoading = true;
+
+  private eventSub: Subscription | null = null;
+  private metadataSub: Subscription | null = null;
+  private atcSub: Subscription | null = null;
+  private atcToValidateSub: Subscription | null = null;
+  private lcwEventSub: Subscription | null = null;
+  private attendanceSub: Subscription | null = null;
+  private eTicketSub: Subscription | null = null;
+  private videoAskSub: Subscription | null = null;
+  private videoAskTagSub: Subscription | null = null;
+  private clientIssuesSub: Subscription | null = null;
+  private callLogSub: Subscription | null = null;
+  private draftAtcSub: Subscription | null = null;
+  private eventZonesSub: Subscription | null = null;
+  private bigCohortsSub: Subscription | null = null;
+  private participantZonesSub: Subscription | null = null;
+
+  constructor(private authguard: AuthguardService) {}
+
+  // ==========================================================================
+  // INIT
+  // ==========================================================================
+  async init(): Promise<void> {
+    this.isLoading = true;
+
+    // H1 (perf audit 2026-07-30): every read below is independent of the others,
+    // so they run in PARALLEL — the old serial await chain paid the SUM of ~10
+    // round trips (1-3s of pure latency before any payload). Events+queues emit
+    // changed$ the moment THEY land, so the event selector and ongoing strip
+    // paint while the big metadata scan is still streaming — the page appears
+    // step by step instead of all-at-once after a long blank.
+    // selectEvent no longer waits for the metadata scan (measured 2026-08-01:
+    // gating on it held the whole queue pipeline — and the firestore-atc
+    // channel's very first request — until ~15.5s on production data). The scan
+    // resolves concurrently and RE-KICKS calculateProcedureData + changed$ when
+    // the map lands; until then name lookups fall back ('Unknown' /
+    // registeredNames) and calculateProcedureData bails harmlessly.
+
+    // journey map (V2 ngOnInit)
+    const journeyP = getDocs(collection(this.firestoreDefault, 'journey')).then(snap => {
+      for (let i = 0; i < snap.docs.length; i++) {
+        const journeyData = snap.docs[i].data();
+        journeyData['docid'] = snap.docs[i].id;
+        this.mapJourneyData[snap.docs[i].id] = journeyData;
+      }
+      console.log('[v3][init] journey docs:', Object.keys(this.mapJourneyData).length);
+    }).catch(err => console.error('Error loading journeys:', err));
+
+    // procedures map (FT loadData procedures block)
+    const proceduresP = getDocs(collection(this.firestoreDefault, 'procedures')).then(procedure => {
+      procedure.docs.forEach(data => {
+        const procedureData = data.data();
+        this.mapProcedureNames[data.id] = procedureData['name'];
+        this.mapProcedureData[data.id] = { totalCompleted: { count: 0, data: [] }, totalOpportunities: { count: 0, data: [] }, doerNotStarted: { count: 0, data: [] }, doerCompleted: { count: 0, data: [] }, beneficierNotStarted: { count: 0, data: [] }, beneficierCompleted: { count: 0, data: [] }, liveChangework: { count: 0, data: [] } };
+      });
+      console.log('[v3][init] procedures docs:', Object.keys(this.mapProcedureNames).length);
+      // a rejection here (or in journeyP) would make Promise.all skip selectEvent
+      // entirely — catch so a transient read failure degrades that one section
+      // instead of the whole dashboard (verifier finding, 2026-07-30)
+    }).catch(err => console.error('Error loading procedures:', err));
+
+    // participant-tag taxonomy — ONE query for both tag families (CHANGED, operator):
+    //   participantTags = tagsfor 'video ask'  → Video Ask Tags section
+    //   crmTags         = tagsfor 'live event' → A&H CRM flag status
+    // Both are active-only. array-contains-any fetches the union in a single
+    // round-trip, then we split client-side; a tag carrying BOTH values lands in
+    // both lists, exactly as the two separate queries used to return it.
+    // Order is preserved: unordered Firestore queries come back by document id, and
+    // filtering a docid-sorted superset keeps each subset in its original order —
+    // load-bearing, because tag COLOR is assigned by palette index, so a reordering
+    // here silently recolours every column. (It used to also decide which single tag a
+    // participant was filed under; that priority rule is gone as of 2026-07-29, when
+    // the section moved to per-submission tags and became multi-tag.)
+    // CHANGED (operator): crmTags is now active-only — first-timers-dashboard does
+    // NOT filter isActive, so v3 deliberately shows fewer CRM flags than it does.
+    const tagsP = getDocs(query(
+      collection(this.firestoreDefault, 'participant tags'),
+      where('tagsfor', 'array-contains-any', ['video ask', 'live event']),
+      where('isActive', '==', true)
+    )).then(snap => {
+      const tags = snap.docs.map(d => ({ docid: d.id, ...d.data() } as any));
+      this.participantTags = tags.filter(t => (t['tagsfor'] || []).includes('video ask'));
+      this.crmTags = tags.filter(t => (t['tagsfor'] || []).includes('live event'));
+      console.log('[v3][init] participant tags — video-ask:', this.participantTags.length, '| A&H CRM:', this.crmTags.length);
+    }).catch(err => console.error('Error loading participant tags:', err));
+
+    // participant metadata (V2 loadParticipantMetadata) — the biggest read; runs
+    // concurrently with everything else instead of gating it
+    const metadataP = this.loadParticipantMetadata();
+
+    // customer support categories config (global doc, loaded once); the tickets
+    // themselves are event-scoped and (re)subscribed per selectEvent.
+    const issueCatP = this.loadIssueCategories();
+
+    // current user for call-log writes (same accessor as V1/zone-management)
+    const rolesP = (async () => {
+      try {
+        const roles: any = await this.authguard.getRoles();
+        this.loggedInProfileId = roles?.['profile_ref']?.id || null;
+      } catch (err) { console.error('Error resolving current user:', err); }
+      console.log('[v3][init] logged-in profileId:', this.loggedInProfileId);
+    })();
+
+    // Staff (coordinator/mentor) names for the Zones view come from
+    // participantMetadataMap — getProfileMap() was a full platform-wide
+    // profile_data scan serving only that one lookup (perf audit 2026-07-30,
+    // H3). profile_data is no longer read here.
+
+    // product id→name map (authguard.getProductMap) for the drill-down lists.
+    const productsP = (async () => {
+      try {
+        this.productMap = (await this.authguard.getProductMap()) || {};
+      } catch (err) { console.error('Error loading product map:', err); }
+      console.log('[v3][init] product map entries:', Object.keys(this.productMap).length);
+    })();
+
+    // events + queues (FT loadData / V2 identical) — the selector's data. Emits
+    // changed$ on its own the moment both lists are in, so the dropdown and the
+    // ongoing chips render without waiting for the rest of the batch.
+    const eventsQueuesP = (async () => {
+      try {
+        const eventsSnapshot = await getDocs(query(collection(this.firestoreDefault, 'event collection'), orderBy('end_date', 'desc')));
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        eventsSnapshot.docs.forEach(d => {
+          const data = d.data() as EventData;
+          data['docref'] = d.ref;
+          this.eventsList.push(data);
+          const startDate = data['start_date']?.toDate ? data['start_date'].toDate() : new Date(data['start_date']);
+          const endDate = data['end_date']?.toDate ? data['end_date'].toDate() : new Date(data['end_date']);
+          startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
+          if (startDate <= today && today <= endDate) { this.ongoingEvents.push(data); }
+        });
+
+        // queues (FT loadQueues / V2) — loaded once so chips can render both kinds
+        const queuesSnapshot = await getDocs(query(collection(this.firestoreDefault, 'queue generation'), orderBy('queueenddate', 'desc')));
+        queuesSnapshot.docs.forEach(d => {
+          const data = d.data() as QueueData;
+          data['docref'] = d.ref;
+          this.queuesList.push(data);
+          const startDate = data['queuestartdate']?.toDate ? data['queuestartdate'].toDate() : new Date(data['queuestartdate']);
+          const endDate = data['queueenddate']?.toDate ? data['queueenddate'].toDate() : new Date(data['queueenddate']);
+          startDate.setHours(0, 0, 0, 0); endDate.setHours(23, 59, 59, 999);
+          if (startDate <= today && today <= endDate) { this.ongoingQueues.push(data); }
+        });
+
+        console.log('[v3][events] total:', this.eventsList.length, '| ongoing:', this.ongoingEvents.length,
+          this.ongoingEvents.map(e => e['name']));
+        console.log('[v3][queues] total:', this.queuesList.length, '| ongoing:', this.ongoingQueues.length,
+          this.ongoingQueues.map(q => q['name'] || q['queuename']));
+        this.changed$.next();               // first paint: selector + ongoing strip
+      } catch (error) {
+        console.error('Error loading events/queues:', error);
+      }
+    })();
+
+    // metadata lands whenever it lands — re-kick every metadata-derived number
+    // then (loadParticipantMetadata catches internally, so this always runs).
+    // calculateJourneyCounts must be here too: selectEvent computes it before
+    // the map lands (zeros), and NOTHING else re-runs it. Ordering-safe: before
+    // selectEvent it sees an empty universe and selectEvent recomputes after.
+    metadataP.then(() => {
+      this.calculateJourneyCounts();
+      this.calculateProcedureData();
+      this.changed$.next();
+    }).catch(err => console.error('metadata re-kick failed:', err));
+    await Promise.all([journeyP, proceduresP, tagsP, issueCatP, rolesP, productsP, eventsQueuesP]);
+
+    // ONLY dependency in the whole chain: auto-selecting the ongoing event needs
+    // the events list, and its listeners need every static map above.
+    try {
+      if (this.ongoingEvents.length > 0) { await this.selectEvent(this.ongoingEvents[0]); }
+    } catch (error) {
+      console.error('Error selecting initial event:', error);
+    } finally {
+      this.isLoading = false;
+      this.changed$.next();
+    }
+  }
+
+  // ==========================================================================
+  // METADATA (V2 loadParticipantMetadata)
+  // ==========================================================================
+  async loadParticipantMetadata(): Promise<void> {
+    this.participantMetadataMap = {};
+    try {
+      const metadataSnapshot = await getDocs(query(collection(this.firestoreDefault, 'participant metadata'), orderBy('name', 'asc')));
+      metadataSnapshot.docs.forEach(d => {
+        const data = d.data();
+        this.participantMetadataMap[d.id] = {
+          profileid: d.id,
+          name: data['name'] || data['fullname'] || data['displayName'] || '',
+          email: data['email'] || '',
+          phone: data['phone'] || data['mobile'] || data['number'] || '',
+          photo: data['profile'] || data['profileimg'] || '',
+          activejourney: data['activejourney'] || '',
+          profiletags: data['profiletags'] || [],
+          ...data
+        };
+      });
+      console.log('[v3][metadata] participant metadata docs:', Object.keys(this.participantMetadataMap).length);
+    } catch (error) {
+      console.error('Error loading participant metadata:', error);
+    }
+  }
+
+  // ==========================================================================
+  // EVENT SELECTION — drives the whole pipeline (mirrors FT/V2 selectEvent)
+  // ==========================================================================
+  async selectEvent(event: EventData): Promise<void> {
+    this.unsubscribeEventPipeline();
+    // Queue-scoped snapshot state must not survive an event switch: repeat
+    // attendees' old-event atc_alpha docs pass the NEW event's universe filter,
+    // and the derive/calc calls that now run synchronously during the switch
+    // would transiently blend them into the new event's numbers.
+    this.resetProcedureState();
+    // The event-wide changework stream too — arena now attaches BEFORE
+    // subscribeToEventChangeWork resets it, and deriveLcwViews at attach must
+    // not filter the PREVIOUS event's docs into the new event's window. Kept
+    // OUT of resetProcedureState deliberately: queue deselection must not wipe
+    // these (a day-chip click still derives that day's changework with zero
+    // queues selected).
+    this.eventChangeWorkDocs = [];
+    this.selectedEvent = event;
+    this.procDayFilter = 'all';
+    this.participantFilter = 'all';
+
+    // date window = whole event ("All Days"), per FT updateFilterDateRange('all')
+    const start = event['start_date']?.toDate ? event['start_date'].toDate() : new Date(event['start_date']);
+    const end = event['end_date']?.toDate ? event['end_date'].toDate() : new Date(event['end_date']);
+    this.filterStartDate = new Date(start); this.filterStartDate.setHours(0, 0, 0, 0);
+    this.filterEndDate = new Date(end); this.filterEndDate.setHours(23, 59, 59, 999);
+
+    console.log('[v3][select] event:', event['name'], '| window:', this.filterStartDate, '→', this.filterEndDate);
+    await this.loadParticipants();
+    this.calculateJourneyCounts();
+    this.subscribeToETickets();
+    this.generateDayWiseStructure();
+    this.applyDefaultProcedureDay();
+
+    // auto-select this event's ongoing queues (FT/V2 default) and attach the ATC
+    // pipeline FIRST: it rides the separate firestore-atc channel, so opening it
+    // before the default-DB heavies (attendance, videoask, event changework, …)
+    // lets both databases backfill in parallel instead of the ATC card queuing
+    // behind them. It must not wait a round-trip for the queue-variation read
+    // either — its queries scope by queueid + queue range, not atcModels
+    // (measured 2026-08-01: those serial hops held the firestore-atc channel's
+    // first request to ~15.5s on production data).
+    this.selectedQueues = this.ongoingQueues.filter(q => q['eventref'] && this.selectedEvent && this.pathOf(q['eventref']) === this.pathOf(this.selectedEvent.docref));
+    if (this.selectedQueues.length === 0 && this.ongoingQueues.length > 0) { this.selectedQueues = [this.ongoingQueues[0]]; }
+    this.selectedQueueRefs = this.selectedQueues.map(q => q.docref);
+    console.log('[v3][select] auto-selected queues:', this.selectedQueues.map(q => q['name'] || q['queuename']));
+    this.updateQueueDateRange();
+    this.subscribeToArenaOverview();
+
+    this.subscribeToAttendance();
+    this.subscribeToVideoAsk();
+    this.subscribeToVideoAskTags();
+    this.subscribeToClientIssues();
+    this.subscribeToCallLog();
+    this.subscribeToEventZones();
+    this.subscribeToBigCohorts();
+    this.subscribeToParticipantZones();
+    this.subscribeToEventChangeWork();
+
+    await this.loadQueuevariation();
+
+    this.changed$.next();
+  }
+
+  /** Chip toggle for a queue (mirrors FT toggleQueueSelection) — re-derives atcModels. */
+  async toggleQueue(queue: QueueData): Promise<void> {
+    const idx = this.selectedQueues.findIndex(q => this.pathOf(q.docref) === this.pathOf(queue.docref));
+    if (idx > -1) { this.selectedQueues.splice(idx, 1); this.selectedQueueRefs.splice(idx, 1); }
+    else { this.selectedQueues.push(queue); this.selectedQueueRefs.push(queue.docref); }
+    this.updateQueueDateRange();
+    if (this.selectedQueues.length > 0) { this.subscribeToArenaOverview(); await this.loadQueuevariation(); }
+    else { this.unsubscribeQueuePipeline(); this.resetProcedureState(); }
+    this.changed$.next();
+  }
+
+  isQueueSelected(queue: QueueData): boolean {
+    return this.selectedQueues.some(q => this.pathOf(q.docref) === this.pathOf(queue.docref));
+  }
+
+  // ---- participant UNIVERSE — V2 loadParticipants (event participation request,
+  //      status in ['approved','attended'], dedup by profileid). Team-confirmed
+  //      source for eventParticipantProfileIds. registeredCount = its size.
+  private async loadParticipants(): Promise<void> {
+    if (!this.selectedEvent) return;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestoreDefault, 'event participation request'),
+        where('eventref', '==', this.selectedEvent.docref),
+        where('status', 'in', ['approved', 'attended'])
+      ));
+      const seen = new Set<string>();
+      const docs: any[] = [];
+      // A participant can have MULTIPLE request docs — one per eligible product.
+      // Dedup the universe by profileid, but collect ALL productrefs per person.
+      const productSets: { [pid: string]: Set<string> } = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const profileId = data['profileid'] || '';
+        if (!profileId) return;
+        const pref = data['productref']?.id;
+        if (pref) { (productSets[profileId] = productSets[profileId] || new Set<string>()).add(pref); }
+        if (seen.has(profileId)) return;
+        seen.add(profileId);
+        docs.push({ docref: d.id, profileid: profileId, ...data });
+      });
+      this.eventParticipantProfileIds = [...seen];
+      this.eventParticipantSet = new Set(this.eventParticipantProfileIds);
+      this.registeredCount = this.eventParticipantProfileIds.length;
+      this.registeredNames = {};
+      this.registeredProductIds = {};
+      Object.keys(productSets).forEach(pid => { this.registeredProductIds[pid] = [...productSets[pid]]; });
+      docs.forEach(d => {
+        const n = d['name'] || d['fullname'] || d['displayName'] || ''; if (n) { this.registeredNames[d.profileid] = n; }
+      });
+      this.eventParticipants = docs.map(d => this.buildParticipantFromProfileId(d.profileid, false));
+      this.registeredByProfileId = {};
+      this.eventParticipants.forEach(p => { this.registeredByProfileId[p.profileid] = p; });
+      const named = this.eventParticipantProfileIds.filter(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id]).length;
+      console.log('[v3][participants] event:', this.selectedEvent?.['name'],
+        '| approved/attended (registered universe):', this.registeredCount, '| with a resolvable name:', named);
+    } catch (error) {
+      console.error('Error loading participants:', error);
+    }
+  }
+
+  // "Generated"/hero — V2 subscribeToETickets (arena e-ticket, active==true).
+  // A distinct set from the registered universe.
+  private subscribeToETickets(): void {
+    if (!this.selectedEvent) return;
+    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
+    this.eTicketSub = collectionData(query(
+      collection(this.firestoreDefault, 'arena e-ticket'),
+      where('eventref', '==', this.selectedEvent.docref),
+      where('active', '==', true)
+    )).subscribe({
+      next: (list: any[]) => {
+        const scanned = new Set<string>();
+        this.arenaETicketByProfile = {};
+        list.forEach((d: any) => { const pid = d['profileid']; if (pid) { scanned.add(pid); this.arenaETicketByProfile[pid] = d; } });
+        this.scannedProfileIds = [...scanned];
+        this.scannedCount = this.scannedProfileIds.length;
+        this.recomputeNotScanned();
+        console.log('[v3][hero/generated] e-ticket docs:', list.length,
+          '| registered:', this.registeredCount, '| scanned (hero):', this.scannedCount,
+          '| notScanned:', this.notScannedCount);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to e-tickets:', error)
+    });
+  }
+
+  private recomputeNotScanned(): void {
+    const scanned = new Set(this.scannedProfileIds);
+    this.notScannedProfileIds = this.eventParticipantProfileIds.filter(id => !scanned.has(id));
+    this.notScannedCount = this.notScannedProfileIds.length;
+  }
+
+  // ---- attendance (V2 generateDayWiseStructure) ------------------------------
+  private generateDayWiseStructure(): void {
+    if (!this.selectedEvent) { this.dayWiseAttendance = []; return; }
+    const startDate = this.selectedEvent['start_date']?.toDate ? this.selectedEvent['start_date'].toDate() : new Date(this.selectedEvent['start_date']);
+    const endDate = this.selectedEvent['end_date']?.toDate ? this.selectedEvent['end_date'].toDate() : new Date(this.selectedEvent['end_date']);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    this.dayWiseAttendance = [];
+    let currentDate = new Date(startDate); currentDate.setHours(0, 0, 0, 0);
+    let dayNumber = 1;
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toLocaleDateString('en-CA');
+      const todayStr = today.toLocaleDateString('en-CA');
+      const isToday = dateStr === todayStr;
+      this.dayWiseAttendance.push({
+        day: dayNumber, date: dateStr, displayLabel: isToday ? 'Today' : 'DAY ' + dayNumber,
+        count: 0, percentage: 0, isToday, isPast: currentDate < today, isFuture: currentDate > today,
+        presentProfileIds: [], absentProfileIds: []
+      });
+      currentDate.setDate(currentDate.getDate() + 1); dayNumber++;
+    }
+    console.log('[v3][attendance] day structure:', this.dayWiseAttendance.length, 'days');
+  }
+
+  // V2 getEventDatesUntilToday
+  get eventDatesUntilToday(): string[] {
+    const today = new Date().toLocaleDateString('en-CA');
+    return this.dayWiseAttendance.filter(d => d.date <= today).map(d => d.date);
+  }
+
+  // V2 subscribeToAttendance (attendance-grid slice only; Phase-3 followup calls dropped)
+  private subscribeToAttendance(): void {
+    if (!this.selectedEvent) return;
+    if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
+    this.attendanceSub = collectionData(query(
+      collection(this.firestoreDefault, 'arena e-ticket log'), where('eventref', '==', this.selectedEvent.docref)
+    )).subscribe({
+      next: (list: any[]) => {
+        this.mapAttendence = {};
+        for (let i = 0; i < list.length; i++) {
+          const element = list[i];
+          const profileId = element['profileid'];
+          if (!profileId) continue;
+          this.mapAttendence[profileId] = this.mapAttendence[profileId] || [];
+          const existingDates = this.mapAttendence[profileId].map(e => new Date(e['logdate'].toDate()).toLocaleDateString('en-CA'));
+          const logDate = new Date(element['logdate'].toDate()).toLocaleDateString('en-CA');
+          if (!existingDates.includes(logDate)) { this.mapAttendence[profileId].push(element); }
+        }
+        this.recomputeAttendanceDays();
+        console.log('[v3][attendance] e-ticket-log docs:', list.length,
+          '| per-day present:', this.dayWiseAttendance.map(d => `${d.displayLabel}:${d.count}`),
+          '| todayAttendence:', this.todayAttendence,
+          '| neverAttended:', this.allDayAbsentProfileIds.length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to attendance:', error)
+    });
+  }
+
+  // Recompute per-day present/absent from mapAttendence + the current universe.
+  // Denominator for % is the arena e-ticket universe (eventParticipantProfileIds).
+  private recomputeAttendanceDays(): void {
+    const universe = this.eventParticipantProfileIds.length;
+    this.dayWiseAttendance.forEach(day => {
+      day.presentProfileIds = [];
+      Object.keys(this.mapAttendence).forEach(profileId => {
+        const attendedDates = this.mapAttendence[profileId].map(e => new Date(e['logdate'].toDate()).toLocaleDateString('en-CA'));
+        if (attendedDates.includes(day.date)) { day.presentProfileIds.push(profileId); }
+      });
+      day.absentProfileIds = this.eventParticipantProfileIds.filter(profileId => !day.presentProfileIds.includes(profileId));
+      day.count = day.presentProfileIds.length;
+      const universeAttendees = day.presentProfileIds.filter(id => this.eventParticipantProfileIds.includes(id)).length;
+      day.percentage = universe > 0 ? Math.round((universeAttendees / universe) * 100) : 0;
+    });
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const todayDay = this.dayWiseAttendance.find(d => d.date === todayStr);
+    this.todayAttendence = todayDay ? todayDay.count : 0;
+    this.allDayAbsentProfileIds = this.eventParticipantProfileIds.filter(profileId => {
+      const attendanceDates = this.mapAttendence[profileId]?.map(e => new Date(e['logdate'].toDate()).toLocaleDateString('en-CA')) || [];
+      return this.eventDatesUntilToday.every(date => !attendanceDates.includes(date));
+    });
+    if (todayDay) {
+      console.log('[v3][calls] today not-marked (absent):', todayDay.absentProfileIds.length,
+        '| sample names:', todayDay.absentProfileIds.slice(0, 5).map(id => this.participantMetadataMap[id]?.['name'] || this.registeredNames[id] || 'Unknown'));
+    }
+  }
+
+  // FT autoSelectToday — default the procedure Day filter to TODAY when the event
+  // is ongoing (today falls inside the range); otherwise "All Days" (event already
+  // completed, or not started yet). Sets the livechangework window accordingly,
+  // before subscribeToArenaOverview runs.
+  private applyDefaultProcedureDay(): void {
+    const today = this.dayWiseAttendance.find(d => d.isToday);
+    if (today) {
+      this.procDayFilter = today.date;
+      const [y, m, dd] = today.date.split('-').map(Number);
+      this.filterStartDate = new Date(y, m - 1, dd, 0, 0, 0, 0);
+      this.filterEndDate = new Date(y, m - 1, dd, 23, 59, 59, 999);
+    } else {
+      this.procDayFilter = 'all';
+      // filterStartDate/End already span the whole event (set in selectEvent).
+    }
+    console.log('[v3][proc day default]', this.procDayFilter, '(ongoing today?', !!today, ')');
+  }
+
+  // ---- video ask submissions (V2 subscribeToVideoAsk) — per-day counts --------
+  // arenavideoask (campaigns for the event) → participantvideoask (submissions),
+  // bucketed by uploaded date. Enables the attendance grid's per-day Video Ask row.
+  private async subscribeToVideoAsk(): Promise<void> {
+    if (!this.selectedEvent) return;
+    if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
+    this.videoAskByDay = {};
+    this.videoAskTaggedByDay = {};
+    this.participantVideoAskTags = {};
+    this.videoAskLoaded = false;
+    try {
+      const snap = await getDocs(query(collection(this.firestoreDefault, 'arenavideoask'), where('eventref', '==', this.selectedEvent.docref)));
+      let ids = snap.docs.map(d => d.id);
+      if (ids.length === 0) {
+        this.videoAskLoaded = true;
+        console.log('[v3][videoask] no arenavideoask campaigns for event');
+        this.changed$.next();
+        return;
+      }
+      if (ids.length > 30) {
+        console.warn('[v3][videoask] >30 arenavideoask campaigns — Firestore "in" caps at 30; using first 30');
+        ids = ids.slice(0, 30);
+      }
+      this.videoAskSub = collectionData(query(
+        collection(this.firestoreDefault, 'participantvideoask'), where('videoaskid', 'in', ids)
+      )).subscribe({
+        next: (docs: any[]) => {
+          const byDay: { [date: string]: Set<string> } = {};
+          const taggedByDay: { [date: string]: Set<string> } = {};
+          const partTags: { [pid: string]: Set<string> } = {};
+          docs.forEach((d: any) => {
+            const pid = d['profileid'] || '';
+            if (!pid) { return; }
+            // CHANGED (operator): "reviewed" = the reviewer has GIVEN the submission a
+            // tag. participantvideoask.tags holds participant-tag docids written by
+            // videoask-display, so any non-empty tags array means it's reviewed.
+            const tags: string[] = Array.isArray(d['tags']) ? d['tags'] : [];
+            const isTagged = tags.length > 0;
+            if (isTagged) { const set = partTags[pid] = partTags[pid] || new Set<string>(); tags.forEach((t: string) => set.add(t)); }
+            const uploaded = d['uploaded']?.toDate ? d['uploaded'].toDate() : (d['uploaded'] ? new Date(d['uploaded']) : null);
+            if (uploaded) {
+              const ds = uploaded.toLocaleDateString('en-CA');
+              (byDay[ds] = byDay[ds] || new Set<string>()).add(pid);
+              if (isTagged) { (taggedByDay[ds] = taggedByDay[ds] || new Set<string>()).add(pid); }
+            }
+          });
+          this.videoAskByDay = {};
+          Object.keys(byDay).forEach(ds => { this.videoAskByDay[ds] = [...byDay[ds]]; });
+          this.videoAskTaggedByDay = {};
+          Object.keys(taggedByDay).forEach(ds => { this.videoAskTaggedByDay[ds] = [...taggedByDay[ds]]; });
+          this.participantVideoAskTags = {};
+          Object.keys(partTags).forEach(pid => { this.participantVideoAskTags[pid] = [...partTags[pid]]; });
+          this.videoAskLoaded = true;
+          console.log('[v3][videoask] participantvideoask docs:', docs.length,
+            '| per-day submitters:', Object.keys(this.videoAskByDay).map(d => `${d}:${this.videoAskByDay[d].length}`),
+            '| per-day tagged (reviewed):', Object.keys(this.videoAskTaggedByDay).map(d => `${d}:${this.videoAskTaggedByDay[d].length}`));
+          this.changed$.next();
+        },
+        error: (e) => console.error('Error subscribing to participantvideoask:', e)
+      });
+    } catch (e) {
+      console.error('Error loading arenavideoask:', e);
+    }
+  }
+
+  // ---- video ask tag buckets (CHANGED, operator 2026-07-29) ------------------
+  // Feeds ONLY the Video Ask Tags section. Deliberately a second subscription rather
+  // than a widening of subscribeToVideoAsk(): that one reaches the collection through
+  // `videoaskid in [arenavideoask ids]`, this one through `arenaevent`, and the two
+  // need not select the same documents. Merging them would silently move Daily
+  // Attendance's per-day Video Ask counts, which the operator did not ask to change.
+  //
+  // Querying `arenaevent` directly also drops the 30-campaign ceiling that the other
+  // path still lives under (see the ids.slice(0, 30) warning above) — this query has
+  // no `in` clause, so no cap.
+  private async subscribeToVideoAskTags(): Promise<void> {
+    if (this.videoAskTagSub) { this.videoAskTagSub.unsubscribe(); this.videoAskTagSub = null; }
+    this.videoAskTagDocs = [];
+    this.videoAskTagDocsLoaded = false;
+    if (!this.selectedEvent) { return; }
+    this.videoAskTagSub = collectionData(query(
+      collection(this.firestoreDefault, 'participantvideoask'),
+      where('arenaevent', '==', this.selectedEvent.docref)
+    )).subscribe({
+      next: (docs: any[]) => {
+        let undated = 0;
+        this.videoAskTagDocs = docs.map((d: any) => {
+          const day = this.createdToDayKey(d['created']);
+          if (!day) { undated++; }
+          return {
+            profileid: d['profileid'] || '',
+            day,
+            tags: Array.isArray(d['tags']) ? d['tags'] : [],
+            addressed: d['addressed'] === true   // absent field reads as NOT addressed
+          };
+        }).filter(r => r.profileid);
+        this.videoAskTagDocsLoaded = true;
+        console.log('[v3][videoask-tags] participantvideoask docs for event:', docs.length,
+          '| usable:', this.videoAskTagDocs.length, '| tagged:', this.videoAskTagDocs.filter(r => r.tags.length).length);
+        if (undated) {
+          console.warn('[v3][videoask-tags]', undated, 'doc(s) have a missing/unparseable `created` — excluded from every day AND from All Days');
+        }
+        this.changed$.next();
+      },
+      error: (e) => console.error('Error subscribing to participantvideoask (tags):', e)
+    });
+  }
+
+  /** `created` is a MM/DD/YYYY string on these documents. Parse it to a local Date and
+   *  normalise to the yyyy-mm-dd key every day filter on this screen speaks — the same
+   *  normalisation subscribeToVideoAsk() applies to `uploaded`, so the two agree.
+   *  Returns '' when the field is absent or malformed; such a row is counted nowhere. */
+  private createdToDayKey(created: any): string {
+    if (!created) { return ''; }
+    if (created?.toDate) { return created.toDate().toLocaleDateString('en-CA'); }   // tolerate a Timestamp
+    const m = String(created).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) { return ''; }
+    const parsed = new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+    if (isNaN(parsed.getTime())) { return ''; }
+    return parsed.toLocaleDateString('en-CA');
+  }
+
+  // Category config (V2: chat config doc 0jqtiq3sxtbLVcEGMDhW → categories). Global, once.
+  private async loadIssueCategories(): Promise<void> {
+    try {
+      const configDoc = await getDocs(query(collection(this.firestoreDefault, 'chat config'), where(documentId(), '==', '0jqtiq3sxtbLVcEGMDhW')));
+      if (!configDoc.empty) { this.issueCategories = configDoc.docs[0].data()['categories'] || []; }
+    } catch (err) { console.error('Error loading chat config:', err); }
+  }
+
+  // Event-scoped support tickets. Range-query clientissue by the OPEN timestamp
+  // (reporteddate) over the event window server-side, then filter clientid ∈
+  // eventParticipantProfileIds client-side (avoids an unbounded `in` on profileIds).
+  // Field mapping (from Customer Support components): open=reporteddate,
+  // close=status.date, closed=status.status==='Closed', assignee=assign[] .
+  private subscribeToClientIssues(): void {
+    if (!this.selectedEvent) return;
+    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
+    const s = this.selectedEvent['start_date']?.toDate ? this.selectedEvent['start_date'].toDate() : new Date(this.selectedEvent['start_date']);
+    const e = this.selectedEvent['end_date']?.toDate ? this.selectedEvent['end_date'].toDate() : new Date(this.selectedEvent['end_date']);
+    const startDate = new Date(s); startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(e); endDate.setHours(23, 59, 59, 999);
+    this.clientIssuesSub = collectionData(query(
+      collection(this.firestoreDefault, 'clientissue'),
+      where('reporteddate', '>=', startDate),
+      where('reporteddate', '<=', endDate),
+      orderBy('reporteddate', 'desc')
+    ), { idField: 'id' }).subscribe({
+      next: (issues: any[]) => {
+        const universe = new Set(this.eventParticipantProfileIds);
+        this.clientIssues = issues.filter(i => universe.has(i['clientid']));
+        this.calculateSupport();
+        console.log('[v3][support] window docs:', issues.length, '| in-scope (participant):', this.clientIssues.length,
+          '| open/inProgress/resolvedToday:', JSON.stringify(this.supportCounts), '| mean resolution h:', this.supportResolutionHours);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to client issues:', error)
+    });
+  }
+
+  // Single source of truth for a ticket's status (KPIs, category bar AND feed all
+  // use this — previously the KPI used a stricter rule and diverged):
+  //   closed → resolved · open & (New | no chatstatus) → open (not yet worked) ·
+  //   open & any other chatstatus (Responded / decision making / pending / …) → inProgress.
+  ticketLabel(t: any): 'open' | 'inProgress' | 'resolved' {
+    if (t['status']?.['status'] === 'Closed') { return 'resolved'; }
+    const cs = t['chatstatus'];
+    if (!cs || cs === 'New') { return 'open'; }
+    return 'inProgress';
+  }
+
+  private calculateSupport(): void {
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    let open = 0, inProgress = 0, resolvedToday = 0;
+    const closedHours: number[] = [];
+    this.clientIssues.forEach(t => {
+      const label = this.ticketLabel(t);
+      if (label === 'resolved') {
+        const cd = t['status']?.['date']; const closeDate = cd?.toDate ? cd.toDate() : (cd ? new Date(cd) : null);
+        const rd = t['reporteddate']; const openDate = rd?.toDate ? rd.toDate() : (rd ? new Date(rd) : null);
+        if (closeDate && closeDate.toLocaleDateString('en-CA') === todayStr) { resolvedToday++; }
+        if (closeDate && openDate) { closedHours.push((closeDate.getTime() - openDate.getTime()) / 3600000); }
+      } else if (label === 'open') { open++; }
+      else { inProgress++; }
+    });
+    this.supportCounts = { open, inProgress, resolved: resolvedToday };
+    this.supportResolutionHours = closedHours.length ? Math.round((closedHours.reduce((a, b) => a + b, 0) / closedHours.length) * 10) / 10 : 0;
+    this.totalOpenIssues = open;
+    this.calculateCategoryCounts();
+  }
+
+  // V2 calculateCategoryCounts, over the scoped set + per-category status breakdown.
+  private calculateCategoryCounts(): void {
+    const build = (name: string, list: any[]) => {
+      const profileIds = [...new Set(list.map(i => i['clientid']).filter((id: string) => id))] as string[];
+      let o = 0, p = 0, r = 0;
+      list.forEach(t => { const l = this.ticketLabel(t); if (l === 'open') { o++; } else if (l === 'inProgress') { p++; } else { r++; } });
+      return { category: name, count: list.length, open: o, inProgress: p, resolved: r, profileIds };
+    };
+    this.categoryCounts = [];
+    this.issueCategories.forEach((cat: any) => {
+      const name = cat.category;
+      this.categoryCounts.push(build(name, this.clientIssues.filter(i => i['category'] === name)));
+    });
+    const categorized = this.issueCategories.map((c: any) => c.category);
+    const uncategorized = this.clientIssues.filter(i => !categorized.includes(i['category']));
+    if (uncategorized.length > 0) { this.categoryCounts.push(build('Uncategorized', uncategorized)); }
+  }
+
+  // ==========================================================================
+  // Manual attendance marking — writes `arena e-ticket log` docs in the QR-scanner
+  // shape (docid/product/logdate/profileid/eventref/eticketref).
+  //
+  // OPERATOR RULE (2026-07-27): a manual mark REQUIRES an active arena e-ticket,
+  // so `eticketref` and `product` are never null. No ticket → no write at all
+  // (the old bare-log fallback is gone). The operator multi-selects from the
+  // ticket's `producteligible`; ONE doc is written per selected product, with an
+  // auto-generated id — repeat marks are allowed to create additional docs
+  // (the attendance reader dedupes by calendar date, so per-day counts are safe).
+  // ==========================================================================
+
+  /** The participant's ACTIVE e-ticket for the selected event, or null. Fetched
+   *  fresh at click time (authoritative) rather than read from the in-memory
+   *  `arenaETicketByProfile` map. `active == true` mirrors the QR scanner, which
+   *  refuses an inactive ticket. */
+  async fetchActiveETicket(profileId: string): Promise<{ id: string; data: any } | null> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    const snap = await getDocs(query(
+      collection(this.firestoreDefault, 'arena e-ticket'),
+      where('eventref', '==', this.selectedEvent.docref),
+      where('profileid', '==', profileId),
+      where('active', '==', true)
+    ));
+    if (snap.empty) {
+      console.log('[v3][attendance] no active e-ticket for', profileId);
+      return null;
+    }
+    // The approve flow upserts one ticket per participant per event; if more than
+    // one somehow exists, use the first and surface it rather than failing.
+    if (snap.docs.length > 1) {
+      console.warn('[v3][attendance] multiple active e-tickets for', profileId, '— using the first of', snap.docs.length);
+    }
+    const d = snap.docs[0];
+    return { id: d.id, data: { docid: d.id, ...d.data() } };
+  }
+
+  /** Noon local on a 'yyyy-mm-dd' day. recomputeAttendanceDays buckets a log by the
+   *  LOCAL calendar date of `logdate`, so a backdated mark has to land safely inside
+   *  that day whatever the offset — midnight can slide into the neighbouring day
+   *  across a timezone or DST boundary, noon cannot. */
+  private noonOn(date: string): Date {
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0, 0);
+  }
+
+  /** One `arena e-ticket log` doc per selected product. Ids are pre-generated so
+   *  `docid` can carry the real id in the same single write.
+   *
+   *  `onDate` ('yyyy-mm-dd') backdates the mark — the operator marking from a PAST
+   *  day's Unattended list means "this person was here that day", and stamping now
+   *  would credit today instead, leaving that day's count untouched. Omitted for
+   *  today's lists so the stamp stays the real click time (the Arena Followup
+   *  irregular-arrival cutoff reads the time of day, not just the date). */
+  async markAttendanceForProducts(profileId: string, eticketDocId: string, productIds: string[], onDate?: string): Promise<void> {
+    if (!this.selectedEvent) { throw new Error('NO_EVENT'); }
+    if (!eticketDocId) { throw new Error('NO_ETICKET'); }
+    if (!productIds.length) { throw new Error('NO_PRODUCT'); }
+    const col = collection(this.firestoreDefault, 'arena e-ticket log');
+    const eticketref = doc(this.firestoreDefault, 'arena e-ticket', eticketDocId);
+    // client now (avoids the pending serverTimestamp null the attendance read can't handle)
+    const logdate = onDate ? Timestamp.fromDate(this.noonOn(onDate)) : Timestamp.now();
+    await Promise.all(productIds.map(productId => {
+      const id = doc(col).id;                     // auto id, known before the write
+      return setDoc(doc(col, id), {
+        docid: id,
+        product: doc(this.firestoreDefault, 'products', productId),
+        logdate,
+        profileid: profileId,
+        eventref: this.selectedEvent!.docref,
+        eticketref,
+        markedmanually: true,                     // audit flag — distinguishes manual marks from QR scans
+      });
+    }));
+    console.log('[v3][attendance] manual mark:', profileId, '| eticket:', eticketDocId,
+      '| products:', productIds, '| credited to:', onDate || 'today');
+  }
+
+  // ==========================================================================
+  // Arena Calling — event_caller_log (read subscription + upsert write)
+  // ==========================================================================
+  // dayKey ('yyyy-mm-dd') → normalized start-of-day Timestamp (app timezone).
+  private dayKeyToTimestamp(dayKey: string): Timestamp {
+    const [y, m, d] = dayKey.split('-').map(Number);
+    return Timestamp.fromDate(new Date(y, m - 1, d, 0, 0, 0, 0));
+  }
+  // `day` Timestamp → dayKey ('yyyy-mm-dd'), matching dayWiseAttendance keys.
+  private dayTimestampToKey(day: any): string {
+    const dt = day?.toDate ? day.toDate() : new Date(day);
+    return dt.toLocaleDateString('en-CA');
+  }
+
+  // Real-time, dedup-tolerant read: latest updateAt per (profileid, dayKey).
+  private subscribeToCallLog(): void {
+    if (!this.selectedEvent) return;
+    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    this.callLogSub = collectionData(query(
+      collection(this.firestoreDefault, 'event_caller_log'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'id' }).subscribe({
+      next: (docs: any[]) => {
+        const map: LiveEventDataService['callLogMap'] = {};
+        docs.forEach((d: any) => {
+          if (!d['profileid'] || !d['day']) { return; }
+          const dayKey = this.dayTimestampToKey(d['day']);
+          const key = `${d['profileid']}|${dayKey}`;
+          const upd = d['updateAt']?.toMillis ? d['updateAt'].toMillis() : 0;
+          const prev = map[key];
+          if (!prev || upd >= prev.upd) {
+            map[key] = { id: d['id'], profileId: d['profileid'], dayKey, status: d['status'] || 'pending', calledAt: d['calledAt'] || null, callerId: d['callerId'] || null, upd };
+          }
+        });
+        this.callLogMap = map;
+        console.log('[v3][calls] event_caller_log docs:', docs.length, '| deduped entries:', Object.keys(map).length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event_caller_log:', error)
+    });
+  }
+
+  // Upsert-by-query: one record per (participant, normalized day); latest wins.
+  // The ONLY write in v3. calledAt = exact marking time; updateAt = server time.
+  async setCallOutcome(profileId: string, dayKey: string, status: string): Promise<void> {
+    if (!this.selectedEvent) { return; }
+    const dayTs = this.dayKeyToTimestamp(dayKey);
+    const calledAt = Timestamp.now();
+    const callerId = this.loggedInProfileId || null;
+    const col = collection(this.firestoreDefault, 'event_caller_log');
+    const existing = await getDocs(query(col,
+      where('eventref', '==', this.selectedEvent.docref),
+      where('profileid', '==', profileId),
+      where('day', '==', dayTs),
+      limit(1)
+    ));
+    if (!existing.empty) {
+      await updateDoc(doc(this.firestoreDefault, 'event_caller_log', existing.docs[0].id), { status, calledAt, callerId, updateAt: serverTimestamp() });
+    } else {
+      await addDoc(col, { eventref: this.selectedEvent.docref, profileid: profileId, day: dayTs, status, calledAt, callerId, updateAt: serverTimestamp() });
+    }
+  }
+
+  // ==========================================================================
+  // ZONES — live occupancy (READ-ONLY). Zone defs + cohorts + staff names from
+  // event-zone-management (ZM); allocations + no-zone from V2 (subscribeToZones /
+  // calculateNoZoneParticipants). No writes — config/toggle stay in ZM.
+  // ==========================================================================
+
+  // ZM eventZoneList — "event zones" scoped to this event; sorted by zonename.
+  private subscribeToEventZones(): void {
+    if (!this.selectedEvent) return;
+    if (this.eventZonesSub) { this.eventZonesSub.unsubscribe(); this.eventZonesSub = null; }
+    this.eventZoneList = [];
+    this.mapEventZoneData = {};
+    this.eventZonesSub = collectionData(query(
+      collection(this.firestoreDefault, 'event zones'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'docid' }).subscribe({
+      next: (data: any[]) => {
+        this.eventZoneList = [...data].sort((a, b) => (a['zonename'] || '').localeCompare(b['zonename'] || ''));
+        this.mapEventZoneData = {};
+        data.forEach((zone: any) => { this.mapEventZoneData[zone['docid']] = zone; });
+        console.log('[v3][zones] event zones:', data.length,
+          '| open:', this.eventZoneList.filter(z => z['status'] === 'open').length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event zones:', error)
+    });
+  }
+
+  // ZM cohort block — "big cohorts" scoped to this event; docid→data + members.
+  private subscribeToBigCohorts(): void {
+    if (!this.selectedEvent) return;
+    if (this.bigCohortsSub) { this.bigCohortsSub.unsubscribe(); this.bigCohortsSub = null; }
+    this.mapCohortsData = {};
+    this.mapCohortParticipants = {};
+    this.bigCohortsSub = collectionData(query(
+      collection(this.firestoreDefault, 'big cohorts'), where('eventref', '==', this.selectedEvent.docref)
+    ), { idField: 'docid' }).subscribe({
+      next: (data: any[]) => {
+        this.mapCohortsData = {};
+        this.mapCohortParticipants = {};
+        data.forEach((cohort: any) => {
+          this.mapCohortsData[cohort['docid']] = cohort;
+          this.mapCohortParticipants[cohort['docid']] = cohort['participantidlist'] || [];
+        });
+        console.log('[v3][zones] big cohorts:', data.length);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to big cohorts:', error)
+    });
+  }
+
+  // V2 subscribeToZones — "event participant zones"; EXTENDED to also capture
+  // selectedzone + eligiliblecohorts (both read by ZM) for the occupancy view.
+  private subscribeToParticipantZones(): void {
+    if (!this.selectedEvent) return;
+    if (this.participantZonesSub) { this.participantZonesSub.unsubscribe(); this.participantZonesSub = null; }
+    this.zoneAllocationMap = {};
+    this.zoneParticipantIds = new Set();
+    this.participantZonesSub = collectionData(query(
+      collection(this.firestoreDefault, 'event participant zones'), where('eventref', '==', this.selectedEvent.docref)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const alloc: LiveEventDataService['zoneAllocationMap'] = {};
+        const ids = new Set<string>();
+        docs.forEach((zone: any) => {
+          const pid = zone['profileid'];
+          if (!pid) { return; }
+          ids.add(pid);   // V2: any allocation → "in a zone"
+          alloc[pid] = { selectedzone: zone['selectedzone'] || '', eligiliblecohorts: zone['eligiliblecohorts'] || zone['eligiblecohorts'] || [] };
+        });
+        this.zoneAllocationMap = alloc;
+        this.zoneParticipantIds = ids;
+        this.calculateNoZoneParticipants();
+        console.log('[v3][zones] participant-zone allocations:', docs.length,
+          '| allocated profiles:', ids.size, '| no-zone:', this.noZoneCount);
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to participant zones:', error)
+    });
+  }
+
+  // V2 calculateNoZoneParticipants — registered universe minus allocated.
+  private calculateNoZoneParticipants(): void {
+    this.noZoneProfileIds = this.eventParticipantProfileIds.filter(id => !this.zoneParticipantIds.has(id));
+    this.noZoneCount = this.noZoneProfileIds.length;
+  }
+
+  // Earliest scan-in TODAY for a participant (from the already-subscribed
+  // mapAttendence), formatted 'HH:MM' (app timezone). mapAttendence is
+  // date-deduped, so in practice this is today's single kept scan record.
+  firstScanTimeToday(profileId: string): string {
+    const records = this.mapAttendence[profileId] || [];
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    let earliest: Date | null = null;
+    records.forEach(r => {
+      const ld = r['logdate']?.toDate ? r['logdate'].toDate() : new Date(r['logdate']);
+      if (ld.toLocaleDateString('en-CA') === todayStr && (!earliest || ld < earliest)) { earliest = ld; }
+    });
+    if (!earliest) { return ''; }
+    return (earliest as Date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ---- procedure tracking: day + scope filters (FT setFilter/participantFilter)
+  /** Day filter — narrows the livechangework createdon window (FT updateFilterDateRange). */
+  setProcedureDay(dayKey: string): void {
+    this.procDayFilter = dayKey;
+    if (!this.selectedEvent) return;
+    if (dayKey === 'all') {
+      const start = this.selectedEvent['start_date']?.toDate ? this.selectedEvent['start_date'].toDate() : new Date(this.selectedEvent['start_date']);
+      const end = this.selectedEvent['end_date']?.toDate ? this.selectedEvent['end_date'].toDate() : new Date(this.selectedEvent['end_date']);
+      this.filterStartDate = new Date(start); this.filterStartDate.setHours(0, 0, 0, 0);
+      this.filterEndDate = new Date(end); this.filterEndDate.setHours(23, 59, 59, 999);
+    } else {
+      const [y, m, dd] = dayKey.split('-').map(Number);
+      this.filterStartDate = new Date(y, m - 1, dd, 0, 0, 0, 0);
+      this.filterEndDate = new Date(y, m - 1, dd, 23, 59, 59, 999);
+    }
+    // Only livechangework depends on the day window; ATC opportunities use the
+    // queue range and are unaffected (FT semantics). The day views are a pure
+    // in-memory re-filter of the event-wide stream now — a chip change no longer
+    // tears down and re-runs two server queries, so it needs no network at all.
+    this.deriveLcwViews();
+    this.calculateProcedureData();
+    this.changed$.next();
+  }
+
+  /** Scope filter — All vs First timers (FT participantFilter + getFilteredDoerIds). */
+  setProcedureScope(scope: 'all' | 'firstTimers'): void {
+    this.participantFilter = scope;
+    this.calculateProcedureData();
+    this.changed$.next();
+  }
+
+  /** First-timer set comes from the component's seam 3; kept in sync so scope=First
+   *  timers resolves against the SAME registered universe. Empty while seam unfilled. */
+  setFirstTimerIds(ids: string[]): void {
+    const changed = ids.length !== this.firstTimerProfileIds.length || ids.some(id => !this.firstTimerProfileIds.includes(id));
+    this.firstTimerProfileIds = ids;
+    if (changed && this.participantFilter === 'firstTimers') { this.calculateProcedureData(); this.changed$.next(); }
+  }
+
+  // ---- queue variation → atcModels (FT loadQueuevariation, debug removed) -----
+  private async loadQueuevariation(): Promise<void> {
+    if (this.selectedQueues.length === 0) return;
+    this.atcModels = [];
+    try {
+      const variationPromises = this.selectedQueueRefs.map(queueRef =>
+        getDocs(query(collection(this.firestoreDefault, 'queue variation'), where('queueref', '==', queueRef))));
+      const variationSnapshots = await Promise.all(variationPromises);
+      const models: string[] = [];
+      variationSnapshots.forEach(vs => vs.docs.forEach(d => models.push(d.data()['atcmodel'])));
+      this.atcModels = [...new Set(models)];
+      console.log('[v3][atcModels] from', variationSnapshots.reduce((n, s) => n + s.docs.length, 0),
+        'queue-variation docs →', this.atcModels);
+    } catch (error) {
+      console.error('Error loading queue variation:', error);
+    }
+  }
+
+  // ---- queue date range (FT updateQueueDateRange) ----------------------------
+  private updateQueueDateRange(): void {
+    if (this.selectedQueues.length === 0) { this.queueRangeStartDate = null; this.queueRangeEndDate = null; return; }
+    let oldestStart: Date | null = null; let newestEnd: Date | null = null;
+    this.selectedQueues.forEach(queue => {
+      const startDate = queue['queuestartdate']?.toDate ? queue['queuestartdate'].toDate() : new Date(queue['queuestartdate']);
+      const endDate = queue['queueenddate']?.toDate ? queue['queueenddate'].toDate() : new Date(queue['queueenddate']);
+      if (!oldestStart || startDate < oldestStart) { oldestStart = new Date(startDate); }
+      if (!newestEnd || endDate > newestEnd) { newestEnd = new Date(endDate); }
+    });
+    if (oldestStart) (oldestStart as Date).setHours(0, 0, 0, 0);
+    if (newestEnd) (newestEnd as Date).setHours(23, 59, 59, 999);
+    this.queueRangeStartDate = oldestStart;
+    this.queueRangeEndDate = newestEnd;
+    console.log('[v3][queueRange]', this.queueRangeStartDate, '→', this.queueRangeEndDate);
+  }
+
+  // ==========================================================================
+  // ATC / LIVECHANGEWORK subscriptions (FT subscribeToArenaOverview)
+  // ==========================================================================
+  private subscribeToArenaOverview(): void {
+    this.liveChangeWorkData = [];
+    this.liveChangeworkLiveData = [];
+    // atcModels no longer gates ATC — atc_alpha/atc_to_validate now scope by queueid.
+    if (this.selectedQueues.length === 0 || !this.selectedEvent) return;
+    if (!this.filterStartDate || !this.filterEndDate) return;
+    this.unsubscribeQueuePipeline();
+    this.subscribeToAtcAlpha();
+    this.subscribeToAtcToValidate();
+    this.subscribeToDraftAtc();
+    this.deriveLcwViews();
+    this.calculateProcedureData();
+  }
+
+  // V2 subscribeToDraftAtc — temporary_ATC drafts (delete==false) whose transcript[0]
+  // has an adjustment and whose lastupdated is within the queue range; scoped to the
+  // registered universe, counted as UNIQUE participants. Read from firestore-atc.
+  private subscribeToDraftAtc(): void {
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
+    if (!this.selectedEvent || !this.queueRangeStartDate) { this.draftAtcProfileIds = []; this.draftAtcCount = 0; return; }
+    // Bounded server-side (operator, 2026-08-01): only drafts touched on/after
+    // the EARLIEST selected queue's start date (queueRangeStartDate = oldest
+    // queuestartdate across the selection, midnight-floored — updateQueueDateRange)
+    // come down the wire. The client-side isDateInQueueRange filter below always
+    // discarded everything older, but only AFTER downloading every active draft
+    // platform-wide (perf audit H4) — the numbers cannot move, only the download
+    // shrinks. The client filter stays unchanged as the parity backstop (it also
+    // applies the upper bound). NOTE: equality(delete) + range(lastupdated) needs
+    // a composite index on the firestore-atc DB — if missing, the error handler
+    // below logs a failed-precondition error carrying a one-click create link.
+    this.draftAtcSub = collectionData(query(
+      collection(this.firestoreATC, 'temporary_ATC'),
+      where('delete', '==', false),
+      where('lastupdated', '>=', this.queueRangeStartDate)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const ids: string[] = [];
+        docs.forEach((d: any) => {
+          const transcript = d['transcript'] || [];
+          if (transcript.length > 0 && ![null, undefined, ''].includes(transcript[0]['adjustment'])) {
+            if (this.isDateInQueueRange(d['lastupdated'])) {
+              const profileId = d['profileid'] || '';
+              if (profileId && this.eventParticipantProfileIds.includes(profileId)) {
+                const lastUpdated = d['lastupdated']?.toDate ? d['lastupdated'].toDate() : new Date(d['lastupdated']);
+                if (this.queueRangeStartDate && lastUpdated >= this.queueRangeStartDate && !ids.includes(profileId)) { ids.push(profileId); }
+              }
+            }
+          }
+        });
+        this.draftAtcProfileIds = ids;
+        this.draftAtcCount = ids.length;
+        console.log('[v3][atc] temporary_ATC draft docs:', docs.length, '| draft participants (event):', ids.length);
+        this.changed$.next();
+      },
+      error: (error) => {
+        // A failed-precondition here = the composite index (delete equality +
+        // lastupdated range) is missing on the firestore-atc DB; the error text
+        // carries a one-click create link. Clear rather than keep stale counts.
+        this.draftAtcProfileIds = [];
+        this.draftAtcCount = 0;
+        this.changed$.next();
+        console.error('Error subscribing to temporary_ATC drafts — if this is failed-precondition, open the index-creation link inside this error:', error);
+      }
+    });
+  }
+
+  // V2 isDateInQueueRange
+  private isDateInQueueRange(prescriptionDate: any): boolean {
+    if (!this.queueRangeStartDate || !this.queueRangeEndDate || !prescriptionDate) return false;
+    const prescDate = prescriptionDate?.toDate ? prescriptionDate.toDate() : new Date(prescriptionDate);
+    return prescDate >= this.queueRangeStartDate && prescDate <= this.queueRangeEndDate;
+  }
+
+  // Selected queue doc ids (queue generation ids) — the value stamped on ATC docs
+  // as `queueid` (prescribe-atc). Basis for scoping ATC by the SELECTED QUEUE(S).
+  private selectedQueueIds(): string[] {
+    return this.selectedQueues.map(q => q.docref?.id).filter((id): id is string => !!id);
+  }
+
+  // atc_to_validate half → atcToValidateProfileIds.
+  // Query from V2 (product in atcModels). Unvalidated = any atc_to_validate doc
+  // whose status is NOT 'validated' (operator-confirmed): the collection holds many
+  // statuses, and only 'validated' ones are done — everything else is still pending.
+  private subscribeToAtcToValidate(): void {
+    if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { this.atcToValidateProfileIds = []; this.recomputeAtcBuckets(); return; }
+    // CHANGED (operator): scope by the SELECTED QUEUE ID(s) — atc_to_validate.queueid
+    // — instead of product-in-atcModels + queue date range.
+    this.atcToValidateSub = collectionData(query(
+      collection(this.firestoreATC, 'atc_to_validate'), where('queueid', 'in', queueIds)
+    )).subscribe({
+      next: (docs: any[]) => {
+        const ids: string[] = [];
+        let pendingDocs = 0;
+        docs.forEach((d: any) => {
+          // view-prescribed-atc rule: a prescription is UNVALIDATED iff status ===
+          // 'atc given' (every other status is validated). Also mirror its doc
+          // filters: isdelete==false and type=='online'.
+          if (d['status'] === 'atc given' && d['isdelete'] !== true && d['type'] === 'online') {
+            pendingDocs++;
+            const profileId = d['profileid'] || '';
+            if (profileId && this.eventParticipantProfileIds.includes(profileId) && !ids.includes(profileId)) { ids.push(profileId); }
+          }
+        });
+        this.atcToValidateProfileIds = ids;
+        console.log('[v3][atc] atc_to_validate docs:', docs.length,
+          "| status=='atc given' (unvalidated) & online:", pendingDocs,
+          '| unvalidated profiles (event-participant):', ids.length);
+        this.recomputeAtcBuckets();
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to atc_to_validate:', error)
+    });
+  }
+
+  // Partition event participants into full / partial / unvalidated / none.
+  // "completed" = has an atc_alpha doc in scope (Object.keys(profileAtcMap),
+  // built in subscribeToAtcAlpha — V2's atcCompleted basis, no status filter).
+  private recomputeAtcBuckets(): void {
+    const completed = new Set(Object.keys(this.profileAtcMap));
+    const toValidate = new Set(this.atcToValidateProfileIds);
+    const full: string[] = []; const partial: string[] = []; const unvalidated: string[] = []; const none: string[] = [];
+    this.eventParticipantProfileIds.forEach(id => {
+      const c = completed.has(id); const v = toValidate.has(id);
+      if (c && v) { partial.push(id); }
+      else if (c) { full.push(id); }
+      else if (v) { unvalidated.push(id); }
+      else { none.push(id); }
+    });
+    this.atcBuckets = {
+      full: full.length, partial: partial.length, unvalidated: unvalidated.length, none: none.length,
+      fullIds: full, partialIds: partial, unvalidatedIds: unvalidated, noneIds: none
+    };
+    const sum = full.length + partial.length + unvalidated.length + none.length;
+    console.log('[v3][atc buckets] full:', full.length, '| partial:', partial.length,
+      '| unvalidated:', unvalidated.length, '| none:', none.length,
+      '| sum:', sum, '| eventParticipants:', this.eventParticipantProfileIds.length,
+      '(sum should equal eventParticipants) | completed(atc_alpha) profiles:', Object.keys(this.profileAtcMap).length,
+      '| toValidate profiles:', this.atcToValidateProfileIds.length);
+  }
+
+  // FT subscribeToAtcAlpha (adjustments sums added from V1, applied to the same docs)
+  private subscribeToAtcAlpha(): void {
+    const queueIds = this.selectedQueueIds();
+    if (queueIds.length === 0) { return; }
+    // CHANGED (operator): scope ATC by the SELECTED QUEUE ID(s) — atc_alpha.queueid —
+    // instead of product-in-atcModels + queue date range. queueid is stamped on
+    // submit (prescribe-atc) and is the read pattern eit-education-atc uses. isdelete
+    // and latest-doc-per-profile are applied client-side to keep the query index-light.
+    const atcQuery = query(collection(this.firestoreATC, 'atc_alpha'),
+      where('queueid', 'in', queueIds));
+    this.atcSub = collectionData(atcQuery).subscribe({
+      next: (docs: any[]) => {
+        this.atcDocs = docs.filter((d: any) => d['isdelete'] !== true);
+        this.profileAtcMap = {};
+        // ONE pass over the snapshot builds BOTH the latest-doc-per-profile map
+        // AND the V1 scalar adjustment sums (event totals + the per-participant
+        // aggregate, accumulated across ALL of a person's docs, not just the
+        // latest) — computeAdjustmentTotals used to walk the same doc set a
+        // second time. Set membership replaces the per-doc O(participants)
+        // array scan; same universe, same numbers (C-12 basis unchanged).
+        this.totalAdjustmentCount = 0;
+        this.totalAdjustmentCompletedCount = 0;
+        this.totalAdjustmentPendingCount = 0;
+        this.participantAtc = {};
+        const num = (v: any) => (v && !Number.isNaN(v)) ? Number(v) : 0;
+        this.atcDocs.forEach((d: any) => {
+          const profileId: string = d['profileid'] || '';
+          if (!profileId || !this.eventParticipantSet.has(profileId)) return;
+          const prescriptionDate = d['prescription_date']?.toDate ? d['prescription_date'].toDate() : new Date(d['prescription_date']);
+          if (!this.profileAtcMap[profileId] || prescriptionDate > this.profileAtcMap[profileId]._date) { this.profileAtcMap[profileId] = { ...d, _date: prescriptionDate }; }
+          const total = num(d['totaladjustment']);
+          const completedAdj = num(d['totaladjustmentcompleted']);
+          const pendingAdj = num(d['totaladjustmentpending']);
+          this.totalAdjustmentCount += total;
+          this.totalAdjustmentCompletedCount += completedAdj;
+          this.totalAdjustmentPendingCount += pendingAdj;
+          const agg = this.participantAtc[profileId] || { adjTotal: 0, adjDone: 0, adjPending: 0, procTotal: 0, procDone: 0, procPending: 0 };
+          agg.adjTotal += total; agg.adjDone += completedAdj; agg.adjPending += pendingAdj;
+          agg.procTotal += num(d['totalprocedure']);
+          agg.procDone += num(d['totalprocedurecompleted']);
+          agg.procPending += num(d['totalprocedurepending']);
+          this.participantAtc[profileId] = agg;
+        });
+        this.beneficierProfileIds = [];
+        Object.keys(this.profileAtcMap).forEach(profileId => {
+          const atcDoc = this.profileAtcMap[profileId];
+          const procedurePendingList: string[] = atcDoc['procedurependinglist'] || [];
+          const procedureCompletedList: string[] = atcDoc['procedurecompletedlist'] || [];
+          if (procedurePendingList.length > 0 || procedureCompletedList.length > 0) { this.beneficierProfileIds.push(profileId); }
+        });
+        this.beneficierTotal = this.beneficierProfileIds.length;
+        console.log('[v3][atc] atc_alpha docs:', docs.length,
+          '| completed profiles (event-participant):', Object.keys(this.profileAtcMap).length,
+          '| adj total/done/pending:', this.totalAdjustmentCount, this.totalAdjustmentCompletedCount, this.totalAdjustmentPendingCount);
+        this.recomputeAtcBuckets();
+        this.calculateProcedureData();
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to atc_alpha:', error)
+    });
+  }
+
+  // The two day-scoped livechangework views (completed / live) are DERIVED from
+  // the ONE event-wide listener (subscribeToEventChangeWork) whose result set
+  // strictly contains them — the event's changework used to download roughly
+  // twice, and every changework write fired three snapshot callbacks.
+  // Predicate parity with the removed server queries (numbers must not move):
+  // same eventref scope (the source listener's own where); createdon must be a
+  // real Timestamp inside [start, end] — a server range filter only matches
+  // timestamp-typed values, so string/missing createdon never matched and must
+  // not match here; EXACT procedurestatus equality (the queries used ==, not the
+  // trim/lowercase some client code applies); the same filterStart||queueRange
+  // date fallback; and results re-sorted createdon-asc then doc id to reproduce
+  // the implicit orderBy a Firestore range query applies (drill-down row order).
+  // Guard matches the OLD server queries' guard EXACTLY (!start || !end ||
+  // !selectedEvent) — deliberately NO queue check: the old day queries also ran
+  // with zero queues selected (a day-chip click after deselecting every queue
+  // still shows that day's changework; verifier round 4, defect 1).
+  private deriveLcwViews(): void {
+    const start = this.filterStartDate || this.queueRangeStartDate;
+    const end = this.filterEndDate || this.queueRangeEndDate;
+    if (!start || !end || !this.selectedEvent) {
+      this.liveChangeWorkData = [];
+      this.liveChangeworkLiveData = [];
+      return;
+    }
+    const s = start.getTime(); const e = end.getTime();
+    const completed: any[] = []; const live: any[] = [];
+    (this.eventChangeWorkDocs || []).forEach((d: any) => {
+      const t = d['createdon'];
+      if (!t?.toDate) { return; }
+      const ms = t.toDate().getTime();
+      if (ms < s || ms > e) { return; }
+      if (d['procedurestatus'] === 'completed') { completed.push(d); }
+      else if (d['procedurestatus'] === 'live') { live.push(d); }
+    });
+    const byCreated = (a: any, b: any) => {
+      const am = a['createdon'].toDate().getTime(); const bm = b['createdon'].toDate().getTime();
+      return am - bm || (a['id'] < b['id'] ? -1 : a['id'] > b['id'] ? 1 : 0);
+    };
+    this.liveChangeWorkData = completed.sort(byCreated);
+    this.liveChangeworkLiveData = live.sort(byCreated);
+    console.log('[v3][lcw derived] completed:', completed.length, '| live:', live.length,
+      '| from event-wide docs:', (this.eventChangeWorkDocs || []).length);
+  }
+
+  /** ALL changework for the event — no `createdon` window and no status filter, so
+   *  it survives the Procedure Tracking day chips. Feeds only the Arena Followup
+   *  "Not Doing CW" / "CW Not Received" cards, which are event-wide by definition
+   *  Subscribed once per event (setProcedureDay does NOT touch it). */
+  private subscribeToEventChangeWork(): void {
+    if (!this.selectedEvent) return;
+    if (this.lcwEventSub) { this.lcwEventSub.unsubscribe(); this.lcwEventSub = null; }
+    this.eventChangeWorkDocs = [];
+    const q = query(collection(this.firestoreDefault, 'livechangework'),
+      where('eventref', '==', this.selectedEvent.docref));
+    this.lcwEventSub = collectionData(q, { idField: 'id' }).subscribe({
+      next: (docs: any[]) => {
+        this.eventChangeWorkDocs = docs;
+        // The day-scoped completed/live views are subsets of THIS stream — derive
+        // them (and the procedure numbers they feed) here instead of running two
+        // more server queries over the same documents.
+        this.deriveLcwViews();
+        this.calculateProcedureData();
+        console.log('[v3][lcw event-wide] docs:', docs.length, '(followup CW cards + derived day views)');
+        this.changed$.next();
+      },
+      error: (error) => console.error('Error subscribing to event-wide livechangework:', error)
+    });
+  }
+
+  /** Event participants narrowed by the Overall / First Timers scope. The doer column
+   *  works off this, and so does beneficiary-COMPLETED (see calculateProcedureData). */
+  private getScopedParticipantIds(): string[] {
+    if (this.participantFilter === 'all') return this.eventParticipantProfileIds;
+    return this.eventParticipantProfileIds.filter(id => this.firstTimerProfileIds.includes(id));
+  }
+  private getFilteredDoerIds(): string[] { return this.getScopedParticipantIds(); }
+  /** The ATC-PRESCRIBED beneficiary universe — people whose latest atc_alpha in the
+   *  selected queue lists procedures. Basis for beneficiary "not started" (and the
+   *  live cell), NOT for "completed". */
+  private getFilteredBeneficierIds(): string[] {
+    if (this.participantFilter === 'all') return this.beneficierProfileIds;
+    return this.beneficierProfileIds.filter(id => this.firstTimerProfileIds.includes(id));
+  }
+
+  // ==========================================================================
+  // FT calculateProcedureData — lifted verbatim (TEMP DEBUG blocks removed,
+  // cdr.detectChanges → changed$.next). Do not alter the derivation.
+  // ==========================================================================
+  private calculateProcedureData(): void {
+    if (!this.participantMetadataMap || Object.keys(this.participantMetadataMap).length === 0) return;
+    if (!this.eventParticipantProfileIds.length) return;
+    const tempMap = { ...this.mapProcedureData };
+    const filteredDoerIds = this.getFilteredDoerIds();
+    const filteredBeneficierIds = this.getFilteredBeneficierIds();
+    // OPERATOR RULE: beneficiary "completed" comes from livechangework, not atc_alpha.
+    // A participant can RECEIVE changework without an ATC prescribing that procedure,
+    // and gating on the prescribed universe silently dropped those — a procedure could
+    // read 4 completed as doer and 0 as beneficiary for the very same changework.
+    // "Not started" still comes from the ATC pending list (that is a prescription, and
+    // only a prescription can be outstanding). Scope still applies, as on the doer side.
+    const completedBeneficiaryScope = new Set(this.getScopedParticipantIds());
+    this.doerTotal = filteredDoerIds.length;
+    this.beneficierTotal = filteredBeneficierIds.length;
+
+    const beneficierPendingMap: { [procedureId: string]: Set<string> } = {};
+    const beneficierCompletedFromAtcMap: { [procedureId: string]: Set<string> } = {};
+    const totalOpportunitiesMap: { [procedureId: string]: string[] } = {};
+    const totalCompletedMap: { [procedureId: string]: string[] } = {};
+
+    const eventSet = new Set(this.eventParticipantProfileIds);
+    const firstTimerSet = new Set(this.firstTimerProfileIds);
+
+    this.atcDocs.forEach((atc: any) => {
+      const profileId = atc.profileid;
+      if (!profileId) return;
+      if (!eventSet.has(profileId)) return;
+      if (this.participantFilter === 'firstTimers' && !firstTimerSet.has(profileId)) return;
+      const pending = atc.procedurependinglist || [];
+      const completed = atc.procedurecompletedlist || [];
+      pending.forEach((procId: string) => {
+        if (!tempMap[procId]) return;
+        if (!totalOpportunitiesMap[procId]) totalOpportunitiesMap[procId] = [];
+        totalOpportunitiesMap[procId].push(profileId);
+        if (!beneficierPendingMap[procId]) { beneficierPendingMap[procId] = new Set<string>(); }
+        beneficierPendingMap[procId].add(profileId);
+      });
+      completed.forEach((procId: string) => {
+        if (!tempMap[procId]) return;
+        if (!totalCompletedMap[procId]) totalCompletedMap[procId] = new Array();
+        if (!beneficierCompletedFromAtcMap[procId]) { beneficierCompletedFromAtcMap[procId] = new Set<string>(); }
+        beneficierCompletedFromAtcMap[procId].add(profileId);
+        totalCompletedMap[procId].push(profileId);
+      });
+    });
+
+    Object.keys(tempMap).forEach(procId => {
+      tempMap[procId].doerCompleted = { count: 0, data: [] };
+      tempMap[procId].doerNotStarted = { count: 0, data: [] };
+      tempMap[procId].beneficierCompleted = { count: 0, data: [] };
+      tempMap[procId].beneficierNotStarted = { count: 0, data: [] };
+      tempMap[procId].liveChangework = { count: 0, data: [] };
+      const oppArr = totalOpportunitiesMap[procId] || [];
+      const compArr = totalCompletedMap[procId] || [];
+      const oppFrequency: any = {};
+      oppArr.forEach(id => { oppFrequency[id] = (oppFrequency[id] || 0) + 1; });
+      const oppDisplay = Object.keys(oppFrequency).map(id => ({ profileId: String(id), count: oppFrequency[id] }));
+      tempMap[procId].totalOpportunities = { count: oppArr.length, data: oppDisplay };
+      const compFrequency: any = {};
+      compArr.forEach(id => { compFrequency[id] = (compFrequency[id] || 0) + 1; });
+      const compDisplay = Object.keys(compFrequency).map(id => ({ profileId: String(id), count: compFrequency[id] }));
+      tempMap[procId].totalCompleted = { count: compArr.length, data: compDisplay };
+    });
+
+    const doerCompletedMap: { [procedureId: string]: Map<string, any> } = {};
+    const beneficierCompletedMap: { [procedureId: string]: Map<string, any> } = {};
+
+    this.liveChangeWorkData.forEach((lcw: any) => {
+      const procedureId: string = lcw['procedureid'] || '';
+      const doerId: string = lcw['doerid'] || '';
+      const beneficiaryId: string = lcw['beneficiaryid'] || '';
+      const procedureName: string = lcw['procedurename'] || this.mapProcedureNames[procedureId] || '';
+      const hours: string = lcw['hours'] || '';
+      const hourType: string = lcw['hourtype'] || '';
+      const sharedNotes: string = lcw['sharednotes'] || '';
+      if (!procedureId || !tempMap[procedureId]) return;
+      const doerName = this.participantMetadataMap[doerId]?.['name'] || 'Unknown';
+      const beneficiaryName = this.participantMetadataMap?.[beneficiaryId]?.['name'] ?? lcw['beneficiaryname'] ?? 'Unknown';
+      // ONE entry per lead (the map is keyed by them, and `count` is its size — the
+      // number the procedure cell shows), but every counterpart is accumulated onto
+      // that entry. The old `if (!has(id))` guard kept the first changework and threw
+      // the rest away, so a doer who ran the procedure for four people surfaced with
+      // only the first of them and no sign the others existed.
+      if (doerId && filteredDoerIds.includes(doerId)) {
+        if (!doerCompletedMap[procedureId]) { doerCompletedMap[procedureId] = new Map<string, any>(); }
+        let e = doerCompletedMap[procedureId].get(doerId);
+        if (!e) {
+          e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
+                counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
+                // ONE record per changework of each counterpart pair (aligned with
+                // counterpartIds): note + createdon + procedure + hours/hourType.
+                // An x2 pair holds two records, so the popup can show each note as
+                // its own dated widget and every "saved N hours per X" line.
+                counterpartCw: [] as any[][],
+                displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
+          doerCompletedMap[procedureId].set(doerId, e);
+        }
+        // one slot per distinct counterpart, carrying HOW MANY changeworks they share
+        if (beneficiaryId) {
+          const j = e.counterpartIds.indexOf(beneficiaryId);
+          const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
+                          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+                          docId: lcw['id'] ?? null };
+          if (j === -1) {
+            e.counterpartIds.push(beneficiaryId); e.counterpartNames.push(beneficiaryName); e.counterpartCounts.push(1);
+            e.counterpartCw.push([cwRec]);
+          } else {
+            e.counterpartCounts[j]++;
+            e.counterpartCw[j].push(cwRec);
+          }
+        }
+      }
+      if (beneficiaryId && completedBeneficiaryScope.has(beneficiaryId)) {
+        if (!beneficierCompletedMap[procedureId]) { beneficierCompletedMap[procedureId] = new Map<string, any>(); }
+        let e = beneficierCompletedMap[procedureId].get(beneficiaryId);
+        if (!e) {
+          e = { doerId, doerName, beneficiaryId, beneficiaryName, procedureName, hours, hourType, sharedNotes,
+                counterpartIds: [] as string[], counterpartNames: [] as string[], counterpartCounts: [] as number[],
+                // ONE record per changework of each pair — see the doer accumulator
+                counterpartCw: [] as any[][],
+                displayText: `${doerName} - ${beneficiaryName} (${procedureName})` };
+          beneficierCompletedMap[procedureId].set(beneficiaryId, e);
+        }
+        if (doerId) {
+          const j = e.counterpartIds.indexOf(doerId);
+          const cwRec = { note: sharedNotes, createdon: lcw['createdon'] ?? null, procedure: procedureName, hours, hourType,
+                          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
+                          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+                          docId: lcw['id'] ?? null };
+          if (j === -1) {
+            e.counterpartIds.push(doerId); e.counterpartNames.push(doerName); e.counterpartCounts.push(1);
+            e.counterpartCw.push([cwRec]);
+          } else {
+            e.counterpartCounts[j]++;
+            e.counterpartCw[j].push(cwRec);
+          }
+        }
+      }
+    });
+
+    const liveChangeworkMap: { [procedureId: string]: any[] } = {};
+    this.liveChangeworkLiveData.forEach((lcw: any) => {
+      const procedureId: string = lcw['procedureid'] || '';
+      const doerId: string = lcw['doerid'] || '';
+      const beneficiaryId: string = lcw['beneficiaryid'] || '';
+      const procedureName: string = lcw['procedurename'] || this.mapProcedureNames[procedureId] || '';
+      if (!procedureId || !tempMap[procedureId]) return;
+      const doerInFilter = doerId && filteredDoerIds.includes(doerId);
+      const beneficiaryInFilter = beneficiaryId && filteredBeneficierIds.includes(beneficiaryId);
+      if (doerInFilter || beneficiaryInFilter) {
+        if (!liveChangeworkMap[procedureId]) { liveChangeworkMap[procedureId] = []; }
+        const doerName = this.participantMetadataMap[doerId]?.['name'] || 'Unknown';
+        const beneficiaryName = this.participantMetadataMap[beneficiaryId]?.['name'] || 'Unknown';
+        // createdon + per-side statuses ride along untouched (no effect on
+        // counts) so the panel can show a live elapsed timer and D/B status
+        // chips per changework.
+        liveChangeworkMap[procedureId].push({ doerId, doerName, beneficiaryId, beneficiaryName, procedureName, createdon: lcw['createdon'] ?? null,
+          doerStatus: lcw['doerstatus'] ?? null, beneficiaryStatus: lcw['beneficiarystatus'] ?? null,
+          docId: lcw['id'] ?? null,
+          // the changework popup shows the doc's own fields for live pairs too
+          note: lcw['sharednotes'] || '', hours: lcw['hours'] || '', hourType: lcw['hourtype'] || '',
+          adjustment: lcw['adjustment'] ?? '', lastUpdated: lcw['updatedate'] ?? lcw['lastupdated'] ?? lcw['updatedon'] ?? null,
+          displayText: `${doerName} - ${beneficiaryName} - (${procedureName})` });
+      }
+    });
+
+    let totalLiveCount = 0;
+    Object.keys(tempMap).forEach(procedureId => {
+      const doerCompletedData = doerCompletedMap[procedureId] || new Map<string, any>();
+      tempMap[procedureId].doerCompleted.count = doerCompletedData.size;
+      tempMap[procedureId].doerCompleted.data = Array.from(doerCompletedData.values());
+      const doerCompletedIds = new Set(doerCompletedData.keys());
+      const doerNotStartedArray = filteredDoerIds.filter(id => !doerCompletedIds.has(id));
+      tempMap[procedureId].doerNotStarted.count = doerNotStartedArray.length;
+      tempMap[procedureId].doerNotStarted.data = doerNotStartedArray;
+      const beneficierCompletedData = beneficierCompletedMap[procedureId] || new Map<string, any>();
+      tempMap[procedureId].beneficierCompleted.count = beneficierCompletedData.size;
+      tempMap[procedureId].beneficierCompleted.data = Array.from(beneficierCompletedData.values());
+      const pendingSet = beneficierPendingMap[procedureId] || new Set<string>();
+      const completedFromLive = new Set(beneficierCompletedData.keys());
+      const beneficierNotStartedArray = [...pendingSet].filter(id => !completedFromLive.has(id));
+      tempMap[procedureId].beneficierNotStarted.count = beneficierNotStartedArray.length;
+      tempMap[procedureId].beneficierNotStarted.data = beneficierNotStartedArray;
+      const liveData = liveChangeworkMap[procedureId] || [];
+      tempMap[procedureId].liveChangework.count = liveData.length;
+      tempMap[procedureId].liveChangework.data = liveData;
+      totalLiveCount += liveData.length;
+    });
+
+    this.liveChangeworkTotal = totalLiveCount;
+    this.mapProcedureData = { ...tempMap };
+    this.applySort();
+    const pt = this.procTotals;
+    console.log('[v3][procData] procedures:', this.sortedProcedureIds.length,
+      '| opportunities:', pt.total, '| done:', pt.done, '| pending:', pt.pending,
+      '| overall %:', this.overallProgressPct, '| live total:', this.liveChangeworkTotal,
+      '| scope:', this.participantFilter);
+  }
+
+  // FT applySort (live desc, tie-break completion %)
+  private applySort(): void {
+    const ids = Object.keys(this.mapProcedureData);
+    ids.sort((a, b) => {
+      const live = this.mapProcedureData[b].liveChangework.count - this.mapProcedureData[a].liveChangework.count;
+      if (live !== 0) { return live; }
+      return this.completionPct(b) - this.completionPct(a);
+    });
+    this.sortedProcedureIds = ids;
+  }
+
+  // FT completionPct (execution-based denominator) — CONFIRMED % basis (C-2)
+  completionPct(procedureId: string): number {
+    const d = this.mapProcedureData[procedureId];
+    if (!d) { return 0; }
+    const numerator = d.totalCompleted.count;
+    const denominator = d.totalOpportunities.count + d.totalCompleted.count;
+    if (denominator === 0) { return 0; }
+    return Math.min(100, Math.round((numerator / denominator) * 100));
+  }
+
+  // FT overallProgressPct (sum of numerators / sum of denominators)
+  get overallProgressPct(): number {
+    let numerator = 0; let denominator = 0;
+    for (const id of this.sortedProcedureIds) {
+      const d = this.mapProcedureData[id];
+      if (!d) { continue; }
+      numerator += d.totalCompleted.count;
+      denominator += d.totalOpportunities.count + d.totalCompleted.count;
+    }
+    if (denominator === 0) { return 0; }
+    return Math.min(100, Math.round((numerator / denominator) * 100));
+  }
+
+  // Aggregate procedure totals for the apBody bar (same numerator/denominator
+  // basis as overallProgressPct: done = Σ completed, total = Σ(opp + completed)).
+  get procTotals(): { total: number; done: number; pending: number } {
+    let done = 0; let opp = 0;
+    for (const id of this.sortedProcedureIds) {
+      const d = this.mapProcedureData[id];
+      if (!d) { continue; }
+      done += d.totalCompleted.count;
+      opp += d.totalOpportunities.count;
+    }
+    return { total: opp + done, done, pending: opp };
+  }
+
+  /** Flattened LIVE-now who/what list from FT's live pipeline (mapProcedureData).
+   *  Both parties of each live changework are listed — the doer AND the beneficiary
+   *  — each tagged with its role + procedure. */
+  get liveChangeworkList(): { profileId: string; name: string; proc: string }[] {
+    const out: { profileId: string; name: string; proc: string }[] = [];
+    for (const id of Object.keys(this.mapProcedureData)) {
+      const d = this.mapProcedureData[id];
+      (d.liveChangework.data || []).forEach((row: any) => {
+        const procName = row.procedureName || this.mapProcedureNames[id] || '';
+        if (row.doerId) { out.push({ profileId: row.doerId, name: row.doerName, proc: `Doer · ${procName}` }); }
+        if (row.beneficiaryId) { out.push({ profileId: row.beneficiaryId, name: row.beneficiaryName, proc: `Beneficiary · ${procName}` }); }
+      });
+    }
+    return out;
+  }
+
+  // ==========================================================================
+  // JOURNEYS (V2 calculateJourneyCounts) — universe = registered participants
+  // ==========================================================================
+  calculateJourneyCounts(): void {
+    this.journeyCounts = [];
+    const journeyMap: { [journeyId: string]: string[] } = {};
+    const participantsWithJourney: string[] = [];
+    const currentList = this.eventParticipantProfileIds;
+
+    currentList.forEach(profileId => {
+      const metadata = this.participantMetadataMap[profileId];
+      const activeJourney = metadata?.activejourney;
+      if (activeJourney && this.mapJourneyData[activeJourney]) {
+        if (!journeyMap[activeJourney]) { journeyMap[activeJourney] = []; }
+        journeyMap[activeJourney].push(profileId);
+        participantsWithJourney.push(profileId);
+      }
+    });
+
+    Object.keys(this.mapJourneyData).forEach(journeyId => {
+      const journeyData = this.mapJourneyData[journeyId];
+      const profileIds = journeyMap[journeyId] || [];
+      this.journeyCounts.push({
+        journeyId,
+        journeyName: journeyData['journey'] || journeyData['name'] || 'Unknown Journey',
+        count: profileIds.length,
+        profileIds
+      });
+    });
+
+    this.journeyCounts.sort((a, b) => b.count - a.count);
+    this.totalJourneyParticipants = this.journeyCounts.reduce((sum, j) => sum + j.count, 0);
+    console.log('[v3][journeyCounts] total-with-journey:', this.totalJourneyParticipants,
+      '| of registered:', this.eventParticipantProfileIds.length,
+      '|', this.journeyCounts.filter(j => j.count > 0).map(j => `${j.journeyName}:${j.count}`));
+  }
+
+  // V2 buildParticipantFromProfileId
+  buildParticipantFromProfileId(profileId: string, isPresent: boolean): PanelParticipant {
+    const metadata = this.participantMetadataMap[profileId] || {};
+    const registered = this.registeredByProfileId[profileId];
+    const isNotRegistered = !this.eventParticipantSet.has(profileId);
+    return {
+      docref: registered?.docref || profileId,
+      profileid: profileId,
+      name: metadata['name'] || this.registeredNames[profileId] || registered?.name || 'Unknown',
+      email: metadata['email'] || registered?.email || '',
+      phone: metadata['phone'] || registered?.phone || '',
+      photo: metadata['photo'] || registered?.photo || '',
+      activejourney: metadata['activejourney'] || registered?.activejourney || '',
+      profiletags: metadata['profiletags'] || registered?.profiletags || [],
+      isPresent, isSelected: false, isNotRegistered
+    };
+  }
+
+  // ==========================================================================
+  // Arena Followup — derivations over already-subscribed data (NO new query).
+  // All scoped to the current universe (eventParticipantProfileIds).
+  // ==========================================================================
+
+  // V2 calculateIrregularParticipants — participants who scanned in AFTER the
+  // cutoff time on the target day (late arrivals). targetDate defaults to today;
+  // timeFilter default '09:00'. Scoped to the universe (eventParticipantProfileIds).
+  irregularParticipantIds(targetDate: string, timeFilter: string): string[] {
+    if (!this.selectedEvent || !targetDate) { return []; }
+    const [fh, fm] = timeFilter.split(':').map(Number);
+    const [y, m, dd] = targetDate.split('-').map(Number);
+    const cutoff = new Date(y, m - 1, dd, fh || 0, fm || 0, 0, 0);
+    return this.eventParticipantProfileIds.filter(profileId => {
+      const records = this.mapAttendence[profileId] || [];
+      return records.some(r => {
+        const ld = r['logdate']?.toDate ? r['logdate'].toDate() : new Date(r['logdate']);
+        return ld.toLocaleDateString('en-CA') === targetDate && ld >= cutoff;
+      });
+    });
+  }
+
+  // doer / beneficiary id sets for the Followup cards. "Throughout event" scope,
+  // matching the prototype (no today/overall toggle there) — so these read the
+  // event-wide docs, NOT liveChangeWorkData/liveChangeworkLiveData, which the
+  // Procedure Tracking day chips narrow to a single day. Statuses are filtered
+  // here to the same completed ∪ live the day-scoped subscriptions query for.
+  private changeworkDoerBeneficiarySets(): { doers: Set<string>; beneficiaries: Set<string> } {
+    const doers = new Set<string>(); const beneficiaries = new Set<string>();
+    this.eventChangeWorkDocs.forEach((d: any) => {
+      const st = d['procedurestatus'];
+      if (st !== 'completed' && st !== 'live') { return; }
+      if (d['doerid']) { doers.add(d['doerid']); }
+      if (d['beneficiaryid']) { beneficiaries.add(d['beneficiaryid']); }
+    });
+    return { doers, beneficiaries };
+  }
+
+  // V2 changeWorkOverview.notDoneOthers — registered not a doer in any changework.
+  get notDoingCWIds(): string[] {
+    const { doers } = this.changeworkDoerBeneficiarySets();
+    return this.eventParticipantProfileIds.filter(id => !doers.has(id));
+  }
+
+  // V2 changeWorkOverview.notDoneSelf — registered not a beneficiary in any changework.
+  get cwNotReceivedIds(): string[] {
+    const { beneficiaries } = this.changeworkDoerBeneficiarySets();
+    return this.eventParticipantProfileIds.filter(id => !beneficiaries.has(id));
+  }
+
+  // ==========================================================================
+  // teardown
+  // ==========================================================================
+  private resetProcedureState(): void {
+    this.atcDocs = [];
+    this.profileAtcMap = {};
+    this.atcToValidateProfileIds = [];
+    this.atcBuckets = { full: 0, partial: 0, unvalidated: 0, none: 0, fullIds: [], partialIds: [], unvalidatedIds: [], noneIds: [] };
+    this.draftAtcProfileIds = [];
+    this.draftAtcCount = 0;
+    this.liveChangeWorkData = [];
+    this.liveChangeworkLiveData = [];
+    this.liveChangeworkTotal = 0;
+    this.totalAdjustmentCount = 0;
+    this.totalAdjustmentCompletedCount = 0;
+    this.totalAdjustmentPendingCount = 0;
+    this.participantAtc = {};
+    Object.keys(this.mapProcedureData).forEach(procId => {
+      this.mapProcedureData[procId] = { totalCompleted: { count: 0, data: [] }, totalOpportunities: { count: 0, data: [] }, doerNotStarted: { count: 0, data: [] }, doerCompleted: { count: 0, data: [] }, beneficierNotStarted: { count: 0, data: [] }, beneficierCompleted: { count: 0, data: [] }, liveChangework: { count: 0, data: [] } };
+    });
+  }
+
+  private unsubscribeQueuePipeline(): void {
+    if (this.atcSub) { this.atcSub.unsubscribe(); this.atcSub = null; }
+    if (this.atcToValidateSub) { this.atcToValidateSub.unsubscribe(); this.atcToValidateSub = null; }
+    if (this.draftAtcSub) { this.draftAtcSub.unsubscribe(); this.draftAtcSub = null; }
+  }
+
+  private unsubscribeEventPipeline(): void {
+    this.unsubscribeQueuePipeline();
+    if (this.attendanceSub) { this.attendanceSub.unsubscribe(); this.attendanceSub = null; }
+    if (this.eTicketSub) { this.eTicketSub.unsubscribe(); this.eTicketSub = null; }
+    if (this.videoAskSub) { this.videoAskSub.unsubscribe(); this.videoAskSub = null; }
+    if (this.videoAskTagSub) { this.videoAskTagSub.unsubscribe(); this.videoAskTagSub = null; }
+    if (this.clientIssuesSub) { this.clientIssuesSub.unsubscribe(); this.clientIssuesSub = null; }
+    if (this.callLogSub) { this.callLogSub.unsubscribe(); this.callLogSub = null; }
+    // event-scoped, not queue-scoped — the day chips must never tear this down
+    if (this.lcwEventSub) { this.lcwEventSub.unsubscribe(); this.lcwEventSub = null; }
+    this.unsubscribeZonePipeline();
+  }
+
+  private unsubscribeZonePipeline(): void {
+    if (this.eventZonesSub) { this.eventZonesSub.unsubscribe(); this.eventZonesSub = null; }
+    if (this.bigCohortsSub) { this.bigCohortsSub.unsubscribe(); this.bigCohortsSub = null; }
+    if (this.participantZonesSub) { this.participantZonesSub.unsubscribe(); this.participantZonesSub = null; }
+  }
+
+  private pathOf(ref: any): string { return ref && ref.path ? ref.path : String(ref); }
+
+  ngOnDestroy(): void {
+    // Was an inline copy of unsubscribeEventPipeline — which is how a subscription
+    // added to that method leaks here. Call it instead of restating it.
+    this.unsubscribeEventPipeline();
+    if (this.eventSub) { this.eventSub.unsubscribe(); this.eventSub = null; }
+    if (this.metadataSub) { this.metadataSub.unsubscribe(); this.metadataSub = null; }
+    this.changed$.complete();
+  }
+}

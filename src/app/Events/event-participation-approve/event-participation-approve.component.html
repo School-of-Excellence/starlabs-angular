@@ -72,11 +72,21 @@
     </mat-tab> -->
     
     <!-- Approved Selected Event Table -->
-    <mat-tab label="Approved">
-      <mat-form-field class="search mt-2 " appearance="outline" style="margin-left: 10px;min-width: 300px;">
-        <mat-label>Filter</mat-label>
-        <input matInput (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
-      </mat-form-field>
+    <mat-tab label="Approved ({{approved.length}})">
+      <div class="actionbox">
+        <mat-form-field class="search mt-2 " appearance="outline" style="margin-left: 10px;min-width: 300px;">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="applyFilterD1($event)" placeholder="Ex. Mia" #input>
+        </mat-form-field>
+        <div class="overall-profiles">
+          <div class="op-pill">
+            <div>Overall Profiles: <span>{{distinctProfiles(approved)}}</span></div>
+            <div class="product-counts">
+              <div *ngFor="let pc of productProfileCounts(approved)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div>
         <table mat-table [dataSource]="dataSource1" matSort #sort1="matSort">
           <ng-container matColumnDef="sno">
@@ -116,7 +126,7 @@
       </div>
     </mat-tab>
     <!-- attended Selected Event Table -->
-    <mat-tab label="Mark Attendence">
+    <mat-tab label="Mark Attendence ({{attendance.length}})">
       <div class="actionbox">
         <div>
           <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
@@ -124,9 +134,17 @@
             <input matInput (keyup)="applyFilterD2($event)" placeholder="Ex. Mia" #input>
           </mat-form-field>
         </div>
+        <div class="overall-profiles">
+          <div class="op-pill">
+            <div>Overall Profiles: <span>{{distinctProfiles(attendance)}}</span></div>
+            <div class="product-counts">
+              <div *ngFor="let pc of productProfileCounts(attendance)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+            </div>
+          </div>
+        </div>
         <div *ngIf="attendanceselection.selected.length != 0">
-          <button class="greenbtn" mat-stroked-button (click)="markAsAttended()">Mark as Attended</button>
-          <button class="redbtn" mat-stroked-button (click)="markAsUnattendedAndCancelProduct()">Mark as Not Attended</button>
+          <button class="greenbtn" mat-stroked-button (click)="markAsAttended()">Mark as Attended ({{attendanceselection.selected.length}})</button>
+          <button class="redbtn" mat-stroked-button (click)="markAsUnattendedAndCancelProduct()">Mark as Not Attended ({{attendanceselection.selected.length}})</button>
         </div>
       </div>
       <div>
@@ -179,11 +197,11 @@
               <button *ngIf="row.status != 'attended'" mat-raised-button type="button" (click)="onApprove(row, 'unattended')">Not Attended</button>
             </td> -->
           </ng-container>
-          <tr mat-header-row *matHeaderRowDef="displayedColumns3"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns3;"></tr>
+          <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
           <!-- Row shown when there is no matching data. -->
           <tr class="mat-row" *matNoDataRow>
-            <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+            <td class="mat-cell" colspan="5">No data matching the filter "{{input.value}}"</td>
           </tr>
         </table>
         <mat-paginator #paginator2 [pageSizeOptions]="[25, 100 , 250 ,500]" aria-label="Select page of users"></mat-paginator>
@@ -191,7 +209,7 @@
   </mat-tab>
 
   <!-- attended Selected Event Table -->
-  <mat-tab label="Attended">
+  <mat-tab label="Attended ({{attended.length}})">
     <div class="actionbox">
       <div>
         <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
@@ -199,8 +217,16 @@
           <input matInput (keyup)="applyFilterD3($event)" placeholder="Ex. Mia" #input>
         </mat-form-field>
       </div>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(attended)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(attended)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
       <div>
-        <button *ngIf="attendanceselection.selected.length != 0" class="redbtn mr-3" mat-stroked-button (click)="markAsUnattendedAndCancelProduct()">Mark as Not Attended</button>
+        <button *ngIf="attendedselection.selected.length != 0" class="redbtn mr-3" mat-stroked-button (click)="markAsUnattendedAndCancelProduct(attendedselection)">Mark as Not Attended ({{attendedselection.selected.length}})</button>
         <button type="button" mat-stroked-button (click)="exportCSV()">Export CSV</button>
       </div>
     </div>
@@ -234,17 +260,17 @@
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef>
             <mat-checkbox
-              (change)="$event ? masterToggleattendance() : null"
-              [checked]="attendanceselection.hasValue() && isAllSelectedattendance()"
-              [indeterminate]="attendanceselection.hasValue() && !isAllSelectedattendance()"
+              (change)="$event ? masterToggleattended() : null"
+              [checked]="attendedselection.hasValue() && isAllSelectedattended()"
+              [indeterminate]="attendedselection.hasValue() && !isAllSelectedattended()"
             >
             </mat-checkbox>
           </th>
           <td mat-cell *matCellDef="let row">
             <mat-checkbox
               (click)="$event.stopPropagation()"
-              (change)="$event ? attendanceselection.toggle(row) : null"
-              [checked]="attendanceselection.isSelected(row)"
+              (change)="$event ? attendedselection.toggle(row) : null"
+              [checked]="attendedselection.isSelected(row)"
             >
             </mat-checkbox>
           </td>
@@ -254,15 +280,140 @@
             <button *ngIf="row.status != 'attended'" mat-raised-button type="button" (click)="onApprove(row, 'unattended')">Not Attended</button>
           </td> -->
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="displayedColumns2"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns2;"></tr>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns3"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns3;"></tr>
         <!-- Row shown when there is no matching data. -->
         <tr class="mat-row" *matNoDataRow>
-          <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+          <td class="mat-cell" colspan="5">No data matching the filter "{{input.value}}"</td>
         </tr>
       </table>
       <mat-paginator #paginator3 [pageSizeOptions]="[25, 100 , 250 ,500]" aria-label="Select page of users"></mat-paginator>
     </div>
 </mat-tab>
+
+  <!-- Unattended Selected Event Table -->
+  <mat-tab label="Unattended ({{unattendedList.length}})">
+    <div class="actionbox">
+      <div>
+        <mat-form-field class="search" appearance="outline" style="margin-left: 10px;min-width: 300px;">
+          <mat-label>Filter</mat-label>
+          <input matInput (keyup)="applyFilterD5($event)" placeholder="Ex. Mia" #input>
+        </mat-form-field>
+      </div>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(unattendedList)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(unattendedList)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <button *ngIf="unattendedselection.selected.length != 0" class="greenbtn" mat-stroked-button (click)="markAsAttended(unattendedselection, true)">Mark as Attended ({{unattendedselection.selected.length}})</button>
+      </div>
+    </div>
+    <div>
+      <table mat-table [dataSource]="dataSource5" matSort #sort5="matSort">
+        <ng-container matColumnDef="sno">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> S No </th>
+          <td mat-cell *matCellDef="let row; let i = index"> {{i+1}} </td>
+        </ng-container>
+        <!-- client name Column -->
+        <ng-container matColumnDef="clientname">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Client Name </th>
+          <td mat-cell *matCellDef="let row"><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="row.profileid" [name]="row.clientname || ''" [size]="28"></app-profile-picture><span>{{row.clientname}}</span></span></td>
+        </ng-container>
+        <!-- journey Column -->
+        <ng-container matColumnDef="journey">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Journey </th>
+          <td mat-cell *matCellDef="let row"> {{row.journey}} </td>
+        </ng-container>
+        <!-- product Column -->
+        <ng-container matColumnDef="product">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Product </th>
+          <td mat-cell *matCellDef="let row"> {{row.product}} </td>
+        </ng-container>
+        <!-- status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
+          <td mat-cell *matCellDef="let row"> {{row.status}} </td>
+        </ng-container>
+        <!-- action Column -->
+        <ng-container matColumnDef="action">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox
+              (change)="$event ? masterToggleunattended() : null"
+              [checked]="unattendedselection.hasValue() && isAllSelectedunattended()"
+              [indeterminate]="unattendedselection.hasValue() && !isAllSelectedunattended()"
+            >
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <mat-checkbox
+              (click)="$event.stopPropagation()"
+              (change)="$event ? unattendedselection.toggle(row) : null"
+              [checked]="unattendedselection.isSelected(row)"
+            >
+            </mat-checkbox>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns5"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns5;"></tr>
+        <!-- Row shown when there is no matching data. -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" colspan="5">No data matching the filter "{{input.value}}"</td>
+        </tr>
+      </table>
+      <mat-paginator #paginator5 [pageSizeOptions]="[25, 100 , 250 ,500]" aria-label="Select page of users"></mat-paginator>
+    </div>
+  </mat-tab>
+
+  <!-- Revoked Selected Event Table (read-only — no row actions) -->
+  <mat-tab label="Revoke ({{revoked.length}})">
+    <div class="actionbox">
+      <mat-form-field class="search mt-2" appearance="outline" style="margin-left: 10px;min-width: 300px;">
+        <mat-label>Filter</mat-label>
+        <input matInput (keyup)="applyFilterD4($event)" placeholder="Ex. Mia" #input>
+      </mat-form-field>
+      <div class="overall-profiles">
+        <div class="op-pill">
+          <div>Overall Profiles: <span>{{distinctProfiles(revoked)}}</span></div>
+          <div class="product-counts">
+            <div *ngFor="let pc of productProfileCounts(revoked)"><span>{{pc.product}}</span><span>{{pc.count}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <table mat-table [dataSource]="dataSource4" matSort #sort4="matSort">
+        <ng-container matColumnDef="sno">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> S No </th>
+          <td mat-cell *matCellDef="let row; let i = index"> {{i+1}} </td>
+        </ng-container>
+        <!-- client name Column -->
+        <ng-container matColumnDef="clientname">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Client Name </th>
+          <td mat-cell *matCellDef="let row"><span style="display:inline-flex;align-items:center;gap:8px;"><app-profile-picture [profileId]="row.profileid" [name]="row.clientname || ''" [size]="28"></app-profile-picture><span>{{row.clientname}}</span></span></td>
+        </ng-container>
+        <!-- product Column -->
+        <ng-container matColumnDef="product">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Product </th>
+          <td mat-cell *matCellDef="let row"> {{row.product}} </td>
+        </ng-container>
+        <!-- status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
+          <td mat-cell *matCellDef="let row"> {{row.status}} </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns4"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns4;"></tr>
+        <!-- Row shown when there is no matching data. -->
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell" colspan="4">No data matching the filter "{{input.value}}"</td>
+        </tr>
+      </table>
+      <mat-paginator #paginator4 [pageSizeOptions]="[25, 100 , 250 ,500]" aria-label="Select page of users"></mat-paginator>
+    </div>
+  </mat-tab>
   </mat-tab-group>
 </div>

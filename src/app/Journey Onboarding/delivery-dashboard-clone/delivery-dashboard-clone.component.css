@@ -17802,3 +17802,39 @@ i.seat-chip {
 .dd-initiate-btn:active {
   transform: scale(0.97);
 }
+
+.view-form-btn {
+  background: #3f51b5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.event-filter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.event-select {
+  width: 260px;
+}
+
+::ng-deep .event-dropdown {
+  min-width: 350px !important;
+  max-width: 500px !important;
+}
+
+::ng-deep .mat-mdc-option .mdc-list-item__primary-text {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.up-confirmed {
+  width: 300px;
+}
+
+.pm-filter-field--hidden { display: none; }

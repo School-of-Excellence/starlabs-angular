@@ -4650,3 +4650,62 @@
   height: 14px;
   color: #888888;
 }
+.export-selected {
+  border-color: #1976d2 !important;
+  color: #1976d2 !important;
+  background-color: #e3f2fd !important;
+}
+.history-tabs {
+  display: flex;
+  border-bottom: 0.5px solid #e0e0e0;
+  padding: 0 16px;
+}
+
+.history-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-active-reverted {
+  border-bottom-color: #d32f2f !important;
+  color: #d32f2f !important;
+}
+
+.tab-active-booked {
+  border-bottom-color: #2e7d32 !important;
+  color: #2e7d32 !important;
+}
+
+.history-tab-badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 20px;
+}
+
+.reverted-badge {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.booked-badge {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.booked-entry {
+  border-left: 3px solid #2e7d32;
+}
+
+.booked-number {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+}

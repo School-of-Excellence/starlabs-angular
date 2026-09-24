@@ -338,15 +338,18 @@ export class BigCohortClone2Component {
     // Load saved selections from localStorage
     this.loadSavedSelections();
 
-    getDocs(collection(this.firestore, "big cohorts")).then(snap => {
-      this.cohortsList = snap.docs.map(e => {
-        let element: any = e.data()
-        element['contentview'] = 'participants'
-        return element
+    collectionSnapshots(collection(this.firestore, "big cohorts"))
+      .pipe(takeUntil(this.subscription))
+      .subscribe(snapData => {
+        this.cohortsList = snapData.map(d => {
+          let element: any = d.data()
+          const existing = this.cohortsList?.find((c: any) => c.docid === element.docid)
+          element['contentview'] = existing?.['contentview'] ?? 'participants'
+          return element
+        })
+        this.filteredCohortsList = this.cohortsList
+        this.toRunFilterFunctions()
       })
-      this.filteredCohortsList = this.cohortsList
-      this.toRunFilterFunctions()
-    })
     getDocs(query(collection(this.firestore, "big marathon"), orderBy("startdate", "asc"))).then(snap => {
       for (let i = 0; i < snap.docs.length; i++) {
         const element: any = snap.docs[i].data();
@@ -1154,26 +1157,29 @@ export class BigCohortClone2Component {
       minWidth: "500px",
       disableClose: true
     })
-    dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
-      if (result != null && result != undefined) {
-        let docid = doc(collection(this.firestore, "buffermix archive")).id
-        result['docid'] = docid
-        setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
-          console.log("buffer document created");
-        }).catch(err => {
-          console.log(err);
-        })
-      }
-    });
+    // dialogRef.afterClosed().pipe(takeUntil(this.destroy$)).subscribe(result => {
+    //   if (result != null && result != undefined) {
+    //     let docid = doc(collection(this.firestore, "buffermix archive")).id
+    //     result['docid'] = docid
+    //     setDoc(doc(this.firestore, "buffermix archive", docid), result).then(() => {
+    //       console.log("buffer document created");
+    //     }).catch(err => {
+    //       console.log(err);
+    //     })
+    //   }
+    // });
   }
 
   moveMenuSearchQuery: string = '';
   moveMenuFilteredCohorts: any[] = [];
   isMovingParticipant: boolean = false;
 
-  filterMoveMenuCohorts(sourceCohortId: string) {
+  // function to filter cohorts in cohorts move menu
+  filterMoveMenuCohorts(cohort: string) {
+    const cohortId = cohort['docid'];
+    const eventId = cohort['eventref']?.id;
     const query = this.moveMenuSearchQuery.toLowerCase().trim();
-    let cohorts = this.filteredCohortsList.filter(c => c.docid !== sourceCohortId);
+    let cohorts = this.cohortsList.filter(c => c.docid !== cohortId && c['eventref']?.id === eventId);
 
     if (query) {
       cohorts = cohorts.filter(c => c.name?.toLowerCase().includes(query));
@@ -1221,6 +1227,7 @@ export class BigCohortClone2Component {
         targetCohort.participantidlist.push(participantId);
       }
 
+      alert(`Moved participant ${this.mapProfile[participantId]} from ${sourceCohort.name} to ${targetCohort.name}`)
       console.log(`Moved participant ${participantId} from ${sourceCohort.name} to ${targetCohort.name}`);
 
     } catch (error) {
@@ -1999,16 +2006,7 @@ export class BigCohortClone2Component {
     });
 
     dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        getDocs(collection(this.firestore, "big cohorts")).then(snap => {
-          this.cohortsList = snap.docs.map(e => {
-            let element: any = e.data()
-            element['contentview'] = 'activities'
-            return element
-          })
-          this.toRunFilterFunctions()
-        })
-      }
+      // cohort list updates automatically via the live "big cohorts" listener
     });
   }
 

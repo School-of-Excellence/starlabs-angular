@@ -17,21 +17,25 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { RouterModule } from '@angular/router';
 import {
   Firestore, collection, doc, query, where,
-  updateDoc, Timestamp, Unsubscribe,
+  updateDoc, setDoc, Timestamp, Unsubscribe,
   getDoc, getDocs, onSnapshot, getFirestore, documentId,
+  arrayUnion,
 } from '@angular/fire/firestore';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
 import { debounceTime, firstValueFrom, Subject, takeUntil } from 'rxjs';
+import * as XLSX from 'xlsx';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment.development';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { SnackbarService } from '../../shared/snackbar.service';
+import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsapp-progress-dialog.component';
@@ -44,7 +48,8 @@ import { WhatsAppProgressData, WhatsappProgressDialogComponent } from '../whatsa
     MatProgressSpinnerModule, MatProgressBarModule, MatTableModule,
     MatPaginatorModule, MatSortModule, MatChipsModule, MatExpansionModule, MatSnackBarModule,
     MatListModule, MatTooltipModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule
+    RouterModule, MatMenuModule, MatRadioModule, FormsModule, MatSelectModule,
+    MatDatepickerModule
   ],
   templateUrl: './workshop-dashboard.component.html',
   styleUrls: ['./workshop-dashboard.component.css']
@@ -58,6 +63,32 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   selectedParticipants: any[] = [];
   selectedStatusInfo: any = null;
 
+  // Challenge Progress Overview redesign — presentation-only expansion state
+  // (replaces mat-expansion-panel's internal state; no data involved).
+  expandedChallenges = new Set<number>();
+
+  toggleChallengePanel(index: number): void {
+    if (this.expandedChallenges.has(index)) this.expandedChallenges.delete(index);
+    else this.expandedChallenges.add(index);
+  }
+
+  isChallengeExpanded(index: number): boolean {
+    return this.expandedChallenges.has(index);
+  }
+
+  // All Assignments / All Forms / All VideoAsk redesign — presentation-only
+  // expansion state (replaces mat-expansion-panel internals; no data involved).
+  expandedArchiveGroups = new Set<string>();
+
+  toggleArchiveGroup(key: string): void {
+    if (this.expandedArchiveGroups.has(key)) this.expandedArchiveGroups.delete(key);
+    else this.expandedArchiveGroups.add(key);
+  }
+
+  isArchiveGroupExpanded(key: string): boolean {
+    return this.expandedArchiveGroups.has(key);
+  }
+
   // Evergreen-only referral metrics (workshopreferral collection)
   shareClickedProfileIds: string[] = [];
   shareClaimedProfileIds: string[] = [];
@@ -66,6 +97,32 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   shareProfileNames: { [id: string]: string } = {};
   // claimed sharer profileid -> their referralcode (used to find who enrolled via that code)
   shareClaimedReferralByProfile: { [id: string]: string } = {};
+
+  // Evergreen + paid only: purchasers (workshoppaymentlog collection).
+  purchaseProfileIds: string[] = [];
+  purchaseProfileNames: { [id: string]: string } = {};
+
+  // Evergreen day-journey distribution (only when evergreenWorkshop === true).
+  // Each participant's "day" = floor((now - enrollmentdate) / 24h) + 1, exact to the second.
+  evergreenDayDistribution: { day: number; count: number; profileIds: string[] }[] = [];
+  evergreenCompletedBucket: { day: number; count: number; profileIds: string[]; completed: boolean } =
+    { day: -1, count: 0, profileIds: [], completed: true };
+  // Past-workshop participants with >= 1 evergreenaccessto.extendworkshop entry
+  // live here instead of Completed. activeCount = users whose latest
+  // extenduntill is still in the future.
+  evergreenExtendedBucket: { count: number; profileIds: string[]; activeCount: number } =
+    { count: 0, profileIds: [], activeCount: 0 };
+  evergreenDayTotal = 0;
+
+  // Completed-panel extension UI (evergreen only).
+  extendTargetProfileId: string | null = null;
+  extendDate: Date | null = null;
+  extendSaving = false;
+  // Getter, not a field: a dashboard left open past midnight must not allow
+  // picking an already-past day.
+  get extendMinDate(): Date {
+    return new Date();
+  }
 
   selectedParticipantData: any = null;
   participantWorkshopData: any = null;
@@ -110,7 +167,6 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   mapProfile: any = {};
   mapProfileNew: any = {};
   loading = true;
-  isRefreshing = false;
   error: string | null = null;
   isMovingParticipant: string | null = null;
 
@@ -120,6 +176,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   allSelected = false;
 
   unsubscribes: Unsubscribe[] = [];
+  private destroyed = false;
   private destroy$ = new Subject<void>();
   private recalculateSubject$ = new Subject<void>();
   journeyData: any[] = [];
@@ -148,6 +205,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   private participantDataCache = new Map<string, any>();
   private participantWorkshopMap = new Map<string, any>();
   challengeForms: any[] = [];
+  videoAskList: any[] = [];
+  isExportingForms = false;
   // cp workshop
   categoryWiseEnrolled: { categoryId: string; categoryName: string; count: number; profileIds: string[] }[] = [];
   categoryNamesMap: Map<string, string> = new Map();
@@ -240,6 +299,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     return { docdata, map, list };
   }
 
+  // new_user_data is loaded once (not live) — it drives only the peripheral
+  // New Users counts and is a large, growing collection.
   private async initializeProfileData() {
     try {
       const userRef = collection(this.firestoreDefault, 'new_user_data');
@@ -304,6 +365,46 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
     this.setupFilterPredicate();
+    this.setupSortingAccessor();
+  }
+
+  /**
+   * Column ids don't match the row property names (progress vs
+   * progressPercentage, completed vs completedChallenges), and category-based
+   * workshops display derived values — so sorting needs its own accessor.
+   */
+  private setupSortingAccessor() {
+    this.dataSource.sortingDataAccessor = (data: any, sortHeaderId: string) => {
+      switch (sortHeaderId) {
+        case 'participantId':
+          return (this.mapProfile[data.profileid]?.['name'] || '').toLowerCase();
+        case 'progress':
+          return this.effectiveProgress(data);
+        case 'completed':
+          return this.effectiveCompleted(data);
+        case 'status': {
+          // Not Started (0) < Active (1) < Completed (2)
+          const pct = this.effectiveProgress(data);
+          return pct === 100 ? 2 : pct > 0 ? 1 : 0;
+        }
+        default:
+          return data[sortHeaderId];
+      }
+    };
+  }
+
+  /** Progress % as shown in the table (access-based for category workshops). */
+  private effectiveProgress(participant: any): number {
+    return this.workshopData?.categorybased === true
+      ? this.calculateAccessBasedProgress(participant).progressPercentage
+      : (participant.progressPercentage ?? 0);
+  }
+
+  /** Completed count as shown in the table (access-based for category workshops). */
+  private effectiveCompleted(participant: any): number {
+    return this.workshopData?.categorybased === true
+      ? this.calculateAccessBasedProgress(participant).completedChallenges
+      : (participant.completedChallenges ?? 0);
   }
 
   private setupFilterPredicate() {
@@ -336,8 +437,15 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
     this.clearSelectedParticipant();
-    this.unsubscribes.forEach(unsubscribe => unsubscribe());
+    // Tear down every live Firestore listener (workshop config, enrolled,
+    // participant workshop, and referral for evergreen). Guarded so one bad
+    // unsubscribe can't leave the rest attached.
+    this.unsubscribes.forEach(unsubscribe => {
+      try { unsubscribe(); } catch (e) { console.error('unsubscribe failed', e); }
+    });
+    this.unsubscribes = [];
     this.destroy$.next();
     this.destroy$.complete();
     this.participantDataCache.clear();
@@ -350,6 +458,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       if (this.paginator) {
         this.dataSource.paginator = this.paginator;
         this.paginator.firstPage();
+      }
+      // The table renders behind loading gates, so the MatSort ViewChild can
+      // appear after ngAfterViewInit — re-attach whenever data lands.
+      if (this.sort && this.dataSource.sort !== this.sort) {
+        this.dataSource.sort = this.sort;
       }
       this.cdr.detectChanges();
     });
@@ -367,36 +480,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async refreshData() {
-    if (this.isRefreshing) return;
-    try {
-      this.isRefreshing = true;
-      await this.loadAllParticipantWorkshopData();
-      this.rebuildProgressFromMap();
-      if (this.selectedParticipantData) {
-        const profileId = this.selectedParticipantData.profileid;
-        this.participantWorkshopData = this.participantWorkshopMap.get(profileId) || null;
-        this.updateParticipantDisplayData();
-      }
-      this.triggerRecalculation();
-      this.snackbarService.show('Data refreshed');
-    } catch (err) {
-      console.error('Refresh error:', err);
-      this.snackbarService.show('Failed to refresh data');
-    } finally {
-      this.isRefreshing = false;
-      this.cdr.detectChanges();
-    }
-  }
-
   async setupWorkshopSnapshot() {
     if (!this.workshopId) return;
 
     let enrolledSnapshotInitialized = false;
     let referralSnapshotInitialized = false;
+    let paymentSnapshotInitialized = false;
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const unsubscribe = onSnapshot(workshopRef, (docSnap) => {
+      if (this.destroyed) return;
       if (docSnap.exists()) {
         this.workshopData = { ...docSnap.data(), docid: docSnap.id };
         this.updateWorkshopDisplayData();
@@ -411,8 +504,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           this.setupWorkshopReferralSnapshot();
         }
 
+        // Purchasers list: evergreen + paid workshops only.
+        if (this.workshopData.evergreenWorkshop === true && this.workshopData.payment === true
+            && !paymentSnapshotInitialized) {
+          paymentSnapshotInitialized = true;
+          this.setupWorkshopPaymentSnapshot();
+        }
+
         if (!enrolledSnapshotInitialized) {
           enrolledSnapshotInitialized = true;
+          this.setupParticipantWorkshopSnapshot();
           this.setupEnrolledParticipantsSnapshot();
         }
       } else {
@@ -455,8 +556,40 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.shareClaimedProfileIds = claimed;
       this.shareClaimedReferralByProfile = referralByProfile;
       // Referral sharers may not be enrolled, so resolve their names from profile_data.
-      this.shareProfileNames = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      const names = await this.getProfileNameMapForIds([...clicked, ...claimed]);
+      if (this.destroyed) return; // component torn down while awaiting
+      this.shareProfileNames = names;
     }, (err) => console.error('workshopreferral snapshot error', err));
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Evergreen + paid only: live list of purchasers for this workshop.
+  // workshoppaymentlog docs where workshopref == this workshop; each has `profileid`.
+  setupWorkshopPaymentSnapshot() {
+    if (!this.workshopId) return;
+    const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
+    const paymentQuery = query(
+      collection(this.firestoreDefault, 'workshoppaymentlog'),
+      where('workshopref', '==', workshopRef)
+    );
+    const unsubscribe = onSnapshot(paymentQuery, async (snap) => {
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      snap.forEach(d => {
+        const data: any = d.data();
+        const pid = data?.profileid;
+        if (pid && !seen.has(pid)) {
+          seen.add(pid);
+          ids.push(pid);
+        }
+      });
+      this.purchaseProfileIds = ids;
+      // Purchasers may not be enrolled, so resolve names from profile_data.
+      const names = await this.getProfileNameMapForIds(ids);
+      if (this.destroyed) return; // component torn down while awaiting
+      this.purchaseProfileNames = names;
+    }, (err) => console.error('workshoppaymentlog snapshot error', err));
 
     this.unsubscribes.push(unsubscribe);
   }
@@ -520,6 +653,68 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     }
     this.applyFilterSide();
+  }
+
+  // ============ Email composer (same flow as participants-analytics) ============
+  // EmailInputComponent reads `profileid`, `email` and `name` off each entry, so
+  // flatten the panel's participants ({ profileid, name, metadata }) into that shape.
+  private get emailRecipients(): any[] {
+    return (this.filteredParticipants || [])
+      .filter(p => p?.['metadata']?.['email'])
+      .map(p => ({
+        ...p['metadata'],
+        profileid: p['profileid'],
+        name: p['name'] || p['metadata']?.['name'],
+        email: p['metadata']?.['email'],
+      }));
+  }
+
+  sendEmailToSelectedParicipant() {
+    const recipients = this.emailRecipients;
+    if (recipients.length === 0) {
+      this.snackbarService.show('No valid recipients found');
+      return;
+    }
+
+    const dialogRef = this.dialog.open(EmailInputComponent, {
+      data: recipients,
+      minWidth: '600px',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(async result => {
+      if (result != null && result != undefined) {
+        const docRef = doc(collection(this.firestoreDefault, 'email archive'), result['docid']);
+        if (result['status'] == 'queued' || result['status'] == 'send') {
+          await setDoc(docRef, result, { merge: true }).then(() => {
+            this.snackbarService.show(result['status'] == 'queued' ? 'Successfully Added to Queue' : 'Email Sent Successfully');
+          }).catch(err => {
+            console.log(err);
+            this.snackbarService.show('Error Sending Email');
+          });
+        } else if (result['status'] == 'validated') {
+          let url: string;
+          if (environment.firebase.projectId == 'starlabs-test') {
+            url = 'https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail';
+          } else if (environment.firebase.projectId == 'fir-sample-aae4a') {
+            url = 'https://us-central1-fir-sample-aae4a.cloudfunctions.net/sendBatchEmail';
+          }
+          const data = result;
+          data['archiveid'] = result['docid'];
+          this.http.post(url, JSON.stringify(data), {
+            responseType: 'text',
+            headers: new HttpHeaders().set('Content-Type', 'application/json'),
+          }).subscribe({
+            next: (response) => {
+              console.log('response', response);
+            },
+            error: (err) => {
+              console.log('Error: ' + err);
+            }
+          });
+        }
+      }
+    });
   }
 
   async sendMail() {
@@ -1005,25 +1200,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
       const enrolledProfileIds = this.enrolledParticipants.map(p => p.profileid);
       const participantData = await this.getParticipantMetaMapForIds(enrolledProfileIds);
+      if (this.destroyed) return; // component torn down while awaiting
       this.mapProfile = { ...participantData.docdata, ...this.mapProfileNew };
-      await this.loadAllParticipantWorkshopData();
-      if (this.workshopData?.categorybased === true) {
-        this.participantCohortMap.clear();
-        this.participantWorkshopCategoryMap.clear();
-        for (const p of this.enrolledParticipants) {
-          const pwData = this.participantWorkshopMap.get(p.profileid);
-          if (pwData) {
-            this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
-            if (pwData['workshopcategory']) {
-              this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
-            }
-          }
-        }
-        this.updateCohortCount();
-      }
-      this.rebuildProgressFromMap();
-      this.updateMetrics();
-      this.triggerRecalculation();
+      // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
+      // here we just re-derive from the current (live) participantWorkshopMap.
+      this.recomputeDerivedState();
 
       if (this.loading) {
         this.loading = false;
@@ -1037,10 +1218,11 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.unsubscribes.push(unsubscribe);
   }
 
-  private async loadAllParticipantWorkshopData(): Promise<void> {
+  // Live listener for participant progress (the 'participant workshop' collection).
+  // Replaces the old one-time fetch + manual refresh button: any progress change
+  // now re-derives the whole dashboard automatically.
+  setupParticipantWorkshopSnapshot() {
     if (!this.workshopId) return;
-
-    this.participantWorkshopMap.clear();
 
     const workshopRef = doc(this.firestoreDefault, 'workshopconfiguration', this.workshopId);
     const pwQuery = query(
@@ -1048,8 +1230,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       where('workshopref', '==', workshopRef)
     );
 
-    try {
-      const pwSnap = await getDocs(pwQuery);
+    const unsubscribe = onSnapshot(pwQuery, (pwSnap) => {
+      if (this.destroyed) return;
+      this.participantWorkshopMap.clear();
       pwSnap.docs.forEach(d => {
         const data = d.data();
         const profileid: string = data['profileid'];
@@ -1057,9 +1240,48 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           this.participantWorkshopMap.set(profileid, { id: d.id, ...data });
         }
       });
-    } catch (err) {
-      console.error('Error fetching participant workshop collection:', err);
+      this.recomputeDerivedState();
+    }, (err) => {
+      console.error('Error listening to participant workshop collection:', err);
+    });
+
+    this.unsubscribes.push(unsubscribe);
+  }
+
+  // Re-derives all dashboard state from the current live snapshots
+  // (enrolledParticipants + participantWorkshopMap + mapProfile). Shared by the
+  // enrolled-participants and participant-workshop snapshots so both stay in sync,
+  // for evergreen, category-based, and plain workshops alike.
+  private recomputeDerivedState() {
+    if (this.workshopData?.categorybased === true) {
+      this.participantCohortMap.clear();
+      this.participantWorkshopCategoryMap.clear();
+      for (const p of this.enrolledParticipants) {
+        const pwData = this.participantWorkshopMap.get(p.profileid);
+        if (pwData) {
+          this.participantCohortMap.set(p.profileid, pwData['cohortparticipant'] === true);
+          if (pwData['workshopcategory']) {
+            this.participantWorkshopCategoryMap.set(p.profileid, pwData['workshopcategory']);
+          }
+        }
+      }
+      this.updateCohortCount();
     }
+
+    this.rebuildProgressFromMap();
+    this.updateMetrics();
+
+    // Keep an open participant-detail panel live when its underlying data changes.
+    if (this.selectedParticipantData) {
+      const pid = this.selectedParticipantData.profileid;
+      const pwData = this.participantWorkshopMap.get(pid) || null;
+      if (pwData) {
+        this.participantWorkshopData = pwData;
+        this.updateParticipantDisplayData();
+      }
+    }
+
+    this.triggerRecalculation();
   }
 
   private rebuildProgressFromMap(): void {
@@ -1118,7 +1340,9 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   scrollToParticipantData(): void {
-    const element = document.querySelector('.participant-data-card');
+    // The redesigned section carries the id (the old .participant-data-card
+    // class went away with the mat-card markup).
+    const element = document.querySelector('#participantDataCard');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
     }
@@ -1305,6 +1529,81 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.facilitatorCount = this.facilitatorProfileIds.length;
       this.updateCategoryBasedMetrics();
     }
+
+    if (this.workshopData?.evergreenWorkshop === true) {
+      this.computeEvergreenDayDistribution();
+    }
+  }
+
+  // Buckets enrolled participants by their current workshop day, based on enrollmentdate.
+  // day = floor((now - enrollmentdate) / 24h) + 1 (exact to the second). Days beyond
+  // workshopDays fall into the "Completed" bucket.
+  computeEvergreenDayDistribution() {
+    const days = this.evergreenWorkshopDays;
+    if (this.workshopData?.evergreenWorkshop !== true || days <= 0) {
+      this.evergreenDayDistribution = [];
+      this.evergreenCompletedBucket = { day: -1, count: 0, profileIds: [], completed: true };
+      this.evergreenExtendedBucket = { count: 0, profileIds: [], activeCount: 0 };
+      this.evergreenDayTotal = 0;
+      return;
+    }
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const buckets: { day: number; count: number; profileIds: string[] }[] = [];
+    for (let i = 1; i <= days; i++) buckets.push({ day: i, count: 0, profileIds: [] });
+    const completed = { day: -1, count: 0, profileIds: [] as string[], completed: true };
+    const extended = { count: 0, profileIds: [] as string[], activeCount: 0 };
+    let total = 0;
+
+    for (const p of this.enrolledParticipants) {
+      const enrolledMs = this.toMillis(p.enrollmentdate);
+      if (enrolledMs == null) continue;
+      total++;
+      let day = Math.floor((now - enrolledMs) / DAY_MS) + 1;
+      if (day < 1) day = 1; // guard against clock skew / future-dated enrollment
+      if (day > days) {
+        // Anyone with at least one workshop extension moves to Extended.
+        const entries = this.getExtendEntries(p.profileid);
+        if (entries.length > 0) {
+          extended.count++;
+          extended.profileIds.push(p.profileid);
+          const until = this.toMillis(entries[entries.length - 1]?.extenduntill);
+          if (until != null && until >= now) extended.activeCount++;
+        } else {
+          completed.count++;
+          completed.profileIds.push(p.profileid);
+        }
+      } else {
+        const b = buckets[day - 1];
+        b.count++;
+        b.profileIds.push(p.profileid);
+      }
+    }
+
+    this.evergreenDayDistribution = buckets;
+    this.evergreenCompletedBucket = completed;
+    this.evergreenExtendedBucket = extended;
+    this.evergreenDayTotal = total;
+  }
+
+  // evergreenaccessto.extendworkshop entries from the live participant
+  // workshop doc ([{extenduntill, created}, ...]).
+  private getExtendEntries(profileid: string): any[] {
+    const pw = this.participantWorkshopMap.get(profileid);
+    const arr = pw?.['evergreenaccessto']?.['extendworkshop'];
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  private toMillis(ts: any): number | null {
+    if (!ts) return null;
+    if (typeof ts.toMillis === 'function') return ts.toMillis();
+    if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+    if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+    if (ts instanceof Date) return ts.getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? null : d.getTime();
   }
 
   async loadCategoryNames() {
@@ -1385,6 +1684,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
 
     this.prepareAssignmentsList();
     this.loadChallengeForms();
+    this.loadVideoAsks();
   }
 
   calculateChallengeStats(challenge: any, challengeIndex: number, challengeStats: any, progressList?: any[]) {
@@ -1482,6 +1782,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   get activeParticipants() { return this.metrics.get('activeParticipants')?.length || 0; }
   get shareClicked() { return this.shareClickedProfileIds.length; }
   get shareClaimed() { return this.shareClaimedProfileIds.length; }
+  get purchase() { return this.purchaseProfileIds.length; }
+  get evergreenWorkshopDays(): number {
+    return Number(this.workshopData?.evergreenWorkshopMeta?.workshopDays) || 0;
+  }
   get completionRate() {
     const total = this.totalEnrolled;
     const completed = this.metrics.get('completedParticipants')?.length || 0;
@@ -1631,6 +1935,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.showParticipantPanel = true;
       this.filterOption = 'all';
       this.applyFilterSide();
+
+    } else if (metricType === 'purchase') {
+      this.selectedParticipants = this.purchaseProfileIds.map(id => ({
+        profileid: id,
+        name: this.purchaseProfileNames[id] || this.mapProfile[id]?.name || 'Unknown',
+        metadata: this.mapProfile[id]
+      }));
+      this.selectedStatusInfo = {
+        status: metricType,
+        challengeName: 'Purchase',
+        subChallengeName: 'Purchase',
+        count: this.selectedParticipants.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.applyFilterSide();
     } else {
       const participantIds = this.metrics.get(metricType);
       this.selectedParticipants = participantIds.map(id => this.buildParticipantEntry(id));
@@ -1648,6 +1968,115 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
     }
+  }
+
+  // Opens the shared side panel with the participants currently in the given evergreen day bucket.
+  onDayClick(bucket: { day: number; count: number; profileIds: string[]; completed?: boolean }) {
+    if (!bucket || bucket.count === 0) return;
+    const label = bucket.completed ? 'Completed' : `Day ${bucket.day}`;
+    this.selectedParticipants = bucket.profileIds.map(id => this.buildParticipantEntry(id));
+    this.selectedStatusInfo = {
+      status: label,
+      challengeName: label,
+      subChallengeName: bucket.completed
+        ? `Past day ${this.evergreenWorkshopDays} of ${this.evergreenWorkshopDays}`
+        : `Day ${bucket.day} of ${this.evergreenWorkshopDays}`,
+      count: bucket.count,
+      // Completed rows swap the profile link for the extend-date picker.
+      evergreenCompleted: !!bucket.completed
+    };
+    this.extendTargetProfileId = null;
+    this.extendDate = null;
+    this.showParticipantPanel = true;
+    this.filterOption = 'all';
+    this.selectedJourneyFilters = [];
+    this.selectedEnrollmentStatusFilters = [];
+    this.selectedTierFilters = [];
+    this.selectedCategoryFilters = [];
+    this.selectedNotStartedTypeFilters = [];
+    this.applyFilterSide();
+  }
+
+  // ---- evergreen workshop extension (Completed panel) ----
+  toggleExtendTarget(profileid: string): void {
+    this.extendTargetProfileId = this.extendTargetProfileId === profileid ? null : profileid;
+    this.extendDate = null;
+  }
+
+  // Appends {extenduntill, created} to evergreenaccessto.extendworkshop on the
+  // participant workshop doc — a NEW array index per extension. extenduntill is
+  // pinned to 11:59 pm of the chosen day; created is now. The live participant
+  // workshop snapshot then moves the user from Completed to Extended.
+  async confirmExtend(participant: any): Promise<void> {
+    if (!this.extendDate || this.extendSaving) return;
+    const enrolled = this.enrolledParticipants.find(e => e.profileid === participant.profileid);
+    const ref = enrolled?.participantworkshopref;
+    if (!ref) {
+      this.snackbarService.show('No participant workshop document found for this user');
+      return;
+    }
+
+    this.extendSaving = true;
+    try {
+      const d = this.extendDate;
+      const until = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 0, 0);
+      await updateDoc(ref, {
+        'evergreenaccessto.extendworkshop': arrayUnion({
+          extenduntill: Timestamp.fromDate(until),
+          created: Timestamp.now()
+        })
+      });
+
+      // The snapshot listener re-buckets; update the open panel list optimistically.
+      this.selectedParticipants = this.selectedParticipants.filter(p => p.profileid !== participant.profileid);
+      if (this.selectedStatusInfo) {
+        this.selectedStatusInfo.count = Math.max(0, (this.selectedStatusInfo.count || 1) - 1);
+      }
+      this.applyFilterSide();
+      this.extendTargetProfileId = null;
+      this.extendDate = null;
+      this.snackbarService.show(`Extended ${participant.name} until ${until.toLocaleDateString()}`);
+    } catch (err) {
+      console.error('Error extending workshop access:', err);
+      this.snackbarService.show('Error extending. Please try again.');
+    } finally {
+      this.extendSaving = false;
+    }
+  }
+
+  // Extended node -> premium timeline dialog of every extended user.
+  async openExtendedTimeline(): Promise<void> {
+    const users = this.evergreenExtendedBucket.profileIds.map(id => {
+      const enrolled = this.enrolledParticipants.find(e => e.profileid === id);
+      const entries = this.getExtendEntries(id)
+        .map(e => ({
+          created: this.toMillis(e?.created),
+          extenduntill: this.toMillis(e?.extenduntill)
+        }))
+        .filter(e => e.created != null || e.extenduntill != null)
+        .sort((a, b) => (a.created || 0) - (b.created || 0));
+      return {
+        profileid: id,
+        name: this.mapProfile[id]?.name || 'Unknown',
+        participantworkshopref: enrolled?.participantworkshopref || null,
+        entries
+      };
+    })
+    // Most recently extended user first.
+    .sort((a, b) => {
+      const lastA = a.entries.length ? (a.entries[a.entries.length - 1].created || 0) : 0;
+      const lastB = b.entries.length ? (b.entries[b.entries.length - 1].created || 0) : 0;
+      return lastB - lastA;
+    });
+
+    const { ExtendedTimelineComponent } = await import('./extended-timeline/extended-timeline.component');
+    this.dialog.open(ExtendedTimelineComponent, {
+      width: '860px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      autoFocus: false,
+      data: { workshopTitle: this.workshopTitle, users }
+    });
   }
 
   onChallengeMainStatusClick(status: string, challengeIndex: number, count: number) {
@@ -1692,6 +2121,20 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       data: { workshopId: this.workshopId, workshopTitle: this.workshopTitle },
       disableClose: false, panelClass: 'fullscreen-dialog',
       hasBackdrop: true, backdropClass: 'fullscreen-backdrop'
+    });
+  }
+
+  /**
+   * Enrollment diagnostics — explains, gate by gate, why one profile can or
+   * cannot enroll in THIS workshop. Ports the EiFlix Flutter web enroll gates
+   * so support can answer "why can't this user enroll?" without the user's
+   * browser console.
+   */
+  async openDiagnoseDialog() {
+    const { EnrollDiagnosticsComponent } = await import('./enroll-diagnostics/enroll-diagnostics.component');
+    this.dialog.open(EnrollDiagnosticsComponent, {
+      data: { workshopId: this.workshopId, workshopTitle: this.workshopTitle },
+      width: '900px', maxWidth: '96vw', maxHeight: '92vh', autoFocus: false,
     });
   }
 
@@ -2836,5 +3279,168 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
       return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch { return ''; }
+  }
+
+  loadVideoAsks(): void {
+    if (!this.participantProgressList || this.participantProgressList.length === 0) {
+      this.videoAskList = []; return;
+    }
+    const vaMap = new Map<string, any>();
+    this.participantProgressList.forEach(participant => {
+      if (!participant.challenges || !Array.isArray(participant.challenges)) return;
+      participant.challenges.forEach((challenge: any, challengeIdx: number) => {
+        if (!challenge.challenges || !Array.isArray(challenge.challenges)) return;
+        challenge.challenges.forEach((subchallenge: any, subIdx: number) => {
+          if (subchallenge.type === 'videoask' && subchallenge.status === 'completed' && subchallenge.result) {
+            const vaKey = `${challengeIdx}-${subIdx}`;
+            if (!vaMap.has(vaKey)) {
+              vaMap.set(vaKey, {
+                title: subchallenge.name || subchallenge.title || 'Untitled VideoAsk',
+                challengeTitle: challenge.heading || challenge.title || 'Challenge',
+                subChallengeIndex: subIdx, challengeIndex: challengeIdx,
+                participants: []
+              });
+            }
+            vaMap.get(vaKey)!.participants.push({
+              name: this.mapProfile[participant.profileid]?.['name'] || 'Unknown',
+              profileid: participant.profileid,
+              submittedDate: subchallenge.completed || null,
+              vaPlaying: false, vaLoading: false, vaUrl: null
+            });
+          }
+        });
+      });
+    });
+    this.videoAskList = Array.from(vaMap.values());
+  }
+
+  /**
+   * Plays the participant's VideoAsk inline, replacing that participant's own
+   * card with the player (never forces full screen — that stays behind the
+   * player's native control).
+   */
+  async playVideoAsk(va: any, participant: any): Promise<void> {
+    if (participant.vaLoading || participant.vaPlaying) return;
+    participant.vaLoading = true;
+    try {
+      const participantProgress = this.participantProgressList.find(p => p.profileid === participant.profileid);
+      const subChallenge = participantProgress?.challenges?.[va.challengeIndex]?.challenges?.[va.subChallengeIndex];
+      const resultRef = subChallenge?.result;
+      if (!resultRef) { alert('VideoAsk result not found for this participant.'); return; }
+      const docSnap = await getDoc(resultRef);
+      if (!docSnap.exists()) { alert('VideoAsk data not found.'); return; }
+      const downloadURL = (docSnap.data() as any)['fileurl'];
+      if (!downloadURL) { alert('VideoAsk URL not available.'); return; }
+      participant.vaUrl = downloadURL;
+      participant.vaPlaying = true;
+    } catch (error) {
+      console.error('Error loading VideoAsk video:', error);
+      alert('Failed to load the video. Please try again.');
+    } finally {
+      participant.vaLoading = false;
+    }
+  }
+
+  stopVideoAsk(participant: any): void {
+    participant.vaPlaying = false;
+    participant.vaUrl = null;
+  }
+
+  /**
+   * Exports every form's submissions to one Excel workbook — a sheet per form,
+   * rows of Name | Question | Answer. The submission docs in formsByClient carry
+   * both fieldname and value, so no template fetch is needed, and every doc is
+   * fetched in parallel (the old serial per-participant awaits made this crawl).
+   */
+  async exportFormsToExcel(): Promise<void> {
+    if (this.isExportingForms) return;
+    if (!this.challengeForms || this.challengeForms.length === 0) {
+      alert('No forms to export.'); return;
+    }
+    if (!window.confirm('Export all form submissions as an Excel file?')) return;
+
+    this.isExportingForms = true;
+    try {
+      const formatAnswer = (raw: any): string =>
+        raw === null || raw === undefined ? ''
+          : Array.isArray(raw) ? raw.map(v => typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)).join(', ')
+          : typeof raw === 'object' ? JSON.stringify(raw)
+          : String(raw);
+
+      // All submission docs of all forms are fetched concurrently.
+      const formResults = await Promise.all(this.challengeForms.map(async (form: any) => {
+        const entries = (form.participants as any[])
+          .map(participant => {
+            const subChallenge = this.participantProgressList
+              .find(p => p.profileid === participant.profileid)
+              ?.challenges?.[form.challengeIndex]?.challenges?.[form.subChallengeIndex];
+            return subChallenge?.result?.id
+              ? { name: participant.name, docid: subChallenge.result.id }
+              : null;
+          })
+          .filter(Boolean) as { name: string; docid: string }[];
+        if (entries.length === 0) return { title: form.title, rows: [] };
+
+        const snaps = await Promise.all(
+          entries.map(e => getDoc(doc(this.firestoreForms, 'formsByClient', e.docid)))
+        );
+
+        // Header row = Name + the shared question list; one row per participant
+        // with their name in column A and answers under each question.
+        const questions: string[] = [];
+        const submissions: { name: string; byQuestion: Map<string, string>; ordered: string[] }[] = [];
+        snaps.forEach((snap, i) => {
+          if (!snap.exists()) return;
+          const byQuestion = new Map<string, string>();
+          const ordered: string[] = [];
+          ((snap.data() as any)['formarray'] || []).forEach((field: any) => {
+            if (['label', 'video', 'audio'].includes(field.type)) return;
+            const question = field.fieldname || '';
+            const answer = formatAnswer(field.value);
+            if (question && questions.indexOf(question) === -1 && submissions.length === 0) questions.push(question);
+            byQuestion.set(question, answer);
+            ordered.push(answer);
+          });
+          submissions.push({ name: entries[i].name, byQuestion, ordered });
+        });
+        if (submissions.length === 0 || questions.length === 0) return { title: form.title, aoa: [] as string[][] };
+
+        const aoa: string[][] = [['Name', ...questions]];
+        submissions.forEach(s => {
+          aoa.push([
+            s.name,
+            ...questions.map((question, qi) => s.byQuestion.get(question) ?? s.ordered[qi] ?? '')
+          ]);
+        });
+        return { title: form.title, aoa };
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const usedNames = new Set<string>();
+      let sheetsAdded = 0;
+      for (const result of formResults) {
+        if (result.aoa.length === 0) continue;
+        const ws = XLSX.utils.aoa_to_sheet(result.aoa);
+        ws['!cols'] = [{ wch: 25 }, ...result.aoa[0].slice(1).map(() => ({ wch: 40 }))];
+        const sheetName = (result.title || 'Form').replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 28) || 'Form';
+        let unique = sheetName;
+        let suffix = 2;
+        while (usedNames.has(unique)) unique = `${sheetName} ${suffix++}`.slice(0, 31);
+        usedNames.add(unique);
+        XLSX.utils.book_append_sheet(wb, ws, unique);
+        sheetsAdded++;
+      }
+
+      if (sheetsAdded === 0) {
+        alert('No form submissions found to export.'); return;
+      }
+      const fileName = `workshop-forms-${this.workshopTitle || 'workshop'}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error exporting forms:', error);
+      alert('Failed to export forms. Please try again.');
+    } finally {
+      this.isExportingForms = false;
+    }
   }
 }

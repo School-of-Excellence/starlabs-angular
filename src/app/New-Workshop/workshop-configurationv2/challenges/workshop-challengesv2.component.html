@@ -1,0 +1,672 @@
+<!-- ═══════════════ shared inline icons ═══════════════ -->
+<ng-template #icChevDown><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></ng-template>
+<ng-template #icChevRight><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></ng-template>
+<ng-template #icTrash><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></ng-template>
+<ng-template #icPlus><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></ng-template>
+<ng-template #icUpload><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg></ng-template>
+<ng-template #icCal><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg></ng-template>
+<ng-template #icClock><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></ng-template>
+<ng-template #icX><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></ng-template>
+<ng-template #icGrip><svg class="i" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></svg></ng-template>
+<ng-template #icImage><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-8 8"></path></svg></ng-template>
+<ng-template #icSearch><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg></ng-template>
+<ng-template #icAlert><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg></ng-template>
+<ng-template #icCheck><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></ng-template>
+<ng-template #icLock><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg></ng-template>
+<ng-template #icExt><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"></path><path d="M20 14v6H4V4h6"></path></svg></ng-template>
+
+<!-- ═══════════════ generic reference picker (single select, searchable) ═══════════════ -->
+<ng-template #refPicker let-control="control" let-pid="pid" let-items="items" let-placeholder="placeholder">
+  <div class="pop-anchor" data-pop>
+    <button type="button" class="input pick" (click)="togglePopover(pid)">
+      <span class="txt" [class.ph]="!control?.value">{{ control?.value ? refLabel(control.value) : placeholder }}</span>
+      <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+    </button>
+    <div class="pop" *ngIf="openPopover === pid">
+      <div class="input sm">
+        <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+        <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search…">
+      </div>
+      <div class="pop-list">
+        <button type="button" class="pop-row" *ngFor="let it of items" [class.sel]="sameRef(control?.value, it.ref)" (click)="pickRef(control, it.ref)">
+          <span class="box"><ng-container *ngIf="sameRef(control?.value, it.ref)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+          <span class="n">{{ refLabel(it.ref) }}</span>
+        </button>
+        <div class="help pad" *ngIf="!items?.length">Nothing matches.</div>
+      </div>
+      <div class="hrow between" *ngIf="control?.value">
+        <span class="help">Selected: {{ refLabel(control.value) }}</span>
+        <button type="button" class="link" (click)="pickRef(control, null)">Clear</button>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<!-- ═══════════════ image pickers (set icon / activity thumbnail) ═══════════════ -->
+<ng-template #imagePicker let-control="control" let-pid="pid" let-items="items" let-placeholder="placeholder" let-kind="kind">
+  <div class="pop-anchor" data-pop>
+    <button type="button" class="input pick" (click)="togglePopover(pid)">
+      <span class="thumb xs" [class.wide]="kind === 'thumb'">
+        <img *ngIf="control?.value" [src]="control.value" alt="">
+        <ng-container *ngIf="!control?.value" [ngTemplateOutlet]="icImage"></ng-container>
+      </span>
+      <span class="txt" [class.ph]="!control?.value">{{ control?.value ? (kind === 'thumb' ? thumbName(control.value) : iconName(control.value)) : placeholder }}</span>
+      <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+    </button>
+    <div class="pop" *ngIf="openPopover === pid">
+      <div class="input sm">
+        <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+        <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" [placeholder]="kind === 'thumb' ? 'Search thumbnails…' : 'Search icons…'">
+      </div>
+      <div class="grid-icons" [class.thumbs]="kind === 'thumb'" *ngIf="items?.length; else noImages">
+        <button type="button" class="ic" *ngFor="let im of items" [class.sel]="im.imageUrl === control?.value" [title]="im.description" (click)="pickRef(control, im.imageUrl)">
+          <img [src]="im.imageUrl" alt="">
+        </button>
+      </div>
+      <ng-template #noImages><div class="help pad">Nothing matches.</div></ng-template>
+      <div class="hrow between">
+        <span class="help">Selected: {{ control?.value ? (kind === 'thumb' ? thumbName(control.value) : iconName(control.value)) : 'none' }}</span>
+        <button type="button" class="link" *ngIf="control?.value" (click)="pickRef(control, '')">Clear</button>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<div class="layout">
+
+  <!-- ═══════════════ curriculum rail ═══════════════ -->
+  <aside class="card rail">
+    <div class="rail-label">Curriculum</div>
+    <button type="button" class="rail-item" *ngFor="let set of challengesArray.controls; let i = index; trackBy: trackBySet"
+      [class.on]="activeSetId === setId(set)" [class.attn]="setHasUntyped(set)" (click)="jumpToSet(set)">
+      <span class="num">{{ i + 1 }}</span>
+      <span class="n">{{ setTitle(set, i) }}</span>
+      <span class="c" *ngIf="set.get('type')?.value !== 'zoomcall'">{{ getChallengeArray(set).length }}</span>
+      <span class="z" *ngIf="set.get('type')?.value === 'zoomcall'" title="Zoom call"></span>
+    </button>
+    <div class="help pad" *ngIf="!challengesArray.length">No sets yet.</div>
+    <div class="rail-add"><button type="button" class="btn btn-sm" [disabled]="!hasInitializedForm" (click)="addCurriculum()"><ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add set</span></button></div>
+    <div class="rail-stats">
+      <div class="help">{{ totals.sets }} {{ totals.sets === 1 ? 'set' : 'sets' }} · {{ totals.activities }} {{ totals.activities === 1 ? 'activity' : 'activities' }} · {{ totals.calls }} {{ totals.calls === 1 ? 'call' : 'calls' }}</div>
+      <div class="help">Evolution mapping: before {{ evolutionSlots.before ? '✓' : '–' }} · after {{ evolutionSlots.after ? '✓' : '–' }}</div>
+    </div>
+    <div class="rail-meter">
+      <div class="label"><span class="meter-label">Document size</span><span class="counter">{{ documentsize }}</span></div>
+      <div class="meter"><div [style.width.%]="docPercent"></div></div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════ main column ═══════════════ -->
+  <main class="main">
+
+    <div class="banner" *ngIf="isActive">
+      <ng-container [ngTemplateOutlet]="icLock"></ng-container>
+      <span>Workshop is <strong>active</strong>: set order, activity order and unlock dates are locked. Turn Active off in Settings to change them.</span>
+    </div>
+
+    <form [formGroup]="challengesPageForm" novalidate class="main-form">
+      <div class="sets" formArrayName="challenges" cdkDropList (cdkDropListDropped)="dropChallengeOuter($event)">
+
+        <section class="card set" *ngFor="let set of challengesArray.controls; let i = index; trackBy: trackBySet"
+          [formGroupName]="i" [id]="'set-' + setId(set)" cdkDrag [cdkDragDisabled]="isActive" [class.open]="isSetOpen(set)">
+          <div class="drop-line" *cdkDragPlaceholder></div>
+
+          <!-- ── set header ── -->
+          <div class="sec-head" [class.closed]="!isSetOpen(set)" (click)="toggleSet(set)">
+            <span class="drag" [class.locked]="isActive" cdkDragHandle (click)="$event.stopPropagation()" [title]="isActive ? 'Locked while active' : 'Drag to reorder'"><ng-container [ngTemplateOutlet]="icGrip"></ng-container></span>
+            <span class="chev"><ng-container [ngTemplateOutlet]="isSetOpen(set) ? icChevDown : icChevRight"></ng-container></span>
+            <span class="set-num">{{ i + 1 }}</span>
+            <span class="thumb xs">
+              <img *ngIf="set.get('headicon')?.value" [src]="set.get('headicon')?.value" alt="">
+              <ng-container *ngIf="!set.get('headicon')?.value" [ngTemplateOutlet]="icImage"></ng-container>
+            </span>
+            <span class="set-title">{{ setTitle(set, i) }}<span class="subh" *ngIf="set.get('subheading')?.value"> · {{ set.get('subheading')?.value }}</span></span>
+            <span class="badge b-activity" *ngIf="set.get('type')?.value === 'challenge'">Activity</span>
+            <span class="badge b-zoom" *ngIf="set.get('type')?.value === 'zoomcall'">Zoom call</span>
+            <span class="badge b-err" *ngIf="!set.get('type')?.value">No type</span>
+            <span class="badge b-muted" *ngIf="set.get('facilitatoronly')?.value">Facilitators only</span>
+            <span class="badge b-done" *ngIf="set.get('type')?.value === 'zoomcall' && set.get('status')?.value === 'completed'">Completed</span>
+            <span class="dot-err" *ngIf="setHasUntyped(set)" title="An activity has no type"></span>
+            <span class="grow"></span>
+            <span class="meta"><ng-container *ngFor="let m of setMeta(set); let k = index"><span class="d" *ngIf="k">·</span><span>{{ m }}</span></ng-container></span>
+            <button type="button" class="icon-btn" (click)="$event.stopPropagation(); removeCurriculum(i)" title="Delete set"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+          </div>
+
+          <!-- ── set body ── -->
+          <div class="sec-body" *ngIf="isSetOpen(set)">
+            <div class="sub-title">Set details</div>
+            <div class="grid3">
+              <div class="field">
+                <div class="label"><span>Set type</span></div>
+                <div class="seg">
+                  <button type="button" [class.on]="set.get('type')?.value === 'challenge'" (click)="setSetType(set, 'challenge')">Activity</button>
+                  <button type="button" [class.on]="set.get('type')?.value === 'zoomcall'" (click)="setSetType(set, 'zoomcall')">Zoom call</button>
+                </div>
+              </div>
+              <div class="field">
+                <div class="label"><span>Icon</span></div>
+                <ng-container [ngTemplateOutlet]="imagePicker" [ngTemplateOutletContext]="{ control: set.get('headicon'), pid: 'icon:' + setId(set), items: filteredIcons, placeholder: 'Choose icon', kind: 'icon' }"></ng-container>
+              </div>
+              <div class="field" *ngIf="set.get('type')?.value !== 'zoomcall'">
+                <div class="label"><span>Unlocks on</span><span class="lock" *ngIf="isActive"><ng-container [ngTemplateOutlet]="icLock"></ng-container>Locked</span></div>
+                <div class="win" *ngIf="!isActive; else lockedUnlock">
+                  <div class="input date">
+                    <button type="button" class="prefix" (click)="sdp.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                    <input class="txt" [matDatepicker]="sdp" formControlName="startdate" placeholder="Date">
+                    <mat-datepicker #sdp></mat-datepicker>
+                  </div>
+                  <div class="input time">
+                    <button type="button" class="prefix" (click)="stp.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                    <input class="txt" [matTimepicker]="stp" formControlName="starttime" placeholder="Time">
+                    <mat-timepicker #stp></mat-timepicker>
+                  </div>
+                </div>
+                <!-- Workshop Active: the two controls stay in the form (still saved) but are not editable -->
+                <ng-template #lockedUnlock>
+                  <div class="win">
+                    <div class="input date ro"><span class="prefix"><ng-container [ngTemplateOutlet]="icCal"></ng-container></span><span class="txt">{{ fmtDate(set.get('startdate')?.value) || '—' }}</span></div>
+                    <div class="input time ro"><span class="prefix"><ng-container [ngTemplateOutlet]="icClock"></ng-container></span><span class="txt">{{ fmtTime(set.get('starttime')?.value) || '—' }}</span></div>
+                  </div>
+                </ng-template>
+              </div>
+              <div class="field" *ngIf="set.get('type')?.value === 'zoomcall'">
+                <div class="label"><span>Audience</span></div>
+                <div class="input tog"><span class="tog-label">Facilitators only</span><button type="button" class="toggle" [class.on]="set.get('facilitatoronly')?.value" (click)="toggleBool(set.get('facilitatoronly'))" aria-label="Facilitators only"></button></div>
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <div class="label"><span>Heading</span></div>
+                <div class="input"><input class="txt" formControlName="heading" placeholder="Enter heading"></div>
+              </div>
+              <div class="field">
+                <div class="label"><span>Sub heading</span></div>
+                <div class="input"><input class="txt" formControlName="subheading" placeholder="Enter subheading"></div>
+              </div>
+            </div>
+
+            <!-- categories picker (shared markup for both set types) -->
+            <ng-template #categoriesField>
+              <div class="field pop-anchor" data-pop>
+                <div class="label"><span>Categories</span><span class="counter">{{ (set.get('workshopcategory')?.value?.length || 0) ? (set.get('workshopcategory')?.value?.length + ' selected · from Settings → Category based') : 'All' }}</span></div>
+                <ng-container *ngIf="uniqueWorkshopCategories.length; else noCats">
+                  <div class="input chips" (click)="togglePopover('cats:' + setId(set))">
+                    <span class="chip soft in" *ngFor="let cid of set.get('workshopcategory')?.value">
+                      {{ catName(cid) }}
+                      <button type="button" class="chip-x" (click)="$event.stopPropagation(); toggleCategory(set, cid)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                    </span>
+                    <span class="txt ph">Add category…</span>
+                    <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                  </div>
+                  <div class="pop" *ngIf="openPopover === 'cats:' + setId(set)">
+                    <div class="input sm">
+                      <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+                      <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search categories…">
+                    </div>
+                    <div class="pop-list">
+                      <button type="button" class="pop-row" *ngFor="let cid of filteredCategories" [class.sel]="isCategorySelected(set, cid)" (click)="toggleCategory(set, cid)">
+                        <span class="box"><ng-container *ngIf="isCategorySelected(set, cid)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                        <span class="n">{{ catName(cid) }}</span>
+                      </button>
+                      <div class="help pad" *ngIf="!filteredCategories.length">No categories match.</div>
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #noCats>
+                  <div class="input ro"><span class="txt ph">No categories saved for this workshop</span></div>
+                  <div class="help">Create and select categories in <span class="link-text">Settings → Category based</span> first.</div>
+                </ng-template>
+              </div>
+            </ng-template>
+
+            <ng-container *ngIf="set.get('type')?.value !== 'zoomcall'">
+              <div class="field">
+                <div class="label"><span>Description</span></div>
+                <div class="input"><input class="txt" formControlName="description" placeholder="Enter description"></div>
+              </div>
+              <div class="grid2">
+                <ng-container [ngTemplateOutlet]="categoriesField"></ng-container>
+                <div class="field">
+                  <div class="label"><span>Audience</span></div>
+                  <div class="input tog"><span class="tog-label">Facilitators only</span><button type="button" class="toggle" [class.on]="set.get('facilitatoronly')?.value" (click)="toggleBool(set.get('facilitatoronly'))" aria-label="Facilitators only"></button></div>
+                  <div class="help">Off: every participant sees this set.</div>
+                </div>
+              </div>
+
+              <!-- ── activities ── -->
+              <div class="hrow between acts-head">
+                <div class="sub-title">Activities <span class="count" [class.zero]="!getChallengeArray(set).length">{{ getChallengeArray(set).length }}</span></div>
+                <div class="pop-anchor" data-pop>
+                  <button type="button" class="btn btn-sm" (click)="getChallengeArray(set).length ? togglePopover('add:' + setId(set)) : addSubChallenge(set)">
+                    <ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add activity</span>
+                  </button>
+                  <div class="pop menu right" *ngIf="openPopover === 'add:' + setId(set)">
+                    <div class="pop-list">
+                      <div class="mi hd">Add activity…</div>
+                      <button type="button" class="pop-row sel" (click)="addSubChallenge(set)"><ng-container [ngTemplateOutlet]="icPlus"></ng-container><span class="n">At the end</span></button>
+                      <div class="mi hd">Insert after</div>
+                      <button type="button" class="pop-row" *ngFor="let a of getChallengeArray(set).controls; let j = index" (click)="addSubChallenge(set, j)">
+                        <span class="act-n">{{ j + 1 }}</span><span class="n">{{ a.get('name')?.value || 'Activity ' + (j + 1) }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="acts" formArrayName="challenges" cdkDropList (cdkDropListDropped)="dropChallenge(set, $event)">
+                <ng-container *ngFor="let act of getChallengeArray(set).controls; let j = index; trackBy: trackByAct">
+                  <div class="act" [formGroupName]="j" [attr.data-activity-id]="actId(act)" cdkDrag [cdkDragDisabled]="isActive" [class.open]="isActOpen(act)">
+                    <div class="drop-line" *cdkDragPlaceholder></div>
+                    <div class="act-head" (click)="toggleAct(act)">
+                      <span class="drag" [class.locked]="isActive" cdkDragHandle (click)="$event.stopPropagation()" [title]="isActive ? 'Locked while active' : 'Drag to reorder'"><ng-container [ngTemplateOutlet]="icGrip"></ng-container></span>
+                      <span class="chev"><ng-container [ngTemplateOutlet]="isActOpen(act) ? icChevDown : icChevRight"></ng-container></span>
+                      <span class="act-n">{{ j + 1 }}</span>
+                      <span class="act-name" [class.ph]="!act.get('name')?.value">{{ act.get('name')?.value || 'Untitled activity' }}</span>
+                      <span class="badge" [ngClass]="typeClass(act.get('type')?.value)" *ngIf="act.get('type')?.value">{{ typeLabel(act.get('type')?.value) }}</span>
+                      <span class="badge b-err" *ngIf="!act.get('type')?.value">No type</span>
+                      <span class="badge b-evolution" *ngIf="act.get('type')?.value === 'videoask' && act.get('finalevolution')?.value && act.get('finalevolutiontype')?.value">{{ act.get('finalevolutiontype')?.value === 'before' ? 'Before' : 'After' }}</span>
+                      <span class="grow"></span>
+                      <span class="meta" *ngIf="!isActOpen(act) && actMeta(act)"><span>{{ actMeta(act) }}</span></span>
+                      <button type="button" class="icon-btn" (click)="$event.stopPropagation(); removeSubChallenge(set, j)" title="Delete activity"><ng-container [ngTemplateOutlet]="icTrash"></ng-container></button>
+                    </div>
+
+                    <div class="act-body" *ngIf="isActOpen(act)">
+                      <div class="grid3">
+                        <div class="field">
+                          <div class="label"><span>Activity name</span></div>
+                          <div class="input"><input class="txt" formControlName="name" placeholder="Activity name"></div>
+                        </div>
+                        <div class="field pop-anchor" data-pop>
+                          <div class="label"><span>Activity type</span></div>
+                          <button type="button" class="input pick" (click)="togglePopover('type:' + actId(act))">
+                            <span class="badge" [ngClass]="typeClass(act.get('type')?.value)" *ngIf="act.get('type')?.value">{{ typeLabel(act.get('type')?.value) }}</span>
+                            <span class="txt" [class.ph]="!act.get('type')?.value">{{ act.get('type')?.value ? typeLabel(act.get('type')?.value) : 'Choose type…' }}</span>
+                            <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                          </button>
+                          <div class="pop menu" *ngIf="openPopover === 'type:' + actId(act)">
+                            <div class="pop-list">
+                              <button type="button" class="pop-row" *ngFor="let t of challengetype" [class.sel]="act.get('type')?.value === t" (click)="changeActivityType(act, t)">
+                                <span class="badge" [ngClass]="typeClass(t)">{{ typeLabel(t) }}</span>
+                              </button>
+                            </div>
+                          </div>
+                          <div class="help warn" *ngIf="act.get('type')?.value">Changing the type clears this activity's type fields.</div>
+                          <div class="err" *ngIf="!act.get('type')?.value"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Choose a type for this activity.</div>
+                        </div>
+                        <div class="field">
+                          <div class="label"><span>Description</span></div>
+                          <div class="input"><input class="txt" formControlName="description" placeholder="Activity description"></div>
+                        </div>
+                      </div>
+
+                      <!-- ── type fields ── -->
+                      <div class="type-box" *ngIf="act.get('type')?.value" [ngSwitch]="act.get('type')?.value" [class.legacy]="act.get('type')?.value === 'zoomcall'">
+                        <div class="tb-title"><span class="badge" [ngClass]="typeClass(act.get('type')?.value)">{{ typeLabel(act.get('type')?.value) }}</span> Type fields<ng-container *ngIf="act.get('type')?.value === 'zoomcall'"> · read-only legacy</ng-container></div>
+
+                        <!-- video -->
+                        <ng-container *ngSwitchCase="'video'">
+                          <div class="input tog"><span class="tog-label">Preview video</span><button type="button" class="toggle" [class.on]="act.get('previewvideo')?.value" (click)="toggleBool(act.get('previewvideo'))" aria-label="Preview video"></button></div>
+                          <div class="grid2">
+                            <div class="field">
+                              <div class="label"><span>Episode</span><span class="counter">from episodes</span></div>
+                              <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'ep:' + actId(act), items: filteredEpisodes, placeholder: 'Select an episode…' }"></ng-container>
+                            </div>
+                            <div class="field">
+                              <div class="label"><span>Thumbnail</span><span class="counter">workshop images · thumbnail</span></div>
+                              <ng-container [ngTemplateOutlet]="imagePicker" [ngTemplateOutletContext]="{ control: act.get('thumbnail'), pid: 'th:' + actId(act), items: filteredThumbs, placeholder: 'Choose a thumbnail…', kind: 'thumb' }"></ng-container>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <!-- audio -->
+                        <ng-container *ngSwitchCase="'audio'">
+                          <div class="grid2">
+                            <div class="field">
+                              <div class="label"><span>Solar Voice</span><span class="counter">from solar voice audios</span></div>
+                              <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'au:' + actId(act), items: filteredAudios, placeholder: 'Select a Solar Voice audio…' }"></ng-container>
+                            </div>
+                            <div class="field">
+                              <div class="label"><span>Thumbnail</span></div>
+                              <ng-container [ngTemplateOutlet]="imagePicker" [ngTemplateOutletContext]="{ control: act.get('thumbnail'), pid: 'th:' + actId(act), items: filteredThumbs, placeholder: 'Choose a thumbnail…', kind: 'thumb' }"></ng-container>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <!-- form -->
+                        <ng-container *ngSwitchCase="'form'">
+                          <div class="field">
+                            <div class="label"><span>Form</span><button type="button" class="link" (click)="open('form')">New form (builder)</button></div>
+                            <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'fm:' + actId(act), items: filteredForms, placeholder: 'Select a form…' }"></ng-container>
+                            <div class="help">delivery forms where formfor = workshop, by name.</div>
+                          </div>
+                        </ng-container>
+
+                        <!-- videoask -->
+                        <ng-container *ngSwitchCase="'videoask'">
+                          <div class="grid2">
+                            <div class="field">
+                              <div class="label"><span>VideoAsk template</span><button type="button" class="link" (click)="open('videoask')">New template ↗</button></div>
+                              <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'va:' + actId(act), items: filteredVideoAsk, placeholder: 'Select a VideoAsk template…' }"></ng-container>
+                            </div>
+                            <div class="field">
+                              <div class="label"><span>Final evolution mapping</span><span class="counter">{{ evolutionMappingCount }} of 2 used</span></div>
+                              <div class="hrow" style="gap:12px;">
+                                <div class="input tog auto">
+                                  <button type="button" class="toggle" [class.on]="act.get('finalevolution')?.value" [disabled]="!act.get('finalevolution')?.value && !canEnableEvolutionMapping(i, j)" (click)="toggleFinalEvolution(i, j, act)" aria-label="Final evolution mapping"></button>
+                                  <span class="tog-label light">{{ act.get('finalevolution')?.value ? 'Enabled' : 'Off' }}</span>
+                                </div>
+                                <div class="pop-anchor grow" data-pop *ngIf="act.get('finalevolution')?.value">
+                                  <button type="button" class="input pick" (click)="togglePopover('evo:' + actId(act))">
+                                    <span class="txt" [class.ph]="!act.get('finalevolutiontype')?.value">{{ act.get('finalevolutiontype')?.value === 'before' ? 'Before' : act.get('finalevolutiontype')?.value === 'after' ? 'After' : 'Choose before / after' }}</span>
+                                    <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                                  </button>
+                                  <div class="pop menu" *ngIf="openPopover === 'evo:' + actId(act)">
+                                    <div class="pop-list">
+                                      <button type="button" class="pop-row" *ngFor="let t of ['before', 'after']" [class.sel]="act.get('finalevolutiontype')?.value === t"
+                                        [disabled]="!getAvailableEvolutionTypes(i, j).includes(t)" (click)="setEvolutionType(t, i, j, act)">
+                                        <span class="box"><ng-container *ngIf="act.get('finalevolutiontype')?.value === t" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                                        <span class="n">{{ t === 'before' ? 'Before' : 'After' }}</span>
+                                        <span class="c" *ngIf="!getAvailableEvolutionTypes(i, j).includes(t)">used</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="help" *ngIf="act.get('finalevolution')?.value || canEnableEvolutionMapping(i, j)">{{ freeEvolutionSlotText() }} Each of before / after can be used once, on at most 2 VideoAsk activities.</div>
+                              <div class="help warn" *ngIf="!act.get('finalevolution')?.value && !canEnableEvolutionMapping(i, j)">Only 2 activities can have Final Evolution Mapping enabled.</div>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <!-- quiz -->
+                        <ng-container *ngSwitchCase="'quiz'">
+                          <div class="field pop-anchor" data-pop>
+                            <div class="label"><span>Quizzes</span><button type="button" class="link" (click)="open('quiz')">New quiz (dialog)</button></div>
+                            <div class="input chips" (click)="togglePopover('qz:' + actId(act))">
+                              <span class="chip soft in" *ngFor="let q of act.get('quizref')?.value; let k = index">
+                                {{ refLabel(q) || 'Quiz ' + (k + 1) }}
+                                <button type="button" class="chip-x" (click)="$event.stopPropagation(); removeQuizFromSelection(act, k)"><ng-container [ngTemplateOutlet]="icX"></ng-container></button>
+                              </span>
+                              <span class="txt ph">Add quiz…</span>
+                              <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                            </div>
+                            <div class="pop" *ngIf="openPopover === 'qz:' + actId(act)">
+                              <div class="input sm">
+                                <span class="caret"><ng-container [ngTemplateOutlet]="icSearch"></ng-container></span>
+                                <input class="txt" type="text" [(ngModel)]="popSearch" [ngModelOptions]="{standalone: true}" placeholder="Search quizzes…">
+                              </div>
+                              <div class="pop-list">
+                                <button type="button" class="pop-row" *ngFor="let q of filteredQuiz" [class.sel]="isQuizSelected(act, q.ref)" (click)="toggleQuiz(act, q.ref)">
+                                  <span class="box"><ng-container *ngIf="isQuizSelected(act, q.ref)" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                                  <span class="n">{{ refLabel(q.ref) }}</span>
+                                </button>
+                                <div class="help pad" *ngIf="!filteredQuiz.length">No quizzes match.</div>
+                              </div>
+                            </div>
+                            <div class="help">Multiple allowed; chips removable.</div>
+                          </div>
+                        </ng-container>
+
+                        <!-- assignment -->
+                        <ng-container *ngSwitchCase="'assignment'">
+                          <div class="input tog"><span class="tog-label">Review assignment</span><button type="button" class="toggle" [class.on]="act.get('reviewassignemnt')?.value" (click)="toggleBool(act.get('reviewassignemnt'))" aria-label="Review assignment"></button></div>
+                          <div class="field">
+                            <div class="label"><span>Assignment type</span></div>
+                            <div class="seg">
+                              <button type="button" [class.on]="act.get('assignmenttype')?.value === 'form'" (click)="setAssignmentType(act, 'form')">Form</button>
+                              <button type="button" [class.on]="act.get('assignmenttype')?.value === 'question'" (click)="setAssignmentType(act, 'question')">Question</button>
+                            </div>
+                          </div>
+                          <div class="field" *ngIf="act.get('assignmenttype')?.value === 'form'">
+                            <div class="label"><span>Form</span><button type="button" class="link" (click)="open('form')">New form (builder)</button></div>
+                            <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: act.get('contentref'), pid: 'af:' + actId(act), items: filteredForms, placeholder: 'Select a form…' }"></ng-container>
+                          </div>
+                          <ng-container *ngIf="act.get('assignmenttype')?.value === 'question'">
+                            <div class="grid2">
+                              <div class="field">
+                                <div class="label"><span>Topic</span></div>
+                                <div class="input"><input class="txt" formControlName="assignmenttopic" placeholder="Assignment topic"></div>
+                              </div>
+                              <div class="field">
+                                <div class="label"><span>Description</span></div>
+                                <div class="input"><input class="txt" formControlName="assignmentdescription" placeholder="Assignment description"></div>
+                              </div>
+                            </div>
+                            <div class="grid2">
+                              <div class="field">
+                                <div class="label"><span>Submission</span></div>
+                                <div class="seg">
+                                  <button type="button" [class.on]="act.get('submissionformat')?.value === 'upload'" (click)="setSubmissionFormat(act, 'upload')">Upload</button>
+                                  <button type="button" [class.on]="act.get('submissionformat')?.value === 'text'" (click)="setSubmissionFormat(act, 'text')">Text</button>
+                                </div>
+                              </div>
+                              <div class="field pop-anchor" data-pop *ngIf="act.get('submissionformat')?.value === 'upload'">
+                                <div class="label"><span>Upload type</span></div>
+                                <button type="button" class="input pick" (click)="togglePopover('ut:' + actId(act))">
+                                  <span class="txt" [class.ph]="!act.get('uploadtype')?.value">{{ act.get('uploadtype')?.value ? (act.get('uploadtype')?.value | uppercase) : 'Choose upload type' }}</span>
+                                  <span class="caret"><ng-container [ngTemplateOutlet]="icChevDown"></ng-container></span>
+                                </button>
+                                <div class="pop menu" *ngIf="openPopover === 'ut:' + actId(act)">
+                                  <div class="pop-list">
+                                    <button type="button" class="pop-row" *ngFor="let u of uploadTypes" [class.sel]="act.get('uploadtype')?.value === u" (click)="pickRef(act.get('uploadtype'), u)">
+                                      <span class="box"><ng-container *ngIf="act.get('uploadtype')?.value === u" [ngTemplateOutlet]="icCheck"></ng-container></span>
+                                      <span class="n">{{ u | uppercase }}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="field">
+                              <div class="label"><span>Rich description</span></div>
+                              <div class="rt">
+                                <ngx-editor-menu [editor]="getEditor(act, 'assignmentdescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
+                                <ngx-editor class="rt-md" [editor]="getEditor(act, 'assignmentdescriptionrich')" formControlName="assignmentdescriptionrich" [outputFormat]="'html'" placeholder="Optional longer brief…"></ngx-editor>
+                              </div>
+                            </div>
+                            <div class="help">Upload type: pdf · doc · image · video · audio · any.</div>
+                          </ng-container>
+                        </ng-container>
+
+                        <!-- resource -->
+                        <ng-container *ngSwitchCase="'resource'">
+                          <div class="hrow">
+                            <button type="button" class="btn btn-sm" (click)="uploadResource(act)"><ng-container [ngTemplateOutlet]="icUpload"></ng-container><span>Upload file</span></button>
+                            <span class="help">to workshop/resource/</span>
+                          </div>
+                          <div class="grid2">
+                            <div class="field">
+                              <div class="label"><span>Resource title</span></div>
+                              <div class="input"><input class="txt" formControlName="uploadedresourcetitle" placeholder="Resource title"></div>
+                            </div>
+                            <div class="field">
+                              <div class="label"><span>Resource URL</span><button type="button" class="link" *ngIf="act.get('uploadedresource')?.value" (click)="openResourceLink(act.get('uploadedresource')?.value)">Open ↗</button></div>
+                              <div class="input ro"><input class="txt mono" formControlName="uploadedresource" readonly placeholder="Filled by the upload"></div>
+                              <div class="help">Read-only, filled by the upload.</div>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <!-- offer -->
+                        <ng-container *ngSwitchCase="'offer'">
+                          <div class="grid3">
+                            <div class="field"><div class="label"><span>Reward head</span></div><div class="input"><input class="txt" formControlName="rewardhead" placeholder="Reward head"></div></div>
+                            <div class="field"><div class="label"><span>Reward description</span></div><div class="input"><input class="txt" formControlName="rewarddescription" placeholder="Reward description"></div></div>
+                            <div class="field"><div class="label"><span>Reward link</span></div><div class="input"><input class="txt mono" formControlName="rewardlink" placeholder="https://…"></div></div>
+                          </div>
+                        </ng-container>
+
+                        <!-- note -->
+                        <ng-container *ngSwitchCase="'note'">
+                          <div class="grid2">
+                            <div class="field"><div class="label"><span>Note head</span></div><div class="input"><input class="txt" formControlName="notehead" placeholder="Note head"></div></div>
+                            <div class="field"><div class="label"><span>Note description</span></div><div class="input"><input class="txt" formControlName="notedescription" placeholder="Note description"></div></div>
+                          </div>
+                          <div class="field">
+                            <div class="label"><span>Note (rich)</span></div>
+                            <div class="rt">
+                              <ngx-editor-menu [editor]="getEditor(act, 'notedescriptionrich')" [toolbar]="toolbarFull"></ngx-editor-menu>
+                              <ngx-editor class="rt-md" [editor]="getEditor(act, 'notedescriptionrich')" formControlName="notedescriptionrich" [outputFormat]="'html'" placeholder="Formatted note shown in the app…"></ngx-editor>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <!-- evolution mapping -->
+                        <ng-container *ngSwitchCase="'evolutionmapping'">
+                          <div class="grid2">
+                            <div class="field"><div class="label"><span>Title</span></div><div class="input"><input class="txt" formControlName="evolutionmappingtitle" placeholder="Evolution mapping title"></div></div>
+                            <div class="field"><div class="label"><span>Description</span></div><div class="input"><input class="txt" formControlName="evolutionmappingdescription" placeholder="Evolution mapping description"></div></div>
+                          </div>
+                          <div class="input tog"><span class="tog-label">Final before / after</span><button type="button" class="toggle" [class.on]="act.get('finalbeforeafter')?.value" [disabled]="!act.get('finalbeforeafter')?.value && !canEnableFinalBeforeAfter()" (click)="toggleFinalBeforeAfter(act)" aria-label="Final before / after"></button></div>
+                          <div class="help" *ngIf="canEnableFinalBeforeAfter()">A "before" and an "after" VideoAsk activity exist, so this can be enabled.</div>
+                          <div class="help warn" *ngIf="!canEnableFinalBeforeAfter()">Both 'before' and 'after' types must be selected in VideoAsk activities first.</div>
+                        </ng-container>
+
+                        <!-- retired zoom-call activity: read-only legacy -->
+                        <ng-container *ngSwitchCase="'zoomcall'">
+                          <div class="grid2">
+                            <div class="field"><div class="label"><span>Zoom link</span></div><div class="input ro"><input class="txt mono" formControlName="zoomlinkchallenge" readonly></div></div>
+                            <div class="field"><div class="label"><span>Meet date</span></div><div class="input ro"><span class="txt">{{ fmtDateTime(act.get('meetdate')?.value, act.get('meetdate')?.value) || '—' }}</span></div></div>
+                          </div>
+                          <div class="help warn">Retired type: not offered in the Type menu, but old data still renders so nothing is lost.</div>
+                        </ng-container>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- insert-between affordance -->
+                  <div class="insert" *ngIf="j < getChallengeArray(set).length - 1">
+                    <button type="button" class="plus" (click)="addSubChallenge(set, j)"><ng-container [ngTemplateOutlet]="icPlus"></ng-container>Insert activity here</button>
+                  </div>
+                </ng-container>
+                <div class="help" *ngIf="!getChallengeArray(set).length">No activities yet. Add the first one.</div>
+              </div>
+            </ng-container>
+
+            <!-- ── zoom call set ── -->
+            <ng-container *ngIf="set.get('type')?.value === 'zoomcall'">
+              <div class="grid2">
+                <div class="field">
+                  <div class="label"><span>Description</span></div>
+                  <div class="input"><input class="txt" formControlName="description" placeholder="Enter description"></div>
+                </div>
+                <ng-container [ngTemplateOutlet]="categoriesField"></ng-container>
+              </div>
+              <div class="sub-title">Call</div>
+              <div class="grid3">
+                <div class="field">
+                  <div class="label"><span>Call starts</span></div>
+                  <div class="win">
+                    <div class="input date">
+                      <button type="button" class="prefix" (click)="ddp.open()"><ng-container [ngTemplateOutlet]="icCal"></ng-container></button>
+                      <input class="txt" [matDatepicker]="ddp" formControlName="duedate" placeholder="Date">
+                      <mat-datepicker #ddp></mat-datepicker>
+                    </div>
+                    <div class="input time">
+                      <button type="button" class="prefix" (click)="dtp.open()"><ng-container [ngTemplateOutlet]="icClock"></ng-container></button>
+                      <input class="txt" [matTimepicker]="dtp" formControlName="duetime" placeholder="Time">
+                      <mat-timepicker #dtp></mat-timepicker>
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Live call starts text</span></div>
+                  <div class="input"><input class="txt" formControlName="startlivecall" placeholder="Shown before the call starts"></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Zoom link</span></div>
+                  <div class="input"><input class="txt mono" formControlName="zoomlink" placeholder="Enter zoom meeting link"></div>
+                </div>
+              </div>
+              <div class="grid3">
+                <div class="field">
+                  <div class="label"><span>Recording</span><button type="button" class="link" (click)="openUploadDialog()">Upload recording</button></div>
+                  <ng-container [ngTemplateOutlet]="refPicker" [ngTemplateOutletContext]="{ control: set.get('zoomvideoref'), pid: 'rec:' + setId(set), items: filteredEpisodes, placeholder: 'Select an uploaded episode…' }"></ng-container>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Completed Zoom URL</span></div>
+                  <div class="input"><input class="txt mono" formControlName="completedzoomurl" placeholder="Paste the recording URL"></div>
+                </div>
+                <div class="field">
+                  <div class="label"><span>Status</span></div>
+                  <div class="hrow" style="gap:8px;">
+                    <div class="input tog grow"><span class="tog-label light">Completed</span><button type="button" class="toggle" [class.on]="set.get('status')?.value === 'completed'" (click)="setCompleted(set, set.get('status')?.value !== 'completed')" aria-label="Completed"></button></div>
+                    <div class="input tog grow"><span class="tog-label light">Hide call</span><button type="button" class="toggle" [class.on]="set.get('hidezoom')?.value === true" (click)="toggleBool(set.get('hidezoom'))" aria-label="Hide call"></button></div>
+                  </div>
+                  <div class="help">Completed writes status: completed; off removes the field on save.</div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </section>
+      </div>
+
+      <!-- empty curriculum -->
+      <div class="card empty" *ngIf="!challengesArray.length">
+        <div class="empty-title">No sets yet</div>
+        <div class="help">A set is a day of activities or a live Zoom call. Add the first one to start the curriculum.</div>
+        <button type="button" class="btn btn-primary" [disabled]="!hasInitializedForm" (click)="addCurriculum()"><ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add set</span></button>
+      </div>
+      <div class="hrow center" *ngIf="challengesArray.length">
+        <button type="button" class="btn" [disabled]="!hasInitializedForm" (click)="addCurriculum()"><ng-container [ngTemplateOutlet]="icPlus"></ng-container><span>Add set</span></button>
+      </div>
+    </form>
+
+    <!-- ═══════════════ sticky save bar ═══════════════ -->
+    <div class="savebar" *ngIf="hasInitializedForm" [class.ok]="saveState === 'saved'" [class.bad]="saveState === 'error'">
+      <ng-container [ngSwitch]="saveState">
+        <ng-container *ngSwitchCase="'idle'">
+          <span class="pill pill-mute">No changes</span>
+          <span class="help warn" *ngIf="untypedWarning">{{ untypedWarning }}</span>
+          <span class="grow"></span>
+          <button type="button" class="btn btn-primary" disabled>Save Challenges</button>
+        </ng-container>
+        <ng-container *ngSwitchCase="'dirty'">
+          <span class="pill pill-warn"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Unsaved changes</span>
+          <span class="help edited">{{ editedSetsText }}</span>
+          <span class="help warn" *ngIf="untypedWarning">{{ untypedWarning }}</span>
+          <span class="grow"></span>
+          <span class="help">Saves the whole curriculum. Enrollment and Settings save separately.</span>
+          <button type="button" class="btn btn-ghost" (click)="discardChanges()">Discard</button>
+          <button type="button" class="btn btn-primary" (click)="saveChallengesPage()">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"></path><path d="M8 3v5h7V3M8 21v-7h8v7"></path></svg>
+            <span>Save Challenges</span>
+          </button>
+        </ng-container>
+        <ng-container *ngSwitchCase="'saving'">
+          <span class="pill pill-warn">Saving…</span>
+          <span class="grow"></span>
+          <button type="button" class="btn btn-primary" disabled style="opacity:.8;"><span class="spin"></span>Saving</button>
+        </ng-container>
+        <ng-container *ngSwitchCase="'blocked'">
+          <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>{{ blockedReason }}</span>
+          <span class="grow"></span>
+          <button type="button" class="btn btn-ghost" *ngIf="hasUnsavedChanges()" (click)="discardChanges()">Discard</button>
+          <button type="button" class="btn btn-primary" disabled>Save Challenges</button>
+        </ng-container>
+        <ng-container *ngSwitchCase="'saved'">
+          <span class="pill pill-ok"><ng-container [ngTemplateOutlet]="icCheck"></ng-container>Saved just now</span>
+          <span class="grow"></span>
+          <button type="button" class="btn btn-primary" disabled>Save Challenges</button>
+        </ng-container>
+        <ng-container *ngSwitchCase="'error'">
+          <span class="pill pill-err"><ng-container [ngTemplateOutlet]="icAlert"></ng-container>Could not save</span>
+          <span class="help">Check your connection and try again.</span>
+          <span class="grow"></span>
+          <button type="button" class="btn btn-primary" (click)="saveChallengesPage()">Retry</button>
+        </ng-container>
+      </ng-container>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════ confirm dialog (delete set / activity, type change) ═══════════════ -->
+<div class="overlay" *ngIf="confirmDialog">
+  <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dlg-title">{{ confirmDialog.title }}</div>
+    <div class="dlg-text">{{ confirmDialog.body }}<strong *ngIf="confirmDialog.bodyStrong">{{ confirmDialog.bodyStrong }}</strong>{{ confirmDialog.bodyTail || '' }}</div>
+    <div class="hrow end" style="gap:8px;margin-top:4px;">
+      <button type="button" class="btn" (click)="answerConfirm(false)">{{ confirmDialog.cancelLabel }}</button>
+      <button type="button" class="btn" [class.btn-danger]="confirmDialog.danger" [class.btn-primary]="!confirmDialog.danger" (click)="answerConfirm(true)">{{ confirmDialog.confirmLabel }}</button>
+    </div>
+  </div>
+</div>
