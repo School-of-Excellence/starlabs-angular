@@ -44,7 +44,9 @@ URL: http://localhost:4201/journey-coach-health
 ## Proof
 - Spec path: src/app/Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.contract.spec.ts  (Karma — logic invariants: isOnboardingAppt disjoint/legacy, openAhDrill signal-not-dialog, pickAhDrill, onCoachChange guard)
 - Spec path: qa/checks/jc-health-contract.mjs  (Node — template/structural invariants: one-way binding, onboardingcall discriminator, native overlay, no dialog component)
-- Command: npx ng test --ts-config tsconfig.spec.jc.json --watch=false --browsers=ChromeHeadless
+- Command: npx ng test --include "src/app/Journey Onboarding/journey-coach-health-dashboard/*.spec.ts" --ts-config tsconfig.spec.jc.json --watch=false --browsers=ChromeHeadless
 - Command: node qa/checks/jc-health-contract.mjs
 - Fail if reverted: yes
-- Last run: PASS (Karma) | PASS (Node) — 2026-09-23
+- Last run: PASS (Karma, 45/45) | PASS (Node) — 2026-09-24
+- Note: --ts-config ALONE does not scope the karma run (the builder globs every *.spec.ts);
+  --include scopes what runs, --ts-config scopes the TS program. Both are required.
