@@ -37,6 +37,8 @@ import { UpdateDeliveryComponent } from '../../Product Designer/delivery-set/upd
 import { QuizComponent } from '../quiz/quiz.component';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import { AuthguardService } from '../../authguard.service';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import { canEditWorkshops as canEditWorkshopsRule } from '../workshop-access/workshop-access.model';
 import { WorkshopCategoryComponent } from '../workshop-category/workshop-category.component';
 import { UploadEpisodeDialogComponent } from '../../content/episodes-dashboard/upload-episode-dialog/upload-episode-dialog.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
@@ -386,7 +388,7 @@ export class WorkshopConfigurationComponent implements OnInit, OnDestroy {
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private guard: AuthguardService,
-  
+    private accessService: WorkshopAccessService,
   ) {
     // this.getWorkshopCategories()
     this.getbigCohorts()
@@ -675,7 +677,24 @@ onTemplateFilterChange(selectedIds: string[]): void {
     this.testimonialData = [];
   }
 }
+/** Set when the signed-in person may not edit workshops. Same gate as the v2 editor. */
+editBlocked = false;
+
 async ngOnInit() {
+  // Editing is granted in a workshop's Dashboard Access settings. This older
+  // editor is reachable on its own URL, so it has to ask the same question.
+  try {
+    const [profileId, lists] = await Promise.all([
+      this.accessService.currentProfileId(),
+      this.accessService.getAdminLists(),
+    ]);
+    this.editBlocked = !canEditWorkshopsRule(profileId, lists);
+  } catch (error) {
+    console.error('Error checking workshop edit access:', error);
+    this.editBlocked = true;
+  }
+  if (this.editBlocked) return;
+
   try {
     const uid = await firstValueFrom(this.guard.uid$.pipe(filter((v): v is string => !!v), take(1)));
     if (uid) {

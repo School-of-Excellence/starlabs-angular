@@ -1106,3 +1106,8 @@ mat-divider { margin: 8px 0 !important; }
 .de-toggle-text { display: flex; flex-direction: column; }
 .de-toggle-title { font-weight: 600; color: #374151; font-size: 0.9rem; }
 .de-toggle-desc { color: #6b7280; font-size: 0.78rem; margin-top: 2px; }
+
+/* Shown instead of the editor when the signed-in person may not edit workshops. */
+.wc-blocked { max-width: 520px; margin: 64px auto; padding: 32px; border: 1px solid #e3e8ef; border-radius: 14px; background: #fff; text-align: center; }
+.wc-blocked h1 { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #1a2535; }
+.wc-blocked p { margin: 0; font-size: 13.5px; color: #6b7280; line-height: 1.6; }
