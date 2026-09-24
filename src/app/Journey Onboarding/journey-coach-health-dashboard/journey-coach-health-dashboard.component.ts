@@ -91,6 +91,7 @@ interface PortfolioRow {
   priority: number;
   priorityBand: 'High' | 'Medium' | 'Low';
   reason: string;
+  naReasons?: string[];
   pjpIds: string[];              // journey-product doc ids for this participant (for assignment writes)
   recentEventRequest: { eventName: string; date: Date | null; status: string } | null;
   // Coach-set Health State (manual coach assessment, separate from customerstatus)
@@ -1841,6 +1842,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     r.priority = Math.max(0, Math.min(100, Math.round(p)));
     r.priorityBand = r.priority >= 40 ? 'High' : r.priority >= 22 ? 'Medium' : 'Low';
     r.reason = drivers.length ? `${drivers.slice(0, 2).join(' + ')} → ${this.actionFor(r)}` : 'On track';
+    r.naReasons = this.naReasonsFor(r);
   }
 
   /** Phase-2 (gated): compute the Health state from whatever signals exist today. Sparse until
@@ -2302,6 +2304,21 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   private isGoingQuietBucketLite(l: LiteIndexRow): boolean {
     return l.goingQuiet && !this.isNeedsAttentionLite(l);
+  }
+  /** Human-readable needs-attention conditions for a row — the SAME triggers as isNeedsAttention(),
+   *  mapped to labels so the UI shows WHY a participant needs attention (doc item 4).
+   *  Going-quiet & renewals are deliberately NOT here (they keep their own tiles). */
+  private naReasonsFor(r: PortfolioRow): string[] {
+    const out: string[] = [];
+    if (r.lapsed) out.push('Lapsed');
+    if (r.notStarted) out.push('Journey not started');
+    if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
+    const fin = (r.financialstatus ?? '').toLowerCase();
+    if (fin === 'locked') out.push('Payments locked');
+    else if (fin === 'defaulted') out.push('Payments defaulted');
+    if (r.llCritical) out.push('Critical');
+    if (r.llAttention) out.push('Needs Attention');
+    return out;
   }
   private isNeedsAttention(r: PortfolioRow): boolean {
     return r.lapsed || r.notStarted || r.openTickets > 0

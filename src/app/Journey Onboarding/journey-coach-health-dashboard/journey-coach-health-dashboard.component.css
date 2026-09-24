@@ -3251,3 +3251,24 @@ td.mat-mdc-cell span {
 .jchd-theme-toggle:hover { background: var(--tile-hover); color: var(--ink); }
 .jchd-theme-toggle:active { transform: scale(0.94); }
 .jchd-theme-toggle mat-icon { font-size: var(--fs-600); width: 19px; height: 19px; line-height: 19px; }
+
+
+/* ---- Needs-attention reason chips (ported from joshua-development: c425ef7f). ---- */
+.na-why {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.na-chip {
+  font-size: var(--fs-100);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  background: var(--tile);
+  border: 1px solid var(--hairline);
+  white-space: nowrap;
+}

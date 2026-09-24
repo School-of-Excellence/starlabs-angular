@@ -118,7 +118,7 @@
           <div class="ios2-people" *ngIf="needsAttentionRows().length; else naEmpty">
             <span class="ios2-person" *ngFor="let r of needsAttentionRows() | slice:0:3">
               <span class="ios-avatar av-xs" [ngClass]="avatarClass(r.profileid)">{{ initials(r.name) }}</span>
-              <span class="ios2-pmeta"><span class="ios2-nm">{{ r.name }}</span><span class="ios2-reason">{{ r.reason }}</span></span>
+              <span class="ios2-pmeta"><span class="ios2-nm">{{ r.name }}</span><span class="ios2-reason">{{ (r.naReasons && r.naReasons.length) ? r.naReasons.join(' · ') : r.reason }}</span></span>
               <span class="ios-pill" [ngClass]="bandClass(r.priorityBand)">{{ r.priorityBand }}</span>
             </span>
           </div>
@@ -732,6 +732,9 @@
               <span class="dot" [ngClass]="prioClass(r.priorityBand)"></span>
               <span class="plabel">{{ prioLabel(r.priorityBand) }}</span>
               <span class="pscore">· {{ r.priority }}</span>
+            </span>
+            <span class="na-why" *ngIf="r.naReasons?.length">
+              <span class="na-chip" *ngFor="let w of r.naReasons">{{ w }}</span>
             </span>
           </td>
         </ng-container>

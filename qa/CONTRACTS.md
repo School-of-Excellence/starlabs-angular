@@ -9,3 +9,4 @@ One line per live contract (gate section 1.1).
 | jc-health-going-quiet | /journey-coach-health | qa/checks/jc-health-going-quiet.mjs | 2026-09-24 PASS |
 | jc-health-dark-mode | /journey-coach-health | qa/checks/jc-health-dark-mode.mjs | 2026-09-24 PASS |
 | jc-health-event-filter | /journey-coach-health | qa/checks/jc-health-event-filter.mjs | 2026-09-24 PASS |
+| jc-health-na-reasons | /journey-coach-health | qa/checks/jc-health-na-reasons.mjs | 2026-09-24 PASS |
