@@ -83,7 +83,7 @@ export function accessLabel(key: string): string {
   return WORKSHOP_ACCESS_KEYS.find(k => k.key === key)?.label || key;
 }
 
-/** The three global lists, as stored in the one shared document... */
+/** The three global lists, as stored in the one shared document. */
 export interface WorkshopAdminLists {
   /** Everything, on every workshop dashboard. */
   dashboardAdmins: string[];
