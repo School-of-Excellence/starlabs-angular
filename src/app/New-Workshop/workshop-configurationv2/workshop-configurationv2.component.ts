@@ -21,6 +21,8 @@ import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
 import { WC2_TOOLBAR_FULL, WC2_TOOLBAR_TITLE, WC2_TOOLBAR_ITEM, resetToParagraph, focusedEditor } from './wc2-editor';
 import { FIELD_HINTS } from './wc2-help';
 import { AuthguardService } from '../../authguard.service';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import { canEditWorkshops as canEditWorkshopsRule } from '../workshop-access/workshop-access.model';
 
 import { EnrollmentDateAdapter, WC2_MONTHS as MONTHS } from './wc2-date-adapter';
 import { WorkshopChallengesv2Component } from './challenges/workshop-challengesv2.component';
@@ -179,15 +181,36 @@ export class WorkshopConfigurationv2Component implements OnInit, AfterViewInit, 
     private zone: NgZone,
     private host: ElementRef<HTMLElement>,
     private dialog: MatDialog,
+    private accessService: WorkshopAccessService,
   ) {}
 
   // ═══════════════════════════ lifecycle ═══════════════════════════
+  /** Set when the signed-in person may not edit workshops: nothing is loaded. */
+  editBlocked = false;
+
   ngOnInit(): void {
     this.initializeForm();
     this.workshopId = this.route.snapshot.paramMap.get('id');
     if (!this.workshopId) { this.loading = false; this.notFound = true; return; }
-    this.loadReferenceData();
-    this.loadWorkshopData();
+    // Editing is granted in a workshop's Dashboard Access settings. Check before
+    // reading anything, so someone without access never sees the workshop.
+    this.checkEditAccess().then(allowed => {
+      if (!allowed) { this.editBlocked = true; this.loading = false; return; }
+      this.loadReferenceData();
+      this.loadWorkshopData();
+    });
+  }
+
+  private async checkEditAccess(): Promise<boolean> {
+    try {
+      const profileId = await this.accessService.currentProfileId();
+      const lists = await this.accessService.getAdminLists();
+      return canEditWorkshopsRule(profileId, lists);
+    } catch (error) {
+      // Nothing is open by default, so a failed read closes the editor too.
+      console.error('Error checking workshop edit access:', error);
+      return false;
+    }
   }
 
   /** Toolbar 'Normal' button: turn the current block back into a paragraph. */
