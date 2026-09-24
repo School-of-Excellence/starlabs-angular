@@ -1,93 +1,125 @@
 <main class="m-4">
   <input type="file" id="emailImportInput" accept=".xlsx,.xls,.csv" data-testid="vpf-import-file" (change)="onImportEmails($event)" style="display: none;">
-  <div class="top-bar" [formGroup]="filterForm">
-    <mat-form-field appearance="outline" class="compact-field date-field">
-      <mat-label>Date Range</mat-label>
-      <mat-date-range-input [rangePicker]="picker">
-        <input matStartDate [(ngModel)]="startDate" [ngModelOptions]="{standalone: true}" placeholder="Start">
-        <input matEndDate [(ngModel)]="endDate" [ngModelOptions]="{standalone: true}" placeholder="End">
-      </mat-date-range-input>
-      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-      <mat-date-range-picker #picker></mat-date-range-picker>
-    </mat-form-field>
+  <!-- Filter panel — every filter is sent to Firestore when Fetch is pressed -->
+  <section class="filter-panel" [formGroup]="filterForm" data-testid="vpf-filter-panel">
+    <header class="filter-panel__head">
+      <div class="filter-panel__title">
+        <mat-icon>tune</mat-icon>
+        <span>Filters</span>
+        <span class="filter-count" *ngIf="activeFilterCount > 0" data-testid="vpf-active-filter-count">{{ activeFilterCount }} active</span>
+      </div>
+      <div class="filter-panel__status">
+        <span class="pending-pill" *ngIf="hasPendingChanges && !isFetching" data-testid="vpf-pending-changes">
+          <mat-icon>schedule</mat-icon> Changes not applied — press Fetch
+        </span>
+        <span class="result-count" *ngIf="appliedFilters && !isFetching" data-testid="vpf-result-count">
+          {{ dataSource.filteredData.length }} result{{ dataSource.filteredData.length === 1 ? '' : 's' }}
+        </span>
+      </div>
+    </header>
 
-    <button mat-stroked-button color="primary" type="button" data-testid="vpf-fetch" (click)="fetchData()">Fetch</button>
+    <div class="filter-grid">
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Date Range</mat-label>
+        <mat-date-range-input [rangePicker]="picker">
+          <input matStartDate [(ngModel)]="startDate" [ngModelOptions]="{standalone: true}" placeholder="Start">
+          <input matEndDate [(ngModel)]="endDate" [ngModelOptions]="{standalone: true}" placeholder="End">
+        </mat-date-range-input>
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-date-range-picker #picker></mat-date-range-picker>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="compact-field">
-      <mat-label>Participant</mat-label>
-      <mat-select formControlName="name" multiple data-testid="vpf-filter-participant" (selectionChange)="onFilter(filterForm.value)">
-        <mat-option>
-          <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search..."
-            noEntriesFoundLabel="No match"></ngx-mat-select-search>
-        </mat-option>
-        <mat-option *ngFor="let participant of filteredParticipantList" [value]="participant.profileId">
-          {{participant.name}}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Participant</mat-label>
+        <mat-select formControlName="name" multiple data-testid="vpf-filter-participant">
+          <mat-option>
+            <ngx-mat-select-search [formControl]="participantFilterCtrl" placeholderLabel="Search..."
+              noEntriesFoundLabel="No match"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let participant of filteredParticipantList" [value]="participant.profileId">
+            {{participant.name}}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="compact-field">
-      <mat-label>Queue</mat-label>
-      <mat-select formControlName="queue" multiple data-testid="vpf-filter-queue" (selectionChange)="onFilter(filterForm.value)">
-        <mat-option>
-          <ngx-mat-select-search [formControl]="queueFilterCtrl" placeholderLabel="Search..."
-            noEntriesFoundLabel="No match"></ngx-mat-select-search>
-        </mat-option>
-        <mat-option *ngFor="let list of filteredQueueList" [value]="list.docid">{{list['queuename']}}</mat-option>
-      </mat-select>
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Queue</mat-label>
+        <mat-select formControlName="queue" multiple data-testid="vpf-filter-queue">
+          <mat-option>
+            <ngx-mat-select-search [formControl]="queueFilterCtrl" placeholderLabel="Search..."
+              noEntriesFoundLabel="No match"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let list of filteredQueueList" [value]="list.docid">{{list['queuename']}}</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="compact-field">
-      <mat-label>Workshop</mat-label>
-      <mat-select formControlName="workshop" multiple data-testid="vpf-filter-workshop" (selectionChange)="onFilter(filterForm.value)">
-        <mat-option>
-          <ngx-mat-select-search [formControl]="workshopFilterCtrl" placeholderLabel="Search..."
-            noEntriesFoundLabel="No match"></ngx-mat-select-search>
-        </mat-option>
-        <mat-option *ngFor="let list of filteredCombinedWorkshopList" [value]="list.docid">
-          {{ list.displayTitle }}
-        </mat-option>
-      </mat-select>
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Workshop</mat-label>
+        <mat-select formControlName="workshop" multiple data-testid="vpf-filter-workshop">
+          <mat-option>
+            <ngx-mat-select-search [formControl]="workshopFilterCtrl" placeholderLabel="Search..."
+              noEntriesFoundLabel="No match"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let list of filteredCombinedWorkshopList" [value]="list.docid">
+            {{ list.displayTitle }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="compact-field">
-      <mat-label>Form</mat-label>
-      <mat-select formControlName="formname" multiple data-testid="vpf-filter-form" (selectionChange)="onFilter(filterForm.value)">
-        <mat-option>
-          <ngx-mat-select-search [formControl]="formFilterCtrl" placeholderLabel="Search..."
-            noEntriesFoundLabel="No match"></ngx-mat-select-search>
-        </mat-option>
-        <mat-option *ngFor="let list of filteredFormList" [value]="list.formname">{{list.formname}}</mat-option>
-      </mat-select>
-    </mat-form-field>
-
-    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-      <button mat-stroked-button color="accent" data-testid="vpf-import-emails" (click)="triggerFileInput()"
-        matTooltip="Column name of email should be 'Email' (Case-insensitive)">
-        <mat-icon>upload_file</mat-icon> Import Emails
-      </button>
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Form</mat-label>
+        <mat-select formControlName="formname" multiple data-testid="vpf-filter-form">
+          <mat-option>
+            <ngx-mat-select-search [formControl]="formFilterCtrl" placeholderLabel="Search..."
+              noEntriesFoundLabel="No match"></ngx-mat-select-search>
+          </mat-option>
+          <mat-option *ngFor="let list of filteredFormList" [value]="list.formname">{{list.formname}}</mat-option>
+        </mat-select>
+      </mat-form-field>
     </div>
 
-    <button mat-stroked-button data-testid="vpf-filter-liked" (click)="toggleLikeFilter()" [color]="filterLiked ? 'warn' : ''"
-      matTooltip="Filter liked forms">
-      <mat-icon>{{ filterLiked ? 'favorite' : 'favorite_border' }}</mat-icon>
-      Liked
-    </button>
+    <footer class="filter-panel__foot">
+      <div class="toggle-group">
+        <button type="button" class="toggle-chip" [class.toggle-chip--liked]="filterLiked" data-testid="vpf-filter-liked"
+          (click)="toggleLikeFilter()" matTooltip="Only liked forms" [attr.aria-pressed]="filterLiked">
+          <mat-icon>{{ filterLiked ? 'favorite' : 'favorite_border' }}</mat-icon> Liked
+        </button>
+        <button type="button" class="toggle-chip" [class.toggle-chip--flagged]="filterFlagged" data-testid="vpf-filter-flagged"
+          (click)="toggleFlagFilter()" matTooltip="Only flagged forms" [attr.aria-pressed]="filterFlagged">
+          <mat-icon>{{ filterFlagged ? 'flag' : 'outlined_flag' }}</mat-icon> Flagged
+        </button>
+        <button type="button" class="toggle-chip" [class.toggle-chip--opportunity]="filterOpportunity" data-testid="vpf-filter-opportunity"
+          (click)="toggleOpportunityFilter()" matTooltip="Only opportunity forms" [attr.aria-pressed]="filterOpportunity">
+          <mat-icon>{{ filterOpportunity ? 'attach_money' : 'money_off' }}</mat-icon> Opportunity
+        </button>
+      </div>
 
-    <button mat-stroked-button data-testid="vpf-filter-flagged" (click)="toggleFlagFilter()" [color]="filterFlagged ? 'accent' : ''"
-      matTooltip="Filter flagged forms">
-      <mat-icon>{{ filterFlagged ? 'flag' : 'outlined_flag' }}</mat-icon>
-      Flagged
-    </button>
+      <div class="secondary-actions">
+        <button mat-button type="button" data-testid="vpf-import-emails" (click)="triggerFileInput()"
+          matTooltip="Refines the loaded results. Column name of email should be 'Email' (Case-insensitive)">
+          <mat-icon>upload_file</mat-icon> Import Emails
+        </button>
+        <button mat-button type="button" matTooltip="Save forms selected in 'Form' dropdown to My Forms"
+          [disabled]="filterForm.get('formname')?.value?.length === 0" data-testid="vpf-save-myforms" (click)="addSelectedFormsToMyForms()">
+          <mat-icon>bookmark_add</mat-icon> Save to My Forms
+        </button>
+        <button mat-button type="button" matTooltip="Clear all filters and fetch again" data-testid="vpf-clear-filters"
+          [disabled]="isFetching" (click)="clearFilters()">
+          <mat-icon>restart_alt</mat-icon> Clear all
+        </button>
+      </div>
 
-    <button mat-stroked-button color="primary" matTooltip="Save forms selected in 'Form' dropdown to My Forms"
-      [disabled]="filterForm.get('formname')?.value?.length === 0" data-testid="vpf-save-myforms" (click)="addSelectedFormsToMyForms()">
-      <mat-icon>bookmark_add</mat-icon> Save to My Forms
-    </button>
+      <button mat-flat-button color="primary" type="button" class="fetch-btn" [class.fetch-btn--pending]="hasPendingChanges"
+        data-testid="vpf-fetch" [disabled]="isFetching" (click)="fetchData()">
+        <mat-spinner *ngIf="isFetching" diameter="18" data-testid="vpf-fetch-spinner"></mat-spinner>
+        <mat-icon *ngIf="!isFetching">search</mat-icon>
+        {{ isFetching ? 'Fetching…' : 'Fetch' }}
+      </button>
+    </footer>
+  </section>
 
-    <button mat-icon-button matTooltip="Clear all filters" data-testid="vpf-clear-filters" (click)="ngOnInit();onFilter(filterForm.value)">
-      <mat-icon>restart_alt</mat-icon>
-    </button>
+  <div class="fetch-notice" *ngIf="fetchNotice" data-testid="vpf-fetch-notice">
+    <mat-icon>info</mat-icon> {{ fetchNotice }}
   </div>
 
   <!-- My Forms Bar -->
@@ -168,7 +200,12 @@
     </button>
   </div>
 
-  <div class="mat-elevation-z8">
+  <div class="mat-elevation-z8 table-shell" [class.table-shell--loading]="isFetching" [attr.aria-busy]="isFetching">
+    <mat-progress-bar *ngIf="isFetching" mode="indeterminate" class="table-progress" data-testid="vpf-fetch-progress"></mat-progress-bar>
+    <div class="table-loading-overlay" *ngIf="isFetching" data-testid="vpf-fetch-overlay">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Fetching forms from Firestore…</span>
+    </div>
     <table mat-table [dataSource]="dataSource" matSort>
 
       <!-- Checkbox Column -->
