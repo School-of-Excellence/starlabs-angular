@@ -1130,11 +1130,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         // appointments missing all three markers are still caught by their appointment-type ref
         // (onboardingApptTypeIds), the authoritative discriminator, so onboarding never leaks into
         // the Journey-Coaching schedule.
-        const apptTypeId = data['appointment']?.id ?? null;
-        const isOnboarding = data['onboarding'] === true
-          || data['journeyid'] != null
-          || data['participantjourneyproductid'] != null
-          || (apptTypeId != null && this.onboardingApptTypeIds.has(apptTypeId));
+        const isOnboarding = this.isOnboardingAppt(data);
         if (data['attended'] !== true) {
           // booked and live: future = pending, past = overdue (the slot passed unattended).
           pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
@@ -1171,6 +1167,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private jcDoneEvents = signal<JcDoneEvent[]>([]);
   /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcDoneEvent[]>([]);
+
+  /** True when a journeycoach appointment is really an ONBOARDING call — by its own onboarding flag,
+   *  its journey/pjp refs, OR (authoritative, catches legacy docs) its appointment-type ref being an
+   *  onboarding type. Named so the JC-vs-Onboarding partition is unit-testable (contract spec). */
+  private isOnboardingAppt(data: any): boolean {
+    const apptTypeId = data?.['appointment']?.id ?? null;
+    return data?.['onboarding'] === true
+      || data?.['journeyid'] != null
+      || data?.['participantjourneyproductid'] != null
+      || (apptTypeId != null && this.onboardingApptTypeIds.has(apptTypeId));
+  }
 
   /** Load (once) the set of appointment-type ids that are ONBOARDING calls, so onboarding appointments
    *  missing the onboarding / journeyid / pjp markers (legacy data) are still recognised by their type
