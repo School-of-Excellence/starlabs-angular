@@ -347,12 +347,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // 'UNASSESSED' = participant has no fresh coach-set health state (the "Not assessed" filter option).
   healthFilters: Array<CoachHealthState | 'UNASSESSED'> = [];
   financeFilters: string[] = [];                   // financialstatus values (multi)
+  eventStatusFilters: string[] = [];
   renewalWindowOnly = false;                        // renewal window (yes)
   goingQuietOnly = false;                           // going quiet (yes)
   noEventRequestOnly = false;                       // no recent event request (null)
   readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
   readonly healthOptions: CoachHealthState[] = COACH_HEALTH_OPTIONS;
   readonly healthFilterOptions: Array<CoachHealthState | 'UNASSESSED'> = [...COACH_HEALTH_OPTIONS, 'UNASSESSED'];
+  readonly eventStatusOptions: { value: string; label: string }[] = [
+    { value: 'approved', label: 'Approved' },
+    { value: 'requested', label: 'Requested' },
+  ];
   financeOptions: string[] = [];                    // discovered from the loaded base
 
   // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
@@ -3595,6 +3600,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
     }
     if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
+    if (this.eventStatusFilters.length && !this.eventStatusFilters.includes((r.recentEventRequest?.status ?? '').toLowerCase())) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
     if (this.goingQuietOnly && !this.isGoingQuietBucket(r)) return false;
     if (this.noEventRequestOnly && r.recentEventRequest) return false;
@@ -3781,6 +3787,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.bandFilters = [];
     this.healthFilters = [];
     this.financeFilters = [];
+    this.eventStatusFilters = [];
     this.renewalWindowOnly = false;
     this.goingQuietOnly = false;
     this.noEventRequestOnly = false;
@@ -3791,7 +3798,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   get hasActiveFilters(): boolean {
     return !!this.search || !!this.journeyFilter || this.journeyGroupFilter.length > 0 || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
       || this.productTypeFilters.length > 0 || this.tierFilters.length > 0 || this.bandFilters.length > 0
-      || this.healthFilters.length > 0 || this.financeFilters.length > 0
+      || this.healthFilters.length > 0 || this.financeFilters.length > 0 || this.eventStatusFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
 
@@ -3803,7 +3810,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   get pageLocalFilterActive(): boolean {
     // band / health are never in the lite index → always page-local. Going-quiet / needs-attention
     // are page-local ONLY until the touchpoint+appointment data loads (then they're base-wide).
-    return this.bandFilters.length > 0 || this.healthFilters.length > 0
+    return this.bandFilters.length > 0 || this.healthFilters.length > 0 || this.eventStatusFilters.length > 0
       || (!this.contactDataLoaded() && (this.goingQuietOnly || this.activeLever === 'goingQuiet' || this.activeLever === 'needsAttention'));
   }
 

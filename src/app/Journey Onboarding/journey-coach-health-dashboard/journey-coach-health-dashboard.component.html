@@ -611,6 +611,16 @@
             </mat-select>
           </mat-form-field>
         </label>
+
+        <label class="fp-field" matTooltip="Status of the participant's most recent event request">
+          <span class="fp-field-label">Event confirmation</span>
+          <mat-form-field appearance="outline" class="fp-mat">
+            <mat-select data-testid="event-status-filter" [(ngModel)]="eventStatusFilters" (ngModelChange)="applyFilters()" multiple
+              panelClass="jchd-fp-panel" placeholder="Any">
+              <mat-option *ngFor="let e of eventStatusOptions" [value]="e.value">{{ e.label }}</mat-option>
+            </mat-select>
+          </mat-form-field>
+        </label>
       </div>
 
       <div class="fp-toggles">

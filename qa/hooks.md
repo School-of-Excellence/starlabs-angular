@@ -26,3 +26,4 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | jcd-ph-needsattn-row | Outreach·top row (shows reason) | je-dashboard-jc-fixes |
 | jcd-ph-needsattn-all | Outreach·top "All N" link | je-dashboard-jc-fixes |
 | jcd-name-link | drill-table participant name link | je-dashboard-jc-fixes |
+| event-status-filter | Participants filter panel · Event confirmation multi-select |
