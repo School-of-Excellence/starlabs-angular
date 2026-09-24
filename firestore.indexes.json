@@ -1022,6 +1022,44 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "//": "je-dashboard Participant Health — item 5: open-tickets getCountFromServer (clientid IN + status.status==open)",
+      "collectionGroup": "clientissue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "clientid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "je-dashboard Participant Health — item 7: coach-contact appointments (bookedby IN + journeycoach + attended + not cancelled)",
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "journeycoach",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "attended",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cancelled",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "bookedby",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
