@@ -16,8 +16,10 @@ gate blocked on them. Operator chose "cover what's reachable".
 - `suites-manifest.json`: `src/app/Participant Intelligence/**` → **profiles** suite (was covered by none).
 - profiles: `participant-intelligence.spec.ts` (PI-01..04), `view-participants-form-filters.spec.ts` (VPF-F01..03),
   operator's local `bulk-add-products.spec.ts` + seed jobs, route grant `/participant-intelligence`.
-- content: `content-analytics-v2-addressable.spec.ts` — ALL cav hooks as `fixme`. v2 is **not routed**
-  (its `contentanalytics` route is commented out; `/contentanalytics` still loads v1). Route it → write real cases.
+- content: `content-analytics-v2-addressable.spec.ts` — ALL cav hooks as `fixme`. v2 is **not routed** after the
+  operator's local route change (committed separately, "route /contentanalytics back to v1"): b471a730 had pointed
+  `/contentanalytics` at v2; the operator restored v1 and commented v2 out. Route v2 again → write real cases
+  (and content-analytics.spec.ts, the v1 spec, would then need retiring).
 
 ## Found
 - view-participants-form reads `formsByClient` from the **firestore-forms named db** → denied on the emulator.
