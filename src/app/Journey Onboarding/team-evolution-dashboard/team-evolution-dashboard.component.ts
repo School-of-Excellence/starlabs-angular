@@ -272,13 +272,19 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     private router : Router
   ) { }
 
-  async ngOnInit() {
-    await Promise.all([
-      this.getDfuProducts(),
-      this.getAhMembers()
-    ]);
+  // Resolves once the AH members' metadata is loaded. The product dropdown fills earlier (after
+  // getDfuProducts), so selectProduct must wait on this or it builds — and caches — an empty list.
+  private metadataReady: Promise<void> = Promise.resolve();
 
-    await this.getParticipantMetadata();
+  async ngOnInit() {
+    this.metadataReady = (async () => {
+      await Promise.all([
+        this.getDfuProducts(),
+        this.getAhMembers()
+      ]);
+      await this.getParticipantMetadata();
+    })();
+    await this.metadataReady;
   }
   // get ahmember from users_roles
   async getAhMembers(){
@@ -346,6 +352,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
 
     this.loadingParticipants = true;
+    await this.metadataReady;
     this.buildOngoingParticipants(docId);
 
     const productRef = doc(this.firestore, 'products', docId);
