@@ -204,9 +204,9 @@
           <div class="jcs-col" data-testid="sched-jc-col">
             <div class="jcs-colhead"><span class="jcs-tag jcs-tag-jc">Journey Coaching</span></div>
             <div class="jcp-row">
-              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
-              <div class="jcp-tile"><span class="jcp-num">{{ jcSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
-              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+              <button type="button" class="jcp-tile" [class.is-on]="jcSchedBucket()==='today'" (click)="setSchedBucket(false,'today')" matTooltip="Filter to today"><span class="jcp-num">{{ jcSchedCounts().today }}</span><span class="jcp-label">Today</span></button>
+              <button type="button" class="jcp-tile" [class.is-on]="jcSchedBucket()==='week'" (click)="setSchedBucket(false,'week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ jcSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></button>
+              <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-jc-overdue" [class.is-on]="jcSchedBucket()==='overdue'" (click)="setSchedBucket(false,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ jcSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
             </div>
             <div class="jcp-list" *ngIf="jcSchedList().length; else noJcSched">
               <ng-container *ngFor="let g of jcSchedList()">
@@ -224,9 +224,9 @@
           <div class="jcs-col" data-testid="sched-ob-col">
             <div class="jcs-colhead"><span class="jcs-tag jcs-tag-ob">Onboarding</span></div>
             <div class="jcp-row">
-              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().today }}</span><span class="jcp-label">Today</span></div>
-              <div class="jcp-tile"><span class="jcp-num">{{ obSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></div>
-              <div class="jcp-tile jcp-overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></div>
+              <button type="button" class="jcp-tile" [class.is-on]="obSchedBucket()==='today'" (click)="setSchedBucket(true,'today')" matTooltip="Filter to today"><span class="jcp-num">{{ obSchedCounts().today }}</span><span class="jcp-label">Today</span></button>
+              <button type="button" class="jcp-tile" [class.is-on]="obSchedBucket()==='week'" (click)="setSchedBucket(true,'week')" matTooltip="Filter to the next 7 days"><span class="jcp-num">{{ obSchedCounts().week }}</span><span class="jcp-label">Next 7 days</span></button>
+              <button type="button" class="jcp-tile jcp-overdue" data-testid="sched-ob-overdue" [class.is-on]="obSchedBucket()==='overdue'" (click)="setSchedBucket(true,'overdue')" matTooltip="Filter to overdue"><span class="jcp-num">{{ obSchedCounts().overdue }}</span><span class="jcp-label">Overdue</span></button>
             </div>
             <div class="jcp-list" *ngIf="obSchedList().length; else noObSched">
               <ng-container *ngFor="let g of obSchedList()">
@@ -288,6 +288,68 @@
         <ng-template #noJc>
           <p class="ios2-empty" *ngIf="jcPipeline().ready">No journey coaches completed in this period.</p>
         </ng-template>
+      </section>
+
+      <!-- Ecosystem Health · Ask A&H + Love Letter analytics (item 3): flag breakdown per collection +
+           combined + resolved, over the recent window, base-wide. Mirrors the original dashboard. -->
+      <section class="ios2-card jchd-ah-card" *ngIf="ahSummary() as s">
+        <div class="ios2-head">
+          <span class="ios2-app ap-pink"><mat-icon>favorite</mat-icon></span>
+          <span class="ios2-title">Ask A&amp;H &amp; Love Letter</span>
+          <span class="ah-src">
+            <button type="button" class="ah-src-pill ah-src-ask" (click)="openAhDrill('ask', 'all', false, 'Ask AH · all')" matTooltip="Show all Ask AH">Ask AH · {{ s.askAH.total }}</button>
+            <button type="button" class="ah-src-pill ah-src-love" (click)="openAhDrill('love', 'all', false, 'Love Letter · all')" matTooltip="Show all Love Letters">Love Letter · {{ s.loveLetter.total }}</button>
+          </span>
+        </div>
+        <div class="ah-table">
+          <table>
+            <thead>
+              <tr><th class="ah-flag">Flag</th><th>Ask AH</th><th>Love Letter</th><th>Combined</th><th class="ah-res">Resolved</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-happy"></span>Happy</td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('ask', 'liked', false, 'Ask AH · Happy')">{{ s.askAH.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('love', 'liked', false, 'Love Letter · Happy')">{{ s.loveLetter.liked }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('both', 'liked', false, 'Happy · combined')">{{ s.liked }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="openAhDrill('both', 'liked', true, 'Resolved · Happy')">{{ s.resolvedLiked }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-attn"></span>Needs Attention</td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('ask', 'tagged', false, 'Ask AH · Needs Attention')">{{ s.askAH.tagged }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('love', 'tagged', false, 'Love Letter · Needs Attention')">{{ s.loveLetter.tagged }}</button></td>
+                <td><button type="button" class="ah-num" data-testid="ah-needsattention-combined" (click)="openAhDrill('both', 'tagged', false, 'Needs Attention · combined')">{{ s.tagged }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="openAhDrill('both', 'tagged', true, 'Resolved · Needs Attention')">{{ s.resolvedTagged }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-opp"></span>Opportunity</td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('ask', 'opportunity', false, 'Ask AH · Opportunity')">{{ s.askAH.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('love', 'opportunity', false, 'Love Letter · Opportunity')">{{ s.loveLetter.opportunity }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('both', 'opportunity', false, 'Opportunity · combined')">{{ s.opportunity }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="openAhDrill('both', 'opportunity', true, 'Resolved · Opportunity')">{{ s.resolvedOpportunity }}</button></td>
+              </tr>
+              <tr>
+                <td class="ah-flag"><span class="ah-dot ah-crit"></span>Critical</td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('ask', 'critical', false, 'Ask AH · Critical')">{{ s.askAH.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('love', 'critical', false, 'Love Letter · Critical')">{{ s.loveLetter.critical }}</button></td>
+                <td><button type="button" class="ah-num" (click)="openAhDrill('both', 'critical', false, 'Critical · combined')">{{ s.critical }}</button></td>
+                <td class="ah-res"><button type="button" class="ah-num" (click)="openAhDrill('both', 'critical', true, 'Resolved · Critical')">{{ s.resolvedCritical }}</button></td>
+              </tr>
+              <tr class="ah-total">
+                <td class="ah-flag">Total Flagged</td>
+                <td>{{ s.askAH.liked + s.askAH.tagged + s.askAH.opportunity + s.askAH.critical }}</td>
+                <td>{{ s.loveLetter.liked + s.loveLetter.tagged + s.loveLetter.opportunity + s.loveLetter.critical }}</td>
+                <td>{{ s.liked + s.tagged + s.opportunity + s.critical }}</td>
+                <td class="ah-res">{{ s.resolvedTotal }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="ah-cards">
+          <button type="button" class="ah-mini ah-mini-unflagged" (click)="openAhDrill('both', 'unflagged', false, 'Unflagged')"><span class="ah-mini-k">Unflagged</span><span class="ah-mini-n">{{ s.unflagged }}</span></button>
+          <button type="button" class="ah-mini ah-mini-positive" (click)="openAhDrill('both', 'liked', false, 'Positive flags')"><span class="ah-mini-k">Positive flags</span><span class="ah-mini-n">{{ s.liked }}</span></button>
+          <button type="button" class="ah-mini ah-mini-critattn" (click)="openAhDrill('both', 'critattn', false, 'Critical + Attention')"><span class="ah-mini-k">Critical + Attn</span><span class="ah-mini-n">{{ s.critical + s.tagged }}</span></button>
+        </div>
       </section>
 
       <!-- Row 3: coach-set health + by journey -->

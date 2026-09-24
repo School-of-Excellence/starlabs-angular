@@ -1168,6 +1168,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcDoneEvent[]>([]);
 
+  /** Which count tile is active per schedule column; 'all' = show every booked session (default).
+   *  Clicking a Today / Next-7 / Overdue tile filters that column's list to the bucket (toggle off). */
+  jcSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  obSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  setSchedBucket(onboarding: boolean, bucket: 'today' | 'week' | 'overdue'): void {
+    const sig = onboarding ? this.obSchedBucket : this.jcSchedBucket;
+    sig.set(sig() === bucket ? 'all' : bucket);
+  }
+
   /** True when a journeycoach appointment is really an ONBOARDING call — by its own onboarding flag,
    *  its journey/pjp refs, OR (authoritative, catches legacy docs) its appointment-type ref being an
    *  onboarding type. Named so the JC-vs-Onboarding partition is unit-testable (contract spec). */
@@ -1331,10 +1340,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
    *  days — same horizon as the tiles). Each row = participant + host coach + time. */
   private schedList(onboarding: boolean): { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }[] {
     const todayStart = this.startOfDay(new Date()).getTime();
-    const week7 = this.endOfDay(new Date()).getTime() + 7 * 86400000;
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
     const inScope = new Set(this.rosterIds());
+    const bucket = (onboarding ? this.obSchedBucket : this.jcSchedBucket)();
+    const inBucket = (ms: number): boolean => {
+      if (bucket === 'all') return ms <= week7;
+      const overdue = this.startOfDay(new Date(ms)).getTime() < todayStart;
+      if (bucket === 'overdue') return overdue;
+      if (bucket === 'today') return !overdue && ms <= endToday;
+      return !overdue && ms > endToday && ms <= week7;   // 'week' = Next 7 days
+    };
     const rows = this.jcPendingEvents()
-      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && e.ms <= week7)
+      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && inBucket(e.ms))
       .sort((a, b) => a.ms - b.ms);
     const groups = new Map<number, { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }>();
     for (const e of rows) {
