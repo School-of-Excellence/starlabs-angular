@@ -163,6 +163,17 @@ interface LiteIndexRow {
 /** A coach's personal journey group: a chosen name over a set of journey names (one journey per group). */
 interface JourneyGroup { id: string; name: string; journeys: string[]; }
 
+interface AhDrillEntry { profileid: string; name: string; created: number; }
+
+/** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
+interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
+interface AHSummary {
+  askAH: AHFlagCounts;
+  loveLetter: AHFlagCounts;
+  liked: number; tagged: number; opportunity: number; critical: number; unflagged: number;
+  resolvedTotal: number; resolvedLiked: number; resolvedTagged: number; resolvedOpportunity: number; resolvedCritical: number;
+}
+
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
 interface ScoreboardRow {
   coachId: string;
@@ -377,6 +388,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private openTicketCounts: Record<string, number> = {};
   private touchpointByProfile: Record<string, number> = {};
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
+  // Appointment-type ids whose type is an ONBOARDING call (appointmenttype.onboardingcall === true).
+  // Authoritative discriminator so a legacy onboarding appointment missing the onboarding/journeyid/pjp
+  // markers is still recognised by its type ref and kept OUT of the Journey-Coaching schedule.
+  private onboardingApptTypeIds = new Set<string>();
   // profileid -> most-recent event participation request {eventName, date, status}
   private recentEventByProfile: Record<string, { eventName: string; date: Date | null; status: string }> = {};
   // profileid -> latest coach-set Health State (manual coach assessment)
@@ -1090,6 +1105,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const map: Record<string, number> = {};
     const events: JcDoneEvent[] = [];
     const pending: JcDoneEvent[] = [];
+    await this.loadOnboardingApptTypes();
     try {
       // ONE read of every journey-coach appointment (the `attended` filter used to be in the
       // query). Splitting client-side gives, from the same snapshot: completed JCs (attended),
@@ -1109,9 +1125,19 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (data['cancelled'] === true) return;
         const hosts0: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
         const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+        // Onboarding detection hardened (7023d94f): the schedule dialog sets onboarding===true AND a
+        // journeyid + participantjourneyproductid ONLY for onboarding calls. Legacy onboarding
+        // appointments missing all three markers are still caught by their appointment-type ref
+        // (onboardingApptTypeIds), the authoritative discriminator, so onboarding never leaks into
+        // the Journey-Coaching schedule.
+        const apptTypeId = data['appointment']?.id ?? null;
+        const isOnboarding = data['onboarding'] === true
+          || data['journeyid'] != null
+          || data['participantjourneyproductid'] != null
+          || (apptTypeId != null && this.onboardingApptTypeIds.has(apptTypeId));
         if (data['attended'] !== true) {
           // booked and live: future = pending, past = overdue (the slot passed unattended).
-          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: data['onboarding'] === true });
+          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
           return;
         }
         // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
@@ -1145,6 +1171,29 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private jcDoneEvents = signal<JcDoneEvent[]>([]);
   /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcDoneEvent[]>([]);
+
+  /** Load (once) the set of appointment-type ids that are ONBOARDING calls, so onboarding appointments
+   *  missing the onboarding / journeyid / pjp markers (legacy data) are still recognised by their type
+   *  ref and kept out of the Journey-Coaching schedule. One read of the small appointmenttype reference
+   *  collection, cached for the session. */
+  private async loadOnboardingApptTypes(): Promise<void> {
+    if (this.onboardingApptTypeIds.size) return;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'appointmenttype'),
+        where('onboardingcall', '==', true),
+      ));
+      const ids = new Set<string>();
+      snap.forEach(d => {
+        ids.add(d.id);
+        const fid = (d.data() as any)['id'];
+        if (typeof fid === 'string' && fid) ids.add(fid);
+      });
+      this.onboardingApptTypeIds = ids;
+    } catch (e) {
+      console.warn('appointmenttype (onboarding) load failed (non-fatal)', e);
+    }
+  }
 
   /** Per-coach JC metrics for the Coaches tab (doc item 9). Attribution is the appointment's
    *  `hosts[0]` — the coach who actually ran (or is due to run) the session, which is NOT
@@ -1291,6 +1340,120 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
   jcSchedList = computed(() => this.schedList(false));
   obSchedList = computed(() => this.schedList(true));
+
+
+  /** Scoped A&H love-letter / ask-A&H tags for a set of participants (doc item 5): batched
+   *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
+   *  tagged=needs-attn / opportunity) OR-ed per participant, within a recent 180d window applied
+   *  client-side (avoids a profileid+created composite index). Degrades on permission-denied. */
+  // ---- Ecosystem Health · Ask A&H + Love Letter analytics summary (item 3) — mirrors the original
+  //  journeycoach-dashboard's askAHLoveLetterSummary: flag breakdown per collection + combined + resolved,
+  //  over a recent window, base-wide. One-shot read of 'ask AH' + 'love letter' (single 'created' filter,
+  //  no composite index). tagged = Needs Attention · opportunity = Opportunity · liked = Happy · critical = Critical.
+  ahSummary = signal<AHSummary | null>(null);
+
+  /** Native (in-component) A&H drill overlay — replaces the former AhFlagListDialogComponent MatDialog
+   *  so the list renders inside .jchd-wrap and themes with the dashboard tokens (dark included). */
+  ahDrill = signal<{ title: string; entries: AhDrillEntry[] } | null>(null);
+  private ahSummaryLoaded = false;
+  /** One row per source A&H / Love Letter document kept behind the analytics card, so a clicked cell
+   *  can drill to the exact participants that make up its count (list length reconciles the cell). */
+  private ahDocs: { profileid: string; coll: 'ask' | 'love'; liked: boolean; tagged: boolean;
+    opportunity: boolean; critical: boolean; resolved: boolean; created: number }[] = [];
+  private async loadAHSummary(): Promise<void> {
+    if (this.ahSummaryLoaded) return;
+    this.ahSummaryLoaded = true;
+    const since = new Date(Date.now() - 180 * 86400000);
+    const read = async (coll: string): Promise<any[]> => {
+      try {
+        const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
+        return snap.docs.map(d => d.data());
+      } catch (e) {
+        if (this.isPermissionDenied(e)) return [];
+        console.warn(`${coll} summary read failed (non-fatal)`, e);
+        return [];
+      }
+    };
+    const [ask, love] = await Promise.all([read('ask AH'), read('love letter')]);
+    const mapDoc = (d: any, coll: 'ask' | 'love') => ({
+      profileid: typeof d['profileid'] === 'string' ? d['profileid'] : '',
+      coll,
+      liked: d['liked'] === true, tagged: d['tagged'] === true,
+      opportunity: d['opportunity'] === true, critical: d['critical'] === true,
+      resolved: d['resolved'] === true,
+      created: this.toDate(d['created'])?.getTime() ?? 0,
+    });
+    this.ahDocs = [...ask.map(d => mapDoc(d, 'ask')), ...love.map(d => mapDoc(d, 'love'))];
+    const count = (docs: any[]): AHFlagCounts => ({
+      total: docs.length,
+      tagged: docs.filter(d => d['tagged'] === true).length,
+      opportunity: docs.filter(d => d['opportunity'] === true).length,
+      liked: docs.filter(d => d['liked'] === true).length,
+      critical: docs.filter(d => d['critical'] === true).length,
+      resolved: docs.filter(d => d['resolved'] === true).length,
+    });
+    const all = [...ask, ...love];
+    this.ahSummary.set({
+      askAH: count(ask),
+      loveLetter: count(love),
+      liked: all.filter(d => d['liked'] === true).length,
+      tagged: all.filter(d => d['tagged'] === true).length,
+      opportunity: all.filter(d => d['opportunity'] === true).length,
+      critical: all.filter(d => d['critical'] === true).length,
+      unflagged: all.filter(d => !d['tagged'] && !d['opportunity'] && !d['liked'] && !d['critical']).length,
+      resolvedTotal: all.filter(d => d['resolved'] === true).length,
+      resolvedLiked: all.filter(d => d['liked'] && d['resolved']).length,
+      resolvedTagged: all.filter(d => d['tagged'] && d['resolved']).length,
+      resolvedOpportunity: all.filter(d => d['opportunity'] && d['resolved']).length,
+      resolvedCritical: all.filter(d => d['critical'] && d['resolved']).length,
+    });
+  }
+
+  /** A&H analytics card drill-down: list the participants behind a clicked count, then open the one
+   *  the coach taps. `coll` scopes to a collection ('both' = combined); `flag` picks the predicate;
+   *  `resolvedOnly` restricts to resolved docs. One row per matching document (no de-dup) so the list
+   *  length equals the clicked cell's number. */
+  openAhDrill(
+    coll: 'ask' | 'love' | 'both',
+    flag: 'all' | 'liked' | 'tagged' | 'opportunity' | 'critical' | 'unflagged' | 'critattn',
+    resolvedOnly: boolean, title: string,
+  ): void {
+    const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
+      d.liked || d.tagged || d.opportunity || d.critical;
+    const docs = this.ahDocs.filter(d => {
+      if (coll !== 'both' && d.coll !== coll) return false;
+      if (resolvedOnly && !d.resolved) return false;
+      switch (flag) {
+        case 'all': return true;
+        case 'unflagged': return !flagged(d);
+        case 'critattn': return d.critical || d.tagged;
+        default: return d[flag] === true;
+      }
+    });
+    if (!docs.length) return;
+    const entries: AhDrillEntry[] = docs
+      .slice()
+      .sort((a, b) => b.created - a.created)
+      .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
+    this.ahDrill.set({ title, entries });
+  }
+
+  /** Close the native A&H drill overlay. */
+  closeAhDrill(): void { this.ahDrill.set(null); }
+
+  /** Row click in the A&H drill: close the overlay and open that participant's slide-over. */
+  pickAhDrill(e: AhDrillEntry): void {
+    if (!e.profileid) return;
+    this.ahDrill.set(null);
+    this.openJcParticipant(e.profileid);
+  }
+
+  /** Escape closes the drill. Kept SEPARATE from onKeydown (which early-returns off the base view and
+   *  when a MatDialog is open) because the drill opens from the Summary tab. */
+  @HostListener('document:keydown.escape')
+  onAhDrillEscape(): void { if (this.ahDrill()) this.closeAhDrill(); }
+
+
 
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
