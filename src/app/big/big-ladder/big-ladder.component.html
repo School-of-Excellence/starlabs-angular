@@ -13,15 +13,30 @@
 <div class="bl-app">
 
     <!-- sort controls: hidden radios, read by the stylesheet -->
-    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-n">
+    <!-- <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-n">
     <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-level" checked>
     <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-studio">
     <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-cohortlog">
     <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-att">
     <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-impact">
-    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-eilifiz">
+    <input class="bl-switch" type="radio" name="bl-sort" id="bl-sort-eilifiz"> -->
 
+    
     <div class="bl-card">
+        <!-- <div>
+            <input [(ngModel)]="participantSearch" (input)="filterTable()" placeholder="search participant..."/>
+        </div> -->
+
+        <div class="topbar-search">
+            <!-- <svg class="ico" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+            </svg> -->
+            <input type="text" placeholder="Search Participant..." [(ngModel)]="participantSearch"
+                (input)="filterTable()" />
+            <!-- <span class="kbd-hint">Clrt + Shift + F</span> -->
+        </div>
+
         <div class="bl-scroll">
             <div class="bl-grid">
 
@@ -487,13 +502,13 @@
                     </div>
                 </div> -->
 
-                <div class="bl-rows" *ngFor="let participant of filteredDashbordData; let i = index;">
+                <div class="bl-rows" *ngFor="let participant of paginatedData; let i = index;">
                     <div class="bl-row bl-r0">
                         <div class="bl-cell bl-left"><span class="bl-rank">{{i + 1}}</span></div>
                         <div class="bl-cell bl-left">
                             <span class="bl-avatar"
                                 style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span>
-                            <span class="bl-person"><span class="bl-name">{{participant.name}}</span></span>
+                            <span class="bl-person" (click)="openSidePanel(participant?.profileid)"><span class="bl-name">{{participant.name}}</span></span>
                         </div>
                         <div class="bl-cell bl-left">
                             <div>
@@ -519,6 +534,309 @@
                 </div>
             </div>
         </div>
+        <mat-paginator [length]="filteredDashbordData.length" [pageSize]="pageSize" [pageSizeOptions]="[5, 10, 15 , 25, 100]" [pageIndex]="pageIndex" (page)="onPageChange($event)" [showFirstLastButtons]="true"> </mat-paginator>
     </div>
 
+     <div class="bl-sidebar" *ngIf="sidePanelParticipant">
+
+      <!-- <input class="bl-switch bl-t-level" type="radio" name="bl-tab" id="bl-tab-level" checked>
+      <input class="bl-switch bl-t-impact" type="radio" name="bl-tab" id="bl-tab-impact">
+      <input class="bl-switch bl-t-att" type="radio" name="bl-tab" id="bl-tab-att">
+      <input class="bl-switch bl-t-studio" type="radio" name="bl-tab" id="bl-tab-studio">
+      <input class="bl-switch bl-t-cal" type="radio" name="bl-tab" id="bl-tab-cal">
+      <input class="bl-switch bl-t-eiflix" type="radio" name="bl-tab" id="bl-tab-eiflix"> -->
+
+      <div class="bl-drawer-head">
+        <span class="bl-avatar bl-avatar-lg" style="background:linear-gradient(135deg,hsl(316 62% 52%),hsl(354 64% 42%))">{{getInital(sidePanelParticipant.name)}}</span>
+        <span class="bl-who">
+          <span class="bl-who-name">{{sidePanelParticipant.name}}</span>
+          <span class="bl-who-meta">{{sidePanelParticipant.customerstatus}} &middot; Journey {{getParticipantJourney(sidePanelParticipant)}}</span>
+        </span>
+        <div class="bl-close" title="Close" (click)="closeSidePanel()">&times;</div>
+      </div>
+
+      <div class="bl-tabs">
+          <label class="bl-tab bl-tab-level" for="bl-tab-level" [class.active-sidetab]="sidePanelCurrentTab === 'level'" title="Current level" (click)="sidePanelCurrentTab = 'level'">
+            <span class="bl-tab-l">Level</span>
+          </label>
+          <label class="bl-tab bl-tab-att" for="bl-tab-att" title="Attendance" [class.active-sidetab]="sidePanelCurrentTab === 'attended'" (click)="sidePanelCurrentTab = 'attended'">
+            <span class="bl-tab-l">Attendance</span>
+          </label>
+          <label class="bl-tab bl-tab-studio" for="bl-tab-studio" title="Studio log" [class.active-sidetab]="sidePanelCurrentTab === 'studio'" (click)="sidePanelCurrentTab = 'studio'">
+            <span class="bl-tab-l">Studio</span>
+          </label>
+          <label class="bl-tab bl-tab-cal" for="bl-tab-cal" title="Cohort activity log" [class.active-sidetab]="sidePanelCurrentTab === 'activity'" (click)="sidePanelCurrentTab = 'activity'">
+            <span class="bl-tab-l">Activity</span>
+          </label>
+          <label class="bl-tab bl-tab-eiflix" for="bl-tab-eiflix" title="Eiflix consumption" [class.active-sidetab]="sidePanelCurrentTab === 'content'" (click)="sidePanelCurrentTab = 'content'">
+            <span class="bl-tab-l">Eiflix</span>
+          </label>
+      </div>
+
+      <div class="bl-panels">
+        <div class="bl-panel bl-p-level" *ngIf="sidePanelCurrentTab === 'level'">
+          <div *ngIf="(sidePanelCurrentTab.bigParticipantLevel ?? []).length == 0">
+            <div class="bl-panel-head">Current level</div>
+            <div class="bl-panel-stat"><span class="bl-panel-n">Field Preparation</span>
+            </div>
+          </div>
+          <div *ngFor="let level of sidePanelCurrentTab.bigParticipantLevel ?? []">
+            <div class="bl-panel-head">Current level</div>
+            <div class="bl-panel-stat"><span class="bl-panel-n">{{bigLevelMap[ level['level']?.id ?? '']?.level ?? ''}}</span><span class="bl-panel-l">Level,
+                actual</span>
+            </div>
+            <div class="bl-facts">
+              <div class="bl-fact"><span class="bl-fact-l">ATC model</span><span class="bl-fact-v">{{level['atcmodel']}}</span></div>
+              <!-- <div class="bl-fact"><span class="bl-fact-l">Customer status</span><span class="bl-fact-v">Active</span></div> -->
+              <!-- <div class="bl-fact"><span class="bl-fact-l">Journey</span><span class="bl-fact-v">B!G</span></div> -->
+            </div>
+            <div class="bl-group">
+              <div class="bl-group-title">Special activity</div>
+              <div class="bl-act" *ngFor="let specialActivity of level['specialactivity'] ?? []">
+                <span class="bl-act-name">{{bigActivityMap[specialActivity['activity']?.id ?? ''] ?? ''}}</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip"><b>{{specialActivity['completed'] ?? 0}}</b></span>
+                </span>
+              </div>
+            </div>
+            <div class="bl-group">
+              <div class="bl-group-title">Booster activity</div>
+              <div class="bl-act" *ngFor="let boosterActivity of level['boosteractivity'] ?? []">
+                <span class="bl-act-name">{{bigActivityMap[boosterActivity['activity']?.id ?? ''] ?? ''}}</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip"><b>{{boosterActivity['completed'] ?? 0}}</b></span>
+                </span>
+              </div>
+            </div>
+            <div class="bl-group">
+              <div class="bl-group-title">Fast track</div>
+              <div class="bl-act" *ngFor="let fasttrack of level['fasttrack'] ?? []">
+                <span class="bl-act-name">{{bigLevelMap[fasttrack['level']?.id ?? '']}}</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>{{fasttrack['validation'][0]['completed']}} / {{fasttrack['validation'][0]['metric']}}</b></span>
+                  <span class="bl-act-chip">Stablization <b>{{fasttrack['stabilization'][0]['completed']}} / {{fasttrack['stabilization'][0]['metric']}}</b></span>
+                </span>
+              </div>
+              <!-- <div class="bl-act">
+                <span class="bl-act-name">Stablization</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>5 / 5</b></span>
+                  <span class="bl-act-chip">Stablization <b>10 / 20</b></span>
+                </span>
+              </div> -->
+            </div>
+            <!-- <div class="bl-group">
+              <div class="bl-group-title">Regular</div>
+              <div class="bl-act">
+                <span class="bl-act-name">Changework Shadow</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>5 / 5</b></span>
+                  <span class="bl-act-chip">Stablization <b>12 / 20</b></span>
+                </span>
+              </div>
+              <div class="bl-act">
+                <span class="bl-act-name">Changework Mentee</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>7 / 20</b></span>
+                  <span class="bl-act-chip">Stablization <b>10 / 40</b></span>
+                </span>
+              </div>
+              <div class="bl-act">
+                <span class="bl-act-name">Changework Solo</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>6 / 50</b></span>
+                  <span class="bl-act-chip">Stablization <b>8 / 60</b></span>
+                </span>
+              </div>
+              <div class="bl-act">
+                <span class="bl-act-name">Scope Enhancer Shadow</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip">Validation <b>5 / 20</b></span>
+                  <span class="bl-act-chip">Stablization <b>6 / 30</b></span>
+                </span>
+              </div>
+            </div> -->
+            <div class="bl-group">
+              <div class="bl-group-title">Regular</div>
+              <div class="bl-act" *ngFor="let regular of level['regular'] ?? []">
+                <span class="bl-act-name">{{bigActivityMap[regular['activity']?.id ?? '']}}</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip"><b>{{regular['completed']}} / {{regular['metric']}}</b></span>
+                </span>
+              </div>
+            </div>
+            <div class="bl-group">
+              <div class="bl-group-title">Warm up</div>
+              <div class="bl-act" *ngFor="let warmup of level['warmup'] ?? []">
+                <span class="bl-act-name">{{bigActivityMap[warmup['activity'].id]}}</span>
+                <span class="bl-act-counts">
+                  <span class="bl-act-chip"><b>{{warmup['completed']}}</b></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- <div class="bl-panel bl-p-impact">
+          <div class="bl-panel-head">Extended impact (yrs)</div>
+          <div class="bl-panel-stat"><span class="bl-panel-n">345</span><span class="bl-panel-l">Impact full years</span></div>
+          <div class="bl-group"><div class="bl-group-title">Where it came from</div>
+            <div class="bl-act bl-act-flat"><span class="bl-act-name">Changework</span><span class="bl-act-counts"><span class="bl-act-chip">172 yrs</span></span></div>
+            <div class="bl-act bl-act-flat"><span class="bl-act-name">Diagnostics</span><span class="bl-act-counts"><span class="bl-act-chip">104 yrs</span></span></div>
+            <div class="bl-act bl-act-flat"><span class="bl-act-name">Scope enhancer</span><span class="bl-act-counts"><span class="bl-act-chip">69 yrs</span></span></div>
+          </div>
+        </div> -->
+        <div class="bl-panel bl-p-att" *ngIf="sidePanelCurrentTab === 'attended'">
+          <div class="bl-panel-head">Attendance</div>
+          <div class="bl-panel-stat"><span class="bl-panel-n">{{(sidePanelParticipant?.eventAttended ?? [])?.length}}<span class="bl-of"></span></span><span class="bl-panel-l">Events attended</span></div>
+          <!-- <div class="bl-group"><div class="bl-group-title">Events</div> -->
+            <div class="bl-event" *ngFor="let eventId of sidePanelParticipant?.eventAttended ?? []">
+              <span class="bl-event-main">
+                <span class="bl-event-name">{{eventMap[eventId]?.name}}</span>
+                <span class="bl-event-date">{{toDate(eventMap[eventId]?.start_date) | date:'medium'}}</span>
+              </span>
+            </div>
+            <!-- <div class="bl-event">
+              <span class="bl-event-main">
+                <span class="bl-event-name">Diagnostics Clinic</span>
+                <span class="bl-event-date">Starts May 13, 2026</span>
+              </span>
+              <span class="bl-mark-yes">Present</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main">
+                <span class="bl-event-name">Scope Enhancer Session</span>
+                <span class="bl-event-date">Starts Jun 10, 2026</span>
+              </span>
+              <span class="bl-mark-yes">Present</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main">
+                <span class="bl-event-name">Cohort Sync</span>
+                <span class="bl-event-date">Starts Jul 15, 2026</span>
+              </span>
+              <span class="bl-mark-yes">Present</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main">
+                <span class="bl-event-name">B!G Monthly</span>
+                <span class="bl-event-date">Starts Aug 12, 2026</span>
+              </span>
+              <span class="bl-mark-yes">Present</span>
+            </div> 
+          </div>-->
+        </div>
+        <div class="bl-panel bl-p-studio" *ngIf="sidePanelCurrentTab === 'studio'">
+          <div class="bl-panel-head">Studio log</div>
+          <div class="bl-panel-stat"><span class="bl-panel-n">8</span><span class="bl-panel-l">Entries logged</span></div>
+          <div class="bl-group"><div class="bl-group-title">Entries</div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Changework studio</span>
+              <span class="bl-log-date">July 9, 2026, 5:32 PM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Clone</span><span class="bl-tag">LYL</span><span class="bl-tag">Live assignment</span></span>
+              <span class="bl-log-sub">Participant Test 82</span>
+            </div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Scope studio</span>
+              <span class="bl-log-date">June 2, 2026, 11:15 AM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Clone</span><span class="bl-tag">B!G</span><span class="bl-tag">Live assignment</span></span>
+              <span class="bl-log-sub">Participant Test 63</span>
+            </div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Diagnostics studio</span>
+              <span class="bl-log-date">May 28, 2026, 12:50 PM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Clone</span><span class="bl-tag">LYL</span><span class="bl-tag">Live assignment</span></span>
+              <span class="bl-log-sub">Participant Test 24</span>
+            </div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Review studio</span>
+              <span class="bl-log-date">April 18, 2026, 9:05 AM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Origin</span><span class="bl-tag">CTD</span><span class="bl-tag">Self assignment</span></span>
+              <span class="bl-log-sub">Participant Test 110</span>
+            </div>
+          </div>
+        </div>
+        <div class="bl-panel bl-p-cal" *ngIf="sidePanelCurrentTab === 'activity'">
+          <div class="bl-panel-head">Cohort activity log</div>
+          <div class="bl-panel-stat"><span class="bl-panel-n">0 <span class="bl-of">/ 1</span></span><span class="bl-panel-l">Logged against assigned</span></div>
+          <div class="bl-group"><div class="bl-group-title">Queue</div>
+            <div class="bl-queue"><span class="bl-pill">Review <b>6</b></span><span class="bl-pill">Rework <b>2</b></span><span class="bl-pill">Missed <b>18</b></span><span class="bl-pill">Completed <b>3</b></span></div>
+          </div>
+          <div class="bl-group"><div class="bl-group-title">Logged activity</div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Diagnostics solo</span>
+              <span class="bl-log-date">July 9, 2026, 5:32 PM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Clone</span><span class="bl-tag">LYL</span><span class="bl-tag">Live assignment</span></span>
+              <span class="bl-log-sub">Participant Test 82</span>
+            </div>
+            <div class="bl-log-row">
+              <span class="bl-log-act">Changework solo</span>
+              <span class="bl-log-date">June 2, 2026, 11:15 AM</span>
+              <span class="bl-log-tags"><span class="bl-tag">MIG - Clone</span><span class="bl-tag">B!G</span><span class="bl-tag">Live assignment</span></span>
+              <span class="bl-log-sub">Participant Test 82</span>
+            </div>
+          </div>
+          <div class="bl-group"><div class="bl-group-title">Submitted activities</div>
+            <div class="bl-actcard">
+              <span class="bl-actcard-top">
+                <span class="bl-badge bl-badge-type">Form</span>
+                <span class="bl-badge bl-badge-review">Review</span>
+              </span>
+              <span class="bl-actcard-title">Form Activity</span>
+              <span class="bl-actcard-dates">
+                <span><i>Start</i>Apr 15, 2026, 3:57 PM</span>
+                <span><i>End</i>Apr 18, 2026, 3:57 PM</span>
+              </span>
+            </div>
+            <div class="bl-actcard">
+              <span class="bl-actcard-top">
+                <span class="bl-badge bl-badge-type">Form</span>
+                <span class="bl-badge bl-badge-review">Review</span>
+              </span>
+              <span class="bl-actcard-title">Test Form</span>
+              <span class="bl-actcard-dates">
+                <span><i>Start</i>Apr 15, 2026, 6:05 PM</span>
+                <span><i>End</i>Apr 18, 2026, 6:06 PM</span>
+              </span>
+            </div>
+            <div class="bl-actcard">
+              <span class="bl-actcard-top">
+                <span class="bl-badge bl-badge-type">Form</span>
+                <span class="bl-badge bl-badge-completed">Completed</span>
+              </span>
+              <span class="bl-actcard-title">Test 15</span>
+              <span class="bl-actcard-dates">
+                <span><i>Start</i>Jan 12, 2026, 1:00 AM</span>
+                <span><i>End</i>Jun 2, 2026, 1:00 AM</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="bl-panel bl-p-eiflix" *ngIf="sidePanelCurrentTab === 'content'">
+          <div class="bl-panel-head">Eiflix consumption</div>
+          <div class="bl-panel-stat"><span class="bl-panel-n">41</span><span class="bl-panel-l">Units consumed</span></div>
+          <div class="bl-group"><div class="bl-group-title">Recently watched</div>
+            <div class="bl-event">
+              <span class="bl-event-main"><span class="bl-event-name">Changework Masterclass</span><span class="bl-event-date">Sep 2, 2026</span></span>
+              <span class="bl-act-chip">42 min</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main"><span class="bl-event-name">Scope Enhancer Walkthrough</span><span class="bl-event-date">Aug 19, 2026</span></span>
+              <span class="bl-act-chip">28 min</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main"><span class="bl-event-name">Diagnostilevelcs Deep Dive</span><span class="bl-event-date">Jul 28, 2026</span></span>
+              <span class="bl-act-chip">35 min</span>
+            </div>
+            <div class="bl-event">
+              <span class="bl-event-main"><span class="bl-event-name">Stablization Clinic</span><span class="bl-event-date">Jun 30, 2026</span></span>
+              <span class="bl-act-chip">21 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
+  </div>
 </div>
+
+

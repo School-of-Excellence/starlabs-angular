@@ -30,14 +30,17 @@
 .bl-card {
     max-width: 1600px;
     margin: 0 auto;
-    background: #FFFFFF;
     border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 10px 30px rgba(0, 0, 0, .05);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .bl-scroll {
-    overflow-x: auto
+    overflow-x: auto;
+    background: #FFFFFF;
 }
 
 .bl-grid {
@@ -1143,3 +1146,286 @@
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+
+/* Search */
+.topbar-search {
+  flex: 1;
+  height: 34px;
+  border: 1px solid #E7E7EC;
+  border-radius: 10px;;
+  background: #FBFBFD;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #9798A3;
+  max-width: 360px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  margin-left: 1px;
+}
+
+.topbar-search:focus-within {
+  border-color: #4F46E5;
+  background: #FBFBFD;
+  box-shadow: 0 0 0 3px #EEEDFD;
+}
+
+.topbar-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: #16171B;
+  flex: 1;
+  font-family: inherit;
+}
+
+.topbar-search input::placeholder {
+  color: #9798A3;
+}
+
+/* side bar */
+.bl-sidebar{
+  position:fixed;
+  width:580px;
+  max-width:100%;
+  margin:0 auto;
+  background:#FFFFFF;
+  border-radius:16px;
+  overflow:auto;
+  box-shadow:0 1px 2px rgba(0,0,0,.04), 0 10px 30px rgba(0,0,0,.06);
+  right: 0;
+  top: 65px;
+  bottom: 0;  
+}
+
+/* the tab radios are functional, not visible */
+.bl-switch{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+
+/* --------------------------------------------------------------------------
+   2. HEADER
+   -------------------------------------------------------------------------- */
+.bl-drawer-head{
+    position: sticky;
+    top: 1px;
+  display:flex; align-items:center; gap:12px;
+  padding:18px 18px 14px;
+  background:#FFFFFF;
+  border-bottom:.5px solid rgba(60,60,67,.16);
+}
+.bl-avatar{
+  width:30px; height:30px; border-radius:50%;
+  flex:none; display:grid; place-items:center;
+  font-size:11px; font-weight:600; line-height:1; letter-spacing:.2px; color:#FFFFFF;
+}
+.bl-avatar-lg{width:44px; height:44px; font-size:15px}
+.bl-who{display:flex; flex-direction:column; flex:1; min-width:0}
+.bl-who-name{font-size:19px; font-weight:700; letter-spacing:-.4px}
+.bl-who-meta{font-size:13px; color:rgba(60,60,67,.62)}
+.bl-close{
+  flex:none; width:30px; height:30px; border-radius:50%;
+  display:grid; place-items:center; cursor:pointer;
+  background:rgba(120,120,128,.12); color:rgba(60,60,67,.62);
+  font-size:19px; line-height:1;
+}
+.bl-close:hover{background:rgba(120,120,128,.22); color:#1C1C1E}
+
+/* --------------------------------------------------------------------------
+   3. TABS
+   One tab per leaderboard column, each carrying that participant's value.
+   Equal cards, so no tab stretches the row.
+   -------------------------------------------------------------------------- */
+.bl-tabs{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:5px;
+  padding:9px 10px;
+  background:#F7F7FA;
+  border-bottom:.5px solid rgba(60,60,67,.16);
+}
+.bl-tab{
+  display:flex; flex-direction:column; justify-content:center; gap:3px;
+  min-height:56px;
+  padding:8px 6px;
+  border-radius:10px;
+  background:#FFFFFF;
+  text-align:center;
+  cursor:pointer;
+  transition:background .15s ease, box-shadow .15s ease;
+}
+.bl-tab:hover{background:#EFEFF4}
+.bl-tab:focus-within{outline:2px solid #007AFF; outline-offset:-2px}
+.bl-tab-v{
+  font-size:14.5px; font-weight:600; letter-spacing:-.2px; line-height:1.15;
+  font-variant-numeric:tabular-nums; color:#1C1C1E;
+}
+.bl-tab-level .bl-tab-v{font-size:10.5px; line-height:1.25}
+.bl-tab-l{
+  font-size:11px; font-weight:600; letter-spacing:.03em;
+  text-transform:uppercase; color:rgba(22, 22, 22, 0.36);
+}
+
+/* the checked radio lights its own tab */
+.bl-sidebar input.bl-t-level:checked  ~ .bl-tabs .bl-tab-level,
+.bl-sidebar input.bl-t-impact:checked ~ .bl-tabs .bl-tab-impact,
+.bl-sidebar input.bl-t-att:checked    ~ .bl-tabs .bl-tab-att,
+.bl-sidebar input.bl-t-studio:checked ~ .bl-tabs .bl-tab-studio,
+.bl-sidebar input.bl-t-cal:checked    ~ .bl-tabs .bl-tab-cal,
+.bl-sidebar input.bl-t-eiflix:checked ~ .bl-tabs .bl-tab-eiflix{
+  background:#007AFF;
+  box-shadow:0 1px 3px rgba(0,122,255,.35);
+}
+.active-sidetab {
+  background:#007AFF;
+  box-shadow:0 1px 3px rgba(0,122,255,.35);
+}
+.bl-sidebar input.bl-t-level:checked  ~ .bl-tabs .bl-tab-level .bl-tab-v,
+.bl-sidebar input.bl-t-impact:checked ~ .bl-tabs .bl-tab-impact .bl-tab-v,
+.bl-sidebar input.bl-t-att:checked    ~ .bl-tabs .bl-tab-att .bl-tab-v,
+.bl-sidebar input.bl-t-studio:checked ~ .bl-tabs .bl-tab-studio .bl-tab-v,
+.bl-sidebar input.bl-t-cal:checked    ~ .bl-tabs .bl-tab-cal .bl-tab-v,
+.bl-sidebar input.bl-t-eiflix:checked ~ .bl-tabs .bl-tab-eiflix .bl-tab-v{color:#FFFFFF}
+.bl-sidebar input.bl-t-level:checked  ~ .bl-tabs .bl-tab-level .bl-tab-l,
+.bl-sidebar input.bl-t-impact:checked ~ .bl-tabs .bl-tab-impact .bl-tab-l,
+.bl-sidebar input.bl-t-att:checked    ~ .bl-tabs .bl-tab-att .bl-tab-l,
+.bl-sidebar input.bl-t-studio:checked ~ .bl-tabs .bl-tab-studio .bl-tab-l,
+.bl-sidebar input.bl-t-cal:checked    ~ .bl-tabs .bl-tab-cal .bl-tab-l,
+.bl-sidebar input.bl-t-eiflix:checked ~ .bl-tabs .bl-tab-eiflix .bl-tab-l{color:rgba(255,255,255,.72)}
+
+/* and reveals its own panel */
+.bl-panel{ padding:4px 18px 18px}
+.bl-sidebar input.bl-t-level:checked  ~ .bl-panels .bl-p-level,
+.bl-sidebar input.bl-t-impact:checked ~ .bl-panels .bl-p-impact,
+.bl-sidebar input.bl-t-att:checked    ~ .bl-panels .bl-p-att,
+.bl-sidebar input.bl-t-studio:checked ~ .bl-panels .bl-p-studio,
+.bl-sidebar input.bl-t-cal:checked    ~ .bl-panels .bl-p-cal,
+.bl-sidebar input.bl-t-eiflix:checked ~ .bl-panels .bl-p-eiflix{display:block}
+
+/* --------------------------------------------------------------------------
+   4. PANEL CONTENT
+   -------------------------------------------------------------------------- */
+.bl-panel-head{
+  font-size:11px; font-weight:600; letter-spacing:.02em; text-transform:uppercase;
+  color:rgba(60,60,67,.36);
+  padding:14px 0 0;
+}
+.bl-panel-stat{display:flex; flex-direction:column; gap:1px; padding:6px 0 14px}
+.bl-panel-n{
+  font-size:34px; font-weight:700; letter-spacing:-.9px; line-height:1.1;
+  font-variant-numeric:tabular-nums; color:#1C1C1E;
+}
+.bl-p-level .bl-panel-n{font-size:24px; letter-spacing:-.5px}
+.bl-of{font-size:22px; font-weight:600; color:rgba(60,60,67,.36)}
+.bl-panel-l{font-size:13px; color:rgba(60,60,67,.62)}
+
+.bl-facts{border-top:.5px solid rgba(60,60,67,.16); margin-bottom:6px}
+.bl-fact{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:9px 0; border-bottom:.5px solid rgba(60,60,67,.16);
+}
+.bl-fact-l{font-size:14px; color:rgba(60,60,67,.62)}
+.bl-fact-v{font-size:14px; font-weight:600; color:#1C1C1E; text-align:right}
+
+.bl-group{margin-top:14px}
+.bl-group-title{
+  font-size:11px; font-weight:600; letter-spacing:.02em; text-transform:uppercase;
+  color:rgba(60,60,67,.36); margin-bottom:6px;
+}
+.bl-empty{font-size:13px; color:rgba(60,60,67,.36); padding:2px 0 4px}
+
+/* --------------------------------------------------------------------------
+   5. ACTIVITY ROWS - each activity reports validation and stablization
+   -------------------------------------------------------------------------- */
+.bl-act{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 11px; margin-bottom:5px;
+  background:#F7F7FA; border-radius:10px;
+}
+.bl-act-name{font-size:13.5px; font-weight:500; color:#1C1C1E}
+.bl-act-counts{display:flex; gap:5px; flex:none}
+.bl-act-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 9px; border-radius:999px;
+  background:#FFFFFF; color:rgba(60,60,67,.62);
+  font-size:11px; font-weight:500; white-space:nowrap;
+  box-shadow:inset 0 0 0 .5px rgba(60,60,67,.16);
+}
+.bl-act-chip b{font-weight:700; color:#1C1C1E; font-variant-numeric:tabular-nums}
+.bl-act-flat{background:#FFFFFF; box-shadow:inset 0 0 0 .5px rgba(60,60,67,.16)}
+
+/* --------------------------------------------------------------------------
+   6. EVENTS - a name, its start date, and how it went
+   -------------------------------------------------------------------------- */
+.bl-event{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 11px; margin-bottom:5px;
+  background:#F7F7FA; border-radius:10px;
+}
+.bl-event-main{display:flex; flex-direction:column; gap:1px; min-width:0}
+.bl-event-name{font-size:13.5px; font-weight:500; color:#1C1C1E}
+.bl-event-date{font-size:12px; color:rgba(60,60,67,.62); font-variant-numeric:tabular-nums}
+.bl-mark-yes,.bl-mark-no{flex:none; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600}
+.bl-mark-yes{background:rgba(52,199,89,.16); color:#1E7B36}
+.bl-mark-no{background:rgba(255,59,48,.14); color:#C22A21}
+
+/* --------------------------------------------------------------------------
+   7. LOG ROWS - every column the activity log carries
+   -------------------------------------------------------------------------- */
+.bl-log-row{
+  display:flex; flex-direction:column; gap:1px;
+  padding:9px 0; border-bottom:.5px solid rgba(60,60,67,.16);
+}
+.bl-log-act{font-size:14px; font-weight:600; color:#1C1C1E}
+.bl-log-date{font-size:12.5px; color:rgba(60,60,67,.62); font-variant-numeric:tabular-nums}
+.bl-log-tags{display:flex; flex-wrap:wrap; gap:4px; margin-top:5px}
+.bl-tag{
+  padding:2px 8px; border-radius:6px;
+  background:rgba(120,120,128,.12); color:rgba(60,60,67,.62);
+  font-size:11px; font-weight:500; white-space:nowrap;
+}
+.bl-log-sub{font-size:11.5px; color:rgba(60,60,67,.36); margin-top:4px}
+
+.bl-queue{display:flex; flex-wrap:wrap; gap:6px}
+.bl-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 11px; border-radius:999px;
+  background:rgba(0,122,255,.10); color:#0063CC;
+  font-size:12.5px; font-weight:500;
+}
+.bl-pill b{font-weight:700; font-variant-numeric:tabular-nums}
+
+/* --------------------------------------------------------------------------
+   8. SUBMITTED ACTIVITY CARDS
+   -------------------------------------------------------------------------- */
+.bl-actcard{
+  display:flex; flex-direction:column; gap:7px;
+  padding:11px 12px; margin-bottom:6px;
+  border-radius:12px;
+  box-shadow:inset 0 0 0 .5px rgba(60,60,67,.16);
+}
+.bl-actcard-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.bl-badge{padding:3px 9px; border-radius:999px; font-size:10px; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase}
+.bl-badge-type{background:rgba(255,149,0,.16); color:#9A5B00}
+.bl-badge-review{background:rgba(175,82,222,.14); color:#7B2FA8}
+.bl-badge-completed{background:rgba(52,199,89,.16); color:#1E7B36}
+.bl-badge-rework{background:rgba(255,59,48,.14); color:#C22A21}
+.bl-actcard-title{font-size:14.5px; font-weight:600; color:#1C1C1E}
+.bl-actcard-dates{display:flex; gap:18px; flex-wrap:wrap}
+.bl-actcard-dates span{display:flex; flex-direction:column; gap:1px;
+  font-size:12.5px; color:#1C1C1E; font-variant-numeric:tabular-nums}
+.bl-actcard-dates i{font-style:normal; font-size:10px; font-weight:600;
+  letter-spacing:.03em; text-transform:uppercase; color:rgba(60,60,67,.36)}
+
+/* --------------------------------------------------------------------------
+   9. RESPONSIVE
+   -------------------------------------------------------------------------- */
+@media (max-width:600px){
+  .bl-app{padding:12px 10px}
+  .bl-sidebar{width:100%}
+  .bl-tabs{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  .bl-tab{transition:none}
+}
+

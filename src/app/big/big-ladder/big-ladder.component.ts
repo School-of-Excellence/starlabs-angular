@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { Firestore, getDocs , collection , query , where, DocumentReference} from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 
 interface CohortActivities{
   completed : Array<any>,
@@ -15,7 +17,9 @@ interface CohortActivities{
 @Component({
   selector: 'app-big-ladder',
   imports: [
-    CommonModule
+    CommonModule,
+    FormsModule,
+    MatPaginatorModule
   ],
   templateUrl: './big-ladder.component.html',
   styleUrl: './big-ladder.component.css'
@@ -23,6 +27,13 @@ interface CohortActivities{
 export class BigLadderComponent implements OnInit {
 
   isLoading = true;
+
+  participantSearch = '';
+
+  paginatedData = [];
+  pageSize : number = 15;
+  pageIndex : number = 0;
+
 
   participantMetadataMap = {};
   eventsAttended : {[key : string] : Set<string>}= {};
@@ -36,11 +47,16 @@ export class BigLadderComponent implements OnInit {
   filteredDashbordData = [];
 
   bigJourney : string[] = [];
+  bigEvents : string[] = [];
   eventMap = {};
   journeyMap = {};
   bigLevelMap = {};
+  bigActivityMap = {};
 
   sortHeader = null;
+
+  sidePanelParticipant = null;
+  sidePanelCurrentTab : 'level' | 'studio' | 'activity' | 'content' | 'attended' = 'level';
 
   constructor(private firestore : Firestore , private authService : AuthguardService){
     getDocs(query(collection(this.firestore , 'biglevel'))).then((bigLevelSnap)=>{
@@ -48,11 +64,22 @@ export class BigLadderComponent implements OnInit {
         const level = docref.data();
         this.bigLevelMap[docref.id] = level;
       }
-      console.log(this.bigLevelMap)
-    })
+    });
+
+    getDocs(query(collection(this.firestore , 'bigactivity'))).then((bigActivitySnap)=>{
+      for (const docref of bigActivitySnap.docs) {
+        const activity = docref.data();
+        this.bigActivityMap[docref.id] = activity;
+      }
+    });
   }
 
   async ngOnInit() {
+    this.fetchDashbordData();
+  }
+
+
+  async fetchDashbordData(){
     const now = new Date();
 
     const participantMetadataMap = {};
@@ -225,6 +252,88 @@ export class BigLadderComponent implements OnInit {
 
     this.dashboardData = [...dashboardData];
     this.filteredDashbordData = [...dashboardData];
+    this.updatePaginatedData();
+  }
+
+  filterTable(){
+    const data = [...this.dashboardData];
+    const filterData = data.filter((participant) => {
+      const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
+      if (search.length > 0) {
+        const participantName: string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
+        if (!participantName.includes(search)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+    this.filteredDashbordData = filterData;
+    this.pageIndex = 0;
+    this.updatePaginatedData();
+  }
+
+  // applyFilter(participant : any){
+  //   const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
+  //   console.log(search)
+  //   if (search.length > 0) {
+  //     const participantName : string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
+  //     console.log(!participantName.includes(search))
+  //     if (!participantName.includes(search)) {
+  //       return false;
+  //     }
+  //   }
+
+  //   return true
+  // }
+
+  openSidePanel(profileId : string){
+    if (profileId) {
+      const metadata = this.participantMetadataMap[profileId] ?? null;
+      const eventsAttended = this.eventsAttended[profileId] ?? new Set();
+      const bigActivity = this.cohortActivities[profileId] ?? null;
+      const overAllActivity = Object.values(bigActivity ?? {}).reduce((t,c)=> t + c?.length , 0);
+      const eiflixConsumption = this.eiflixConsumptionMap[profileId] ?? new Set();
+      const queueActivityLog = this.queueActivityLog[profileId] ?? [];
+      const bigParticipantLevel = this.bigParticipantLevel[profileId] ?? [];
+
+      const participantMetrics = {
+        ...metadata,
+        eventAttended : [...eventsAttended],
+        bigActivity : bigActivity,
+        eiflixConsumption : [...eiflixConsumption],
+        queueActivityLog : queueActivityLog,
+        bigParticipantLevel : bigParticipantLevel,
+      };
+
+      this.sidePanelParticipant = participantMetrics;
+      console.log(this.sidePanelParticipant)
+    }
+  }
+
+  closeSidePanel(){
+    this.sidePanelParticipant = null;
+    this.sidePanelCurrentTab = 'level';
+  }
+
+  getParticipantJourney(participant : any) : string{
+    const journey = participant['activejourney'] ?? participant['lastcompletedjourney'] ?? null;
+    if (journey) {
+      return this.journeyMap[journey]?.journey ?? '';
+    }
+    return ''
+  }
+
+  onPageChange(event: PageEvent) {
+    this.pageSize = event.pageSize;
+    this.pageIndex = event.pageIndex;
+    this.updatePaginatedData();
+  }
+
+  private updatePaginatedData() {
+    const startIndex = this.pageIndex * this.pageSize;
+    const endIndex = startIndex + this.pageSize;
+    this.paginatedData = this.filteredDashbordData.slice(startIndex, endIndex);
   }
 
   getInital(name : string){
