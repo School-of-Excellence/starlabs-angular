@@ -31,3 +31,16 @@ PI 4/4, VPF F01+F03 pass, bap + vpf-controls pass. Full profiles: 85 pass, 11 sk
 
 ## Revert guide
 Hooks are attribute-only; `git revert <this commit>` removes them with no behaviour change.
+
+## Later the same day — bulk-add-products removed from the release (operator)
+`bulk-add-products/**` and its caller in `participants-analytics` restored to `origin/development` (drops
+143ae6a2's package modes / unresolved review / export / live history and the 7 `bap-*` hooks). The hub's
+`profiles/bulk-add-products.spec.ts` + bulkProductJobs seed were removed with it — development's component
+has no hooks, so the spec would have failed the gate on every branch. The bulk plan/journal docs stay as history.
+
+## CI journey failures (run1) — fixed in the hub seed, not the app
+CI runs the functions emulator; productsdata_to_pmd rebuilt the FTO members' activeproduct from
+participantsproduct via orderBy('sequenceorder') and dropped the seeded rows (no sequenceorder) → JTED-02..08.
+The FTO DFU product had no `id` field → delivery-dashboard-clone's doc('products', data.id) threw
+("reading 'indexOf'") → ddc + JP-25. Seed now CF-consistent (sequenceorder, statusdate, product `id`).
+Local run WITH functions: journey 81 pass / 0 fail, profiles 86 pass / 0 fail.
