@@ -1,0 +1,24 @@
+{
+  "//": "Composite indexes the NEW board path requires in production. The emulator does NOT enforce these, so they are documented here as the Phase-2 deliverable. Drawer queries are single-field equality (profileid==/clientid==) and use auto single-field indexes — no composite needed.",
+  "indexes": [
+    {
+      "//": "coach-filtered, cursor-paginated board page: where(coachedby ==) + orderBy(documentId())",
+      "collectionGroup": "participantjourneyproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "coachedby", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "onboarded-initiated count card: where(journeystatus in) + where(onboarded ==)",
+      "collectionGroup": "participantjourneyproduct",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "journeystatus", "order": "ASCENDING" },
+        { "fieldPath": "onboarded", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

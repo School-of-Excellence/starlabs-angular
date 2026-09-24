@@ -56,6 +56,7 @@ interface PortfolioRow {
   number: string | null;
   email: string | null;
   coachname: string;
+  coachedby?: any;                  // raw coachedby ref (real coach OR stale non-journeycoach id) — kept so the Unassign action stays available when coachNameFor resolves the name to '—' (doc item 2)
   journeyname: string;
   atcmodel: string | null;
   productType: ProductType;        // ecosystem / dfu / gifts / other (derived from journey.type)
@@ -77,6 +78,9 @@ interface PortfolioRow {
   goingQuiet: boolean;
   // global participant flag (star) — mirrors the `flagged` set in healthtracker_flag
   flagged: boolean;
+  llCritical?: boolean;             // unresolved A&H love-letter / ask-A&H critical tag (doc item 5)
+  llAttention?: boolean;            // unresolved A&H needs-attention (tagged) tag
+  llOpportunity?: boolean;          // unresolved A&H opportunity tag (surfaced only; not attention)
   renewalWindow: boolean;
   // subscription-based active flag: the participant has >=1 journey-product whose subscriptionend
   // is in the future (daysToRenewal >= 0). Active/Inactive counting + levers key off THIS, not
@@ -87,6 +91,7 @@ interface PortfolioRow {
   priority: number;
   priorityBand: 'High' | 'Medium' | 'Low';
   reason: string;
+  naReasons?: string[];
   pjpIds: string[];              // journey-product doc ids for this participant (for assignment writes)
   recentEventRequest: { eventName: string; date: Date | null; status: string } | null;
   // Coach-set Health State (manual coach assessment, separate from customerstatus)
@@ -123,7 +128,7 @@ type CoachMetric = 'caseload' | 'active' | 'needToday' | 'goingQuiet' | 'flagged
 
 /** One completed JC: an `appointments` doc with journeycoach == true AND attended == true.
  *  `coachId` is the first entry of the doc's `hosts[]` — the coach who ran the session. */
-interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; }
+interface JcDoneEvent { profileid: string; coachId: string | null; ms: number; onboarding?: boolean; }
 
 /** Product-type classification, derived from the `journey` collection's `type` field
  *  (and the special-cased FTO journey for gifts) — the same signal the sales dashboards use. */
@@ -152,10 +157,23 @@ interface LiteIndexRow {
   lapsed: boolean;                 // subscription ended within LAPSED_DAYS and not an inactive status
   notStarted: boolean;             // onboarded but journey not started
   goingQuiet: boolean;             // no coach contact in QUIET_DAYS+ days (set once contact data loads)
+  llCritical?: boolean;            // base-wide A&H critical tag (doc item 5)
+  llAttention?: boolean;           // base-wide A&H needs-attention tag
 }
 
 /** A coach's personal journey group: a chosen name over a set of journey names (one journey per group). */
 interface JourneyGroup { id: string; name: string; journeys: string[]; }
+
+interface AhDrillEntry { profileid: string; name: string; created: number; }
+
+/** Ask A&H / Love Letter analytics (item 3) — flag breakdown per collection + combined + resolved. */
+interface AHFlagCounts { total: number; tagged: number; opportunity: number; liked: number; critical: number; resolved: number; }
+interface AHSummary {
+  askAH: AHFlagCounts;
+  loveLetter: AHFlagCounts;
+  liked: number; tagged: number; opportunity: number; critical: number; unflagged: number;
+  resolvedTotal: number; resolvedLiked: number; resolvedTagged: number; resolvedOpportunity: number; resolvedCritical: number;
+}
 
 /** Phase C: one coach's gamified scoreboard row for the selected date range. */
 interface ScoreboardRow {
@@ -192,6 +210,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   readonly QUIET_DAYS = 60;
   readonly RENEWAL_DAYS = 90;
+  readonly W_LL_CRITICAL = 30;     // A&H love-letter critical → priority weight (doc item 5)
+  readonly W_LL_ATTENTION = 18;    // A&H needs-attention (tagged) → priority weight
   readonly LAPSED_DAYS = 90;       // show lapses up to this many days past end
   readonly HEALTH_TTL_DAYS = 60;   // a coach-set health tag is valid 60 days, then reverts to Not assessed
   readonly ALL = '__all__';
@@ -212,6 +232,18 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly COVERAGE_TARGET = 0.9;  // contact at least this share of the base each period
 
   view: DashboardView = 'summary';
+  // Dark/light theming (operator-approved): follows prefers-color-scheme by default; the header toggle
+  // overrides and persists to localStorage. Applied via [attr.data-theme] on .jchd-wrap.
+  theme: 'dark' | 'light' | null = null;
+  private readonly THEME_KEY = 'jchd-theme';
+  get isDark(): boolean {
+    if (this.theme) return this.theme === 'dark';
+    return typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  toggleTheme(): void {
+    this.theme = this.isDark ? 'light' : 'dark';
+    try { localStorage.setItem(this.THEME_KEY, this.theme); } catch {}
+  }
   // Worklist view: a focused triage queue over the already-priority-sorted dataSource.data.
   worklistLimit = 25;
   period: 'week' | 'month' | 'custom' = 'month';
@@ -316,12 +348,17 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // 'UNASSESSED' = participant has no fresh coach-set health state (the "Not assessed" filter option).
   healthFilters: Array<CoachHealthState | 'UNASSESSED'> = [];
   financeFilters: string[] = [];                   // financialstatus values (multi)
+  eventStatusFilters: string[] = [];
   renewalWindowOnly = false;                        // renewal window (yes)
   goingQuietOnly = false;                           // going quiet (yes)
   noEventRequestOnly = false;                       // no recent event request (null)
   readonly tierOptions = ['B!G', 'LYL', 'uP!', 'CPM'];
   readonly healthOptions: CoachHealthState[] = COACH_HEALTH_OPTIONS;
   readonly healthFilterOptions: Array<CoachHealthState | 'UNASSESSED'> = [...COACH_HEALTH_OPTIONS, 'UNASSESSED'];
+  readonly eventStatusOptions: { value: string; label: string }[] = [
+    { value: 'approved', label: 'Approved' },
+    { value: 'requested', label: 'Requested' },
+  ];
   financeOptions: string[] = [];                    // discovered from the loaded base
 
   // Set of profileids that pass the lightweight full-base filters (paged mode only). When non-null,
@@ -345,7 +382,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private matchedIds: string[] = [];
   private suppressPagedRender = false;   // guards computeRows→applyFilters re-entry during a matched render
 
-  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+  summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
 
   // Current Firebase Auth uid, resolved during resolveCoach() so the audit-trail writes
   // (logCall / setHealthState / toggleFlag) can stamp actorUid synchronously. Never reused from
@@ -356,6 +393,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   // healthtracker_flag collection where flagged == true. Base-wide by construction, so the
   // Flagged count + filter are correct in paged mode too (no page-local caveat needed).
   flaggedIds = signal<Set<string>>(new Set());
+  // Per-participant A&H love-letter / ask-A&H tags (doc item 5): unresolved, non-happy tags OR-ed
+  // across a participant's docs. Plain map (rows rebuild after the load lands), like the ticket counts.
+  private llTagsByProfile: Record<string, { critical: boolean; attention: boolean; opportunity: boolean }> = {};
 
   private profileMap: any = {};
   private metaMap: any = {};
@@ -366,6 +406,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private openTicketCounts: Record<string, number> = {};
   private touchpointByProfile: Record<string, number> = {};
   private contactEventByProfile: Record<string, number> = {}; // raw attended-session recency
+  // Appointment-type ids whose type is an ONBOARDING call (appointmenttype.onboardingcall === true).
+  // Authoritative discriminator so a legacy onboarding appointment missing the onboarding/journeyid/pjp
+  // markers is still recognised by its type ref and kept OUT of the Journey-Coaching schedule.
+  private onboardingApptTypeIds = new Set<string>();
   // profileid -> most-recent event participation request {eventName, date, status}
   private recentEventByProfile: Record<string, { eventName: string; date: Date | null; status: string }> = {};
   // profileid -> latest coach-set Health State (manual coach assessment)
@@ -419,6 +463,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    try {
+      const t = localStorage.getItem(this.THEME_KEY);
+      if (t === 'dark' || t === 'light') this.theme = t;
+    } catch {}
+    void this.loadAHSummary();   // Ecosystem A&H analytics (item 3) — base-wide, loads in parallel.
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
@@ -558,6 +607,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.setProgress(85, 'Indexed full base · loading activity…');
     void this.loadExactOpenTickets();            // exact open-ticket counts, base-wide
     void this.loadAttentionDataInBackground();   // Going-quiet / Needs-Attention base-wide
+    void this.loadLoveLetterTagsBaseWide();      // A&H love-letter / ask-A&H tags, base-wide (recent window)
   }
 
   /** B-in-the-background: after first paint + index, load touchpoints + attended coach appointments
@@ -601,7 +651,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // is not, because the lever filters re-derive their own scope from it.
       if (!this.liteInScope(lite)) continue;
       if (goingQuiet) gq++;
-      if (goingQuiet || lite.lapsed || lite.notStarted || lite.renewalWindow || lite.openTickets > 0) na++;
+      if (this.isNeedsAttentionLite(lite)) na++;
     }
     this.fullBaseGoingQuiet = gq;
     this.fullBaseNeedsAttention.set(na);
@@ -673,9 +723,11 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (r.renewalWindow) this.summary.renewalsSoon++;
       if (r.lapsed) this.summary.lapsed++;
       if (r.openTickets > 0) this.summary.withOpenTickets++;
-      if (r.goingQuiet) this.summary.goingQuiet++;
+      if (this.isGoingQuietBucket(r)) this.summary.goingQuiet++;
       if (r.notStarted) this.summary.notStarted++;
       if ((r.financialstatus ?? '').toLowerCase() === 'locked') this.summary.paymentsLocked++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'defaulted') this.summary.defaulted++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'late') this.summary.missed++;
     }
     this.loadedRowCount = this.countedProfiles.size;
     if (this.selectedCoachId === this.UNASSIGNED) this.unassignedCount = this.loadedRowCount;
@@ -711,6 +763,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.noStatus = journeyIdx.reduce((n, l) => n + (this.lifecycleOf(l.customerstatus) === 'nostatus' ? 1 : 0), 0);
       this.summary.renewalsSoon = filteredIdx.reduce((n, l) => n + (l.renewalWindow ? 1 : 0), 0);
       this.summary.paymentsLocked = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'locked' ? 1 : 0), 0);
+      this.summary.defaulted = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'defaulted' ? 1 : 0), 0);
+      this.summary.missed = filteredIdx.reduce((n, l) => n + ((l.financialstatus ?? '').toLowerCase() === 'late' ? 1 : 0), 0);
       // journeyIdx, NOT filteredIdx: tickets are exempt from the lifecycle filter (see
       // leverIgnoresLifecycle) so the card matches the list it opens.
       this.summary.withOpenTickets = journeyIdx.reduce((n, l) => n + (l.openTickets > 0 ? 1 : 0), 0);
@@ -718,9 +772,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.summary.lapsed = filteredIdx.reduce((n, l) => n + (l.lapsed ? 1 : 0), 0);
       // going-quiet flags land on the lite rows only once contact data loads (computeBaseWideAttention);
       // until then keep the earlier fallback rather than flash 0.
-      if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (l.goingQuiet ? 1 : 0), 0);
+      if (this.contactDataLoaded()) this.summary.goingQuiet = filteredIdx.reduce((n, l) => n + (this.isGoingQuietBucketLite(l) ? 1 : 0), 0);
       // base-wide needs-attention / flagged / shown-count / health — all scoped to the filtered set
-      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + ((l.goingQuiet || l.lapsed || l.notStarted || l.renewalWindow || l.openTickets > 0) ? 1 : 0), 0));
+      this.fullBaseNeedsAttention.set(filteredIdx.reduce((n, l) => n + (this.isNeedsAttentionLite(l) ? 1 : 0), 0));
       this.pagedFilteredCount.set(filteredIdx.length);
       const h = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
       for (const l of filteredIdx) {
@@ -755,7 +809,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // Only zero the summary BEFORE the base-wide numbers exist. Once the lite index is built the
     // counts are base-wide (not page-accumulated), so a page reload must not flash them to 0.
     if (!this.fullIndexBuilt) {
-      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+      this.summary = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     }
     this.loadedRowCount = 0;
   }
@@ -810,6 +864,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       this.loadContactEventsFor(missing),
       this.loadRecentEventRequestsFor(missing),
       this.loadCoachHealthStatesFor(missing),
+      this.loadLoveLetterTagsFor(missing),
     ]);
     for (const id of missing) this.loadedJoinIds.add(id);
   }
@@ -967,6 +1022,73 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
   }
 
+  /** A&H love-letter / ask-A&H tags for a set of participants (doc item 5), SCOPED via batched
+   *  where('profileid','in',chunk). One-shot getDocs (this dashboard keeps no realtime listeners);
+   *  unresolved, NON-happy tags (critical / tagged=needs-attn / opportunity) OR-ed per participant.
+   *  Feeds the worklist chip + Needs-attention via the row flags. Degrades on permission-denied. */
+  private async loadLoveLetterTagsFor(profileIds: string[]): Promise<void> {
+    const ids = profileIds.filter(id => id && !(id in this.llTagsByProfile));
+    if (!ids.length) return;
+    for (const id of ids) this.llTagsByProfile[id] = { critical: false, attention: false, opportunity: false };
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    const collect = async (coll: string) => {
+      for (const chunk of chunks) {
+        try {
+          const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', 'in', chunk)));
+          snap.forEach(d => {
+            const data: any = d.data();
+            if (data['resolved'] === true) return;               // resolved in the love-letter dashboard → cleared
+            const t = this.llTagsByProfile[data['profileid']];
+            if (!t) return;
+            if (data['critical'] === true) t.critical = true;
+            if (data['tagged'] === true) t.attention = true;     // 'tagged' == needs-attention
+            if (data['opportunity'] === true) t.opportunity = true;
+          });
+        } catch (e) {
+          if (this.isPermissionDenied(e)) return;
+          console.warn(`${coll} tag load failed (non-fatal)`, e);
+        }
+      }
+    };
+    await Promise.all([collect('love letter'), collect('ask AH')]);
+  }
+
+  /** Base-wide A&H tags for the ALL / admin paged view (doc item 5): a SINGLE date-bounded read per
+   *  collection (recent window, ~180d), client-filtered to unresolved non-happy, setting the lite-index
+   *  flags so the base-wide Needs-attention count includes love-letter signals. Recent-window tradeoff:
+   *  unresolved tags older than the cutoff aren't counted base-wide (per-coach/per-page stays exact). */
+  private async loadLoveLetterTagsBaseWide(): Promise<void> {
+    if (!this.fullIndexBuilt) return;
+    const since = new Date(Date.now() - 180 * 86400000);
+    const map: Record<string, { critical: boolean; attention: boolean }> = {};
+    const collect = async (coll: string) => {
+      try {
+        const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
+        snap.forEach(d => {
+          const data: any = d.data();
+          if (data['resolved'] === true) return;
+          const pid = data['profileid'];
+          if (!pid) return;
+          const t = map[pid] ?? (map[pid] = { critical: false, attention: false });
+          if (data['critical'] === true) t.critical = true;
+          if (data['tagged'] === true) t.attention = true;
+        });
+      } catch (e) {
+        if (this.isPermissionDenied(e)) return;
+        console.warn(`${coll} base-wide tag load failed (non-fatal)`, e);
+      }
+    };
+    await Promise.all([collect('love letter'), collect('ask AH')]);
+    for (const l of this.fullIndex) {
+      const t = map[l.profileid];
+      l.llCritical = !!t?.critical;
+      l.llAttention = !!t?.attention;
+    }
+    this.computeBaseWideAttention();
+    if (this.pagedMode) { this.accumulatePagedSummary(); this.applyFilters(); }
+  }
+
   /** Firestore permission-denied detector (code `permission-denied` or a /permission/i message). */
   private isPermissionDenied(e: any): boolean {
     const code = (e?.code ?? '').toString();
@@ -1006,6 +1128,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const map: Record<string, number> = {};
     const events: JcDoneEvent[] = [];
     const pending: JcDoneEvent[] = [];
+    await this.loadOnboardingApptTypes();
     try {
       // ONE read of every journey-coach appointment (the `attended` filter used to be in the
       // query). Splitting client-side gives, from the same snapshot: completed JCs (attended),
@@ -1025,11 +1148,24 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         if (data['cancelled'] === true) return;
         const hosts0: any[] = Array.isArray(data['hosts']) ? data['hosts'] : [];
         const host = hosts0.map(h => (typeof h === 'string' ? h : h?.id)).find(Boolean) ?? null;
+        // Onboarding detection hardened (7023d94f): the schedule dialog sets onboarding===true AND a
+        // journeyid + participantjourneyproductid ONLY for onboarding calls. Legacy onboarding
+        // appointments missing all three markers are still caught by their appointment-type ref
+        // (onboardingApptTypeIds), the authoritative discriminator, so onboarding never leaks into
+        // the Journey-Coaching schedule.
+        const isOnboarding = this.isOnboardingAppt(data);
         if (data['attended'] !== true) {
           // booked and live: future = pending, past = overdue (the slot passed unattended).
-          pending.push({ profileid: pid, coachId: host, ms: dt.getTime() });
+          pending.push({ profileid: pid, coachId: host, ms: dt.getTime(), onboarding: isOnboarding });
           return;
         }
+        // ACTUAL journey coach only (doc item 6): onboarding calls are ALSO written
+        // journeycoach==true on `appointments` (schedule-dialog sets `onboarding: true` only for
+        // calltype 'onboarding'), so an attended ONBOARDING must not count as a completed JC or show
+        // in the JC-done list. Mirrors the journeycoach-dashboard rule ([null,undefined].includes(onboarding)).
+        // Pending/overdue above is intentionally left untouched — the JC-vs-Onboarding schedule split
+        // (doc item 1) is handled there separately.
+        if (data['onboarding'] === true) return;
         map[pid] = Math.max(map[pid] ?? 0, dt.getTime());
         // Keep each event as well — this query IS "JC done" (a journey-coach appointment that was
         // attended), and the JC pipeline metrics need the individual occurrences, not just the
@@ -1054,6 +1190,49 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private jcDoneEvents = signal<JcDoneEvent[]>([]);
   /** Booked, not cancelled, not yet marked attended. Future = pending, past = overdue. */
   private jcPendingEvents = signal<JcDoneEvent[]>([]);
+
+  /** Which count tile is active per schedule column; 'all' = show every booked session (default).
+   *  Clicking a Today / Next-7 / Overdue tile filters that column's list to the bucket (toggle off). */
+  jcSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  obSchedBucket = signal<'all' | 'today' | 'week' | 'overdue'>('all');
+  setSchedBucket(onboarding: boolean, bucket: 'today' | 'week' | 'overdue'): void {
+    const sig = onboarding ? this.obSchedBucket : this.jcSchedBucket;
+    sig.set(sig() === bucket ? 'all' : bucket);
+  }
+
+  /** True when a journeycoach appointment is really an ONBOARDING call — by its own onboarding flag,
+   *  its journey/pjp refs, OR (authoritative, catches legacy docs) its appointment-type ref being an
+   *  onboarding type. Named so the JC-vs-Onboarding partition is unit-testable (contract spec). */
+  private isOnboardingAppt(data: any): boolean {
+    const apptTypeId = data?.['appointment']?.id ?? null;
+    return data?.['onboarding'] === true
+      || data?.['journeyid'] != null
+      || data?.['participantjourneyproductid'] != null
+      || (apptTypeId != null && this.onboardingApptTypeIds.has(apptTypeId));
+  }
+
+  /** Load (once) the set of appointment-type ids that are ONBOARDING calls, so onboarding appointments
+   *  missing the onboarding / journeyid / pjp markers (legacy data) are still recognised by their type
+   *  ref and kept out of the Journey-Coaching schedule. One read of the small appointmenttype reference
+   *  collection, cached for the session. */
+  private async loadOnboardingApptTypes(): Promise<void> {
+    if (this.onboardingApptTypeIds.size) return;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'appointmenttype'),
+        where('onboardingcall', '==', true),
+      ));
+      const ids = new Set<string>();
+      snap.forEach(d => {
+        ids.add(d.id);
+        const fid = (d.data() as any)['id'];
+        if (typeof fid === 'string' && fid) ids.add(fid);
+      });
+      this.onboardingApptTypeIds = ids;
+    } catch (e) {
+      console.warn('appointmenttype (onboarding) load failed (non-fatal)', e);
+    }
+  }
 
   /** Per-coach JC metrics for the Coaches tab (doc item 9). Attribution is the appointment's
    *  `hosts[0]` — the coach who actually ran (or is due to run) the session, which is NOT
@@ -1154,6 +1333,175 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     }
     return { today, week, month, ready };
   });
+
+  // ---- Schedule (doc item 1): Journey Coaching vs Onboarding, shown as two SEPARATE schedules ----
+  //  Source = jcPendingEvents (booked journey-coach appointments not yet attended). Each pending
+  //  event carries an `onboarding` flag (set in loadContactEvents) so the same array partitions into
+  //  the two schedules with no extra read. Scope + readiness match the JC pipeline (rosterIds /
+  //  contactDataLoaded). Replaces the old single "Coming up" card.
+  /** Today / next-7-days / overdue counts for one schedule (JC when onboarding=false, else Onboarding). */
+  private schedCounts(onboarding: boolean): { today: number; week: number; overdue: number; ready: boolean } {
+    const ready = this.contactDataLoaded();
+    const now = Date.now();
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
+    const inScope = new Set(this.rosterIds());
+    let today = 0, week = 0, overdue = 0;
+    for (const e of this.jcPendingEvents()) {
+      if ((e.onboarding === true) !== onboarding) continue;   // JC vs Onboarding partition
+      if (!inScope.has(e.profileid)) continue;
+      if (e.ms < now) { overdue++; continue; }                // slot passed, never marked attended
+      if (e.ms <= endToday) today++;
+      else if (e.ms <= week7) week++;
+    }
+    return { today, week, overdue, ready };
+  }
+  jcSchedCounts = computed(() => this.schedCounts(false));
+  obSchedCounts = computed(() => this.schedCounts(true));
+
+  /** One schedule's booked sessions grouped by day (overdue days first, then today, then the next 7
+   *  days — same horizon as the tiles). Each row = participant + host coach + time. */
+  private schedList(onboarding: boolean): { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }[] {
+    const todayStart = this.startOfDay(new Date()).getTime();
+    const endToday = this.endOfDay(new Date()).getTime();
+    const week7 = endToday + 7 * 86400000;
+    const inScope = new Set(this.rosterIds());
+    const bucket = (onboarding ? this.obSchedBucket : this.jcSchedBucket)();
+    const inBucket = (ms: number): boolean => {
+      if (bucket === 'all') return ms <= week7;
+      const overdue = this.startOfDay(new Date(ms)).getTime() < todayStart;
+      if (bucket === 'overdue') return overdue;
+      if (bucket === 'today') return !overdue && ms <= endToday;
+      return !overdue && ms > endToday && ms <= week7;   // 'week' = Next 7 days
+    };
+    const rows = this.jcPendingEvents()
+      .filter(e => (e.onboarding === true) === onboarding && inScope.has(e.profileid) && inBucket(e.ms))
+      .sort((a, b) => a.ms - b.ms);
+    const groups = new Map<number, { day: Date; overdue: boolean; items: { profileid: string; participant: string; coach: string; date: Date }[] }>();
+    for (const e of rows) {
+      const dayKey = this.startOfDay(new Date(e.ms)).getTime();
+      let g = groups.get(dayKey);
+      if (!g) { g = { day: new Date(dayKey), overdue: dayKey < todayStart, items: [] }; groups.set(dayKey, g); }
+      g.items.push({ profileid: e.profileid, participant: this.nameOf(e.profileid), coach: this.jcCoachName(e.coachId), date: new Date(e.ms) });
+    }
+    return [...groups.values()].sort((a, b) => a.day.getTime() - b.day.getTime());
+  }
+  jcSchedList = computed(() => this.schedList(false));
+  obSchedList = computed(() => this.schedList(true));
+
+
+  /** Scoped A&H love-letter / ask-A&H tags for a set of participants (doc item 5): batched
+   *  where('profileid','in',chunk), one-shot getDocs; unresolved, NON-happy tags (critical /
+   *  tagged=needs-attn / opportunity) OR-ed per participant, within a recent 180d window applied
+   *  client-side (avoids a profileid+created composite index). Degrades on permission-denied. */
+  // ---- Ecosystem Health · Ask A&H + Love Letter analytics summary (item 3) — mirrors the original
+  //  journeycoach-dashboard's askAHLoveLetterSummary: flag breakdown per collection + combined + resolved,
+  //  over a recent window, base-wide. One-shot read of 'ask AH' + 'love letter' (single 'created' filter,
+  //  no composite index). tagged = Needs Attention · opportunity = Opportunity · liked = Happy · critical = Critical.
+  ahSummary = signal<AHSummary | null>(null);
+
+  /** Native (in-component) A&H drill overlay — replaces the former AhFlagListDialogComponent MatDialog
+   *  so the list renders inside .jchd-wrap and themes with the dashboard tokens (dark included). */
+  ahDrill = signal<{ title: string; entries: AhDrillEntry[] } | null>(null);
+  private ahSummaryLoaded = false;
+  /** One row per source A&H / Love Letter document kept behind the analytics card, so a clicked cell
+   *  can drill to the exact participants that make up its count (list length reconciles the cell). */
+  private ahDocs: { profileid: string; coll: 'ask' | 'love'; liked: boolean; tagged: boolean;
+    opportunity: boolean; critical: boolean; resolved: boolean; created: number }[] = [];
+  private async loadAHSummary(): Promise<void> {
+    if (this.ahSummaryLoaded) return;
+    this.ahSummaryLoaded = true;
+    const since = new Date(Date.now() - 180 * 86400000);
+    const read = async (coll: string): Promise<any[]> => {
+      try {
+        const snap = await getDocs(query(collection(this.firestore, coll), where('created', '>=', since)));
+        return snap.docs.map(d => d.data());
+      } catch (e) {
+        if (this.isPermissionDenied(e)) return [];
+        console.warn(`${coll} summary read failed (non-fatal)`, e);
+        return [];
+      }
+    };
+    const [ask, love] = await Promise.all([read('ask AH'), read('love letter')]);
+    const mapDoc = (d: any, coll: 'ask' | 'love') => ({
+      profileid: typeof d['profileid'] === 'string' ? d['profileid'] : '',
+      coll,
+      liked: d['liked'] === true, tagged: d['tagged'] === true,
+      opportunity: d['opportunity'] === true, critical: d['critical'] === true,
+      resolved: d['resolved'] === true,
+      created: this.toDate(d['created'])?.getTime() ?? 0,
+    });
+    this.ahDocs = [...ask.map(d => mapDoc(d, 'ask')), ...love.map(d => mapDoc(d, 'love'))];
+    const count = (docs: any[]): AHFlagCounts => ({
+      total: docs.length,
+      tagged: docs.filter(d => d['tagged'] === true).length,
+      opportunity: docs.filter(d => d['opportunity'] === true).length,
+      liked: docs.filter(d => d['liked'] === true).length,
+      critical: docs.filter(d => d['critical'] === true).length,
+      resolved: docs.filter(d => d['resolved'] === true).length,
+    });
+    const all = [...ask, ...love];
+    this.ahSummary.set({
+      askAH: count(ask),
+      loveLetter: count(love),
+      liked: all.filter(d => d['liked'] === true).length,
+      tagged: all.filter(d => d['tagged'] === true).length,
+      opportunity: all.filter(d => d['opportunity'] === true).length,
+      critical: all.filter(d => d['critical'] === true).length,
+      unflagged: all.filter(d => !d['tagged'] && !d['opportunity'] && !d['liked'] && !d['critical']).length,
+      resolvedTotal: all.filter(d => d['resolved'] === true).length,
+      resolvedLiked: all.filter(d => d['liked'] && d['resolved']).length,
+      resolvedTagged: all.filter(d => d['tagged'] && d['resolved']).length,
+      resolvedOpportunity: all.filter(d => d['opportunity'] && d['resolved']).length,
+      resolvedCritical: all.filter(d => d['critical'] && d['resolved']).length,
+    });
+  }
+
+  /** A&H analytics card drill-down: list the participants behind a clicked count, then open the one
+   *  the coach taps. `coll` scopes to a collection ('both' = combined); `flag` picks the predicate;
+   *  `resolvedOnly` restricts to resolved docs. One row per matching document (no de-dup) so the list
+   *  length equals the clicked cell's number. */
+  openAhDrill(
+    coll: 'ask' | 'love' | 'both',
+    flag: 'all' | 'liked' | 'tagged' | 'opportunity' | 'critical' | 'unflagged' | 'critattn',
+    resolvedOnly: boolean, title: string,
+  ): void {
+    const flagged = (d: { liked: boolean; tagged: boolean; opportunity: boolean; critical: boolean }) =>
+      d.liked || d.tagged || d.opportunity || d.critical;
+    const docs = this.ahDocs.filter(d => {
+      if (coll !== 'both' && d.coll !== coll) return false;
+      if (resolvedOnly && !d.resolved) return false;
+      switch (flag) {
+        case 'all': return true;
+        case 'unflagged': return !flagged(d);
+        case 'critattn': return d.critical || d.tagged;
+        default: return d[flag] === true;
+      }
+    });
+    if (!docs.length) return;
+    const entries: AhDrillEntry[] = docs
+      .slice()
+      .sort((a, b) => b.created - a.created)
+      .map(d => ({ profileid: d.profileid, name: d.profileid ? this.nameOf(d.profileid) : 'Unknown participant', created: d.created }));
+    this.ahDrill.set({ title, entries });
+  }
+
+  /** Close the native A&H drill overlay. */
+  closeAhDrill(): void { this.ahDrill.set(null); }
+
+  /** Row click in the A&H drill: close the overlay and open that participant's slide-over. */
+  pickAhDrill(e: AhDrillEntry): void {
+    if (!e.profileid) return;
+    this.ahDrill.set(null);
+    this.openJcParticipant(e.profileid);
+  }
+
+  /** Escape closes the drill. Kept SEPARATE from onKeydown (which early-returns off the base view and
+   *  when a MatDialog is open) because the drill opens from the Summary tab. */
+  @HostListener('document:keydown.escape')
+  onAhDrillEscape(): void { if (this.ahDrill()) this.closeAhDrill(); }
+
+
 
   /** Coach-set Health State: read the 'healthtracker_healthstate' audit collection once and keep
    *  the MOST RECENT doc per participant (by date). Each save is a new doc (history preserved);
@@ -1358,6 +1706,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       number: meta['phonenumber'] ?? meta['number'] ?? null,
       email: meta['email'] ?? null,
       coachname: this.coachNameFor(meta['coachedby']),
+      coachedby: meta['coachedby'] ?? null,
       journeyname: this.journeyLabelFor(journeyId),
       atcmodel: journeyId ? (this.atcByJourney[journeyId] ?? null) : null,
       productType: journeyId ? (this.typeByJourney[journeyId] ?? 'other') : 'other',
@@ -1382,6 +1731,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       onboarded: false,          // pjp-only field; no longer read
       goingQuiet: false,
       flagged: this.flaggedIds().has(profileid),
+      llCritical: !!this.llTagsByProfile[profileid]?.critical,
+      llAttention: !!this.llTagsByProfile[profileid]?.attention,
+      llOpportunity: !!this.llTagsByProfile[profileid]?.opportunity,
       renewalWindow: daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= this.RENEWAL_DAYS,
       subActive,
       lapsed: daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -this.LAPSED_DAYS
@@ -1485,10 +1837,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // NOTE: customerstatus 'late' means the participant is gone (unactionable) — it does NOT add
     // priority and such rows are excluded from the active board (see isInactiveStatus / applyFilters).
     if (r.openTickets > 0) { p += Math.min(r.openTickets, 3) * 4; drivers.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`); }
+    if (r.llCritical) { p += this.W_LL_CRITICAL; drivers.push('A&H critical'); }
+    if (r.llAttention) { p += this.W_LL_ATTENTION; drivers.push('A&H needs attention'); }
 
     r.priority = Math.max(0, Math.min(100, Math.round(p)));
     r.priorityBand = r.priority >= 40 ? 'High' : r.priority >= 22 ? 'Medium' : 'Low';
     r.reason = drivers.length ? `${drivers.slice(0, 2).join(' + ')} → ${this.actionFor(r)}` : 'On track';
+    r.naReasons = this.naReasonsFor(r);
   }
 
   /** Phase-2 (gated): compute the Health state from whatever signals exist today. Sparse until
@@ -1588,15 +1943,16 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       onAssignCoach: (coachIdOrNull: string | null) =>
         coachIdOrNull ? this.assignCoachToRow(row, coachIdOrNull) : this.unassignCoach(row),
       addressed: this.isAddressed(row),
-      needsAttention: row.goingQuiet || row.lapsed || row.notStarted || row.renewalWindow || row.openTickets > 0,
+      needsAttention: this.isNeedsAttention(row),
       onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
+      isDark: this.isDark,   // the slide-over + its composer render in CDK overlays outside .jchd-wrap
     };
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
       width: 'min(520px, 100vw)',
       height: '100vh',
       position: { right: '0', top: '0' },
-      panelClass: 'jchd-slideover-panel',
+      panelClass: this.isDark ? ['jchd-slideover-panel', 'jchd-overlay-dark'] : 'jchd-slideover-panel',
       // a11y: label the dialog by the participant-name heading and move focus into the panel
       // (the close button) on open, instead of leaving focus on the trigger outside the overlay.
       ariaLabelledBy: 'so-title',
@@ -1728,7 +2084,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
   logCall(row: PortfolioRow): void {
-    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false });
+    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false, panelClass: this.isDark ? 'jchd-overlay-dark' : undefined });
     ref.afterClosed().subscribe(async (res: LogCallResult | undefined) => {
       if (!res) return;
       await this.writeCall(row, res.outcome, res.note, res.nextActionDate ?? null);
@@ -1787,6 +2143,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const ref = this.dialog.open(SetHealthStateDialogComponent, {
       data: { name: row.name, current: row.coachHealthState?.state ?? null },
       autoFocus: false,
+      panelClass: this.isDark ? 'jchd-overlay-dark' : undefined,
     });
     ref.afterClosed().subscribe(async (res: SetHealthStateResult | undefined) => {
       if (!res) return;
@@ -1923,19 +2280,63 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   //      Attention until a NEW issue appears (stored as an 'addressed' healthtracker_activity event). ----
   /** The Needs-Attention issue keys currently active on a row. */
   private activeIssues(r: PortfolioRow): string[] {
+    // Keys MUST match the isNeedsAttention() predicate (doc item 4) so the Mark-addressed snapshot
+    // re-surfaces a participant when a NEW needs-attention issue appears. Going-quiet & renewals are
+    // no longer needs-attention issues (own tiles), so they are not tracked here.
     const out: string[] = [];
-    if (r.goingQuiet) out.push('goingQuiet');
     if (r.lapsed) out.push('lapsed');
     if (r.notStarted) out.push('notStarted');
-    if (r.renewalWindow) out.push('renewalWindow');
     if (r.openTickets > 0) out.push('tickets');
+    if (['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())) out.push('financial');
+    if (r.llCritical) out.push('llCritical');
+    if (r.llAttention) out.push('llAttention');
     return out;
   }
+  /** Needs-attention — the ONE actionable-now predicate (doc item 4), the single source of truth that
+   *  every count / lever / hero / coach-card site delegates to. Renewals and going-quiet are
+   *  deliberately NOT folded in (they keep their own tiles/levers) so the count stays honest;
+   *  financial locked / defaulted are in. Love-letter critical / needs-attention join in doc item 5. */
+  /** "Going Quiet" BUCKET membership — quiet AND not already a Needs-Attention case, so a participant
+   *  shows in exactly ONE of the two buckets (Needs Attention wins; per Joshua — no duplicates). Every
+   *  Going-Quiet count / lever / list uses this; the raw `goingQuiet` flag stays for the scoreboard
+   *  coverage metric (which measures contact, independent of needs-attention). */
+  private isGoingQuietBucket(r: PortfolioRow): boolean {
+    return r.goingQuiet && !this.isNeedsAttention(r);
+  }
+  private isGoingQuietBucketLite(l: LiteIndexRow): boolean {
+    return l.goingQuiet && !this.isNeedsAttentionLite(l);
+  }
+  /** Human-readable needs-attention conditions for a row — the SAME triggers as isNeedsAttention(),
+   *  mapped to labels so the UI shows WHY a participant needs attention (doc item 4).
+   *  Going-quiet & renewals are deliberately NOT here (they keep their own tiles). */
+  private naReasonsFor(r: PortfolioRow): string[] {
+    const out: string[] = [];
+    if (r.lapsed) out.push('Lapsed');
+    if (r.notStarted) out.push('Journey not started');
+    if (r.openTickets > 0) out.push(`${r.openTickets} open ticket${r.openTickets > 1 ? 's' : ''}`);
+    const fin = (r.financialstatus ?? '').toLowerCase();
+    if (fin === 'locked') out.push('Payments locked');
+    else if (fin === 'defaulted') out.push('Payments defaulted');
+    if (r.llCritical) out.push('Critical');
+    if (r.llAttention) out.push('Needs Attention');
+    return out;
+  }
+  private isNeedsAttention(r: PortfolioRow): boolean {
+    return r.lapsed || r.notStarted || r.openTickets > 0
+      || ['locked', 'defaulted'].includes((r.financialstatus ?? '').toLowerCase())
+      || !!r.llCritical || !!r.llAttention;
+  }
+  /** Base-wide (lite index) twin of isNeedsAttention — same rule over a LiteIndexRow. */
+  private isNeedsAttentionLite(l: LiteIndexRow): boolean {
+    return l.lapsed || l.notStarted || l.openTickets > 0
+      || ['locked', 'defaulted'].includes((l.financialstatus ?? '').toLowerCase())
+      || !!l.llCritical || !!l.llAttention;
+  }
   /** Does this row have at least one live Needs-Attention issue, i.e. is there anything to address?
-   *  Same predicate as needsAttentionRows() / the slideover's `needsAttention` flag. Public so the
-   *  table can render the Mark-addressed control disabled (rather than hidden) when it is false. */
+   *  Delegates to isNeedsAttention(). Public so the table can render the Mark-addressed control
+   *  disabled (rather than hidden) when it is false. */
   hasAddressableIssue(r: PortfolioRow): boolean {
-    return r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0;
+    return this.isNeedsAttention(r);
   }
 
   /** True when the coach marked this participant addressed AND no NEW issue type has appeared since
@@ -2083,7 +2484,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   needsAttentionRows = computed<PortfolioRow[]>(() =>
     this.filteredRows()
-      .filter(r => (r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0) && !this.isAddressed(r))
+      .filter(r => this.isNeedsAttention(r) && !this.isAddressed(r))
       .sort((a, b) => b.priority - a.priority));
   // backing computed for the parens-free `needsAttentionCount` getter (template binds the getter).
   private _needsAttentionCount = computed<number>(() => {
@@ -2099,7 +2500,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Real participant rows behind a given Summary card (from the loaded base). */
   goingQuietRows = computed<PortfolioRow[]>(() =>
-    this.filteredRows().filter(r => r.goingQuiet).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
+    this.filteredRows().filter(r => this.isGoingQuietBucket(r)).sort((a, b) => (b.daysSinceCoach ?? 0) - (a.daysSinceCoach ?? 0)));
   paymentsLockedRows = computed<PortfolioRow[]>(() =>
     this.filteredRows().filter(r => (r.financialstatus ?? '').toLowerCase() === 'locked').sort((a, b) => b.priority - a.priority));
   renewalRows = computed<PortfolioRow[]>(() =>
@@ -2463,7 +2864,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly COACH_QUEUE_SIZE = 10;
   topQueueForCoach(coachId: string): PortfolioRow[] {
     return this.rowsForCoach(coachId)
-      .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
+      .filter(r => this.isNeedsAttention(r))
       .sort((a, b) => b.priority - a.priority)
       .slice(0, this.COACH_QUEUE_SIZE);
   }
@@ -2516,6 +2917,26 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.applyFilters();
   }
 
+  /** Summary "Defaulted" / "Missed" finance tiles → Participants filtered to the matching finance
+   *  token ('defaulted' / 'late'), reusing the SAME finance-filter drill-down as Payments locked. */
+  goToDefaulted(): void {
+    this.statusFilter = '';
+    this.activeLever = 'all';
+    this.carrySummaryFilterToBase();
+    this.view = 'base';
+    this.financeFilters = ['defaulted'];
+    this.applyFilters();
+  }
+
+  goToMissed(): void {
+    this.statusFilter = '';
+    this.activeLever = 'all';
+    this.carrySummaryFilterToBase();
+    this.view = 'base';
+    this.financeFilters = ['late'];
+    this.applyFilters();
+  }
+
   /** Build one coach card per coach, every stat traced to real loaded data (honest zeros otherwise).
    *  Caseload reuses the scoreboard's baseSize (distinct coachedby assignments); the action stats are
    *  grouped from the currently-loaded base rows by coach name; Handled today = touchpoints this coach
@@ -2543,8 +2964,8 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       // the loaded page only, so every card under-reported unless its coach happened to be on it.
       const rows = this.rowsForCoach(c.id);
       const caseload = baseByScoreboard[c.id] || rows.length;
-      const needToday = rows.filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0).length;
-      const goingQuiet = rows.filter(r => r.goingQuiet).length;
+      const needToday = rows.filter(r => this.isNeedsAttention(r)).length;
+      const goingQuiet = rows.filter(r => this.isGoingQuietBucket(r)).length;
       const flagged = rows.filter(r => r.flagged).length;
       const handled = handledByCoach[c.id] ?? 0;
       // only surface coaches with an actual base (assignments OR loaded rows) — never invent coaches
@@ -2554,7 +2975,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
         activeCaseload: rows.filter(r => this.lifecycleOf(r.customerstatus) === 'active').length,
         jc: this.coachJcStats(c.id),
         queue: rows
-          .filter(r => r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0)
+          .filter(r => this.isNeedsAttention(r))
           .sort((a, b) => b.priority - a.priority)
           .slice(0, this.COACH_QUEUE_SIZE),
       });
@@ -2624,7 +3045,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       case 'caseload':   return fromRows(this.rowsForCoach(coachId));
       case 'active':     return fromRows(this.rowsForCoach(coachId).filter(r => this.lifecycleOf(r.customerstatus) === 'active'));
       case 'needToday':  return fromRows(this.rowsForCoach(coachId).filter(r => this.hasAddressableIssue(r)));
-      case 'goingQuiet': return fromRows(this.rowsForCoach(coachId).filter(r => r.goingQuiet));
+      case 'goingQuiet': return fromRows(this.rowsForCoach(coachId).filter(r => this.isGoingQuietBucket(r)));
       case 'flagged':    return fromRows(this.rowsForCoach(coachId).filter(r => r.flagged));
       case 'doneToday':  return fromEvents(this.jcDoneEvents(), ms => ms <= now && ms >= startToday);
       case 'doneWeek':   return fromEvents(this.jcDoneEvents(), ms => ms <= now && ms >= now - 7 * dayMs);
@@ -2797,6 +3218,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   private endOfDay(d: Date): Date { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 
   async onCoachChange(id: string): Promise<void> {
+    // Re-picking the scope that's already loaded is a no-op — don't re-read the base or wipe the
+    // active summary filter. (Initial load sets selectedCoachId via loadPortfolio, not here.)
+    if (id === this.selectedCoachId) return;
     this.selectedCoachId = id;
     this.activeLever = 'all';
     this.assignTargetCoachId = '';
@@ -2927,8 +3351,15 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     } else {
       id = coachedby?.id ?? null;
     }
-    return id ? (this.coaches.find(c => c.id === id)?.name ?? this.metaMap?.docdata?.[id]?.['name'] ?? '—') : '—';
+    // ACTUAL journey coaches only (doc item 2): a coachedby pointing at someone who is NOT a
+    // journeycoach must NOT render their name — resolve only within this.coaches, else '—'
+    // (the raw ref is still carried on the row as `coachedby` so it stays clearable).
+    return id ? (this.coaches.find(c => c.id === id)?.name ?? '—') : '—';
   }
+
+  /** Row still holds a coachedby ref (a real coach OR a stale non-journeycoach id) — used to keep the
+   *  row-menu "Unassign" action available even when coachNameFor resolves the name to '—' (doc item 2). */
+  rowHasCoachRef(r: PortfolioRow): boolean { return !this.isUnassigned(r.coachedby); }
 
   private isMine(coachedby: any, coachId: string): boolean {
     if (!coachId || coachedby == null) return false;
@@ -3063,7 +3494,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // allRows is already per-distinct-participant. Total = distinct participants. The lifecycle
     // split (Active / Non-active / Discontinued / No status) is CUSTOMERSTATUS-based, read from the
     // participant metadata doc — NOT from the pjp record, whose customerstatus is empty.
-    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
+    const s = { total: 0, active: 0, inactive: 0, renewalsSoon: 0, lapsed: 0, withOpenTickets: 0, goingQuiet: 0, notStarted: 0, paymentsLocked: 0, defaulted: 0, missed: 0, discontinued: 0, nonActive: 0, noStatus: 0 };
     // Band (lifecycle split) reflects the JOURNEY filter only, so all three segments stay visible and
     // switchable even while one is selected as the active lifecycle filter.
     for (const r of this.journeyFilteredRows()) {
@@ -3086,11 +3517,13 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     for (const r of this.filteredRows()) {
       if (r.renewalWindow) s.renewalsSoon++;
       if (r.lapsed) s.lapsed++;
-      if (r.goingQuiet) s.goingQuiet++;
+      if (this.isGoingQuietBucket(r)) s.goingQuiet++;
       if (r.notStarted) s.notStarted++;
       // Payments locked: rows whose financialstatus is the 'locked' token (same token the
       // priority/action logic keys off — see scoreRow / actionFor). New count for the Summary view.
       if ((r.financialstatus ?? '').toLowerCase() === 'locked') s.paymentsLocked++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'defaulted') s.defaulted++;
+      if ((r.financialstatus ?? '').toLowerCase() === 'late') s.missed++;
     }
     this.summary = s;
   }
@@ -3158,12 +3591,12 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // still filterable on demand via the Active / Inactive levers (see below).
     // Status-band segments — participant-metadata customerstatus, same predicate as the counts.
     if (this.lifecycleFilter && this.lifecycleOf(r.customerstatus) !== this.lifecycleFilter) return false;
-    // needsAttention: SAME predicate as needsAttentionRows() (goingQuiet | lapsed | notStarted |
-    // renewalWindow | openTickets>0). No new scoring — reuses the existing per-row flags.
+    // needsAttention: SAME predicate as needsAttentionRows() — see isNeedsAttention() (doc item 4:
+    // lapsed | notStarted | open ticket | locked/defaulted payments; renewals & going-quiet excluded).
     if (this.activeLever === 'needsAttention'
-      && (!(r.goingQuiet || r.lapsed || r.notStarted || r.renewalWindow || r.openTickets > 0) || this.isAddressed(r))) return false;
+      && (!this.isNeedsAttention(r) || this.isAddressed(r))) return false;
     if (this.activeLever === 'flagged' && !r.flagged) return false;
-    if (this.activeLever === 'goingQuiet' && !r.goingQuiet) return false;
+    if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucket(r)) return false;
     if (this.activeLever === 'renewalWindow' && !r.renewalWindow) return false;
     if (this.activeLever === 'lapsed' && !r.lapsed) return false;
     if (this.activeLever === 'notStarted' && !r.notStarted) return false;
@@ -3185,8 +3618,9 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       if (!(st ? this.healthFilters.includes(st) : this.healthFilters.includes('UNASSESSED'))) return false;
     }
     if (this.financeFilters.length && !this.financeFilters.includes(r.financialstatus ?? '')) return false;
+    if (this.eventStatusFilters.length && !this.eventStatusFilters.includes((r.recentEventRequest?.status ?? '').toLowerCase())) return false;
     if (this.renewalWindowOnly && !r.renewalWindow) return false;
-    if (this.goingQuietOnly && !r.goingQuiet) return false;
+    if (this.goingQuietOnly && !this.isGoingQuietBucket(r)) return false;
     if (this.noEventRequestOnly && r.recentEventRequest) return false;
     // paged mode: only rows whose lightweight full-base entry also matches the index-level filters
     if (this.pagedMode && this.fullBaseMatchIds && !this.fullBaseMatchIds.has(r.profileid)) return false;
@@ -3227,10 +3661,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     // going-quiet / needs-attention need touchpoint+appointment data. Once it has loaded (lite.goingQuiet
     // is populated), scope the matched set base-wide; before that, fall through (page-local refine).
     if (this.contactDataLoaded()) {
-      if (this.activeLever === 'goingQuiet' && !lite.goingQuiet) return false;
-      if (this.goingQuietOnly && !lite.goingQuiet) return false;
+      if (this.activeLever === 'goingQuiet' && !this.isGoingQuietBucketLite(lite)) return false;
+      if (this.goingQuietOnly && !this.isGoingQuietBucketLite(lite)) return false;
       if (this.activeLever === 'needsAttention'
-        && !(lite.goingQuiet || lite.lapsed || lite.notStarted || lite.renewalWindow || lite.openTickets > 0)) return false;
+        && !this.isNeedsAttentionLite(lite)) return false;
     }
     return true;
   }
@@ -3371,6 +3805,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     this.bandFilters = [];
     this.healthFilters = [];
     this.financeFilters = [];
+    this.eventStatusFilters = [];
     this.renewalWindowOnly = false;
     this.goingQuietOnly = false;
     this.noEventRequestOnly = false;
@@ -3381,7 +3816,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   get hasActiveFilters(): boolean {
     return !!this.search || !!this.journeyFilter || this.journeyGroupFilter.length > 0 || !!this.statusFilter || !!this.lifecycleFilter || this.activeLever !== 'all'
       || this.productTypeFilters.length > 0 || this.tierFilters.length > 0 || this.bandFilters.length > 0
-      || this.healthFilters.length > 0 || this.financeFilters.length > 0
+      || this.healthFilters.length > 0 || this.financeFilters.length > 0 || this.eventStatusFilters.length > 0
       || this.renewalWindowOnly || this.goingQuietOnly || this.noEventRequestOnly;
   }
 
@@ -3393,7 +3828,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   get pageLocalFilterActive(): boolean {
     // band / health are never in the lite index → always page-local. Going-quiet / needs-attention
     // are page-local ONLY until the touchpoint+appointment data loads (then they're base-wide).
-    return this.bandFilters.length > 0 || this.healthFilters.length > 0
+    return this.bandFilters.length > 0 || this.healthFilters.length > 0 || this.eventStatusFilters.length > 0
       || (!this.contactDataLoaded() && (this.goingQuietOnly || this.activeLever === 'goingQuiet' || this.activeLever === 'needsAttention'));
   }
 
@@ -3411,7 +3846,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       case 'renewalWindow':
         return `Showing people whose plan is due to renew within the next 90 days.`;
       case 'needsAttention':
-        return `Showing people who need a follow-up — going quiet, lapsed, not started, renewing soon, or with an open ticket.`;
+        return `Showing people who need a follow-up — lapsed, not started, with an open support ticket, or with locked / defaulted payments. (Going quiet and renewals have their own cards.)`;
       case 'flagged':
         return `Showing people that you or another coach starred.`;
       case 'lapsed':

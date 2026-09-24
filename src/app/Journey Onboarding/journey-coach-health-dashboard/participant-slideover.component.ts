@@ -3,7 +3,7 @@ import { CommonModule, DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
-  Firestore, collection, query, where, getDocs,
+  Firestore, collection, query, where, getDocs, orderBy, limit,
   doc, getDoc, getFirestore, DocumentReference,
 } from '@angular/fire/firestore';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -93,6 +93,9 @@ export interface SlideoverData {
   addressed: boolean;
   needsAttention: boolean;
   onMarkAddressed: (next: boolean) => void;
+  // resolved dashboard theme (the slide-over + its composer render in CDK overlays outside .jchd-wrap,
+  // so they can't inherit the dashboard's [data-theme]; used to add the dark overlay panelClass).
+  isDark?: boolean;
 }
 
 interface TicketItem { subject: string; status: string; category: string; date: Date | null; }
@@ -103,6 +106,7 @@ interface ReportItem { types: string; status: string; date: Date | null; }
 interface BreakthroughItem { message: string; date: Date | null; }
 interface AelItem { status: string; date: Date | null; }
 interface CoachNoteItem { text: string; author: string; date: Date | null; }
+interface LoveNoteItem { text: string; tags: string[]; date: Date | null; }
 
 /** Composer type switch options. */
 type ComposerType = 'call' | 'health' | 'schedule' | 'note';
@@ -141,16 +145,10 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           </div>
         </div>
         <div class="so-head-actions">
-          <!-- Always rendered (operator directive, 2026-08-26): the *ngIf used to hide this whenever
-               the participant had no Needs-Attention issue, so coaches saw no control at all and
-               could not tell a permission problem from "nothing to do". Disabled + explained instead. -->
-          <button class="so-flag-btn" type="button"
-                  [disabled]="!data.needsAttention && !addressedLocal"
+          <button class="so-flag-btn" type="button" *ngIf="data.needsAttention || addressedLocal"
                   [class.is-addressed]="addressedLocal" [attr.aria-pressed]="addressedLocal"
                   aria-label="Mark addressed" (click)="toggleAddressed()"
-                  [matTooltip]="addressedLocal ? 'Addressed — click to re-open'
-                    : (data.needsAttention ? 'Mark addressed (clears Needs Attention until a new issue)'
-                                           : 'Nothing to address — this participant has no active issues')">
+                  [matTooltip]="addressedLocal ? 'Addressed — click to re-open' : 'Mark addressed (clears Needs Attention until a new issue)'">
             <mat-icon>{{ addressedLocal ? 'task_alt' : 'radio_button_unchecked' }}</mat-icon>
             <span>{{ addressedLocal ? 'Addressed' : 'Mark addressed' }}</span>
           </button>
@@ -181,6 +179,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
           <h3 class="so-sec-h">Journey</h3>
           <dl class="so-kv">
             <div><dt>Journey</dt><dd>{{ row.journeyname || '—' }}</dd></div>
+            <div><dt>Status</dt><dd>{{ row.journeystatus || '—' }}</dd></div>
             <div><dt>Product</dt><dd class="cap">{{ row.productType || '—' }}</dd></div>
           </dl>
         </section>
@@ -212,20 +211,6 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
                 {{ row.lastcoachdate ? (row.lastcoachdate | date:'mediumDate') : 'Never' }}
                 <span class="so-sub" *ngIf="row.daysSinceCoach != null">({{ row.daysSinceCoach }}d ago)</span>
               </dd>
-            </div>
-            <!-- Last JOURNEY COACH appointment, kept as its own field rather than folded into
-                 Last touch: attended + in the past. Next JC (booked, still ahead) is separate
-                 again — merging the two is what made the old lastjourneycoachdate field wrong. -->
-            <div>
-              <dt>Last journey coach</dt>
-              <dd class="num">
-                <span *ngIf="apptsLoading" class="so-muted">…</span>
-                <ng-container *ngIf="!apptsLoading">{{ jcLast ? (jcLast | date:'mediumDate') : 'Never' }}</ng-container>
-              </dd>
-            </div>
-            <div *ngIf="jcNext">
-              <dt>Next journey coach</dt>
-              <dd class="num">{{ jcNext | date:'mediumDate' }}</dd>
             </div>
             <div><dt>Going quiet</dt><dd>{{ row.goingQuiet ? 'Yes' : 'No' }}</dd></div>
           </dl>
@@ -428,6 +413,58 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
                 {{ isShowAll('interim') ? 'Show less' : 'Show all (' + reports.length + ')' }}
               </button>
               <ng-template #noReports><p class="so-empty">No interim reports.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Recent Love Letter (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('loveletters')" (click)="toggleCollapsed('loveletters')">
+            <span>Recent Love Letter <span class="so-count" *ngIf="!loveLettersLoading">{{ loveLetters.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('loveletters')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('loveletters')">
+            <div *ngIf="loveLettersLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!loveLettersLoading">
+              <ul class="so-list" *ngIf="loveLetters.length; else noLoveLetters">
+                <li *ngFor="let x of (loveLetters | slice:0:(isShowAll('loveletters') ? loveLetters.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Love letter' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="loveLetters.length > 3" (click)="toggleShowAll('loveletters')">
+                {{ isShowAll('loveletters') ? 'Show less' : 'Show all (' + loveLetters.length + ')' }}
+              </button>
+              <ng-template #noLoveLetters><p class="so-empty">No love letters yet.</p></ng-template>
+            </ng-container>
+          </div>
+        </section>
+
+        <!-- Recent Ask A&H (doc item 7) -->
+        <section class="so-sec" aria-live="polite">
+          <button type="button" class="so-sec-h so-sec-toggle" [attr.aria-expanded]="!isCollapsed('askah')" (click)="toggleCollapsed('askah')">
+            <span>Recent Ask A&amp;H <span class="so-count" *ngIf="!askAHLoading">{{ askAH.length }}</span></span>
+            <mat-icon class="so-chev" [class.open]="!isCollapsed('askah')">expand_more</mat-icon>
+          </button>
+          <div *ngIf="!isCollapsed('askah')">
+            <div *ngIf="askAHLoading" class="so-skel-group"><div class="so-skel"></div><div class="so-skel"></div></div>
+            <ng-container *ngIf="!askAHLoading">
+              <ul class="so-list" *ngIf="askAH.length; else noAskAH">
+                <li *ngFor="let x of (askAH | slice:0:(isShowAll('askah') ? askAH.length : 3))" class="so-list-row">
+                  <span class="so-list-main so-clamp">{{ x.text || 'Ask A&H' }}</span>
+                  <span class="so-list-side">
+                    <span class="so-status" *ngFor="let t of x.tags">{{ t }}</span>
+                    <span class="so-sub" *ngIf="x.date">{{ x.date | date:'shortDate' }}</span>
+                  </span>
+                </li>
+              </ul>
+              <button type="button" class="so-showall" *ngIf="askAH.length > 3" (click)="toggleShowAll('askah')">
+                {{ isShowAll('askah') ? 'Show less' : 'Show all (' + askAH.length + ')' }}
+              </button>
+              <ng-template #noAskAH><p class="so-empty">No Ask A&amp;H entries yet.</p></ng-template>
             </ng-container>
           </div>
         </section>
@@ -688,10 +725,10 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-body::-webkit-scrollbar { width: 9px; }
     .so-body::-webkit-scrollbar-thumb {
-      background: #cdd6e3; border-radius: 999px;
+      background: var(--so-border); border-radius: 999px;
       border: 2px solid var(--so-bg); background-clip: padding-box;
     }
-    .so-body::-webkit-scrollbar-thumb:hover { background: #aebccd; background-clip: padding-box; }
+    .so-body::-webkit-scrollbar-thumb:hover { background: var(--so-muted); background-clip: padding-box; }
     .so-body::-webkit-scrollbar-track { background: transparent; }
 
     .so-sec { padding: 14px 20px; border-top: 1px solid var(--so-border-soft); }
@@ -828,11 +865,6 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-flag-btn:hover { background: rgba(118,118,128,.2); color: var(--so-ink); }
     .so-flag-btn:active { transform: scale(0.96); }
-    /* Disabled = "nothing to address" (see the always-rendered button above): visible but inert,
-       so a coach can tell the control exists and simply does not apply to this participant. */
-    .so-flag-btn:disabled { opacity: .38; cursor: default; }
-    .so-flag-btn:disabled:hover { background: rgba(118,118,128,.12); color: inherit; }
-    .so-flag-btn:disabled:active { transform: none; }
     .so-flag-btn.is-flagged { color: #c25e00; background: rgba(255,149,0,.16); }
     .so-flag-btn mat-icon { font-size: 17px; width: 17px; height: 17px; }
 
@@ -841,7 +873,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     .so-coach-current { font-size: 13px; font-weight: 600; color: var(--so-ink); }
     .so-coach-select {
       font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink); cursor: pointer;
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink); cursor: pointer;
       max-width: 55%;
     }
 
@@ -861,7 +893,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       --so-bg: #ffffff; --so-ink: #1c1c1e; --so-ink2: rgba(60,60,67,.6); --so-muted: rgba(60,60,67,.45);
       --so-border: rgba(60,60,67,.12); --so-border-soft: rgba(60,60,67,.08);
       --so-accent: #007aff; --so-accent-soft: rgba(0,122,255,.08);
-      background: #ffffff; color: var(--so-ink); padding: 22px 24px 22px;
+      background: var(--so-bg); color: var(--so-ink); padding: 22px 24px 22px;
       font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
     }
     .so-comp-top {
@@ -883,7 +915,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
       transition: color .2s ease, background-color .2s ease, transform .06s ease;
     }
     .so-seg-btn.on {
-      background: #fff; color: var(--so-ink); font-weight: 600;
+      background: var(--so-bg); color: var(--so-ink); font-weight: 600;
       box-shadow: 0 3px 8px rgba(0,0,0,.10), 0 1px 1px rgba(0,0,0,.04);
     }
     .so-seg-btn:active { transform: scale(.97); }
@@ -906,7 +938,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     }
     .so-input::placeholder { color: var(--so-muted); }
     .so-input:focus {
-      outline: none; background-color: #fff; border-color: var(--so-accent);
+      outline: none; background-color: var(--so-bg); border-color: var(--so-accent);
       box-shadow: 0 0 0 3px var(--so-accent-soft);
     }
     select.so-input {
@@ -916,7 +948,7 @@ type ComposerType = 'call' | 'health' | 'schedule' | 'note';
     textarea.so-input { resize: vertical; min-height: 64px; line-height: 1.4; }
     .so-state-pick { display: flex; flex-wrap: wrap; gap: 8px; }
     .so-state-opt {
-      border: 1px solid var(--so-border); background: #fff; color: var(--so-ink2);
+      border: 1px solid var(--so-border); background: var(--so-bg); color: var(--so-ink2);
       font: inherit; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px; cursor: pointer;
       transition: background-color .15s ease, color .15s ease, border-color .15s ease, transform .06s ease;
     }
@@ -958,6 +990,11 @@ export class ParticipantSlideoverComponent implements OnInit {
   formsLoading = true;
   reports: ReportItem[] = [];
   reportsLoading = true;
+  // A&H feedback (doc item 7): recent Love Letter / Ask A&H entries for this participant, with tags.
+  loveLetters: LoveNoteItem[] = [];
+  loveLettersLoading = true;
+  askAH: LoveNoteItem[] = [];
+  askAHLoading = true;
   breakthroughs: BreakthroughItem[] = [];
   breakthroughsLoading = true;
   ael: AelItem[] = [];
@@ -1022,31 +1059,6 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.data.onMarkAddressed(this.addressedLocal);
   }
 
-  // Last / next journey-coach appointment, derived from the `appointments` this panel ALREADY
-  // reads (loadAppointments) — no profile_data doc fetch. Deliberately split in two: an ATTENDED
-  // past JC is a real contact, a future booking is not. Merging them is exactly what the old
-  // profile_data.lastjourneycoachdate field did, which is why it could report a date that hadn't
-  // happened yet.
-  jcLast: Date | null = null;
-  jcNext: Date | null = null;
-
-  /** Fill jcLast / jcNext from the raw appointment docs. Called by loadAppointments(). */
-  private deriveJourneyCoachDates(rows: any[]): void {
-    const now = Date.now();
-    let last: number | null = null;
-    let next: number | null = null;
-    for (const d of rows) {
-      if (d['journeycoach'] !== true || d['cancelled'] === true) continue;
-      const dt = this.toDate(d['starttime']) ?? this.toDate(d['date']);
-      if (!dt) continue;
-      const ms = dt.getTime();
-      if (d['attended'] === true && ms <= now) { if (last == null || ms > last) last = ms; }
-      else if (ms > now) { if (next == null || ms < next) next = ms; }
-    }
-    this.jcLast = last != null ? new Date(last) : null;
-    this.jcNext = next != null ? new Date(next) : null;
-  }
-
   ngOnInit(): void {
     // Fire every scoped read in parallel; each owns its own loading flag and degrades
     // independently, so a slow/denied section never blocks the rest of the panel.
@@ -1055,6 +1067,8 @@ export class ParticipantSlideoverComponent implements OnInit {
     void this.loadAppointments();
     void this.loadForms();
     void this.loadReports();
+    void this.loadLoveLetters();
+    void this.loadAskAH();
     void this.loadBreakthroughs();
     void this.loadAel();
     void this.loadCoachNotes();
@@ -1156,7 +1170,6 @@ export class ParticipantSlideoverComponent implements OnInit {
         where('bookedby', '==', doc(this.firestore, 'profile_data', pid)),
       ));
       const rows = snap.docs.map(d => d.data() as any);
-      this.deriveJourneyCoachDates(rows);   // last attended / next booked JC, from these same docs
       // sort by endtime, most recent first
       rows.sort((a, b) => (this.toDate(b['endtime'])?.getTime() ?? 0) - (this.toDate(a['endtime'])?.getTime() ?? 0));
       // Resolve each DISTINCT appointment-type ref once (there are only a handful of types), so we can
@@ -1241,6 +1254,68 @@ export class ParticipantSlideoverComponent implements OnInit {
       console.warn('slideover interim reports read failed', e);
     } finally {
       this.reportsLoading = false;
+    }
+  }
+
+  /** RECENT LOVE LETTER / ASK A&H (doc item 7) — the participant's own A&H feedback docs, newest
+   *  first, with their tag chips. Same one-shot getDocs pattern as the other intel sections (the
+   *  DEFAULT firestore, not the forms DB). The aggregate unresolved/non-happy tags that feed Needs
+   *  Attention are computed on the dashboard side; here we simply surface recent entries. */
+  private toLoveNote(data: any): LoveNoteItem {
+    const tags: string[] = [];
+    if (data['critical']) tags.push('critical');
+    if (data['tagged']) tags.push('needs attention');
+    if (data['opportunity']) tags.push('opportunity');
+    if (data['liked']) tags.push('happy');
+    if (data['resolved']) tags.push('resolved');
+    // love letter -> 'loveletter', ask A&H -> 'askah' (fallback 'installationaskah'); first non-empty.
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) { const v = data[k]; if (typeof v === 'string' && v.trim()) return v.trim(); }
+      return '';
+    };
+    const text = pick('loveletter', 'askah', 'installationaskah', 'message', 'content', 'letter', 'note', 'text');
+    return { text, tags, date: this.toDate(data['created']) };
+  }
+
+  /** Latest 1 doc for a participant from an A&H collection: prefers the indexed
+   *  orderBy(created desc)+limit(1); falls back to an index-free fetch + client-side latest-1 when
+   *  the (profileid, created) composite index isn't deployed yet (so the section never breaks). */
+  private async latestOne(coll: string, pid: string): Promise<LoveNoteItem[]> {
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, coll), where('profileid', '==', pid), orderBy('created', 'desc'), limit(1),
+      ));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any));
+    } catch {
+      const snap = await getDocs(query(collection(this.firestore, coll), where('profileid', '==', pid)));
+      return snap.docs.map(d => this.toLoveNote(d.data() as any))
+        .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0)).slice(0, 1);
+    }
+  }
+
+  private async loadLoveLetters(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      // Latest 1 only (item 5). Prefer the indexed orderBy+limit(1); if the ('love letter':
+      // profileid ASC, created DESC) composite index isn't deployed yet, fall back to an index-free
+      // fetch + client-side latest-1 so the section still shows the latest note (no breakage).
+      this.loveLetters = await this.latestOne('love letter', pid);
+    } catch (e) {
+      console.warn('slideover love letter read failed', e);
+    } finally {
+      this.loveLettersLoading = false;
+    }
+  }
+
+  private async loadAskAH(): Promise<void> {
+    const pid = this.row.profileid;
+    try {
+      // Latest 1 only (item 5) — indexed orderBy+limit(1) with an index-free client-side fallback.
+      this.askAH = await this.latestOne('ask AH', pid);
+    } catch (e) {
+      console.warn('slideover ask A&H read failed', e);
+    } finally {
+      this.askAHLoading = false;
     }
   }
 
@@ -1382,32 +1457,29 @@ export class ParticipantSlideoverComponent implements OnInit {
   }
   /** Dropdown change: '__unassign__' -> unassign (null); a coach id -> assign/reassign. */
   onAssignCoach(value: string): void {
-    if (value === '__unassign__') { this.data.onAssignCoach(null); return; }
-    this.data.onAssignCoach(value);
+    // Capture the current coach BEFORE the parent mutates the row.
+    const from = this.currentCoachName || null;
+    const isUnassign = value === '__unassign__';
+    const toName = isUnassign ? null : (this.data.coaches?.find(c => c.id === value)?.name ?? null);
+    const action = isUnassign ? 'unassign' : (from ? 'reassign' : 'assign');
+    // The parent owns the Firestore write (healthtracker_activity coach_change); the timeline is
+    // one-shot loaded at open, so optimistically prepend the coach change here too (mirrors submit()),
+    // otherwise it only appears after the panel is reopened.
+    this.data.activity = [{
+      type: 'coach_change' as ActivityType,
+      actorName: 'You',
+      date: new Date(),
+      note: '',
+      outcome: null, state: null, flagged: false, dueDate: null,
+      action, fromCoachName: from, toCoachName: toName,
+    }, ...(this.data.activity ?? [])];
+    this.data.onAssignCoach(isUnassign ? null : value);
   }
 
   /** Header flag toggle: prompt for an optional short note, then delegate (parent owns the write). */
   toggleFlag(): void {
-    const wasFlagged = this.row.flagged;
-    const note = (window.prompt(wasFlagged ? 'Remove flag — optional note:' : 'Flag — optional note:', '') ?? '').trim();
+    const note = (window.prompt(this.row.flagged ? 'Remove flag — optional note:' : 'Flag — optional note:', '') ?? '').trim();
     this.data.onToggleFlag(note);
-    // The timeline is one-shot loaded when the panel opens, so an event written after that never
-    // appears until the panel is reopened. The Log composer already prepends optimistically; this
-    // toggle did not, in EITHER direction — so neither "Flagged" nor "Flag removed" showed up live.
-    // The dashboard writes a 'flag' activity event for both (logActivity(..., 'flag', {flagged})),
-    // so mirror it here. `flagged` is the NEW state, which is what activityLabel() reads to choose
-    // between "Flagged" and "Flag removed".
-    this.data.activity = [{
-      type: 'flag' as ActivityType,
-      actorName: 'You',
-      date: new Date(),
-      note,
-      outcome: null,
-      state: null,
-      flagged: !wasFlagged,
-      dueDate: null,
-      action: null, fromCoachName: null, toCoachName: null,
-    }, ...(this.data.activity ?? [])];
   }
 
   // ---- Log composer (centered dialog over the side sheet) ----
@@ -1417,7 +1489,7 @@ export class ParticipantSlideoverComponent implements OnInit {
     this.composerRef = this.dialog.open(this.composerTpl, {
       width: 'min(560px, 92vw)',
       maxHeight: '85vh',
-      panelClass: 'jchd-logcomposer-panel',
+      panelClass: this.data.isDark ? ['jchd-logcomposer-panel', 'jchd-overlay-dark'] : 'jchd-logcomposer-panel',
       autoFocus: false,
       restoreFocus: true,
     });

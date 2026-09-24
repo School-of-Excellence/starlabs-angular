@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
+import { loggedInGuard } from './Participant Intelligence/auth-only.guard';
 import { roleGuard } from './role.guard';
 import { pendingUploadsGuard } from './content/episodes-dashboard/upload-studio/pending-uploads.guard';
 import { workshopConfigUnsavedGuard } from './New-Workshop/workshop-configurationv2/unsaved-changes.guard';
@@ -33,6 +34,7 @@ export const routes: Routes = [
   {path: 'userprofile_old', loadComponent: () => import('./Participants Profile Management/userprofile_old/userprofile_old.component').then(m => m.UserprofileComponent), canActivate: [authGuard]},
   {path: 'deliveryactivities', loadComponent: () => import('./Product Designer/delivery-set/delivery-set.component').then(m => m.DeliverySetComponent), canActivate:[authGuard]},
   {path: 'eventopportunitydashboard', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard]},
+  {path: 'arena-event-planning', loadComponent: () => import('./queue system/event-opportunity-dashboard/event-opportunity-dashboard.component').then(m => m.EventOpportunityDashboardComponent), canActivate:[authGuard], data: { defaultTab: 'planning' }},
   {path: 'arena/:queueid/:stage', loadComponent: () => import('./queue system/arena-board/arena-board.component').then(m => m.ArenaBoardComponent), canActivate:[authGuard]},
   {path: 'formtemplate', loadComponent: () => import('./Product Designer/delivery-set/formtemplate/formtemplate.component').then(m => m.FormtemplateComponent), canActivate:[authGuard]},
   {path: 'queuelist', loadComponent: () => import('./queue system/queue-list/queue-list.component').then(m => m.QueueListComponent), canActivate:[authGuard]},
@@ -230,8 +232,6 @@ export const routes: Routes = [
 
   // Journey Onboarding
   {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
-  {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
-  {path: 'sales-teams', loadComponent: () => import('./Journey Onboarding/sales-teams/sales-teams.component').then(m => m.SalesTeamsComponent), canActivate:[authGuard]},
   {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
   {path: 'opportunities', loadComponent: () => import('./Journey Onboarding/journeycoach-opportunities/journeycoach-opportunities.component').then(m => m.JourneycoachOpportunitiesComponent), canActivate: [authGuard]},
   {path: 'JourneycoachDashboard-new', loadComponent: () => import('./Journey Onboarding/journeycoach-dashboard/journeycoach-dashboard.component').then(m => m.JourneycoachDashboardComponent), canActivate:[authGuard]},
@@ -240,12 +240,14 @@ export const routes: Routes = [
   {path: 'overall-dashboard', loadComponent: () => import('./Journey Onboarding/overall-dashboard/overall-dashboard.component').then(m => m.OverallDashboardComponent), canActivate:[authGuard]},
   {path: 'journey-coach-health', loadComponent: () => import('./Journey Onboarding/journey-coach-health-dashboard/journey-coach-health-dashboard.component').then(m => m.JourneyCoachHealthDashboardComponent), canActivate:[authGuard]},
   {path: 'sales-report', loadComponent: () => import('./Journey Onboarding/sales-dashboard-clone/sales-dashboard-clone.component').then(m => m.SalesDashboardCloneComponent), canActivate:[authGuard]},
+  {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
   {path: 'ecosystem', loadComponent: () => import('./Journey Onboarding/eco-system-new/eco-system-new.component').then(m => m.EcoSystemNewComponent), canActivate: [authGuard]},
   {path: 'onboarding-pipeline', loadComponent: () => import('./Journey Onboarding/onboarding-pipeline/onboarding-pipeline.component').then(m => m.OnboardingPipelineComponent), canActivate: [authGuard]},
   {path: 'team-evolution-dashboard', loadComponent: () => import('./Journey Onboarding/team-evolution-dashboard/team-evolution-dashboard.component').then(m => m.TeamEvolutionDashboardComponent), canActivate: [authGuard]},
 
   // Participants Profile Management
   {path: 'participants-analytics', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-analytics.component').then(m => m.ParticipantsAnalyticsComponent), canActivate: [authGuard]},
+  {path: 'participant-intelligence', loadComponent: () => import('./Participant Intelligence/participant-intelligence.component').then(m => m.ParticipantIntelligenceComponent), canActivate: [loggedInGuard]},
   {path: 'participant-evolution-summary', loadComponent: () => import('./Participants Profile Management/participants-analytics/participants-evolution-summary/participants-evolution-summary.component').then(m => m.ParticipantsEvolutionSummaryComponent), canActivate:[authGuard]},
   {path: 'participant-form-tracker', loadComponent: () => import('./Participants Profile Management/participant-form-tracker/participant-form-tracker.component').then(m => m.ParticipantFormTrackerComponent), canActivate:[authGuard]},
 

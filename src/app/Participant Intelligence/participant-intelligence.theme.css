@@ -1,0 +1,236 @@
+/* Isolated theme for the Participant Intelligence screen.
+   Tokens are --pi-* prefixed; dialog-kit classes are namespaced under .pi-dialog
+   (the panelClass on every dialog) so nothing leaks into the rest of starlabs. */
+
+/* iOS design tokens (A3) */
+:root {
+  --pi-bg: #f2f2f7;
+  --pi-surface: #ffffff;
+  --pi-surface-2: #fafafc;
+  --pi-surface-3: #ececf1;
+  --pi-fill: rgba(118, 118, 128, 0.12);
+  --pi-border: rgba(60, 60, 67, 0.1);
+  --pi-border-strong: rgba(60, 60, 67, 0.18);
+
+  --pi-text: #1c1c1e;
+  --pi-text-2: rgba(60, 60, 67, 0.62);
+  --pi-text-3: rgba(60, 60, 67, 0.34);
+
+  --pi-accent: #007aff;
+  --pi-accent-2: #0a84ff;
+  --pi-accent-bg: rgba(0, 122, 255, 0.1);
+  --pi-accent-text: #0060df;
+
+  --pi-radius: 12px;
+  --pi-radius-sm: 8px;
+  --pi-radius-lg: 16px;
+
+  --pi-shadow-sm: 0 0.5px 2px rgba(20, 30, 40, 0.05);
+  --pi-shadow: 0 4px 16px rgba(20, 30, 40, 0.07), 0 1px 3px rgba(20, 30, 40, 0.05);
+  --pi-shadow-lg: 0 14px 44px rgba(20, 30, 40, 0.16);
+
+  --pi-status-active: #30b85a;
+  --pi-status-active-bg: rgba(52, 199, 89, 0.14);
+  --pi-status-late: #e8870e;
+  --pi-status-late-bg: rgba(255, 149, 0, 0.16);
+  --pi-status-discontinued: #8a8a8e;
+  --pi-status-discontinued-bg: rgba(142, 142, 147, 0.18);
+  --pi-status-banned: #e8443a;
+  --pi-status-banned-bg: rgba(255, 59, 48, 0.13);
+  --pi-status-none: #a0a0a6;
+  --pi-status-none-bg: rgba(142, 142, 147, 0.12);
+}
+
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+.pi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* dialog kit — only active inside our dialogs (panelClass pi-dialog) */
+.pi-dialog .mat-mdc-dialog-surface {
+  border-radius: var(--pi-radius-lg);
+  box-shadow: var(--pi-shadow-lg);
+}
+.pi-dialog .dlg {
+  display: flex;
+  flex-direction: column;
+  max-height: 84vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+  color: var(--pi-text);
+}
+.pi-dialog .dlg-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--pi-border);
+}
+.pi-dialog .dlg-head .ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--pi-accent-bg);
+  color: var(--pi-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pi-dialog .dlg-head .ic .material-symbols-rounded {
+  font-size: 21px;
+}
+.pi-dialog .dlg-head h2 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+}
+.pi-dialog .dlg-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--pi-text-2);
+}
+.pi-dialog .dlg-head .x {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--pi-text-3);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+}
+.pi-dialog .dlg-head .x:hover {
+  background: var(--pi-surface-3);
+  color: var(--pi-text);
+}
+.pi-dialog .dlg-body {
+  padding: 18px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+.pi-dialog .dlg-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--pi-border);
+  background: var(--pi-surface-2);
+}
+.pi-dialog .dlg-foot .spacer {
+  margin-right: auto;
+}
+.pi-dialog .dlg-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pi-text-2);
+  margin: 0 0 6px;
+}
+.pi-dialog .dlg-field {
+  margin-bottom: 16px;
+}
+.pi-dialog .dlg-input,
+.pi-dialog .dlg-textarea,
+.pi-dialog .dlg-select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--pi-text);
+  border: 1px solid var(--pi-border-strong);
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.1s ease;
+}
+.pi-dialog .dlg-input:focus,
+.pi-dialog .dlg-textarea:focus,
+.pi-dialog .dlg-select:focus {
+  border-color: var(--pi-accent);
+  box-shadow: 0 0 0 3px var(--pi-accent-bg);
+}
+.pi-dialog .dlg-textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.5;
+}
+.pi-dialog .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.1s ease;
+}
+.pi-dialog .btn .material-symbols-rounded {
+  font-size: 18px;
+}
+.pi-dialog .btn-primary {
+  background: var(--pi-accent);
+  color: #fff;
+}
+.pi-dialog .btn-primary:hover:not(:disabled) {
+  background: var(--pi-accent-2);
+}
+.pi-dialog .btn-primary:disabled {
+  background: var(--pi-border-strong);
+  color: #fff;
+  cursor: default;
+}
+.pi-dialog .btn-ghost {
+  background: transparent;
+  color: var(--pi-text-2);
+  border-color: var(--pi-border-strong);
+}
+.pi-dialog .btn-ghost:hover {
+  background: var(--pi-surface-3);
+  color: var(--pi-text);
+}
+.pi-dialog .btn-danger {
+  background: var(--pi-status-banned-bg);
+  color: var(--pi-status-banned);
+}
+.pi-dialog .btn-danger:hover {
+  background: #f6dcd8;
+}
+.pi-dialog .pi-badge.live {
+  background: var(--pi-status-active-bg);
+  color: var(--pi-status-active);
+  margin-left: 8px;
+}
+
+/* communications analytics popover (mat-menu hosting the panel) */
+.pi-comms-menu.mat-mdc-menu-panel {
+  max-width: 420px;
+}
+.pi-comms-menu .mat-mdc-menu-content {
+  padding: 0;
+}

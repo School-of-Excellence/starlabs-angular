@@ -2,6 +2,34 @@
   "//": "Composite indexes the Queue Manager e2e queries need on the cloud test project slabs-queue-e2e-exdcz (and the emulator with --import). Each was ground-truth-verified by a read-only Admin-SDK probe that captured Firestore's exact create_composite token; see the 2026-06-08 cloud-evidence journal. EMULATOR/test use; production indexes are managed separately.",
   "indexes": [
     {
+      "collectionGroup": "love letter",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ask AH",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "profileid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "queue_token",
       "queryScope": "COLLECTION",
       "fields": [
@@ -991,6 +1019,44 @@
         },
         {
           "fieldPath": "starttime",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "je-dashboard Participant Health — item 5: open-tickets getCountFromServer (clientid IN + status.status==open)",
+      "collectionGroup": "clientissue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status.status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "clientid",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "//": "je-dashboard Participant Health — item 7: coach-contact appointments (bookedby IN + journeycoach + attended + not cancelled)",
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "journeycoach",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "attended",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cancelled",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "bookedby",
           "order": "ASCENDING"
         }
       ]
