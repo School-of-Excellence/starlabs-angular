@@ -175,25 +175,231 @@ tr.mat-mdc-row:hover {
 }
 
 /* Compact Top Bar */
-.top-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 16px;
+/* ==========================================
+   Filter panel
+   ========================================== */
+.filter-panel {
+  background: #fff;
+  border: 1px solid #e3e7ee;
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
-.compact-field {
-  width: 200px;
+.filter-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.filter-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.filter-panel__title mat-icon {
+  color: #1976d2;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.filter-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1565c0;
+  background: #e3f2fd;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.filter-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
 }
 
-.compact-field.date-field {
-  width: 230px;
+.pending-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-weight: 500;
 }
 
-::ng-deep .top-bar .mat-mdc-form-field-subscript-wrapper {
+.pending-pill mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.result-count {
+  color: #6b7280;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px 12px;
+}
+
+.filter-field {
+  width: 100%;
+  font-size: 13px;
+}
+
+::ng-deep .filter-panel .mat-mdc-form-field-subscript-wrapper {
   display: none;
+}
+
+.filter-panel__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eef1f5;
+}
+
+.toggle-group {
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.toggle-chip mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.toggle-chip:hover {
+  background: #f5f7fa;
+}
+
+.toggle-chip--liked {
+  background: #fdecec;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.toggle-chip--flagged {
+  background: #fff4e5;
+  border-color: #ffb74d;
+  color: #e65100;
+}
+
+.toggle-chip--opportunity {
+  background: #e8f5e9;
+  border-color: #81c784;
+  color: #2e7d32;
+}
+
+.secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.fetch-btn {
+  min-width: 120px;
+  height: 40px;
+}
+
+.fetch-btn mat-spinner {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.fetch-btn--pending:not([disabled]) {
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.25);
+}
+
+.fetch-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff8e1;
+  color: #8d6e00;
+  font-size: 13px;
+}
+
+.fetch-notice mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Table loading state */
+.table-shell {
+  position: relative;
+  min-height: 160px;
+}
+
+.table-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+
+.table-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 72px;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #374151;
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .secondary-actions {
+    margin-left: 0;
+  }
+
+  .fetch-btn {
+    width: 100%;
+  }
 }
 
 /* My Forms Bar */
