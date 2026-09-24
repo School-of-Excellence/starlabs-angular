@@ -467,6 +467,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       const t = localStorage.getItem(this.THEME_KEY);
       if (t === 'dark' || t === 'light') this.theme = t;
     } catch {}
+    void this.loadAHSummary();   // Ecosystem A&H analytics (item 3) — base-wide, loads in parallel.
     try {
       await this.resolveCoach();
       await this.loadPortfolio();

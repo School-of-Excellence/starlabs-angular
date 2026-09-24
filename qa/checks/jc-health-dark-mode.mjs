@@ -49,6 +49,18 @@ check('DM11', 'log composer overlay gets jchd-overlay-dark (slide-over side)',
 
 check('DM12', 'dark token block exists on .jchd-wrap[data-theme="dark"]',
   () => /\.jchd-wrap\[data-theme="dark"\]\s*\{/.test(css));
+// DM12b: the dark block only does something if the stylesheet actually READS those tokens.
+// Origin's CSS is hard-coded colour (0 var() reads); local's is token-driven (681). Defining tokens
+// nothing reads makes data-theme="dark" a no-op — which is exactly what shipped in 1107c8f4 and was
+// caught only in the browser. This check fails until the type/token remap is ported.
+check('DM12b', 'the stylesheet READS the dark tokens (var(--...) usage, not hard-coded colour)', () => {
+  const darkBlock = css.match(/\.jchd-wrap\[data-theme="dark"\]\s*\{([^}]*)\}/)?.[1] ?? '';
+  const defined = [...darkBlock.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]);
+  if (!defined.length) return false;
+  const read = defined.filter(t => new RegExp(`var\\(${t}\\b`).test(css));
+  console.log(`      (dark tokens defined: ${defined.length}, actually read by the stylesheet: ${read.length})`);
+  return read.length >= Math.ceil(defined.length * 0.5);
+});
 check('DM13', 'the theme toggle is styled',
   () => /\.jchd-theme-toggle/.test(css));
 check('DM14', 'jchd-overlay-dark rules live in the GLOBAL stylesheet (overlays escape component scope)',

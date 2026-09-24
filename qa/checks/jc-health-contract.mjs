@@ -32,6 +32,13 @@ const checks = [
     () => /ahDrill\s*=\s*signal/.test(ts)
        && !/import\s*\{[^}]*AhFlagListDialogComponent/.test(ts)
        && !/dialog\.open\(\s*AhFlagListDialogComponent/.test(ts)],
+  // The A&H card is *ngIf="ahSummary() as s" — if nothing ever CALLS loadAHSummary(), the summary
+  // stays null, the card never renders, and the drill has no trigger. Defined-but-never-called passed
+  // every structural check on 2026-09-24 and was caught only in the browser. Guard the call site.
+  ['Fix3  loadAHSummary() is actually CALLED, not just defined',
+    () => /void this\.loadAHSummary\(\)/.test(ts)],
+  ['Fix3  the A&H card and its drill triggers exist in the template',
+    () => /class="[^"]*\bjchd-ah-card\b[^"]*"/.test(html) && /openAhDrill\(/.test(html)],
   ['Fix3  ah-flag-list-dialog.component.ts deleted',
     () => !existsSync(join(dash, 'ah-flag-list-dialog.component.ts'))],
 ];
