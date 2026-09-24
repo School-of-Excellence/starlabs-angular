@@ -21,6 +21,7 @@ export const routes: Routes = [
   {path: 'productdelivery', loadComponent: () => import('./Product Designer/product-delivery/product-delivery.component').then(m => m.ProductDeliveryComponent), canActivate:[authGuard]},
   {path: 'deliverysequence', loadComponent: () => import('./Product Designer/delivery-sequence/delivery-sequence.component').then(m => m.DeliverySequenceComponent), canActivate:[authGuard]},
   {path: 'profilelist', loadComponent: () => import('./Participants Profile Management/profilelist/profilelist.component').then(m => m.ProfilelistComponent), canActivate:[authGuard]},
+  {path: 'segmentboard', loadComponent: () => import('./Participants Profile Management/segment-board/segment-board.component').then(m => m.SegmentBoardComponent), canActivate:[authGuard]},
   {path: 'app-flow-breaks', loadComponent: () => import('./Participants Profile Management/app-flow-breaks/app-flow-breaks.component').then(m => m.AppFlowBreaksComponent), canActivate:[authGuard]},
   {path: 'participantproduct', loadComponent: () => import('./Participants Profile Management/participant-product/participant-product.component').then(m => m.ParticipantProductComponent), canActivate:[authGuard]},
   {path: 'ProfileScreen', loadComponent: () => import('./Participants Profile Management/new-profile/new-profile.component').then(m => m.NewProfileComponent), canActivate:[authGuard]},
