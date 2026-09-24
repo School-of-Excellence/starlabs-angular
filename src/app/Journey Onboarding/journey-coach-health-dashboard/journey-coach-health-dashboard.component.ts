@@ -231,6 +231,18 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   readonly COVERAGE_TARGET = 0.9;  // contact at least this share of the base each period
 
   view: DashboardView = 'summary';
+  // Dark/light theming (operator-approved): follows prefers-color-scheme by default; the header toggle
+  // overrides and persists to localStorage. Applied via [attr.data-theme] on .jchd-wrap.
+  theme: 'dark' | 'light' | null = null;
+  private readonly THEME_KEY = 'jchd-theme';
+  get isDark(): boolean {
+    if (this.theme) return this.theme === 'dark';
+    return typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  toggleTheme(): void {
+    this.theme = this.isDark ? 'light' : 'dark';
+    try { localStorage.setItem(this.THEME_KEY, this.theme); } catch {}
+  }
   // Worklist view: a focused triage queue over the already-priority-sorted dataSource.data.
   worklistLimit = 25;
   period: 'week' | 'month' | 'custom' = 'month';
@@ -445,6 +457,10 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    try {
+      const t = localStorage.getItem(this.THEME_KEY);
+      if (t === 'dark' || t === 'light') this.theme = t;
+    } catch {}
     try {
       await this.resolveCoach();
       await this.loadPortfolio();
@@ -1921,13 +1937,14 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
       addressed: this.isAddressed(row),
       needsAttention: this.isNeedsAttention(row),
       onMarkAddressed: (next: boolean) => this.markAddressed(row, next),
+      isDark: this.isDark,   // the slide-over + its composer render in CDK overlays outside .jchd-wrap
     };
     this.dialog.open(ParticipantSlideoverComponent, {
       data,
       width: 'min(520px, 100vw)',
       height: '100vh',
       position: { right: '0', top: '0' },
-      panelClass: 'jchd-slideover-panel',
+      panelClass: this.isDark ? ['jchd-slideover-panel', 'jchd-overlay-dark'] : 'jchd-slideover-panel',
       // a11y: label the dialog by the participant-name heading and move focus into the panel
       // (the close button) on open, instead of leaving focus on the trigger outside the overlay.
       ariaLabelledBy: 'so-title',
@@ -2059,7 +2076,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
 
   /** Open the Log-call dialog; on save, write the enriched touchpoint and close the loop. */
   logCall(row: PortfolioRow): void {
-    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false });
+    const ref = this.dialog.open(LogCallDialogComponent, { data: { name: row.name }, autoFocus: false, panelClass: this.isDark ? 'jchd-overlay-dark' : undefined });
     ref.afterClosed().subscribe(async (res: LogCallResult | undefined) => {
       if (!res) return;
       await this.writeCall(row, res.outcome, res.note, res.nextActionDate ?? null);
@@ -2118,6 +2135,7 @@ export class JourneyCoachHealthDashboardComponent implements OnInit {
     const ref = this.dialog.open(SetHealthStateDialogComponent, {
       data: { name: row.name, current: row.coachHealthState?.state ?? null },
       autoFocus: false,
+      panelClass: this.isDark ? 'jchd-overlay-dark' : undefined,
     });
     ref.afterClosed().subscribe(async (res: SetHealthStateResult | undefined) => {
       if (!res) return;

@@ -3203,3 +3203,51 @@ td.mat-mdc-cell span {
   text-overflow: ellipsis; }
 .ahd-date { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .ahd-chev { color: var(--ink-4); font-size: 18px; }
+
+
+/* ---- Dark theme tokens + the header theme toggle (ported from joshua-development:
+   991970f9 / 9dbde118 / 795201e0 / 7aa70441). data-theme is set on .jchd-wrap. ---- */
+@media (prefers-color-scheme: dark) {
+  .jchd-wrap:not([data-theme="light"]) {
+    --canvas: #0e0e11; --surface: #1b1b20; --surface-2: #24242a; --tile: #26262b; --tile-hover: #303036;
+    --ink: #f5f5f7; --ink-2: rgba(235,235,245,0.64); --ink-3: rgba(235,235,245,0.5); --ink-4: rgba(235,235,245,0.4);
+    --muted: rgba(235,235,245,0.62); --faint: rgba(235,235,245,0.45);
+    --hairline: rgba(255,255,255,0.12); --hairline-2: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+    --blue: #0a84ff; --blue-fg: #64b5ff; --blue-wash: rgba(10,132,255,0.16);
+    --blue-08: rgba(10,132,255,0.14); --blue-12: rgba(10,132,255,0.18); --blue-16: rgba(10,132,255,0.22); --blue-22: rgba(10,132,255,0.30);
+    --card-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 14px 30px -18px rgba(0,0,0,0.8);
+    --card-shadow-hover: 0 2px 5px rgba(0,0,0,0.5), 0 20px 44px -22px rgba(0,0,0,0.8);
+    --sem-red: #ff6b6b; --sem-red-strong: #ff453a; --sem-orange-fg: #ffb84d; --sem-orange: #ff9f0a;
+    --sem-green-fg: #5bd97a; --sem-green: #30d158; --sem-teal: #40c8e0; --sem-pink: #ff375f;
+    --sem-purple: #bf5af2; --sem-indigo: #5e5ce6; --sem-gray-fg: var(--ink-4);
+    --ink-1: rgba(235,235,245,0.7); --blue-wash-2: rgba(10,132,255,0.16); --fill-hover: #303036; --surface-3: #202027; --surface-tint: #202027;
+    --sep: rgba(255,255,255,0.09); --border-2: rgba(255,255,255,0.14); --border-3: rgba(255,255,255,0.12); --faint-2: rgba(235,235,245,0.4);
+    --sem-indigo-fg: #8f8dff; --sem-red-deep: #ff6b6b;
+    --sk-base: #202027; --sk-hi: #2b2b32;
+    --slate-2: rgba(235,235,245,0.6); --slate-ink: #f5f5f7; --slate-line: rgba(255,255,255,0.12); --slate-fill: #24242a;
+  }
+}
+.jchd-wrap[data-theme="dark"] {
+  --canvas: #0e0e11; --surface: #1b1b20; --surface-2: #24242a; --tile: #26262b; --tile-hover: #303036;
+  --ink: #f5f5f7; --ink-2: rgba(235,235,245,0.64); --ink-3: rgba(235,235,245,0.5); --ink-4: rgba(235,235,245,0.4);
+  --muted: rgba(235,235,245,0.62); --faint: rgba(235,235,245,0.45);
+  --hairline: rgba(255,255,255,0.12); --hairline-2: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
+  --blue: #0a84ff; --blue-fg: #64b5ff; --blue-wash: rgba(10,132,255,0.16);
+  --blue-08: rgba(10,132,255,0.14); --blue-12: rgba(10,132,255,0.18); --blue-16: rgba(10,132,255,0.22); --blue-22: rgba(10,132,255,0.30);
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 14px 30px -18px rgba(0,0,0,0.8);
+  --card-shadow-hover: 0 2px 5px rgba(0,0,0,0.5), 0 20px 44px -22px rgba(0,0,0,0.8);
+  --sem-red: #ff6b6b; --sem-red-strong: #ff453a; --sem-orange-fg: #ffb84d; --sem-orange: #ff9f0a;
+  --sem-green-fg: #5bd97a; --sem-green: #30d158; --sem-teal: #40c8e0; --sem-pink: #ff375f;
+  --sem-purple: #bf5af2; --sem-indigo: #5e5ce6; --sem-gray-fg: var(--ink-4);
+  --ink-1: rgba(235,235,245,0.7); --blue-wash-2: rgba(10,132,255,0.16); --fill-hover: #303036; --surface-3: #202027; --surface-tint: #202027;
+  --sep: rgba(255,255,255,0.09); --border-2: rgba(255,255,255,0.14); --border-3: rgba(255,255,255,0.12); --faint-2: rgba(235,235,245,0.4);
+  --sem-indigo-fg: #8f8dff; --sem-red-deep: #ff6b6b;
+  --sk-base: #202027; --sk-hi: #2b2b32;
+  --slate-2: rgba(235,235,245,0.6); --slate-ink: #f5f5f7; --slate-line: rgba(255,255,255,0.12); --slate-fill: #24242a;
+}
+.jchd-theme-toggle { display: inline-grid; place-items: center; width: 34px; height: 34px; border: none;
+  border-radius: 999px; background: var(--tile); color: var(--ink-2); cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .1s ease; }
+.jchd-theme-toggle:hover { background: var(--tile-hover); color: var(--ink); }
+.jchd-theme-toggle:active { transform: scale(0.94); }
+.jchd-theme-toggle mat-icon { font-size: var(--fs-600); width: 19px; height: 19px; line-height: 19px; }

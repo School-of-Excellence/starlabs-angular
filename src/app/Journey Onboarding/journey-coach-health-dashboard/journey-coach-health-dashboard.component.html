@@ -1,4 +1,4 @@
-<div class="jchd-wrap" [ngClass]="'jchd-view-' + view">
+<div class="jchd-wrap" [ngClass]="'jchd-view-' + view" [attr.data-theme]="theme">
 
   <header class="jchd-header">
     <div class="header-left">
@@ -15,6 +15,11 @@
         <mat-button-toggle value="base">Participants</mat-button-toggle>
         <mat-button-toggle value="scoreboard">Coaches</mat-button-toggle>
       </mat-button-toggle-group>
+
+      <button type="button" class="jchd-theme-toggle" (click)="toggleTheme()"
+        [attr.aria-label]="'Switch to ' + (isDark ? 'light' : 'dark') + ' mode'" matTooltip="Toggle dark mode">
+        <mat-icon>{{ isDark ? 'light_mode' : 'dark_mode' }}</mat-icon>
+      </button>
 
       <label class="jchd-pill jchd-pill-select coach-pill" *ngIf="view === 'summary' || view === 'base'">
         <span class="jchd-pill-label"><span class="vk">Viewing</span>{{ selectedCoachName }}</span>
