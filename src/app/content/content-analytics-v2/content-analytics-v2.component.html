@@ -1,0 +1,969 @@
+<!-- Content Analytics v2 — hook prefix: cav -->
+
+<!-- ── Shared fragments ─────────────────────────────────────────────── -->
+<ng-template #tInfo>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+</ng-template>
+
+<ng-template #tEmpty>
+  @if (live.error()) {
+    <div class="card empty" data-testid="cav-state-error"><h3>Couldn't load views</h3><p>{{ live.error() }}</p></div>
+  } @else if (live.loading()) {
+    <div class="card empty" data-testid="cav-state-loading"><h3>Loading views…</h3><p>Reading content analytics for this period.</p></div>
+  } @else {
+    <div class="card empty" data-testid="cav-state-empty"><h3>No views match these filters</h3><p>Try widening the period or clearing a filter above.</p></div>
+  }
+</ng-template>
+
+<!-- progress bar + label; r = 0..1 fill, t = label (defaults to the percentage) -->
+<ng-template #tProg let-r="r" let-t="t">
+  <div class="prog"><div class="bar"><i [style.width.%]="max(2, r * 100)" [style.background]="reachColor(r)"></i></div><span class="pc">{{ t ?? pct(r) }}</span></div>
+</ng-template>
+
+<ng-template #tSrc let-k>
+  <span class="src"><i [style.background]="sources[k].color"></i>{{ sources[k].label }}</span>
+</ng-template>
+
+
+
+
+<ng-template #tStatus let-e>
+  @let s = statusOf(e);
+  <span class="pill" [ngClass]="status[s].cls">@if (s === 'live') {<i class="pulse"></i>}{{ s === 'progress' ? pct(reachOf(e)) : status[s].label }}</span>
+</ng-template>
+
+<ng-template #tCont let-e>
+  @let c = e.cont;
+  @if (c) {
+    <span class="src" [attr.title]="c.kind === 'playlist' ? 'Pushed playlist' : 'Series the content belongs to'"><i [style.background]="c.color" [style.border-radius]="c.kind === 'playlist' ? '2px' : '99px'"></i>{{ c.label }}</span>
+  } @else {
+    <span style="color:var(--t3)">—</span>
+  }
+</ng-template>
+
+
+
+<!-- the content bucket a push carried: `type` on the recommended mix playlist document -->
+<ng-template #tRecType let-k>
+  @if (recType[k]; as t) {<span class="jy" [style.color]="t.color"><i [style.background]="t.color"></i>{{ t.label }}</span>}
+  @else {<span class="plat">{{ k || '—' }}</span>}
+</ng-template>
+
+<!-- where one push stands: no close date is its own state, it is never "missed" -->
+<ng-template #tRecPill let-x="x">
+  @if (x.total && x.done === x.total) {<span class="pill ok">Completed</span>}
+  @else if (x.state === 'nodate') {<span class="pill" [ngClass]="x.opened ? 'mid' : 'rw'">{{ x.opened ? 'In progress' : 'Not started' }}</span>}
+  @else if (x.state === 'closed') {<span class="pill low">Closed unfinished</span>}
+  @else {<span class="pill" [ngClass]="x.prog >= 0.5 ? 'mid' : 'rw'">{{ x.prog >= 0.5 ? 'On track' : 'Behind' }} · {{ x.left }}d left</span>}
+</ng-template>
+
+<!-- numeric half of a By-content row, shared by the item and each of its playlist slices -->
+<ng-template #tVidMetrics let-o="o" let-tag="tag">
+  <td class="num" style="font-weight:700"><span data-testid="cav-dnum-tag-views" class="dnum" (click)="dEvents($event, tag + ' · all views', o.evs)">{{ o.views }}</span></td>
+  <td class="num"><span data-testid="cav-dnum-tag-viewers" class="dnum" (click)="dPeople($event, tag + ' · unique viewers', o.evs)">{{ o.viewers }}</span></td>
+  <td class="num">@if (o.rewatch) {<span data-testid="cav-dnum-tag-repeat" class="dnum" (click)="dRepeat($event, tag + ' · repeat plays', o.evs)">{{ o.rewatch }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+  <td class="num"><span style="font-weight:700" [style.color]="reachColor(o.avgReach)">{{ pct(o.avgReach) }}</span></td>
+  <td class="num">@if (o.doneN) {<span data-testid="cav-dnum-tag-done" class="dnum" (click)="dPeopleIn($event, tag + ' · finished it', o.evs, o.done)">{{ o.doneN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+  <td class="num">@if (o.midN) {<span data-testid="cav-dnum-tag-mid" class="dnum" (click)="dPeopleIn($event, tag + ' · did not finish it', o.evs, o.mid)">{{ o.midN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+  <td class="num" style="font-weight:600">@if (o.watch) { {{ durLong(o.watch) }} } @else {<span style="color:var(--t3)">—</span>}</td>
+</ng-template>
+
+<!-- Event / Queue / Others → product → mode cascade, shared by Mode + Recommendation -->
+
+<!-- ══ Page ═══════════════════════════════════════════════════════════ -->
+<div class="wrap" data-testid="cav-root">
+
+  <div class="phead">
+    <div>
+      <h1>Content Analytics</h1>
+    </div>
+    <div class="grow"></div>
+    <button class="btn" data-testid="cav-head-export" (click)="exportCsv()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+  </div>
+
+  <!-- Period -->
+  <div class="card period">
+    <span class="lbl">Period</span>
+    <div class="presets">
+      <button data-testid="cav-period-7" [class.on]="preset() === 7" (click)="setPeriod(7)">7 days</button>
+      <button data-testid="cav-period-14" [class.on]="preset() === 14" (click)="setPeriod(14)">14 days</button>
+      <button data-testid="cav-period-30" [class.on]="preset() === 30" (click)="setPeriod(30)">30 days</button>
+      <button data-testid="cav-period-90" [class.on]="preset() === 90" (click)="setPeriod(90)">90 days</button>
+    </div>
+    <div class="range" [class.on]="preset() === null">
+      <button type="button" class="rcal" data-testid="cav-period-picker" aria-label="Pick a date range" (click)="picker.open()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      <mat-date-range-input class="rin" [formGroup]="range" [rangePicker]="picker" [max]="maxDate" separator="→">
+        <input matStartDate formControlName="start" data-testid="cav-period-from" placeholder="Start date" (dateChange)="commitRange()">
+        <input matEndDate formControlName="end" data-testid="cav-period-to" placeholder="End date" (dateChange)="commitRange()">
+      </mat-date-range-input>
+      <mat-date-range-picker #picker (opened)="pickerOpen = true" (closed)="onPickerClosed()"></mat-date-range-picker>
+    </div>
+    <div class="grow"></div>
+    <span class="live"><i class="pulse"></i>&ngsp;<b style="color:var(--t1)"><span class="dnum" data-testid="cav-period-live" (click)="dEvents($event, 'Watching right now', liveEvents())">{{ liveEvents().length }}</span></b>&nbsp;watching right now</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button data-testid="cav-tab-log" [class.on]="view() === 'log'" (click)="setView('log')">Activity log <span class="cnt">{{ num(rows().length) }}</span></button>
+    <button data-testid="cav-tab-video" [class.on]="view() === 'video'" (click)="setView('video')">By content <span class="cnt">{{ videoRollup().length }}</span></button>
+    <button data-testid="cav-tab-person" [class.on]="view() === 'person'" (click)="setView('person')">By participant <span class="cnt">{{ personCount() }}</span></button>
+    <button data-testid="cav-tab-mode" [class.on]="view() === 'mode'" (click)="setView('mode')">Mode based <span class="cnt">{{ live.modeData()?.modes?.length || '—' }}</span></button>
+    <button data-testid="cav-tab-rec" [class.on]="view() === 'rec'" (click)="setView('rec')">Recommendation based <span class="cnt">{{ live.recs()?.length ?? '—' }}</span></button>
+    <button data-testid="cav-tab-tier" [class.on]="view() === 'tier'" (click)="setView('tier')">EiFLIX tier based <span class="cnt">{{ live.tierData()?.tiers?.length || '—' }}</span></button>
+  </div>
+
+  @if (!bare()) {
+    <!-- Tiles -->
+    @let t = tiles();
+    <div class="tiles">
+      <div class="card tile"><div class="k">Period</div><div class="v mono">{{ t.days }} day{{ t.days === 1 ? '' : 's' }}</div>
+        <div class="s">{{ shortDay(from()) }} – {{ shortDay(to()) }} {{ toYear() }}</div></div>
+      <div class="card tile"><div class="k">Unique viewers</div>
+        <div class="v mono"><span class="dnum" data-testid="cav-tile-viewers" (click)="dPeople($event, 'Unique viewers in this period', rows())">{{ t.viewers }}</span></div>
+        <div class="s"><b><span class="dnum" data-testid="cav-tile-views" (click)="dEvents($event, 'All views in this period', rows())">{{ num(t.views) }}</span></b> views ·
+          @if (t.delta === null) {<span class="delta" style="color:var(--t3)">{{ t.deltaNote }}</span>}
+          @else {<span class="delta" [class.up]="t.delta >= 0" [class.dn]="t.delta < 0">{{ t.delta >= 0 ? '▲' : '▼' }} {{ t.deltaPct }}%</span> vs prev}
+        </div></div>
+      <div class="card tile"><div class="k">Total watch time</div><div class="v mono">{{ durLong(t.watch) }}</div>
+        <div class="s">Median session <b>{{ dur(t.med) }}</b></div></div>
+      <div class="card tile"><div class="k">Avg per viewer</div><div class="v mono">{{ dur(t.per) }}</div>
+        <div class="s"><b>{{ t.each }}</b> items each</div></div>
+      <div class="card tile"><div class="k">Completion rate</div><div class="v mono">{{ t.completion }}</div>
+        <div class="s"><b><span class="dnum" data-testid="cav-tile-completed" (click)="dEvents($event, 'Completed plays', t.completedRows)">{{ t.done }}</span></b> of {{ num(t.views) }} plays completed</div></div>
+    </div>
+
+    <!-- All time — server-side count/sum aggregates over the whole collection -->
+    <div class="card alltime" data-testid="cav-alltime">
+      <span class="lbl2">All time</span>
+      @if (allTime(); as at) {
+        <span class="it"><b data-testid="cav-alltime-views">{{ num(at.views) }}</b> views</span>
+        <span class="it"><b>{{ durLong(at.watch) }}</b> watch time</span>
+        <span class="it" title="Plays the app marked complete (status = complete)"><b>{{ pct(at.completion) }}</b> completion</span>
+        @if (at.first) {<span class="it since">since {{ shortDay(at.first) }} {{ fmtYear(at.first) }}</span>}
+      } @else {
+        <span class="it" style="color:var(--t3)">Loading lifetime totals…</span>
+      }
+    </div>
+
+    <!-- Filters -->
+    <div class="card filters">
+      <div class="srch">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input data-testid="cav-filter-search" placeholder="Search participant or video…" [ngModel]="q()" (ngModelChange)="setFilter('q', $event)">
+      </div>
+      <select class="f" data-testid="cav-filter-source" [class.act]="!!src()" [ngModel]="src()" (ngModelChange)="setFilter('src', $event)">
+        <option value="">All sources</option>
+        @for (k of sourceKeys; track k) {<option [value]="k">{{ sources[k].label }}</option>}
+      </select>
+      <select class="f" data-testid="cav-filter-status" [class.act]="!!st()" [ngModel]="st()" (ngModelChange)="setFilter('st', $event)">
+        <option value="">Any outcome</option><option value="completed">Completed</option>
+        <option value="progress">In progress</option><option value="live">Watching now</option>
+      </select>
+      @if (hasPlatform()) {
+      <select class="f" data-testid="cav-filter-platform" [class.act]="!!pl()" [ngModel]="pl()" (ngModelChange)="setFilter('pl', $event)">
+        <option value="">All platforms</option>
+        @for (p of platformOpts(); track p) {<option [value]="p">{{ platformLabel(p) }}</option>}
+      </select>
+      }
+      <select class="f" data-testid="cav-filter-min" [class.act]="!!min()" [ngModel]="min()" (ngModelChange)="setMin($event)">
+        <option [ngValue]="0">Any watch time</option><option [ngValue]="60">Over 1 min</option>
+        <option [ngValue]="300">Over 5 mins</option><option [ngValue]="900">Over 15 mins</option>
+      </select>
+      <div class="grow"></div>
+      <div class="chips">
+        @for (c of chips(); track c.key) {<span class="chip">{{ c.label }}<button data-testid="cav-filter-chip-x" (click)="clearChip(c.key)">×</button></span>}
+      </div>
+      @if (chips().length) {<button class="clr" data-testid="cav-filter-clear" (click)="clearAll()">Clear all</button>}
+    </div>
+  }
+
+  @if (live.capped(); as cap) {
+    <div class="note" data-testid="cav-cap-note">
+      <ng-container *ngTemplateOutlet="tInfo" />
+      <div><b>This period holds {{ num(cap.total) }} plays — showing the most recent {{ num(cap.shown) }}.</b>
+        Every number on this screen is counted from those, so totals here understate the period. Narrow the period for exact figures.</div>
+    </div>
+  }
+
+  <!-- ══ Views ══════════════════════════════════════════════════════ -->
+  <div>
+  @switch (view()) {
+
+    <!-- ── Activity log ── -->
+    @case ('log') {
+      @if (!rows().length) { <ng-container *ngTemplateOutlet="tEmpty" /> } @else {
+        @let lv = logVM();
+        <div class="card"><div class="tblwrap"><table>
+          <thead><tr>
+            @for (c of logCols(); track c.k) {
+              <th class="sortable" data-testid="cav-log-sort" [ngClass]="c.cls" [class.on]="lv.sk === c.k" [attr.title]="tip(c.l)" (click)="sortBy('log', c.k)">{{ c.l }}<span class="arw">{{ lv.sd === 'asc' ? '▲' : '▼' }}</span></th>
+            }
+          </tr></thead>
+          <tbody>
+            @for (e of lv.page; track $index) {
+              <tr data-testid="cav-log-row">
+                <td><div class="when">{{ fmtDate(e.ts) }}</div></td>
+                <td><div class="pname">{{ e.name }}</div>@if (e.newUser) {<div class="sub">New user</div>}</td>
+                <td><div class="vname">{{ e.video }}</div></td>
+                <td><ng-container *ngTemplateOutlet="tCont; context: { $implicit: e }" /></td>
+                <td><ng-container *ngTemplateOutlet="tSrc; context: { $implicit: e.src }" /></td>
+                <td class="num"><span style="color:var(--t2)">{{ dur(e.rt) }}</span></td>
+                <td class="num"><span style="font-weight:600" [style.color]="e.live ? 'var(--ok)' : null" [attr.title]="e.live ? 'Current position — still watching' : null">{{ dur(e.exit) }}</span></td>
+                <td class="num"><span style="font-weight:600">{{ dur(e.spent) }}</span>
+                  @if (e.rewatch) {&ngsp;<span class="pill rw" title="Spent more than the item's length (beyond one 15s heartbeat) — rewatched or scrubbed back">↻ {{ (e.spent / e.rt).toFixed(1) }}×</span>}</td>
+                @if (hasPlatform()) {<td><span class="plat">{{ platformLabel(e.platform) }}</span></td>}
+                <td><ng-container *ngTemplateOutlet="tStatus; context: { $implicit: e }" /></td>
+              </tr>
+            }
+          </tbody></table></div>
+          <div class="tfoot"><span>Showing <b>{{ lv.page.length }}</b> of <b>{{ num(rows().length) }}</b> views</span>
+            @if (lv.page.length < rows().length) {<button class="btn" data-testid="cav-log-more" (click)="more()">Show 25 more</button>} @else {<span>End of results</span>}
+          </div></div>
+      }
+    }
+
+    <!-- ── By content ── -->
+    @case ('video') {
+      @if (!rows().length) { <ng-container *ngTemplateOutlet="tEmpty" /> } @else {
+        @let vv = videoVM();
+        <div class="note">
+          <ng-container *ngTemplateOutlet="tInfo" />
+          <div><b>{{ vv.needs }} of {{ vv.counts.all }} items need promoting</b> — {{ vv.counts.none }} nobody opened at all, {{ vv.counts.low }} reached under a quarter of the active audience.
+            An item carried by more than one playlist opens up. Collapsed is its combined performance; expanded splits the same plays by the playlist or series they came out of,
+            so you can see the shelf it works on and the one it doesn't.
+            Completed and Partly watched count people, not plays — each person lands in one bucket, from their best attempt.
+            Views add up across a split; people do not, because the same person can reach an item from more than one playlist.</div>
+        </div>
+        <div class="band">
+          <div class="seg">
+            <button data-testid="cav-video-band-all" [class.on]="cband() === 'all'" (click)="cband.set('all')">{{ bands.all }}<span class="n2">{{ vv.counts.all }}</span></button>
+            <button data-testid="cav-video-band-none" [class.on]="cband() === 'none'" (click)="cband.set('none')">{{ bands.none }}<span class="n2">{{ vv.counts.none }}</span></button>
+            <button data-testid="cav-video-band-low" [class.on]="cband() === 'low'" (click)="cband.set('low')">{{ bands.low }}<span class="n2">{{ vv.counts.low }}</span></button>
+            <button data-testid="cav-video-band-ok" [class.on]="cband() === 'ok'" (click)="cband.set('ok')">{{ bands.ok }}<span class="n2">{{ vv.counts.ok }}</span></button>
+          </div>
+          @if (cband() !== 'all') {<span style="font-size:11.5px;color:var(--t2);font-weight:500">Showing <b>{{ vv.list.length }}</b> of {{ vv.counts.all }}</span>}
+        </div>
+        <div class="card"><div class="tblwrap"><table>
+          <thead><tr>
+            @for (c of videoCols; track c.k) {
+              <th class="sortable" data-testid="cav-video-sort" [ngClass]="c.cls" [class.on]="vv.sk === c.k" [attr.title]="tip(c.l)" (click)="sortBy('video', c.k)">{{ c.l }}<span class="arw">{{ vv.sd === 'asc' ? '▲' : '▼' }}</span></th>
+            }
+          </tr></thead>
+          <tbody>
+            @for (o of vv.list; track o.key) {
+              @let many = o.groups.length > 1;
+              @let op = openContent() === o.key;
+              <tr data-testid="cav-video-row" [class.crow]="many" [style.background]="o.band === 'none' ? '#FDF6F7' : o.band === 'low' ? '#FDFBF3' : null" (click)="many && toggleContent(o.key)">
+                <td><div class="vname">@if (many) {<span class="chev" [class.open]="op">▶</span>&ngsp;}<span class="clink" data-testid="cav-video-insights" title="Open insights" (click)="openInsights($event, o.key)">{{ o.video }}</span>@if (o.plCount > 1) {<span class="xover" [attr.title]="'Carried by ' + o.plCount + ' different playlists'">in {{ o.plCount }} playlists</span>}</div></td>
+                <td><ng-container *ngTemplateOutlet="tSrc; context: { $implicit: o.src }" /></td>
+                <td class="num" style="color:var(--t2)">{{ dur(o.rt) }}</td>
+                <ng-container *ngTemplateOutlet="tVidMetrics; context: { o: o, tag: o.video }" />
+              </tr>
+              @if (op) {
+                @for (g of o.groups; track g.kind + g.label) {
+                  <tr class="csub" data-testid="cav-video-sub-row">
+                    <td><div class="cname"><i [style.background]="g.kind === 'playlist' ? '#6D029A' : g.kind === 'series' ? '#6B7280' : '#D4D3CE'" [style.border-radius]="g.kind === 'playlist' ? '2px' : '99px'"></i>{{ g.label }}</div></td>
+                    <td><span class="ctype">{{ g.kind === 'playlist' ? 'Playlist' : g.kind === 'series' ? 'Series' : 'Direct' }}</span></td>
+                    <td></td>
+                    <ng-container *ngTemplateOutlet="tVidMetrics; context: { o: g, tag: o.video + ' · ' + g.label }" />
+                  </tr>
+                }
+              }
+            }
+          </tbody></table></div>
+          <div class="tfoot"><span><b>{{ vv.list.length }}</b> items shown · <b>{{ vv.counts.none }}</b> never opened in this period · <b>{{ vv.counts.low }}</b> under-watched</span></div></div>
+      }
+    }
+
+    <!-- ── By participant ── -->
+    @case ('person') {
+      @if (!rows().length) { <ng-container *ngTemplateOutlet="tEmpty" /> } @else {
+        @let pv = personVM();
+        <div class="card"><div class="tblwrap"><table>
+          <thead><tr>
+            <th class="selcol"><input type="checkbox" class="selall" data-testid="cav-person-selall" title="Select everyone listed" [checked]="allSel(pv.keys)" (change)="toggleAll(pv.keys, $any($event.target).checked, pv.labels)"></th>
+            @for (c of personCols(); track c.k) {
+              <th class="sortable" data-testid="cav-person-sort" [ngClass]="c.cls" [class.on]="pv.sk === c.k" [attr.title]="tip(c.l)" (click)="sortBy('person', c.k)">{{ c.l }}<span class="arw">{{ pv.sd === 'asc' ? '▲' : '▼' }}</span></th>
+            }
+          </tr></thead>
+          <tbody>
+            @for (o of pv.list; track o.key) {
+              <tr data-testid="cav-person-row">
+                <td class="selcol"><input type="checkbox" class="rowsel" data-testid="cav-person-sel" [checked]="isSel(o.key)" (change)="toggleSel(o.key, $any($event.target).checked, o.name)"></td>
+                <td><div class="pname">{{ o.name }}</div>@if (o.newUser) {<div class="sub">New user</div>}</td>
+                @if (hasJourney()) {<td><span class="plat">{{ o.journeyName || '—' }}</span></td>}
+                @for (k of personSrcKeys(); track k) {
+                  <td class="num">
+                    @if (o.bySrc[k]; as b) {<span data-testid="cav-dnum-person-source" class="dnum" (click)="dPContent($event, o.name + ' · ' + sources[k].label, b.evs)">{{ b.vids.size }}</span>}
+                    @else {<span style="color:var(--t3)">—</span>}
+                  </td>
+                }
+                <td class="num"><span data-testid="cav-dnum-person-content" class="dnum" (click)="dPContent($event, o.name + ' · everything watched', o.evs)">{{ o.unique }}</span></td>
+                <td class="num" style="font-weight:700"><span data-testid="cav-dnum-person-views" class="dnum" (click)="dEvents($event, o.name + ' · all views', o.evs)">{{ o.views }}</span></td>
+                <td class="num" style="font-weight:600">{{ durLong(o.watch) }}</td>
+                <td class="num" style="color:var(--t2);white-space:nowrap">{{ fmtDate(o.last) }}</td>
+              </tr>
+            }
+          </tbody></table></div>
+          <div class="tfoot"><span><b>{{ pv.list.length }}</b> participants active in this period</span></div></div>
+      }
+    }
+
+    <!-- ── Mode based (live) ── -->
+    @case ('mode') {
+      @if (live.modeLoading() && !live.modeData()) {
+        <div class="card empty" data-testid="cav-mode-loading"><h3>Loading modes…</h3><p>Reading products, the mode catalogue and mode configuration.</p></div>
+      } @else if (!live.modeData()) {
+        <div class="card empty" data-testid="cav-mode-empty"><h3>Mode data unavailable</h3><p>Products and mode configuration could not be read.</p></div>
+      } @else {
+        <div class="panels">
+          <!-- Panel A — who moves next, read from nextmodedate -->
+          <div class="card panel">
+            <div class="ph"><h4>Moving mode in the next {{ shiftWin() }} days</h4>
+              <div class="win">
+                <button data-testid="cav-mode-win-7" [class.on]="shiftWin() === 7" (click)="shiftWin.set(7)">7d</button>
+                <button data-testid="cav-mode-win-10" [class.on]="shiftWin() === 10" (click)="shiftWin.set(10)">10d</button>
+                <button data-testid="cav-mode-win-14" [class.on]="shiftWin() === 14" (click)="shiftWin.set(14)">14d</button>
+                <button data-testid="cav-mode-win-30" [class.on]="shiftWin() === 30" (click)="shiftWin.set(30)">30d</button>
+              </div></div>
+            @if (modeVM(); as mv) {
+              @for (o of mv.shifts; track o.from + o.to) {
+                <div class="shift">
+                  <span class="fromto"><span class="jy" [style.color]="modeColor(o.from)"><i [style.background]="modeColor(o.from)"></i>{{ o.from }}</span><span class="ar">▶</span><span class="jy" [style.color]="modeColor(o.to)"><i [style.background]="modeColor(o.to)"></i>{{ o.to }}</span></span>
+                  <span class="n"><span data-testid="cav-dnum-mode-movers" class="dnum" (click)="dMovers($event, o.from + ' ▶ ' + o.to + ' · next ' + shiftWin() + ' days', o.list)">{{ o.n }}</span></span>
+                  <span class="wh">from {{ shortDay(o.first) }}</span></div>
+              } @empty {
+                <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">Nobody on this product is due to move in this window.</div>
+              }
+              <div class="shift" style="border-top:.5px solid var(--line);margin-top:4px;padding-top:10px">
+                <span class="fromto" style="color:var(--t2);font-weight:700">Total moving</span>
+                <span class="n"><span data-testid="cav-dnum-mode-movers-all" class="dnum" (click)="dMovers($event, 'Everyone moving mode in the next ' + shiftWin() + ' days', mv.soon)">{{ mv.moving }}</span></span>
+                <span class="wh">of {{ num(mv.rows.length) }} on this product</span></div>
+            } @else if (!hasScopeSel()) {
+              <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">Pick a scope to see who moves.</div>
+            } @else {
+              <div style="padding:14px 0;font-size:12.5px;color:var(--t2)" data-testid="cav-scope-loading">Loading the people in this scope…</div>
+            }
+          </div>
+
+          <!-- Panel B — Event / Queue / Others → product → mode. Always usable: it is what decides
+               which participants are fetched, so it must not depend on a scope having loaded. -->
+          <div class="card panel">
+            <div class="ph"><h4>Scope</h4><span class="hint">{{ scopeBy() === 'other' ? 'Product → mode' : scopeByDef[scopeBy()] + ' → product → mode' }}</span></div>
+            <div class="casc">
+              <div><label>Scope by</label>
+                <div class="seg">
+                  <button data-testid="cav-scope-by-event" [class.on]="scopeBy() === 'event'" (click)="setScopeBy('event')">Event</button>
+                  <button data-testid="cav-scope-by-queue" [class.on]="scopeBy() === 'queue'" (click)="setScopeBy('queue')">Queue</button>
+                  <button data-testid="cav-scope-by-other" [class.on]="scopeBy() === 'other'" (click)="setScopeBy('other')">Others</button>
+                </div></div>
+              @if (modeActivities().length) {
+                <div><label>{{ scopeByDef[scopeBy()] }} name</label>
+                  <select data-testid="cav-scope-activity" [ngModel]="activity()" (ngModelChange)="setActivity($event)">
+                    <option value="">Choose a{{ scopeBy() === 'event' ? 'n event' : ' queue' }}…</option>
+                    @for (a of modeActivities(); track a.id) {<option [value]="a.id">{{ a.label }}</option>}
+                  </select></div>
+              }
+              <div class="two">
+                <div><label>Product</label>
+                  <select data-testid="cav-scope-product" [ngModel]="selProduct()" (ngModelChange)="setProduct($event)">
+                    @if (!selProduct()) {<option value="">Choose a product…</option>}
+                    @for (p of prodOpts(); track p.id) {<option [value]="p.id">{{ p.name }}</option>}
+                  </select></div>
+                <div><label>Mode</label>
+                  <select data-testid="cav-scope-mode" [ngModel]="mmode()" (ngModelChange)="mmode.set($event)">
+                    <option value="">All modes</option>
+                    @for (m of ladderOpts(); track m) {<option [value]="m">{{ m }}</option>}
+                  </select></div>
+              </div>
+              @if (modeVM(); as mv) {
+                <div class="out"><b>{{ num(mv.inScopeCount) }}</b> participants in scope ·
+                  <b>{{ num(mv.plays.length) }}</b> plays by them in the selected period</div>
+                @if (mv.partial) {
+                  <div class="out" data-testid="cav-scope-partial" style="border-color:var(--warn);color:var(--warn)">
+                    This scope holds <b>{{ num(mv.partial.total) }}</b> participant products — too many to load at once, so only
+                    the ones moving mode in the next <b>{{ mv.partial.win }} days</b> were read. Counts below cover those people only.</div>
+                }
+              } @else {
+                <div class="out">{{ hasScopeSel() ? 'Loading…' : 'Nothing is loaded until you choose — participantsproduct is read one scope at a time.' }}</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+      @if (modeVM(); as mv) {
+        <div class="note">
+          <ng-container *ngTemplateOutlet="tInfo" />
+          <div><b>{{ mv.onPct }} of watch time here was on-mode</b> — content configured for that mode in <b>product mode config</b>.
+            Plays are attributed to the participant's mode <b>today</b>, not the mode they were in when they pressed play,
+            so a long period reads as approximate. Who moves and when is read from <b>nextmodedate</b>, not forecast.</div>
+        </div>
+
+        <!-- Mode ladder: the product's own modeflow -->
+        <div class="ladder">
+          @for (o of mv.list; track o.key; let last = $last) {
+            <div class="card step" [style.border-top]="'3px solid ' + modeColor(o.key)">
+              <div class="k" [style.color]="modeColor(o.key)">{{ o.key }}</div>
+              <div class="v mono">{{ durLong(o.watch) }}</div>
+              <div class="s"><b>{{ num(o.people) }}</b> here now ·
+                <b>@if (o.views) {<span data-testid="cav-dnum-scope-plays" class="dnum" (click)="dEvents($event, o.key + ' · plays in the period', o.rows)">{{ o.views }}</span>} @else {0}</b> plays</div>
+              <div class="split">
+                <div class="bar"><i [style.width.%]="o.onShare * 100" [style.background]="modeColor(o.key)"></i><i [style.width.%]="(1 - o.onShare) * 100" style="background:#DCDBD5"></i></div>
+                <div class="lg"><span [style.color]="modeColor(o.key)">{{ pct(o.onShare) }} on-mode</span><span>{{ o.shelf }} configured</span></div>
+              </div>
+              @if (!last) {<span class="arw">▶</span>}
+            </div>
+          }
+        </div>
+
+        <div class="card" style="padding:16px 18px 0">
+          <div class="lhead"><h4>{{ mmode() || 'All modes' }} · {{ mv.product?.name }}</h4>
+            <div class="seg">
+              <button data-testid="cav-mode-list-people" [class.on]="mlist() === 'people'" (click)="mlist.set('people')">Participant-wise</button>
+              <button data-testid="cav-mode-list-content" [class.on]="mlist() === 'content'" (click)="mlist.set('content')">Content-wise</button>
+            </div></div>
+          <div style="margin:0 -18px">
+            @if (mlist() === 'people') {
+              <div class="tblwrap"><table>
+                <thead><tr>
+                  <th class="selcol"><input type="checkbox" class="selall" data-testid="cav-mode-selall" title="Select everyone listed" [checked]="allSel(mv.names)" (change)="toggleAll(mv.names, $any($event.target).checked, mv.labels)"></th>
+                  <th [attr.title]="tip('Participant')">Participant</th>
+                  <th [attr.title]="tip('Current mode')">Current mode</th>
+                  <th class="num" [attr.title]="tip('Moves in')">Moves in</th>
+                  <th class="num">Plays in period</th>
+                  <th class="num">Watch time</th>
+                </tr></thead>
+                <tbody>
+                  @for (r of mv.shown; track r.profileid + r.productid) {
+                    <tr data-testid="cav-mode-row">
+                      <td class="selcol"><input type="checkbox" class="rowsel" data-testid="cav-mode-sel" [checked]="isSel(r.profileid)" (change)="toggleSel(r.profileid, $any($event.target).checked, r.name)"></td>
+                      <td><div class="pname">{{ r.name }}</div></td>
+                      <td>@if (r.mode) {<span class="jy" [style.color]="modeColor(r.mode)"><i [style.background]="modeColor(r.mode)"></i>{{ r.mode }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+                      <td class="num">
+                        @if (r.days === null) {<span style="color:var(--t3)">no date set</span>}
+                        @else {<span style="font-weight:700" [style.color]="r.days <= shiftWin() ? 'var(--warn)' : 'var(--t1)'">{{ r.days }}d</span>
+                          <div class="sub">{{ shortDay(r.nextmodedate) }} → {{ r.nextmode || '—' }}</div>}
+                      </td>
+                      <td class="num">{{ r.plays }}</td>
+                      <td class="num" style="font-weight:600">{{ r.watch ? durLong(r.watch) : '—' }}</td>
+                    </tr>
+                  }
+                </tbody></table></div>
+              <div class="tfoot"><span>Showing <b>{{ num(mv.shown.length) }}</b> participant products · plays and watch time are from the selected period</span></div>
+            } @else {
+              @let cr = modeContent();
+              <div class="tblwrap"><table>
+                <thead><tr><th>Configured content</th><th>Mode</th><th>Widget</th><th class="num">Plays</th>
+                  <th class="num">Viewers</th><th class="num">Finished</th><th class="num">Avg reach</th><th class="num">Watch time</th></tr></thead>
+                <tbody>
+                  @for (o of cr; track o.mode + o.key) {
+                    <tr data-testid="cav-mode-content-row" [style.background]="o.views === 0 ? '#FDFBF6' : null">
+                      <td><div class="vname">{{ o.label }}@if (o.mandatory) {<span class="xover" title="Marked mandatory in the mode configuration">mandatory</span>}</div></td>
+                      <td><span class="jy" [style.color]="modeColor(o.mode)"><i [style.background]="modeColor(o.mode)"></i>{{ o.mode }}</span></td>
+                      <td><span class="plat">{{ o.widget || '—' }}</span></td>
+                      <td class="num" style="font-weight:700">@if (o.views) {<span data-testid="cav-dnum-mode-plays" class="dnum" (click)="dEvents($event, o.label + ' · plays in ' + o.mode, o.evs)">{{ o.views }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
+                      <td class="num">@if (o.viewers) {<span data-testid="cav-dnum-mode-viewers" class="dnum" (click)="dPeople($event, o.label + ' · viewers', o.evs)">{{ o.viewers }}</span>} @else {0}</td>
+                      <td class="num">{{ o.finN }}</td>
+                      <td>@if (o.views) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.avgReach }" />} @else {<span style="color:var(--t3)">—</span>}</td>
+                      <td class="num" style="font-weight:600">{{ o.watch ? durLong(o.watch) : '—' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--t2)">No content is configured for this product and mode.</td></tr>
+                  }
+                </tbody></table></div>
+              <div class="tfoot"><span><b>{{ countZero(cr) }}</b> configured items with no plays in this period — highlighted rows</span></div>
+            }
+          </div>
+        </div>
+      } @else if (live.modeData() && !hasScopeSel()) {
+        <div class="card empty" data-testid="cav-scope-pick"><h3>Choose a scope</h3>
+          <p>Pick an <b>Event</b>, a <b>Queue</b> or a <b>product</b> above. Participants are read one scope at a
+            time — <b>participantsproduct</b> holds tens of thousands of rows, so nothing is loaded until you choose.</p></div>
+      } @else if (live.modeData() && !live.scopeLoading()) {
+        @if (live.modeScope()?.error) {
+          <div class="card empty" data-testid="cav-scope-error"><h3>Participants could not be read</h3>
+            <p><b>participantsproduct</b> refused this {{ scopeBy() === 'other' ? 'product' : scopeByDef[scopeBy()] }} — the console has the reason.</p></div>
+        } @else {
+          <div class="card empty" data-testid="cav-scope-empty"><h3>No participants in this scope</h3>
+            <p>Nothing in <b>participantsproduct</b> matched this {{ scopeBy() === 'other' ? 'product' : scopeByDef[scopeBy()] }} — pick another one above.</p></div>
+        }
+      }
+    }
+
+
+    <!-- ── Recommendation based ── -->
+    @case ('rec') {
+      @if (live.recLoading() && !live.recs()) {
+        <div class="card empty" data-testid="cav-rec-loading"><h3>Loading pushed playlists…</h3><p>Reading recommended mix playlist for this period.</p></div>
+      } @else if (!live.recs()?.length) {
+        <div class="card empty" data-testid="cav-rec-empty"><h3>No playlists were pushed in this period</h3>
+          <p>Pushes are matched on the date they were sent. Widen the period, or check <b>recommended mix playlist</b>.</p></div>
+      } @else {
+        @let rv = recVM();
+        <div class="panels" style="grid-template-columns:1fr">
+          <div class="card panel">
+            <div class="ph"><h4>Playlists closing in the next {{ shiftWin() }} days</h4>
+              <div class="win">
+                <button data-testid="cav-rec-win-7" [class.on]="shiftWin() === 7" (click)="shiftWin.set(7)">7d</button>
+                <button data-testid="cav-rec-win-10" [class.on]="shiftWin() === 10" (click)="shiftWin.set(10)">10d</button>
+                <button data-testid="cav-rec-win-14" [class.on]="shiftWin() === 14" (click)="shiftWin.set(14)">14d</button>
+                <button data-testid="cav-rec-win-30" [class.on]="shiftWin() === 30" (click)="shiftWin.set(30)">30d</button>
+              </div></div>
+            @for (o of rv.cl; track o.label) {
+              <div class="shift">
+                <span class="fromto">{{ o.label }}@for (t of o.types; track t) {<span class="ar">·</span><ng-container *ngTemplateOutlet="tRecType; context: { $implicit: t }" />}</span>
+                <span class="n"><span data-testid="cav-dnum-rec-closing" class="dnum" (click)="dPushes($event, o.label + ' · closing with work left', o.list)">{{ o.n }}</span></span>
+                <span class="wh">by {{ shortDay(o.first) }}</span></div>
+            } @empty {
+              <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">No playlists close in this window with work outstanding.</div>
+            }
+            <div class="shift" style="border-top:.5px solid var(--line);margin-top:4px;padding-top:10px">
+              <span class="fromto" style="color:var(--t2);font-weight:700">Unfinished and closing</span>
+              <span class="n"><span data-testid="cav-dnum-rec-closing-all" class="dnum" (click)="dPushes($event, 'Everything closing in the next ' + shiftWin() + ' days', rv.clAll)">{{ rv.clTotal }}</span></span>
+              <span class="wh">of <span data-testid="cav-dnum-rec-open" class="dnum" (click)="dPushes($event, 'Pushes that carry a close date', rv.open)">{{ rv.open.length }}</span> still open</span></div>
+          </div>
+        </div>
+
+        <div class="note">
+          <ng-container *ngTemplateOutlet="tInfo" />
+          <div><b>{{ rv.donePct }} of pushed items were finished</b> ({{ num(rv.totDone) }} of {{ num(rv.totItems) }}) —
+            <b><span data-testid="cav-dnum-rec-pushed-people" class="dnum" (click)="dPushPeople($event, 'Participants with a playlist pushed', rv.pushes)">{{ rv.people.length }}</span></b> {{ rv.people.length === 1 ? 'participant' : 'participants' }},
+            <b><span data-testid="cav-dnum-rec-pushed" class="dnum" (click)="dPushes($event, 'Playlists pushed in this period', rv.pushes)">{{ num(rv.pushes.length) }}</span></b> {{ rv.pushes.length === 1 ? 'push' : 'pushes' }}.
+            A pushed series or playlist is expanded into the episodes and audios inside it, and an item counts as finished
+            from the <b>play log</b> — the documents' own <b>completedcontent</b> is filled on too few of them to report from.
+            @if (rv.undated) {
+              <b><span data-testid="cav-dnum-rec-noclose" class="dnum" (click)="dPushes($event, 'Pushes with no close date', rv.pushes)">{{ num(rv.undated) }}</span></b> of these have
+              no <b>expiredate</b> — with no close date, a push never counts as missed.
+            }
+            @if (live.recCapped(); as c) { Only the most recent <b>{{ num(c.shown) }}</b> of <b>{{ num(c.total) }}</b> pushes were loaded. }
+          </div>
+        </div>
+
+        <div class="ladder">
+          @for (o of rv.pls; track o.id) {
+            @let col = recTypeColor(o.types);
+            <div class="card step" [style.border-top]="'3px solid ' + col">
+              <div class="k" [style.color]="col" style="text-transform:none;letter-spacing:.02em;font-size:11px">{{ o.label }}</div>
+              <div class="v mono">{{ pct(o.itemRate) }}</div>
+              <div class="s"><b><span data-testid="cav-dnum-rec-item-people" class="dnum" (click)="dPushPeople($event, o.label + ' · pushed to', o.all)">{{ o.peopleN }}</span></b> {{ o.peopleN === 1 ? 'person' : 'people' }} ·
+                <b><span data-testid="cav-dnum-rec-item-pushes" class="dnum" (click)="dPushes($event, o.label + ' · every push', o.all)">{{ o.pushed }}</span></b> {{ o.pushed === 1 ? 'push' : 'pushes' }}</div>
+              <div class="split">
+                <div class="bar"><i [style.width.%]="o.itemRate * 100" [style.background]="col"></i><i [style.width.%]="(1 - o.itemRate) * 100" style="background:#DCDBD5"></i></div>
+                <div class="lg"><span [style.color]="col">{{ pct(o.itemRate) }} items done</span><span>{{ pct(o.finRate) }} fully</span></div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="card" style="padding:16px 18px 0">
+          <div class="lhead"><h4>All playlists</h4>
+            <div class="seg">
+              <button data-testid="cav-rec-list-people" [class.on]="rlist() === 'people'" (click)="rlist.set('people')">Participant-wise</button>
+              <button data-testid="cav-rec-list-content" [class.on]="rlist() === 'content'" (click)="rlist.set('content')">Content-wise</button>
+            </div></div>
+          <div style="margin:0 -18px">
+            @if (rlist() === 'people') {
+              <div class="tblwrap"><table>
+                <thead><tr>
+                  <th class="selcol"><input type="checkbox" class="selall" data-testid="cav-rec-selall" title="Select everyone listed" [checked]="allSel(rv.names)" (change)="toggleAll(rv.names, $any($event.target).checked, rv.labels)"></th>
+                  @for (c of recPeopleCols(); track c.l) {<th [ngClass]="c.cls" [attr.title]="tip(c.l)">{{ c.l }}</th>}
+                </tr></thead>
+                <tbody>
+                  @for (r of rv.people; track r.pid) {
+                    @let op = openRec() === r.pid;
+                    <tr class="rrow" data-testid="cav-rec-row" (click)="toggleRec(r.pid)">
+                      <td data-testid="cav-rec-selcol" class="selcol" (click)="$event.stopPropagation()"><input type="checkbox" class="rowsel" data-testid="cav-rec-sel" [checked]="isSel(r.pid)" (change)="toggleSel(r.pid, $any($event.target).checked, r.n)"></td>
+                      <td><span class="chev" [class.open]="op">▶</span>&ngsp;<span class="pname" style="display:inline-block">{{ r.n }}</span></td>
+                      @if (hasJourney()) {<td style="font-size:11.5px;font-weight:600;color:var(--t2)">{{ r.j || '—' }}</td>}
+                      <td class="num" style="font-weight:700"><span data-testid="cav-dnum-rec-row-pushed" class="dnum" (click)="dPushes($event, r.n + ' · playlists pushed', r.all)">{{ r.pushed }}</span></td>
+                      <td class="num">{{ r.done }}<span style="color:var(--t3)"> / {{ r.items }}</span></td>
+                      <td><ng-container *ngTemplateOutlet="tProg; context: { r: r.prog }" /></td>
+                      <td class="num">@if (r.complete) {<span data-testid="cav-dnum-rec-row-completed" class="dnum" (click)="dPushes($event, r.n + ' · completed playlists', completedOf(r.all))">{{ r.complete }}</span>} @else {0}</td>
+                      <td class="num">@if (r.missed) {<span data-testid="cav-dnum-rec-row-missed" class="dnum" (click)="dPushes($event, r.n + ' · closed unfinished', missedOf(r.all))">{{ r.missed }}</span>} @else {0}</td>
+                      <td class="num">@if (r.soon) {<span data-testid="cav-dnum-rec-row-closing" class="dnum" (click)="dPushes($event, r.n + ' · closing soon', closingOf(r.all))">{{ r.soon }}</span>} @else {0}</td>
+                      <td class="num"><span class="pill" [ngClass]="pushFlagDef[r.flag][1]">{{ pushFlagDef[r.flag][0] }}</span></td>
+                    </tr>
+                    @if (op && openRecHist(); as hist) {
+                      <tr class="pexp" data-testid="cav-rec-exp"><td [attr.colspan]="recPeopleCols().length + 1"><div class="inner">
+                        <div class="hd">{{ r.n }} · every playlist pushed</div>
+                        <div class="hr hcol"><span class="v2">Playlist</span><span class="m">Window</span><span class="st">Status</span>
+                          <span class="pg">Items done</span><span class="mt">Watch time</span><span style="flex:1"></span></div>
+                        @for (x of hist; track x.key) {
+                          <div class="hr">
+                            <span class="v2">{{ x.title }}@if (x.personalised) {<span class="xover" [title]="x.by ? 'Curated by ' + x.by : 'Personalised push'">personalised</span>}</span>
+                            <span class="m" style="font-size:11.5px;color:var(--t2);font-weight:600">{{ shortDay(x.start) }}@if (x.end) { – {{ shortDay(x.end) }} } @else { <span style="color:var(--t3)">· no close date</span> }</span>
+                            <span class="st"><ng-container *ngTemplateOutlet="tRecPill; context: { x: x }" /></span>
+                            <span class="pg"><ng-container *ngTemplateOutlet="tProg; context: { r: x.prog, t: x.done + '/' + x.total }" /></span>
+                            <span class="mt">{{ x.watch ? durLong(x.watch) : '—' }}</span>
+                            <span style="flex:1"></span>
+                            <span data-testid="cav-dnum-rec-exp-items" class="dnum" (click)="dItems($event, r.n + ' · ' + x.title, x.items)">Items</span>
+                          </div>
+                        }
+                      </div></td></tr>
+                    }
+                  }
+                </tbody></table></div>
+              <div class="tfoot"><span>Showing <b>{{ rv.people.length }}</b> participants · click a row for every playlist they were pushed, with its window</span></div>
+            } @else {
+              @let cr = recContent();
+              <div class="tblwrap"><table>
+                <thead><tr>@for (c of recContentCols; track c.l) {<th [ngClass]="c.cls" [attr.title]="tip(c.l)">{{ c.l }}</th>}</tr></thead>
+                <tbody>
+                  @for (o of cr; track o.key) {
+                    <tr data-testid="cav-rec-content-row" [style.background]="o.opened === 0 ? '#FDF6F7' : null">
+                      <td><div class="vname">{{ o.label }}</div></td>
+                      <td style="font-size:11.5px;font-weight:600;color:var(--t2)">{{ o.container || '—' }}</td>
+                      <td><ng-container *ngTemplateOutlet="tRecType; context: { $implicit: o.type }" /></td>
+                      <td class="num" style="font-weight:700">{{ o.pushed }}</td>
+                      <td class="num">@if (o.opened) {<span data-testid="cav-dnum-rec-content-plays" class="dnum" (click)="dEvents($event, o.label + ' · plays by people it was pushed to', o.plays)">{{ o.opened }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
+                      <td class="num">{{ o.done }}</td>
+                      <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.openRate }" /></td>
+                      <td>@if (o.opened) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.avgReach }" />} @else {<span style="color:var(--t3)">—</span>}</td>
+                      <td class="num" style="font-weight:600">{{ o.watch ? durLong(o.watch) : '—' }}</td>
+                    </tr>
+                  }
+                </tbody></table></div>
+              <div class="tfoot"><span><b>{{ countUnopened(cr) }}</b> pushed items nobody has opened — highlighted rows</span></div>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <!-- ── EiFLIX tier based (all-time) ── -->
+    @case ('tier') {
+      @if (live.tierLoading() && !live.tierData()) {
+        <div class="card empty" data-testid="cav-tier-loading"><h3>Loading tiers…</h3><p>Reading the tier catalogue and the series each tier opens.</p></div>
+      } @else if (!tierVM()) {
+        <div class="card empty" data-testid="cav-tier-empty"><h3>Tier data unavailable</h3><p>The <b>tier</b> catalogue could not be read.</p></div>
+      } @else {
+        @let tv = tierVM()!;
+        <div class="note">
+          <ng-container *ngTemplateOutlet="tInfo" />
+          <div><b>Everything here is measured inside the selected period</b> — the prototype claimed all-time, but
+            that would mean scanning every play ever logged. For one participant's real all-time progress, open
+            <b>All-time</b> on their row: it reads their <b>participant content analytics</b> rollup, one document.
+            A series counts as completed only when every episode in it is finished. Access comes from
+            <b>series.tier</b>, and a participant holding more than one tier is listed under each of them.</div>
+        </div>
+        <div class="tchips">
+          <button data-testid="cav-tier-chip-all" [class.on]="tier() === ''" (click)="tier.set(''); page.set(25)">All tiers<span class="n3">{{ num(tv.all.length) }}</span></button>
+          @for (ov of tv.overview; track ov.id) {
+            <button data-testid="cav-tier-chip" [class.on]="tier() === ov.id" [disabled]="!ov.r.length" (click)="tier.set(ov.id); page.set(25)">{{ ov.name }}<span class="n3">{{ num(ov.r.length) }}</span></button>
+          }
+        </div>
+
+        <div class="card"><div class="tblwrap"><table>
+          <thead><tr>@for (c of tierOverviewCols; track c.l) {<th [ngClass]="c.cls" [attr.title]="tip(c.l)">{{ c.l }}</th>}</tr></thead>
+          <tbody>
+            @for (ov of tv.overview; track ov.id) {
+              <tr data-testid="cav-tier-overview-row" [style.opacity]="ov.r.length ? null : .4">
+                <td><span class="tierpill">{{ ov.name }}</span></td>
+                <td class="num" style="font-weight:700">@if (ov.r.length) {<span data-testid="cav-dnum-tier-overview-people" class="dnum" (click)="dTierPeople($event, ov.name + ' · participants', ov.r)">{{ num(ov.r.length) }}</span>} @else {0}</td>
+                <td class="num" style="color:var(--t2)">{{ ov.open }}@if (ov.epsOpen) {<div class="sub">{{ num(ov.epsOpen) }} videos</div>}</td>
+                <td class="num">{{ ov.r.length && ov.open ? ov.avg.toFixed(1) + ' of ' + ov.open : '—' }}</td>
+                <td class="num">@if (ov.r.length && ov.epsOpen) {<ng-container *ngTemplateOutlet="tProg; context: { r: ov.rate }" />} @else {—}</td>
+              </tr>
+            }
+          </tbody></table></div>
+          <div class="tfoot"><span>Access is set per series in <b>series.tier</b> — there is no fixed number of series per tier.
+            @if (tv.tierless) { <b>{{ num(tv.tierless) }}</b> participants hold no tier at all. }</span></div></div>
+
+        <div class="card" style="padding:16px 18px 0;margin-top:14px">
+          <div class="lhead"><h4>{{ tier() === '' ? 'All tiers' : tierLabel(tier()) }}</h4>
+            <div class="seg">
+              <button data-testid="cav-tier-list-people" [class.on]="tlist() === 'people'" (click)="tlist.set('people')">Participant-wise</button>
+              <button data-testid="cav-tier-list-series" [class.on]="tlist() === 'series'" (click)="tlist.set('series')">Series-wise</button>
+            </div></div>
+          <div style="margin:0 -18px">
+            @if (tlist() === 'people') {
+              <div class="tblwrap"><table>
+                <thead><tr>
+                  <th class="selcol"><input type="checkbox" class="selall" data-testid="cav-tier-selall" title="Select everyone listed" [checked]="allSel(tv.names)" (change)="toggleAll(tv.names, $any($event.target).checked, tv.labels)"></th>
+                  @for (c of tierPeopleCols; track c.l) {<th [ngClass]="c.cls" [attr.title]="tip(c.l)">{{ c.l }}</th>}
+                </tr></thead>
+                <tbody>
+                  @for (r of tv.shown; track r.pid) {
+                    <tr data-testid="cav-tier-row">
+                      <td class="selcol"><input type="checkbox" class="rowsel" data-testid="cav-tier-sel" [checked]="isSel(r.pid)" (change)="toggleSel(r.pid, $any($event.target).checked, r.name)"></td>
+                      <td><div class="pname">{{ r.name }}</div></td>
+                      <td>@for (t of r.tierNames; track t) {<span class="tierpill">{{ t }}</span>&ngsp;} @empty {<span style="color:var(--t3)">Tierless</span>}</td>
+                      <td class="num" style="color:var(--t2)">{{ r.open }}@if (r.eps) {<div class="sub">{{ num(r.eps) }} videos</div>}</td>
+                      <td class="num" style="font-weight:700">{{ r.done }}</td>
+                      <td class="num"><span style="font-weight:700">{{ r.epsDone }}</span><span style="color:var(--t3)"> / {{ num(r.eps) }}</span>
+                        <div class="sub" [style.color]="reachColor(r.epsPct)">{{ pct(r.epsPct) }}</div></td>
+                      <td class="num"><span style="font-weight:700" [style.color]="reachColor(r.consumed)">{{ pct(r.consumed) }}</span></td>
+                      <td class="num"><span class="dnum" data-testid="cav-tier-alltime" (click)="openAllTime($event, r)">All-time</span></td>
+                    </tr>
+                  }
+                </tbody></table></div>
+              <div class="tfoot">
+                <span>Showing <b>{{ num(tv.shown.length) }}</b> of <b>{{ num(tv.shownTotal) }}</b> participants with an app account{{ tier() === '' ? '' : ' in ' + tierLabel(tier()) }} ·
+                  <b>{{ num(tv.active) }}</b> watched something in this period</span>
+                @if (tv.shown.length < tv.shownTotal) {<button class="btn" data-testid="cav-tier-more" (click)="more()">Show 25 more</button>} @else {<span>End of results</span>}
+              </div>
+            } @else {
+              <div class="tblwrap"><table>
+                <thead><tr>@for (c of tierSeriesCols; track c.l) {<th [ngClass]="c.cls" [attr.title]="tip(c.l)">{{ c.l }}</th>}</tr></thead>
+                <tbody>
+                  @for (sr of tv.series; track sr.id) {
+                    <tr data-testid="cav-tier-series-row" [style.opacity]="sr.access.length === 0 ? .4 : null" [style.background]="sr.fin.length === 0 && sr.access.length ? '#FDF6F7' : null">
+                      <td><div class="vname">{{ sr.name }}</div></td>
+                      <td>@for (t of sr.tierNames; track t) {<span class="tierpill">{{ t }}</span>&ngsp;} @empty {<span style="color:var(--t3)">No tier</span>}</td>
+                      <td class="num" style="color:var(--t2)">{{ sr.eps.length }}</td>
+                      <td class="num">@if (sr.access.length) {<span data-testid="cav-dnum-tier-series-access" class="dnum" (click)="dTierPeople($event, sr.name + ' · have access', sr.access)">{{ num(sr.access.length) }}</span>} @else {0}</td>
+                      <td class="num" style="font-weight:700">@if (sr.fin.length) {<span data-testid="cav-dnum-tier-series-fin" class="dnum" (click)="dTierPeople($event, sr.name + ' · completed it', sr.fin)">{{ sr.fin.length }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+                      <td class="num">@if (sr.epsTot) {<span style="font-weight:700">{{ num(sr.epsDone) }}</span><span style="color:var(--t3)"> / {{ num(sr.epsTot) }}</span>
+                        <div class="sub" [style.color]="reachColor(sr.epsDone / sr.epsTot)">{{ pct(sr.epsDone / sr.epsTot) }}</div>} @else {<span style="color:var(--t3)">—</span>}</td>
+                      <td class="num">@if (sr.access.length) {<span style="font-weight:700" [style.color]="reachColor(sr.consumed)">{{ pct(sr.consumed) }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+                      <td class="num">@if (sr.access.length) {<ng-container *ngTemplateOutlet="tProg; context: { r: sr.rate }" />} @else {—}</td>
+                    </tr>
+                  }
+                </tbody></table></div>
+              <div class="tfoot"><span><b>{{ tv.series.length }}</b> series across <b>{{ live.tierData()?.tiers?.length }}</b> tiers · measured against the <b>{{ num(tv.series[0]?.inScope || 0) }}</b> participants in scope</span></div>
+            }
+          </div>
+        </div>
+      }
+    }
+  }
+  </div>
+</div>
+
+<!-- ══ Content insights ═══════════════════════════════════════════════ -->
+@if (insights(); as ins) {
+  <div class="ovl" data-testid="cav-ins-modal" (click)="closeOnBackdrop($event, 'ins')">
+    <div class="mdl ins-w">
+      <div class="mh"><h3>{{ ins.o.video }}</h3><span class="ct">{{ sources[ins.o.src].label }} · {{ dur(ins.o.rt) }}</span>
+        <button class="x" data-testid="cav-ins-close" (click)="insKey.set(null)">×</button></div>
+      <div class="mb"><div class="ins">
+        <div class="kpis">
+          <div class="kpi"><div class="k">Total views</div><div class="v">{{ ins.o.views }}</div></div>
+          <div class="kpi"><div class="k">Unique viewers</div><div class="v">{{ ins.o.viewers }}</div></div>
+          <div class="kpi"><div class="k">Rewatches</div><div class="v">{{ ins.o.rewatch }}</div></div>
+          <div class="kpi"><div class="k">Avg consumption</div><div class="v"><span [style.color]="reachColor(ins.o.avgReach)">{{ pct(ins.o.avgReach) }}</span></div></div>
+          <div class="kpi"><div class="k">Completed</div><div class="v">{{ ins.o.doneN }}</div></div>
+          <div class="kpi"><div class="k">Watch time</div><div class="v">{{ durLong(ins.o.watch) }}</div></div>
+        </div>
+        <div class="sec">
+          <div class="sh"><h4>Audience retention</h4>
+            <span>Share of plays still going at each point · <b>{{ pct(ins.half) }}</b> reach the halfway mark</span></div>
+          @let rt = ins.ret;
+          @let hv = retHover();
+          <div class="chartwrap">
+            <svg #retSvg [attr.viewBox]="'0 0 ' + rt.W + ' ' + rt.H" role="img" aria-label="Audience retention across the item">
+              @for (g of rt.grid; track g.label) {
+                <line [attr.x1]="rt.L" [attr.y1]="g.y" [attr.x2]="rt.W - rt.R" [attr.y2]="g.y" stroke="#EFEEE9" stroke-width="1"/>
+                <text [attr.x]="rt.L - 9" [attr.y]="g.y + 4" text-anchor="end" font-size="10" fill="#9CA3AF">{{ g.label }}</text>
+              }
+              @for (x of rt.xlab; track $index) {
+                <text [attr.x]="x.x" [attr.y]="rt.H - 9" [attr.text-anchor]="x.anchor" font-size="10" fill="#9CA3AF">{{ x.label }}</text>
+              }
+              <path [attr.d]="rt.area" fill="#0076C8" opacity=".12"/>
+              <path [attr.d]="rt.line" fill="none" stroke="#0076C8" stroke-width="2" stroke-linejoin="round"/>
+              <line [attr.x1]="hv ? hv.px : 0" [attr.y1]="rt.T" [attr.x2]="hv ? hv.px : 0" [attr.y2]="rt.T + rt.ph" stroke="#0076C8" stroke-width="1" [attr.opacity]="hv ? .35 : 0"/>
+              <circle [attr.cx]="hv ? hv.px : 0" [attr.cy]="hv ? hv.py : 0" r="4.5" fill="#0076C8" stroke="#fff" stroke-width="2" [attr.opacity]="hv ? 1 : 0"/>
+              <rect [attr.x]="rt.L" [attr.y]="rt.T" [attr.width]="rt.pw" [attr.height]="rt.ph" fill="transparent" style="cursor:crosshair"
+                (mousemove)="retMove($event, retSvg)" (mouseleave)="retHover.set(null)"/>
+            </svg>
+            <div class="ctip" [style.opacity]="hv ? 1 : 0" [style.left.px]="hv ? hv.px / hv.scale : 0" [style.top.px]="hv ? hv.py / hv.scale : 0">
+              @if (hv) { {{ dur(rt.rt * hv.i / rt.N) }} · <b>{{ pct(rt.pts[hv.i]) }}</b> still watching }
+            </div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sh"><h4>Plays per day</h4><span>{{ shortDay(from()) }} – {{ shortDay(to()) }} · peak day drives the scale</span></div>
+          @let dy = ins.daily;
+          <div class="chartwrap"><svg [attr.viewBox]="'0 0 ' + dy.W + ' ' + dy.H" role="img" aria-label="Plays per day">
+            <line [attr.x1]="dy.L" [attr.y1]="dy.T + dy.ph" [attr.x2]="dy.W - dy.R" [attr.y2]="dy.T + dy.ph" stroke="#EFEEE9" stroke-width="1"/>
+            <text [attr.x]="dy.L - 8" [attr.y]="dy.T + 6" text-anchor="end" font-size="10" fill="#9CA3AF">{{ dy.peak }}</text>
+            <text [attr.x]="dy.L - 8" [attr.y]="dy.T + dy.ph + 3" text-anchor="end" font-size="10" fill="#9CA3AF">0</text>
+            @for (b of dy.bars; track $index) {
+              <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.w" [attr.height]="b.h" [attr.rx]="b.rx" fill="#0076C8" [attr.opacity]="b.op"><title>{{ b.title }}</title></rect>
+            }
+            <text [attr.x]="dy.L" [attr.y]="dy.H - 7" font-size="10" fill="#9CA3AF">{{ dy.first }}</text>
+            <text [attr.x]="dy.W - dy.R" [attr.y]="dy.H - 7" text-anchor="end" font-size="10" fill="#9CA3AF">{{ dy.last }}</text>
+          </svg></div>
+        </div>
+        <div class="two2" style="grid-template-columns:1fr">
+          <div style="border-right:none"><div class="sh"><h4>Where it was watched from</h4><span>average consumption</span></div>
+            @for (i of ins.from; track i.label) {
+              <div class="hbar" [attr.title]="i.label + ' — ' + i.text + ' ' + i.em">
+                <div class="nm2"><i [style.background]="i.color" [style.border-radius]="i.square ? '2px' : '99px'"></i><span>{{ i.label }}</span></div>
+                <div class="tr2"><i [style.width.%]="i.w"></i></div>
+                <div class="vv">{{ i.text }} <em>{{ i.em }}</em></div></div>
+            }</div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+}
+
+<!-- ══ Selection action bar — opens the app's own WhatsApp / Email / Notification composers ══════ -->
+@if (sel().size) {
+  <div class="actbar" data-testid="cav-act-bar">
+    <span class="cnt2">{{ sel().size }} participant{{ sel().size === 1 ? '' : 's' }} selected</span>
+    <button class="lnk" data-testid="cav-act-clear" (click)="clearSel()">Clear</button>
+    <button class="go" data-testid="cav-act-whatsapp" [disabled]="!!sending()" (click)="send('whatsapp')" title="WhatsApp — the WATI composer used by Participants Analytics">
+      <span class="ic" style="background:#25D366">W</span>WhatsApp</button>
+    <button class="go" data-testid="cav-act-email" [disabled]="!!sending()" (click)="send('email')">
+      <span class="ic" style="background:#0076C8">&#64;</span>Email</button>
+    <button class="go" data-testid="cav-act-notification" [disabled]="!!sending()" (click)="send('notification')">
+      <span class="ic" style="background:#6D029A">A</span>Notification</button>
+  </div>
+}
+
+
+<!-- ══ Drill-down: the records behind any number ══════════════════════ -->
+@if (drill(); as d) {
+  <div class="ovl" data-testid="cav-drill-modal" (click)="closeOnBackdrop($event, 'drill')">
+    <div class="mdl">
+      <div class="mh"><h3>{{ d.label }}</h3><span class="ct">{{ num(d.rows.length) }} {{ kindNoun[d.kind] }}</span>
+        <button class="x" data-testid="cav-drill-close" (click)="drill.set(null)">×</button></div>
+      <div class="mb">
+        @if (!d.rows.length) {
+          <div class="empty"><h3>Nothing behind this number</h3><p>No records match.</p></div>
+        } @else {
+          @switch (d.kind) {
+            @case ('events') {
+              <table><thead><tr><th>When</th><th>Participant</th><th>Content</th><th>Playlist / Series</th>
+                <th class="num">Overall Duration</th><th class="num">Dropped at</th><th class="num">Spend time</th><th>Outcome</th></tr></thead>
+                <tbody>@for (e of drillRows(); track $index) {
+                  <tr data-testid="cav-drill-row"><td><div class="when">{{ fmtDate(e.ts) }}</div></td>
+                    <td><div class="pname">{{ e.name }}</div></td>
+                    <td><div class="vname">{{ e.video }}</div></td>
+                    <td><ng-container *ngTemplateOutlet="tCont; context: { $implicit: e }" /></td>
+                    <td class="num" style="color:var(--t2)">{{ dur(e.rt) }}</td>
+                    <td class="num" style="font-weight:600">{{ dur(e.exit) }}</td>
+                    <td class="num" style="font-weight:600">{{ dur(e.spent) }}</td>
+                    <td><ng-container *ngTemplateOutlet="tStatus; context: { $implicit: e }" /></td></tr>
+                }</tbody></table>
+            }
+            @case ('people') {
+              <table><thead><tr><th>Participant</th>@if (drillHasJourney()) {<th>Journey</th>}<th class="num">Views</th><th class="num">Completed</th>
+                <th class="num">Avg reach</th><th class="num">Watch time</th><th class="num">Last active</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.key) {
+                  <tr data-testid="cav-drill-row"><td><div class="pname">{{ o.name }}</div></td>
+                    @if (drillHasJourney()) {<td><span class="plat">{{ o.journeyName || '—' }}</span></td>}
+                    <td class="num" style="font-weight:700">{{ o.views }}</td><td class="num">{{ o.done }}</td>
+                    <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.avgReach }" /></td>
+                    <td class="num" style="font-weight:600">{{ durLong(o.watch) }}</td>
+                    <td class="num" style="color:var(--t2);white-space:nowrap">{{ fmtDate(o.last) }}</td></tr>
+                }</tbody></table>
+            }
+            @case ('pcontent') {
+              <table><thead><tr><th>Item</th><th>Library</th><th class="num">Overall Duration</th><th class="num">Plays</th>
+                <th class="num">Best reach</th><th class="num">Spend time</th><th>Outcome</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.key) {
+                  <tr data-testid="cav-drill-row"><td><div class="vname">{{ o.video }}</div></td>
+                    <td><ng-container *ngTemplateOutlet="tSrc; context: { $implicit: o.src }" /></td>
+                    <td class="num" style="color:var(--t2)">{{ dur(o.rt) }}</td>
+                    <td class="num" style="font-weight:700">{{ o.plays }}</td>
+                    <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.best }" /></td>
+                    <td class="num" style="font-weight:600">{{ dur(o.spent) }}</td>
+                    <td><span class="pill" [ngClass]="isDoneRow(o) ? 'ok' : o.best >= .05 ? 'mid' : 'low'">{{ isDoneRow(o) ? 'Finished' : o.best >= .05 ? pct(o.best) : 'Bounced' }}</span></td></tr>
+                }</tbody></table>
+            }
+            @case ('tierpeople') {
+              <table><thead><tr><th>Participant</th><th>Tier</th><th class="num">Series available</th><th class="num">Series completed</th><th class="num">Videos watched</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.pid) {
+                  <tr data-testid="cav-drill-row"><td><div class="pname">{{ o.name }}</div></td>
+                    <td>@for (t of o.tierNames; track t) {<span class="tierpill">{{ t }}</span>&ngsp;} @empty {<span style="color:var(--t3)">Tierless</span>}</td>
+                    <td class="num" style="color:var(--t2)">{{ o.open }}</td>
+                    <td class="num" style="font-weight:700">{{ o.done }}</td>
+                    <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.epsPct, t: o.epsDone + '/' + o.eps }" /></td></tr>
+                }</tbody></table>
+            }
+            @case ('pushes') {
+              <table><thead><tr><th>Playlist</th><th>Participant</th><th>Window</th><th>Type</th><th class="num">Items done</th><th>Status</th><th class="num">Watch time</th></tr></thead>
+                <tbody>@for (x of drillRows(); track $index) {
+                  <tr data-testid="cav-drill-row"><td><div class="vname">{{ x.title }}</div></td>
+                    <td><div class="pname">{{ x.name }}</div></td>
+                    <td><div class="when">{{ shortDay(x.start) }}@if (x.end) { – {{ shortDay(x.end) }} } @else { <span style="color:var(--t3)">· no close date</span> }</div></td>
+                    <td>@for (t of x.types; track t) {<ng-container *ngTemplateOutlet="tRecType; context: { $implicit: t }" />&ngsp;}</td>
+                    <td><ng-container *ngTemplateOutlet="tProg; context: { r: x.prog, t: x.done + '/' + x.total }" /></td>
+                    <td><ng-container *ngTemplateOutlet="tRecPill; context: { x: x }" /></td>
+                    <td class="num" style="font-weight:600">{{ x.watch ? durLong(x.watch) : '—' }}</td></tr>
+                }</tbody></table>
+            }
+            @case ('pushpeople') {
+              <table><thead><tr><th>Participant</th><th class="num">Playlists</th><th class="num">Items done</th><th class="num">Progress</th>
+                <th class="num">Finished</th><th class="num">Closed unfinished</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.pid) {
+                  <tr data-testid="cav-drill-row"><td><div class="pname">{{ o.n }}</div></td>
+                    <td class="num" style="font-weight:700">{{ o.pushed }}</td>
+                    <td class="num">{{ o.done }}<span style="color:var(--t3)"> / {{ o.items }}</span></td>
+                    <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.prog }" /></td>
+                    <td class="num">{{ countDone(o.all) }}</td><td class="num">{{ missedOf(o.all).length }}</td></tr>
+                }</tbody></table>
+            }
+            @case ('items') {
+              <table><thead><tr><th>Item in playlist</th><th>Status</th><th class="num">Plays in period</th><th class="num">Best reach</th><th class="num">Watch time</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.key) {
+                  <tr data-testid="cav-drill-row"><td><div class="vname">{{ o.label }}</div></td>
+                    <td><span class="pill" [ngClass]="o.done ? 'ok' : o.opened ? 'mid' : 'low'">{{ o.done ? 'Finished' : o.opened ? 'Started' : 'Not opened' }}</span></td>
+                    <td class="num">{{ o.plays.length }}</td>
+                    <td>@if (o.opened) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.best }" />} @else {<span style="color:var(--t3)">—</span>}</td>
+                    <td class="num" style="font-weight:600">{{ o.watch ? dur(o.watch) : '—' }}</td></tr>
+                }</tbody></table>
+            }
+            @case ('shelf') {
+              <table><thead><tr><th>Configured content</th><th>Status</th><th class="num">Their plays</th><th class="num">Best reach</th></tr></thead>
+                <tbody>@for (o of drillRows(); track o.video) {
+                  <tr data-testid="cav-drill-row"><td><div class="vname">{{ o.video }}</div></td>
+                    <td><span class="pill" [ngClass]="o.done ? 'ok' : o.views ? 'mid' : 'low'">{{ o.done ? 'Finished' : o.views ? 'Started' : 'Not opened' }}</span></td>
+                    <td class="num">{{ o.views }}</td>
+                    <td>@if (o.views) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.best }" />} @else {<span style="color:var(--t3)">—</span>}</td></tr>
+                }</tbody></table>
+            }
+            @case ('movers') {
+              <table><thead><tr><th>Participant</th><th>Current mode</th><th>Next mode</th><th class="num">Moves on</th><th class="num">Moves in</th></tr></thead>
+                <tbody>@for (o of drillRows(); track $index) {
+                  <tr data-testid="cav-drill-row"><td><div class="pname">{{ o.name }}</div></td>
+                    <td>@if (o.mode) {<span class="jy" [style.color]="modeColor(o.mode)"><i [style.background]="modeColor(o.mode)"></i>{{ o.mode }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+                    <td>@if (o.nextmode) {<span class="jy" [style.color]="modeColor(o.nextmode)"><i [style.background]="modeColor(o.nextmode)"></i>{{ o.nextmode }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+                    <td class="num">{{ o.nextmodedate ? shortDay(o.nextmodedate) : '—' }}</td>
+                    <td class="num"><span style="font-weight:700">{{ o.days === null ? '—' : o.days + 'd' }}</span></td></tr>
+                }</tbody></table>
+            }
+          }
+        }
+      </div>
+      <div class="mf">{{ d.rows.length > drillCap ? 'Showing the first ' + drillCap + ' of ' + num(d.rows.length) + ' — export for the full set' : 'Esc or click outside to close' }}</div>
+    </div>
+  </div>
+}
+
+<!-- One participant's ALL-TIME finished series, from the `participant content analytics` rollup.
+     It is a separate panel from the drill because it is fetched, not derived from the loaded period. -->
+@if (tierAllTime(); as a) {
+  <div class="ovl" data-testid="cav-alltime-modal" (click)="closeOnBackdrop($event, 'alltime')">
+    <div class="mdl">
+      <div class="mh"><h3>{{ a.name }} · all-time series completed</h3>
+        <span class="ct">{{ a.loading ? 'loading…' : a.series === null ? 'no rollup' : num(a.series.length) + ' series' }}</span>
+        <button class="x" data-testid="cav-alltime-close" (click)="closeAllTime()">×</button></div>
+      <div class="mb">
+        @if (a.loading) {
+          <div class="empty"><h3>Reading their rollup…</h3><p>One document from <b>participant content analytics</b>.</p></div>
+        } @else if (a.series === null) {
+          <div class="empty"><h3>No rollup for this participant</h3>
+            <p>They have no <b>participant content analytics</b> document. That is not the same as having finished
+              nothing — it means nothing has been rolled up for them yet.</p></div>
+        } @else if (!a.series.length) {
+          <div class="empty"><h3>No series finished</h3><p>Their rollup exists but lists no completed series.</p></div>
+        } @else {
+          <table><thead><tr><th>Series completed (all time)</th></tr></thead>
+            <tbody>@for (id of a.series; track id) {
+              <tr data-testid="cav-alltime-row"><td><div class="vname">{{ seriesNameOf(id) }}</div></td></tr>
+            }</tbody></table>
+        }
+      </div>
+      <div class="mf">All-time, from the rollup — the tables behind this panel only cover the selected period.</div>
+    </div>
+  </div>
+}

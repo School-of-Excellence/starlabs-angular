@@ -228,6 +228,11 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   selectedProductId: string | null = null;
   selectedProductName: string | null = null;
   statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
+  ahMemberProfileIds: Set<string> = new Set();
+  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
+  selectedProductId: string | null = null;
+  selectedProductName: string | null = null;
+  statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
   
   // Boolean declarations
   drawerOpen = false;
@@ -272,13 +277,19 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     private router : Router
   ) { }
 
-  async ngOnInit() {
-    await Promise.all([
-      this.getDfuProducts(),
-      this.getAhMembers()
-    ]);
+  // Resolves once the AH members' metadata is loaded. The product dropdown fills earlier (after
+  // getDfuProducts), so selectProduct must wait on this or it builds — and caches — an empty list.
+  private metadataReady: Promise<void> = Promise.resolve();
 
-    await this.getParticipantMetadata();
+  async ngOnInit() {
+    this.metadataReady = (async () => {
+      await Promise.all([
+        this.getDfuProducts(),
+        this.getAhMembers()
+      ]);
+      await this.getParticipantMetadata();
+    })();
+    await this.metadataReady;
   }
   // get ahmember from users_roles
   async getAhMembers(){
@@ -346,6 +357,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     }
 
     this.loadingParticipants = true;
+    await this.metadataReady;
     this.buildOngoingParticipants(docId);
 
     const productRef = doc(this.firestore, 'products', docId);
@@ -836,6 +848,23 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     if (this.pplRole === 'spec') { list = list.filter(p => p.spec); }
     if (this.pplRole === 'ponly') { list = list.filter(p => !p.spec); }
     return list;
+  }
+
+  // A&H member cards for the Participants tab — one per AH member's participant metadata,
+  // with their active products resolved to DFU product names.
+  get ahParticipantCards(): { profileid: string; name: string; email: string; products: string[] }[] {
+    const q = this.pplSearch.toLowerCase();
+    return this.participantMetadata
+      .filter(p => (p.name || '').toLowerCase().includes(q))
+      .map(p => ({
+        profileid: p.profileid,
+        name: p.name || 'Unnamed',
+        email: p.email || '',
+        products: (p.activeproduct || []).map((value: any) => {
+          const id = typeof value === 'string' ? value.split('/').pop() : value?.id;
+          return this.dfuProductsMap[id]?.product || id;
+        })
+      }));
   }
 
   activeJourneyFor(pid: string): Journey | undefined {
