@@ -223,54 +223,86 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   expandedSpecialistId: string | null = null;
   expandedOverviewRowId: string | null = null;
   kpiFilter: LifecycleKey | null = null;
+  ahMemberProfileIds: Set<string> = new Set();
+  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
+  selectedProductId: string | null = null;
+  selectedProductName: string | null = null;
+  statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
   
   // Boolean declarations
   drawerOpen = false;
   paletteOpen = false;
+  loadingParticipants = false;
 
   // Array declarations
   participants: any[] = [];                   
   participantMetadata: any[] = [];
   dfuProductRefs: any[] = [];
+  readonly diagnosticsArray: string[] = [
+    'EI Diagnostics',
+    'WiSH Diagnostics',
+    'EI Starter Pack Diagnostics',
+    'Custom Solutions Diagnostics',
+    'Critical Support Diagnostics',
+    'A&H Light Diagnostics'
+  ];
 
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
-    expandedOverviewProduct: { [key: string]: boolean } = {};
-    dfuParticipantMap: {
+  expandedOverviewProduct: { [key: string]: boolean } = {};
+  ongoingparticipants: {
     [profileId: string]: {
       name: string;
       email: string;
-      activeproduct: string[];       
-      ongoingProducts: string[];
-      completedProducts: string[];
-      notStartedProducts: string[];
-      participantproducts?: any[];
-      deliverysequence?: { step: number; deliveryname: string; status: string }[];
+      participantproducts?: any[];   
+      notstartedparticipant?: boolean;
+      needsattention?: boolean;
+      completed?: boolean;
+      awaitingsignoff?: boolean;
     };
   } = {};
+  fetchedProduct: { [productId: string]: typeof this.ongoingparticipants } = {};
 
-  dfuOverviewTotals: { ongoing: number; completed: number; notStarted: number } = {
-    ongoing: 0,
-    completed: 0,
-    notStarted: 0
-  };
+  // set/map declarations
+  private fetchedProductData = new Set<string>();
+  private fetchDeliverables = new Map<string, any>();
 
-  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
-  
   constructor(
     private firestore : Firestore,
     private router : Router
   ) { }
 
+  // Resolves once the AH members' metadata is loaded. The product dropdown fills earlier (after
+  // getDfuProducts), so selectProduct must wait on this or it builds — and caches — an empty list.
+  private metadataReady: Promise<void> = Promise.resolve();
+
   async ngOnInit() {
-    await Promise.all([
-      this.getDfuProducts(),
-      this.getParticipantMetadata()
-    ]);
-    this.mapDfuParticipants();
+    this.metadataReady = (async () => {
+      await Promise.all([
+        this.getDfuProducts(),
+        this.getAhMembers()
+      ]);
+      await this.getParticipantMetadata();
+    })();
+    await this.metadataReady;
+  }
+  // get ahmember from users_roles
+  async getAhMembers(){
+    try {
+      const q = query(collection(this.firestore, 'users_roles'), where('ahmember', '==', true));
+      const ahMembersSnapshot = await getDocs(q);
+
+      ahMembersSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        this.ahMemberProfileIds.add(data['profile_ref'].id);
+      });
+      console.log('AH Member profileids fetched:', this.ahMemberProfileIds);
+    } catch (error) {
+      console.error('Error fetching AH members:', error);
+    }
   }
 
-  // fetch the DFU products type from products collection
+    // fetch the DFU products type from products collection
   async getDfuProducts(){
     try {
       const q = query(collection(this.firestore, 'products'), where('type', '==', 'DFU'));
@@ -288,160 +320,282 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   }
 
   // fetch the participant metadata from participant metadata collection
-  async getParticipantMetadata(){
-    try {
-      const participantsRef = collection(this.firestore,'participant metadata');
-      const participants = await firstValueFrom(collectionData(query(participantsRef), { idField: 'id' }));
-      this.participantMetadata = participants;
-      console.log('Participant metadata fetched:', this.participantMetadata);
-    } catch (error) {
-      console.error('Error fetching participant metadata:', error);
+  async getParticipantMetadata() {
+  try {
+    const profileIds = Array.from(this.ahMemberProfileIds);
+    const participantsRef = collection(this.firestore,'participant metadata');
+    const chunks = [];
+    for (let i = 0; i < profileIds.length; i += 30) {
+      chunks.push(profileIds.slice(i, i + 30));
     }
+    const participantMetadata: any[] = [];
+    for (const chunk of chunks) {
+      const participants = await firstValueFrom(collectionData(query(participantsRef,where('profileid', 'in', chunk)), { idField: 'id' }));
+      participantMetadata.push(...participants);
+    }
+    this.participantMetadata = participantMetadata;
+    console.log('AH member participant metadata fetched:',this.participantMetadata);
+  } catch (error) {
+    console.error('Error fetching participant metadata:',error);
+  }
+}
+
+  async selectProduct(docId: string, displayName: string = docId): Promise<void> {
+    this.selectedProductId = docId;
+    this.selectedProductName = displayName;
+    this.statusView = 'ongoing';
+
+    const cachedParticipants = this.fetchedProduct[docId];
+    if (cachedParticipants) {
+      this.ongoingparticipants = cachedParticipants;
+      return;
+    }
+
+    this.loadingParticipants = true;
+    await this.metadataReady;
+    this.buildOngoingParticipants(docId);
+
+    const productRef = doc(this.firestore, 'products', docId);
+    await Promise.all([
+      this.getProductToDeliverySequence(docId, productRef),
+      this.fetchParticipantData(productRef)
+    ]);
+
+    this.fetchedProduct[docId] = this.ongoingparticipants;
+    this.loadingParticipants = false;
   }
 
-  // map the participants who have active DFU products ongoing or initiated
-  mapDfuParticipants() {
-    const localMap: typeof this.dfuParticipantMap = {};
-    const totals = { ongoing: 0, completed: 0, notStarted: 0 };
+
+  buildOngoingParticipants(productId: string): void {
+    const localMap: typeof this.ongoingparticipants = {};
 
     this.participantMetadata.forEach(participant => {
-      if (!(participant.email?.toLowerCase().endsWith('@soexcellence.com'))) {
+      const activeProducts: any[] = participant.activeproduct || [];
+      const consumedProducts: any[] = participant.consumedproducts || [];
+      const hasChosenProduct = activeProducts.some(value => this.matchesProductId(value, productId));
+      if (!hasChosenProduct) {
         return;
       }
 
-      const ongoingProducts = (participant.activeproduct || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-      const completedProducts = (participant.consumedproducts || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-      const notStartedProducts = (participant.unconsumedproducts || [])
-        .filter((id: string) => this.dfuProductsMap[id]);
-
-      if (!ongoingProducts.length && !completedProducts.length && !notStartedProducts.length) {
-        return;
-      }
+      const hasConsumedProduct = consumedProducts.some(value => this.matchesProductId(value, productId));
 
       localMap[participant.profileid] = {
         name: participant.name,
         email: participant.email,
-        activeproduct: ongoingProducts,
-        ongoingProducts,
-        completedProducts,
-        notStartedProducts
+        completed: hasConsumedProduct
       };
-
-      totals.ongoing += ongoingProducts.length;
-      totals.completed += completedProducts.length;
-      totals.notStarted += notStartedProducts.length;
     });
 
-    this.dfuParticipantMap = localMap;
-    this.dfuOverviewTotals = totals;
-    console.log('DFU Participant Map:', this.dfuParticipantMap);
+    this.ongoingparticipants = localMap;
   }
 
-  // fetch the participant products for a given participant profileid
-  async toggleParticipant(profileid: string): Promise<void> {
-    this.toggleOverviewRow(profileid);
-    const participant = this.dfuParticipantMap[profileid];
-
-    if (!participant) {
+  async getProductToDeliverySequence(productId: string, productRef: any): Promise<void> {
+    if (this.fetchedProductData.has(productId)) {
       return;
     }
+    this.fetchedProductData.add(productId);
 
-    const activeProductIds: string[] = participant.activeproduct || [];
-    if (activeProductIds.length == 0) {
-      this.dfuParticipantMap[profileid].participantproducts = [];
-      return;
-    }
-
-    const productRefs = this.dfuProductRefs.filter(ref =>
-      activeProductIds.includes(ref.id)
-    );
-    const chunkSize = 30;
-    const participantProducts: any[] = [];
-
-    for (let i = 0; i < productRefs.length; i += chunkSize) {
-      const chunk = productRefs.slice(i, i + chunkSize);
-
-      const q = query(
-        collection(this.firestore, 'participantsproduct'),
-        where('profileid', '==', profileid),
-        where('status', 'in', ['ongoing', 'initiated']),
-        where('productref', 'in', chunk)
-      );
-
+    try {
+      const q = query(collection(this.firestore, 'productToDeliverySequence'), where('product', '==', productRef));
       const snapshot = await getDocs(q);
 
-      snapshot.docs.forEach(docSnap => {
-        participantProducts.push({
-          participantproductid: docSnap.id,
-          ...docSnap.data()
-        });
-      });
-    }
+      const activityRefs: any[] = [];
+      for (const docSnap of snapshot.docs) {
+        const deliveryOptions = docSnap.data()['deliveryoptions'] || [];
+        for (const option of deliveryOptions) {
+          const steps = option.deliverysequence || [];
+          for (const step of steps) {
+            if (step.activity) { activityRefs.push(step.activity); }
+          }
+        }
+      }
 
-    this.dfuParticipantMap[profileid].participantproducts = participantProducts;
-    console.log('Participant products for', profileid, participantProducts);
+      await Promise.all(activityRefs.map(ref => this.getCachedDocData(ref)));
+    } catch (error) {
+      console.error('Error fetching product delivery sequence template:', error);
+    }
   }
 
-  // fetch the delivery sequence for a participant product
-  async deliverySequence(profileid: string, participantproductid: string): Promise<void> { 
-    this.toggleOverviewProduct(profileid, participantproductid);
-    const deliverysequenceQuery = query(collection(this.firestore, 'participantdeliverysequence'), where('profileid', '==', profileid)); 
-    const deliverySnapshot = await getDocs(deliverysequenceQuery); 
-    let deliverySteps: any[] = []; 
-    const stepList: { step: number; deliveryname: string; status: string }[] = []; 
+  async fetchParticipantData(productRef: any): Promise<void> {
+    const profileIds = Object.keys(this.ongoingparticipants);
+    const chunkSize = 30;
 
-    deliverySnapshot.docs.forEach(docSnap => { 
-      const data = docSnap.data(); 
-      const products = data['products'] || []; 
-      const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid); 
-      if (matchedProduct) { 
-        deliverySteps = matchedProduct.delivery || []; 
-      } 
-    }); 
+    const participantProductChunks: Promise<any>[] = [];
+    const deliverySequenceChunks: Promise<any>[] = [];
 
-    for (let i = 0; i < deliverySteps.length; i++) { 
-      const seqStep = deliverySteps[i]; 
-      const deliverableDoc = await getDoc(seqStep.sequenceref); 
-      const deliverableData = deliverableDoc.data(); 
-      const deliveryType = deliverableData?.['type']; 
-      console.log('Delivery step', i, 'for', profileid, 'participantproductid', participantproductid, 'is', deliverableData); 
-      let deliveryName = ''; 
+    for (let i = 0; i < profileIds.length; i += chunkSize) {
+      const chunk = profileIds.slice(i, i + chunkSize);
 
-      if (deliveryType === 'appointment') {
-         const appointmentType = await getDoc(deliverableData['deliveryref']); 
-         deliveryName = appointmentType.data()?.['appointmenttype'] || ''; 
-      } else if (deliveryType === 'form') { 
-        const form = await getDoc(deliverableData['deliveryref']); 
-        deliveryName = form.data()?.['formname'] || ''; 
-      } 
-      stepList.push({ 
-        step: i+1, 
-        deliveryname: deliveryName, 
-        status: deliverableData?.['status'] || '' 
-      }); 
-    } 
-      this.dfuParticipantMap[profileid].deliverysequence = stepList; 
-      console.log('deliverysequence for', profileid, stepList); 
+      const participantProductQuery = query(
+        collection(this.firestore, 'participantsproduct'),
+        where('profileid', 'in', chunk),
+        where('productref', '==', productRef),
+        where('status', 'in', ['ongoing', 'initiated'])
+      );
+      participantProductChunks.push(getDocs(participantProductQuery));
+
+      const deliverySequenceQuery = query(
+        collection(this.firestore, 'participantdeliverysequence'),
+        where('profileid', 'in', chunk)
+      );
+      deliverySequenceChunks.push(getDocs(deliverySequenceQuery));
+    }
+
+    const [participantProductSnapshots, deliverySequenceSnapshots] = await Promise.all([
+      Promise.all(participantProductChunks),
+      Promise.all(deliverySequenceChunks)
+    ]);
+
+    this.processParticipantProducts(participantProductSnapshots);
+
+    const deliveryDocs: any[] = [];
+    for (const snapshot of deliverySequenceSnapshots) {
+      deliveryDocs.push(...snapshot.docs);
+    }
+    await this.processDeliverySequences(deliveryDocs);
+  }
+
+  processParticipantProducts(snapshots: any[]): void {
+    for (const snapshot of snapshots) {
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const participantProduct = { participantproductid: docSnap.id, ...data };
+        const profileid = participantProduct['profileid'];
+        const participant = this.ongoingparticipants[profileid];
+        if (!participant) { continue; }
+
+        if (!participant.participantproducts) { participant.participantproducts = []; }
+        participant.participantproducts.push(participantProduct);
+      }
+    }
+  }
+
+  async processDeliverySequences(deliveryDocs: any[]): Promise<void> {
+    const profileIds = Object.keys(this.ongoingparticipants);
+
+    for (const profileid of profileIds) {
+      const participant = this.ongoingparticipants[profileid];
+      const myDocs = deliveryDocs.filter(d => d.data()['profileid'] === profileid);
+      for (const pp of participant.participantproducts || []) {
+        const steps = this.findDeliverySteps({ docs: myDocs } as any, pp.participantproductid);
+        pp.deliverysequence = await this.buildStepList(steps, participant);
+      }
+    }
+  }
+
+  findDeliverySteps(deliverySnapshot: any, participantproductid: string): any[] {
+    let deliverySteps: any[] = [];
+
+    deliverySnapshot.docs.forEach((docSnap: any) => {
+      const data = docSnap.data();
+      const products = data['products'] || [];
+      const matchedProduct = products.find((p: any) => p.participantproductid === participantproductid);
+
+      if (matchedProduct) {
+        deliverySteps = matchedProduct.delivery || [];
+      }
+    });
+
+    return deliverySteps;
+  }
+
+  async buildStepList(deliverySteps: any[], participant: any): Promise<{ step: number; deliveryname: string; status: string }[]> {
+    const sequenceDataList = await Promise.all(
+      deliverySteps.map(s => this.getCachedDocData(s.sequenceref))
+    );
+
+    const secondLevelPromises = sequenceDataList.map(async (deliverableData) => {
+      const deliveryType = deliverableData?.['type'];
+      const isResolvable = deliveryType === 'appointment' || deliveryType === 'form';
+      const refData = isResolvable ? await this.getCachedDocData(deliverableData['deliveryref']) : null;
+      return { deliverableData, deliveryType, refData };
+    });
+
+    const resolved = await Promise.all(secondLevelPromises);
+
+    const stepList: { step: number; deliveryname: string; status: string }[] = [];
+    let previousCompletedDate: Date | null = null;
+
+    resolved.forEach((r, i) => {
+      const seqStep = deliverySteps[i];
+      const deliveryStatus = seqStep.status || '';
+      let deliveryName = '';
+      let appointmentType = '';
+      let completedDate: Date | null = null;
+
+      if (r.deliveryType === 'appointment') {
+        appointmentType = r.refData?.['appointmenttype'] || '';
+        deliveryName = appointmentType;
+        if (deliveryStatus === 'completed') {
+          const endTimestamp = r.refData?.['appointmentend'] || r.refData?.['endtime'];
+          completedDate = endTimestamp ? endTimestamp.toDate() : null;
+        }
+      } else if (r.deliveryType === 'form') {
+        deliveryName = r.refData?.['formname'] || '';
+      } else {
+        deliveryName = r.deliveryType || '';
+      }
+
+      stepList.push({ step: i + 1, deliveryname: deliveryName, status: deliveryStatus });
+
+      if (this.diagnosticsArray.includes(appointmentType) && deliveryStatus === 'ready') {
+        participant.notstartedparticipant = true;
+      }
+      if (deliveryStatus === 'ready' && previousCompletedDate !== null) {
+        if (this.daysSince(previousCompletedDate) > 7) {
+          participant.needsattention = true;
+        }
+      }
+      if (completedDate) previousCompletedDate = completedDate;
+    });
+
+    return stepList;
   }
 
   // Helper functions
+  private matchesProductId(value: any, targetId: string): boolean {
+    if (typeof value === 'string') {
+      const lastSegment = value.includes('/') ? value.split('/').pop() : value;
+      return lastSegment === targetId;
+    }
+    return value?.id === targetId;
+  }
+
+  private async getCachedDocData(ref: any): Promise<any> {
+    if (!ref) { return null; }
+    const cached = this.fetchDeliverables.get(ref.path);
+    if (cached) { return cached; }
+
+    const docSnap = await getDoc(ref);
+    const data = docSnap.data();
+    this.fetchDeliverables.set(ref.path, data);
+    return data;
+  }
+
+  onProductDropdownChange(docId: string): void {
+    const displayName = this.dfuProductsMap[docId]?.product || docId;
+    this.selectProduct(docId, displayName);
+  }
+
+  private daysSince(date: Date): number {
+    return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
   toggleOverviewRow(profileid: string): void {
     const isSameRow = this.expandedOverviewRowId === profileid;
     this.expandedOverviewRowId = isSameRow ? null : profileid;
   }
 
-  toggleOverviewProduct(profileid: string, participantproductid: any): void {
-    const key = participantproductid;
-    const isOpen = this.expandedOverviewProduct[key];
-    this.expandedOverviewProduct[key] = !isOpen;
+  setStatusView(view: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff'): void {
+    this.statusView = view;
   }
 
-  // filteredOverviewEntries is a getter, so it hands *ngFor a fresh array on every
-  // change-detection pass; track by profile id so rows are not torn down and rebuilt.
-  trackOverviewEntry(_i: number, entry: { key: string }): string {
-    return entry.key;
+  get displayedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    if (this.statusView === 'notStarted') { return this.notStartedEntries; }
+    if (this.statusView === 'needsAttention') { return this.needsAttentionEntries; }
+    if (this.statusView === 'completed') { return this.completedEntries; }
+    if (this.statusView === 'awaitingSignoff') { return this.awaitingSignoffEntries; }
+    return this.ongoingEntries;
   }
 
   toggleOverviewStatus(status: 'ongoing' | 'completed' | 'notStarted'): void {
@@ -455,10 +609,45 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         : p.notStartedProducts;
   }
 
-  get filteredOverviewEntries(): { key: string; value: typeof this.dfuParticipantMap[string] }[] {
-    const entries = Object.keys(this.dfuParticipantMap).map(key => ({ key, value: this.dfuParticipantMap[key] }));
-    if (!this.overviewStatusFilter) { return entries; }
-    return entries.filter(e => this.productsForStatus(e.value, this.overviewStatusFilter!).length > 0);
+  get ongoingEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return Object.keys(this.ongoingparticipants).map(key => ({ key, value: this.ongoingparticipants[key] }));
+  }
+
+  get notStartedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.notstartedparticipant === true);
+  }
+
+  get notStartedCount(): number {
+    return this.notStartedEntries.length;
+  }
+
+  get needsAttentionEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.needsattention === true);
+  }
+
+  get needsAttentionCount(): number {
+    return this.needsAttentionEntries.length;
+  }
+
+  get completedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.completed === true);
+  }
+
+  get completedCount(): number {
+    return this.completedEntries.length;
+  }
+
+  get awaitingSignoffEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+    return this.ongoingEntries.filter(entry => entry.value.awaitingsignoff === true);
+  }
+
+  get awaitingSignoffCount(): number {
+    return this.awaitingSignoffEntries.length;
+  }
+
+  toggleOverviewProduct(participantproductid: string): void {
+    const isOpen = this.expandedOverviewProduct[participantproductid];
+    this.expandedOverviewProduct[participantproductid] = !isOpen;
   }
 
   // ================= HELPERS =================
@@ -654,6 +843,23 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     if (this.pplRole === 'spec') { list = list.filter(p => p.spec); }
     if (this.pplRole === 'ponly') { list = list.filter(p => !p.spec); }
     return list;
+  }
+
+  // A&H member cards for the Participants tab — one per AH member's participant metadata,
+  // with their active products resolved to DFU product names.
+  get ahParticipantCards(): { profileid: string; name: string; email: string; products: string[] }[] {
+    const q = this.pplSearch.toLowerCase();
+    return this.participantMetadata
+      .filter(p => (p.name || '').toLowerCase().includes(q))
+      .map(p => ({
+        profileid: p.profileid,
+        name: p.name || 'Unnamed',
+        email: p.email || '',
+        products: (p.activeproduct || []).map((value: any) => {
+          const id = typeof value === 'string' ? value.split('/').pop() : value?.id;
+          return this.dfuProductsMap[id]?.product || id;
+        })
+      }));
   }
 
   activeJourneyFor(pid: string): Journey | undefined {
