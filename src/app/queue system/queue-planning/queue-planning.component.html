@@ -709,10 +709,26 @@
       {{ slotDialogMode === 'multi' ? 'Create Slot for Multiple Segments' : 'Edit Date Entry' }}
       <span *ngIf="slotDialogMode === 'multi'"> - {{ editingStageName }}</span>
     </h2>
-    <div>
+
+    <!-- STEP 1: Type choice — only shown when the stage supports appointments and nothing's picked yet -->
+    <div *ngIf="editingSlotType === null" style="padding: 20px 0;">
+      <h3 style="margin-bottom: 16px;">How would you like to add this slot?</h3>
+      <div style="display: flex; gap: 12px;">
+        <button mat-stroked-button style="flex: 1; padding: 16px;" (click)="editingSlotType = 'queue'">
+          <mat-icon>event</mat-icon>
+          Queue Slot
+        </button>
+        <button mat-stroked-button style="flex: 1; padding: 16px;" (click)="editingSlotType = 'appointment'; fetchAppointmentAvailability(editingStageName)">
+          <mat-icon>medical_services</mat-icon>
+          Appointment Slot
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2a: Queue slot form — existing fields, now properly wrapped -->
+    <div *ngIf="editingSlotType === 'queue'">
       <div class="date-edit-form">
 
-        <!-- Stage Info Display (only for multi mode) -->
         <div class="stage-info-display" *ngIf="slotDialogMode === 'multi'">
           <mat-icon>info</mat-icon>
           <span>Creating slots for stage: <strong>{{ editingStageName }}</strong></span>
@@ -738,7 +754,6 @@
           <mat-hint>{{ multiSlotData.selectedSegments?.length || 0 }} segment(s) selected</mat-hint>
         </mat-form-field>
 
-        <!-- Selected Segments Preview (only for multi mode) -->
         <div class="selected-segments-preview"
           *ngIf="slotDialogMode === 'multi' && multiSlotData.selectedSegments?.length > 0">
           <h4>Selected Segments ({{ multiSlotData.selectedSegments.length }}):</h4>
@@ -752,7 +767,6 @@
           </mat-chip-set>
         </div>
 
-        <!-- Date and Time Fields (for both modes) -->
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="slot-field">
             <mat-label>Title</mat-label>
@@ -766,7 +780,7 @@
             <textarea data-testid="qpln-txt-11" matInput type="text" [(ngModel)]="editingDateEntry.description"></textarea>
           </mat-form-field>
         </div>
-        
+
         <div class="datetime-row">
           <mat-form-field appearance="outline" class="date-field">
             <mat-label>Start Date</mat-label>
@@ -809,16 +823,65 @@
         </div>
       </div>
     </div>
+
+    <!-- STEP 2b: Appointment slot picker -->
+    <div *ngIf="editingSlotType === 'appointment'">
+      <h4 style="margin-bottom: 12px;">Select Specialist Slots</h4>
+
+      <mat-form-field appearance="outline" style="width: 100%;">
+        <mat-label>Search Specialist</mat-label>
+        <input matInput [(ngModel)]="searchAppointmentSlot" placeholder="Type specialist name...">
+      </mat-form-field>
+
+      <div *ngIf="loadingAppointmentSlots" style="text-align: center; padding: 24px;">
+        <mat-spinner diameter="32" style="margin: 0 auto;"></mat-spinner>
+        <p>Loading availability...</p>
+      </div>
+
+      <div *ngIf="!loadingAppointmentSlots && appointmentSlotOptions.length === 0" style="text-align: center; padding: 24px; color: #999;">
+        No open availability found for this appointment type.
+      </div>
+
+      <div *ngIf="!loadingAppointmentSlots && appointmentSlotOptions.length > 0" style="max-height: 320px; overflow-y: auto;">
+        <div *ngFor="let slot of getFilteredAppointmentSlots()"
+             style="display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;"
+             (click)="toggleAppointmentSlotSelection(slot)">
+          <mat-checkbox [checked]="slot.selected" (click)="$event.stopPropagation(); toggleAppointmentSlotSelection(slot)"></mat-checkbox>
+          <div>
+            <div style="font-weight: 600;">{{ slot.specialistName }}</div>
+            <div style="font-size: 13px; color: #666;">
+              {{ slot.slotstart.toDate() | date:'d MMM y' }},
+              {{ slot.slotstart.toDate() | date:'h:mm a' }} – {{ slot.slotend.toDate() | date:'h:mm a' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; font-size: 13px; color: #666;">
+        {{ selectedAppointmentSlots.length }} slot(s) selected
+      </div>
+    </div>
+
+    <!-- STEP 3: Action buttons — differ by which mode/type is active -->
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close data-testid="qp-datedlg-cancel">Cancel</button>
-      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'single'" (click)="saveDateEntry()" data-testid="qp-datedlg-save">
+
+      <button mat-button *ngIf="editingSlotType === 'appointment'" (click)="editingSlotType = stageSupportsAppointment(editingStageName) ? null : 'queue'">
+        Back
+      </button>
+
+      <button mat-raised-button color="primary" *ngIf="editingSlotType === 'queue' && slotDialogMode === 'single'" (click)="saveDateEntry()" data-testid="qp-datedlg-save">
         Save
       </button>
-      <button mat-raised-button color="primary" *ngIf="slotDialogMode === 'multi'" (click)="saveMultiSegmentSlot()"
+      <button mat-raised-button color="primary" *ngIf="editingSlotType === 'queue' && slotDialogMode === 'multi'" (click)="saveMultiSegmentSlot()"
         [disabled]="!isMultiSlotDataValid()" data-testid="qp-datedlg-createmulti">
         Create Slots for {{ multiSlotData.selectedSegments?.length || 0 }} Segment(s)
       </button>
+      <button mat-raised-button color="primary" *ngIf="editingSlotType === 'appointment'"
+              [disabled]="selectedAppointmentSlots.length === 0"
+              (click)="saveAppointmentSlots()">
+        Reserve {{ selectedAppointmentSlots.length }} Slot(s)
+      </button>
     </mat-dialog-actions>
   </div>
-
 </ng-template>

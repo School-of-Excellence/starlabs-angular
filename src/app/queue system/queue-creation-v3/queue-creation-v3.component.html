@@ -406,6 +406,12 @@
                             <mat-option *ngFor="let form of formTemplateList" [value]="form.docid">{{form.formname}}</mat-option>
                           </mat-select>
                         </mat-form-field>
+                        <mat-form-field class="ml-4" style="margin-right: 10px;" *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'appointment'" appearance="outline">
+                          <mat-label>Select Appointment Type</mat-label>
+                          <mat-select formControlName="actionresource">
+                            <mat-option *ngFor="let appt of appointmentTypeList" [value]="appt.docid">{{appt.appointmenttype}}</mat-option>
+                          </mat-select>
+                        </mat-form-field>
                         <button [attr.data-testid]="'qcv3-btn-36-' + i" class="ml-3"  style="margin-right: 10px;"
                           *ngIf="stagePropertyArray.controls[i].get('actiontype').value == 'form' && ![null,undefined].includes(stagePropertyArray.controls[i].get('actionresource').value) && ![null,undefined].includes(data?.docid)" 
                           mat-stroked-button type="button" 
