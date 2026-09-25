@@ -4,7 +4,7 @@ import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
-import { collection, collectionData, doc, Firestore, getDocs, getDoc, orderBy, query, where, updateDoc, arrayUnion, serverTimestamp, Timestamp, getFirestore } from '@angular/fire/firestore';
+import { collection, doc, Firestore, getDocs, getDoc, orderBy, query, where, updateDoc, arrayUnion, serverTimestamp, Timestamp, getFirestore, Query, QueryConstraint } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -22,6 +22,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { SelectionModel } from '@angular/cdk/collections';
 import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import jsPDF from 'jspdf';
@@ -50,6 +51,7 @@ import { FormOverlayViewComponent } from '../form-overlay-view/form-overlay-view
     MatTooltipModule,
     MatDividerModule,
     MatProgressSpinnerModule,
+    MatProgressBarModule,
     NgxMatSelectSearchModule,
     FormOverlayViewComponent
   ],
@@ -144,6 +146,19 @@ export class ViewParticipantsFormComponent {
   //Like and Flag Filter
   filterLiked = false;
   filterFlagged = false;
+  filterOpportunity = false;
+
+  // ==========================================
+  // SERVER-SIDE FETCH STATE
+  // ==========================================
+  // Filters are applied by the Fetch button: they are sent to Firestore as
+  // where() clauses, and the table shows exactly what that fetch returned.
+  isFetching = false;
+  fetchNotice = '';
+  appliedFilters: AppliedFilters = null;
+  private fetchSeq = 0;
+  // Firestore allows at most 30 disjunctions (product of all `in` sizes) per query.
+  private static readonly MAX_DISJUNCTIONS = 30;
 
   openFormOverlay(row: any) {
     this.formOverlay.mapProfile = this.mapProfile;
@@ -217,7 +232,8 @@ export class ViewParticipantsFormComponent {
 
     const queueGenerationCollRef = collection(this.firestoreDefault, "queue generation");
     const queueGenerationQuery = query(queueGenerationCollRef, orderBy("queueenddate", "desc"));
-    collectionData(queueGenerationQuery).pipe(takeUntil(this.destroy$)).subscribe(async queuesnap => {
+    getDocs(queueGenerationQuery).then(snap => {
+      const queuesnap = snap.docs.map(d => d.data());
       this.queuelist = queuesnap;
       for (let i = 0; i < queuesnap.length; i++) {
         const element = queuesnap[i];
@@ -259,8 +275,6 @@ export class ViewParticipantsFormComponent {
       queryRunTimes = queryRunTimes + 1;
       if (queryRunTimes >= 4) loadingRef.close();
     });
-
-    this.fetchData();
   }
 
   ngOnInit(): void {
@@ -280,6 +294,7 @@ export class ViewParticipantsFormComponent {
     this.formFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterForms());
     this.participantFilterCtrl.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.filterParticipants());
 
+    this.fetchData();
   }
 
   ngOnDestroy() {
@@ -357,18 +372,146 @@ export class ViewParticipantsFormComponent {
   // FETCH DATA
   // ==========================================
   fetchData() {
-    let loadingRef = this.loadingScreen;
+    if (!this.filterForm) return;
     this.endDate = new Date(new Date(this.endDate).setHours(23, 59, 59, 0));
     this.startDate = new Date(new Date(this.startDate).setHours(0, 0, 0, 0));
+
+    const applied = this.snapshotFilters();
     const formsByClientCollRef = collection(this.firestoreForms, "formsByClient");
-    const formsByClientQuery = query(formsByClientCollRef, where('date', '>', this.startDate), where('date', '<', this.endDate), orderBy('date', 'desc'));
-    collectionData(formsByClientQuery).pipe(takeUntil(this.destroy$)).subscribe(async formsnap => {
-      this.participantForm = formsnap;
+
+    const base: QueryConstraint[] = [where('date', '>', this.startDate), where('date', '<', this.endDate)];
+    if (applied.liked) base.push(where('liked', '==', true));
+    if (applied.flagged) base.push(where('tagged', '==', true));
+    if (applied.opportunity) base.push(where('opportunity', '==', true));
+
+    const inFilters: InFilter[] = [
+      { field: 'profileid', values: applied.name },
+      { field: 'formname', values: applied.formname },
+      { field: 'queueref', values: applied.queue.map(id => doc(this.firestoreForms, 'queue generation', id)) },
+      { field: 'workshopref', values: applied.workshop.map(id => this.workshopRef(id)) },
+    ].filter(f => f.values.length > 0);
+
+    const queries = this.buildQueries(formsByClientCollRef, base, inFilters);
+    this.fetchNotice = '';
+    this.runFetch(queries, applied, () => {
+      // Missing composite index → fall back to the date-only query; the table
+      // predicate still applies every filter, so results stay correct.
+      this.fetchNotice = 'Filters applied in the browser — a Firestore index for this filter combination is missing.';
+      this.runFetch([query(formsByClientCollRef, where('date', '>', this.startDate), where('date', '<', this.endDate), orderBy('date', 'desc'))], applied);
+    });
+  }
+
+  // One-shot reads (no live listener). Each Fetch bumps the sequence so a slower,
+  // older fetch can't overwrite the table after a newer one.
+  private async runFetch(queries: Query[], applied: AppliedFilters, onIndexMissing?: () => void) {
+    const seq = ++this.fetchSeq;
+    this.isFetching = true;
+
+    try {
+      const snaps = await Promise.all(queries.map(q => getDocs(q)));
+      if (seq !== this.fetchSeq) return;
+
+      const byId = new Map<string, any>();
+      snaps.flatMap(snap => snap.docs.map(d => d.data())).forEach((row: any, i) => byId.set(row?.docid ?? `__${i}`, row));
+      const rows = Array.from(byId.values())
+        .sort((a, b) => (b?.date?.toMillis?.() ?? 0) - (a?.date?.toMillis?.() ?? 0));
+
+      this.appliedFilters = applied;
+      this.participantForm = rows;
       this.buildParticipantList();
       this.ngAfterViewInit(this.participantForm);
+      this.onFilter();
       this.selection.clear();
-      loadingRef.close();
+      this.isFetching = false;
+    } catch (err: any) {
+      if (seq !== this.fetchSeq) return;
+      console.error('formsByClient fetch failed:', err);
+      if (err?.code === 'failed-precondition' && onIndexMissing) {
+        onIndexMissing();
+        return;
+      }
+      this.isFetching = false;
+      this.fetchNotice = 'Could not fetch forms. Please try again.';
+    }
+  }
+
+  /**
+   * Splits the `in` filters into queries that each stay within Firestore's
+   * 30-disjunction limit. Smallest filters go in whole; the first one that no
+   * longer fits is chunked across several queries; anything beyond that is left
+   * to the table predicate (which always applies every filter anyway).
+   */
+  private buildQueries(ref: any, base: QueryConstraint[], inFilters: InFilter[]): Query[] {
+    const sorted = [...inFilters].sort((a, b) => a.values.length - b.values.length);
+    const whole: QueryConstraint[] = [];
+    let product = 1;
+    let chunked: InFilter = null;
+
+    for (const f of sorted) {
+      if (product * f.values.length <= ViewParticipantsFormComponent.MAX_DISJUNCTIONS) {
+        whole.push(where(f.field, 'in', f.values));
+        product *= f.values.length;
+      } else if (!chunked) {
+        chunked = f;
+      }
+    }
+
+    const order = orderBy('date', 'desc');
+    if (!chunked) return [query(ref, ...base, ...whole, order)];
+
+    const size = Math.max(1, Math.floor(ViewParticipantsFormComponent.MAX_DISJUNCTIONS / product));
+    const queries: Query[] = [];
+    for (let i = 0; i < chunked.values.length; i += size) {
+      queries.push(query(ref, ...base, ...whole, where(chunked.field, 'in', chunked.values.slice(i, i + size)), order));
+    }
+    return queries;
+  }
+
+  // Workshop ids come from two collections; the stored ref points at whichever one owns the id.
+  private workshopRef(id: string) {
+    const isNew = (this.workshopListNew || []).some(w => w.docid === id);
+    return doc(this.firestoreForms, isNew ? 'workshopconfiguration' : 'eiflix workshop', id);
+  }
+
+  private snapshotFilters(): AppliedFilters {
+    const v = this.filterForm.value;
+    return {
+      name: [...(v.name || [])],
+      queue: [...(v.queue || [])],
+      workshop: [...(v.workshop || [])],
+      formname: [...(v.formname || [])],
+      liked: this.filterLiked,
+      flagged: this.filterFlagged,
+      opportunity: this.filterOpportunity,
+      start: this.startDate?.getTime(),
+      end: this.endDate?.getTime(),
+    };
+  }
+
+  /** True when the filter bar differs from what the table was last fetched with. */
+  get hasPendingChanges(): boolean {
+    if (!this.filterForm || !this.appliedFilters) return false;
+    const current = { ...this.snapshotFilters() };
+    const norm = (f: AppliedFilters) => JSON.stringify({
+      ...f, name: [...f.name].sort(), queue: [...f.queue].sort(), workshop: [...f.workshop].sort(), formname: [...f.formname].sort(),
+      start: new Date(f.start).setHours(0, 0, 0, 0), end: new Date(f.end).setHours(0, 0, 0, 0),
     });
+    return norm(current) !== norm(this.appliedFilters);
+  }
+
+  get activeFilterCount(): number {
+    if (!this.filterForm) return 0;
+    const v = this.filterForm.value;
+    return ['name', 'queue', 'workshop', 'formname'].filter(k => (v[k] || []).length > 0).length
+      + (this.filterLiked ? 1 : 0) + (this.filterFlagged ? 1 : 0) + (this.filterOpportunity ? 1 : 0);
+  }
+
+  clearFilters() {
+    this.filterForm.reset({ name: [], queue: [], formname: [], workshop: [] });
+    this.filterLiked = false;
+    this.filterFlagged = false;
+    this.filterOpportunity = false;
+    this.fetchData();
   }
 
   ngAfterViewInit(data: any[]) {
@@ -380,14 +523,17 @@ export class ViewParticipantsFormComponent {
   // ==========================================
   // TABLE FILTER
   // ==========================================
-  onFilter(value: any) {
-    this.dataSource.filter = JSON.stringify(value);
+  // Re-runs the table predicate against the filters of the last fetch
+  // (plus the instant My Forms / imported-emails refinements).
+  onFilter(_value?: any) {
+    if (!this.appliedFilters) return;
+    this.dataSource.filter = JSON.stringify(this.appliedFilters);
   }
 
   public customfilter(): (data: any, filter: string) => boolean {
     let filterFunction = (data: any, filter: string): boolean => {
       let e = data;
-      let value = JSON.parse(filter);
+      let value: AppliedFilters = JSON.parse(filter);
 
       // My Forms filter
       if (this.showMyFormsOnly && this.selectedMyForms.length > 0) {
@@ -400,10 +546,13 @@ export class ViewParticipantsFormComponent {
       }
 
       // Like filter
-      if (this.filterLiked && !e['liked']) return false;
+      if (value.liked && !e['liked']) return false;
 
       // Flag filter
-      if (this.filterFlagged && !e['tagged']) return false;
+      if (value.flagged && !e['tagged']) return false;
+
+      // Opportunity filter
+      if (value.opportunity && !e['opportunity']) return false;
 
       return (
         (value.name.length != 0 ? value.name.includes(e['profileid']) : true)
@@ -945,15 +1094,9 @@ export class ViewParticipantsFormComponent {
 
     try {
       const excelData: any[] = [];
-      for (let i = 0; i < selectedRows.length; i++) {
-        const row = selectedRows[i];
-        const formDocRef = doc(this.firestoreDefault, "delivery forms", row.formid);
-        const formTemplateDoc = await getDoc(formDocRef);
-        if (!formTemplateDoc.exists()) continue;
-        const formTemplate = formTemplateDoc.data();
-        const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", row.docid));
-        if (!submittedFormDoc.exists()) continue;
-        const submittedFormData = submittedFormDoc.data();
+      // Rows are the full formsByClient docs from the live fetch — no Firestore reads needed.
+      for (const row of selectedRows) {
+        const submittedFormData = row;
 
         const rowData: any = {
           'Participant Name': this.mapProfile[row.profileid] || this.mapProfileNew[row.profileid] || 'Unknown',
@@ -1049,14 +1192,13 @@ export class ViewParticipantsFormComponent {
       const margin = 12;
       let isFirstForm = true;
 
+      const templates = await this.loadFormTemplates(selectedRows);
+
       for (let formIndex = 0; formIndex < selectedRows.length; formIndex++) {
         const row = selectedRows[formIndex];
-        const formTemplateDoc = await getDoc(doc(this.firestoreDefault, "delivery forms", row.formid));
-        if (!formTemplateDoc.exists()) continue;
-        const formTemplate = formTemplateDoc.data();
-        const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", row.docid));
-        if (!submittedFormDoc.exists()) continue;
-        const submittedFormData = submittedFormDoc.data();
+        const formTemplate = templates.get(row.formid);
+        if (!formTemplate) continue;
+        const submittedFormData = row;
 
         const formValues: any = {};
         let controlIndex = 0;
@@ -1185,6 +1327,8 @@ export class ViewParticipantsFormComponent {
       data: { msg: `Downloading ${selectedRows.length} PDF(s)... Please wait.` }, disableClose: true
     });
 
+    const templates = await this.loadFormTemplates(selectedRows);
+
     let successCount = 0; let failCount = 0;
     for (let i = 0; i < selectedRows.length; i++) {
       const row = selectedRows[i];
@@ -1192,7 +1336,7 @@ export class ViewParticipantsFormComponent {
       loadingRef = this.dialog.open(LoadingProgressComponent, {
         data: { msg: `Downloading PDF ${i + 1} of ${selectedRows.length}...` }, disableClose: true
       });
-      try { await this.generateAndDownloadPDF(row); successCount++; await this.delay(500); }
+      try { await this.generateAndDownloadPDF(row, templates.get(row.formid)); successCount++; await this.delay(500); }
       catch (error) { console.error(`Error downloading PDF for row ${i + 1}:`, error); failCount++; }
     }
     loadingRef.close();
@@ -1214,15 +1358,12 @@ export class ViewParticipantsFormComponent {
   // ==========================================
   // HELPER: Generate and Download Single PDF (unchanged)
   // ==========================================
-  private async generateAndDownloadPDF(form: any): Promise<void> {
-    const formDocRef = doc(this.firestoreDefault, "delivery forms", form.formid);
-    const formTemplateDoc = await getDoc(formDocRef);
-    if (!formTemplateDoc.exists()) throw new Error('Form template not found');
-    const formTemplate = formTemplateDoc.data();
+  private async generateAndDownloadPDF(form: any, template?: any): Promise<void> {
+    const formTemplate = template !== undefined ? template : (await this.loadFormTemplates([form])).get(form.formid);
+    if (!formTemplate) throw new Error('Form template not found');
 
-    const submittedFormDoc = await getDoc(doc(this.firestoreForms, "formsByClient", form.docid));
-    if (!submittedFormDoc.exists()) throw new Error('Submitted form not found');
-    const submittedFormData = submittedFormDoc.data();
+    // `form` is the full formsByClient doc from the live fetch — no re-read needed.
+    const submittedFormData = form;
 
     const formValues: any = {};
     let controlIndex = 0;
@@ -1354,6 +1495,13 @@ export class ViewParticipantsFormComponent {
     return valueText;
   }
 
+  /** Fetches each distinct `delivery forms` template once, in parallel. Missing templates map to null. */
+  private async loadFormTemplates(rows: any[]): Promise<Map<string, any>> {
+    const ids = [...new Set(rows.map(r => r.formid).filter(Boolean))] as string[];
+    const snaps = await Promise.all(ids.map(id => getDoc(doc(this.firestoreDefault, "delivery forms", id))));
+    return new Map(snaps.map((snap, i) => [ids[i], snap.exists() ? snap.data() : null]));
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -1370,14 +1518,34 @@ export class ViewParticipantsFormComponent {
   return !hasAnyForms;
 }
 
- toggleLikeFilter() {
-  this.filterLiked = !this.filterLiked;
-  this.onFilter(this.filterForm.value);
+  // Like/Flag are query filters — they take effect on the next Fetch.
+  toggleLikeFilter() {
+    this.filterLiked = !this.filterLiked;
+  }
+
+  toggleFlagFilter() {
+    this.filterFlagged = !this.filterFlagged;
+  }
+
+  toggleOpportunityFilter() {
+    this.filterOpportunity = !this.filterOpportunity;
+  }
+
 }
 
-toggleFlagFilter() {
-  this.filterFlagged = !this.filterFlagged;
-  this.onFilter(this.filterForm.value);
+interface AppliedFilters {
+  name: string[];
+  queue: string[];
+  workshop: string[];
+  formname: string[];
+  liked: boolean;
+  flagged: boolean;
+  opportunity: boolean;
+  start: number;
+  end: number;
 }
 
+interface InFilter {
+  field: string;
+  values: any[];
 }
