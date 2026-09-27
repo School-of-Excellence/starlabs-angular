@@ -923,6 +923,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
 
   /* the six "areas changed" buckets — each row opens in place to show who is in it */
   let VIEW = 'step';              // 'step' | 'people' — survives re-renders (search, date change)
+  let PEOPLE_ALL = false;         // By participant lists the first 40 until "Show all" is used
   const XOPEN = new Set();        // which bucket rows are open
   const XPANEL = new Set();       // which Crossover Meters have the Areas changed list open
   function xBucketPanel(s, P){
@@ -990,11 +991,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const P = sectionPool();
     const f = q.trim().toLowerCase();
     const rows = P.filter(p => !f || p.nm.toLowerCase().includes(f));
-    const show = rows.slice(0, 40);
+    const show = rows.slice(0, PEOPLE_ALL ? rows.length : 40);
     return `
     <div class="ptools">
       <input id="psearch-${s.id}" data-testid="ird-people-search" placeholder="Search participant…" value="${escHtml(q)}">
-      <div class="f" style="height:38px">Showing <b style="margin-left:5px">${show.length} of ${rows.length}</b></div>
+      <div class="f" style="height:38px">Showing <b style="margin-left:5px">${show.length} of ${rows.length}</b>${
+        show.length < rows.length ? `<button class="showall" data-testid="ird-people-show-all" data-peopleall>Show all</button>` : ''}</div>
       <button class="pexp" data-testid="ird-people-export" data-pexport="${s.id}" title="Export these participants to Excel">⤓ Export</button>
     </div>
     <div class="pt">
@@ -1177,7 +1179,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
   let mo = { mode:'', send:null, rows:[], meta:{} };
 
   function openModal(title, sub, mode, rows, meta = {}){
-    mo = { mode, send:meta.send, rows, meta };
+    mo = { mode, send:meta.send, rows, meta, all:false };   // every list starts at the cap, "Show all" lifts it
     $('moTitle').innerHTML = title; $('moSub').textContent = sub;
     paintModal(''); $('moSearch').value = ''; $('ov').classList.add('show');
   }
@@ -1204,7 +1206,9 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     // ticked when every pickable row is — it used to render unticked always, even with the whole list picked
     const everyone = pick && allPicked(rows.map(r => r.p).filter(Boolean));
     const pkHead = pick ? `<th class="pk"${cols.some(c => c.g) ? ' rowspan="2"' : ''}><input type="checkbox"
-      data-testid="ird-pick-all" data-pickall aria-label="Select everyone in this list"${everyone ? ' checked' : ''}></th>` : '';
+      data-testid="ird-pick-all" data-pickall aria-label="Select everyone in this list"${everyone ? ' checked' : ''}></th>`
+      // the row's number in THIS list, so a long list can be read off and talked about (operator, 2026-09-27)
+      + `<th class="sn" scope="col"${cols.some(c => c.g) ? ' rowspan="2"' : ''}>#</th>` : '';
     let head;
     if(cols.some(c => c.g)){
       let r1 = pkHead + '<th rowspan="2">Name</th><th rowspan="2">Journey</th>', r2 = '';
@@ -1219,10 +1223,10 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       head = `<tr>${r1}</tr><tr>${r2}</tr>`;
     } else head = `<tr>${pkHead}<th>Name</th><th>Journey</th>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr>`;
     const firstOfGroup = cols.map((c, i) => c.g && (i === 0 || cols[i - 1].g !== c.g));
-    return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map(r => `
+    return `<div class="mt-wrap"><table class="mt"><thead>${head}</thead><tbody>${rows.map((r, n) => `
       <tr ${ROW_TESTID[where]}>${pick ? `<td class="pk"><input type="checkbox" data-testid="ird-pick-row"
           data-pickrow="${r.p.profileid || ''}"${isPicked(r.p) ? ' checked' : ''}${pickable(r.p) ? '' : ' disabled'}
-          aria-label="Select ${escHtml(r.p.nm)}"></td>` : ''}<td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
+          aria-label="Select ${escHtml(r.p.nm)}"></td><td class="sn" data-testid="ird-row-no">${n + 1}</td>` : ''}<td><div class="mt-nm"><span class="av">${initials(r.p.nm)}</span>
           <span>${nameLink(r.p)}<small>${r.p.sub ?? '#' + (1000 + r.p.i)}</small></span></div></td>
         <td><span class="pill grey">${r.p.journey}</span></td>
         ${r.cells.map((c, i) => `<td${firstOfGroup[i] ? ' class="first"' : ''}>${c}</td>`).join('')}</tr>`).join('')}
@@ -1377,9 +1381,14 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       'asks', rows, { send:s, kind });
   }
 
+  /* the first 60 keep a 2000-row list quick to open; the note under it opens the rest (operator, 2026-09-27) */
+  const moreNote = (shown, total) => shown >= total ? '' :
+    `<div class="more">Showing the first ${shown} of ${total}.
+      <button class="showall" data-testid="ird-modal-show-all" data-moreall>Show all ${total}</button></div>`;
+
   function paintModal(q){
     const f = q.trim().toLowerCase();
-    const cap = 60;
+    const cap = mo.all ? Infinity : 60;
 
     if(mo.mode === 'table'){
       const { cols, filter } = mo.meta, fv = filter ? mo.meta.fval : '';
@@ -1390,8 +1399,7 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
       const rows = mo.rows.filter(r => (!fv || filter.of(r) === fv)
         && (!f || r.p.nm.toLowerCase().includes(f) || r.p.journey.toLowerCase().includes(f)));
       $('moBody').innerHTML = bar + (rows.length
-        ? tableHTML(cols, rows.slice(0, cap))
-          + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
+        ? tableHTML(cols, rows.slice(0, cap)) + moreNote(Math.min(cap, rows.length), rows.length)
         : `<div class="more">No participants here.</div>`);
       return;
     }
@@ -1399,14 +1407,13 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(mo.mode === 'letters'){
       // real letters — tags, resolved and notes are set right here (tagEditor)
       const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || p.love.text.toLowerCase().includes(f));
-      $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
+      $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map((p, n) => `
         <div class="letter" data-testid="ird-letter-row">
-          <div class="lh"><span class="av">${initials(p.nm)}</span>
+          <div class="lh"><span class="sn" data-testid="ird-row-no">${n + 1}</span><span class="av">${initials(p.nm)}</span>
             <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
           <p>${escHtml(p.love.text)}</p>
           ${tagEditor('love', p)}
-        </div>`).join('')
-        + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
+        </div>`).join('') + moreNote(Math.min(cap, rows.length), rows.length)
         : `<div class="more">No letters match.</div>`;
       return;
     }
@@ -1415,13 +1422,12 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     const kind = mo.meta.kind;
     const textOf = p => (kind === 'inst' ? p.asks.inst : p.asks.ah) || '';
     const rows = mo.rows.filter(p => !f || p.nm.toLowerCase().includes(f) || textOf(p).toLowerCase().includes(f));
-    $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map(p => `
+    $('moBody').innerHTML = rows.length ? rows.slice(0, cap).map((p, n) => `
       <div class="letter" data-testid="ird-ask-row">
-        <div class="lh"><span class="av" style="background:var(--${kind === 'inst' ? 'teal' : 'purple'}-soft);color:var(--${kind === 'inst' ? 'teal' : 'purple'})">${initials(p.nm)}</span>
+        <div class="lh"><span class="sn" data-testid="ird-row-no">${n + 1}</span><span class="av" style="background:var(--${kind === 'inst' ? 'teal' : 'purple'}-soft);color:var(--${kind === 'inst' ? 'teal' : 'purple'})">${initials(p.nm)}</span>
           <span>${nameLink(p)}<small>${p.sub || ''}</small></span></div>
         <p>${escHtml(textOf(p))}</p>
-        ${tagEditor('ask', p)}</div>`).join('')
-      + (rows.length > cap ? `<div class="more">Showing the first ${cap} of ${rows.length}.</div>` : '')
+        ${tagEditor('ask', p)}</div>`).join('') + moreNote(Math.min(cap, rows.length), rows.length)
       : `<div class="more">Nothing here.</div>`;
   }
 
@@ -1551,6 +1557,9 @@ export function mountInterimReportDashboard(root: ShadowRoot, api: InterimDashbo
     if(OPEN_SEL && !e.target.closest('.fsel')){ OPEN_SEL = ''; paintSels(); }
     if(e.target.id === 'moExport') return exportModal();
     if(e.target.closest('[data-pexport]')) return exportPeople();
+    /* "Show all" under a capped list — the dialog, or the By participant table */
+    if(e.target.closest('[data-moreall]')){ mo.all = true; paintModal($('moSearch').value); return; }
+    if(e.target.closest('[data-peopleall]')){ PEOPLE_ALL = true; repaintViews(); return; }
 
     /* new log dialog */
     const lgt = e.target.closest('[data-lgtab]');
