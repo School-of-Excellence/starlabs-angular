@@ -25,14 +25,17 @@
 | Edit | Why |
 |---|---|
 | `goToHealthBoard` back to `window.open(..., '_blank')` | the pull switched it to in-tab `router.navigate`; the 09-23 new-tab behaviour is what JCD-02 asserts — operator kept new tab |
+| Outreach row `statusLine` prefers priority.engine's reason again | the pull dropped it (Joshua c5477756 item 6); JCD-03 caught it |
+| restored Joshua's open-ticket server count (`getCountFromServer`, item 5) + filtered appointments query (item 7) + their fix comments | Sashong's 88132b7b was built on the pre-c5477756 file and reverted them: tile counted PEOPLE with a stale-metadata fallback, appointments read unfiltered. Found by a parallel audit agent; JCD-01's seed can't tell the two apart |
+| stripped 4 debug `console.log("Upgrade EMI…")` | came in with ee63ba33 |
 | removed the 3 `this.getAtcAlpha()` calls the pull added | they read `atc_alpha` / `atc_to_validate` (ATC — off-limits under test). Unreachable today (their handlers aren't bound in the template) but one rebind away from an ATC read |
 
-Also in the pull, behaviour-neutral: open-tickets and attended-appointment filters moved from Firestore queries
-to client-side filtering over the scoped reads (more rows read, same numbers); Tickets tile now counts PEOPLE
-with an open ticket. Debug `console.log`s in the EMI/upgrade code came in with it.
+Net of the edits, what the pull contributes is Sashong's features only: per-product "To Be Onboarded"
+drilldown, Ecosystem/DFU active + non-active boxes, `getProductName` / product-name fallback for the journey column.
 
 ## e2e
-No template changes → no new hooks; hook-diff aligned for both. Suites run before push (see PROGRESS / commit).
+No template changes → no new hooks; hook-diff aligned for both. Pre-push (emulator WITH functions): full journey 80 pass /
+1 fail (JCD-03 → fixed) / 27 skip; after the fixes coach-dashboards + dashboards 16/16.
 
 ## Revert guide (per screen)
 - delivery dashboard: `git checkout 43055b77^1 -- "src/app/Journey Onboarding/delivery-dashboard-clone"`
