@@ -222,6 +222,31 @@ export class InterimReportDashboardComponent implements OnChanges {
     XLSX.writeFile(wb, `${(name.replace(/[^\w\- ]+/g, '').trim() || 'interim-report')} ${stamp}.xlsx`);
   }
 
+  /**
+   * Cancelled reports per day, so the calendar dots match what the dashboard would actually list
+   * (operator, 2026-09-27). Read ONCE per mount, with an equality-only query: `status == 'cancelled'`
+   * beside the `createdon` range would need a composite index that is not deployed, and the aggregation
+   * counts cannot filter without one either. Cancelled logs are a small slice of the collection (139 of
+   * 2461 on production), so one read of them is cheaper than a second count per day.
+   */
+  private cancelledDays: Promise<Map<string, number>> | null = null;
+  private cancelledPerDay(): Promise<Map<string, number>> {
+    if (!this.cancelledDays) {
+      this.cancelledDays = this.fromServer(
+        query(collection(this.firestore, 'interimreport log'), where('status', '==', 'cancelled')))
+        .then(snap => {
+          const per = new Map<string, number>();
+          snap.docs.forEach(d => {
+            const on = toDate(d.data()['createdon']);
+            if (on) per.set(dayKey(on), (per.get(dayKey(on)) || 0) + 1);
+          });
+          return per;
+        })
+        .catch(err => { this.cancelledDays = null; throw err; });   // a failed read is retried next month view
+    }
+    return this.cancelledDays;
+  }
+
   /** count interimreport log docs created in [from, to) — an aggregation, so no documents are downloaded */
   private countLogs(from: Date, to: Date): Promise<number> {
     return getCountFromServer(query(collection(this.firestore, 'interimreport log'),
@@ -235,11 +260,16 @@ export class InterimReportDashboardComponent implements OnChanges {
     const y = date.getFullYear(), m = date.getMonth(), key = `${y}-${m}`;
     if (this.monthsLoaded.has(key)) return;
     this.monthsLoaded.add(key);
-    this.countLogs(new Date(y, m, 1), new Date(y, m + 1, 1))
-      .then(total => !total ? [] : Promise.all(
-        Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) =>
-          this.countLogs(new Date(y, m, i + 1), new Date(y, m, i + 2))
-            .then(n => { if (n) this.reportDays.add(dayKey(new Date(y, m, i + 1))); }))))
+    Promise.all([this.countLogs(new Date(y, m, 1), new Date(y, m + 1, 1)), this.cancelledPerDay()])
+      .then(([total, cancelled]) => {
+        // a day gets a dot only for reports the dashboard would show, so cancelled ones come off the count
+        const off = (d: Date) => cancelled.get(dayKey(d)) || 0;
+        const month = Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) => new Date(y, m, i + 1));
+        if (total - month.reduce((t, d) => t + off(d), 0) <= 0) return [];
+        return Promise.all(month.map(d =>
+          this.countLogs(d, new Date(y, m, d.getDate() + 1))
+            .then(n => { if (n - off(d) > 0) this.reportDays.add(dayKey(d)); })));
+      })
       .then(days => {
         // MatCalendar re-runs dateClass on updateTodaysDate(); the open calendar is only reachable through the picker
         if (days.length) (this.rangePicker as any)?._componentRef?.instance?._calendar?.updateTodaysDate();
@@ -286,10 +316,17 @@ export class InterimReportDashboardComponent implements OnChanges {
       end.setHours(23, 59, 59, 999);
       constraints.push(where('createdon', '<=', Timestamp.fromDate(end)));
     }
-    const logs = await this.fromServer(query(collection(this.firestore, 'interimreport log'), ...constraints));
-    const ids = logs.docs.map(d => d.id);
+    // A CANCELLED report is not part of any dashboard number (operator, 2026-09-27). It is dropped HERE,
+    // one step after the read, rather than in the query: Firestore's `!=` / `not-in` match only documents
+    // whose field EXISTS and is NOT NULL, and an interim report carries `status` only once it is completed
+    // or cancelled — on production 472 of 2461 logs have status null or no status field at all (every
+    // "ongoing" and "not started" one). A query-side filter would drop all of those, and would also put a
+    // second inequality field beside the `createdon` range, needing a new composite index.
+    const docs = this.fromServer(query(collection(this.firestore, 'interimreport log'), ...constraints));
+    const logs = (await docs).docs.filter(d => d.data()['status'] !== 'cancelled');
+    const ids = logs.map(d => d.id);
     await this.ensureFilters();   // journey names are needed to label each participant's journey
-    const journeys = await this.journeysOf(logs.docs.map(d => d.data()['profileid']));
+    const journeys = await this.journeysOf(logs.map(d => d.data()['profileid']));
 
     const [cross, evo, love, ask] = await Promise.all([
       this.latestByLog('interim crossover', ids),
@@ -297,7 +334,7 @@ export class InterimReportDashboardComponent implements OnChanges {
       this.latestByLog('love letter', ids),
       this.latestByLog('ask AH', ids),
     ]);
-    return logs.docs.map((d, i) => this.toMember(d.id, d.data(), {
+    return logs.map((d, i) => this.toMember(d.id, d.data(), {
       cross: cross.get(d.id), evo: evo.get(d.id), love: love.get(d.id), ask: ask.get(d.id),
       journey: journeys.get(d.data()['profileid']),
     }, i));
