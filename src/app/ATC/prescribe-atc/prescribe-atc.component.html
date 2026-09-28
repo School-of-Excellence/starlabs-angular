@@ -273,6 +273,24 @@
       <!-- Adjustments and Procedures Section -->
       <section class="content-section" id="atcfield-transcript">
         <h2 class="section-heading">ADJUSTMENTS & PROCEDURES</h2>
+        <!-- one section per assigned_to activity: pick agents once and apply them to every procedure (page-only, not saved to draft) -->
+        <div *ngFor="let assigned of bigActivityAssignedto" class="bulk-assign-section">
+          <div class="bulk-assign-title">{{assigned.activity}} — set for all procedures</div>
+          <div class="bulk-assign-row">
+            <mat-form-field appearance="outline" class="procedure-field">
+              <mat-label>{{assigned.activity}}</mat-label>
+              <mat-select [(ngModel)]="bulkAssignedSelection[assigned.docid]" multiple>
+                <mat-option>
+                  <ngx-mat-select-search [(ngModel)]="bulkAssignedFilter[assigned.docid]" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                </mat-option>
+                <mat-option *ngFor="let name of availableBulkSpecialistList(assigned.docid)" [value]="name.authorpath">{{name.authorname}}</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <button mat-button class="primary-button bulk-assign-apply" [disabled]="!(bulkAssignedSelection[assigned.docid]?.length)" (click)="applyAssignedToAllProcedures(assigned)">
+              Apply to all procedures
+            </button>
+          </div>
+        </div>
         <div class="adjustment-container" cdkDropList (cdkDropListDropped)="drop($event)">
           <div *ngFor="let adjustment of transcript; let i=index" class="adjustment-item" cdkDrag [attr.id]="'atcfield-adjustment-' + i">
             <div class="example-custom-placeholder" *cdkDragPlaceholder></div>

@@ -117,6 +117,8 @@ export class PrescribeATCComponent {
   bigActivityMentor = []
   bigActivityAdditional = []
   bigActivityAssignedto = []
+  bulkAssignedSelection = {} // section-level agents per assigned_to activity docid (page-only, not saved to draft)
+  bulkAssignedFilter = {} // separate search text per section dropdown
 
   // ATC Data
   alphaid:string
@@ -898,6 +900,31 @@ export class PrescribeATCComponent {
   availableMentorList(): Array<any>{
     var person = this.mentorNameList.filter(e=>e.authorname.toLowerCase().includes(this.filteredSpecialist.toLowerCase()))
     return person;
+  }
+
+  // same list as the per-procedure dropdown, filtered by that section's own search text
+  availableBulkSpecialistList(activityId): Array<any>{
+    var search = (this.bulkAssignedFilter[activityId] ?? "").toLowerCase()
+    var person = this.specialistList.filter(e=>e.authorname.toLowerCase().includes(search))
+    return person;
+  }
+
+  // overwrite this activity's agents on every procedure of every adjustment, then save the draft
+  applyAssignedToAllProcedures(assigned){
+    var selected = this.bulkAssignedSelection[assigned.docid] ?? []
+    if(selected.length == 0) return
+    var procedureCount = (this.transcript ?? []).reduce((count, adjustment)=>count + (adjustment.procedure ?? []).length, 0)
+    var names = selected.map(path=>this.specialistList.find(e=>e.authorpath == path)?.authorname ?? path).join(", ")
+    if(confirm(`Apply ${names} as ${assigned.activity} to all ${procedureCount} procedures? This will replace the current ${assigned.activity} on every procedure.`)){
+      (this.transcript ?? []).forEach(adjustment=>{
+        (adjustment.procedure ?? []).forEach(procedure=>{
+          procedure.assignedMap = procedure.assignedMap ?? {}
+          // each procedure gets its own copy so a later per-procedure edit doesn't change the others
+          procedure.assignedMap[assigned.docid] = [...selected]
+        })
+      })
+      this.autoSave()
+    }
   }
 
   async onProfileSelect(){
