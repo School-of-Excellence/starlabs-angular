@@ -12,6 +12,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu'; 
 import { CommonModule } from '@angular/common';
 import { Clipboard, ClipboardModule } from '@angular/cdk/clipboard';
+import { EventCtaConfigComponent } from './event-cta-config/event-cta-config.component';
 
 @Component({
   selector: 'app-event-list',
@@ -92,6 +93,14 @@ export class EventListComponent {
       panelClass: 'custom-dialog-container',
       maxHeight: "90vh",
       maxWidth: "90vw"
+    });
+  }
+
+  openCTAConfig(){
+    this.dialog.open(EventCtaConfigComponent,{
+      maxHeight: "90vh",
+      maxWidth: "90vw",
+      minWidth : "60vw"
     });
   }
 
