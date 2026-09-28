@@ -1,0 +1,182 @@
+<div class="sas-phead">
+  <div>
+    <h1 data-testid="sah-title">{{ mode === 'all' ? 'Overview' : greeting }}</h1>
+    <p>{{ subtitle }}</p>
+  </div>
+  <div class="sas-acts">
+    @if (mode === 'all') {
+      <select class="sas-sel" data-testid="sah-specialist" aria-label="Specialist" [(ngModel)]="specialistId" (ngModelChange)="onSpecialist()">
+        <option value="">All specialists</option>
+        @for (s of specialists; track s.profileId) {
+          <option [value]="s.profileId">{{ s.name }} · {{ s.role === 'mentor' ? 'Mentor' : 'CW' }}</option>
+        }
+      </select>
+    }
+    <button class="sas-btn" data-testid="sah-add-availability" (click)="addAvailability()"><mat-icon>add</mat-icon>Add availability</button>
+  </div>
+</div>
+
+<div class="sas-stack">
+  <div style="display:flex;justify-content:flex-end">
+    <app-sas-period-bar [period]="period" (periodChange)="onPeriod($event)" />
+  </div>
+
+  @if (loading) {
+    <section class="sas-card"><app-sas-loader msg="Loading hours…" /></section>
+  } @else if (hours) {
+    <div class="sas-stats" data-testid="sah-stats">
+      <div class="sas-stat" data-testid="sah-stat-available">
+        <div class="sas-sk"><mat-icon>schedule</mat-icon>Available</div><b>{{ fmtHours(hours.availMin) }}</b><small>Availability given</small>
+      </div>
+      <div class="sas-stat" data-testid="sah-stat-booked">
+        <div class="sas-sk"><mat-icon>event_available</mat-icon>Booked</div><b>{{ fmtHours(hours.bookedMin) }}</b><small>{{ fmtHours(openMin) }} still open to book</small>
+      </div>
+      <div class="sas-stat is-up" data-testid="sah-stat-delivered">
+        <div class="sas-sk"><mat-icon>check_circle</mat-icon>Delivered</div><b>{{ fmtHours(hours.deliveredMin) }}</b><small>{{ hours.completed }} completed session{{ hours.completed === 1 ? '' : 's' }}</small>
+      </div>
+      <div class="sas-stat is-warn" data-testid="sah-stat-unutilised">
+        <div class="sas-sk"><mat-icon>error_outline</mat-icon>Unutilised</div><b>{{ fmtHours(hours.unutilisedMin) }}</b><small>{{ fmtHours(hours.cancelledMin) }} cancelled</small>
+      </div>
+      <div class="sas-stat is-accent" data-testid="sah-stat-utilisation">
+        <div class="sas-sk"><mat-icon>track_changes</mat-icon>Utilisation</div><b>{{ hours.pct | number: '1.0-0' }}%</b><small>Delivered ÷ available</small>
+      </div>
+    </div>
+  }
+
+  <section class="sas-card" data-testid="sah-calendar">
+    <div class="sas-ch">
+      <h2>{{ mode === 'all' ? 'Calendar' : 'My calendar' }}</h2>
+      <div class="sas-chs">
+        @if (allMode) { Every specialist's availability and sessions · {{ fmtHours(openMin) }} still open to book in this {{ period.mode }}. Pick a specialist above to see only theirs. }
+        @else { {{ fmtHours(openMin) }} still open to book in this {{ period.mode }}. Start times come from each delivery type's length. }
+      </div>
+    </div>
+    @if (loading) {
+      <app-sas-loader msg="Loading calendar…" />
+    } @else if (showCalendar && period.mode === 'week') {
+      <div class="sas-wk-wrap"><div class="sas-wk">
+        @for (d of days; track d.date.getTime(); let i = $index) {
+          <div class="sas-wk-col" [class.is-today]="isToday(d.date)">
+            <div class="sas-wk-h">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></div>
+            @if (!d.windows.length && !d.loose.length) { <div class="sas-wk-none">No availability</div> }
+            @for (x of d.windows; track x.w.id) {
+              <div class="sas-slot" [class]="'sas-slot s-' + x.state" data-testid="sah-window">
+                @if (allMode) { <small class="sas-slot-who" data-testid="sah-window-who">{{ svc.name(x.w.profileId) }}</small> }
+                <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
+                <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}{{ x.w.fixed ? ' · fixed' : '' }}</small>
+                <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
+                @if (x.w.start > now) {
+                  <button class="sas-icon-btn sas-del" data-testid="sah-window-delete" (click)="deleteWindow(x.w, $event)" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
+                }
+              </div>
+              @for (r of x.sessions; track r.appt.id) {
+                <button class="sas-slot is-sess" [class]="'sas-slot is-sess ' + chipClass(r)" data-testid="sah-session" (click)="openDetail(r)">
+                  <b>{{ t(r.appt.start) }} – {{ t(r.appt.end) }}</b><small>{{ status(r) }}</small><small>{{ svc.name(r.appt.participantId) }} · {{ typeName(r) }}</small>
+                </button>
+              }
+            }
+            @for (r of d.loose; track r.appt.id) {
+              <button class="sas-slot is-sess" [class]="'sas-slot is-sess ' + chipClass(r)" data-testid="sah-session" (click)="openDetail(r)">
+                @if (allMode) { <small class="sas-slot-who">{{ hostNames(r) }}</small> }
+                <b>{{ t(r.appt.start) }} – {{ t(r.appt.end) }}</b><small>{{ status(r) }}</small><small>{{ svc.name(r.appt.participantId) }} · {{ typeName(r) }}</small>
+              </button>
+            }
+            @if (isFutureDay(d.date)) {
+              <button class="sas-add-slot" data-testid="sah-day-add" (click)="addAvailability(d.date)">+ Add</button>
+            }
+          </div>
+        }
+      </div></div>
+    } @else if (showCalendar) {
+      <div class="sas-mg">
+        @for (n of DAYS; track n) { <div class="sas-mh">{{ n }}</div> }
+        @for (c of month; track c.date.getTime()) {
+          <button class="sas-mc" [class.is-out]="c.out" [class.is-today]="isToday(c.date)" data-testid="sah-month-day" (click)="gotoWeek(c.date)" [attr.aria-label]="'Open the week of ' + (c.date | date: 'd MMM')">
+            <span class="n">{{ c.date.getDate() }}</span>
+            @for (l of c.lines; track $index) { <span class="ln" [style.--dc]="l.color"><i></i><span>{{ l.label }}</span></span> }
+            @if (c.more) { <span class="ln">+{{ c.more }}</span> }
+          </button>
+        }
+      </div>
+      <p class="sas-fine">Select a day to open its week.</p>
+    }
+  </section>
+
+  <section class="sas-card" data-testid="sah-upcoming">
+    <div class="sas-ch"><h2>Upcoming sessions</h2></div>
+    @if (loading) { <app-sas-loader msg="Loading upcoming sessions…" /> }
+    @else if (!upcoming.length) { <div class="sas-empty"><b>No upcoming sessions</b>They appear here once someone books one of the start times.</div> }
+    @else {
+      <div class="sas-tw"><table class="sas-tbl">
+        <thead><tr><th>Date &amp; time</th><th>Session</th><th>Participant</th>@if (showSpecialistCol) {<th>Specialist</th>}<th>Status</th><th>Join</th><th class="r"><span class="sas-muted" style="font-size:0">Actions</span></th></tr></thead>
+        <tbody>
+          @for (r of upcoming; track r.appt.id) {
+            <tr data-testid="sah-upcoming-row">
+              <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
+              <td>{{ typeName(r) }}</td>
+              <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
+              @if (showSpecialistCol) { <td>{{ hostNames(r) }}</td> }
+              <td><span class="sas-pill" [class]="'sas-pill ' + pillClass(r)">{{ status(r) }}</span></td>
+              <td><button class="sas-link" data-testid="sah-join" (click)="join(r)"><mat-icon>videocam</mat-icon>Join</button></td>
+              <td class="r">
+                <button class="sas-icon-btn" data-testid="sah-upcoming-menu" [matMenuTriggerFor]="upMenu" aria-label="Actions"><mat-icon>more_horiz</mat-icon></button>
+                <mat-menu #upMenu="matMenu">
+                  <button mat-menu-item data-testid="sah-menu-details" (click)="openDetail(r)"><mat-icon>info</mat-icon>View details</button>
+                  <button mat-menu-item data-testid="sah-menu-copy" (click)="copyZoom(r)"><mat-icon>content_copy</mat-icon>Copy Zoom link</button>
+                </mat-menu>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
+    }
+  </section>
+
+  <section class="sas-card" data-testid="sah-past">
+    <div class="sas-ch">
+      <h2>Past sessions</h2>
+      <div class="sas-ca">
+        <select class="sas-sel" data-testid="sah-past-filter" aria-label="Filter past sessions by status" [(ngModel)]="pastFilter" (ngModelChange)="onPastFilter()">
+          <option value="pending">Status updation pending</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="sas-chs">
+        @if (pastFilter === 'pending') { Sessions that have ended and still need a status. Open one to mark it completed or cancelled. }
+        @else { Newest first. Use Load more to go further back. }
+      </div>
+    </div>
+    @if (pastLoading && !past.length) { <app-sas-loader msg="Loading past sessions…" /> }
+    @else if (!past.length) {
+      <div class="sas-empty" data-testid="sah-past-empty"><b>{{ pastFilter === 'pending' ? 'Nothing waiting for a status' : 'No sessions with this status' }}</b></div>
+    } @else {
+      <div class="sas-tw"><table class="sas-tbl">
+        <thead><tr><th>Date &amp; time</th><th>Session</th><th>Participant</th>@if (showSpecialistCol) {<th>Specialist</th>}<th>Length</th><th>Status</th><th class="r"><span style="font-size:0">Actions</span></th></tr></thead>
+        <tbody>
+          @for (r of past; track r.appt.id) {
+            <tr class="is-click" data-testid="sah-past-row" (click)="openDetail(r)">
+              <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
+              <td>{{ typeName(r) }}</td>
+              <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
+              @if (showSpecialistCol) { <td>{{ hostNames(r) }}</td> }
+              <td class="nw">{{ fmtHours((r.appt.end.getTime() - r.appt.start.getTime()) / 60000) }}</td>
+              <td><span class="sas-pill" [class]="'sas-pill ' + pillClass(r)">{{ status(r) === 'Pending' ? 'Status pending' : status(r) }}</span>
+                @if (reasonShown(r)) { <small>{{ r.appt.cancelledReason }}</small> }</td>
+              <td class="r">
+                @if (status(r) === 'Pending') {
+                  <button class="sas-btn is-secondary" data-testid="sah-update-status" (click)="openDetail(r); $event.stopPropagation()">Update status</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
+      <div class="sas-more">
+        <span class="sas-muted">Showing {{ past.length }}{{ pastDone ? ' · that is all' : '' }}</span>
+        @if (pastLoading) { <app-sas-loader size="sm" msg="Loading more…" /> }
+        @else if (!pastDone) { <button class="sas-btn is-secondary" data-testid="sah-past-more" (click)="loadPast(false)">Load more</button> }
+      </div>
+    }
+  </section>
+</div>

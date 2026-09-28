@@ -1,0 +1,146 @@
+<div class="sas-dialog" data-testid="saa-root">
+  <h2 data-testid="saa-title">Add availability</h2>
+  <p class="sas-dsub">Give the dates and time you can take sessions. Participants and the A&amp;H team book from it.</p>
+  
+  @if (data.specialists.length && !data.profileId) {
+    <span class="sas-lbl">Specialist</span>
+    <select class="sas-sel" data-testid="saa-specialist" aria-label="Specialist" [(ngModel)]="profileId" (ngModelChange)="loadProfile()">
+      <option [ngValue]="null">Choose a specialist</option>
+      @for (s of data.specialists; track s.profileId) { <option [ngValue]="s.profileId">{{ s.name }}</option> }
+    </select>
+  }
+  
+  @if (blocked) {
+    <div class="sas-err" data-testid="saa-blocked">The last appointment '{{ blocked }}' Status is not updated by the specialist. Please update to proceed.</div>
+  }
+  
+  @if (!profileId) {
+    <div class="sas-empty" data-testid="saa-pick-first"><b>Choose a specialist</b>Their delivery types, dates and slots appear once you pick who the availability is for.</div>
+  } @else {
+    <span class="sas-lbl">How to add it</span>
+    <div class="sas-mode" role="group" aria-label="How to add availability">
+      <button type="button" data-testid="saa-mode-auto" [class.is-on]="mode === 'auto'" [attr.aria-pressed]="mode === 'auto'" (click)="mode = 'auto'">
+        <b>Auto configuration</b>
+        <small>Give a time range. Start times are created automatically every 30 minutes for each delivery type, each as long as that type's duration, and only where the whole session fits.</small>
+      </button>
+      <button type="button" data-testid="saa-mode-static" [class.is-on]="mode === 'static'" [attr.aria-pressed]="mode === 'static'" (click)="mode = 'static'">
+        <b>Static</b>
+        <small>Add your own slots for the day. Pick a delivery type and a start time for each; it ends after that type's duration. Only those slots are created.</small>
+      </button>
+    </div>
+  
+    <span class="sas-lbl">Delivery types</span>
+    @if (!profileId) { <p class="sas-fine">Choose a specialist first.</p> }
+    @else if (loadingTypes) { <app-sas-loader size="sm" msg="Loading delivery types…" /> }
+    @else if (!types.length) { <p class="sas-fine">No delivery types are mapped to this specialist's EIS roles.</p> }
+    @else if (mode === 'static') {
+      <p class="sas-fine" style="margin-top:0">In Static, pick the delivery type on each slot below.</p>
+    } @else {
+      <div class="sas-chips">
+        @for (t of types; track t.path) {
+          <button type="button" class="sas-chip" data-testid="saa-type" [class.is-on]="picked.has(t.path)" [attr.aria-pressed]="picked.has(t.path)" (click)="toggleType(t)">{{ t.name }} · {{ fmtHours(t.duration) }}</button>
+        }
+      </div>
+    }
+  
+    <span class="sas-lbl">Dates</span>
+    <div class="sas-rc" data-testid="saa-calendar">
+      <div class="sas-rc-head">
+        <button type="button" class="sas-icon-btn" data-testid="saa-month-prev" (click)="shiftMonth(-1)" [disabled]="!canGoBack()" aria-label="Previous month"><mat-icon>chevron_left</mat-icon></button>
+        <span>{{ monthAnchor | date: 'MMMM y' }}</span>
+        <button type="button" class="sas-icon-btn" data-testid="saa-month-next" (click)="shiftMonth(1)" aria-label="Next month"><mat-icon>chevron_right</mat-icon></button>
+      </div>
+      <div class="sas-rc-g">
+        @for (n of DAYS; track n) { <span>{{ n }}</span> }
+        @for (d of monthCells(); track $index) {
+          @if (d) {
+            <button type="button" class="sas-rc-d" data-testid="saa-day" [class.is-in]="inRange(d)" [class.is-edge]="isEdge(d)" [class.is-today]="isToday(d)"
+              [disabled]="d < today" (click)="pickDay(d)" [attr.aria-pressed]="inRange(d)" [attr.aria-label]="d | date: 'fullDate'">{{ d.getDate() }}</button>
+          } @else { <i></i> }
+        }
+      </div>
+    </div>
+    <p class="sas-fine" data-testid="saa-dates-summary">
+      @if (!from) { Pick the first day, then the last day. }
+      @else if (picking) { From {{ from | date: 'EEE d MMM' }}. Now pick the last day, or pick the same day again for one day. }
+      @else { {{ dates().length }} day{{ dates().length === 1 ? '' : 's' }}: {{ from | date: 'EEE d MMM' }}{{ dates().length > 1 ? ' – ' + (to | date: 'EEE d MMM') : '' }}. }
+    </p>
+  
+    @if (mode === 'static') {
+      <span class="sas-lbl">Slots per day</span>
+      @if (!dates().length || picking) {
+        <p class="sas-fine" style="margin-top:0">Pick the dates above first. Each date gets its own slots.</p>
+      } @else {
+        @for (d of dates(); track dayKey(d); let di = $index) {
+          <div class="sas-day" data-testid="saa-day-block">
+            <div class="sas-day-h">
+              <b data-testid="saa-day-title">{{ d | date: 'EEE, d MMM' }}</b>
+              <span class="sas-muted">{{ rowsFor(d).length }} slot{{ rowsFor(d).length === 1 ? '' : 's' }}</span>
+              @if (di === 0 && dates().length > 1) {
+                <button type="button" class="sas-link" data-testid="saa-copy-all" (click)="copyToAll()"><mat-icon>content_copy</mat-icon>Copy these slots to all {{ dates().length }} days</button>
+              }
+            </div>
+            @if (!rowsFor(d).length) { <p class="sas-fine" style="margin:0 0 8px">No slots on this day.</p> }
+            @for (r of rowsFor(d); track $index; let i = $index) {
+              <div class="sas-srow" data-testid="saa-slot-row">
+                <span class="sas-srow-n">{{ i + 1 }}</span>
+                <div class="sas-srow-type">
+                  <span>Delivery type</span>
+                  @if (!profileId) {
+                    <span class="sas-srow-note">Choose the specialist first</span>
+                  } @else if (loadingTypes) {
+                    <span class="sas-srow-note">Loading types…</span>
+                  } @else if (!types.length) {
+                    <span class="sas-srow-note">No delivery types are mapped to this specialist's EIS roles</span>
+                  } @else {
+                    <mat-select class="sas-mselect" data-testid="saa-slot-type" placeholder="Choose a type" panelClass="sas-mselect-panel"
+                      [(ngModel)]="r.typePath" [attr.aria-label]="'Delivery type for slot ' + (i + 1)">
+                      @for (t of types; track t.path) {
+                        <mat-option [value]="t.path" data-testid="saa-slot-type-option">{{ t.name }} · {{ fmtHours(t.duration) }}</mat-option>
+                      }
+                    </mat-select>
+                  }
+                </div>
+                <label>Starts<input class="sas-ctl" type="time" data-testid="saa-slot-start" [(ngModel)]="r.start"></label>
+                <div class="sas-srow-end"><span>Ends</span><b data-testid="saa-slot-end">{{ rowEnd(r) }}</b></div>
+                <button type="button" class="sas-icon-btn" data-testid="saa-slot-remove" (click)="removeRow(d, i)" [attr.aria-label]="'Remove slot ' + (i + 1)"><mat-icon>delete_outline</mat-icon></button>
+              </div>
+            }
+            <button type="button" class="sas-btn is-secondary" data-testid="saa-slot-add" (click)="addRow(d)"><mat-icon>add</mat-icon>Add slot</button>
+          </div>
+        }
+        <p class="sas-fine">{{ slotCount() }} slot{{ slotCount() === 1 ? '' : 's' }} across {{ dates().length }} day{{ dates().length === 1 ? '' : 's' }}. Each slot ends after its delivery type's duration and is saved as its own availability.</p>
+      }
+    } @else {
+      <span class="sas-lbl">Time</span>
+      <div class="sas-range">
+        <label>From<input class="sas-ctl" type="time" data-testid="saa-start" [(ngModel)]="startTime"></label>
+        <label>To<input class="sas-ctl" type="time" data-testid="saa-end" [(ngModel)]="endTime"></label>
+      </div>
+    }
+  
+    @if (mode === 'auto' && picked.size && windowMin() > 0) {
+      <span class="sas-lbl">Start times each day</span>
+      @for (p of preview(); track p.t.path) {
+        <div class="sas-prev" [class.is-bad]="!p.fits" data-testid="saa-preview">
+          <b>{{ p.t.name }} · {{ fmtHours(p.t.duration) }}{{ p.fits ? ' · ' + p.starts.length + ' start time' + (p.starts.length === 1 ? '' : 's') : '' }}</b>
+          @if (p.fits) {
+            <div class="sas-opts">@for (s of p.starts; track s.getTime()) { <span>{{ s | date: 'shortTime' }}</span> }</div>
+          } @else {
+            <span>Needs {{ fmtHours(p.t.duration) }} and this time is {{ fmtHours(windowMin()) }}. Widen the time or drop it.</span>
+          }
+        </div>
+      }
+      <p class="sas-fine">Once a start time is booked, the start times that overlap it close automatically.</p>
+    }
+  
+  }
+
+  @if (error) { <div class="sas-err" role="alert" data-testid="saa-error">{{ error }}</div> }
+  
+  <div class="sas-dfoot">
+    @if (saving) { <app-sas-loader size="sm" msg="Saving availability…" /> }
+    <button type="button" class="sas-btn is-secondary" data-testid="saa-cancel" (click)="close()" [disabled]="saving">Cancel</button>
+    <button type="button" class="sas-btn" data-testid="saa-save" (click)="save()" [disabled]="saving || !!blocked || !profileId">{{ saving ? 'Saving…' : 'Save availability' }}</button>
+  </div>
+</div>

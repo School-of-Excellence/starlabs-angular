@@ -1,0 +1,228 @@
+/* Pure logic for the Specialist Appointment Studio: no Firestore, no Angular, so it is unit-testable.
+   Firestore Timestamps are converted to Date by the caller (see toDate in the service). */
+
+export type ViewRole = 'ah' | 'mentor' | 'cw' | null;
+
+/* users_roles flag keys per view. The user can switch between every view they hold a role for
+   ("View as"); the default is the highest in VIEW_ORDER. A mentor with no product (users_roles.productowner,
+   ticked in Profile list) still gets the Mentor view, which then says no product is assigned; it is only
+   skipped as the default when they have another view to land on. */
+export const AH_KEYS = ['admin', 'ah', 'ahmember', 'developer', 'tester', 'scheduler'];
+export const MENTOR_KEYS = ['mentor'];
+export const CW_KEYS = ['eis', 'journeycoach', 'changeagent'];
+export const VIEW_ORDER: Exclude<ViewRole, null>[] = ['mentor', 'ah', 'cw'];
+export const VIEW_LABEL: Record<Exclude<ViewRole, null>, string> = { mentor: 'Mentor Specialist', ah: 'A&H Team', cw: 'CW Specialist' };
+
+export const ownsProduct = (roles: Record<string, any> | null | undefined) =>
+  !!roles && Array.isArray(roles['productowner']) && roles['productowner'].length > 0;
+
+export function availableViews(roles: Record<string, any> | null | undefined): Exclude<ViewRole, null>[] {
+  if (!roles) return [];
+  const on = (keys: string[]) => keys.some(k => roles[k] === true);
+  const has = { mentor: on(MENTOR_KEYS), ah: on(AH_KEYS), cw: on(CW_KEYS) };
+  return VIEW_ORDER.filter(v => has[v]);
+}
+
+/* The view the screen opens on. */
+export function resolveViewRole(roles: Record<string, any> | null | undefined): ViewRole {
+  const views = availableViews(roles);
+  const usable = views.filter(v => v !== 'mentor' || ownsProduct(roles));
+  return usable[0] ?? views[0] ?? null;
+}
+
+export interface Interval { start: Date; end: Date; }
+
+export const minutesBetween = (a: Date, b: Date) => Math.max(0, (b.getTime() - a.getTime()) / 60000);
+
+/* Total minutes covered by a set of intervals, overlapping time counted once. */
+export function unionMinutes(list: Interval[]): number {
+  const sorted = list.filter(i => i.end > i.start).sort((a, b) => a.start.getTime() - b.start.getTime());
+  let total = 0, curS: Date | null = null, curE: Date | null = null;
+  for (const i of sorted) {
+    if (!curE || i.start > curE) {
+      if (curS && curE) total += minutesBetween(curS, curE);
+      curS = i.start; curE = i.end;
+    } else if (i.end > curE) {
+      curE = i.end;
+    }
+  }
+  if (curS && curE) total += minutesBetween(curS, curE);
+  return total;
+}
+
+/* An availability window as the screen uses it: the doc's own time plus its per-type slot arrays. */
+export interface Slot { typeId: string; start: Date; end: Date; booked: boolean; available: boolean; }
+export interface AvailWindow { id: string; profileId: string; start: Date; end: Date; typeIds: string[]; slots: Slot[]; fixed: boolean; }
+
+export const windowMinutes = (w: AvailWindow) => minutesBetween(w.start, w.end);
+
+/* Booked time inside a window. computeSlot cuts overlapping slots per type, so union them. */
+export const bookedMinutes = (w: AvailWindow) => unionMinutes(w.slots.filter(s => s.booked));
+
+/* A slot someone can still book: free and not started yet. */
+const bookable = (s: Slot, now: Date) => s.available && !s.booked && s.start > now;
+
+export type WindowState = 'open' | 'full' | 'ended' | 'unused';
+export function windowState(w: AvailWindow, now: Date): WindowState {
+  if (w.slots.some(s => bookable(s, now))) return 'open';
+  if (w.end > now) return 'full';
+  return w.slots.some(s => s.booked) ? 'ended' : 'unused';
+}
+
+/* What a window reads as. An open window that already holds a booking is "Partly booked": computeSlot
+   cuts several start times per window, so one can be booked while another is still free. */
+export function windowLabel(w: AvailWindow, now: Date): string {
+  const st = windowState(w, now);
+  if (st === 'open') return w.slots.some(s => s.booked) ? 'Partly booked' : 'Open for booking';
+  return st === 'full' ? 'Fully booked' : st === 'ended' ? 'Ended' : 'Unused';
+}
+
+/* A window's status from its bookings (operator rules, 2026-09-29), first match wins:
+   1. a live booking whose time has passed and is not marked       → Completion pending
+   2. window over, every live booking marked completed             → Completed
+   3. window over, no live booking: some were cancelled → Cancelled, none at all → Unused
+   4. window not over: bookable time left → Partly booked (has bookings) / Open for booking;
+      nothing bookable left → Fully booked (has bookings) / Unused
+   "Live" = not cancelled. */
+export const WINDOW_STATUSES = [
+  'Open for booking', 'Partly booked', 'Fully booked', 'Completion pending', 'Completed', 'Cancelled', 'Unused',
+] as const;
+export type WindowStatus = typeof WINDOW_STATUSES[number];
+
+export function windowStatus(w: AvailWindow, sessions: Appt[], now: Date): WindowStatus {
+  const live = sessions.filter(a => !a.cancelled);
+  if (live.some(a => a.end <= now && !a.attended)) return 'Completion pending';
+  if (w.end <= now) {
+    if (live.length) return 'Completed';
+    return sessions.length ? 'Cancelled' : 'Unused';
+  }
+  if (openMinutes(w, now) > 0) return live.length ? 'Partly booked' : 'Open for booking';
+  return live.length ? 'Fully booked' : 'Unused';
+}
+
+/* Open time = the time still bookable: free, future slots, overlap across types counted once.
+   So open time > 0 exactly when the window is 'open', and leftover minutes too short for any
+   session never count as open. */
+export const openMinutes = (w: AvailWindow, now: Date) => unionMinutes(w.slots.filter(s => bookable(s, now)));
+
+/* A specialist's status for a set of windows (e.g. this week) and their sessions. */
+export type AvailStatus = 'In session' | 'Available' | 'Fully booked' | 'No availability';
+export function availStatus(windows: AvailWindow[], appts: Appt[], now: Date): AvailStatus {
+  if (appts.some(a => !a.cancelled && a.start <= now && a.end > now)) return 'In session';
+  if (windows.some(w => openMinutes(w, now) > 0)) return 'Available';
+  return windows.some(w => w.end > now) ? 'Fully booked' : 'No availability';
+}
+
+/* ---------- Appointments ---------- */
+/* MarkAppointmentStatusComponent stores a no-show as cancelled with this reason. The screen never shows
+   "no-show": it is a cancellation like any other, and this reason text is hidden. */
+export const NO_SHOW_REASON = "Client didn't show up";
+
+export interface Appt {
+  id: string; start: Date; end: Date; attended: boolean; cancelled: boolean;
+  cancelledReason: string | null; hostIds: string[]; participantId: string | null;
+  typeId: string | null; productId: string | null; zoomUrl: string | null;
+}
+
+export type ApptStatus = 'Completed' | 'Cancelled' | 'In session' | 'Pending' | 'Booked';
+export function apptStatus(a: Appt, now: Date): ApptStatus {
+  if (a.attended && !a.cancelled) return 'Completed';
+  if (a.cancelled) return 'Cancelled';
+  if (a.start <= now && a.end > now) return 'In session';
+  if (a.end <= now) return 'Pending';
+  return 'Booked';
+}
+
+/* ---------- Hours summary ---------- */
+export interface Hours {
+  availMin: number; bookedMin: number; deliveredMin: number; unutilisedMin: number;
+  cancelledMin: number; pct: number; completed: number;
+}
+
+/* Available = window hours · Booked = booked slot time · Delivered = attended & not cancelled ·
+   Unutilised = Available − Delivered · Utilisation = Delivered ÷ Available. */
+export function hoursSummary(windows: AvailWindow[], appts: Appt[]): Hours {
+  const availMin = windows.reduce((a, w) => a + windowMinutes(w), 0);
+  const bookedMin = windows.reduce((a, w) => a + bookedMinutes(w), 0);
+  let deliveredMin = 0, cancelledMin = 0, completed = 0;
+  for (const x of appts) {
+    const m = minutesBetween(x.start, x.end);
+    if (x.attended && !x.cancelled) { deliveredMin += m; completed++; }
+    else if (x.cancelled) cancelledMin += m;
+  }
+  return {
+    availMin, bookedMin, deliveredMin, cancelledMin, completed,
+    unutilisedMin: Math.max(0, availMin - deliveredMin),
+    pct: availMin ? (deliveredMin / availMin) * 100 : 0,
+  };
+}
+
+export function fmtHours(min: number): string {
+  const v = Math.round(min / 6) / 10;
+  return v + (v === 1 ? ' hr' : ' hrs');
+}
+
+/* ---------- Slot preview: mirrors computeSlot (starlabs-cloud-function appointment.js) ----------
+   Types are taken longest first; a start is offered every 30 minutes and kept only if the slot
+   fits before the window ends. A fixed (static) window gets exactly one slot per type. */
+export interface TypeDur { id: string; duration: number; }
+export function previewSlots(start: Date, end: Date, types: TypeDur[], fixed = false): Record<string, Interval[]> {
+  const out: Record<string, Interval[]> = {};
+  const sorted = [...types].sort((a, b) => b.duration - a.duration);
+  for (const t of sorted) {
+    if (fixed) { out[t.id] = end > start ? [{ start: new Date(start), end: new Date(end) }] : []; continue; }
+    const list: Interval[] = [];
+    let s = new Date(start);
+    while (end > s) {
+      const e = new Date(s.getTime() + t.duration * 60000);
+      if (end >= e) list.push({ start: new Date(s), end: e });
+      s = new Date(s.getTime() + 30 * 60000);
+    }
+    out[t.id] = list;
+  }
+  return out;
+}
+
+/* ---------- Period ---------- */
+export type PeriodMode = 'week' | 'month';
+export interface Period { mode: PeriodMode; from: Date; to: Date; }
+
+export function mondayOf(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+/* from is inclusive, to is exclusive. */
+export function periodOf(mode: PeriodMode, anchor: Date): Period {
+  if (mode === 'week') {
+    const from = mondayOf(anchor);
+    const to = new Date(from); to.setDate(to.getDate() + 7);
+    return { mode, from, to };
+  }
+  const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1);
+  return { mode, from, to };
+}
+
+export function shiftPeriod(p: Period, dir: 1 | -1): Period {
+  const a = new Date(p.from);
+  if (p.mode === 'week') a.setDate(a.getDate() + 7 * dir); else a.setMonth(a.getMonth() + dir);
+  return periodOf(p.mode, a);
+}
+
+export const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/* Dates from a to b inclusive, at local midnight. */
+export function daysBetween(a: Date, b: Date): Date[] {
+  const out: Date[] = [];
+  const d = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const last = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  while (d <= last && out.length < 62) { out.push(new Date(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+
+/* True when [s,e) overlaps any interval (same rule as add-appointment-availability's validateAvailabilityExists). */
+export const overlapsAny = (s: Date, e: Date, list: Interval[]) =>
+  list.some(i => (s >= i.start && s < i.end) || (e > i.start && e <= i.end) || (i.start >= s && i.start < e));

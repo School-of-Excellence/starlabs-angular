@@ -165,6 +165,7 @@ export const routes: Routes = [
   {path: 'approveofftime', loadComponent: () => import('./Offtime/approve-offtime/approve-offtime.component').then(m => m.ApproveOfftimeComponent), canActivate:[authGuard]},
   {path: 'capacityutilization', loadComponent: () => import('./Scheduling/capacity-utilization/capacity-utilization.component').then(m => m.CapacityUtilizationComponent), canActivate:[authGuard]},
   {path: 'appointmentstudio', loadComponent: () => import('./Scheduling/appointment-studio/appointment-studio.component').then(m => m.AppointmentStudioComponent), canActivate:[authGuard]},
+  {path: 'specialistappointmentstudio', loadComponent: () => import('./Scheduling/specialist-appointment-studio/specialist-appointment-studio.component').then(m => m.SpecialistAppointmentStudioComponent), canActivate:[authGuard]},
   {path: 'openappointmentzoom/:id', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-zoom-view.component').then(m => m.AppointmentZoomViewComponent), canActivate:[authGuard]},
   {path: 'appointment-status-update', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-status-update/appointment-status-update.component').then(m => m.AppointmentStatusUpdateComponent), canActivate:[authGuard]},
 

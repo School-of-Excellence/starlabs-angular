@@ -1,0 +1,88 @@
+@if (loading) {
+  <app-sas-loader msg="Loading availability and sessions…" />
+} @else if (!rows.length) {
+  <div class="sas-empty" data-testid="stt-empty"><b>No team members</b>No EIS is mapped to the appointment types in these products' delivery sequences.</div>
+} @else {
+  <div class="sas-tw"><table class="sas-tbl" data-testid="stt-table">
+    <thead><tr>
+      <th>EIS</th><th>Status</th><th class="num">Available</th><th class="num">Booked</th><th class="num">Delivered</th>
+      <th class="num">Utilisation</th><th class="num">Participants</th><th class="num">Completed</th><th></th>
+    </tr></thead>
+    <tbody>
+      @for (r of shown; track r.id) {
+        <tr class="is-click" data-testid="stt-row" tabindex="0" [attr.aria-expanded]="open === r.id" (click)="toggle(r.id)" (keydown.enter)="toggle(r.id)">
+          <td><div class="sas-who"><span class="sas-av" aria-hidden="true">{{ initials(r.name) }}</span><b>{{ r.name }}</b></div></td>
+          <td><span class="sas-pill" [class]="'sas-pill ' + statusClass(r.status)">{{ r.status }}</span></td>
+          <td class="num">{{ fmtHours(r.hours.availMin) }}</td>
+          <td class="num">{{ fmtHours(r.hours.bookedMin) }}</td>
+          <td class="num">{{ fmtHours(r.hours.deliveredMin) }}</td>
+          <td class="num"><div class="sas-util" [attr.title]="fmtHours(r.hours.deliveredMin) + ' delivered of ' + fmtHours(r.hours.availMin) + ' available'"><span class="sas-bar"><i [style.width.%]="r.hours.pct > 100 ? 100 : r.hours.pct"></i></span><b>{{ r.hours.pct | number: '1.0-0' }}%</b></div></td>
+          <td class="num">{{ r.participants.length }}</td>
+          <td class="num">{{ r.hours.completed }}</td>
+          <td class="r"><mat-icon>{{ open === r.id ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+        </tr>
+        @if (open === r.id) {
+          <tr><td colspan="9" class="sas-sub" data-testid="stt-detail">
+            <div class="sas-sub-bar">
+              <b class="sas-sub-h">Availability given · {{ r.avail.length }} window{{ r.avail.length === 1 ? '' : 's' }} · {{ fmtHours(r.hours.availMin) }} · {{ fmtHours(r.hours.deliveredMin) }} delivered ({{ r.hours.pct | number: '1.0-0' }}%)</b>
+              @if (r.avail.length) {
+                <select class="sas-sel" data-testid="stt-status-filter" aria-label="Filter availability by status" [(ngModel)]="availFilter" (click)="$event.stopPropagation()">
+                  <option value="">All statuses ({{ r.avail.length }})</option>
+                  @for (st of WINDOW_STATUSES; track st) {
+                    <option [value]="st" [disabled]="!statusCount(r, st)">{{ st }} ({{ statusCount(r, st) }})</option>
+                  }
+                </select>
+              }
+            </div>
+            @if (!r.avail.length && !r.outside.length) {
+              <div class="sas-empty" data-testid="stt-no-avail"><b>No availability in this period</b></div>
+            } @else {
+              <table class="sas-tbl" data-testid="stt-avail">
+                <thead><tr><th>Date &amp; time</th><th>Delivery types</th><th>Status</th><th>Booked: time · appointment type · participant</th></tr></thead>
+                <tbody>
+                  @for (a of filteredAvail(r); track a.w.id) {
+                    <tr data-testid="stt-avail-row">
+                      <td><b class="nw">{{ a.w.start | date: 'EEE d MMM' }}</b><small>{{ a.w.start | date: 'shortTime' }} – {{ a.w.end | date: 'shortTime' }}{{ a.w.fixed ? ' · static' : '' }}</small></td>
+                      <td>{{ typeNames(a.w) }}</td>
+                      <td><span class="sas-pill" [class]="'sas-pill ' + STATUS_PILL[a.status]" data-testid="stt-avail-status">{{ a.status }}</span>
+                        <small>{{ fmtHours((a.w.end.getTime() - a.w.start.getTime()) / 60000) }} given{{ a.openMin > 0 ? ' · ' + fmtHours(a.openMin) + ' still open' : '' }}</small></td>
+                      <td>
+                        @if (!a.sessions.length) { <span class="sas-muted">Nothing booked</span> }
+                        @for (x of a.sessions; track x.appt.id) {
+                          <div class="sas-bk" data-testid="stt-booking">
+                            <span class="nw">{{ x.appt.start | date: 'shortTime' }} – {{ x.appt.end | date: 'shortTime' }}</span>
+                            <b>{{ typeName(x) }}</b> · {{ svc.name(x.appt.participantId) }}
+                            <span class="sas-pill" [class]="'sas-pill ' + apptPill(x)">{{ apptLabel(x) }}</span>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                  @if (availFilter && !filteredAvail(r).length) {
+                    <tr><td colspan="4"><div class="sas-empty"><b>No windows with this status</b></div></td></tr>
+                  }
+                  @if (r.outside.length && !availFilter) {
+                    <tr data-testid="stt-outside-row">
+                      <td><b>Outside availability</b><small>Booked without a window</small></td>
+                      <td></td><td></td>
+                      <td>
+                        @for (x of r.outside; track x.appt.id) {
+                          <div class="sas-bk" data-testid="stt-booking">
+                            <span class="nw">{{ x.appt.start | date: 'd MMM, shortTime' }} – {{ x.appt.end | date: 'shortTime' }}</span>
+                            <b>{{ typeName(x) }}</b> · {{ svc.name(x.appt.participantId) }}
+                            <span class="sas-pill" [class]="'sas-pill ' + apptPill(x)">{{ apptLabel(x) }}</span>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </td></tr>
+        }
+      }
+    </tbody>
+  </table></div>
+  @if (!shown.length) { <div class="sas-empty" data-testid="stt-no-match"><b>No one named "{{ q }}"</b>in this team or their participants.</div> }
+}

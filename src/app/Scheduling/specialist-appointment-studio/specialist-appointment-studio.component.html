@@ -1,0 +1,45 @@
+<div class="sas-root" [class.is-single]="!showSide" data-testid="sas-root">
+  @if (showSide) {
+    <nav class="sas-side" aria-label="Appointments" data-testid="sas-nav">
+      @if (views.length > 1) {
+        <label class="sas-viewas">
+          <span>View as</span>
+          <select class="sas-sel" data-testid="sas-view-as" [ngModel]="viewRole" (ngModelChange)="setView($event)">
+            @for (v of views; track v) { <option [ngValue]="v">{{ VIEW_LABEL[v] }}</option> }
+          </select>
+        </label>
+      }
+      @for (n of nav; track n.tab) {
+        <button class="sas-nav-item" data-testid="sas-nav-item" [class.is-on]="tab === n.tab" [attr.aria-current]="tab === n.tab ? 'page' : null" (click)="go(n.tab)">
+          <mat-icon>{{ n.icon }}</mat-icon><span>{{ n.label }}</span>
+        </button>
+      }
+    </nav>
+  }
+  <main class="sas-main"><div class="sas-wrap">
+    @if (loading) {
+      <app-sas-loader msg="Loading appointments…" />
+    } @else if (!viewRole) {
+      <section class="sas-card"><div class="sas-empty" data-testid="sas-no-role"><b>No appointment role</b>This screen is for CW specialists, mentors and the A&amp;H team.</div></section>
+    } @else if (noProduct) {
+      <div class="sas-phead"><div><h1 data-testid="sas-mentor-title">Mentor</h1></div></div>
+      <section class="sas-card"><div class="sas-empty" data-testid="sas-no-product"><b>No product owner is assigned to you</b>Ask an admin to tick your product under Product Owner in the Profile list.</div></section>
+    } @else {
+      <!-- keyed on the view, so switching View as re-creates the tabs with the new view's data -->
+      @for (v of [viewRole]; track v) {
+        @switch (tab) {
+          @case ('home') { <app-sas-home mode="self" /> }
+          @case ('team') { <app-sas-team /> }
+          @case ('overview') { <app-sas-home mode="all" /> }
+          @case ('mentors') { <app-sas-mentors /> }
+          @case ('util') { <app-sas-utilisation /> }
+          @case ('book') {
+            <div class="sas-phead"><div><h1 data-testid="sas-book-title">Book Session</h1><p>Book a participant into an open slot.</p></div></div>
+            <section class="sas-card" data-testid="sas-book"><app-book-appointment /></section>
+          }
+          @case ('settings') { <app-sas-settings /> }
+        }
+      }
+    }
+  </div></main>
+</div>
