@@ -2055,6 +2055,9 @@ export class DeliveryDashboardCloneComponent {
                         }
                     }
                     this.allMatchedProductsRaw = Array.from(productMap.values());
+                    await this.loadJourneyProductMapFor(
+                        this.allMatchedProductsRaw.map((i: any) => i?.['profileid'])
+                    );
                     await this.applyDateFilter();
                     if (this.selectedProductLabel) {
                         this.selectProduct(this.selectedProductLabel);
@@ -4509,6 +4512,12 @@ export class DeliveryDashboardCloneComponent {
         return daysDifference;
     }
 
+    // A wait of null/undefined means "we have no onboarding date", which is NOT
+    // the same as "waited zero days". The table shows an em dash for the former.
+    isKnownWait(value: any): boolean {
+        return value !== null && value !== undefined && !isNaN(Number(value));
+    }
+
     getWaitingPeriod(participant: any): number {
         if (participant.waitingperiod !== undefined) {
             return participant.waitingperiod;
@@ -4974,7 +4983,7 @@ export class DeliveryDashboardCloneComponent {
         }
 
         if (header.key === 'waitingperiod') {
-            return `${value || 0} DAYS`;
+            return (value === null || value === undefined) ? '\u2014' : `${value} DAYS`;
         }
 
         if (header.key === 'generalnotes') {
@@ -6572,11 +6581,79 @@ export class DeliveryDashboardCloneComponent {
     private readonly IDLE_DAYS = 7;
     private readonly STUCK_DAYS = 15;
 
-    private daysSinceTs(ts: any): number {
-        if (!ts) return 0;
-        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
-        if (!d || isNaN(d.getTime())) return 0;
+    // Returns null (not 0) when there is no usable timestamp, so the table can show
+    // "-" instead of a fake "0 DAYS" that reads as "onboarded today".
+    private daysSinceTs(ts: any): number | null {
+        const d = this.toDateOrNull(ts);
+        if (!d) return null;
         return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
+    }
+
+    private toDateOrNull(ts: any): Date | null {
+        if (!ts) return null;
+        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+        return d && !isNaN(d.getTime()) ? d : null;
+    }
+
+    private tsMillis(ts: any): number {
+        const d = this.toDateOrNull(ts);
+        return d ? d.getTime() : Number.POSITIVE_INFINITY;
+    }
+
+    // onboardedtime lives on participantjourneyproduct, NOT on 'participant metadata'.
+    // Roster-scoped + cached: only the profiles actually on screen are fetched, in
+    // chunks of 30, so this never becomes an unbounded read of a PII collection.
+    private journeyProductFetched = new Set<string>();
+
+    private async loadJourneyProductMapFor(profileIds: string[]): Promise<void> {
+        const missing = Array.from(new Set(profileIds))
+            .filter((pid) => !!pid && !this.journeyProductFetched.has(pid));
+        if (missing.length === 0) return;
+
+        const chunks: string[][] = [];
+        for (let i = 0; i < missing.length; i += 30) chunks.push(missing.slice(i, i + 30));
+
+        const snaps = await Promise.all(
+            chunks.map((chunk) =>
+                runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'participantjourneyproduct'),
+                        where('profileid', 'in', chunk)
+                    ))
+                )
+            )
+        );
+
+        for (const snap of snaps) {
+            for (const d of snap.docs) {
+                const data: any = d.data();
+                const pid = data?.['profileid'];
+                if (!pid) continue;
+                const kept = this.journeyProductMap[pid];
+                // Several journey products per profile: keep the earliest onboarding,
+                // which is the one that has been waiting longest.
+                if (!kept || this.tsMillis(data['onboardedtime']) < this.tsMillis(kept['onboardedtime'])) {
+                    this.journeyProductMap[pid] = data;
+                }
+            }
+        }
+        for (const pid of missing) this.journeyProductFetched.add(pid);
+    }
+
+    // Awaiting / Ready rows are participant-level decisions (the row carries no product
+    // column and the bulk actions act on a person), so one profile must yield one row.
+    // Keep the earliest-onboarded row: the longest wait is the one worth surfacing.
+    private dedupeByParticipant(rows: any[]): any[] {
+        const byProfile = new Map<string, any>();
+        for (const row of rows) {
+            const pid = row?.profileid;
+            if (!pid) continue;
+            const kept = byProfile.get(pid);
+            if (!kept || this.tsMillis(row['onboardedtime']) < this.tsMillis(kept['onboardedtime'])) {
+                byProfile.set(pid, row);
+            }
+        }
+        return Array.from(byProfile.values());
     }
 
     populateActionableCohorts(selectedLabels: string[] = []): void {
@@ -6618,7 +6695,8 @@ export class DeliveryDashboardCloneComponent {
             const journeyName = this.mapjourneyname?.[journeyId] || 'N/A';
 
             const sd = item?.statusdate || {};
-            const onboarded = meta['onboardedtime'] || sd['initiated'] || null;
+            const journeyProduct = this.journeyProductMap?.[profileId] || {};
+            const onboarded = journeyProduct['onboardedtime'] || meta['onboardedtime'] || sd['initiated'] || null;
             const initiated = sd['initiated'] || null;
             const lastActivity = sd['ongoing'] || sd['started'] || sd['initiated'] || onboarded;
             const lastPayment = meta['lastpaymentdate'] || meta['lastpayment'] || null;
@@ -6686,10 +6764,13 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
-        this.originalData['awaitingInitiation'].data = awaiting;
-        this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['readyForInitiation'].data = clearedPayment;
-        this.originalData['readyForInitiation'].count = clearedPayment.length;
+        const awaitingUnique = this.dedupeByParticipant(awaiting);
+        const clearedUnique = this.dedupeByParticipant(clearedPayment);
+
+        this.originalData['awaitingInitiation'].data = awaitingUnique;
+        this.originalData['awaitingInitiation'].count = awaitingUnique.length;
+        this.originalData['readyForInitiation'].data = clearedUnique;
+        this.originalData['readyForInitiation'].count = clearedUnique.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;

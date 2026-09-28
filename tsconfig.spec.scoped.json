@@ -1,0 +1,15 @@
+/* Scoped test tsconfig: compiles ONE spec and only what it imports.
+   The repo-wide spec suite is pre-broken (unrelated TS2307/TS2724 in
+   content-analytics and assigncategorydialog). This lets a contract spec run
+   in isolation without touching those files. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec-scoped",
+    "types": ["jasmine"]
+  },
+  "include": [
+    "src/app/Journey Onboarding/delivery-dashboard-clone/delivery-dashboard-days-waiting.spec.ts",
+    "src/**/*.d.ts"
+  ]
+}

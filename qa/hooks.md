@@ -27,3 +27,16 @@ Literal `data-testid` strings only — no `${interpolation}` (gate section 1.1 /
 | jcd-ph-needsattn-all | Outreach·top "All N" link | je-dashboard-jc-fixes |
 | jcd-name-link | drill-table participant name link | je-dashboard-jc-fixes |
 | event-status-filter | Participants filter panel · Event confirmation multi-select | jc-health-event-filter |
+
+## delivery-dashboard-clone (Delivery Dashboard) — Participant Management & Actions
+| testid | element | contract |
+|---|---|---|
+| pm-tab-awaiting | Awaiting Initiation tab label | delivery-dashboard-days-waiting |
+| pm-tab-awaiting-count | Awaiting Initiation count badge | delivery-dashboard-days-waiting |
+| pm-tab-idle | Initiated – Not Consuming tab label | delivery-dashboard-days-waiting |
+| pm-tab-idle-count | Initiated – Not Consuming count badge | delivery-dashboard-days-waiting |
+| pm-tab-stuck | Stuck Cases tab label | delivery-dashboard-days-waiting |
+| pm-tab-stuck-count | Stuck Cases count badge | delivery-dashboard-days-waiting |
+| pm-row | participant row in the PM table | delivery-dashboard-days-waiting |
+| pm-days-waiting | DAYS WAITING badge in a row | delivery-dashboard-days-waiting |
+| pm-row-info | "Showing X to Y of N entries" footer | delivery-dashboard-days-waiting |

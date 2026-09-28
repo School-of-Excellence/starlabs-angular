@@ -1739,8 +1739,8 @@
             <mat-tab-group class="pm-tab-group" (selectedTabChange)="onTabChange($event)" #tabGroup
               [(selectedIndex)]="currentTabIndex">
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Awaiting Initiation</span><span
-                    class="pm-tab-count">{{
+                <ng-template mat-tab-label><span class="pm-tab-text" data-testid="pm-tab-awaiting">Awaiting Initiation</span><span
+                    class="pm-tab-count" data-testid="pm-tab-awaiting-count">{{
                     originalData['awaitingInitiation'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
                   <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
@@ -1765,8 +1765,8 @@
                 </div>
               </mat-tab>
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Initiated – Not Consuming</span><span
-                    class="pm-tab-count">{{ originalData['currentJourneyInitiated'].count }}</span></ng-template>
+                <ng-template mat-tab-label><span class="pm-tab-text" data-testid="pm-tab-idle">Initiated – Not Consuming</span><span
+                    class="pm-tab-count" data-testid="pm-tab-idle-count">{{ originalData['currentJourneyInitiated'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
                   <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
                       style="margin-right:8px">
@@ -1790,7 +1790,7 @@
                 </div>
               </mat-tab>
               <mat-tab>
-                <ng-template mat-tab-label><span class="pm-tab-text">Stuck Cases</span><span class="pm-tab-count">{{
+                <ng-template mat-tab-label><span class="pm-tab-text" data-testid="pm-tab-stuck">Stuck Cases</span><span class="pm-tab-count" data-testid="pm-tab-stuck-count">{{
                     originalData['stuckCases'].count }}</span></ng-template>
                 <div *ngIf="isFilterActive()" class="pm-filter-indicator">
                   <span class="pm-filter-text"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
@@ -1818,7 +1818,7 @@
 
             <ng-template #pmTableBody>
               <tbody>
-                <tr *ngFor="let participant of paginatedData" class="pm-table-row"
+                <tr *ngFor="let participant of paginatedData" class="pm-table-row" data-testid="pm-row"
                   [ngClass]="{'urgent-row': getWaitingPeriod(participant) >= 14, 'high-row': getWaitingPeriod(participant) >= 10 && getWaitingPeriod(participant) < 14}">
                   <td *ngFor="let header of getCurrentTabHeaders()">
                     <input *ngIf="header.key === 'checkbox'" type="checkbox" class="pm-table-checkbox">
@@ -1835,8 +1835,9 @@
                       *ngIf="header.type === 'text' && header.key !== 'checkbox' && header.key !== 'priority' && header.key !== 'addnotes' && header.key !== 'waitingperiod'">{{
                       participant[header.key] || 'N/A' }}</span>
                     <span *ngIf="header.key === 'waitingperiod'" class="pm-days-badge"
-                      [ngClass]="{'days-red': participant[header.key] >= 14, 'days-amber': participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': participant[header.key] < 7}">{{
-                      participant[header.key] }} DAYS</span>
+                      data-testid="pm-days-waiting"
+                      [ngClass]="{'days-red': isKnownWait(participant[header.key]) && participant[header.key] >= 14, 'days-amber': isKnownWait(participant[header.key]) && participant[header.key] >= 7 && participant[header.key] < 14, 'days-green': isKnownWait(participant[header.key]) && participant[header.key] < 7, 'days-unknown': !isKnownWait(participant[header.key])}">{{
+                      isKnownWait(participant[header.key]) ? participant[header.key] + ' DAYS' : '\u2014' }}</span>
                     <span *ngIf="header.key === 'addnotes'">
                       <div (click)="addNotes(participant)"><mat-icon class="pm-edit-icon">edit_note</mat-icon></div>
                     </span>
@@ -1868,7 +1869,7 @@
 
           <!-- Pagination Footer -->
           <div class="pm-table-footer">
-            <div class="pm-row-info">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage *
+            <div class="pm-row-info" data-testid="pm-row-info">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage *
               itemsPerPage, getCurrentTabData().length) }} of {{ getCurrentTabData().length }} entries</div>
             <div class="pm-pagination">
               <button class="pm-page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page"><svg
