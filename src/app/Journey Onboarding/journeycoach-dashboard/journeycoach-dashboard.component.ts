@@ -847,7 +847,7 @@ export class JourneycoachDashboardComponent {
   getGrossNotAssuredCount() { return engine.countNotAssured(this.originalData['grosssale']?.data || []); }
 
   // Participant Health (Option B): KPI strip from real sources; full coach-set-health board lives at /journey-coach-health
-  goToHealthBoard() { this.router.navigate(['/journey-coach-health']); }
+  goToHealthBoard() { const url = this.router.serializeUrl(this.router.createUrlTree(['/journey-coach-health'])); window.open(url, '_blank'); }
   getRenewingSoon() { return (this.originalData['currentMonth']?.count || 0) + (this.originalData['nextMonth']?.count || 0); }
 
   /** width % of a coach-set-health segment relative to the assessed+unassessed total */
@@ -4621,7 +4621,6 @@ export class JourneycoachDashboardComponent {
     this.filterStartDate = start;
     this.updateDateRangeHint();
     this.loadInterimData();
-    this.getAtcAlpha();
   }
 
   onDateRangeChange(): void {
@@ -4633,7 +4632,6 @@ export class JourneycoachDashboardComponent {
     this.numberOfMonths = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.5)));
     this.updateDateRangeHint();
     this.loadInterimData();
-    this.getAtcAlpha();
   }
 
   stepMonths(delta: number): void {
@@ -5153,7 +5151,6 @@ export class JourneycoachDashboardComponent {
 
   onQueueSelectionChange(): void {
     if (this.selectedQueueIds.length === 0) return;
-    this.getAtcAlpha();
   }
 
   getOverallTotal(): number {
