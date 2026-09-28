@@ -6943,7 +6943,6 @@ export class DeliveryDashboardCloneComponent {
         const awaiting: any[] = [];
         const idle: any[] = [];
         const stuck: any[] = [];
-        const clearedPayment: any[] = [];
 
         for (const item of this.allMatchedProductsRaw || []) {
 
@@ -6983,20 +6982,6 @@ export class DeliveryDashboardCloneComponent {
             const daysSinceOnboarded = this.daysSinceTs(onboarded);
             const daysSinceInitiated = this.daysSinceTs(initiated);
             const daysSinceActivity = this.daysSinceTs(lastActivity);
-
-            // payment confirmed — not yet initiated
-            if (!status && isClearedPayment) {
-                clearedPayment.push({
-                    profileid: profileId,
-                    journey: journeyName,
-                    onboardedtime: onboarded,
-                    waitingperiod: daysSinceOnboarded,
-                    financialdata,
-                    lastpaymentdate: lastPayment,
-                    bottleneck: 'Ready for Initiation',
-                });
-                continue;
-            }
 
             // payment not confirmed — not yet initiated
             if (!status && isEligible) {
@@ -7049,10 +7034,31 @@ export class DeliveryDashboardCloneComponent {
             }
         }
 
+        const yetToStart: any[] = [];
+        for (const cardId of this.visibleCardIds) {
+            yetToStart.push(...this.getCardFunnel(cardId).awaiting);   
+        }
+
+        const readyToStart = yetToStart.map(item => {
+            const meta = this.mapMetaData[item.profileid] || {};
+            const onboarded = item.productonboardingscheduled || meta['onboardedtime'] || null;
+            return {
+                profileid: item.profileid,
+                journey: this.mapjourneyname[item.journeyref?.id || meta['activejourney']] || 'N/A',
+                product: this.shortenProductName(this.mapProductName[item.productref?.id] || '') || 'N/A',
+                onboardedtime: onboarded,
+                waitingperiod: this.daysSinceTs(onboarded),
+                financialdata: 'Cleared',
+                lastpaymentdate: meta['lastpaymentdate'] || null,
+                bottleneck: 'Ready for Initiation',
+                participantproductid: item.docid || null,
+            };
+        });
+
         this.originalData['awaitingInitiation'].data = awaiting;
         this.originalData['awaitingInitiation'].count = awaiting.length;
-        this.originalData['readyForInitiation'].data = clearedPayment;
-        this.originalData['readyForInitiation'].count = clearedPayment.length;
+        this.originalData['readyForInitiation'].data = readyToStart;
+        this.originalData['readyForInitiation'].count = readyToStart.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
