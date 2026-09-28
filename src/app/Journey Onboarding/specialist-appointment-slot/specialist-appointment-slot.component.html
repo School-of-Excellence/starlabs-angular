@@ -21,7 +21,7 @@
           <div class="spec-field spec-field--activity">
             <span class="spec-field-label">Delivery Activity</span>
             <div class="spec-input-wrap">
-              <select class="spec-input spec-select" [(ngModel)]="selectedActivity" (ngModelChange)="onActivityChange($event)">
+              <select data-testid="jsas-sel-001" class="spec-input spec-select" [(ngModel)]="selectedActivity" (ngModelChange)="onActivityChange($event)">
                 <option [ngValue]="null" disabled>Select activity</option>
                 <option *ngFor="let activity of filteredSpecialistSequences" [ngValue]="activity.appointmentTypeId">
                   {{ activity.appointmentType }}
@@ -40,7 +40,7 @@
                 <rect x="3" y="4" width="18" height="18" rx="2" />
                 <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              <input type="date" class="spec-dr-input" [min]="minDate | date:'yyyy-MM-dd'"
+              <input data-testid="jsas-inp-002" type="date" class="spec-dr-input" [min]="minDate | date:'yyyy-MM-dd'"
                 [value]="specialistStartDate | date:'yyyy-MM-dd'" (change)="onSpecialistStartInput($event)">
               <span class="spec-dr-sep">→</span>
               <span class="spec-dr-end">{{ (specialistEndDate | date:'dd MMM yyyy') || '—' }}</span>
@@ -60,7 +60,7 @@
       <div class="spec-grid" *ngIf="specialistData.length > 0">
         <div class="spec-card" *ngFor="let specialist of specialistData" [class.is-open]="expandedSpecialist === specialist.eisId">
 
-          <button type="button" class="spec-card-head" (click)="openSpecialistSlots(specialist.eisId)">
+          <button data-testid="jsas-btn-003" type="button" class="spec-card-head" (click)="openSpecialistSlots(specialist.eisId)">
             <div class="spec-card-top">
               <div class="spec-avatar">{{ (specialist.name || '?').charAt(0) | uppercase }}</div>
               <div class="spec-card-id">
@@ -87,7 +87,7 @@
           <div class="spec-booking-panel" *ngIf="expandedSpecialist === specialist.eisId">
 
             <div class="bk-dates" *ngIf="availableDates?.length > 0; else noDatesTpl">
-              <button type="button" *ngFor="let date of availableDates" class="bk-date-card"
+              <button data-testid="jsas-btn-004" type="button" *ngFor="let date of availableDates" class="bk-date-card"
                 [class.active]="selectedDate === date.fullDate.toDateString()"
                 [class.is-empty]="!date.hasSlots" [disabled]="!date.hasSlots" (click)="onDateSelect(date)">
                 <div class="bk-date-day">{{ date.day }}</div>
@@ -105,7 +105,7 @@
             </div>
 
             <div class="seat-map" *ngIf="mergedSeatSlots?.length; else noSeatsTpl">
-              <button type="button" *ngFor="let slot of mergedSeatSlots" class="seat-chip"
+              <button data-testid="jsas-btn-005" type="button" *ngFor="let slot of mergedSeatSlots" class="seat-chip"
                 [class.seat-avail]="slot.available && !slot.booked" [class.seat-booked]="slot.booked"
                 [class.seat-unavail]="!slot.available && !slot.booked" [class.seat-merged]="slot._merged"
                 [class.seat-selected]="slotSelected && selectedSlotData === slot"
@@ -154,14 +154,14 @@
                 <svg class="pp-search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input type="text" class="pp-search-input" placeholder="Search eligible profiles…" [(ngModel)]="filteredProfile">
-                <button type="button" class="pp-clear" *ngIf="filteredProfile" (click)="filteredProfile = ''" aria-label="Clear search">×</button>
+                <input data-testid="jsas-inp-006" type="text" class="pp-search-input" placeholder="Search eligible profiles…" [(ngModel)]="filteredProfile">
+                <button data-testid="jsas-btn-007" type="button" class="pp-clear" *ngIf="filteredProfile" (click)="filteredProfile = ''" aria-label="Clear search">×</button>
               </div>
 
               <div class="pp-list">
                 <div class="pp-loading" *ngIf="eligibleProfilesLoading"><span class="pp-spinner"></span> Finding eligible profiles…</div>
                 <ng-container *ngIf="!eligibleProfilesLoading">
-                  <button type="button" class="pp-item" *ngFor="let user of returnClient()" [class.active]="selectedUser === user.id" (click)="selectProfileForBooking(user)">
+                  <button data-testid="jsas-btn-008" type="button" class="pp-item" *ngFor="let user of returnClient()" [class.active]="selectedUser === user.id" (click)="selectProfileForBooking(user)">
                     <span class="pp-avatar">{{ (user.name || '?').charAt(0) | uppercase }}</span>
                     <span class="pp-name">{{ user.name }}</span>
                     <svg class="pp-check" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">

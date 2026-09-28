@@ -4,8 +4,9 @@
     <h1 class="font">App Flow Breaks</h1>
     <div class="header-info">
       <span class="total-count">Total: {{ filteredBugs.length }} bugs</span>
-      <button *ngIf="getActiveFiltersCount() > 0" 
-              class="clear-all-btn" 
+      <button *ngIf="getActiveFiltersCount() > 0"
+              class="clear-all-btn"
+              data-testid="afb-clear-all-filters"
               (click)="clearAllFilters()">
         Clear All Filters ({{ getActiveFiltersCount() }})
       </button>
@@ -23,17 +24,19 @@
     <div class="filter-section">
       <h3 class="font">Filter by Type</h3>
       <div class="chips-container">
-        <div *ngFor="let type of availableTypes" 
+        <div *ngFor="let type of availableTypes"
              class="chip"
              [class.chip-selected]="isTypeSelected(type)"
+             [attr.data-testid]="'afb-type-' + type"
              (click)="toggleTypeFilter(type)">
           {{ type }}
           <span class="chip-count">
             ({{ (allBugs | filter:type:'type').length }})
           </span>
         </div>
-        <button *ngIf="selectedTypes.size > 0" 
-                class="clear-types-btn" 
+        <button *ngIf="selectedTypes.size > 0"
+                class="clear-types-btn"
+                data-testid="afb-clear-types"
                 (click)="clearTypeFilters()">
           Clear Types
         </button>
@@ -45,10 +48,11 @@
       <div class="search-inputs">
         <div class="search-field">
           <label for="profileName">Profile Name</label>
-          <input 
+          <input
             id="profileName"
-            type="text" 
-            [(ngModel)]="searchProfileName" 
+            type="text"
+            data-testid="afb-search-name"
+            [(ngModel)]="searchProfileName"
             (input)="onSearchChange()"
             placeholder="Search by profile name..."
             class="search-input">
@@ -56,10 +60,11 @@
         
         <div class="search-field">
           <label for="email">Email</label>
-          <input 
+          <input
             id="email"
-            type="text" 
-            [(ngModel)]="searchEmail" 
+            type="text"
+            data-testid="afb-search-email"
+            [(ngModel)]="searchEmail"
             (input)="onSearchChange()"
             placeholder="Search by email..."
             class="search-input">
@@ -67,10 +72,11 @@
         
         <div class="search-field">
           <label for="phone">Phone Number</label>
-          <input 
+          <input
             id="phone"
-            type="text" 
-            [(ngModel)]="searchPhone" 
+            type="text"
+            data-testid="afb-search-phone"
+            [(ngModel)]="searchPhone"
             (input)="onSearchChange()"
             placeholder="Search by phone..."
             class="search-input">
@@ -127,27 +133,30 @@
       </div>
 
       <div class="pagination-controls">
-        <button 
+        <button
           class="pagination-btn"
+          data-testid="afb-page-prev"
           [disabled]="currentPage === 0"
           (click)="previousPage()">
           Previous
         </button>
 
         <div class="page-numbers">
-          <button 
+          <button
             *ngIf="getPageNumbers()[0] > 0"
             class="page-number"
+            data-testid="afb-page-first"
             (click)="goToPage(0)">
             1
           </button>
           
           <span *ngIf="getPageNumbers()[0] > 1" class="page-ellipsis">...</span>
 
-          <button 
+          <button
             *ngFor="let page of getPageNumbers()"
             class="page-number"
             [class.active]="page === currentPage"
+            [attr.data-testid]="'afb-page-' + page"
             (click)="goToPage(page)">
             {{ page + 1 }}
           </button>
@@ -155,16 +164,18 @@
           <span *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 2" 
                 class="page-ellipsis">...</span>
 
-          <button 
+          <button
             *ngIf="getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1"
             class="page-number"
+            data-testid="afb-page-last"
             (click)="goToPage(totalPages - 1)">
             {{ totalPages }}
           </button>
         </div>
 
-        <button 
+        <button
           class="pagination-btn"
+          data-testid="afb-page-next"
           [disabled]="currentPage >= totalPages - 1"
           (click)="nextPage()">
           Next
@@ -173,7 +184,7 @@
 
       <div class="page-size-selector">
         <label>Items per page:</label>
-        <select [(ngModel)]="pageSize" (change)="currentPage = 0; applyFilters()">
+        <select [(ngModel)]="pageSize" data-testid="afb-page-size" (change)="currentPage = 0; applyFilters()">
           <option [value]="10">10</option>
           <option [value]="20">20</option>
           <option [value]="30">30</option>

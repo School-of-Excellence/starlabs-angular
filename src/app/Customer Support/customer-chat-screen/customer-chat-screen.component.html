@@ -27,7 +27,7 @@
                         <span>{{mapProfileData[assign]?.name}}</span>
                       </span>
                     </div>
-                    <div *ngIf="assignTo.length > 3" class="assigned-chip assign-toggle" (click)="toggleAssignShow()">
+                    <div *ngIf="assignTo.length > 3" class="assigned-chip assign-toggle" data-testid="ccs-assign-toggle" (click)="toggleAssignShow()">
                       <!-- {{showAllAssignTo ? 'Show Less' : `+ ${assignTo.length - 3} More`}} -->
                       <span *ngIf="showAllAssignTo">Show Less</span>
                       <span [matTooltip]="getAssignForToolTip()" *ngIf="!showAllAssignTo">{{`+ ${assignTo.length - 3}
@@ -72,16 +72,17 @@
                   <div class="form-label">Category</div>
                   <div class="header-action" [class.active]="ticketEditFormStatus.category">
                     <div *ngIf="ticketEditFormStatus.category" class="edit-options">
-                      <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                      <button class="action-btn add-btn" type="button" data-testid="ccs-category-save" (click)="updateTicketDetails(filterform.value)">
                         <mat-icon>add</mat-icon>
                       </button>
 
-                      <button class="action-btn clear-btn" type="button" (click)="cancelEdit('category')">
+                      <button class="action-btn clear-btn" type="button" data-testid="ccs-category-cancel" (click)="cancelEdit('category')">
                         <mat-icon>close</mat-icon>
                       </button>
                     </div>
 
                     <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.category"
+                      data-testid="ccs-category-edit"
                       (click)="showEdit('category')">
                       <mat-icon>edit</mat-icon>
                     </button>
@@ -96,7 +97,7 @@
                 <ng-container *ngIf="ticketEditFormStatus.category else  category ">
                   <mat-form-field class="formfield" appearance="outline" style="width:100%;margin-bottom:4px">
                     <mat-label>Category</mat-label>
-                    <mat-select formControlName="category">
+                    <mat-select formControlName="category" data-testid="ccs-category-select">
                       <mat-option *ngFor="let category of categorylist" [value]="category.category">
                         {{category.category}}
                       </mat-option>
@@ -111,16 +112,17 @@
                   <div class="form-label">People Involved</div>
                   <div class="header-action" [class.active]="ticketEditFormStatus.peopleinvolved">
                     <div *ngIf="ticketEditFormStatus.peopleinvolved" class="edit-options">
-                      <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                      <button class="action-btn add-btn" type="button" data-testid="ccs-people-save" (click)="updateTicketDetails(filterform.value)">
                         <mat-icon>add</mat-icon>
                       </button>
 
-                      <button class="action-btn clear-btn" type="button" (click)="cancelEdit('peopleinvolved')">
+                      <button class="action-btn clear-btn" type="button" data-testid="ccs-people-cancel" (click)="cancelEdit('peopleinvolved')">
                         <mat-icon>close</mat-icon>
                       </button>
                     </div>
 
                     <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.peopleinvolved"
+                      data-testid="ccs-people-edit"
                       (click)="showEdit('peopleinvolved')">
                       <mat-icon>edit</mat-icon>
                     </button>
@@ -136,7 +138,7 @@
 
                   <mat-form-field class="formfield" appearance="outline" style="width:100%">
                     <mat-label>People Involved</mat-label>
-                    <mat-select multiple formControlName="peopleinvolved">
+                    <mat-select multiple formControlName="peopleinvolved" data-testid="ccs-people-select">
                       <mat-option>
                         <ngx-mat-select-search [(ngModel)]="filteredMember" [ngModelOptions]="{standalone:true}"
                           placeholderLabel="Search" noEntriesFoundLabel="No matching records found"
@@ -158,12 +160,12 @@
               <div>
                 <div class="block-label">Status</div>
                 <div class="status-toggle">
-                  <button type="button" class="status-btn open-btn"
+                  <button type="button" class="status-btn open-btn" data-testid="ccs-status-open"
                     [class.active]="currentIssueData['status']?.status?.toLowerCase() == 'open'"
                     (click)="updateStatus('Open')">
                     <mat-icon>lock_open</mat-icon> Open
                   </button>
-                  <button type="button" class="status-btn closed-btn"
+                  <button type="button" class="status-btn closed-btn" data-testid="ccs-status-closed"
                     [class.active]="currentIssueData['status']?.status?.toLowerCase() == 'closed'"
                     (click)="updateStatus('Closed')">
                     <mat-icon>lock</mat-icon> Closed
@@ -174,7 +176,7 @@
               <!-- Flag -->
               <div>
                 <div class="block-label">Flag</div>
-                <button type="button"
+                <button type="button" data-testid="ccs-flag-toggle"
                   [class]="'flag-btn ' + ([null,undefined,false].includes(currentIssueData['flag']) ? 'unflagged' : 'flagged')"
                   (click)="updateFlag()">
                   <mat-icon>flag</mat-icon>
@@ -184,11 +186,11 @@
                 <div *ngIf="enableFlag" style="margin-top:8px">
                   <mat-form-field appearance="outline" style="width:100%">
                     <mat-label>Severity</mat-label>
-                    <mat-select [(ngModel)]="flagseverity" [ngModelOptions]="{standalone:true}">
+                    <mat-select [(ngModel)]="flagseverity" [ngModelOptions]="{standalone:true}" data-testid="ccs-flag-severity">
                       <mat-option *ngFor="let s of severityList" [value]="s">{{s}}</mat-option>
                     </mat-select>
                   </mat-form-field>
-                  <button mat-raised-button color="warn" style="width:100%;margin-top:4px" (click)="confirmFlag()">
+                  <button mat-raised-button color="warn" style="width:100%;margin-top:4px" data-testid="ccs-flag-confirm" (click)="confirmFlag()">
                     Confirm Flag
                   </button>
                 </div>
@@ -331,13 +333,14 @@
                   </p>
                 </div>
                 <div>
-                  <button type="button" mat-icon-button [matMenuTriggerFor]="menu3"
+                  <button type="button" mat-icon-button [matMenuTriggerFor]="menu3" [attr.data-testid]="'ccs-msg-menu-' + idx"
                     style="float: inline-end;"><mat-icon>more_vert</mat-icon></button>
                   <mat-menu #menu3="matMenu">
-                    <button mat-menu-item (click)="copyMessage(chat['originalmessage'])">Copy</button>
-                    <button mat-menu-item (click)="insertMessage(chat)">Insert Chat</button>
+                    <button mat-menu-item [attr.data-testid]="'ccs-msg-copy-' + idx" (click)="copyMessage(chat['originalmessage'])">Copy</button>
+                    <button mat-menu-item [attr.data-testid]="'ccs-msg-insert-' + idx" (click)="insertMessage(chat)">Insert Chat</button>
                     <button mat-menu-item
                       *ngIf="(chat['sender_uid'] == authservice.uid && calculateTimeToDelete(chat['time']) == true)"
+                      [attr.data-testid]="'ccs-msg-delete-' + idx"
                       (click)="delectChat(chat['messageid'])">Delete</button>
                   </mat-menu>
                 </div>
@@ -351,11 +354,11 @@
                     style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
                     <span *ngFor="let image of chat['files']">
                       <span style="margin-left: 5px;margin-top: 5px;">
-                        <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                        <span *ngIf="image['mediatype']?.includes('image')" [attr.data-testid]="'ccs-file-image-' + idx" (click)="downloadFiles(image['fileurl'])">
                           <br>
                           <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
                         </span>
-                        <span #myvideo *ngIf="image['mediatype']?.includes('video')"
+                        <span #myvideo *ngIf="image['mediatype']?.includes('video')" [attr.data-testid]="'ccs-file-video-' + idx"
                           (click)="downloadFiles(image['fileurl'])">
                           <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
                             <source [src]="image['fileurl']">
@@ -378,7 +381,7 @@
                           </span>
                           <span class="lastmessage" style="width: 12vw; font-size: 14px;">
                             {{image['filename']}}
-                            <button mat-icon-button
+                            <button mat-icon-button [attr.data-testid]="'ccs-file-download-' + idx"
                               (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
                           </span>
                         </span>
@@ -426,7 +429,7 @@
               <span class="lastmessage">
                 <p>{{file.filename}}</p>
               </span>
-              <button mat-icon-button (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
+              <button mat-icon-button [attr.data-testid]="'ccs-file-remove-' + index" (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
             </div>
           </div>
         </span>
@@ -435,29 +438,29 @@
           <div class="bottom"
             *ngIf="(currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['assign'].includes(loggedinprofile_id)) || (currentIssueData['status']['status']?.toLowerCase() == 'open' && currentIssueData['peopleinvolved']?.includes(loggedinprofile_id)) && !['website'].includes(currentIssueData['ticketfrom'])">
             <div class="message">
-              <textarea matInput formControlName="message" placeholder="Type your message" cdkTextareaAutosize
+              <textarea matInput formControlName="message" data-testid="ccs-message-input" placeholder="Type your message" cdkTextareaAutosize
                 #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6"></textarea>
             </div>
             <div class="buttons">
-              <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
-              <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+              <button mat-mini-fab [matMenuTriggerFor]="menu" data-testid="ccs-attach"><mat-icon>attach_file</mat-icon></button>
+              <mat-menu #menu="matMenu" yPosition="above" data-testid="ccs-attach-menu" (click)="$event.stopPropagation()">
                 &nbsp;&nbsp;
-                <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+                <button mat-icon-button data-testid="ccs-attach-image" (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
                 &nbsp;&nbsp;
-                <button mat-icon-button (click)="chooseType('video')"
+                <button mat-icon-button data-testid="ccs-attach-video" (click)="chooseType('video')"
                   class="attach"><mat-icon>videocam</mat-icon></button>
                 <br>
                 &nbsp;&nbsp;
-                <button mat-icon-button (click)="chooseType('audio')"
+                <button mat-icon-button data-testid="ccs-attach-audio" (click)="chooseType('audio')"
                   class="attach"><mat-icon>music_note</mat-icon></button>
                 &nbsp;&nbsp;
-                <button mat-icon-button (click)="chooseType('files')"
+                <button mat-icon-button data-testid="ccs-attach-files" (click)="chooseType('files')"
                   class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
               </mat-menu>
-              <input style="display: none;" #fileInput type="file" [accept]="filetype" (click)="onClick($event)"
+              <input style="display: none;" #fileInput type="file" data-testid="ccs-file-input" [accept]="filetype" (click)="onClick($event)"
                 (change)="selectFiles($event)" multiple>
               &nbsp;
-              <button mat-mini-fab
+              <button mat-mini-fab data-testid="ccs-send"
                 (click)="sendMessage(messageform.value,currentIssueData)"><mat-icon>send</mat-icon></button>
             </div>
           </div>
@@ -482,7 +485,7 @@
             *ngIf="mapProfileData[clientid]?.profile == null && mapProfileData[clientid]?.profile == undefined">
             <img src="./../../../assets/Images/noimage.png" width="50px">
           </div>
-          <p class="profile-name" (click)="openProfile(clientid)"><b>{{mapProfileData[clientid]?.name}}</b></p>
+          <p class="profile-name" data-testid="ccs-open-profile" (click)="openProfile(clientid)"><b>{{mapProfileData[clientid]?.name}}</b></p>
         </div>
       </div>
 
@@ -529,16 +532,17 @@
                   'Notes History'}}</div>
                 <div class="header-action" [class.active]="ticketEditFormStatus.notes">
                   <div *ngIf="ticketEditFormStatus.notes" class="edit-options">
-                    <button class="action-btn add-btn" type="button" (click)="updateTicketDetails(filterform.value)">
+                    <button class="action-btn add-btn" type="button" data-testid="ccs-notes-save" (click)="updateTicketDetails(filterform.value)">
                       <mat-icon>add</mat-icon>
                     </button>
 
-                    <button class="action-btn clear-btn" type="button" (click)="cancelEdit('notes')">
+                    <button class="action-btn clear-btn" type="button" data-testid="ccs-notes-cancel" (click)="cancelEdit('notes')">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
 
                   <button class="action-btn edit-btn" type="button" *ngIf="!ticketEditFormStatus.notes"
+                    data-testid="ccs-notes-edit"
                     (click)="showEdit('notes')">
                     <mat-icon>add</mat-icon>
                   </button>
@@ -571,7 +575,7 @@
               <div [formGroup]="filterform">
                 <mat-form-field appearance="outline" style="width:100%" *ngIf="ticketEditFormStatus.notes">
                   <mat-label>Ticket Notes</mat-label>
-                  <textarea matInput formControlName="notes" cdkTextareaAutosize cdkAutosizeMinRows="2"
+                  <textarea matInput formControlName="notes" data-testid="ccs-notes-input" cdkTextareaAutosize cdkAutosizeMinRows="2"
                     cdkAutosizeMaxRows="4"></textarea>
                 </mat-form-field>
               </div>
@@ -634,7 +638,7 @@
       <p><b>Interaction History</b></p>
       <div style="max-height: 29vh; overflow: auto;">
         <div *ngFor="let log of clientTicketsLog">
-          <div (click)="relatedTicket(log)"
+          <div [attr.data-testid]="'ccs-log-' + log['issueno']" (click)="relatedTicket(log)"
             [ngClass]="log['issueno'] == currentIssueData['issueno'] ? 'selected-container' : 'history-container'">
             <div style="display: flex; flex-direction: row; justify-content: space-between;">
               <p>{{log['issueno']}} - {{log['reporteddate']?.toDate() | date : 'mediumDate'}}</p>

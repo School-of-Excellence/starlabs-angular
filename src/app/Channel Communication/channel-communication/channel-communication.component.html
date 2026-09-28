@@ -11,14 +11,14 @@
         <p class="ow-subtitle">{{ participants.length }} participant{{ participants.length !== 1 ? 's' : '' }} selected</p>
       </div>
     </div>
-    <button mat-icon-button (click)="onCancel()" class="ow-close-btn">
+    <button data-testid="chc-oncancel" mat-icon-button (click)="onCancel()" class="ow-close-btn">
       <mat-icon>close</mat-icon>
     </button>
   </div>
 
   <!-- STEPPER  -->
   <div class="ow-stepper">
-    <div class="ow-step" [class.active]="currentStep === 1" [class.done]="currentStep > 1"
+    <div data-testid="chc-currentstep-1-gotostep" class="ow-step" [class.active]="currentStep === 1" [class.done]="currentStep > 1"
       (click)="currentStep > 1 && goToStep(1)">
       <div class="ow-step-num">
         <mat-icon *ngIf="currentStep > 1">check</mat-icon>
@@ -28,7 +28,7 @@
     </div>
     <div class="ow-step-line" [class.done]="currentStep > 1"></div>
 
-    <div class="ow-step" [class.active]="currentStep === 2" [class.done]="currentStep > 2"
+    <div data-testid="chc-currentstep-2-gotostep" class="ow-step" [class.active]="currentStep === 2" [class.done]="currentStep > 2"
       (click)="currentStep > 2 && goToStep(2)">
       <div class="ow-step-num">
         <mat-icon *ngIf="currentStep > 2">check</mat-icon>
@@ -38,7 +38,7 @@
     </div>
     <div class="ow-step-line" [class.done]="currentStep > 2"></div>
 
-    <div class="ow-step" [class.active]="currentStep === 3" [class.done]="currentStep > 3"
+    <div data-testid="chc-currentstep-3-gotostep" class="ow-step" [class.active]="currentStep === 3" [class.done]="currentStep > 3"
       (click)="currentStep > 3 && goToStep(3)">
       <div class="ow-step-num">
         <mat-icon *ngIf="currentStep > 3">check</mat-icon>
@@ -68,14 +68,14 @@
       <div class="ow-channel-search-row">
         <mat-form-field appearance="outline" class="ow-search-field">
           <mat-label>Search channels...</mat-label>
-          <input matInput [(ngModel)]="channelSearch" (input)="onChannelSearch()" placeholder="Search by name...">
+          <input data-testid="chc-search-by-name" matInput [(ngModel)]="channelSearch" (input)="onChannelSearch()" placeholder="Search by name...">
           <mat-icon matPrefix>search</mat-icon>
-          <button matSuffix mat-icon-button *ngIf="channelSearch" (click)="channelSearch=''; onChannelSearch()">
+          <button data-testid="chc-channelsearch-onchannelsearch" matSuffix mat-icon-button *ngIf="channelSearch" (click)="channelSearch=''; onChannelSearch()">
             <mat-icon>clear</mat-icon>
           </button>
         </mat-form-field>
 
-        <button mat-raised-button color="primary" class="ow-inline-create-btn" (click)="showCreateChannel = true">
+        <button data-testid="chc-button" mat-raised-button color="primary" class="ow-inline-create-btn" (click)="showCreateChannel = true">
           <mat-icon>add</mat-icon>
           New Channel
         </button>
@@ -87,7 +87,7 @@
       </div>
 
       <div class="ow-channel-list" *ngIf="!isLoadingChannels">
-        <div class="ow-channel-card"
+        <div data-testid="chc-selectchannel" class="ow-channel-card"
           *ngFor="let ch of filteredChannels"
           [class.selected]="selectedChannel?.id === ch.id"
           (click)="selectChannel(ch)">
@@ -124,13 +124,13 @@
       <div class="ow-template-filters">
         <mat-form-field appearance="outline" class="ow-search-field">
           <mat-label>Search templates...</mat-label>
-          <input matInput [(ngModel)]="templateSearch" (input)="onTemplateSearch()" placeholder="Search by name...">
+          <input data-testid="chc-search-by-name-2" matInput [(ngModel)]="templateSearch" (input)="onTemplateSearch()" placeholder="Search by name...">
           <mat-icon matPrefix>search</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="ow-category-field">
           <mat-label>Category</mat-label>
-          <mat-select [(value)]="selectedCategoryFilter" (selectionChange)="onTemplateSearch()">
+          <mat-select data-testid="chc-mat-select" [(value)]="selectedCategoryFilter" (selectionChange)="onTemplateSearch()">
             <mat-option value="">All Categories</mat-option>
             <mat-option *ngFor="let c of categories" [value]="c">{{ getCategoryName(c) }}</mat-option>
           </mat-select>
@@ -143,7 +143,7 @@
       </div>
 
       <div class="ow-template-grid" *ngIf="!isLoadingTemplates">
-        <div class="ow-template-card"
+        <div data-testid="chc-selecttemplate" class="ow-template-card"
           *ngFor="let t of filteredTemplates"
           [class.selected]="selectedTemplate?.docid === t.docid"
           (click)="selectTemplate(t)">
@@ -197,11 +197,11 @@
           </div>
 
           <div class="ow-var-toggle">
-            <button class="ow-toggle-btn" [class.active]="param.fillType === 'static'"
+            <button data-testid="chc-setfilltype" class="ow-toggle-btn" [class.active]="param.fillType === 'static'"
               (click)="setFillType(param, 'static')">
               <mat-icon>edit</mat-icon> Static
             </button>
-            <button class="ow-toggle-btn" [class.active]="param.fillType === 'metadata'"
+            <button data-testid="chc-setfilltype-2" class="ow-toggle-btn" [class.active]="param.fillType === 'metadata'"
               (click)="setFillType(param, 'metadata')">
               <mat-icon>analytics</mat-icon> Metadata
             </button>
@@ -210,14 +210,14 @@
           <div class="ow-var-input" *ngIf="param.fillType === 'static'">
             <mat-form-field appearance="outline" class="ow-full">
               <mat-label>Value for {{ '{{' + param.name + '}}' }}</mat-label>
-              <input matInput [(ngModel)]="param.staticValue" placeholder="Enter value...">
+              <input data-testid="chc-enter-value" matInput [(ngModel)]="param.staticValue" placeholder="Enter value...">
             </mat-form-field>
           </div>
 
           <div class="ow-var-input" *ngIf="param.fillType === 'metadata'">
             <mat-form-field appearance="outline" class="ow-full">
               <mat-label>Participant metadata field</mat-label>
-              <mat-select [(ngModel)]="param.metadataField">
+              <mat-select data-testid="chc-mat-select-2" [(ngModel)]="param.metadataField">
               <mat-option>   
                 <ngx-mat-select-search
                   [(ngModel)]="param['metadataSearch']"
@@ -259,14 +259,14 @@
       <div class="ow-review-grid">
 
         <!-- Channel -->
-        <div class="ow-review-card ow-review-card--clickable" (click)="showChannelMemberList = true">
+        <div data-testid="chc-div" class="ow-review-card ow-review-card--clickable" (click)="showChannelMemberList = true">
           <div class="ow-review-label"><mat-icon>campaign</mat-icon> Channel</div>
           <div class="ow-review-value">{{ selectedChannel?.group_name }}</div>
           <div class="ow-review-meta">
             {{ (selectedChannel?.members || []).length }} existing members ·
             {{ (selectedChannel?.admins  || []).length }} admins
           </div>
-          <button mat-button class="ow-review-edit" (click)="$event.stopPropagation(); goToStep(1)">
+          <button data-testid="chc-event-stoppropagation" mat-button class="ow-review-edit" (click)="$event.stopPropagation(); goToStep(1)">
             <mat-icon>edit</mat-icon> Change
           </button>
         </div>
@@ -276,13 +276,13 @@
           <div class="ow-review-label"><mat-icon>description</mat-icon> Template</div>
           <div class="ow-review-value">{{ selectedTemplate?.templatename }}</div>
           <div class="ow-review-meta">{{ getCategoryName(selectedTemplate?.category) }}</div>
-          <button mat-button class="ow-review-edit" (click)="goToStep(2)">
+          <button data-testid="chc-gotostep" mat-button class="ow-review-edit" (click)="goToStep(2)">
             <mat-icon>edit</mat-icon> Change
           </button>
         </div>
 
         <!-- Recipients -->
-        <div class="ow-review-card ow-review-card--clickable" (click)="showParticipantList = true">
+        <div data-testid="chc-div-2" class="ow-review-card ow-review-card--clickable" (click)="showParticipantList = true">
           <div class="ow-review-label"><mat-icon>people</mat-icon> Recipients</div>
           <div class="ow-review-value">
             {{ participants.length }} participant{{ participants.length !== 1 ? 's' : '' }}
@@ -313,7 +313,7 @@
             {{ p.fillType === 'static' ? '"' + p.staticValue + '"' : p.metadataField }}
           </span>
         </div>
-        <button mat-button class="ow-review-edit" (click)="goToStep(3)">
+        <button data-testid="chc-gotostep-2" mat-button class="ow-review-edit" (click)="goToStep(3)">
           <mat-icon>edit</mat-icon> Change Variables
         </button>
       </div>
@@ -361,7 +361,7 @@
                   {{ selectedTemplate.footer }}
                 </div>
                 <div class="ow-bubble-files" *ngIf="selectedTemplate?.files?.length > 0">
-                  <a *ngFor="let f of selectedTemplate.files" [href]="f.url" target="_blank"
+                  <a data-testid="chc-link" *ngFor="let f of selectedTemplate.files" [href]="f.url" target="_blank"
                     style="display:block;color:#60a5fa;font-size:11px;text-decoration:underline;margin-top:4px;">
                     {{ f.name }}
                   </a>
@@ -381,14 +381,14 @@
     </div>
 
     <!-- RECIPIENTS POPUP -->
-    <div class="ow-recipients-overlay" *ngIf="showParticipantList" (click)="showParticipantList = false">
-      <div class="ow-recipients-popup" (click)="$event.stopPropagation()">
+    <div data-testid="chc-div-3" class="ow-recipients-overlay" *ngIf="showParticipantList" (click)="showParticipantList = false">
+      <div data-testid="chc-event-stoppropagation-2" class="ow-recipients-popup" (click)="$event.stopPropagation()">
 
         <div class="ow-recipients-popup-header">
           <div class="ow-recipients-popup-title">
             <mat-icon>people</mat-icon> Recipients
           </div>
-          <button mat-icon-button (click)="showParticipantList = false">
+          <button data-testid="chc-button-2" mat-icon-button (click)="showParticipantList = false">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -423,15 +423,15 @@
     </div>
 
     <!--CHANNEL MEMBERS POPUP -->
-    <div class="ow-recipients-overlay" *ngIf="showChannelMemberList" (click)="showChannelMemberList = false">
-      <div class="ow-recipients-popup" (click)="$event.stopPropagation()">
+    <div data-testid="chc-div-4" class="ow-recipients-overlay" *ngIf="showChannelMemberList" (click)="showChannelMemberList = false">
+      <div data-testid="chc-event-stoppropagation-3" class="ow-recipients-popup" (click)="$event.stopPropagation()">
 
         <div class="ow-recipients-popup-header">
           <div class="ow-recipients-popup-title">
             <mat-icon>campaign</mat-icon>
             {{ selectedChannel?.group_name }}
           </div>
-          <button mat-icon-button (click)="showChannelMemberList = false">
+          <button data-testid="chc-button-3" mat-icon-button (click)="showChannelMemberList = false">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -458,15 +458,15 @@
     </div>
 
     <!-- CREATE CHANNEL DIALOG -->
-    <div class="ow-create-overlay" *ngIf="showCreateChannel" (click)="showCreateChannel = false">
-      <div class="ow-create-dialog" (click)="$event.stopPropagation()" [formGroup]="channelForm">
+    <div data-testid="chc-div-5" class="ow-create-overlay" *ngIf="showCreateChannel" (click)="showCreateChannel = false">
+      <div data-testid="chc-event-stoppropagation-4" class="ow-create-dialog" (click)="$event.stopPropagation()" [formGroup]="channelForm">
 
         <div class="ow-create-dialog-header">
           <div class="ow-create-dialog-title">
             <mat-icon>campaign</mat-icon>
             Create New Channel
           </div>
-          <button mat-icon-button (click)="showCreateChannel = false">
+          <button data-testid="chc-button-4" mat-icon-button (click)="showCreateChannel = false">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -475,28 +475,28 @@
 
           <mat-form-field appearance="outline" class="ow-full">
             <mat-label>Channel Name *</mat-label>
-            <input matInput formControlName="channelName" placeholder="e.g. ME Team Updates">
+            <input data-testid="chc-channelname" matInput formControlName="channelName" placeholder="e.g. ME Team Updates">
             <mat-icon matSuffix>campaign</mat-icon>
             <mat-error *ngIf="channelForm.get('channelName')?.hasError('required')">Required</mat-error>
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="ow-full">
             <mat-label>Description</mat-label>
-            <textarea matInput formControlName="description" rows="2"
+            <textarea data-testid="chc-description" matInput formControlName="description" rows="2"
               placeholder="Brief description..."></textarea>
           </mat-form-field>
 
           <div class="ow-img-upload">
             <div class="ow-img-preview" *ngIf="channelImageUrl">
               <img [src]="channelImageUrl" alt="channel image">
-              <button mat-icon-button class="ow-img-remove" (click)="channelImageUrl=''">
+              <button data-testid="chc-button-5" mat-icon-button class="ow-img-remove" (click)="channelImageUrl=''">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
             <div class="ow-img-placeholder" *ngIf="!channelImageUrl">
-              <input type="file" #imgInput accept="image/*"
+              <input data-testid="chc-uploadchannelimage" type="file" #imgInput accept="image/*"
                 (change)="uploadChannelImage($event)" style="display:none">
-              <button mat-stroked-button (click)="imgInput.click()" [disabled]="isUploadingChannelImage">
+              <button data-testid="chc-imginput-click" mat-stroked-button (click)="imgInput.click()" [disabled]="isUploadingChannelImage">
                 <mat-spinner *ngIf="isUploadingChannelImage" diameter="16"></mat-spinner>
                 <mat-icon *ngIf="!isUploadingChannelImage">add_photo_alternate</mat-icon>
                 {{ isUploadingChannelImage ? 'Uploading...' : 'Upload Image' }}
@@ -508,7 +508,7 @@
             <div class="ow-field-label">Admins *</div>
             <mat-form-field appearance="outline" class="ow-full">
               <mat-label>Select Admins</mat-label>
-              <mat-select [(ngModel)]="selectedAdmins" [ngModelOptions]="{standalone:true}"
+              <mat-select data-testid="chc-mat-select-3" [(ngModel)]="selectedAdmins" [ngModelOptions]="{standalone:true}"
                 multiple [compareWith]="compareAdmin">
                 <mat-option>
                   <ngx-mat-select-search
@@ -537,8 +537,8 @@
         </div>
 
         <div class="ow-create-dialog-footer">
-          <button mat-stroked-button (click)="showCreateChannel = false">Cancel</button>
-          <button mat-raised-button color="primary"
+          <button data-testid="chc-button-6" mat-stroked-button (click)="showCreateChannel = false">Cancel</button>
+          <button data-testid="chc-createchannel" mat-raised-button color="primary"
             (click)="createChannel()" [disabled]="isCreatingChannel">
             <mat-spinner *ngIf="isCreatingChannel" diameter="16"></mat-spinner>
             <mat-icon *ngIf="!isCreatingChannel">add_circle</mat-icon>
@@ -552,28 +552,28 @@
 
   <!-- FOOTER -->
   <div class="ow-footer">
-    <button mat-stroked-button (click)="currentStep === 1 ? onCancel() : goToStep(currentStep - 1)">
+    <button data-testid="chc-currentstep-1-oncancel" mat-stroked-button (click)="currentStep === 1 ? onCancel() : goToStep(currentStep - 1)">
       <mat-icon>{{ currentStep === 1 ? 'close' : 'arrow_back' }}</mat-icon>
       {{ currentStep === 1 ? 'Cancel' : 'Back' }}
     </button>
 
     <div class="ow-footer-right">
-      <button mat-raised-button color="primary" *ngIf="currentStep === 1"
+      <button data-testid="chc-gotostep-3" mat-raised-button color="primary" *ngIf="currentStep === 1"
         [disabled]="!selectedChannel" (click)="goToStep(2)">
         Next <mat-icon>arrow_forward</mat-icon>
       </button>
 
-      <button mat-raised-button color="primary" *ngIf="currentStep === 2"
+      <button data-testid="chc-gotostep-4" mat-raised-button color="primary" *ngIf="currentStep === 2"
         [disabled]="!selectedTemplate" (click)="goToStep(3)">
         Next <mat-icon>arrow_forward</mat-icon>
       </button>
 
-      <button mat-raised-button color="primary" *ngIf="currentStep === 3"
+      <button data-testid="chc-gotostep-5" mat-raised-button color="primary" *ngIf="currentStep === 3"
         [disabled]="!allParamsConfigured()" (click)="goToStep(4)">
         Review <mat-icon>arrow_forward</mat-icon>
       </button>
 
-      <button mat-raised-button color="primary" *ngIf="currentStep === 4"
+      <button data-testid="chc-onsend" mat-raised-button color="primary" *ngIf="currentStep === 4"
         [disabled]="isSending" (click)="onSend()">
         <mat-spinner *ngIf="isSending" diameter="16"></mat-spinner>
         <mat-icon *ngIf="!isSending">send</mat-icon>

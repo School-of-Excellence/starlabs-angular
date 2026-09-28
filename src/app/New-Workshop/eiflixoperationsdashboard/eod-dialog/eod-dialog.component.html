@@ -11,7 +11,7 @@
         <span class="eodd-subtitle">{{ config.subtitle }}</span>
       }
     </div>
-    <button type="button" class="eodd-close" (click)="cancel()" aria-label="Close dialog">
+    <button data-testid="ed1-cancel-1" type="button" class="eodd-close" (click)="cancel()" aria-label="Close dialog">
       <mat-icon>close</mat-icon>
     </button>
   </header>
@@ -43,8 +43,8 @@
       <span class="eodd-error" role="alert">{{ crossError }}</span>
     }
     <footer class="eodd-foot">
-      <button type="button" class="eodd-btn" (click)="cancel()">{{ config.cancelLabel || 'Cancel' }}</button>
-      <button type="submit" class="eodd-btn eodd-btn-primary" [disabled]="!valid">{{ config.submitLabel || 'Save' }}</button>
+      <button data-testid="ed1-cancel-2" type="button" class="eodd-btn" (click)="cancel()">{{ config.cancelLabel || 'Cancel' }}</button>
+      <button data-testid="ed1-button-3" type="submit" class="eodd-btn eodd-btn-primary" [disabled]="!valid">{{ config.submitLabel || 'Save' }}</button>
     </footer>
   </form>
 </div>

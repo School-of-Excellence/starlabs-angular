@@ -7,7 +7,7 @@
 
   <form #myForm="ngForm" class="tier-form">
     <mat-form-field class="full">
-      <input type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
+      <input data-testid="adt-inp-001" type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
              ngModel name="name" #name="ngModel" required (keyup)="onSelect()">
       <mat-error *ngIf="!name.valid && name.touched">Tier name required</mat-error>
       <mat-hint *ngIf="crossmatch">
@@ -16,17 +16,17 @@
     </mat-form-field>
 
     <mat-form-field>
-      <textarea matInput rows="3" placeholder="Tier Eligibility Message"
+      <textarea data-testid="adt-txt-002" matInput rows="3" placeholder="Tier Eligibility Message"
                 [(ngModel)]="tiereligibilitymessage" name="tiereligibilitymessage"></textarea>
     </mat-form-field>
 
     <mat-form-field>
-      <textarea matInput rows="3" placeholder="Tier Upgrade Message"
+      <textarea data-testid="adt-txt-003" matInput rows="3" placeholder="Tier Upgrade Message"
                 [(ngModel)]="tierUpgrademessage" name="tierUpgrademessage"></textarea>
     </mat-form-field>
 
     <mat-form-field class="full">
-      <textarea matInput rows="3" placeholder="Tier Downgrade Message"
+      <textarea data-testid="adt-txt-004" matInput rows="3" placeholder="Tier Downgrade Message"
                 [(ngModel)]="tierdowngrademessage" name="tierdowngrademessage"></textarea>
     </mat-form-field>
 
@@ -39,13 +39,13 @@
         <div class="support-row"
              *ngFor="let support of customersupport; let i = index; trackBy: trackByIndex">
           <mat-form-field>
-            <input type="text" matInput placeholder="Customer Support"
+            <input data-testid="adt-inp-005" type="text" matInput placeholder="Customer Support"
                    [(ngModel)]="customersupport[i]" name="customersupport{{ i }}">
           </mat-form-field>
           <div class="support-actions">
-            <button mat-mini-fab color="primary" type="button" aria-label="Add"
+            <button data-testid="adt-btn-006" mat-mini-fab color="primary" type="button" aria-label="Add"
                     (click)="addCustomerSupport()" *ngIf="customersupport.length < 4">+</button>
-            <button mat-mini-fab color="warn" type="button" aria-label="Remove"
+            <button data-testid="adt-btn-007" mat-mini-fab color="warn" type="button" aria-label="Remove"
                     (click)="removeCustomerSupport(i)" *ngIf="customersupport.length > 1">-</button>
           </div>
         </div>
@@ -54,8 +54,8 @@
   </form>
 
   <div class="dialog-actions">
-    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="onSubmit()"
+    <button data-testid="adt-btn-008" mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button data-testid="adt-btn-009" mat-raised-button color="primary" (click)="onSubmit()"
             [disabled]="myForm.invalid || crossmatch">Add</button>
   </div>
 </div>
@@ -69,7 +69,7 @@
 
   <form #myForm="ngForm" class="tier-form">
     <mat-form-field class="full">
-      <input type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
+      <input data-testid="adt-inp-010" type="text" placeholder="Tier Name" matInput [(ngModel)]="tier"
              ngModel name="name" required #name="ngModel" (keyup)="onSelect()">
       <mat-error *ngIf="!name.valid && name.touched">Tier name required</mat-error>
       <mat-hint *ngIf="crossmatch">
@@ -78,17 +78,17 @@
     </mat-form-field>
 
     <mat-form-field>
-      <textarea matInput rows="3" placeholder="Tier Eligibility Message"
+      <textarea data-testid="adt-txt-011" matInput rows="3" placeholder="Tier Eligibility Message"
                 [(ngModel)]="tiereligibilitymessage" name="tiereligibilitymessage"></textarea>
     </mat-form-field>
 
     <mat-form-field>
-      <textarea matInput rows="3" placeholder="Tier Upgrade Message"
+      <textarea data-testid="adt-txt-012" matInput rows="3" placeholder="Tier Upgrade Message"
                 [(ngModel)]="tierUpgrademessage" name="tierUpgrademessage"></textarea>
     </mat-form-field>
 
     <mat-form-field class="full">
-      <textarea matInput rows="3" placeholder="Tier Downgrade Message"
+      <textarea data-testid="adt-txt-013" matInput rows="3" placeholder="Tier Downgrade Message"
                 [(ngModel)]="tierdowngrademessage" name="tierdowngrademessage"></textarea>
     </mat-form-field>
 
@@ -101,13 +101,13 @@
         <div class="support-row"
              *ngFor="let support of customersupport; let i = index; trackBy: trackByIndex">
           <mat-form-field>
-            <input type="text" matInput placeholder="Customer Support"
+            <input data-testid="adt-inp-014" type="text" matInput placeholder="Customer Support"
                    [(ngModel)]="customersupport[i]" name="customersupport{{ i }}">
           </mat-form-field>
           <div class="support-actions">
-            <button mat-mini-fab color="primary" type="button" aria-label="Add"
+            <button data-testid="adt-btn-015" mat-mini-fab color="primary" type="button" aria-label="Add"
                     (click)="addCustomerSupport()" *ngIf="customersupport.length < 4">+</button>
-            <button mat-mini-fab color="warn" type="button" aria-label="Remove"
+            <button data-testid="adt-btn-016" mat-mini-fab color="warn" type="button" aria-label="Remove"
                     (click)="removeCustomerSupport(i)" *ngIf="customersupport.length > 1">-</button>
           </div>
         </div>
@@ -116,8 +116,8 @@
   </form>
 
   <div class="dialog-actions">
-    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
+    <button data-testid="adt-btn-017" mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button data-testid="adt-btn-018" mat-raised-button color="primary" (click)="onEdit(data.id)">Edit</button>
   </div>
 </div>
 
@@ -125,7 +125,7 @@
 <div class="tier-dialog tier-dialog--confirm" *ngIf="delete">
   <h3>Are you sure you want to delete?</h3>
   <div class="dialog-actions">
-    <button mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
-    <button mat-raised-button color="warn" (click)="onDelete(data.id)">Delete</button>
+    <button data-testid="adt-btn-019" mat-stroked-button color="primary" (click)="onClick()">Cancel</button>
+    <button data-testid="adt-btn-020" mat-raised-button color="warn" (click)="onDelete(data.id)">Delete</button>
   </div>
 </div>

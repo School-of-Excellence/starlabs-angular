@@ -2,8 +2,8 @@
     <div class="header">
       <h5 class="heading">Evolution Wishlist Log</h5>
       <div style="display:flex;gap:8px">
-        <button mat-raised-button color="primary" (click)="createQuestion()">Create Question</button>
-        <button mat-raised-button color="primary" [disabled]="!fullAccess" (click)="export()">Export</button>
+        <button data-testid="ewls-btn-1" mat-raised-button color="primary" (click)="createQuestion()">Create Question</button>
+        <button data-testid="ewls-btn-2" mat-raised-button color="primary" [disabled]="!fullAccess" (click)="export()">Export</button>
       </div>
     </div>
     <div class="body mat-elevation-z2">
@@ -16,8 +16,8 @@
           <mat-form-field appearance="outline" class="date-range-field">
             <mat-label>Created range</mat-label>
             <mat-date-range-input [rangePicker]="createdPicker">
-              <input matStartDate [(ngModel)]="createdFrom" placeholder="Start date" (dateChange)="applyFilters()">
-              <input matEndDate [(ngModel)]="createdTo" placeholder="End date" (dateChange)="applyFilters()">
+              <input data-testid="ewls-inp-3" matStartDate [(ngModel)]="createdFrom" placeholder="Start date" (dateChange)="applyFilters()">
+              <input data-testid="ewls-inp-4" matEndDate [(ngModel)]="createdTo" placeholder="End date" (dateChange)="applyFilters()">
             </mat-date-range-input>
             <mat-datepicker-toggle matIconSuffix [for]="createdPicker"></mat-datepicker-toggle>
             <mat-date-range-picker #createdPicker></mat-date-range-picker>
@@ -25,8 +25,8 @@
           <mat-form-field appearance="outline" class="date-range-field">
             <mat-label>Sent range</mat-label>
             <mat-date-range-input [rangePicker]="sentPicker">
-              <input matStartDate [(ngModel)]="sentFrom" placeholder="Start date" (dateChange)="applyFilters()">
-              <input matEndDate [(ngModel)]="sentTo" placeholder="End date" (dateChange)="applyFilters()">
+              <input data-testid="ewls-inp-5" matStartDate [(ngModel)]="sentFrom" placeholder="Start date" (dateChange)="applyFilters()">
+              <input data-testid="ewls-inp-6" matEndDate [(ngModel)]="sentTo" placeholder="End date" (dateChange)="applyFilters()">
             </mat-date-range-input>
             <mat-datepicker-toggle matIconSuffix [for]="sentPicker"></mat-datepicker-toggle>
             <mat-date-range-picker #sentPicker></mat-date-range-picker>
@@ -35,7 +35,7 @@
           <!-- Know More filter -->
           <mat-form-field appearance="outline" style="width:160px">
             <mat-label>Know More</mat-label>
-            <mat-select [(ngModel)]="knowMoreFilter" (ngModelChange)="applyFilters()">
+            <mat-select data-testid="ewls-sel-7" [(ngModel)]="knowMoreFilter" (ngModelChange)="applyFilters()">
               <mat-option value="">All</mat-option>
               <mat-option value="clicked">Clicked</mat-option>
               <mat-option value="notclicked">Not Clicked</mat-option>
@@ -45,52 +45,52 @@
           <!-- Ecosystem filter -->
           <mat-form-field appearance="outline" style="width:160px">
             <mat-label>Ecosystem</mat-label>
-            <mat-select [(ngModel)]="ecosystemFilter" (ngModelChange)="applyFilters()">
+            <mat-select data-testid="ewls-sel-8" [(ngModel)]="ecosystemFilter" (ngModelChange)="applyFilters()">
               <mat-option value="">All</mat-option>
               <mat-option value="yes">In Ecosystem</mat-option>
               <mat-option value="no">Not in Ecosystem</mat-option>
             </mat-select>
           </mat-form-field>
 
-          <button mat-stroked-button color="warn" (click)="applyFilters(true)">Clear</button>
+          <button data-testid="ewls-btn-9" mat-stroked-button color="warn" (click)="applyFilters(true)">Clear</button>
         </div>
       </div>
       <br>
       <div class="count-container">
         <h5 class="count-heading">
-          <div class="count-item" (click)="applyStatusFilter('initiated')" [class.active-card]="activeFilter === 'initiated'">
+          <div data-testid="ewls-act-10" class="count-item" (click)="applyStatusFilter('initiated')" [class.active-card]="activeFilter === 'initiated'">
             <span class="count-number initiated-total">{{ initiatedCount + completedCount + notcompletedCount + cancelledCount }}</span>
             <span class="count-label">Initiated</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('shared')" [class.active-card]="activeFilter === 'shared'">
+          <div data-testid="ewls-act-11" class="count-item" (click)="applyStatusFilter('shared')" [class.active-card]="activeFilter === 'shared'">
             <span class="count-number shared">{{ completedCount + notcompletedCount }}</span>
             <span class="count-label">Shared</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('completed')" [class.active-card]="activeFilter === 'completed'">
+          <div data-testid="ewls-act-12" class="count-item" (click)="applyStatusFilter('completed')" [class.active-card]="activeFilter === 'completed'">
             <span class="count-number completed">{{ completedCount }}</span>
             <span class="count-label">Completed</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('pending')" [class.active-card]="activeFilter === 'pending'">
+          <div data-testid="ewls-act-13" class="count-item" (click)="applyStatusFilter('pending')" [class.active-card]="activeFilter === 'pending'">
             <span class="count-number pending">{{ notcompletedCount }}</span>
             <span class="count-label">Pending</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('notshared')" [class.active-card]="activeFilter === 'notshared'">
+          <div data-testid="ewls-act-14" class="count-item" (click)="applyStatusFilter('notshared')" [class.active-card]="activeFilter === 'notshared'">
             <span class="count-number initiated">{{ initiatedCount }}</span>
             <span class="count-label">Not shared</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('sharessent')" [class.active-card]="activeFilter === 'sharessent'">
+          <div data-testid="ewls-act-15" class="count-item" (click)="applyStatusFilter('sharessent')" [class.active-card]="activeFilter === 'sharessent'">
             <span class="count-number sharessent">{{ totalSharedContacts }}</span>
             <span class="count-label">Shares Sent</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('received')" [class.active-card]="activeFilter === 'received'">
+          <div data-testid="ewls-act-16" class="count-item" (click)="applyStatusFilter('received')" [class.active-card]="activeFilter === 'received'">
             <span class="count-number responsesreceived">{{ totalCompletedContacts }}</span>
             <span class="count-label">Responses Received</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('notreceived')" [class.active-card]="activeFilter === 'notreceived'">
+          <div data-testid="ewls-act-17" class="count-item" (click)="applyStatusFilter('notreceived')" [class.active-card]="activeFilter === 'notreceived'">
             <span class="count-number initiated">{{ totalSharedContacts - totalCompletedContacts }}</span>
             <span class="count-label">Responses Not Received</span>
           </div>
-          <div class="count-item" (click)="applyStatusFilter('cancelled')" [class.active-card]="activeFilter === 'cancelled'">
+          <div data-testid="ewls-act-18" class="count-item" (click)="applyStatusFilter('cancelled')" [class.active-card]="activeFilter === 'cancelled'">
             <span class="count-number cancelled">{{ cancelledCount }}</span>
             <span class="count-label">Cancelled</span>
           </div>
@@ -101,7 +101,7 @@
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Profile Name</th>
           <td mat-cell *matCellDef="let row">
-            <a class="profilename" [routerLink]="'/userprofile/' + row['profileid']" target="_blank" rel="noopener">{{row["name"]}}</a>
+            <a data-testid="ewls-link-19" class="profilename" [routerLink]="'/userprofile/' + row['profileid']" target="_blank" rel="noopener">{{row["name"]}}</a>
           </td>
         </ng-container>
         <ng-container  matColumnDef="type">
@@ -166,7 +166,7 @@
         <ng-container matColumnDef="wishlist">
           <th mat-header-cell *matHeaderCellDef>Details</th>
           <td mat-cell *matCellDef="let row">
-            <button mat-raised-button color="accent" 
+            <button data-testid="ewls-btn-20" mat-raised-button color="accent" 
               [disabled]="!fullAccess"
               (click)="expandedElement = expandedElement === row ? null : row">
               {{ expandedElement === row ? 'Collapse' : 'Expand' }}
@@ -216,7 +216,7 @@
         <ng-container matColumnDef="reinitiate">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Re-initiate </th>
           <td mat-cell *matCellDef="let row">
-            <button [disabled]="row['disableReinitiate'] || row['status'] == 'initiated'" 
+            <button data-testid="ewls-btn-21" [disabled]="row['disableReinitiate'] || row['status'] == 'initiated'" 
               mat-fab
               color="primary" 
               (click)="resendAfterCancel(row)" 
@@ -229,7 +229,7 @@
         <ng-container matColumnDef="delete">
           <th mat-header-cell *matHeaderCellDef mat-sort-header> Cancel </th>
           <td mat-cell *matCellDef="let row">
-              <button [disabled]="row['status'] == 'completed' || row['status'] == 'cancelled'" 
+              <button data-testid="ewls-btn-22" [disabled]="row['status'] == 'completed' || row['status'] == 'cancelled'" 
                       mat-fab
                       color="warn" 
                       (click)="cancelInitiated(row)" 

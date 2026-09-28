@@ -12,7 +12,7 @@
         </p>
       </div>
     </div>
-    <button mat-flat-button color="primary" (click)="load()"
+    <button data-testid="epp2-btn-1" mat-flat-button color="primary" (click)="load()"
             [disabled]="loading || !selectedAtcStage || !selectedQueueId" class="refresh-btn">
       <mat-icon>refresh</mat-icon> Load participants
     </button>
@@ -22,7 +22,7 @@
   <div class="selector-bar mat-elevation-z1">
     <mat-form-field appearance="outline" class="queue-field">
       <mat-label>Queue <span class="hint">(has atcrequiredstages)</span></mat-label>
-      <mat-select [(ngModel)]="selectedQueueId" (ngModelChange)="onQueueChange()"
+      <mat-select data-testid="epp2-sel-2" [(ngModel)]="selectedQueueId" (ngModelChange)="onQueueChange()"
                   [disabled]="queuesLoading">
         <mat-option *ngFor="let q of queues" [value]="q.id">{{ q.name }}</mat-option>
       </mat-select>
@@ -30,7 +30,7 @@
 
     <mat-form-field appearance="outline" class="stage-field">
       <mat-label>ATC stage <span class="hint">(atcrequiredstages.stage)</span></mat-label>
-      <mat-select [(ngModel)]="selectedAtcStage" [disabled]="!availableAtcStages.length">
+      <mat-select data-testid="epp2-sel-3" [(ngModel)]="selectedAtcStage" [disabled]="!availableAtcStages.length">
         <mat-option *ngFor="let a of availableAtcStages" [value]="a.stage">{{ a.stage }}</mat-option>
       </mat-select>
     </mat-form-field>
@@ -45,7 +45,7 @@
   <div class="err-box" *ngIf="queuesError">
     <mat-icon>error_outline</mat-icon>
     <span>{{ queuesError }}</span>
-    <button mat-button (click)="loadQueues()">Retry</button>
+    <button data-testid="epp2-btn-4" mat-button (click)="loadQueues()">Retry</button>
   </div>
 
   <div class="warn-box" *ngIf="!queuesLoading && selectedQueueId && atcCfg && !zoomPairings.length">
@@ -72,23 +72,23 @@
         <span class="meta-hint">Active + Approved in this queue</span>
       </span>
       <span class="meta-sep">·</span>
-      <span class="meta-item clickable" (click)="focus('here')"
+      <span data-testid="epp2-act-5" class="meta-item clickable" (click)="focus('here')"
             matTooltip="No transferredfrom on the token — they started in THIS queue, so their lineage is a single level with nothing to climb">
         <strong>{{ countHere }}</strong> started here
       </span>
       <span class="meta-sep">·</span>
-      <span class="meta-item clickable" (click)="focus('transferred')"
+      <span data-testid="epp2-act-6" class="meta-item clickable" (click)="focus('transferred')"
             matTooltip="Token carries transferredfrom + tokentransferredfrom — the walk can reach their ancestor queues">
         <strong>{{ countTransferred }}</strong> transferred in
       </span>
       <span class="meta-sep" *ngIf="countTransferredOut">·</span>
-      <span class="meta-item clickable" *ngIf="countTransferredOut" (click)="focus('transferredOut')"
+      <span data-testid="epp2-act-7" class="meta-item clickable" *ngIf="countTransferredOut" (click)="focus('transferredOut')"
             matTooltip="Token carries transferredto + tokentransferredto — these participants have LEFT this queue. Being transferred does not by itself move their ATC doc, so the destination queue is checked rather than assumed. A recording attached here still counts: the destination token's lineage points back to this queue.">
         <mat-icon>logout</mat-icon>
         <strong>{{ countTransferredOut }}</strong> transferred out
       </span>
       <span class="meta-sep" *ngIf="countGenElsewhere">·</span>
-      <span class="meta-item clickable" *ngIf="countGenElsewhere" (click)="focus('genElsewhere')"
+      <span data-testid="epp2-act-8" class="meta-item clickable" *ngIf="countGenElsewhere" (click)="focus('genElsewhere')"
             matTooltip="Their ATC doc was found in another queue on their lineage — the queue they transferred FROM or TO. Nothing is missing for these.">
         <mat-icon>swap_horiz</mat-icon>
         <strong>{{ countGenElsewhere }}</strong> ATC doc in another queue
@@ -100,7 +100,7 @@
         <strong>{{ countGenOtherToken }}</strong> doc under another token
       </span>
       <span class="meta-sep" *ngIf="countOffLineage">·</span>
-      <span class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
+      <span data-testid="epp2-act-9" class="meta-item warn clickable" *ngIf="countOffLineage" (click)="focus('offlineage')"
             matTooltip="No studio session on their lineage, but sessions DO exist under other queues. The token is disconnected from the participant's history — link the token; do not attach a recording.">
         <mat-icon>link_off</mat-icon>
         <strong>{{ countOffLineage }}</strong> off-lineage sessions
@@ -109,13 +109,13 @@
 
     <!-- ── TELEMETRY: the funnel, left to right ─────────────────────────── -->
     <div class="funnel">
-      <div class="fstep" (click)="clearFilters()" matTooltip="All Active + Approved participants in the selected queue">
+      <div data-testid="epp2-act-10" class="fstep" (click)="clearFilters()" matTooltip="All Active + Approved participants in the selected queue">
         <span class="fnum">{{ totalAll }}</span>
         <span class="flabel">participants</span>
       </div>
       <mat-icon class="farrow">chevron_right</mat-icon>
 
-      <div class="fstep clickable" (click)="focus('crossed')"
+      <div data-testid="epp2-act-11" class="fstep clickable" (click)="focus('crossed')"
            matTooltip="Moved past the studio stage. A currentstage that is off the queue's stage list counts as crossed (token variations drop trailing stages).">
         <span class="fnum">{{ countCrossed }}</span>
         <span class="flabel">crossed {{ selectedAtcStage }}</span>
@@ -128,7 +128,7 @@
       </div>
       <mat-icon class="farrow">chevron_right</mat-icon>
 
-      <div class="fstep clickable" [class.ok]="!countNoGen" [class.warn]="countNoGen"
+      <div data-testid="epp2-act-12" class="fstep clickable" [class.ok]="!countNoGen" [class.warn]="countNoGen"
            (click)="focus('noGen')"
            matTooltip="Crossed the stage and no queue_atc_generation doc exists in THIS queue or in the queue they were transferred to. This is the genuine repair backlog.">
         <span class="fnum">{{ countNoGen }}</span>
@@ -144,37 +144,37 @@
 
     <!-- ── TELEMETRY: what to do next ───────────────────────────────────── -->
     <div class="summary-bar">
-      <div class="stat need clickable" (click)="focus('needsLink')"
+      <div data-testid="epp2-act-13" class="stat need clickable" (click)="focus('needsLink')"
            matTooltip="Crossed the stage, a studio session exists, but no transcript — paste a Dropbox recording">
         <mat-icon>upload_file</mat-icon>
         <div><strong>{{ countNeeds }}</strong><span>needs a recording</span></div>
       </div>
 
-      <div class="stat rebuild clickable" *ngIf="countRebuildable" (click)="focus('rebuildable')"
+      <div data-testid="epp2-act-14" class="stat rebuild clickable" *ngIf="countRebuildable" (click)="focus('rebuildable')"
            matTooltip="Every studio transcript is present, the ATC doc (owned by this queue) is still dataincomplete, and one Rebuild click will re-resolve it">
         <mat-icon>autorenew</mat-icon>
         <div><strong>{{ countRebuildable }}</strong><span>ready to rebuild</span></div>
       </div>
 
-      <div class="stat superseded clickable" *ngIf="countSuperseded" (click)="focus('superseded')"
+      <div data-testid="epp2-act-15" class="stat superseded clickable" *ngIf="countSuperseded" (click)="focus('superseded')"
            matTooltip="A transcript exists, but on an OLDER session at the same level. The resolver only reads the newest session per level, so the pipeline cannot see it — re-attach to the current session.">
         <mat-icon>history</mat-icon>
         <div><strong>{{ countSuperseded }}</strong><span>on superseded session</span></div>
       </div>
 
-      <div class="stat none clickable" (click)="focus('noSession')"
+      <div data-testid="epp2-act-16" class="stat none clickable" (click)="focus('noSession')"
            matTooltip="Crossed the stage but no 'instudio' log exists anywhere on the lineage — nothing to attach a recording to">
         <mat-icon>block</mat-icon>
         <div><strong>{{ countNoSession }}</strong><span>no studio session</span></div>
       </div>
 
-      <div class="stat gap clickable" *ngIf="countNoDocFormPresent" (click)="focus('noDocFormPresent')"
+      <div data-testid="epp2-act-17" class="stat gap clickable" *ngIf="countNoDocFormPresent" (click)="focus('noDocFormPresent')"
            matTooltip="Crossed, no ATC doc anywhere, but the config-stage form WAS submitted in this queue — the doc should exist. Genuine recovery gap; run the backfill.">
         <mat-icon>report_problem</mat-icon>
         <div><strong>{{ countNoDocFormPresent }}</strong><span>no doc · form present (gap)</span></div>
       </div>
 
-      <div class="stat expected clickable" *ngIf="countNoDocFormMissing" (click)="focus('noDocFormMissing')"
+      <div data-testid="epp2-act-18" class="stat expected clickable" *ngIf="countNoDocFormMissing" (click)="focus('noDocFormMissing')"
            matTooltip="Crossed but no config-stage form was submitted in this queue — so no ATC doc is created, by design. Expected, not a gap.">
         <mat-icon>rule</mat-icon>
         <div><strong>{{ countNoDocFormMissing }}</strong><span>no doc · no form (expected)</span></div>
@@ -201,13 +201,13 @@
     <div class="filter-bar mat-elevation-z1">
       <mat-form-field appearance="outline" class="search-field">
         <mat-label>Search name / profile ID</mat-label>
-        <input matInput [(ngModel)]="searchText" (ngModelChange)="applyFilters()" autocomplete="off">
+        <input data-testid="epp2-inp-19" matInput [(ngModel)]="searchText" (ngModelChange)="applyFilters()" autocomplete="off">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>Crossed {{ selectedAtcStage }}</mat-label>
-        <mat-select [(ngModel)]="filterCrossed" (ngModelChange)="applyFilters()">
+        <mat-select data-testid="epp2-sel-20" [(ngModel)]="filterCrossed" (ngModelChange)="applyFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="yes">✅ Crossed</mat-option>
           <mat-option value="no">⏳ Not yet</mat-option>
@@ -216,7 +216,7 @@
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>Transcript</mat-label>
-        <mat-select [(ngModel)]="filterTranscript" (ngModelChange)="applyFilters()">
+        <mat-select data-testid="epp2-sel-21" [(ngModel)]="filterTranscript" (ngModelChange)="applyFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="yes">✅ Present</mat-option>
           <mat-option value="no">📤 Needs a recording</mat-option>
@@ -227,7 +227,7 @@
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>ATC generation doc</mat-label>
-        <mat-select [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
+        <mat-select data-testid="epp2-sel-22" [(ngModel)]="filterGen" (ngModelChange)="applyFilters()" multiple>
           <mat-option value="none">— not created —</mat-option>
           <mat-option value="out">— doc in another queue —</mat-option>
           <mat-option *ngFor="let s of genStatusOptions" [value]="s">{{ s }}</mat-option>
@@ -236,7 +236,7 @@
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>Config-stage form (no-doc rows)</mat-label>
-        <mat-select [(ngModel)]="filterConfigData" (ngModelChange)="applyFilters()">
+        <mat-select data-testid="epp2-sel-23" [(ngModel)]="filterConfigData" (ngModelChange)="applyFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="present">✅ Form present — doc missing (gap)</mat-option>
           <mat-option value="missing">➖ No form — no doc (expected)</mat-option>
@@ -245,7 +245,7 @@
 
       <mat-form-field appearance="outline" class="filter-field">
         <mat-label>Origin</mat-label>
-        <mat-select [(ngModel)]="filterOrigin" (ngModelChange)="applyFilters()">
+        <mat-select data-testid="epp2-sel-24" [(ngModel)]="filterOrigin" (ngModelChange)="applyFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="here">Started in this queue</mat-option>
           <mat-option value="transferred">Transferred in</mat-option>
@@ -255,7 +255,7 @@
         </mat-select>
       </mat-form-field>
 
-      <button mat-stroked-button (click)="clearFilters()" class="clear-btn">
+      <button data-testid="epp2-btn-25" mat-stroked-button (click)="clearFilters()" class="clear-btn">
         <mat-icon>filter_alt_off</mat-icon> Clear
       </button>
 
@@ -293,7 +293,7 @@
                    reads that can change while the table is open (a transcript
                    lands, a transfer is repaired, a doc is rebuilt elsewhere) —
                    without this the only way to see that is a full 700-row walk. -->
-              <button mat-icon-button class="row-refresh-btn"
+              <button data-testid="epp2-btn-26" mat-icon-button class="row-refresh-btn"
                       [disabled]="row.walking"
                       (click)="refreshRow(row)"
                       matTooltip="Refresh this row only — re-reads the token, re-walks its transfer chain, re-checks the studio sessions and the ATC doc. The rest of the table is left alone.">
@@ -369,7 +369,7 @@
                   <mat-icon>link_off</mat-icon> Off-lineage
                 </span>
 
-                <button mat-icon-button class="view-btn" *ngIf="viewableLa(p)"
+                <button [attr.data-testid]="'epp2-btn-27-' + p" mat-icon-button class="view-btn" *ngIf="viewableLa(p)"
                         (click)="viewTranscript(row, p)" matTooltip="View transcript">
                   <mat-icon>visibility</mat-icon>
                 </button>
@@ -406,14 +406,14 @@
               </div>
 
               <div class="link-cell" *ngIf="!row.walking && !row.walkError && p.hits.length">
-                <input class="link-input" type="url" placeholder="Paste Dropbox link…"
+                <input [attr.data-testid]="'epp2-inp-28-' + p" class="link-input" type="url" placeholder="Paste Dropbox link…"
                        [(ngModel)]="p.dropboxLink"
                        [disabled]="p.saving || pairingBusy(p)"
                        (keyup.enter)="saveLink(row, p)">
                 <!-- On a FAILED job the stored link is unchanged and is exactly what
                      we want to re-run, so this same button IS the retry: saveLink()
                      stamps retranscribeAt, which re-fires seLiveTranscribeSubmit. -->
-                <button mat-icon-button class="link-save-btn"
+                <button [attr.data-testid]="'epp2-btn-29-' + p" mat-icon-button class="link-save-btn"
                         [matTooltip]="pairingStatus(p) === 'failed'
                                         ? 'Retry transcription with this recording'
                                         : (p.status === 'resolved' ? 'Replace transcript' : 'Attach & transcribe')"
@@ -423,7 +423,7 @@
                   <mat-icon *ngIf="!p.saving">{{ pairingStatus(p) === 'failed' ? 'refresh'
                                                  : (p.status === 'resolved' ? 'autorenew' : 'send') }}</mat-icon>
                 </button>
-                <a *ngIf="p.dropboxLink" [href]="p.dropboxLink" target="_blank"
+                <a [attr.data-testid]="'epp2-link-30-' + p" *ngIf="p.dropboxLink" [href]="p.dropboxLink" target="_blank"
                    class="link-open-btn" matTooltip="Open recording">
                   <mat-icon>open_in_new</mat-icon>
                 </a>
@@ -435,11 +435,11 @@
                    only writes onto an already-discovered target. -->
               <div class="link-cell offline-cell"
                    *ngIf="!row.walking && !row.walkError && !p.hits.length && !p.offLineage.length && row.genDocId && row.genIn === 'this'">
-                <input class="link-input" type="url" placeholder="Offline session — paste Dropbox link…"
+                <input [attr.data-testid]="'epp2-inp-31-' + p" class="link-input" type="url" placeholder="Offline session — paste Dropbox link…"
                        [(ngModel)]="p.dropboxLink"
                        [disabled]="p.saving"
                        (keyup.enter)="attachOffline(row, p)">
-                <button mat-icon-button class="link-save-btn"
+                <button [attr.data-testid]="'epp2-btn-32-' + p" mat-icon-button class="link-save-btn"
                         matTooltip="No studio-session log exists — confirm this was an OFFLINE session and attach the recording directly"
                         [disabled]="p.saving"
                         (click)="attachOffline(row, p)">
@@ -505,7 +505,7 @@
               <div class="gen-missing" *ngIf="row.genMissing.length">
                 missing: {{ row.genMissing.join(', ') }}
               </div>
-              <button mat-stroked-button class="rebuild-btn"
+              <button data-testid="epp2-btn-33" mat-stroked-button class="rebuild-btn"
                       *ngIf="row.genStatus !== 'completed' && row.genIn === 'this'"
                       [disabled]="row.rebuilding"
                       (click)="rebuild(row)"
@@ -522,18 +522,18 @@
           <th mat-header-cell *matHeaderCellDef class="col-link">Dropbox recording</th>
           <td mat-cell *matCellDef="let row" class="col-link">
             <div class="link-cell" *ngIf="!row.walking && row.hits.length">
-              <input class="link-input" type="url" placeholder="Paste Dropbox link…"
+              <input data-testid="epp2-inp-34" class="link-input" type="url" placeholder="Paste Dropbox link…"
                      [(ngModel)]="row.dropboxLink"
                      [disabled]="row.saving || isBusy(row)"
                      (keyup.enter)="saveLink(row)">
-              <button mat-icon-button class="link-save-btn"
+              <button data-testid="epp2-btn-35" mat-icon-button class="link-save-btn"
                       [matTooltip]="hasTranscript(row) ? 'Replace transcript' : 'Attach & transcribe'"
                       [disabled]="row.saving || isBusy(row)"
                       (click)="saveLink(row)">
                 <mat-spinner *ngIf="row.saving" diameter="16" strokeWidth="2"></mat-spinner>
                 <mat-icon *ngIf="!row.saving">{{ hasTranscript(row) ? 'autorenew' : 'send' }}</mat-icon>
               </button>
-              <a *ngIf="row.dropboxLink" [href]="row.dropboxLink" target="_blank"
+              <a data-testid="epp2-link-36" *ngIf="row.dropboxLink" [href]="row.dropboxLink" target="_blank"
                  class="link-open-btn" matTooltip="Open recording">
                 <mat-icon>open_in_new</mat-icon>
               </a>

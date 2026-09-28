@@ -9,7 +9,7 @@
           </mat-form-field>
         </div>
         <div class="actionitem">
-          <button class="addbtn" mat-stroked-button (click)="updateAccount(null)">Add New Zoom Account</button>
+          <button data-testid="zacc-btn-1" class="addbtn" mat-stroked-button (click)="updateAccount(null)">Add New Zoom Account</button>
         </div>
       </div>
       <table mat-table [dataSource]="dataSource" matSort>
@@ -27,14 +27,14 @@
         <ng-container matColumnDef="accounttype">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>ACCOUNT TYPE</th>
           <td mat-cell *matCellDef="let row;">
-            <mat-slide-toggle [checked]="row['accounttype'] == 'licensed'" (change)="onToggle($event, row)">Licensed</mat-slide-toggle>
+            <mat-slide-toggle data-testid="zacc-change-2" [checked]="row['accounttype'] == 'licensed'" (change)="onToggle($event, row)">Licensed</mat-slide-toggle>
           </td>
         </ng-container>
   
         <ng-container matColumnDef="action">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let row;">
-            <button class="deletebtn" mat-icon-button type="button" (click)="updateAccount(row)">
+            <button data-testid="zacc-btn-3" class="deletebtn" mat-icon-button type="button" (click)="updateAccount(row)">
               <mat-icon>edit</mat-icon>
             </button>
           </td>

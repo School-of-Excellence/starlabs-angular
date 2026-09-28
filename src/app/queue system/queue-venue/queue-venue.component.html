@@ -28,7 +28,7 @@
     
   <div class="row m-2">
     <div class="col-sm">
-      <button *ngIf="hide == false" class="btn btn-secondary" (click)="hide = true">Go to Queue List</button>
+      <button data-testid="qven-btn-1" *ngIf="hide == false" class="btn btn-secondary" (click)="hide = true">Go to Queue List</button>
     </div>
   
     <div class="col-sm">
@@ -43,7 +43,7 @@
     <mat-radio-group
       aria-labelledby="example-radio-group-label"
       class="example-radio-group">
-      <mat-radio-button class="example-radio-button" *ngFor="let item of queuelist" [value]="item" (change)="drag($event)">
+      <mat-radio-button [attr.data-testid]="'qven-change-2-' + item" class="example-radio-button" *ngFor="let item of queuelist" [value]="item" (change)="drag($event)">
         {{item.queuedata.queuename}}
       </mat-radio-button>
     </mat-radio-group>

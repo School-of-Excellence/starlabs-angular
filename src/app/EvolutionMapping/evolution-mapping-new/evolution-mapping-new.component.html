@@ -4,7 +4,7 @@
     <div class="loading-text">Loading Dashboard</div>
   </div>
 </div>
-<div class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false; showJourneyTypeDropdown = false; showArenaEventPicker = false">
+<div data-testid="emn-show-event-filter-dropdown-1" class="mainscreen" (click)="showEventFilterDropdown = false; showVideoFilterDropdown = false; showJourneyTypeDropdown = false; showArenaEventPicker = false">
   <div class="page-header">
     <h1 class="page-title">Participant Video Mapping</h1>
     <!-- Summary Cards inline with title -->
@@ -55,13 +55,13 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <button mat-stroked-button class="has-video-filter-btn"
+      <button data-testid="emn-show-only-with-videos-2" mat-stroked-button class="has-video-filter-btn"
         [class.has-video-filter-active]="showOnlyWithVideos"
         (click)="showOnlyWithVideos = !showOnlyWithVideos; resetPagination(); fetchRecords()">
         <mat-icon>videocam</mat-icon>
         Has Video
       </button>
-      <button mat-stroked-button class="has-video-filter-btn"
+      <button data-testid="emn-show-only-without-photo-3" mat-stroked-button class="has-video-filter-btn"
         [class.has-video-filter-active]="showOnlyWithoutPhoto"
         (click)="showOnlyWithoutPhoto = !showOnlyWithoutPhoto; resetPagination(); fetchRecords()">
         <mat-icon>no_photography</mat-icon>
@@ -69,7 +69,7 @@
       </button>
       <div class="ep-filter-wrapper">
 
-        <button mat-stroked-button class="ep-filter-btn"
+        <button data-testid="emn-show-arena-event-picker-4" mat-stroked-button class="ep-filter-btn"
           [class.ep-filter-active]="arenaEventFilterActive"
           [disabled]="arenaEventParentLoading"
           (click)="showArenaEventPicker = !showArenaEventPicker;
@@ -85,7 +85,7 @@
           </mat-spinner>
         </button>
 
-        <div class="ep-dropdown" *ngIf="showArenaEventPicker"
+        <div data-testid="emn-event-5" class="ep-dropdown" *ngIf="showArenaEventPicker"
           (click)="$event.stopPropagation()">
 
           <div *ngIf="arenaEventParentLoading" class="ep-loading">
@@ -94,12 +94,12 @@
           </div>
 
           <ng-container *ngIf="!arenaEventParentLoading && !selectedArenaParent">
-            <input class="ep-search-input" type="text"
+            <input data-testid="emn-event-6" class="ep-search-input" type="text"
               [formControl]="arenaEventParentSearchCtrl"
               placeholder="Search events or queues..."
               (click)="$event.stopPropagation()">
             <div class="ep-list">
-              <div *ngFor="let item of filteredArenaParentList"
+              <div data-testid="emn-on-arena-parent-select-7" *ngFor="let item of filteredArenaParentList"
                 class="ep-list-item"
                 (click)="onArenaParentSelect(item)">
                 <span>{{ item.name }}</span>
@@ -112,7 +112,7 @@
           </ng-container>
 
           <ng-container *ngIf="!arenaEventParentLoading && selectedArenaParent">
-            <div class="ep-back-btn"
+            <div data-testid="emn-selected-arena-parent-8" class="ep-back-btn"
               (click)="selectedArenaParent = null; arenaSubEventList = [];
                       selectedArenaSubEventId = null; arenaSubEventLoading = false">
               <mat-icon>arrow_back</mat-icon>
@@ -125,7 +125,7 @@
             </div>
 
             <div class="ep-list" *ngIf="!arenaSubEventLoading">
-              <div *ngFor="let event of arenaSubEventList"
+              <div data-testid="emn-selected-arena-sub-event-id-9" *ngFor="let event of arenaSubEventList"
                 class="ep-list-item"
                 [class.ep-list-item-selected]="selectedArenaSubEventId === event.docid"
                 (click)="selectedArenaSubEventId = event.docid">
@@ -142,7 +142,7 @@
               </div>
             </div>
 
-            <button mat-raised-button color="primary" class="ep-apply-btn"
+            <button data-testid="emn-apply-arena-event-filter-10" mat-raised-button color="primary" class="ep-apply-btn"
               *ngIf="!arenaSubEventLoading"
               [disabled]="!selectedArenaSubEventId"
               (click)="applyArenaEventFilter()">
@@ -152,7 +152,7 @@
 
         </div>
 
-        <button mat-icon-button class="ep-reset-btn"
+        <button data-testid="emn-reset-arena-event-filter-11" mat-icon-button class="ep-reset-btn"
           *ngIf="arenaEventFilterActive"
           matTooltip="Reset Event Filter"
           (click)="resetArenaEventFilter()">
@@ -160,13 +160,13 @@
         </button>
 
       </div>
-      <button mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
+      <button data-testid="emn-clear-filters-12" mat-stroked-button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
-    <button class="export-btn" (click)="exportToExcel()" [disabled]="exportLoading">
+    <button data-testid="emn-export-to-excel-13" class="export-btn" (click)="exportToExcel()" [disabled]="exportLoading">
       <mat-icon>download</mat-icon>
       {{ exportLoading ? 'Exporting...' : 'Export' }}
     </button>
-    <button class="add-video-btn" (click)="openAddVideo()">
+    <button data-testid="emn-open-add-video-14" class="add-video-btn" (click)="openAddVideo()">
       + Add Video
     </button>
   </div>
@@ -182,7 +182,7 @@
         <th mat-header-cell *matHeaderCellDef>PARTICIPANT</th>
         <td mat-cell *matCellDef="let row">
           <div class="participant-cell">
-          <img class="avatar avatar-img"
+          <img data-testid="emn-open-image-15" class="avatar avatar-img"
               [src]="mapProfiles[row['id']]?.photo || 'https://firebasestorage.googleapis.com/v0/b/fir-sample-aae4a.appspot.com/o/profile-image-png-14.png?alt=media&token=ce6361d2-690c-4742-bba7-dbb90e193080'"
               [alt]="row['name']"
               (click)="openImage(mapProfiles[row['id']]?.photo, row['name'], row['id'], mapProfiles[row['id']]?.['profileid']); $event.stopPropagation()">
@@ -202,7 +202,7 @@
           <div class="journey-header">
             ACTIVE/LAST JOURNEY
             <div class="journey-filter-wrap">
-              <button class="journey-type-filter-btn"
+              <button data-testid="emn-open-journey-type-dropdown-16" class="journey-type-filter-btn"
                       (click)="openJourneyTypeDropdown($event)"
                       [class.journey-filter-active]="journeyTypeFilter !== 'all'">
                 <mat-icon>filter_list</mat-icon>
@@ -236,7 +236,7 @@
         <th mat-header-cell *matHeaderCellDef>
           <div class="column-header-with-filter">
             EVENTS ATTENDED
-            <button class="col-filter-btn"
+            <button data-testid="emn-open-event-filter-dropdown-17" class="col-filter-btn"
                     [class.col-filter-active]="selectedEventFilters.length > 0"
                     (click)="openEventFilterDropdown($event)">
               <mat-icon>filter_list</mat-icon>
@@ -253,7 +253,7 @@
         <th mat-header-cell *matHeaderCellDef>
           <div class="column-header-with-filter">
             VIDEOS
-            <button class="col-filter-btn"
+            <button data-testid="emn-open-video-filter-dropdown-18" class="col-filter-btn"
                     [class.col-filter-active]="selectedVideoFilters.length > 0"
                     (click)="openVideoFilterDropdown($event)">
               <mat-icon>filter_list</mat-icon>
@@ -301,8 +301,8 @@
       <!-- Actions -->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef>ACTIONS</th>
-        <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
-          <button class="view-log-btn" (click)="openLog(row)">
+        <td data-testid="emn-event-19" mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+          <button data-testid="emn-open-log-20" class="view-log-btn" (click)="openLog(row)">
             ▶ View Log
           </button>
         </td>
@@ -325,24 +325,24 @@
     </mat-paginator>
   </div>
     <!-- Dropdown -->
-  <div class="journey-type-dropdown" 
+  <div data-testid="emn-event-21" class="journey-type-dropdown" 
       *ngIf="showJourneyTypeDropdown"
       [style.top.px]="journeyFilterDropdownTop"
       [style.left.px]="journeyFilterDropdownLeft"
       (click)="$event.stopPropagation()">
-    <div class="journey-type-option"
+    <div data-testid="emn-set-journey-type-filter-22" class="journey-type-option"
         [class.option-active]="journeyTypeFilter === 'all'"
         (click)="setJourneyTypeFilter('all')">
       <mat-icon>done</mat-icon>
       All
     </div>
-    <div class="journey-type-option"
+    <div data-testid="emn-set-journey-type-filter-23" class="journey-type-option"
         [class.option-active]="journeyTypeFilter === 'active'"
         (click)="setJourneyTypeFilter('active')">
       <mat-icon>done</mat-icon>
       Active Journey
     </div>
-    <div class="journey-type-option"
+    <div data-testid="emn-set-journey-type-filter-24" class="journey-type-option"
         [class.option-active]="journeyTypeFilter === 'last'"
         (click)="setJourneyTypeFilter('last')">
       <mat-icon>done</mat-icon>
@@ -353,23 +353,23 @@
 </div>
 
   <!-- Video Filter Dropdown -->
-  <div class="col-filter-dropdown" *ngIf="showVideoFilterDropdown" [style.top.px]="videoFilterDropdownTop" [style.left.px]="videoFilterDropdownLeft" (click)="$event.stopPropagation()">
+  <div data-testid="emn-event-25" class="col-filter-dropdown" *ngIf="showVideoFilterDropdown" [style.top.px]="videoFilterDropdownTop" [style.left.px]="videoFilterDropdownLeft" (click)="$event.stopPropagation()">
     <div class="col-filter-header">
       <span>Filter by Video Event</span>
-      <button class="col-filter-clear"*ngIf="selectedVideoFilters.length > 0"(click)="selectedVideoFilters = []; fetchRecords()">
+      <button data-testid="emn-selected-video-filters-26" class="col-filter-clear"*ngIf="selectedVideoFilters.length > 0"(click)="selectedVideoFilters = []; fetchRecords()">
         Clear
       </button>
     </div>
 
     <!-- Search input -->
     <div class="col-filter-search">
-      <input class="col-filter-search-input"[formControl]="videoFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
+      <input data-testid="emn-event-27" class="col-filter-search-input"[formControl]="videoFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
     </div>
 
     <div class="col-filter-list">
       <div class="col-filter-item" *ngFor="let event of filteredEventFilterOptions">
         <label class="col-filter-label">
-          <input type="checkbox"
+          <input data-testid="emn-change-on-video-filter-change-28" type="checkbox"
                 [checked]="selectedVideoFilters.includes(event.id)"
                 (change)="onVideoFilterChange(event.id, $event)">
           <span class="col-filter-name">{{ event.name }}</span>
@@ -379,28 +379,28 @@
   </div>
 
   <!-- Event Filter Dropdown -->
-  <div class="col-filter-dropdown" *ngIf="showEventFilterDropdown" [style.top.px]="eventFilterDropdownTop" [style.left.px]="eventFilterDropdownLeft" (click)="$event.stopPropagation()">
+  <div data-testid="emn-event-29" class="col-filter-dropdown" *ngIf="showEventFilterDropdown" [style.top.px]="eventFilterDropdownTop" [style.left.px]="eventFilterDropdownLeft" (click)="$event.stopPropagation()">
     <div class="col-filter-header">
       <span>Filter by Event</span>
-      <button class="col-filter-clear"*ngIf="selectedEventFilters.length > 0"(click)="selectedEventFilters = []; fetchRecords()">
+      <button data-testid="emn-selected-event-filters-30" class="col-filter-clear"*ngIf="selectedEventFilters.length > 0"(click)="selectedEventFilters = []; fetchRecords()">
         Clear
       </button>
     </div>
 
     <!-- Search input -->
     <div class="col-filter-search">
-      <input class="col-filter-search-input"[formControl]="eventFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
+      <input data-testid="emn-event-31" class="col-filter-search-input"[formControl]="eventFilterSearchCtrl"placeholder="Search events..."(click)="$event.stopPropagation()">
     </div>
 
     <div class="col-filter-list">
       <div class="col-filter-item" *ngFor="let event of filteredEventFilterOptions">
         <label class="col-filter-label">
-          <input type="checkbox"
+          <input data-testid="emn-change-on-event-filter-change-32" type="checkbox"
                 [checked]="selectedEventFilters.includes(event.id)"
                 (change)="onEventFilterChange(event.id, $event)">
           <span class="col-filter-name">{{ event.name }}</span>
         </label>
-        <button class="col-filter-copy"
+        <button data-testid="emn-copy-to-clipboard-33" class="col-filter-copy"
                 [style.color]="copiedEventId === event.id ? '#16a34a' : ''"
                 (click)="copyToClipboard(event.name, event.id)"
                 [title]="copiedEventId === event.id ? 'Copied!' : 'Copy event name'">
@@ -420,10 +420,10 @@
           <span class="log-subtitle">Evolution Log · {{ logEventCount }} events attended</span>
         </div>
         <div class="log-header-actions">
-          <button class="add-video-btn" (click)="openAddVideo(currentLogProfileId)">
+          <button data-testid="emn-open-add-video-34" class="add-video-btn" (click)="openAddVideo(currentLogProfileId)">
             + Add Video
           </button>
-          <button mat-icon-button (click)="closeLog()">
+          <button data-testid="emn-close-log-35" mat-icon-button (click)="closeLog()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -450,14 +450,14 @@
             <ng-container *ngFor="let id of selectedLogEventFilter">
               <div class="log-filter-chip">
                 <span>{{ getLogEventName(id) }}</span>
-                <button class="chip-remove" (click)="removeLogEventFilter(id)">
+                <button data-testid="emn-remove-log-event-filter-36" class="chip-remove" (click)="removeLogEventFilter(id)">
                   ×
                 </button>
               </div>
             </ng-container>
           </div>
         </div>
-        <button class="log-filter-clear"*ngIf="selectedLogEventFilter.length > 0"(click)="selectedLogEventFilter = []; applyLogEventFilter()">
+        <button data-testid="emn-selected-log-event-filter-37" class="log-filter-clear"*ngIf="selectedLogEventFilter.length > 0"(click)="selectedLogEventFilter = []; applyLogEventFilter()">
           Clear filters
         </button>
       </div>
@@ -511,17 +511,17 @@
               <div class="event-card-action">
                 <!-- Primary watch button -->
                 <div class="watch-btn-wrap" *ngIf="event.hasVideo && event.videoUrl">
-                    <button class="watch-btn" 
+                    <button data-testid="emn-active-watch-index-38" class="watch-btn" 
                         [title]="event.videoTitle || event.eventName"
                         (click)="activeWatchIndex = (activeWatchIndex === 'p_'+i ? null : 'p_'+i); $event.stopPropagation()">
                       ▶ Watch {{ event['extraVideos']?.length > 0 ? '1' : '' }}
                     </button>
                   <div class="watch-choice-popup" *ngIf="activeWatchIndex === 'p_'+i">
-                    <button class="watch-choice-item" (click)="openVideoPlayer(event.videoUrl, event.eventName); activeWatchIndex = null">
+                    <button data-testid="emn-open-video-player-39" class="watch-choice-item" (click)="openVideoPlayer(event.videoUrl, event.eventName); activeWatchIndex = null">
                       <mat-icon>play_circle</mat-icon>
                       Watch here
                     </button>
-                    <button class="watch-choice-item" (click)="openVideoInNewTab(event.videoUrl); activeWatchIndex = null">
+                    <button data-testid="emn-open-video-in-new-tab-40" class="watch-choice-item" (click)="openVideoInNewTab(event.videoUrl); activeWatchIndex = null">
                       <mat-icon>open_in_new</mat-icon>
                       New tab
                     </button>
@@ -531,17 +531,17 @@
                 <!-- Extra watch buttons -->
                 <ng-container *ngIf="event['extraVideos']?.length > 0">
                   <div class="watch-btn-wrap" *ngFor="let extra of event['extraVideos']; let vi = index">
-                    <button class="watch-btn watch-btn-extra"
+                    <button data-testid="emn-active-watch-index-41" class="watch-btn watch-btn-extra"
                             [title]="extra.videoTitle || 'Video ' + (vi + 2)"
                             (click)="activeWatchIndex = (activeWatchIndex === 'e_'+i+'_'+vi ? null : 'e_'+i+'_'+vi); $event.stopPropagation()">
                       ▶ Watch {{ vi + 2 }}
                     </button>
                     <div class="watch-choice-popup" *ngIf="activeWatchIndex === 'e_'+i+'_'+vi">
-                      <button class="watch-choice-item" (click)="openVideoPlayer(extra.videoUrl, extra.videoTitle); activeWatchIndex = null">
+                      <button data-testid="emn-open-video-player-42" class="watch-choice-item" (click)="openVideoPlayer(extra.videoUrl, extra.videoTitle); activeWatchIndex = null">
                         <mat-icon>play_circle</mat-icon>
                         Watch here
                       </button>
-                      <button class="watch-choice-item" (click)="openVideoInNewTab(extra.videoUrl); activeWatchIndex = null">
+                      <button data-testid="emn-open-video-in-new-tab-43" class="watch-choice-item" (click)="openVideoInNewTab(extra.videoUrl); activeWatchIndex = null">
                         <mat-icon>open_in_new</mat-icon>
                         New tab
                       </button>
@@ -550,21 +550,21 @@
                 </ng-container>
 
                 <!-- edit button -->
-                <button class="add-video-icon-btn" *ngIf="event.hasVideo && event.docId"
+                <button data-testid="emn-open-edit-video-44" class="add-video-icon-btn" *ngIf="event.hasVideo && event.docId"
                         title="Edit videos"
                         (click)="openEditVideo(event, i)">
                   <mat-icon>edit</mat-icon>
                 </button>
 
                 <!-- Add video button for events without video -->
-                <button class="add-video-icon-btn" *ngIf="event.type === 'event' && !event.hasVideo"
+                <button data-testid="emn-open-add-video-for-event-45" class="add-video-icon-btn" *ngIf="event.type === 'event' && !event.hasVideo"
                         title="Add video"
                         (click)="openAddVideoForEvent(event)">
                   <mat-icon>edit</mat-icon>
                 </button>
 
                 <!--  delete button  -->
-                <button class="add-video-icon-btn delete-icon-btn"
+                <button data-testid="emn-open-delete-video-46" class="add-video-icon-btn delete-icon-btn"
                         *ngIf="event.hasVideo && event.docId"
                         title="Delete video"
                         (click)="openDeleteVideo(i); $event.stopPropagation()">
@@ -605,14 +605,14 @@
   </div>
 
   <!-- Delete Video Overlay -->
-  <div class="overlay-backdrop"
+  <div data-testid="emn-close-delete-video-47" class="overlay-backdrop"
       *ngIf="showDeleteVideoOverlay"
       (click)="closeDeleteVideo()">
-    <div class="delete-video-panel" (click)="$event.stopPropagation()">
+    <div data-testid="emn-event-48" class="delete-video-panel" (click)="$event.stopPropagation()">
 
       <div class="add-video-header">
         <h2 class="add-video-title">Delete Video</h2>
-        <button mat-icon-button (click)="closeDeleteVideo()">
+        <button data-testid="emn-close-delete-video-49" mat-icon-button (click)="closeDeleteVideo()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -629,7 +629,7 @@
               </span>
               <span class="delete-video-type-badge">{{ card['videoType'] || 'Event' }}</span>
             </div>
-            <button class="delete-video-icon-btn"
+            <button data-testid="emn-delete-video-index-50" class="delete-video-icon-btn"
                     (click)="deleteVideoIndex = 0;Delete(); $event.stopPropagation()">
               <mat-icon>delete</mat-icon>
             </button>
@@ -641,7 +641,7 @@
               <span class="delete-video-title-text">{{ extra.videoTitle || 'Untitled' }}</span>
               <span class="delete-video-type-badge">{{ extra.videoType || 'Event' }}</span>
             </div>
-            <button class="delete-video-icon-btn"
+            <button data-testid="emn-delete-video-index-51" class="delete-video-icon-btn"
                     (click)="deleteVideoIndex = vi + 1;Delete(); $event.stopPropagation()">
               <mat-icon>delete</mat-icon>
             </button>
@@ -649,18 +649,18 @@
         </ng-container>
       </div>
       <div class="add-video-footer">
-        <button mat-stroked-button (click)="closeDeleteVideo()">Close</button>
+        <button data-testid="emn-close-delete-video-52" mat-stroked-button (click)="closeDeleteVideo()">Close</button>
       </div>
     </div>
   </div>
 
 
   <!-- Video Player Overlay -->
-  <div class="video-overlay-backdrop" *ngIf="showVideoOverlay" (click)="closeVideoOverlay()">
-    <div class="video-overlay-panel" (click)="$event.stopPropagation()">
+  <div data-testid="emn-close-video-overlay-53" class="video-overlay-backdrop" *ngIf="showVideoOverlay" (click)="closeVideoOverlay()">
+    <div data-testid="emn-event-54" class="video-overlay-panel" (click)="$event.stopPropagation()">
       <div class="video-overlay-header">
         <span class="video-overlay-title">{{ overlayVideoTitle }}</span>
-        <button class="video-overlay-close" (click)="closeVideoOverlay()">
+        <button data-testid="emn-close-video-overlay-55" class="video-overlay-close" (click)="closeVideoOverlay()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -674,17 +674,17 @@
   </div>
 
   <!-- Image Preview Overlay -->
-  <div class="overlay-backdrop" *ngIf="showImageOverlay" (click)="closeImage()">
-    <div class="image-preview-panel" (click)="$event.stopPropagation()">
-      <button class="image-close-btn" (click)="closeImage()" [disabled]="imageUploading">
+  <div data-testid="emn-close-image-56" class="overlay-backdrop" *ngIf="showImageOverlay" (click)="closeImage()">
+    <div data-testid="emn-event-57" class="image-preview-panel" (click)="$event.stopPropagation()">
+      <button data-testid="emn-close-image-58" class="image-close-btn" (click)="closeImage()" [disabled]="imageUploading">
         <mat-icon>close</mat-icon>
       </button>
       <img class="preview-image" [src]="previewImageUrl" [alt]="previewImageName">
       <div class="preview-name">{{ previewImageName }}</div>
-      <input #profileImageInput type="file" accept="image/*" hidden (change)="onProfileImageSelected($event)">
+      <input data-testid="emn-change-on-profile-image-selected-59" #profileImageInput type="file" accept="image/*" hidden (change)="onProfileImageSelected($event)">
       <div class="image-edit-actions" *ngIf="previewProfileId || previewProfileMetadataId">
         <ng-container *ngIf="!pendingImageFile; else pendingActions">
-          <button class="image-edit-btn"
+          <button data-testid="emn-trigger-image-upload-60" class="image-edit-btn"
                   [disabled]="imageUploading"
                   (click)="triggerImageUpload(profileImageInput)">
             <mat-icon>edit</mat-icon>
@@ -692,13 +692,13 @@
           </button>
         </ng-container>
         <ng-template #pendingActions>
-          <button class="image-edit-btn ghost"
+          <button data-testid="emn-cancel-pending-image-61" class="image-edit-btn ghost"
                   [disabled]="imageUploading"
                   (click)="cancelPendingImage()">
             <mat-icon>close</mat-icon>
             <span>Cancel</span>
           </button>
-          <button class="image-edit-btn"
+          <button data-testid="emn-confirm-upload-image-62" class="image-edit-btn"
                   [disabled]="imageUploading"
                   (click)="confirmUploadImage()">
             <mat-icon>{{ imageUploading ? 'hourglass_empty' : 'cloud_upload' }}</mat-icon>
@@ -710,13 +710,13 @@
   </div>
 
   <!-- Edit Video Overlay -->
-  <div class="overlay-backdrop" *ngIf="showEditVideoOverlay" (click)="closeEditVideo()">
-    <div class="add-video-panel" (click)="$event.stopPropagation()">
+  <div data-testid="emn-close-edit-video-63" class="overlay-backdrop" *ngIf="showEditVideoOverlay" (click)="closeEditVideo()">
+    <div data-testid="emn-event-64" class="add-video-panel" (click)="$event.stopPropagation()">
 
       <!-- Header -->
       <div class="add-video-header">
         <h2 class="add-video-title">Edit Video</h2>
-        <button mat-icon-button (click)="closeEditVideo()">
+        <button data-testid="emn-close-edit-video-65" mat-icon-button (click)="closeEditVideo()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -807,7 +807,7 @@
                       {{ r.updatedon?.toDate ? (r.updatedon.toDate() | date: 'MMM d, y') : '' }}
                     </div>
                   </div>
-                  <button class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, true)" title="Delete">
+                  <button data-testid="emn-remove-remark-from-separate-66" class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, true)" title="Delete">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -819,7 +819,7 @@
                           placeholder="Add a remark..."
                           rows="2">
                 </textarea>
-                <button class="remark-add-btn"
+                <button data-testid="emn-save-remark-for-entry-67" class="remark-add-btn"
                         (click)="saveRemarkForEntry(i, true)"
                         [disabled]="!RemarkTexts[i]?.trim()">
                   + Save Remark
@@ -836,30 +836,30 @@
 
       <!-- Footer -->
       <div class="add-video-footer">
-        <button mat-stroked-button (click)="closeEditVideo()">Cancel</button>
-        <button class="save-video-btn" (click)="saveEditVideo()" [disabled]="editVideoSaving">
+        <button data-testid="emn-close-edit-video-68" mat-stroked-button (click)="closeEditVideo()">Cancel</button>
+        <button data-testid="emn-save-edit-video-69" class="save-video-btn" (click)="saveEditVideo()" [disabled]="editVideoSaving">
           {{ editVideoSaving ? 'Saving...' : 'Save' }}
         </button>
       </div>
     </div>
   </div>
   <!-- Add Video Overlay -->
-  <div class="overlay-backdrop" *ngIf="showAddVideoOverlay" (click)="closeAddVideo()">
-    <div class="add-video-panel" (click)="$event.stopPropagation()">
+  <div data-testid="emn-close-add-video-70" class="overlay-backdrop" *ngIf="showAddVideoOverlay" (click)="closeAddVideo()">
+    <div data-testid="emn-event-71" class="add-video-panel" (click)="$event.stopPropagation()">
       <!-- Header -->
       <div class="add-video-header">
         <h2 class="add-video-title">Add Video</h2>
-        <button mat-icon-button (click)="closeAddVideo()">
+        <button data-testid="emn-close-add-video-72" mat-icon-button (click)="closeAddVideo()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
 
       <!-- Tab Switcher -->
       <div class="tab-switcher">
-        <button class="tab-btn" [class.tab-active]="activeTab === 'manual'"(click)="switchTab('manual')">
+        <button data-testid="emn-switch-tab-73" class="tab-btn" [class.tab-active]="activeTab === 'manual'"(click)="switchTab('manual')">
           Manual Entry
         </button>
-        <button class="tab-btn" [class.tab-active]="activeTab === 'bulk'" (click)="switchTab('bulk')">
+        <button data-testid="emn-switch-tab-74" class="tab-btn" [class.tab-active]="activeTab === 'bulk'" (click)="switchTab('bulk')">
           Bulk Import
         </button>
       </div>
@@ -892,13 +892,13 @@
           <!-- Video Entries -->
           <div class="video-entries-label">
             <label class="form-label">Video Entries</label>
-            <button class="add-entry-btn" (click)="addVideoEntry()">+ Add Entry</button>
+            <button data-testid="emn-add-video-entry-75" class="add-entry-btn" (click)="addVideoEntry()">+ Add Entry</button>
           </div>
 
           <div class="video-entry" *ngFor="let entry of entriesArray.controls; let i = index" [formGroup]="$any(entry)">
             <div class="entry-header">
               <span class="entry-number">Entry {{ i + 1 }}</span>
-              <button class="remove-entry-btn" (click)="removeVideoEntry(i)" *ngIf="entriesArray.length > 1">
+              <button data-testid="emn-remove-video-entry-76" class="remove-entry-btn" (click)="removeVideoEntry(i)" *ngIf="entriesArray.length > 1">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -964,7 +964,7 @@
                   <div class="remark-item-body">
                     <div class="remark-text-preview">{{ r.text }}</div>
                   </div>
-                  <button class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, false)" title="Delete">
+                  <button data-testid="emn-remove-remark-from-separate-77" class="remark-delete-btn" (click)="removeRemarkFromSeparate(i, ri, false)" title="Delete">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -976,7 +976,7 @@
                           placeholder="Add a remark..."
                           rows="2">
                 </textarea>
-                <button class="remark-add-btn"
+                <button data-testid="emn-save-remark-for-entry-78" class="remark-add-btn"
                         (click)="saveRemarkForEntry(i, false)"
                         [disabled]="!RemarkTexts[i]?.trim()">
                   + Save Remark
@@ -987,13 +987,13 @@
         </div>
 
         <div class="add-video-footer">
-          <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
-          <button class="save-remarks-only-btn"
+          <button data-testid="emn-close-add-video-79" mat-stroked-button (click)="closeAddVideo()">Cancel</button>
+          <button data-testid="emn-save-remarks-only-80" class="save-remarks-only-btn"
                   (click)="saveRemarksOnly()"
                   [disabled]="!addVideoForm.get('participantId')?.valid">
             Save Remarks Only
           </button>
-          <button class="save-video-btn" (click)="saveVideo()">Save</button>
+          <button data-testid="emn-save-video-81" class="save-video-btn" (click)="saveVideo()">Save</button>
         </div>
       </ng-container>
 
@@ -1003,14 +1003,14 @@
 
           <!-- Actions row -->
           <div class="bulk-actions-row">
-            <button class="download-sample-btn" (click)="downloadSampleExcel()">
+            <button data-testid="emn-download-sample-excel-82" class="download-sample-btn" (click)="downloadSampleExcel()">
               <mat-icon>download</mat-icon>
               Download Sample Excel
             </button>
             <label class="upload-excel-btn">
               <mat-icon>upload_file</mat-icon>
               {{ bulkImportFile ? bulkImportFile.name : 'Choose Excel File' }}
-              <input type="file" accept=".xlsx,.xls,.csv" (change)="onBulkFileSelected($event)" hidden>
+              <input data-testid="emn-change-on-bulk-file-selected-83" type="file" accept=".xlsx,.xls,.csv" (change)="onBulkFileSelected($event)" hidden>
             </label>
           </div>
 
@@ -1085,8 +1085,8 @@
         </div>
 
         <div class="add-video-footer">
-          <button mat-stroked-button (click)="closeAddVideo()">Cancel</button>
-          <button class="save-video-btn"
+          <button data-testid="emn-close-add-video-84" mat-stroked-button (click)="closeAddVideo()">Cancel</button>
+          <button data-testid="emn-save-bulk-import-85" class="save-video-btn"
                   (click)="saveBulkImport()"
                   [disabled]="bulkImportSaving || !bulkImportProcessed || getBulkValidCount() === 0">
             {{ bulkImportSaving ? 'Importing...' : 'Import Valid Rows (' + getBulkValidCount() + ')' }}
@@ -1098,11 +1098,11 @@
   </div>
 
   <!-- Bulk Error Dialog -->
-  <div class="overlay-backdrop" *ngIf="showBulkErrorDialog" (click)="closeBulkErrorDialog()">
-    <div class="error-dialog-panel" (click)="$event.stopPropagation()">
+  <div data-testid="emn-close-bulk-error-dialog-86" class="overlay-backdrop" *ngIf="showBulkErrorDialog" (click)="closeBulkErrorDialog()">
+    <div data-testid="emn-event-87" class="error-dialog-panel" (click)="$event.stopPropagation()">
       <div class="note-header">
         <h3>Import Errors Found</h3>
-        <button mat-icon-button (click)="closeBulkErrorDialog()">
+        <button data-testid="emn-close-bulk-error-dialog-88" mat-icon-button (click)="closeBulkErrorDialog()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -1116,7 +1116,7 @@
         </div>
       </div>
       <div class="note-footer">
-        <button class="save-video-btn" (click)="closeBulkErrorDialog()">Got it</button>
+        <button data-testid="emn-close-bulk-error-dialog-89" class="save-video-btn" (click)="closeBulkErrorDialog()">Got it</button>
       </div>
     </div>
   </div>

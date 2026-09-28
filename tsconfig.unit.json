@@ -1,0 +1,27 @@
+/* tsconfig.unit.json — compile scope for the PURE-LOGIC unit tests (no Angular TestBed, no Firestore).
+ *
+ * WHY THIS EXISTS: tsconfig.spec.json includes `src/**​/*.spec.ts`, so `ng test` type-checks the WHOLE app
+ * plus all 417 existing spec files. Four of those do not currently compile — a Node `os` import in
+ * schedule-dialog.component.ts, a missing amazon-chime-sdk-js dependency, a `console` import in
+ * content-analytics.component.ts, and a wrong class name in assigncategorydialog.component.spec.ts — which
+ * aborts the run before any test executes. `--include` filters what RUNS, not what COMPILES, so it does not
+ * help. Those are pre-existing app issues; fixing them would let this file be retired.
+ *
+ * NO PER-FILE MAINTENANCE: the include below is a glob over the `*.unit.spec.ts` naming convention, and
+ * TypeScript pulls in whatever those specs import. Adding a new pure engine under test needs no edit here —
+ * just name the spec `<thing>.unit.spec.ts` and it is in scope, in the CI gate, and routed to its system.
+ *
+ * Usage:
+ *   npx ng test --watch=false --browsers=ChromeHeadless --ts-config=tsconfig.unit.json \
+ *               --include="**​/*.unit.spec.ts"
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/unit",
+    "types": ["jasmine"]
+  },
+  "include": [
+    "src/app/**/*.unit.spec.ts"
+  ]
+}

@@ -37,7 +37,7 @@
 
             <div class="zoomcontent">
               <div>
-                <button class="zoomlaunchbtn" mat-button (click)="joinRoom_Queue(assignment)">Join Meeting Now</button>
+                <button data-testid="lor-join-room-queue-1" class="zoomlaunchbtn" mat-button (click)="joinRoom_Queue(assignment)">Join Meeting Now</button>
               </div>
             </div>
           </div>
@@ -84,7 +84,7 @@
               <div *ngIf="i == 0">
                 <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
                   <div>
-                    <button class="zoomlaunchbtn" mat-button (click)="joinRoom_Appointment(appointment)">Join Meeting Now</button>
+                    <button data-testid="lor-join-room-appointment-2" class="zoomlaunchbtn" mat-button (click)="joinRoom_Appointment(appointment)">Join Meeting Now</button>
                   </div>
                 </div>
                 <ng-template #watingmessage>

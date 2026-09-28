@@ -2,11 +2,11 @@
   <mat-card-content>
     <mat-form-field appearance="outline" class="filter-field">
       <mat-label>Filter</mat-label>
-      <input matInput (keyup)="applyFilter($event)" placeholder="Ex. Dashboard" #input>
+      <input data-testid="rcf-ex-dashboard" matInput (keyup)="applyFilter($event)" placeholder="Ex. Dashboard" #input>
       <mat-icon matSuffix>search</mat-icon>
     </mat-form-field>&nbsp;&nbsp;&nbsp;
-    <button mat-stroked-button type="button" (click)="createRoute()">Create Route</button>&nbsp;
-    <button mat-stroked-button type="button" (click)="toggleExpandAll()">
+    <button data-testid="rcf-createroute" mat-stroked-button type="button" (click)="createRoute()">Create Route</button>&nbsp;
+    <button data-testid="rcf-toggleexpandall" mat-stroked-button type="button" (click)="toggleExpandAll()">
       {{ isAllExpanded ? 'Collapse All' : 'Expand All' }}
     </button>
     <div class="table-container">
@@ -18,7 +18,7 @@
         <ng-container matColumnDef="expand">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let element">
-            <button mat-icon-button 
+            <button data-testid="rcf-toggleexpand" mat-icon-button 
                     *ngIf="hasChildren(element) && !element.isChild" 
                     (click)="toggleExpand(element)">
               <mat-icon>{{element.isExpanded ? 'expand_less' : 'expand_more'}}</mat-icon>
@@ -80,7 +80,7 @@
         <ng-container matColumnDef="Edit">
         <th mat-header-cell *matHeaderCellDef> Edit </th>
         <td mat-cell *matCellDef="let element">
-          <button mat-mini-fab
+          <button data-testid="rcf-editroute" mat-mini-fab
           [disabled]="element.route === '/routeconfiguration'"
             *ngIf="!element.isChild" 
             color="primary" 
@@ -93,7 +93,7 @@
         <ng-container matColumnDef="Delete">
         <th mat-header-cell *matHeaderCellDef> Delete </th>
         <td mat-cell *matCellDef="let element">
-          <button mat-mini-fab
+          <button data-testid="rcf-deleteroute" mat-mini-fab
           [disabled]="element.route === '/routeconfiguration'"
             *ngIf="!element.isChild" 
             color="warn" 

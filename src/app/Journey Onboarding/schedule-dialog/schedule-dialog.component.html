@@ -20,10 +20,10 @@
           <span *ngIf="column === 'name'">{{mapProfile[element['profileid']]}}</span>
           <span *ngIf="column === 'phonenumber'">{{mapphone[element['profileid']]}}</span>
           <span *ngIf="column === 'journey'">{{mapjourneyname[element['journeyref']?.id]}}</span>
-          <span *ngIf="column === 'product+bonus'" style="cursor: pointer;" (click)="openProduct(element)">{{element['participantproducts']?.length}}</span>
+          <span data-testid="jschd-span-001" *ngIf="column === 'product+bonus'" style="cursor: pointer;" (click)="openProduct(element)">{{element['participantproducts']?.length}}</span>
           <span *ngIf="column === 'purchasedate'">{{element['purchasedate']?.toDate() | date: 'mediumDate'}}</span>
           <span *ngIf="column === 'onboardingtime'">{{element['onboardingscheduled']?.toDate() | date:'medium'}}</span>  
-          <span *ngIf="column === 'action'" style="color: green;cursor: pointer;" (click)="scheduledate()">Schedule</span>
+          <span data-testid="jschd-span-002" *ngIf="column === 'action'" style="color: green;cursor: pointer;" (click)="scheduledate()">Schedule</span>
         </td>
       </ng-container>
 
@@ -49,7 +49,7 @@
   <!-- Calendar Section -->
   <!-- <div *ngIf="opencalender"> -->
     <!-- <mat-form-field appearance="outline">
-      <input matInput [(ngModel)]="selectedDate" [min]="mindate" [matDatepicker]="picker"  placeholder="MM-DD-YYYY"  (dateChange)="onDateSelect()">
+      <input data-testid="jschd-inp-003" matInput [(ngModel)]="selectedDate" [min]="mindate" [matDatepicker]="picker"  placeholder="MM-DD-YYYY"  (dateChange)="onDateSelect()">
       <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
       <mat-datepicker #picker></mat-datepicker>
     </mat-form-field> -->
@@ -60,7 +60,7 @@
   <div *ngIf="reschedule != true">
     <header class="header color-teal">
       <h1 class="title">Schedule Appointment</h1>
-      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+      <button data-testid="jschd-btn-004" mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
         <mat-icon style="color:white">close</mat-icon>
       </button>
     </header>
@@ -81,7 +81,7 @@
         <div class="meeting-platform-section" *ngIf="loggedinProfileRole['developer']">
           <label class="platform-label">Select Meeting Platform</label>
           <div class="platform-options">
-            <div
+            <div data-testid="jschd-div-005"
               class="platform-card"
               [class.selected]="selectedPlatform === 'zoom'"
               (click)="selectPlatform('zoom')"
@@ -89,7 +89,7 @@
               <img src="assets/Images/zoom-icon.png" alt="Zoom" class="platform-icon" />
               <span>Zoom</span>
             </div>
-            <div
+            <div data-testid="jschd-div-006"
               class="platform-card"
               [class.selected]="selectedPlatform === 'openvidu'"
               (click)="selectPlatform('openvidu')"
@@ -116,7 +116,7 @@
                     </div>
                   </div>
             
-                  <button class="book-button" (click)="confirmSlot(slot)">
+                  <button data-testid="jschd-btn-007" class="book-button" (click)="confirmSlot(slot)">
                     <span class="button-text">Book Now</span>
                     <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M5 12h14"></path>
@@ -139,7 +139,7 @@
 
     <header class="header color-red">
       <h1 class="title">Do you want to cancel Booked Slot?</h1>
-      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+      <button data-testid="jschd-btn-008" mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
         <mat-icon style="color:white">close</mat-icon>
       </button>
     </header>
@@ -152,10 +152,10 @@
       <br>
       <h4><b style="color: #0C6385;text-align: start;">Reason for Cancel</b></h4>
       <mat-form-field appearance="outline" class="textareafield">
-        <textarea matInput placeholder="Type Here" rows="" [(ngModel)]="generalnote"></textarea>
+        <textarea data-testid="jschd-txt-009" matInput placeholder="Type Here" rows="" [(ngModel)]="generalnote"></textarea>
       </mat-form-field>
 
-    <button
+    <button data-testid="jschd-btn-010"
       mat-raised-button
       class="confirmbutton"
       [disabled]="[null,undefined,''].includes(generalnote)"
@@ -188,11 +188,11 @@
   <!-- <div class="slotsbox" *ngIf="userAvailableSlots.length != 0">
     <h5 class="slotheading">Available Slots</h5>
     <mat-chip-list [multiple]="false" [selectable]="true">
-      <mat-chip *ngFor="let slot of userAvailableSlots; let i = index" (click)="selectedSlot = i" [selected]="selectedSlot == i">
+      <mat-chip data-testid="jschd-matchip-011" *ngFor="let slot of userAvailableSlots; let i = index" (click)="selectedSlot = i" [selected]="selectedSlot == i">
         {{slot.start | date:'shortTime'}} - {{slot.end | date:'shortTime'}} with {{slot.specialist}}
       </mat-chip>
     </mat-chip-list>
-    <button class="bookbtn" mat-stroked-button (click)="confirmSlot()">Book Appointment</button>
+    <button data-testid="jschd-btn-012" class="bookbtn" mat-stroked-button (click)="confirmSlot()">Book Appointment</button>
   </div> -->
   
 </div>
@@ -201,7 +201,7 @@
   <!-- <div class="available-months">
     <h3>Available Months for WISH:</h3>
     <div class="month-buttons">
-      <button mat-raised-button *ngFor="let month of availableMonths" [ngClass]="{'selected': month === 'December'}">
+      <button data-testid="jschd-btn-013" mat-raised-button *ngFor="let month of availableMonths" [ngClass]="{'selected': month === 'December'}">
         {{month}}
       </button>
     </div>

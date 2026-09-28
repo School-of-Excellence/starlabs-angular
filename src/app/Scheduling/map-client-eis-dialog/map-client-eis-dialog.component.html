@@ -43,18 +43,18 @@
               EIS Name <strong>Required</strong>
             </mat-error>
           </mat-form-field>
-          <button class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeEisRole(i)">
+          <button data-testid="mced-remove-eis-role-1" class="addremovebtn" *ngIf="i != 0" mat-icon-button type="button" (click)="removeEisRole(i)">
             <mat-icon class="icon">remove</mat-icon>
           </button>
-          <button class="addremovebtn" *ngIf="i+1 == eisWithRolesfunction().controls.length" mat-icon-button type="button" (click)="addEisRole()">
+          <button data-testid="mced-add-eis-role-2" class="addremovebtn" *ngIf="i+1 == eisWithRolesfunction().controls.length" mat-icon-button type="button" (click)="addEisRole()">
             <mat-icon class="icon">add</mat-icon>
           </button>
         </li>
       </ul>
     </div>
     <div>
-      <button mat-stroked-button class="cancelbtn" type="button" (click)="onCancel()"> Cancel </button>
-      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="assignEISForm.invalid" mat-raised-button >Submit</button>
+      <button data-testid="mced-on-cancel-3" mat-stroked-button class="cancelbtn" type="button" (click)="onCancel()"> Cancel </button>
+      <button data-testid="mced-button-4" mat-stroked-button class="submitbtn" type="submit" [disabled]="assignEISForm.invalid" mat-raised-button >Submit</button>
     </div>
   </form>
 </div>

@@ -6,6 +6,7 @@ import { AuthguardService } from '../../authguard.service';
 import { CommonModule, DatePipe, KeyValue } from '@angular/common';
 import { ScheduleDialogComponent } from '../schedule-dialog/schedule-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
+import { OverlayContainer } from '@angular/cdk/overlay';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -29,6 +30,10 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { CrossOverMetricsDialogComponent } from '../cross-over-metrics-dialog/cross-over-metrics-dialog.component';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
+// Pure business rules, extracted 2026-09-10 — see journeycoach.engine.ts for what and why.
+import * as engine from './journeycoach.engine';
+import { scorePriority, PriorityInput } from '../journey-coach-health-dashboard/priority.engine';
+import { normalizeCoachHealth } from '../journey-coach-health-dashboard/coach-health.types';
 
 interface ColumnConfig {
   key: string;
@@ -226,8 +231,9 @@ export class JourneycoachDashboardComponent {
   monthyear;
   daysInput: number | null = null;
 
-  // Object declarations 
+  // Object declarations
   mapjourneyname: any = {};
+  mapproductname: any = {};
   journeyTypeMap: { [key: string]: string } = {};
   modeMap: any = {};
   mapMetaData: any = {};
@@ -283,7 +289,7 @@ export class JourneycoachDashboardComponent {
 
     allParticipants: { count: 0, data: [] },
 
-    // Sales 
+    // Sales
     grosssale: { count: 0, data: [] },
     assuredsale: { count: 0, data: [] },
     grossnewsale: { count: 0, data: [] },
@@ -299,27 +305,28 @@ export class JourneycoachDashboardComponent {
     assureddowngradetooldsale: { count: 0, data: [] },
     assureddowngradetonewsale: { count: 0, data: [] },
 
-    // Subscription 
+    // Subscription
     nextMonth: { count: 0, data: [] },
     lastMonth: { count: 0, data: [] },
     currentMonth: { count: 0, data: [] },
     totalMonth: { count: 0, data: [] },
 
-    // AR Health 
+    // AR Health
     regularstatus: { count: 0, data: [] },
     missedstatus: { count: 0, data: [] },
     defaultedstatus: { count: 0, data: [] },
     lockedstatus: { count: 0, data: [] },
     fullypaidstatus: { count: 0, data: [] },
 
-    // Onboarding 
+    // Onboarding
     notassured: { count: 0, data: [] },
     all: { count: 0, data: [] },
     last7DaysnotOnboarded: { count: 0, data: [] },
     last15daysnotOnboarded: { count: 0, data: [] },
     onboarded: { count: 0, data: [] },
+    toBeOnboardedProduct: { count: 0, data: [] },
 
-    // Product Initiation 
+    // Product Initiation
     alljourneynotstarted: { count: 0, data: [] },
     lessthan30daysjourneynotstarted: { count: 0, data: [] },
     morethan30daysjourneynotstarted: { count: 0, data: [] },
@@ -332,10 +339,14 @@ export class JourneycoachDashboardComponent {
     more180Engagement: { count: 0, data: [] },
     ecosystem: { count: 0, data: [] },
     dfu: { count: 0, data: [] },
+    ecosystemActive: { count: 0, data: [] },
+    ecosystemNonActive: { count: 0, data: [] },
+    dfuActive: { count: 0, data: [] },
+    dfuNonActive: { count: 0, data: [] },
     discontinued: { count: 0, data: [] },
     overallParticipants: { count: 0, data: [] },
 
-    // Customer Support 
+    // Customer Support
     eventtickets: { count: 0, data: [] },
     eventticketnew: { count: 0, data: [] },
     eventticketresponded: { count: 0, data: [] },
@@ -361,7 +372,7 @@ export class JourneycoachDashboardComponent {
     referralticketresponded: { count: 0, data: [], avg: 0 },
     referralticketsclosed: { count: 0, data: [], avg: 0 },
 
-    // CURA 
+    // CURA
     continuitySales: { count: 0, data: [] },
     upgradeSales: { count: 0, data: [] },
     referralSales: { count: 0, data: [] },
@@ -417,6 +428,9 @@ export class JourneycoachDashboardComponent {
   tableSearchText: string = '';
   filteredTableData: any[] = [];
   pickerMode: string = 'month';
+  darkMode: boolean = false;
+  arLastMonth: any = { regular: 0, missed: 0, defaulted: 0, locked: 0, fullypaid: 0 };
+  onboardingProducts: any[] = [];
   tableType: string = null;
   selectedDateFilter = null;
 
@@ -534,6 +548,16 @@ export class JourneycoachDashboardComponent {
   selectedProfile: InterimProfile | null = null;
   isAllMonthsDialogOpen: boolean = false;
   askAHLoveLetterSummary: any = null;
+
+  // Participant Health analytics — real coach-set data mirrored from Journey-Coach-Health
+  coachSetHealth = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
+  priorityBands = { urgent: 0, watch: 0, calm: 0 };
+  needsAttentionTop: { id: string; name: string; initials: string; statusLine: string; urgency: string; color: string }[] = [];
+  ticketsCount = 0;
+  needsAttnCount = 0;
+  renew90Count = 0;
+  private healthAnalyticsRequested = false;
+  private static healthCache: { at: number; data: any } | null = null;
   journeyCoachTags: any[] = [];
   isTagProfilesDialogOpen: boolean = false;
   selectedTagName: string = '';
@@ -640,7 +664,8 @@ export class JourneycoachDashboardComponent {
     private fb: FormBuilder,
     private datePipe: DatePipe,
     private dialog: MatDialog,
-    private router: Router
+    private router: Router,
+    private overlayContainer: OverlayContainer
   ) {
     this.guard.getRoles().then(roles => {
       this.loggedInProfileid = roles["profile_ref"].id
@@ -664,6 +689,8 @@ export class JourneycoachDashboardComponent {
 
   async ngOnInit() {
     this.isLoading = true;
+    try { this.darkMode = localStorage.getItem('jcdTheme') === 'dark'; } catch(e) {}
+    this.syncOverlayTheme();
     this.setCurrentMonth();
 
     try {
@@ -718,6 +745,14 @@ export class JourneycoachDashboardComponent {
         this.checkAllDataLoaded();
       });
 
+      getDocs(collection(this.firestore, 'products')).then(snap => {
+        for (let i = 0; i < snap.docs.length; i++) {
+          const element = snap.docs[i].data();
+          this.mapproductname[snap.docs[i].id] = element['product'];
+        }
+        this.cdr.markForCheck();
+      });
+
       this.fetchData();
       this.loadQueueList();
       this.buildDisplayLists();
@@ -736,7 +771,7 @@ export class JourneycoachDashboardComponent {
     }
   };
 
-  // Function to set current month date 
+  // Function to set current month date
   setCurrentMonth() {
     const now = new Date();
     this.startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -744,14 +779,253 @@ export class JourneycoachDashboardComponent {
     this.monthyear = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, '0');
   }
 
-  // Function to toggle date filter 
+  // Function to toggle date filter
   toggleDate() {
     this.pickerMode = this.pickerMode == 'month' ? 'range' : 'month';
     this.setCurrentMonth();
     this.fetchData();
   }
 
-  // Update date based on month selection 
+  // Toggle premium dark mode (scoped to this dashboard; persisted)
+  toggleTheme() {
+    this.darkMode = !this.darkMode;
+    try { localStorage.setItem('jcdTheme', this.darkMode ? 'dark' : 'light'); } catch(e) {}
+    this.syncOverlayTheme();
+  }
+  private syncOverlayTheme() {
+    try { this.overlayContainer.getContainerElement().classList.toggle('jcd-dark', this.darkMode); } catch(e) {}
+  }
+
+  // AR Health: current-month bucket count minus last-month (drives the ▲/▼ delta)
+  getArDelta(bucket: string): number {
+    const cur: any = {
+      regular: this.originalData['regularstatus'].count,
+      missed: this.originalData['missedstatus'].count,
+      defaulted: this.originalData['defaultedstatus'].count,
+      locked: this.originalData['lockedstatus'].count,
+      fullypaid: this.originalData['fullypaidstatus'].count
+    };
+    return (cur[bucket] || 0) - ((this.arLastMonth && this.arLastMonth[bucket]) || 0);
+  }
+
+  // Onboarding grouped BY PRODUCT (journeyref.id -> product name). Subtotals reconcile to the cohort counts:
+  // sum(within7)===last7DaysnotOnboarded, sum(plus7)===last15daysnotOnboarded, sum(toOnboard)===all, sum(notAssured)===notassured.
+  recomputeOnboardingProducts() {
+    const nameOf = (rec: any) => {
+      const jid = rec && rec['journeyref'] && rec['journeyref'].id ? rec['journeyref'].id : null;
+      const pname = this.getProductName(rec);
+      return (jid && this.mapjourneyname[jid]) ? this.mapjourneyname[jid] : (pname !== '-' ? pname : 'Unassigned');
+    };
+    const map: Record<string, any> = {};
+    const ensure = (n: string) => (map[n] = map[n] || { product: n, within7: 0, plus7: 0, toOnboard: 0, notAssured: 0 });
+    (this.originalData['last7DaysnotOnboarded']?.data || []).forEach((r: any) => { const m = ensure(nameOf(r)); m.within7++; m.toOnboard++; });
+    (this.originalData['last15daysnotOnboarded']?.data || []).forEach((r: any) => { const m = ensure(nameOf(r)); m.plus7++; m.toOnboard++; });
+    (this.originalData['notassured']?.data || []).forEach((r: any) => { const m = ensure(nameOf(r)); m.notAssured++; });
+    this.onboardingProducts = Object.values(map).sort((a: any, b: any) => b.toOnboard - a.toOnboard);
+  }
+
+  openOnboardingProduct(p: any) {
+    const filtered = (this.originalData['all']?.data || []).filter((r: any) => {
+      const jid = r && r['journeyref'] && r['journeyref'].id ? r['journeyref'].id : null;
+      const pname = this.getProductName(r);
+      const name = (jid && this.mapjourneyname[jid]) ? this.mapjourneyname[jid] : (pname !== '-' ? pname : 'Unassigned');
+      return name === p.product;
+    });
+    const title = 'To Be Onboarded — ' + p.product;
+
+    if (this.currentTableConfig?.title !== title) { this.showTable = false; }
+
+    this.originalData['toBeOnboardedProduct'].data = filtered;
+    this.originalData['toBeOnboardedProduct']['count'] = filtered.length;
+    this.tableConfigs['toBeOnboardedProduct'].title = title;
+    this.onBoxClick('toBeOnboardedProduct');
+  }
+
+  // Gross Sales legend — same engine rules the drill-table legend uses (each pill = its drilled list length)
+  getGrossPendingCount() { return engine.countPending(this.originalData['grosssale']?.data || []); }
+  getGrossAssuredCount() { return engine.countAssured(this.originalData['grosssale']?.data || []); }
+  getGrossNotAssuredCount() { return engine.countNotAssured(this.originalData['grosssale']?.data || []); }
+
+  // Participant Health (Option B): KPI strip from real sources; full coach-set-health board lives at /journey-coach-health
+  goToHealthBoard() { const url = this.router.serializeUrl(this.router.createUrlTree(['/journey-coach-health'])); window.open(url, '_blank'); }
+  getRenewingSoon() { return (this.originalData['currentMonth']?.count || 0) + (this.originalData['nextMonth']?.count || 0); }
+
+  /** width % of a coach-set-health segment relative to the assessed+unassessed total */
+  chPct(n: number): number { return this.coachSetHealth.total ? (n / this.coachSetHealth.total) * 100 : 0; }
+
+  /**
+   * Participant Health analytics — mirrors the Journey-Coach-Health dashboard's aggregates
+   * (coach-set health distribution, priority bands, needs-attention list, open tickets) over the same
+   * population. One-shot getDocs snapshot, cached statically (5 min) so navigation/tab-shifts never refetch.
+   */
+  private async loadCoachHealthAnalytics(): Promise<void> {
+    const cache = JourneycoachDashboardComponent.healthCache;
+    if (cache && Date.now() - cache.at < 5 * 60 * 1000) {
+      Object.assign(this, cache.data);
+      this.cdr.markForCheck();
+      return;
+    }
+    try {
+      const now = Date.now();
+      const DAY = 86400000;
+      const QUIET = 60, RENEWAL = 90, LAPSED = 90, TTL = 60;
+      const toDate = (v: any): Date | null => {
+        if (!v) return null;
+        if (v instanceof Date) return v;
+        if (typeof v?.toDate === 'function') { try { return v.toDate(); } catch { return null; } }
+        const d = new Date(v); return isNaN(d.getTime()) ? null : d;
+      };
+      const isDiscontinued = (s: any): boolean => /discontinued|banned|late/.test((s ?? '').toString().trim().toLowerCase());
+
+      const metaRes: any = await this.guard.getParticipantMetaMap();
+      const docdata: any = metaRes?.docdata || {};
+      const pids = Object.keys(docdata);
+
+      // Roster-scoped reads — chunked where-in over the participant pids only; no whole-collection dumps.
+      const chunk = <T>(a: T[], n: number): T[][] => { const o: T[][] = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
+      const scoped = async (coll: string, field: string, values: any[]): Promise<any[]> => {
+        const rows: any[] = [];
+        await Promise.all(chunk(values, 30).map(c =>
+          getDocs(query(collection(this.firestore, coll), where(field, 'in', c))).then(s => s.forEach(d => rows.push(d.data())))
+        ));
+        return rows;
+      };
+      const profileRefs = pids.map(pid => doc(this.firestore, 'profile_data', pid));
+      // (7) Appointments filtered IN THE QUERY — journey-coach, attended, not cancelled — so fewer docs come back.
+      // Needs a composite index (bookedby + journeycoach + attended + cancelled); falls back to the roster read if absent.
+      const scopedAppointmentsAttended = async (): Promise<any[]> => {
+        const rows: any[] = [];
+        await Promise.all(chunk(profileRefs, 30).map(c =>
+          getDocs(query(collection(this.firestore, 'appointments'),
+            where('bookedby', 'in', c),
+            where('journeycoach', '==', true),
+            where('attended', '==', true),
+            where('cancelled', '==', false)
+          )).then(s => s.forEach(d => rows.push(d.data())))
+        ));
+        return rows;
+      };
+      let apRows: any[];
+      try { apRows = await scopedAppointmentsAttended(); }
+      catch (e) { console.warn('appointments filtered-query index missing; falling back to roster read', e); apRows = await scoped('appointments', 'bookedby', profileRefs); }
+
+      const [hsRows, tpRows] = await Promise.all([
+        scoped('healthtracker_healthstate', 'profileid', pids),
+        scoped('healthtracker_touchpoint', 'profileid', pids),
+      ]);
+
+      // (5) Open tickets — server-side COUNT only (getCountFromServer), roster-scoped, no doc data fetched.
+      // Needs a composite index (clientid + status.status); falls back to the participant-metadata ticket flag.
+      let ticketsCount = 0;
+      try {
+        const tc = await Promise.all(chunk(pids, 30).map(c =>
+          getCountFromServer(query(collection(this.firestore, 'clientissue'),
+            where('clientid', 'in', c), where('status.status', '==', 'open')
+          )).then(s => s.data().count)
+        ));
+        ticketsCount = tc.reduce((a, b) => a + b, 0);
+      } catch (e) {
+        console.warn('open-tickets count index missing; falling back to metadata', e);
+        ticketsCount = pids.reduce((n, pid) => n + (Number(docdata[pid]?.['customersupporttickets']) > 0 ? 1 : 0), 0);
+      }
+
+      // latest coach-set health per profileid
+      const latestHealth: Record<string, { state: any; date: Date | null }> = {};
+      hsRows.forEach((x: any) => {
+        const st = normalizeCoachHealth(x['state']); if (!st) return;
+        const pid = x['profileid']; if (!pid) return;
+        const dt = toDate(x['date']);
+        const cur = latestHealth[pid];
+        if (!cur || !cur.date || (dt && dt >= cur.date)) latestHealth[pid] = { state: st, date: dt };
+      });
+      // last coach contact (touchpoint + attended journey-coach appointment)
+      const lastTouch: Record<string, number> = {};
+      const bump = (pid: any, dt: Date | null) => { if (pid && dt) lastTouch[pid] = Math.max(lastTouch[pid] || 0, dt.getTime()); };
+      tpRows.forEach((x: any) => { bump(x['profileid'], toDate(x['date'])); });
+      apRows.forEach((x: any) => {
+        if (x['journeycoach'] !== true || x['attended'] !== true || x['cancelled'] === true) return;
+        const ref = x['bookedby']; const pid = typeof ref === 'string' ? ref : ref?.id;
+        bump(pid, toDate(x['starttime']) || toDate(x['date']));
+      });
+      // (5) per-person open tickets now come from participant metadata; the server count above drives the tile.
+
+      const ch = { happy: 0, neutral: 0, unhappy: 0, atRisk: 0, critical: 0, notAssessed: 0, total: 0 };
+      const bands = { urgent: 0, watch: 0, calm: 0 };
+      let needsAttn = 0, renew90 = 0;
+      const needs: any[] = [];
+
+      for (const pid of pids) {
+        const meta: any = docdata[pid] || {};
+        const subEnd = toDate(meta['subscriptionend']);
+        const daysToRenewal = subEnd ? Math.floor((subEnd.getTime() - now) / DAY) : null;
+        const subActive = daysToRenewal != null && daysToRenewal >= 0;
+        const lc = lastTouch[pid] || null;
+        const daysSinceCoach = lc ? Math.floor((now - lc) / DAY) : null;
+        const renewalWindow = daysToRenewal != null && daysToRenewal >= 0 && daysToRenewal <= RENEWAL;
+        const lapsed = daysToRenewal != null && daysToRenewal < 0 && daysToRenewal >= -LAPSED && !isDiscontinued(meta['customerstatus']);
+        const goingQuiet = subActive && daysSinceCoach != null && daysSinceCoach > QUIET;
+        const openTickets = Number(meta['customersupporttickets']) || 0;
+        if (renewalWindow) renew90++;
+
+        const entry = latestHealth[pid];
+        const fresh = entry && entry.date && (now - entry.date.getTime() <= TTL * DAY) ? entry.state : null;
+        if (fresh === 'HAPPY') ch.happy++;
+        else if (fresh === 'NEUTRAL') ch.neutral++;
+        else if (fresh === 'UNHAPPY') ch.unhappy++;
+        else if (fresh === 'AT_RISK') ch.atRisk++;
+        else if (fresh === 'CRITICAL') ch.critical++;
+        else ch.notAssessed++;
+        ch.total++;
+
+        const pr = scorePriority({
+          daysSinceCoach, daysToRenewal, notStarted: false, lapsed, renewalWindow, goingQuiet,
+          financialstatus: meta['financialstatus'] ?? null, openTickets,
+          opportunities: Array.isArray(meta['unconsumedproducts']) ? meta['unconsumedproducts'] : [],
+          opportunitiesConsumed: Array.isArray(meta['consumedproducts']) ? meta['consumedproducts'] : [],
+        } as PriorityInput);
+        if (pr.priorityBand === 'High') bands.urgent++;
+        else if (pr.priorityBand === 'Medium') bands.watch++;
+        else bands.calm++;
+
+        if (goingQuiet || lapsed || renewalWindow || openTickets > 0) {
+          needsAttn++;
+          let statusLine = '';
+          if (lapsed) statusLine = `Lapsed ${Math.abs(daysToRenewal as number)}d`;
+          else if (renewalWindow) statusLine = `Renewal in ${daysToRenewal}d`;
+          else if (goingQuiet) statusLine = `Quiet ${daysSinceCoach}d`;
+          else statusLine = `${openTickets} open ticket${openTickets > 1 ? 's' : ''}`;
+          needs.push({ id: pid, name: meta['name'] || pid, priority: pr.priority, band: pr.priorityBand, statusLine: (pr.reason && pr.reason !== 'On track') ? pr.reason : statusLine });
+        }
+      }
+
+      needs.sort((a, b) => b.priority - a.priority);
+      const palette = ['#4338ca', '#0f766e', '#c2410c', '#9d174d', '#5856d6', '#2aa9bf', '#be185d'];
+      const colorOf = (s: string) => palette[Math.abs([...(s || '')].reduce((h, c) => ((h * 31 + c.charCodeAt(0)) | 0), 0)) % palette.length];
+      const initialsOf = (name: string) => {
+        const p = (name || '').trim().split(/\s+/).filter(Boolean);
+        return (p.length >= 2 ? p[0][0] + p[p.length - 1][0] : (name || '?').slice(0, 2)).toUpperCase();
+      };
+
+      const data = {
+        coachSetHealth: ch,
+        priorityBands: bands,
+        ticketsCount,
+        needsAttnCount: needsAttn,
+        renew90Count: renew90,
+        needsAttentionTop: needs.slice(0, 3).map(p => ({
+          id: p.id, name: p.name, initials: initialsOf(p.name), statusLine: p.statusLine,
+          urgency: p.band === 'High' ? 'Urgent' : 'Watch', color: colorOf(p.id),
+        })),
+      };
+      Object.assign(this, data);
+      JourneycoachDashboardComponent.healthCache = { at: Date.now(), data };
+      this.cdr.markForCheck();
+    } catch (e) {
+      console.error('loadCoachHealthAnalytics error', e);
+    }
+  }
+
+  // Update date based on month selection
   updateDate() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -762,7 +1036,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // Function to toggle date of today and last 7 days 
+  // Function to toggle date of today and last 7 days
   onDateFilterClick(filterType: string): void {
     this.selectedDateFilter = filterType;
 
@@ -797,8 +1071,8 @@ export class JourneycoachDashboardComponent {
       this.daysInput = 60;
     }
   }
-  
-  // move to next month 
+
+  // move to next month
   forwardMonth() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -811,7 +1085,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // move to previous month 
+  // move to previous month
   backwardMonth() {
     let year = parseInt(this.monthyear.split('-')[0]);
     let month = parseInt(this.monthyear.split('-')[1]);
@@ -824,7 +1098,7 @@ export class JourneycoachDashboardComponent {
     this.fetchData();
   }
 
-  // Function to check if all data is loaded 
+  // Function to check if all data is loaded
   private checkAllDataLoaded(): void {
     const allLoaded = Object.values(this.loadingStates).every(state => state === true);
     const loadedCount = Object.values(this.loadingStates).filter(s => s === true).length;
@@ -839,7 +1113,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to call all data 
+  // Function to call all data
   fetchData() {
     this.ngOnDestroy();
     this.isLoading = true
@@ -859,6 +1133,16 @@ export class JourneycoachDashboardComponent {
     // this.loadCustomerSupport();
     this.loadModes();
     this.getModes();
+
+    // Ask AH / Love Letter follows the universal (top toolbar) date filter — no separate filter
+    const askWin = this.getUniversalDateWindow();
+    this.filterStartDate = askWin.start;
+    this.filterEndDate = askWin.end;
+    this.isFetchingData = true;
+    this.fetchAskAHAndLoveLetterData(askWin.start, askWin.end);
+
+    // Participant Health analytics — deferred + once per instance; cached across navigation so tab shifts don't refetch
+    if (!this.healthAnalyticsRequested) { this.healthAnalyticsRequested = true; setTimeout(() => this.loadCoachHealthAnalytics(), 1200); }
   }
 
   buildDisplayLists() {
@@ -894,7 +1178,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to initialize columns for each column 
+  // Function to initialize columns for each column
   initializeColumns() {
     this.salesLeadsColumns = [
       { key: 'name', header: 'Name', width: '10%', type: 'text' },
@@ -913,7 +1197,7 @@ export class JourneycoachDashboardComponent {
       { key: 'addnotes', header: '+', width: '25%', type: 'text', substringStart: 0, substringEnd: 50 }
     ]
 
-    //For upgrade sale payment plan details 
+    //For upgrade sale payment plan details
 
     this.upgradeSalesColumns = [
       { key: 'name', header: 'Name', width: '10%', type: 'text' },
@@ -1065,7 +1349,7 @@ export class JourneycoachDashboardComponent {
     this.loadTableConfig();
   }
 
-  // Function to load table config 
+  // Function to load table config
   loadTableConfig() {
     this.tableConfigs = {
       grossSales: {
@@ -1265,6 +1549,13 @@ export class JourneycoachDashboardComponent {
         dataKey: 'onboarded',
         filters: ['search', 'purchasedate', 'journey', 'journeycoach']
       },
+      toBeOnboardedProduct: {
+        title: 'To Be Onboarded',
+        columns: this.assuredColumns,
+        data: [],
+        dataKey: 'toBeOnboardedProduct',
+        filters: ['search', 'purchasedate', 'journey', 'journeycoach']
+      },
       activeEngagement: {
         title: 'Active Engagement',
         columns: this.journeyEngagementColumns,
@@ -1284,6 +1575,34 @@ export class JourneycoachDashboardComponent {
         columns: this.journeyEngagementColumns,
         data: [],
         dataKey: 'dfu',
+        filters: ['search', 'journey', 'customerStatus']
+      },
+      ecosystemActive: {
+        title: 'Ecosystem - Active',
+        columns: this.journeyEngagementColumns,
+        data: [],
+        dataKey: 'ecosystemActive',
+        filters: ['search', 'journey', 'customerStatus']
+      },
+      ecosystemNonActive: {
+        title: 'Ecosystem - Non Active',
+        columns: this.journeyEngagementColumns,
+        data: [],
+        dataKey: 'ecosystemNonActive',
+        filters: ['search', 'journey', 'customerStatus']
+      },
+      dfuActive: {
+        title: 'DFU - Active',
+        columns: this.journeyEngagementColumns,
+        data: [],
+        dataKey: 'dfuActive',
+        filters: ['search', 'journey', 'customerStatus']
+      },
+      dfuNonActive: {
+        title: 'DFU - Non Active',
+        columns: this.journeyEngagementColumns,
+        data: [],
+        dataKey: 'dfuNonActive',
         filters: ['search', 'journey', 'customerStatus']
       },
       discontinued: {
@@ -1396,7 +1715,7 @@ export class JourneycoachDashboardComponent {
       { key: 'journeyref', header: 'Journey', type: 'custom', mapper: (ref) => this.mapjourneyname[ref?.['id']] ?? '-' },
       { key: 'coachingScheduled', header: 'Scheduled Date', type: 'text' },
     ]
-    
+
     const modesColumns: ColumnConfig[] = [
       { key: 'name', header: 'Name', type: 'text' },
     ];
@@ -1472,7 +1791,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to load sales leads data for current month 
+  // Function to load sales leads data for current month
   loadCurrentSalesLeads() {
     const currentMonthStart = new Date(this.startDate);
     currentMonthStart.setHours(0, 0, 0, 0);
@@ -1539,7 +1858,7 @@ export class JourneycoachDashboardComponent {
             const salesLeadsData = salesData[i];
 
             // if (salesLeadsData['journey'] === 'RXvsMYoK0g4SstvDDURZ' && salesLeadsData['email']?.toLowerCase().includes('soexcellence.com')) {
-            //   continue; 
+            //   continue;
             // }
 
             salesLeadsData['generalnotes'] = [null, undefined, ''].includes(this.mapMetaData[salesLeadsData['profileid']]) ? [] : (this.mapMetaData[salesLeadsData['profileid']]['generalnotes'] ?? [])
@@ -1567,6 +1886,7 @@ export class JourneycoachDashboardComponent {
 
                      const toEMI = salesLeadsData['installmentamount'] || 0;
                     const upgradeFromDocId = salesLeadsData['upgradefromdocid']?.id ?? salesLeadsData['upgradefromdocid'];
+                    console.log("Upgrade EMI raw", salesLeadsData['name'], "installmentamount:", salesLeadsData['installmentamount'], typeof salesLeadsData['installmentamount'], "toEMI:", toEMI, typeof toEMI);
 
                     if (![null, undefined, ''].includes(upgradeFromDocId)) {
                       try {
@@ -1574,6 +1894,7 @@ export class JourneycoachDashboardComponent {
                         if (fromDocSnap.exists()) {
                           const fromEMI = fromDocSnap.data()['installmentamount'] || 0;
                           const emiDiff = toEMI - fromEMI;
+                          console.log("Upgrade EMI diff", salesLeadsData['name'], "fromEMI:", fromEMI, typeof fromEMI, "emiDiff:", emiDiff, typeof emiDiff);
 
                           salesLeadsData['preinstallmentamount'] = fromEMI;
                           salesLeadsData['installmentamount'] = toEMI;
@@ -1645,7 +1966,7 @@ export class JourneycoachDashboardComponent {
               this.approvedGrossSales = grossData.filter(sale => sale['status'] && sale['status'].toLowerCase() === 'approved').length;
               this.pendingGrossSales = grossData.filter(sale => !sale['status'] || sale['status'] === null || sale['status'] === undefined || sale['status'] === '').length;
 
-              // Love Factor Calculation 
+              // Love Factor Calculation
               this.originalData['continuitySales'].data = tempContinuitySales;
               this.originalData['continuitySales'].count = tempContinuitySales.length;
 
@@ -1710,6 +2031,7 @@ export class JourneycoachDashboardComponent {
                 upgradesEMI: grossUpgradeEMI,
                 addonsEMI: grossAddonEMI
               }
+              console.log("grossSalesSplit upgradesEMI:", this.grossSalesSplit.upgradesEMI, typeof this.grossSalesSplit.upgradesEMI);
 
               this.originalData['assuredsale'].data = assuredData;
               this.originalData['assuredsale'].count = assuredData.length;
@@ -1742,6 +2064,7 @@ export class JourneycoachDashboardComponent {
                 addonsEMI: assuredAddonEMI
 
               }
+              console.log("assuredSalesSplit upgradesEMI:", this.assuredSalesSplit.upgradesEMI, typeof this.assuredSalesSplit.upgradesEMI);
 
               const cancelledValues = await Promise.all(
                 cancelledData.map(async (sale) => {
@@ -1837,7 +2160,7 @@ export class JourneycoachDashboardComponent {
               this.originalData['assureddowngradetooldsale'].count = assuredDowngradeToOldData.length;
               this.originalData['assureddowngradetonewsale'].count = assuredDowngradeToNewData.length;
 
-    
+
               this.updateTableDataIfOpen(this.tableType);
               this.loadingStates.salesLeads = true;
               this.checkAllDataLoaded();
@@ -1856,10 +2179,10 @@ export class JourneycoachDashboardComponent {
     })
   }
 
-  // Function to fetch data from participant metadata 
+  // Function to fetch data from participant metadata
   loadParticipantMetadata() {
     this.subscriptions['metadata'] = collectionData(query(collection(this.firestore, "participant metadata"), orderBy("name", "asc"))).subscribe((metadata) => {
-      // Subscription declarations 
+      // Subscription declarations
       let currentMonthEnd = [];
       let lastMonthEnd = [];
       let nextMonthEnd = [];
@@ -1868,17 +2191,24 @@ export class JourneycoachDashboardComponent {
       //Mode map declarations
       let tempModeMap = {};
 
-      // AR Health declarations 
+      // AR Health declarations
       let fullyPaid = [];
       let regular = [];
       let defaulted = [];
       let missed = [];
       let locked = [];
+      // AR Health — previous month buckets (for vs-last-month deltas)
+      let fullyPaidLast = [], regularLast = [], defaultedLast = [], missedLast = [], lockedLast = [];
 
       let allParticipantsList = [];
       let ecosystemMap = [];
       let dfuMap = [];
       let discontinuedArray = [];
+
+      let ecosystemActiveArr = [];
+      let ecosystemNonActiveArr = [];
+      let dfuActiveArr = [];
+      let dfuNonActiveArr = [];
 
       const mapCustomerStatusVariable: Record<string, string> = {
         "active": 'activejourney',
@@ -1889,7 +2219,7 @@ export class JourneycoachDashboardComponent {
       let tempActiveJourney: Record<string, Record<string, { status: string; profiles: any[] }>> = {};
       let tempNullStatusProfiles: any[] = [];
 
-      // Journey Engagement declarations 
+      // Journey Engagement declarations
       let journeyMap = {
         1: [],
         2: [],
@@ -1899,6 +2229,9 @@ export class JourneycoachDashboardComponent {
 
       let currentMonth = new Date().getMonth() + 1;
       let currentYear = new Date().getFullYear();
+      let lastMonthDate = new Date(currentYear, currentMonth - 2, 1);
+      let lastMonthNum = lastMonthDate.getMonth() + 1;
+      let lastMonthYear = lastMonthDate.getFullYear();
 
       if (metadata.length != 0) {
         try {
@@ -1934,7 +2267,7 @@ export class JourneycoachDashboardComponent {
             this.mapprofile[metaData['profileid']] = metaData['name']
             this.mapMetaData[metaData['profileid']] = metaData;
 
-            // Subscription Status Processing 
+            // Subscription Status Processing
             const subscriptionEndDate = ![null, undefined, ''].includes(metaData['subscriptionend']) ? metaData['subscriptionend'] : [null, undefined, ""].includes(metaData['lastsubscriptionend']) ? null : metaData['lastsubscriptionend'];
 
             if (subscriptionEndDate != null) {
@@ -1950,7 +2283,7 @@ export class JourneycoachDashboardComponent {
               }
             }
 
-            // AR Health Processing 
+            // AR Health Processing
             if (metaData['activejourney'] != 'InLXMl7OBAqlDTZcXwK0') {
               if (metaData['financedata'] && typeof metaData['financedata'] === 'object' && ['newpayment', 'schedule'].includes(metaData['financedata']['status']) && ![null, undefined, 0].includes(metaData['financedata']?.['computedamount'])) {
 
@@ -1994,6 +2327,18 @@ export class JourneycoachDashboardComponent {
                     }
                   }
                 }
+                else if (financeDate && financeDate.getMonth() + 1 === lastMonthNum && financeDate.getFullYear() === lastMonthYear) {
+                  const balanceL = (metaData['pp_totalpurchasevalue'] || 0) - (metaData['pp_totalpaid'] || 0);
+                  if (balanceL < 100) { fullyPaidLast.push(metaData); }
+                  else if (metaData['financedata']['status'] === 'schedule') {
+                    const fsL = metaData['financialstatus'];
+                    const psL = metaData['financedata']['paymentstatus'];
+                    const leL = metaData['financedata']['lockedemi'];
+                    if (fsL === 'regular') { psL === 'missed' ? missedLast.push(metaData) : regularLast.push(metaData); }
+                    else if (fsL === 'defaulted') { psL === 'missed' ? missedLast.push(metaData) : defaultedLast.push(metaData); }
+                    else if (fsL === 'locked' && (leL && leL > 0)) { lockedLast.push(metaData); }
+                  }
+                }
               }
 
               if (metaData['lasttouchpoint'] && metaData['lasttouchpoint']['activitydate']) {
@@ -2026,9 +2371,11 @@ export class JourneycoachDashboardComponent {
               const journeyId = metaData['activejourney'];
               if (this.journeyTypeMap[journeyId] === 'Eco system') {
                 ecosystemMap.push(metaData);
+                (customerStatus === 'active' ? ecosystemActiveArr : ecosystemNonActiveArr).push(metaData);
               }
               else if (this.journeyTypeMap[journeyId] === 'DFU') {
                 dfuMap.push(metaData);
+                (customerStatus === 'active' ? dfuActiveArr : dfuNonActiveArr).push(metaData);
               }
             }
             // Also check for non-active participants with lastcompletedjourney
@@ -2037,9 +2384,11 @@ export class JourneycoachDashboardComponent {
               const journeyId = metaData['lastcompletedjourney'];
               if (this.journeyTypeMap[journeyId] === 'Eco system') {
                 ecosystemMap.push(metaData);
+                (customerStatus === 'active' ? ecosystemActiveArr : ecosystemNonActiveArr).push(metaData);
               }
               else if (this.journeyTypeMap[journeyId] === 'DFU') {
                 dfuMap.push(metaData);
+                (customerStatus === 'active' ? dfuActiveArr : dfuNonActiveArr).push(metaData);
               }
             }
 
@@ -2077,6 +2426,11 @@ export class JourneycoachDashboardComponent {
               this.originalData['lockedstatus'].data = locked;
               this.originalData['lockedstatus']['count'] = locked.length;
 
+              this.arLastMonth = {
+                regular: regularLast.length, missed: missedLast.length,
+                defaulted: defaultedLast.length, locked: lockedLast.length, fullypaid: fullyPaidLast.length
+              };
+
               this.originalData['activeEngagement'].data = journeyMap[1];
               this.originalData['activeEngagement']['count'] = journeyMap[1].length;
 
@@ -2094,6 +2448,18 @@ export class JourneycoachDashboardComponent {
 
               this.originalData['dfu'].data = dfuMap;
               this.originalData['dfu']['count'] = dfuMap.length;
+
+              this.originalData['ecosystemActive'].data = ecosystemActiveArr;
+              this.originalData['ecosystemActive']['count'] = ecosystemActiveArr.length;
+
+              this.originalData['ecosystemNonActive'].data = ecosystemNonActiveArr;
+              this.originalData['ecosystemNonActive']['count'] = ecosystemNonActiveArr.length;
+
+              this.originalData['dfuActive'].data = dfuActiveArr;
+              this.originalData['dfuActive']['count'] = dfuActiveArr.length;
+
+              this.originalData['dfuNonActive'].data = dfuNonActiveArr;
+              this.originalData['dfuNonActive']['count'] = dfuNonActiveArr.length;
 
               this.originalData['discontinued'].data = discontinuedArray;
               this.originalData['discontinued']['count'] = discontinuedArray.length;
@@ -2152,7 +2518,7 @@ export class JourneycoachDashboardComponent {
     return null;
   }
 
-  // Function to fetch data from Participant Journey Product 
+  // Function to fetch data from Participant Journey Product
   loadParticipantJourneyProduct() {
     const now = new Date();
     const currentMonthStart = new Date(this.startDate);
@@ -2229,13 +2595,14 @@ export class JourneycoachDashboardComponent {
 
           this.originalData['notassured'].data = tempArray1;
           this.originalData['notassured'].count = tempArray1.length;
+          this.recomputeOnboardingProducts();
           this.updateTableDataIfOpen(this.tableType);
         }
       });
 
       this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
         if (onboarded.length != 0) {
-          // last 30days 
+          // last 30days
           let last30days = new Date();
           last30days.setDate(currentDate.getDate() - 30);
 
@@ -2283,6 +2650,7 @@ export class JourneycoachDashboardComponent {
 
               this.originalData['all'].data = [...tempArray2, ...tempArray3];
               this.originalData['all'].count = [...tempArray2, ...tempArray3].length;
+              this.recomputeOnboardingProducts();
 
               // --- Average days: Purchase → Onboard ---
               const tempPurchaseToOnboard = tempArray4.reduce((sum, item) => {
@@ -2358,7 +2726,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to load customer support tickets 
+  // Function to load customer support tickets
   // async loadCustomerSupport() {
   //   this.subscriptions['clientissue'] = collectionData(query(collection(this.firestore, "clientissue"), where("category", "in", ['Events & Process', 'Journey Related', 'Downgrade, Cancellation & Exceptions', 'Finance & Accounts', 'Referrals & Upgrades']))).subscribe((tickets) => {
   //     if (tickets.length != 0) {
@@ -2570,7 +2938,7 @@ export class JourneycoachDashboardComponent {
 
   // }
 
-  // Function to load modes from participant products 
+  // Function to load modes from participant products
   async loadModes() {
     const now = new Date();
 
@@ -2665,22 +3033,12 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to call column class based on schedule condition 
+  // Function to call column class based on schedule condition
   getColumnClass(tentativeStart: Date): string {
-    const now = new Date();
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setMonth(now.getMonth() + 1);
-
-    if (tentativeStart < now) {
-      return 'overdue'; // red
-    } else if (tentativeStart <= oneMonthFromNow) {
-      return 'approaching'; // orange
-    } else {
-      return ''; // no color change
-    }
+    return engine.columnClassFor(tentativeStart);
   }
 
-  // Function to naviagte to journey support screen 
+  // Function to naviagte to journey support screen
   navigatejourneyplan(element: any) {
     const profileId = element['profileid'];
     const docId = element['docid'];
@@ -2688,7 +3046,7 @@ export class JourneycoachDashboardComponent {
     window.open(url, '_blank');
   }
 
-  // Function to filter table 
+  // Function to filter table
   filterTableData(value) {
     if (!this.currentTableConfig || !this.filteredTableData) {
       return;
@@ -2843,7 +3201,7 @@ export class JourneycoachDashboardComponent {
     this.calculatePagination();
   }
 
-  // Function to check onboarding marked 
+  // Function to check onboarding marked
   checkMarkOnboarding(element) {
     let disabled = false;
 
@@ -2856,7 +3214,7 @@ export class JourneycoachDashboardComponent {
     return disabled;
   }
 
-  // Function to mark onbaorded 
+  // Function to mark onbaorded
   markOnboarded(element) {
     element['markonboard'] = true
     element['mapProfile'] = this.mapprofile;
@@ -2933,7 +3291,7 @@ export class JourneycoachDashboardComponent {
     })
   }
 
-  // Function to view notes 
+  // Function to view notes
   viewNotes(element, key) {
     element['viewnotes'] = true;
     element['mapProfile'] = this.mapprofile;
@@ -2998,7 +3356,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to show popup 
+  // Function to show popup
   showPopup(row: any, event: MouseEvent, container: HTMLElement) {
     if (this.hideTimeout) {
       clearTimeout(this.hideTimeout);
@@ -3039,14 +3397,14 @@ export class JourneycoachDashboardComponent {
 
   }
 
-  // Hide popup with delay 
+  // Hide popup with delay
   hidePopupWithDelay() {
     this.hideTimeout = setTimeout(() => {
       this.popupData = null;
     }, 200);
   }
 
-  // Function to clear hdie timeout 
+  // Function to clear hdie timeout
   clearHideTimeout() {
     if (this.hideTimeout) {
       clearTimeout(this.hideTimeout);
@@ -3063,7 +3421,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to refresh filter 
+  // Function to refresh filter
   refreshFilter() {
     this.filterForm.controls['search'].setValue('');
     this.filterForm.controls['journey'].setValue('');
@@ -3078,20 +3436,18 @@ export class JourneycoachDashboardComponent {
     this.filterTableData(this.filterForm.value);
   }
 
-  // Function to view loading progress of the screen 
+  // Function to view loading progress of the screen
   getLoadingProgress(): number {
-    const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
-    const total = Object.keys(this.loadingStates).length;
     this.cdr.markForCheck();
-    return (loaded / total) * 100;
+    return engine.loadingProgressPercent(this.loadingStates);
   }
 
-  // Function to get total loaded count 
+  // Function to get total loaded count
   getLoadedCount(): number {
-    return Object.values(this.loadingStates).filter(state => state === true).length;
+    return engine.loadedCount(this.loadingStates);
   }
 
-  // Function to open schedule dialog 
+  // Function to open schedule dialog
   openSchedule(element, type) {
     if (type == 'coach') {
       element['isReschedule'] = ![null, undefined].includes(this.mapCoachAppointments[element['profileid']]) && !this.mapCoachAppointments[element['profileid']][0]['attended'] ? true : false;
@@ -3112,7 +3468,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to mark Journey Coach Complete 
+  // Function to mark Journey Coach Complete
   async markJCcomplete(profile, schedule) {
     if (![null, undefined, ""].includes(schedule)) {
       if (![null, undefined, ''].includes(schedule['docid'])) {
@@ -3164,7 +3520,7 @@ export class JourneycoachDashboardComponent {
     this.getSelectedDateSchedules();
   }
 
-  //Function to get onboarding scheduled data 
+  //Function to get onboarding scheduled data
   getAllScheduledTableData() {
     if (this.originalData['all'] && this.originalData['all'].data) {
       return this.originalData['all'].data.filter(row =>
@@ -3174,7 +3530,7 @@ export class JourneycoachDashboardComponent {
     return [];
   }
 
-  // Function to get schedules 
+  // Function to get schedules
   async getSelectedDateSchedules() {
 
     if (!this.selectedCalendarDate) {
@@ -3259,8 +3615,7 @@ export class JourneycoachDashboardComponent {
   };
 
   calculateDaysAgo(fromDate, toDate) {
-    const daysDiff = Math.floor((fromDate?.getTime() - toDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? 0 : daysDiff;
+    return engine.calculateDaysAgo(fromDate, toDate);
   }
 
   // Method to handle box clicks
@@ -3278,13 +3633,14 @@ export class JourneycoachDashboardComponent {
         // Reset search text when opening new table
         this.tableSearchText = '';
 
-        // Scroll to table after a brief delay to allow rendering
+        // Scroll to table after a delay to allow rendering (cards stay above, table loads below).
+        // mat-drawer-content ignores smooth scrollIntoView, so use instant block:'start'.
         setTimeout(() => {
           const tableElement = document.querySelector('.jcd-table-section');
           if (tableElement) {
-            tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            tableElement.scrollIntoView({ block: 'start' });
           }
-        }, 100);
+        }, 350);
       }
     }
   }
@@ -3319,7 +3675,7 @@ export class JourneycoachDashboardComponent {
     this.onBoxClick(boxType);
   }
 
-  // Function to update table data 
+  // Function to update table data
   updateTable(boxType: string) {
     let configData = this.tableConfigs[boxType];
     configData['data'] = this.originalData[configData['dataKey']].data;
@@ -3331,7 +3687,7 @@ export class JourneycoachDashboardComponent {
     this.calculatePagination();
   }
 
-  // Function to update config data 
+  // Function to update config data
   updateConfigData(configData: any) {
     this.journeyList = [];
     let tempJourney = [];
@@ -3352,10 +3708,8 @@ export class JourneycoachDashboardComponent {
 
   // Calculate total pages
   calculatePagination() {
-    this.totalPages = Math.ceil(this.currentTableConfig.data.length / this.itemsPerPage);
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
-    }
+    this.totalPages = engine.totalPagesFor(this.currentTableConfig.data.length, this.itemsPerPage);
+    this.currentPage = engine.clampPage(this.currentPage, this.totalPages);
   }
 
   // Update paginated data for display
@@ -3415,31 +3769,7 @@ export class JourneycoachDashboardComponent {
 
   // Get page numbers for pagination display
   getPageNumbers(): number[] {
-    const pages: number[] = [];
-    const maxPagesToShow = 5;
-
-    if (this.totalPages <= maxPagesToShow) {
-      // Show all pages if total is less than max
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show limited pages with ellipsis
-      const halfRange = Math.floor(maxPagesToShow / 2);
-      let start = Math.max(1, this.currentPage - halfRange);
-      let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-      // Adjust start if we're near the end
-      if (end === this.totalPages) {
-        start = Math.max(1, end - maxPagesToShow + 1);
-      }
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-    }
-
-    return pages;
+    return engine.pageNumbers(this.currentPage, this.totalPages);
   }
 
   // Check if column is sortable
@@ -3449,10 +3779,7 @@ export class JourneycoachDashboardComponent {
 
   // Get sort icon for column
   getSortIcon(columnKey: string): string {
-    if (this.sortColumn !== columnKey) {
-      return '⇅'; // Both arrows
-    }
-    return this.sortDirection === 'asc' ? '↑' : '↓';
+    return engine.sortIconFor(this.sortColumn, this.sortDirection, columnKey);
   }
 
   // Export table data
@@ -3514,50 +3841,26 @@ export class JourneycoachDashboardComponent {
 
   // Sort table by column
   sortTable(columnKey: string) {
-    if (this.sortColumn === columnKey) {
-      if (this.sortDirection === 'asc') {
-        this.sortDirection = 'desc';
-      } else if (this.sortDirection === 'desc') {
-        this.sortDirection = null;
-        this.sortColumn = null;
+    // The asc -> desc -> unsorted cycle and the comparator live in journeycoach.engine.ts. Restoring the
+    // unfiltered order and repaginating stay here, because both mutate component state.
+    const next = engine.nextSortState(this.sortColumn, this.sortDirection, columnKey);
+    const cleared = next.sortDirection === null;
+    this.sortColumn = next.sortColumn;
+    this.sortDirection = next.sortDirection;
 
-        this.currentTableConfig.data = [...this.filteredTableData];
-        this.calculatePagination();
-        return;
-      }
-    } else {
-      this.sortColumn = columnKey;
-      this.sortDirection = 'asc';
+    if (cleared) {
+      this.currentTableConfig.data = [...this.filteredTableData];
+      this.calculatePagination();
+      return;
     }
 
-    if (this.sortDirection) {
-      this.currentTableConfig.data.sort((a, b) => {
-        const valueA: any = this.getCellValue(a, columnKey);
-        const valueB: any = this.getCellValue(b, columnKey);
-
-        if (valueA == null && valueB == null) return 0;
-        if (valueA == null) return this.sortDirection === 'asc' ? 1 : -1;
-        if (valueB == null) return this.sortDirection === 'asc' ? -1 : 1;
-
-        let comparison = 0;
-
-        if (!isNaN(valueA) && !isNaN(valueB)) {
-          comparison = Number(valueA) - Number(valueB);
-        } else if (this.isDate(valueA) && this.isDate(valueB)) {
-          comparison = new Date(valueA).getTime() - new Date(valueB).getTime();
-        } else {
-          comparison = valueA.toString().localeCompare(valueB.toString());
-        }
-
-        return this.sortDirection === 'asc' ? comparison : -comparison;
-      });
-    }
+    this.currentTableConfig.data.sort((a, b) =>
+      engine.compareCellValues(this.getCellValue(a, columnKey), this.getCellValue(b, columnKey), this.sortDirection));
   }
 
   // Helper function to check if value is a date
   isDate(value: any): boolean {
-    return value instanceof Date ||
-      (typeof value === 'string' && !isNaN(Date.parse(value)));
+    return engine.isDateLike(value);
   }
 
   // Close table view
@@ -3589,19 +3892,18 @@ export class JourneycoachDashboardComponent {
       date = new Date(inputDate);
     }
 
-    const today = new Date();
-    const diffTime = Math.abs(today.getTime() - date.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 30) return 1;        // 1 month or less
-    if (diffDays <= 90) return 2;        // 2-3 months
-    if (diffDays <= 180) return 3;       // 3-6 months
-    return 4;                            // Greater than 6 months
+    // The banding rule lives in journeycoach.engine.ts; only the Timestamp/string/Date normalisation
+    // above stays here, because it depends on the Firestore Timestamp class.
+    return engine.dateDifferenceCategoryCode(date);
   }
 
-  // Function to format each cell value in table 
+  // Function to format each cell value in table
   formatCellValue(row: any, column: ColumnConfig): string {
     const value = row[column.key];
+
+    if (column.key === 'journeyref' && [null, undefined, ''].includes(value)) {
+      return this.getProductName(row);
+    }
 
     if (value === null || value === undefined) {
       return '-';
@@ -3646,6 +3948,13 @@ export class JourneycoachDashboardComponent {
     }
   }
 
+  getProductName(row: any): string {
+    const refs = row['productref'];
+    const list = Array.isArray(refs) ? refs : (refs ? [refs] : []);
+    const names = list.map((r: any) => this.mapproductname[r?.id]).filter((n: any) => !!n);
+    return names.length ? names.join(', ') : '-';
+  }
+
   // Date formatting
   private formatDate(value: any, format?: string, mapValue?: string): string {
     if (!value) return '-';
@@ -3667,56 +3976,17 @@ export class JourneycoachDashboardComponent {
 
   // Currency formatting
   private formatCurrency(value: number, prefix?: string, mapValue?: string): string {
-    if (!value && value !== 0) return '-';
-
-    if (mapValue) {
-      value = value[mapValue];
-    }
-
-    const symbol = prefix || '₹';
-    const formatted = value.toLocaleString('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-
-    return `${symbol}${formatted}`;
+    return engine.formatCurrency(value, prefix, mapValue);
   }
 
   // Number formatting
   private formatNumber(value: number, prefix?: string, suffix?: string): string {
-    if (!value && value !== 0) return '-';
-
-    const formatted = value.toLocaleString('en-IN');
-    return `${prefix || ''}${formatted}${suffix || ''}`;
+    return engine.formatNumber(value, prefix, suffix);
   }
 
   // Map value using dictionary
   private mapValue(value: any, mapData?: { [key: string]: any }, mapKey?: string, mapValue?: string): string {
-    if (!mapData) return value.toString();
-    let tempMap = '';
-
-    if (mapKey) {
-      // Check if it's array access like "[0].id"
-      if (mapKey.startsWith('[')) {
-        const match = mapKey.match(/\[(\d+)\]\.?(.*)$/);
-        if (match) {
-          const index = parseInt(match[1]);
-          const property = match[2];
-
-          tempMap = value?.[index];
-          if (property) {
-            tempMap = tempMap?.[property];
-          }
-        }
-      } else {
-        tempMap = value?.[mapKey];
-      }
-    } else {
-      tempMap = value;
-    }
-
-    tempMap = mapValue ? mapData[tempMap]?.[mapValue] : mapData[tempMap];
-    return tempMap || value.toString();
+    return engine.mapValue(value, mapData, mapKey, mapValue);
   }
 
   // Get value for a specific cell
@@ -3778,15 +4048,14 @@ export class JourneycoachDashboardComponent {
   }
 
   calculateDaysClosed(reportedDate: Date, closedDate: Date): string {
-    const daysDiff = Math.floor((closedDate?.getTime() - reportedDate?.getTime()) / (1000 * 3600 * 24));
-    return daysDiff.toString() == '-1' ? '0' : daysDiff.toString();
+    return engine.calculateDaysClosed(reportedDate, closedDate);
   }
 
   isRowSelected(row: any): boolean {
     return this.selectedRows.some(selectedRow => this.getRowIdentifier(selectedRow) === this.getRowIdentifier(row));
   }
 
-  // Method to get unique identifier for a row 
+  // Method to get unique identifier for a row
   getRowIdentifier(row: any, index?: number): any {
     return row.id || row.profileId || row.email || `row_${index}`;
   }
@@ -3857,7 +4126,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to open dialog to view participants data for ecosystem data 
+  // Function to open dialog to view participants data for ecosystem data
   openEcoDialog(element: any, head: any, subHead: any = null, profileIdWiseCount: any = null, metrics: any = null, prevMetric: any = null, metricsection: any = null) {
     let dialogData = {};
     if (['Total ATC', 'Unvalidated ATC', 'Completed ATC', 'Total Adjustment'].includes(head)) {
@@ -3900,7 +4169,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to navigate to profile 
+  // Function to navigate to profile
   profileNavigation(profileId: string) {
     const profileid = profileId;
     if (profileId.length < 10) {
@@ -3912,7 +4181,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to navigate screen to customer support 
+  // Function to navigate screen to customer support
   navigateToCustomerSupport() {
     if (window.location.port.includes('4200')) {
       window.open(`http://localhost:4200/customersupportdashboard`, '_blank');
@@ -3939,7 +4208,7 @@ export class JourneycoachDashboardComponent {
     }
   }
 
-  // Function to highlight row based on status 
+  // Function to highlight row based on status
   highlightRow(row: any) {
     if (this.tableType === 'grossSales' || this.tableType === 'grossDowngradeSales' || this.tableType === 'grossCancelledSales') {
       if ([null, undefined, "", "pending"].includes(row['status']?.toLowerCase())) {
@@ -3963,77 +4232,56 @@ export class JourneycoachDashboardComponent {
     return ''
   }
 
-  // Function to get count of pending sales 
+  // Function to get count of pending sales
   getPendingCount() {
-    return this.currentTableConfig.data.filter((e) => [null, undefined, "", "pending"].includes(e['status']?.toLowerCase())).length;
+    return engine.countPending(this.currentTableConfig.data);
   }
 
-  // Function to get count of assured 
+  // Function to get count of assured
   getAssuredCount() {
-    return this.currentTableConfig.data.filter((e) => ![null, undefined, ""].includes(e['paymentplan'])).length;
+    return engine.countAssured(this.currentTableConfig.data);
   }
 
-  // Function to get count of not assured 
+  // Function to get count of not assured
   getNotAssuredCount() {
-    return this.currentTableConfig.data.filter((e) => [null, undefined, ""].includes(e['paymentplan']) && e['status']?.toLowerCase() == 'approved').length;
+    return engine.countNotAssured(this.currentTableConfig.data);
   }
 
   // Function to get count of active participants
   getActiveCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      e['customerstatus']?.toLowerCase() === 'active'
-    ).length;
+    return engine.countActive(this.currentTableConfig.data);
   }
 
   // Function to get count of non-active participants
   getNonactiveCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      e['customerstatus']?.toLowerCase() === 'non active'
-    ).length;
+    return engine.countNonactive(this.currentTableConfig.data);
   }
 
   // Function to get count of discontinued participants
   getDiscontinuedCount(): number {
     if (!this.currentTableConfig?.data) return 0;
-    return this.currentTableConfig.data.filter((e) =>
-      ['discontinued', 'banned', 'late'].includes(e['customerstatus']?.toLowerCase())
-    ).length;
+    return engine.countDiscontinued(this.currentTableConfig.data);
   }
 
   // shouldHighlightWaitingPeriod(row: any): boolean {
   //   return this.tableType === 'grossSales';
   // }
 
-  // Function to calculate gross waiting period 
+  // Function to calculate gross waiting period
   calculateGrossWaitingPeriod(purchaseDate: Date): number {
-    if (!purchaseDate) return 0;
-    let comparisonDate = new Date();
-
-    const timeDifference = comparisonDate.getTime() - purchaseDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
+    return engine.waitingPeriodDays(purchaseDate, new Date());
   }
 
-  // Function to calculate assured waiting period 
+  // Function to calculate assured waiting period
   calculateAssuredWaitingPeriod(purchaseDate: Date, comparisonDate: Date): number {
-    if (!purchaseDate || !comparisonDate) return 0;
-
-    const timeDifference = comparisonDate.getTime() - purchaseDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
+    return engine.waitingPeriodDays(purchaseDate, comparisonDate);
   }
 
   // Add this method to your component
   calculateDelayedDays(enachDate: Date): number {
-    if (!enachDate) return 0;
-
-    const today = new Date();
-    const timeDifference = today.getTime() - enachDate.getTime();
-    const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-
-    return daysDifference;
+    return engine.waitingPeriodDays(enachDate, new Date());
   }
 
   addNotes(element) {
@@ -4093,7 +4341,7 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to get atc alpha data 
+  // Function to get atc alpha data
   getAtcAlpha() {
     let atcQuery: any;
     let unvalidatedATCQuery: any;
@@ -4324,7 +4572,7 @@ export class JourneycoachDashboardComponent {
 
       this.cdr.markForCheck();
       this.buildDisplayLists();
-      this.cdr.markForCheck(); 
+      this.cdr.markForCheck();
     });
   }
 
@@ -4341,94 +4589,30 @@ export class JourneycoachDashboardComponent {
     });
   }
 
-  // Function to calculate evolution process percentage 
+  // Function to calculate evolution process percentage
   processEvolutionProgressFromMap(keyProfileMap: Record<string, { profileId: string; sum: number; docTotal: number }[]>): void {
-    const keys = Object.keys(keyProfileMap);
-
-    const bands = [
-      { label: '< 25%', range: [0, 25] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '25 – 50%', range: [25, 50] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '50 – 75%', range: [50, 75] as [number, number], profiles: {} as Record<string, any[]> },
-      { label: '75 – 100%', range: [75, 101] as [number, number], profiles: {} as Record<string, any[]> },
-    ];
-
-    const totals: Record<string, number> = {};
-
-    keys.forEach(key => {
-      const allEntries = keyProfileMap[key];
-      totals[key] = allEntries.reduce((a, b) => a + b.sum, 0);
-
-      allEntries.forEach(({ profileId, sum, docTotal }) => {
-        const pct = docTotal > 0 ? Math.round((sum / docTotal) * 100) : 0;
-        const profileName = this.mapprofile[profileId] ?? profileId;
-        const profile = { profileId, profileName, total: sum, pct };
-        const band = bands.find(b => pct >= b.range[0] && pct < b.range[1]);
-        if (band) {
-          if (!band.profiles[key]) band.profiles[key] = [];
-          band.profiles[key].push(profile);
-        }
-      });
-    });
-
-    this.evolutionProgressData = { keys, bands, totals };
+    // Percentage + banding rules live in journeycoach.engine.ts.
+    this.evolutionProgressData = engine.buildEvolutionProgress(keyProfileMap, this.mapprofile);
     this.cdr.markForCheck();
   }
 
   buildHealthOverview(): void {
-    const map = this.evolutionprogressMap as Record<string, number>;
-    const total = Object.values(map).reduce((a: number, b: number) => a + b, 0);
-    if (total === 0) return;
+    // Ranking, shares, bar widths, colours and risk tags all live in journeycoach.engine.ts. An empty
+    // result means the total was zero, which the original treated as "leave the overview alone".
+    const built = engine.buildHealthKeyData(
+      this.evolutionprogressMap as Record<string, number>,
+      this.evolutionProgressData,
+    );
+    if (!built.length) return;
 
-    const colors = ['#639922', '#1D9E75', '#378ADD', '#EF9F27', '#E24B4A'];
-    const tags = [
-      { t: 'Top key', bg: '#EAF3DE', c: '#27500A' },
-      { t: 'Strong', bg: '#E1F5EE', c: '#085041' },
-      { t: 'Moderate', bg: '#E6F1FB', c: '#0C447C' },
-      { t: 'Watch', bg: '#FAEEDA', c: '#633806' },
-      { t: 'At risk', bg: '#FCEBEB', c: '#791F1F' },
-    ];
-
-    const sorted: [string, number][] = (Object.entries(map) as [string, number][])
-      .sort((a, b) => b[1] - a[1]);
-
-    const maxCount: number = sorted[0]?.[1] ?? 1;
-
-    // Count unique profiles per dominant key from evolutionProgressData
-    const profileCountPerKey: Record<string, number> = {};
-    if (this.evolutionProgressData) {
-      const profileAllAreas: Record<string, Record<string, number>> = {};
-      this.evolutionProgressData.keys.forEach(k => {
-        this.evolutionProgressData!.bands.forEach(band => {
-          (band.profiles[k] ?? []).forEach(p => {
-            if (!profileAllAreas[p.profileId]) profileAllAreas[p.profileId] = {};
-            profileAllAreas[p.profileId][k] = (profileAllAreas[p.profileId][k] ?? 0) + p.total;
-          });
-        });
-      });
-      Object.entries(profileAllAreas).forEach(([, areas]) => {
-        const dominant = Object.entries(areas).sort((a, b) => b[1] - a[1])[0]?.[0];
-        if (dominant) profileCountPerKey[dominant] = (profileCountPerKey[dominant] ?? 0) + 1;
-      });
-    }
-
-    this.healthKeyData = sorted.map(([key, count], i) => ({
-      key,
-      count,
-      pct: Math.round((count / total) * 100),
-      barPct: Math.round((count / maxCount) * 100),
-      profileCount: profileCountPerKey[key] ?? 0,
-      color: colors[i] ?? '#888780',
-      tag: tags[i]?.t ?? '',
-      tagBg: tags[i]?.bg ?? '#F1EFE8',
-      tagColor: tags[i]?.c ?? '#444441',
-    }));
+    this.healthKeyData = built;
 
     // Clear insights — no longer used
     this.healthInsights = [];
     this.cdr.markForCheck();
   }
 
-  // Function to open the cross over metrics dialog 
+  // Function to open the cross over metrics dialog
   openCrossoverMetricsDialog() {
     const currentMonthStart = new Date(this.startDate);
     currentMonthStart.setHours(0, 0, 0, 0);
@@ -4461,7 +4645,7 @@ export class JourneycoachDashboardComponent {
     this.filterStartDate = start;
     this.updateDateRangeHint();
     this.loadInterimData();
-    this.getAtcAlpha();
+    // (item 2) ATC fetch removed — ATC Status card was dropped from the redesign and ATC collections are off-limits.
   }
 
   onDateRangeChange(): void {
@@ -4473,12 +4657,40 @@ export class JourneycoachDashboardComponent {
     this.numberOfMonths = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.5)));
     this.updateDateRangeHint();
     this.loadInterimData();
-    this.getAtcAlpha();
+    // (item 2) ATC fetch removed — ATC Status card was dropped from the redesign and ATC collections are off-limits.
   }
 
   stepMonths(delta: number): void {
     this.numberOfMonths = Math.max(1, Math.min(24, this.numberOfMonths + delta));
     this.onMonthsCountChange(); // already calls loadInterimData
+  }
+
+  /** Current date window from the universal (top toolbar) filter — month, days quick-filter, or explicit range. */
+  private getUniversalDateWindow(): { start: Date; end: Date } {
+    // Days quick-filter (e.g. last N days)
+    if (this.selectedDateFilter === 'days' && this.daysInput) {
+      const now = new Date();
+      const start = new Date(now);
+      start.setDate(start.getDate() - (this.daysInput - 1));
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    // Explicit date-range mode
+    if (this.pickerMode === 'range' && this.startDate instanceof Date && this.endDate instanceof Date) {
+      const start = new Date(this.startDate); start.setHours(0, 0, 0, 0);
+      const end = new Date(this.endDate); end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    // Month mode (default) — from monthyear (YYYY-MM)
+    const parts = (this.monthyear || '').split('-');
+    let y = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10);
+    if (isNaN(y) || isNaN(m)) { const d = new Date(); y = d.getFullYear(); m = d.getMonth() + 1; }
+    const start = new Date(y, m - 1, 1); start.setHours(0, 0, 0, 0);
+    const end = new Date(y, m, 0); end.setHours(23, 59, 59, 999);
+    return { start, end };
   }
 
   private loadInterimData(): void {
@@ -4646,42 +4858,9 @@ export class JourneycoachDashboardComponent {
         let comparison: any = null;
 
         if (previousDoc) {
-          const allSame = CATEGORIES.every(cat => {
-            const curr = doc.metric[cat];
-            const prev = previousDoc.metric[cat];
-            return curr?.startpoint === prev?.startpoint && curr?.endpoint === prev?.endpoint;
-          });
-
-          if (allSame) {
-            comparison = { status: 'no change', progressedAreas: [], regressedAreas: [], changedCount: 0 };
-          } else {
-            const progressedAreas: string[] = [];
-            const regressedAreas: string[] = [];
-
-            CATEGORIES.forEach(cat => {
-              const currSeq = doc.metric[cat]?.sequence ?? null;
-              const prevSeq = previousDoc?.metric[cat]?.sequence ?? null;
-              if (currSeq != null && prevSeq != null) {
-                if (Number(currSeq) > Number(prevSeq)) progressedAreas.push(cat);
-                else if (Number(currSeq) < Number(prevSeq)) regressedAreas.push(cat);
-              }
-            });
-
-            const totalChanged = progressedAreas.length + regressedAreas.length;
-            const changedCount: number | 'all' = totalChanged === 5 ? 'all' : totalChanged;
-
-            // No longer single status — profile can be in BOTH progressed and regressed
-            const isProgressed = progressedAreas.length > 0;
-            const isRegressed = regressedAreas.length > 0;
-            const isNoChange = !isProgressed && !isRegressed;
-
-            comparison = {
-              status: isNoChange ? 'no change' : 'changed',
-              progressedAreas,
-              regressedAreas,
-              changedCount
-            };
-          }
+          // The progressed/regressed judgement lives in journeycoach.engine.ts; the Firestore reads and
+          // the AEL sequence enrichment above stay here.
+          comparison = engine.compareInterimMetrics(doc.metric, previousDoc.metric, CATEGORIES);
         }
 
         monthResultMap[yearMonth].interimDocs.push({
@@ -4753,8 +4932,7 @@ export class JourneycoachDashboardComponent {
         // Add to progressed if any areas progressed
         if ((doc.comparison.progressedAreas ?? []).length > 0) {
           progressedProfiles.push(interimProfile);
-          const progressedCount = doc.comparison.progressedAreas.length === 5
-            ? 'all' : doc.comparison.progressedAreas.length;
+          const progressedCount = engine.areaBucket(doc.comparison.progressedAreas.length);
           const areaKey: string | number = progressedCount === 'all' ? 'all' : progressedCount as number;
           progressedAreaBreakdown[areaKey] = (progressedAreaBreakdown[areaKey] ?? 0) + 1;
           doc.comparison.progressedAreas.forEach((cat: string) => {
@@ -4765,8 +4943,7 @@ export class JourneycoachDashboardComponent {
         // Add to regressed if any areas regressed — independent of progressed
         if ((doc.comparison.regressedAreas ?? []).length > 0) {
           regressedProfiles.push(interimProfile);
-          const regressedCount = doc.comparison.regressedAreas.length === 5
-            ? 'all' : doc.comparison.regressedAreas.length;
+          const regressedCount = engine.areaBucket(doc.comparison.regressedAreas.length);
           const areaKey: string | number = regressedCount === 'all' ? 'all' : regressedCount as number;
           regressedAreaBreakdown[areaKey] = (regressedAreaBreakdown[areaKey] ?? 0) + 1;
           doc.comparison.regressedAreas.forEach((cat: string) => {
@@ -4815,8 +4992,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getTabLabel(monthSummary: MonthSummary): string {
-    const parts = monthSummary.monthLabel.split(' ');
-    return `${parts[0].slice(0, 3)} ${parts[1].slice(2)}`;
+    return engine.tabLabelFor(monthSummary.monthLabel);
   }
 
   // ── Stat helpers ──────────────────────────────────────────────────────────
@@ -4830,15 +5006,15 @@ export class JourneycoachDashboardComponent {
   }
 
   getMaxValue(breakdownMap: Record<string | number, number>): number {
-    return Math.max(...Object.values(breakdownMap), 1);
+    return engine.maxBreakdownValue(breakdownMap);
   }
 
   getBarWidthPercent(value: number, maxValue: number): number {
-    return Math.round((value / Math.max(maxValue, 1)) * 100);
+    return engine.barWidthPercent(value, maxValue);
   }
 
   getAreaLabel(areaKey: number | 'all'): string {
-    return areaKey === 'all' ? 'All Areas' : `${areaKey} Area${areaKey > 1 ? 's' : ''}`;
+    return engine.areaLabel(areaKey);
   }
 
   getAreaValue(monthSummary: MonthSummary, statusType: 'up' | 'dn', areaKey: number | 'all'): number {
@@ -4856,11 +5032,11 @@ export class JourneycoachDashboardComponent {
   }
 
   getInitials(name: string): string {
-    return (name || '?').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase();
+    return engine.initialsFor(name);
   }
 
   getCountBadgeClass(changedCount: number | 'all', statusType: 'up' | 'dn' | 'nc'): string {
-    return changedCount === 'all' ? 'all' : statusType;
+    return engine.countBadgeClass(changedCount, statusType);
   }
 
   // ── Dialog openers ────────────────────────────────────────────────────────
@@ -4965,25 +5141,23 @@ export class JourneycoachDashboardComponent {
   // ── Category detail helpers ────────────────────────────────────────────────
 
   getCategoryChangeType(profile: InterimProfile, category: string): 'up' | 'dn' | 'nc' {
-    if (profile.progressedAreas.includes(category)) return 'up';
-    if (profile.regressedAreas.includes(category)) return 'dn';
-    return 'nc';
+    return engine.categoryChangeType(profile, category);
   }
 
   getCategoryArrow(changeType: 'up' | 'dn' | 'nc'): string {
-    return changeType === 'up' ? '↑' : changeType === 'dn' ? '↓' : '→';
+    return engine.categoryArrow(changeType);
   }
 
   getCategoryStatusLabel(changeType: 'up' | 'dn' | 'nc'): string {
-    return changeType === 'up' ? 'Progressed' : changeType === 'dn' ? 'Regressed' : 'No change';
+    return engine.categoryStatusLabel(changeType);
   }
 
   isCategoryChanged(profile: InterimProfile, category: string): boolean {
-    return [...profile.progressedAreas, ...profile.regressedAreas].includes(category);
+    return engine.allChangedAreas(profile).includes(category);
   }
 
   getAllChangedAreas(profile: InterimProfile): string[] {
-    return [...profile.progressedAreas, ...profile.regressedAreas];
+    return engine.allChangedAreas(profile);
   }
 
   toggleFilterMode(mode: 'months' | 'daterange' | 'queue'): void {
@@ -5003,7 +5177,7 @@ export class JourneycoachDashboardComponent {
 
   onQueueSelectionChange(): void {
     if (this.selectedQueueIds.length === 0) return;
-    this.getAtcAlpha();
+    // (item 2) ATC fetch removed — ATC Status card was dropped from the redesign and ATC collections are off-limits.
   }
 
   getOverallTotal(): number {
@@ -5257,9 +5431,7 @@ export class JourneycoachDashboardComponent {
     return this.mapjourneyname?.[id] ?? id;
   }
   getSubStatusClass(status: string): string {
-    if (status === 'completed') return 'status-completed';
-    if (status === 'ongoing') return 'status-ongoing';
-    return '';
+    return engine.subStatusClass(status);
   }
   getGrandTotal(): number {
     if (!this.subscriptionMatrix) return 0;
@@ -5282,10 +5454,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getStatusClass(status: string): string {
-    if (status === 'active') return 'js-active';
-    if (status === 'non active') return 'js-nonactive';
-    if (status === 'discontinued') return 'js-discontinued';
-    return 'js-null';
+    return engine.journeyStatusClass(status);
   }
 
   getAllProfilesForJourney(journey: any): any[] {
@@ -5297,19 +5466,7 @@ export class JourneycoachDashboardComponent {
   }
 
   getProfileAllKeyData(profileId: string): { key: string; count: number; pct: number; bandIdx: number }[] {
-    if (!this.evolutionProgressData) return [];
-    const result: { key: string; count: number; pct: number; bandIdx: number }[] = [];
-
-    this.evolutionProgressData.keys.forEach(key => {
-      this.evolutionProgressData!.bands.forEach((band, bandIdx) => {
-        const entry = band.profiles[key]?.find(p => p.profileId === profileId);
-        if (entry) {
-          result.push({ key, count: entry.total, pct: entry.pct, bandIdx });
-        }
-      });
-    });
-
-    return result.sort((a, b) => b.pct - a.pct);
+    return engine.profileAllKeyData(this.evolutionProgressData, profileId);
   }
 
   openHealthKeyDialog(key: string): void {
@@ -5573,20 +5730,6 @@ export class JourneycoachDashboardComponent {
   }
 
   getFilteredAskAHProfiles(): any[] {
-    let list = [...this.askAHDialogProfiles];
-
-    if (this.askAHSourceFilter === 'askAH') {
-      list = list.filter(p => p['source'] === 'ask AH');
-    } else if (this.askAHSourceFilter === 'loveLetter') {
-      list = list.filter(p => p['source'] !== 'ask AH');
-    }
-
-    if (this.askAHResolvedFilter === 'resolved') {
-      list = list.filter(p => p['resolved'] === true);
-    } else if (this.askAHResolvedFilter === 'unresolved') {
-      list = list.filter(p => !p['resolved']);
-    }
-
-    return list;
+    return engine.filterAskAHProfiles(this.askAHDialogProfiles, this.askAHSourceFilter, this.askAHResolvedFilter);
   }
 }

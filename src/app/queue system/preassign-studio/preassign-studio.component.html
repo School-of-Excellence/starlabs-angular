@@ -10,7 +10,7 @@
       <br>
     </mat-radio-group>
     <div class="mt-2 text-center" style="display: flex;justify-content: center;align-items: center;">
-      <button class="mr-2" mat-stroked-button (click)="close()">Go Back</button>
+      <button data-testid="pass-btn-1" class="mr-2" mat-stroked-button (click)="close()">Go Back</button>
       <button class="mr-2 text-success border border-success" mat-stroked-button (click)="submit()" [disabled]="selectedStudioid == null" data-testid="preassign-submit-btn">Pre-assign and Move</button>
     </div>
 </div>

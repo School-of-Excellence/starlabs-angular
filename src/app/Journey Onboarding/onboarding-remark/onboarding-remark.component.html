@@ -10,7 +10,7 @@
     <h3 *ngIf="participantjourneyproduct['markonboard'] === true"><b>Onboard Remark</b></h3>
     <h3 *ngIf="participantjourneyproduct['viewnotes'] === true"><b>View Note</b></h3>
     <h3 *ngIf="participantjourneyproduct['viewreport'] === true"><b>OnBoarding Report</b></h3>
-    <button mat-icon-button class="close-button" (click)="dialogRef.close()">
+    <button data-testid="jorm-btn-001" mat-icon-button class="close-button" (click)="dialogRef.close()">
       <mat-icon style="color:white">close</mat-icon>
     </button>
   </div>
@@ -25,9 +25,9 @@
       <p><b style="color:#0C6385;">Notes</b></p>
       <div class="notes-container">
         <mat-form-field appearance="outline" class="textareafield">
-          <textarea matInput placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
+          <textarea data-testid="jorm-txt-002" matInput placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
         </mat-form-field>
-        <button type="button" class="submit-button" [disabled]="[null,undefined,''].includes(generalnote)"
+        <button data-testid="jorm-btn-003" type="button" class="submit-button" [disabled]="[null,undefined,''].includes(generalnote)"
           (click)="addnotes()">Add Note</button>
       </div>
     </div>
@@ -102,10 +102,10 @@
     <span>JourneyCoach Appointment scheduled with {{mapProfile[participantjourneyproduct['onboardedby'][0].id]}}</span>
     <span>This Appointment Happened?</span>
     <div class="options" *ngIf="participantjourneyproduct['view'] === false">
-      <label><input type="radio" [(ngModel)]="attended" [value]="true" /> Attended</label>
-      <label><input type="radio" [(ngModel)]="attended" [value]="false" /> Cancelled</label>
+      <label><input data-testid="jorm-inp-004" type="radio" [(ngModel)]="attended" [value]="true" /> Attended</label>
+      <label><input data-testid="jorm-inp-005" type="radio" [(ngModel)]="attended" [value]="false" /> Cancelled</label>
     </div>
-    <button *ngIf="participantjourneyproduct['view'] === false" class="submit-button" (click)="onmark()">Submit</button>
+    <button data-testid="jorm-btn-006" *ngIf="participantjourneyproduct['view'] === false" class="submit-button" (click)="onmark()">Submit</button>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════
@@ -148,11 +148,11 @@
         <div class="field-row-pair">
           <mat-form-field appearance="outline" class="flex-field">
             <mat-label>Current Journey</mat-label>
-            <input matInput type="text" [(ngModel)]="currentJourney" readonly>
+            <input data-testid="jorm-inp-007" matInput type="text" [(ngModel)]="currentJourney" readonly>
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-field-sm">
             <mat-label>Journey Status</mat-label>
-            <mat-select [(ngModel)]="currentJourneyStatus" [disabled]="true">
+            <mat-select data-testid="jorm-msel-008" [(ngModel)]="currentJourneyStatus" [disabled]="true">
               <mat-option [value]="null">Clear Status</mat-option>
               <mat-option *ngFor="let option of journeystatusOption"
                 [value]="option.toLowerCase()">{{option}}</mat-option>
@@ -162,11 +162,11 @@
         <div *ngIf="participantjourneyproduct['journeytype'] == 'upgrade'" class="field-row-pair">
           <mat-form-field appearance="outline" class="flex-field">
             <mat-label>Previous Journey</mat-label>
-            <input matInput type="text" [(ngModel)]="previousJourney" readonly>
+            <input data-testid="jorm-inp-009" matInput type="text" [(ngModel)]="previousJourney" readonly>
           </mat-form-field>
           <mat-form-field appearance="outline" class="flex-field-sm">
             <mat-label>Journey Status</mat-label>
-            <mat-select [(ngModel)]="previouseJourneyStatus" [disabled]="true">
+            <mat-select data-testid="jorm-msel-010" [(ngModel)]="previouseJourneyStatus" [disabled]="true">
               <mat-option [value]="null">Clear Status</mat-option>
               <mat-option *ngFor="let option of journeystatusOption"
                 [value]="option.toLowerCase()">{{option}}</mat-option>
@@ -192,7 +192,7 @@
         class="field-group">
         <mat-form-field appearance="outline" class="full-width-field">
           <mat-label>Select Specialist</mat-label>
-          <mat-select [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
+          <mat-select data-testid="jorm-msel-011" [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
             <mat-option *ngFor="let member of ahmember.sort()" [value]="member.profile_ref">{{member.name}}</mat-option>
           </mat-select>
         </mat-form-field>
@@ -203,7 +203,7 @@
           <div class="flex-field">
             <mat-form-field appearance="outline" class="full-width-field">
               <mat-label>Scheduled Date</mat-label>
-              <input matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()"
+              <input data-testid="jorm-inp-012" matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()"
                 placeholder="MM/DD/YYYY">
               <mat-datepicker-toggle matSuffix [for]="picker"><mat-icon
                   matDatepickerToggleIcon>calendar_today</mat-icon></mat-datepicker-toggle>
@@ -214,7 +214,7 @@
           <div class="flex-field-sm">
             <mat-form-field appearance="outline" class="full-width-field">
               <mat-label>Scheduled Time</mat-label>
-              <input matInput type="time" [(ngModel)]="selectedTime" (change)="getCombinedDateTime()">
+              <input data-testid="jorm-inp-013" matInput type="time" [(ngModel)]="selectedTime" (change)="getCombinedDateTime()">
             </mat-form-field>
             <p class="field-error" *ngIf="[null,undefined,''].includes(selectedTime)">Please select a Time</p>
           </div>
@@ -227,7 +227,7 @@
       <div class="field-group">
         <span class="section-label">Onboarding Report</span>
         <mat-form-field appearance="outline" class="full-width-field">
-          <textarea matInput placeholder="Type Here" [(ngModel)]="note" rows="4"></textarea>
+          <textarea data-testid="jorm-txt-014" matInput placeholder="Type Here" [(ngModel)]="note" rows="4"></textarea>
         </mat-form-field>
       </div>
 
@@ -259,7 +259,7 @@
       <!-- ── Send Onboarding Email Checkbox ── -->
       <div class="field-group" *ngIf="!emailSent">
         <label class="send-email-checkbox-label">
-          <input type="checkbox" [(ngModel)]="sendOnboardingEmail" class="send-email-checkbox">
+          <input data-testid="jorm-inp-015" type="checkbox" [(ngModel)]="sendOnboardingEmail" class="send-email-checkbox">
           <span class="send-email-checkbox-text">
             <mat-icon class="checkbox-icon">mail_outline</mat-icon>
             Send Onboarding Email on Submit
@@ -280,7 +280,7 @@
 
       <!-- Submit -->
       <div class="submit-row">
-        <button type="button" class="submit-button"
+        <button data-testid="jorm-btn-016" type="button" class="submit-button"
           [ngStyle]="{'background-color': (validateOnboard() || (sendOnboardingEmail && !selectedTemplate) || emailArchiveCreating) ? '#b0bec5' : '#0056b3'}"
           [disabled]="validateOnboard() || (sendOnboardingEmail && !selectedTemplate) || emailArchiveCreating"
           (click)="onSubmit()">
@@ -324,15 +324,15 @@
         </div>
 
         <!-- ── Non-fixed: custom template search ── -->
-        <div *ngIf="!isFixedJourney && !emailTemplateLoading" class="custom-search-wrapper"
+        <div data-testid="jorm-div-017" *ngIf="!isFixedJourney && !emailTemplateLoading" class="custom-search-wrapper"
           (click)="$event.stopPropagation()">
           <label class="custom-label">Email Template</label>
           <div class="custom-search-box" [class.has-value]="!!selectedTemplate">
             <mat-icon class="search-prefix-icon">search</mat-icon>
-            <input class="custom-search-input" type="text" [(ngModel)]="templateSearchQuery"
+            <input data-testid="jorm-inp-018" class="custom-search-input" type="text" [(ngModel)]="templateSearchQuery"
               (input)="onTemplateSearchChange()" (focus)="onTemplateInputFocus()"
               placeholder="Search template by name or alias…" autocomplete="off">
-            <button *ngIf="selectedTemplate" class="search-clear-btn" (click)="clearTemplate($event)">
+            <button data-testid="jorm-btn-019" *ngIf="selectedTemplate" class="search-clear-btn" (click)="clearTemplate($event)">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -365,28 +365,28 @@
           <div class="gmail-header-bar">
             <span class="gmail-compose-title">New Message</span>
             <div class="gmail-header-actions">
-              <button class="gmail-action-btn" title="Minimize"><mat-icon>remove</mat-icon></button>
-              <button class="gmail-action-btn" title="Expand"><mat-icon>open_in_full</mat-icon></button>
+              <button data-testid="jorm-btn-020" class="gmail-action-btn" title="Minimize"><mat-icon>remove</mat-icon></button>
+              <button data-testid="jorm-btn-021" class="gmail-action-btn" title="Expand"><mat-icon>open_in_full</mat-icon></button>
             </div>
           </div>
 
           <!-- From field with custom dropdown -->
-          <div class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
+          <div data-testid="jorm-div-022" class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
             <span class="gmail-field-label">From</span>
             <div class="gmail-recipient-content">
               <div class="gmail-chip-wrap">
                 <span *ngIf="selectedFromEmail" class="gmail-chip">
                   {{selectedFromEmail}}
-                  <button class="gmail-chip-remove" (click)="removeFromEmail($event)" title="Change sender">×</button>
+                  <button data-testid="jorm-btn-023" class="gmail-chip-remove" (click)="removeFromEmail($event)" title="Change sender">×</button>
                 </span>
                 <div *ngIf="!selectedFromEmail" class="gmail-recipient-input-wrap">
-                  <input class="gmail-recipient-input" type="text"
+                  <input data-testid="jorm-inp-024" class="gmail-recipient-input" type="text"
                         [(ngModel)]="fromSearchQuery"
                         (input)="onFromSearchChange()"
                         (focus)="onFromInputFocus($event)"
                         placeholder="Select sender email…"
                         autocomplete="off">
-                  <div *ngIf="fromDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
+                  <div data-testid="jorm-div-025" *ngIf="fromDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
                     <div *ngIf="fromFilteredEmails.length === 0" class="gmail-dd-empty">No sender emails available</div>
                     <div *ngFor="let email of fromFilteredEmails" class="gmail-dd-item"
                         (mousedown)="selectFromEmail(email, $event)">
@@ -406,20 +406,20 @@
           </div>
 
           <!-- CC row with custom dropdown -->
-          <div class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
+          <div data-testid="jorm-div-026" class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
             <span class="gmail-field-label">Cc</span>
             <div class="gmail-recipient-content">
               <div class="gmail-chip-wrap">
                 <span *ngFor="let chip of selectedCcChips" class="gmail-chip">
                   {{chip}}
-                  <button class="gmail-chip-remove" (click)="removeCcChip(chip)">×</button>
+                  <button data-testid="jorm-btn-027" class="gmail-chip-remove" (click)="removeCcChip(chip)">×</button>
                 </span>
                 <div class="gmail-recipient-input-wrap">
-                  <input class="gmail-recipient-input" type="text" [(ngModel)]="ccSearchQuery"
+                  <input data-testid="jorm-inp-028" class="gmail-recipient-input" type="text" [(ngModel)]="ccSearchQuery"
                     (input)="onCcSearchChange()" (focus)="onCcInputFocus($event)"
                     placeholder="{{selectedCcChips.length === 0 ? 'Add CC recipients…' : ''}}" autocomplete="off">
                   <!-- CC dropdown -->
-                  <div *ngIf="ccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
+                  <div data-testid="jorm-div-029" *ngIf="ccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
                     <div *ngIf="ccEmailsLoading" class="gmail-dd-loading">
                       <mat-progress-spinner [diameter]="14" strokeWidth="2" mode="indeterminate"></mat-progress-spinner>
                       Loading…
@@ -438,20 +438,20 @@
           </div>
 
           <!-- BCC row with custom dropdown -->
-          <div class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
+          <div data-testid="jorm-div-030" class="gmail-field-row gmail-recipient-row" (click)="$event.stopPropagation()">
             <span class="gmail-field-label">Bcc</span>
             <div class="gmail-recipient-content">
               <div class="gmail-chip-wrap">
                 <span *ngFor="let chip of selectedBccChips" class="gmail-chip">
                   {{chip}}
-                  <button class="gmail-chip-remove" (click)="removeBccChip(chip)">×</button>
+                  <button data-testid="jorm-btn-031" class="gmail-chip-remove" (click)="removeBccChip(chip)">×</button>
                 </span>
                 <div class="gmail-recipient-input-wrap">
-                  <input class="gmail-recipient-input" type="text" [(ngModel)]="bccSearchQuery"
+                  <input data-testid="jorm-inp-032" class="gmail-recipient-input" type="text" [(ngModel)]="bccSearchQuery"
                     (input)="onBccSearchChange()" (focus)="onBccInputFocus($event)"
                     placeholder="{{selectedBccChips.length === 0 ? 'Add BCC recipients…' : ''}}" autocomplete="off">
                   <!-- BCC dropdown -->
-                  <div *ngIf="bccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
+                  <div data-testid="jorm-div-033" *ngIf="bccDropdownOpen" class="gmail-recipient-dropdown" (click)="$event.stopPropagation()">
                     <div *ngIf="ccEmailsLoading" class="gmail-dd-loading">
                       <mat-progress-spinner [diameter]="14" strokeWidth="2" mode="indeterminate"></mat-progress-spinner>
                       Loading…
@@ -471,7 +471,7 @@
 
           <!-- Subject -->
           <div class="gmail-field-row gmail-subject-row">
-            <input class="gmail-subject-input" type="text" [value]="selectedTemplate.subject" readonly
+            <input data-testid="jorm-inp-034" class="gmail-subject-input" type="text" [value]="selectedTemplate.subject" readonly
               placeholder="Subject">
           </div>
 
@@ -495,7 +495,7 @@
               <label class="gmail-add-attach-btn" title="Add attachment">
                 <mat-icon>add</mat-icon>
                 Add
-                <input type="file" multiple hidden (change)="onAddAttachment($event)">
+                <input data-testid="jorm-inp-035" type="file" multiple hidden (change)="onAddAttachment($event)">
               </label>
             </div>
 
@@ -537,12 +537,12 @@
                 <!-- Actions -->
                 <div class="gmail-attach-actions">
                   <!-- Open link (only for URL-based, not data: URLs) -->
-                  <a *ngIf="att.url && !att.url.startsWith('data:')" [href]="att.url" target="_blank"
+                  <a data-testid="jorm-a-036" *ngIf="att.url && !att.url.startsWith('data:')" [href]="att.url" target="_blank"
                     rel="noopener noreferrer" class="gmail-attach-action-btn" title="Open">
                     <mat-icon>open_in_new</mat-icon>
                   </a>
                   <!-- Remove -->
-                  <button class="gmail-attach-action-btn gmail-attach-remove-btn"
+                  <button data-testid="jorm-btn-037" class="gmail-attach-action-btn gmail-attach-remove-btn"
                     (click)="removeMailAttachment(att['_id'])" title="Remove attachment">
                     <mat-icon>close</mat-icon>
                   </button>
@@ -554,7 +554,7 @@
           <!-- <div *ngIf="templateAttachments.length > 0" class="gmail-attachments">
             <div class="gmail-attachment-divider"></div>
             <div class="gmail-attach-list">
-              <a *ngFor="let att of templateAttachments"
+              <a data-testid="jorm-a-038" *ngFor="let att of templateAttachments"
                  [href]="att.url"
                  target="_blank"
                  rel="noopener noreferrer"
@@ -577,7 +577,7 @@
                 <mat-icon>check_circle</mat-icon>
                 Email Sent!
               </div>
-              <button *ngIf="!emailSent" class="gmail-send-btn" [disabled]="!canSendEmail || emailSending"
+              <button data-testid="jorm-btn-039" *ngIf="!emailSent" class="gmail-send-btn" [disabled]="!canSendEmail || emailSending"
                 (click)="sendEmail()">
                 Send
                 <mat-icon class="gmail-send-icon">send</mat-icon>
@@ -612,7 +612,7 @@
       <h3 *ngIf="participantjourneyproduct['viewnotes'] === true"><b>View Note</b></h3>
       <h3 *ngIf="participantjourneyproduct['viewreport'] === true"><b>OnBoarding Report</b></h3>
 
-      <button mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
+      <button data-testid="jorm-btn-040" mat-icon-button mat-dialog-close class="close-button" (click)="dialogRef.close()">
         <mat-icon style="color:white">close</mat-icon>
       </button>
 
@@ -629,10 +629,10 @@
     
         <div class="notes-container">
           <mat-form-field appearance="outline" class="textareafield">
-            <textarea matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
+            <textarea data-testid="jorm-txt-041" matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="generalnote" rows="8"></textarea>
           </mat-form-field>
     
-          <button type="button" class="submit-button" mat-stroked-button
+          <button data-testid="jorm-btn-042" type="button" class="submit-button" mat-stroked-button
             [disabled]="[null,undefined,''].includes(generalnote)" (click)="addnotes()">Add Note</button>
         </div>
       </div>
@@ -707,10 +707,10 @@
       <span>JourneyCoach Appointment scheduled with {{mapProfile[participantjourneyproduct['onboardedby'][0].id]}}</span>
       <span>This Appointment Happened?</span>
       <div class="options" *ngIf="participantjourneyproduct['view'] === false">
-        <label><input type="radio" [(ngModel)]= 'attended' [value]=true /> Attended</label>
-        <label><input type="radio" [(ngModel)]= 'attended'  [value]=false/> Cancelled</label>
+        <label><input data-testid="jorm-inp-043" type="radio" [(ngModel)]= 'attended' [value]=true /> Attended</label>
+        <label><input data-testid="jorm-inp-044" type="radio" [(ngModel)]= 'attended'  [value]=false/> Cancelled</label>
       </div>
-      <button *ngIf="participantjourneyproduct['view'] === false" class="submit-button" (click)="onmark()">Submit</button>
+      <button data-testid="jorm-btn-045" *ngIf="participantjourneyproduct['view'] === false" class="submit-button" (click)="onmark()">Submit</button>
     </div>
   
     <div *ngIf="participantjourneyproduct['markonboard'] === true">
@@ -728,12 +728,12 @@
           <div class="d-inline-flex flex-row justify-content-space-between w-100">
             <mat-form-field appearance="outline">
               <mat-label>Current Journey</mat-label>
-              <input matInput type="text" [(ngModel)]="currentJourney" readonly>
+              <input data-testid="jorm-inp-046" matInput type="text" [(ngModel)]="currentJourney" readonly>
             </mat-form-field>
             &nbsp;&nbsp;
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Journey Status</mat-label>
-              <mat-select [(ngModel)]="currentJourneyStatus" [disabled]="true">
+              <mat-select data-testid="jorm-msel-047" [(ngModel)]="currentJourneyStatus" [disabled]="true">
                 <mat-option [value]="null">Clear Status</mat-option>
                 <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
               </mat-select>
@@ -744,12 +744,12 @@
             
             <mat-form-field appearance="outline">
               <mat-label>Previous Journey</mat-label>
-              <input matInput type="text" [(ngModel)]="previousJourney" readonly>
+              <input data-testid="jorm-inp-048" matInput type="text" [(ngModel)]="previousJourney" readonly>
             </mat-form-field>
             &nbsp;&nbsp;
             <mat-form-field class="inputfield" appearance="outline">
               <mat-label>Journey Status</mat-label>
-              <mat-select [(ngModel)]="previouseJourneyStatus" [disabled]="true">
+              <mat-select data-testid="jorm-msel-049" [(ngModel)]="previouseJourneyStatus" [disabled]="true">
                 <mat-option [value]="null">Clear Status</mat-option>
                 <mat-option *ngFor="let option of journeystatusOption" [value]="option.toLowerCase()">{{option}}</mat-option>
               </mat-select>
@@ -775,7 +775,7 @@
 
           <div>
             <mat-form-field appearance="outline">
-              <mat-select placeholder="Select Specialist" [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
+              <mat-select data-testid="jorm-msel-050" placeholder="Select Specialist" [(ngModel)]="participantjourneyproduct['onboardedby']" multiple>
                 <mat-option *ngFor="let member of ahmember.sort()" [value]="member.profile_ref">{{ member.name }}</mat-option>
               </mat-select>
             </mat-form-field>
@@ -789,7 +789,7 @@
             <div>
               <mat-form-field appearance="outline" class="no-padding-time-input">
                 <mat-label>Scheduled Date</mat-label>
-                <input matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()" placeholder="MM/DD/YYYY">
+                <input data-testid="jorm-inp-051" matInput [matDatepicker]="picker" [(ngModel)]="selectedDate" (dateChange)="getCombinedDateTime()" placeholder="MM/DD/YYYY">
                 <mat-datepicker-toggle matSuffix [for]="picker">
                   <mat-icon matDatepickerToggleIcon>calendar_today</mat-icon>
                 </mat-datepicker-toggle>
@@ -804,7 +804,7 @@
             <div>
               <mat-form-field appearance="outline" class="no-padding-time-input">
                 <mat-label>Scheduled Time</mat-label>
-                <input matInput type="time" [(ngModel)]="selectedTime" (change)="getCombinedDateTime()" placeholder="HH:MM">
+                <input data-testid="jorm-inp-052" matInput type="time" [(ngModel)]="selectedTime" (change)="getCombinedDateTime()" placeholder="HH:MM">
               </mat-form-field>
               <p style="color: red;line-height: 0px;" *ngIf="[null,undefined,''].includes(selectedTime)">
                 Please select a Time
@@ -817,7 +817,7 @@
         <div>
           <h4 style="font-size: 16px;color: #0C6385;">Onboarding Report</h4>
           <mat-form-field appearance="outline" class="textareafield">
-            <textarea matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="note" rows="5"></textarea>
+            <textarea data-testid="jorm-txt-053" matInput name="genearlnotes" placeholder="Type Here" [(ngModel)]="note" rows="5"></textarea>
           </mat-form-field>
         </div>
 
@@ -849,7 +849,7 @@
       </div>
   
       <div class="d-flex justify-content-center">
-        <button type="button" class="submit-button" [ngStyle]="{'background-color': validateOnboard() ? '#e0e0e0' : '#0056b3'}" mat-stroked-button [disabled]="validateOnboard()" (click)="onSubmit()">Submit</button>
+        <button data-testid="jorm-btn-054" type="button" class="submit-button" [ngStyle]="{'background-color': validateOnboard() ? '#e0e0e0' : '#0056b3'}" mat-stroked-button [disabled]="validateOnboard()" (click)="onSubmit()">Submit</button>
       </div>
     </div>
 </div> -->

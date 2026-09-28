@@ -4,7 +4,7 @@
     <div class="sidebar-header">
       <h2>Support Chats</h2>
       <div class="header-actions">
-        <button mat-icon-button (click)="editGroup(null)" matTooltip="Create New Group" class="create-group-btn">
+        <button mat-icon-button (click)="editGroup(null)" matTooltip="Create New Group" class="create-group-btn" data-testid="chs-sidebar-create-group">
           <mat-icon>add</mat-icon>
         </button>
       </div>
@@ -14,9 +14,9 @@
     <div class="search-container">
       <mat-form-field class="search-field" appearance="outline">
         <mat-icon matPrefix>search</mat-icon>
-        <input matInput placeholder="Search Groups..." [(ngModel)]="searchQuery" (input)="filterChats()">
+        <input matInput placeholder="Search Groups..." [(ngModel)]="searchQuery" (input)="filterChats()" data-testid="chs-sidebar-search-input">
         <button *ngIf="searchQuery" matSuffix mat-icon-button (click)="searchQuery=''; filterChats()"
-          matTooltip="Clear search">
+          matTooltip="Clear search" data-testid="chs-sidebar-search-clear">
           <mat-icon>clear</mat-icon>
         </button>
       </mat-form-field>
@@ -24,21 +24,21 @@
 
     <!-- Group Status Tabs -->
     <div class="group-tabs">
-      <button class="group-tab" [class.active]="selectedTabIndex === 0" (click)="onTabChange(0)">
+      <button class="group-tab" [class.active]="selectedTabIndex === 0" (click)="onTabChange(0)" data-testid="chs-tabs-active-groups">
         <mat-icon>group</mat-icon>
         <span>Active Groups</span>
         <span class="tab-count" *ngIf="filteredActiveChatList.length > 0">{{ filteredActiveChatList.length }}</span>
       </button>
-      <button class="group-tab" [class.active]="selectedTabIndex === 1" (click)="onTabChange(1)">
+      <button class="group-tab" [class.active]="selectedTabIndex === 1" (click)="onTabChange(1)" data-testid="chs-tabs-inactive-groups">
         <mat-icon>archive</mat-icon>
         <span>Inactive Groups</span>
         <span class="tab-count" *ngIf="filteredInactiveChatList.length > 0">{{ filteredInactiveChatList.length }}</span>
       </button>
-      <button class="group-tab" [class.active]="selectedTabIndex === 2" (click)="onTabChange(2)">
+      <button class="group-tab" [class.active]="selectedTabIndex === 2" (click)="onTabChange(2)" data-testid="chs-tabs-active-channels">
         <mat-icon>group</mat-icon>
         <span>Active Channels</span>
         <span class="tab-count" *ngIf="activeChannelTotalCount > 0">{{ activeChannelTotalCount }}</span>      </button>
-      <button class="group-tab" [class.active]="selectedTabIndex === 3" (click)="onTabChange(3)">
+      <button class="group-tab" [class.active]="selectedTabIndex === 3" (click)="onTabChange(3)" data-testid="chs-tabs-inactive-channels">
         <mat-icon>archive</mat-icon>
         <span>Inactive Channels</span>
       </button>
@@ -53,11 +53,11 @@
     <!-- Active Groups List -->
     <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 0">
       <div *ngFor="let chat of filteredActiveChatList; trackBy: trackByMessageId" class="chat-item"
-        [class.selected]="selectedChat.docid === chat.docid" [class.pinned]="chat.pinned" (click)="selectChat(chat)">
+        [class.selected]="selectedChat.docid === chat.docid" [class.pinned]="chat.pinned" (click)="selectChat(chat)" data-testid="chs-active-chat-item">
 
         <div class="chat-content">
           <!-- Chat Avatar -->
-          <div class="chat-avatar" [class.editable]="canEditGroup(chat)" (click)="onGroupIconClick($event, chat)"
+          <div class="chat-avatar" [class.editable]="canEditGroup(chat)" (click)="onGroupIconClick($event, chat)" data-testid="chs-active-chat-avatar"
             [matTooltip]="canEditGroup(chat) ? 'Click to edit group' : chat.chatname">
             <img [src]="chat.chatprofile">
 
@@ -86,7 +86,7 @@
           <!-- Pin Icon -->
           <div class="pin-container">
             <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
-              (click)="togglePinChat($event, chat)" matTooltip="{{ chat.pinned ? 'Unpin chat' : 'Pin chat' }}">
+              (click)="togglePinChat($event, chat)" matTooltip="{{ chat.pinned ? 'Unpin chat' : 'Pin chat' }}" data-testid="chs-active-pin">
               <mat-icon>{{ chat.pinned ? 'push_pin' : 'push_pin' }}</mat-icon>
             </button>
           </div>
@@ -94,7 +94,7 @@
       </div>
       <!-- load more -->
       <div *ngIf="hasMoreActiveChannels" class="load-more-container">
-        <button mat-stroked-button (click)="loadMoreActiveChannels()" [disabled]="loadingMoreActiveChannels">
+        <button mat-stroked-button (click)="loadMoreActiveChannels()" [disabled]="loadingMoreActiveChannels" data-testid="chs-active-load-more">
           <mat-spinner *ngIf="loadingMoreActiveChannels" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
           {{ loadingMoreActiveChannels ? 'Loading...' : 'Load More Channels' }}
         </button>
@@ -104,7 +104,7 @@
       <div *ngIf="filteredActiveChatList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'chat' }}</mat-icon>
         <p>{{ searchQuery ? 'No active groups found' : 'No active groups' }}</p>
-        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()" data-testid="chs-active-empty-clear-search">
           Clear Search
         </button>
       </div>
@@ -113,7 +113,7 @@
     <!-- Inactive Groups List -->
     <div class="chat-list" *ngIf="!chatlistloading && selectedTabIndex === 1">
       <div *ngFor="let chat of filteredInactiveChatList; trackBy: trackByMessageId" class="chat-item inactive-chat-item"
-        [class.selected]="selectedChat.docid === chat.docid" (click)="selectChat(chat)">
+        [class.selected]="selectedChat.docid === chat.docid" (click)="selectChat(chat)" data-testid="chs-inactive-chat-item">
 
         <div class="chat-content">
           <!-- Chat Avatar -->
@@ -140,7 +140,7 @@
           <!-- Restore Icon (only for admins) -->
           <div class="pin-container" *ngIf="adminRole || chatAdmin">
             <button mat-icon-button class="restore-button" (click)="restoreGroup($event, chat)"
-              matTooltip="Restore Group">
+              matTooltip="Restore Group" data-testid="chs-inactive-restore">
               <mat-icon>restore</mat-icon>
             </button>
           </div>
@@ -149,7 +149,7 @@
 
       <!-- Load More Inactive Channels -->
       <div *ngIf="hasMoreInactiveChannels" class="load-more-container">
-        <button mat-stroked-button (click)="loadMoreInactiveChannels()" [disabled]="loadingMoreInactiveChannels">
+        <button mat-stroked-button (click)="loadMoreInactiveChannels()" [disabled]="loadingMoreInactiveChannels" data-testid="chs-inactive-load-more">
           <mat-spinner *ngIf="loadingMoreInactiveChannels" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
           {{ loadingMoreInactiveChannels ? 'Loading...' : 'Load More Channels' }}
         </button>
@@ -159,7 +159,7 @@
       <div *ngIf="filteredInactiveChatList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'archive' }}</mat-icon>
         <p>{{ searchQuery ? 'No inactive groups found' : 'No inactive groups' }}</p>
-        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()" data-testid="chs-inactive-empty-clear-search">
           Clear Search
         </button>
       </div>
@@ -171,7 +171,7 @@
           class="chat-item channel-chat-item"
           [class.selected]="selectedChat.docid === chat.docid"
           [class.pinned]="chat.pinned"
-          (click)="selectChat(chat)">
+          (click)="selectChat(chat)" data-testid="chs-active-channel-item">
         <div class="chat-content">
           <div class="chat-avatar channel-avatar" [matTooltip]="chat.chatname">
             <img [src]="chat.chatprofile">
@@ -196,7 +196,7 @@
           <div class="pin-container">
             <button mat-icon-button class="pin-button" [class.pinned]="chat.pinned"
                     (click)="togglePinChat($event, chat)"
-                    matTooltip="{{ chat.pinned ? 'Unpin' : 'Pin' }}">
+                    matTooltip="{{ chat.pinned ? 'Unpin' : 'Pin' }}" data-testid="chs-active-channel-pin">
               <mat-icon>push_pin</mat-icon>
             </button>
           </div>
@@ -206,7 +206,7 @@
       <div *ngIf="filteredActiveChannelList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'campaign' }}</mat-icon>
         <p>{{ searchQuery ? 'No active channels found' : 'No active channels' }}</p>
-        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">Clear Search</button>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()" data-testid="chs-active-channel-empty-clear-search">Clear Search</button>
       </div>
     </div>
 
@@ -215,7 +215,7 @@
       <div *ngFor="let chat of filteredInactiveChannelList; trackBy: trackByMessageId"
           class="chat-item inactive-chat-item channel-chat-item"
           [class.selected]="selectedChat.docid === chat.docid"
-          (click)="selectChat(chat)">
+          (click)="selectChat(chat)" data-testid="chs-inactive-channel-item">
         <div class="chat-content">
           <div class="chat-avatar inactive channel-avatar" [matTooltip]="chat.chatname">
             <img [src]="chat.chatprofile">
@@ -232,7 +232,7 @@
             </div>
           </div>
           <div class="pin-container" *ngIf="adminRole || chatAdmin">
-            <button mat-icon-button class="restore-button" (click)="restoreGroup($event, chat)" matTooltip="Restore Channel">
+            <button mat-icon-button class="restore-button" (click)="restoreGroup($event, chat)" matTooltip="Restore Channel" data-testid="chs-inactive-channel-restore">
               <mat-icon>restore</mat-icon>
             </button>
           </div>
@@ -242,7 +242,7 @@
       <div *ngIf="filteredInactiveChannelList.length === 0 && !chatlistloading" class="empty-state">
         <mat-icon>{{ searchQuery ? 'search_off' : 'archive' }}</mat-icon>
         <p>{{ searchQuery ? 'No inactive channels found' : 'No inactive channels' }}</p>
-        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()">Clear Search</button>
+        <button *ngIf="searchQuery" mat-stroked-button (click)="searchQuery=''; filterChats()" data-testid="chs-inactive-channel-empty-clear-search">Clear Search</button>
       </div>
     </div>
   </div>
@@ -270,7 +270,7 @@
       <div class="chat-header-bar">
         <div class="chat-header-info">
   <!-- Clickable avatar → opens profile pic modal -->
-  <div class="header-avatar-wrap" (click)="openProfileModal($event, selectedChat)">
+  <div class="header-avatar-wrap" (click)="openProfileModal($event, selectedChat)" data-testid="chs-header-avatar">
     <img [src]="selectedChat.chatprofile" class="header-avatar">
     <div class="header-avatar-overlay">
       <mat-icon>photo_camera</mat-icon>
@@ -284,7 +284,7 @@
     </h3>
     <p>
       <span class="members-link"
-            (click)="openParticipantsPanel($event, selectedChat)">
+            (click)="openParticipantsPanel($event, selectedChat)" data-testid="chs-header-members-link">
         {{ selectedChat.members?.length }} members
       </span>
       • {{ selectedChat.chattype }}
@@ -295,10 +295,10 @@
         <!-- Selection Mode Actions -->
         <div *ngIf="selectionMode" class="selection-actions">
           <span class="selection-count">{{ selectedMessages.size }} selected</span>
-          <button mat-icon-button (click)="deleteSelectedMessages()" matTooltip="Delete Selected" class="delete-btn">
+          <button mat-icon-button (click)="deleteSelectedMessages()" matTooltip="Delete Selected" class="delete-btn" data-testid="chs-selection-delete">
             <mat-icon>delete</mat-icon>
           </button>
-          <button mat-icon-button (click)="exitSelectionMode()" matTooltip="Cancel">
+          <button mat-icon-button (click)="exitSelectionMode()" matTooltip="Cancel" data-testid="chs-selection-cancel">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -306,28 +306,28 @@
         <!-- Normal Actions -->
         <div *ngIf="!selectionMode" class="chat-actions">
           <button mat-icon-button (click)="toggleMessageSearch()" matTooltip="Search Messages"
-            [class.active]="showMessageSearch">
+            [class.active]="showMessageSearch" data-testid="chs-actions-search">
             <mat-icon>search</mat-icon>
           </button>
           <!-- Pinned Messages Toggle Button -->
           <button mat-icon-button (click)="togglePinnedSection()" matTooltip="Toggle Pinned Messages"
-            class="pinned-messages-toggle" [class.active]="showPinnedSection">
+            class="pinned-messages-toggle" [class.active]="showPinnedSection" data-testid="chs-actions-toggle-pinned">
             <mat-icon>push_pin</mat-icon>
             <span *ngIf="pinnedMessagesCount > 0" class="pin-count-badge">{{ pinnedMessagesCount }}</span>
           </button>
-          <button mat-icon-button (click)="editGroup(selectedChat)" matTooltip="Chat Info">
+          <button mat-icon-button (click)="editGroup(selectedChat)" matTooltip="Chat Info" data-testid="chs-actions-chat-info">
             <mat-icon>info</mat-icon>
           </button>
           <button mat-icon-button [matMenuTriggerFor]="chatMenu" matTooltip="More options"
-            *ngIf="!isInactiveChatSelected">
+            *ngIf="!isInactiveChatSelected" data-testid="chs-actions-more">
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #chatMenu="matMenu">
-            <button mat-menu-item (click)="togglePinChat($event, selectedChat)">
+            <button mat-menu-item (click)="togglePinChat($event, selectedChat)" data-testid="chs-menu-toggle-pin">
               <mat-icon>{{ selectedChat.pinned ? 'push_pin' : 'push_pin' }}</mat-icon>
               <span>{{ selectedChat.pinned ? 'Unpin' : 'Pin' }} Chat</span>
             </button>
-            <button mat-menu-item (click)="enterSelectionMode()">
+            <button mat-menu-item (click)="enterSelectionMode()" data-testid="chs-menu-select-messages">
               <mat-icon>checklist</mat-icon>
               <span class="montserratfont">Select Messages</span>
             </button>
@@ -340,13 +340,13 @@
         <mat-form-field class="message-search-field" appearance="outline">
           <mat-icon matPrefix>search</mat-icon>
           <input #messageSearchInput matInput placeholder="Search messages..." [(ngModel)]="messageSearchQuery"
-            (input)="filterMessages()">
+            (input)="filterMessages()" data-testid="chs-message-search-input">
           <button *ngIf="messageSearchQuery" matSuffix mat-icon-button (click)="messageSearchQuery=''; filterMessages()"
-            matTooltip="Clear search">
+            matTooltip="Clear search" data-testid="chs-message-search-clear">
             <mat-icon>clear</mat-icon>
           </button>
         </mat-form-field>
-        <button mat-icon-button (click)="toggleMessageSearch()" matTooltip="Close search">
+        <button mat-icon-button (click)="toggleMessageSearch()" matTooltip="Close search" data-testid="chs-message-search-close">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -356,7 +356,7 @@
         <div class="pinned-section-content">
           <div class="pinned-messages-grid">
             <div *ngFor="let message of getPinnedMessages().slice(0, maxPinnedDisplay); trackBy: trackByMessageId"
-              class="pinned-message-card" (click)="jumpToMessage(message)">
+              class="pinned-message-card" (click)="jumpToMessage(message)" data-testid="chs-pinned-card">
 
               <!-- Message Header -->
               <div class="pinned-card-header">
@@ -372,7 +372,7 @@
                   </div>
                 </div>
                 <button mat-icon-button (click)="$event.stopPropagation(); pinMessage(message)"
-                  matTooltip="Unpin Message" class="card-unpin-btn" *ngIf="!isInactiveChatSelected">
+                  matTooltip="Unpin Message" class="card-unpin-btn" *ngIf="!isInactiveChatSelected" data-testid="chs-pinned-card-unpin">
                   <mat-icon>close</mat-icon>
                 </button>
               </div>
@@ -389,9 +389,9 @@
                   <!-- Image Preview -->
                   <div *ngIf="getImageFiles(message.files).length > 0" class="pinned-card-images">
                     <img *ngFor="let imageFile of getImageFiles(message.files).slice(0, 2)" [src]="imageFile.fileurl"
-                      class="pinned-card-image" (click)="$event.stopPropagation(); openImage(imageFile)">
+                      class="pinned-card-image" (click)="$event.stopPropagation(); openImage(imageFile)" data-testid="chs-pinned-card-image">
                     <div *ngIf="getImageFiles(message.files).length > 2" class="more-images-indicator"
-                      (click)="$event.stopPropagation(); showAllImages(message)">
+                      (click)="$event.stopPropagation(); showAllImages(message)" data-testid="chs-pinned-card-more-images">
                       +{{ getImageFiles(message.files).length - 2 }}
                     </div>
                   </div>
@@ -413,7 +413,7 @@
 
             <!-- Show More Button -->
             <div *ngIf="getPinnedMessages().length > maxPinnedDisplay" class="show-more-pinned">
-              <button mat-button (click)="expandPinnedMessages()" class="show-more-btn">
+              <button mat-button (click)="expandPinnedMessages()" class="show-more-btn" data-testid="chs-pinned-show-more">
                 <mat-icon>expand_more</mat-icon>
                 Show {{ getPinnedMessages().length - maxPinnedDisplay }} more pinned message{{
                 getPinnedMessages().length - maxPinnedDisplay !== 1 ? 's' : '' }}
@@ -429,7 +429,7 @@
           <mat-icon>push_pin</mat-icon>
           <h4>No Pinned Messages</h4>
           <p>Pin important messages to keep them at the top of your chat for quick access.</p>
-          <button mat-stroked-button (click)="togglePinnedSection()" class="hide-empty-btn">
+          <button mat-stroked-button (click)="togglePinnedSection()" class="hide-empty-btn" data-testid="chs-pinned-empty-hide">
             Hide Section
           </button>
         </div>
@@ -449,7 +449,7 @@
           <!-- Load More Messages (channels only) -->
         <div *ngIf="isChannelSelected && hasMoreMessages" class="channel-send-bar">
           <mat-icon class="channel-send-bar-icon">history</mat-icon>
-          <button class="channel-send-cta" (click)="loadMoreChannelMessages()" [disabled]="loadingMoreMessages">
+          <button class="channel-send-cta" (click)="loadMoreChannelMessages()" [disabled]="loadingMoreMessages" data-testid="chs-messages-load-more">
             <mat-spinner *ngIf="loadingMoreMessages" diameter="16"></mat-spinner>
             <mat-icon *ngIf="!loadingMoreMessages">expand_less</mat-icon>
             {{ loadingMoreMessages ? 'Loading...' : 'Load More' }}
@@ -468,7 +468,7 @@
               [class.my-message]="message.isMyMessage" [class.other-message]="!message.isMyMessage"
               [class.selected]="selectedMessages.has(message.docid)" [class.pinned-message]="message.pinned"
               [attr.data-message-id]="message.docid" (click)="onMessageTap(message, $event)"
-              (contextmenu)="!selectionMode ? $event.preventDefault() : null">
+              (contextmenu)="!selectionMode ? $event.preventDefault() : null" data-testid="chs-message-wrapper">
 
               <!-- Message Container -->
               <div class="message-container">
@@ -487,29 +487,29 @@
 
                   <!-- Message Actions Menu -->
 <div *ngIf="!selectionMode" class="message-actions">
-  <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger">
+  <button mat-icon-button [matMenuTriggerFor]="messageMenu" class="message-menu-trigger" data-testid="chs-message-menu-trigger">
     <mat-icon>more_vert</mat-icon>
   </button>
   <mat-menu #messageMenu="matMenu">
-    <button mat-menu-item (click)="copyMessage(message)">
+    <button mat-menu-item (click)="copyMessage(message)" data-testid="chs-message-menu-copy">
       <mat-icon>content_copy</mat-icon>
       <span class="montserratfont">Copy</span>
     </button>
-    <button *ngIf="message.isMyMessage" mat-menu-item (click)="showReadReceiptsModal(message)">
+    <button *ngIf="message.isMyMessage" mat-menu-item (click)="showReadReceiptsModal(message)" data-testid="chs-message-menu-read-receipts">
       <mat-icon>visibility</mat-icon>
       <span class="montserratfont">Read / Un-Read</span>
     </button>
     <button *ngIf="message.isMyMessage && !isInactiveChatSelected" mat-menu-item
-      (click)="deleteSingleMessage(message)" class="delete-option">
+      (click)="deleteSingleMessage(message)" class="delete-option" data-testid="chs-message-menu-delete">
       <mat-icon>delete</mat-icon>
       <span class="montserratfont">Delete</span>
     </button>
     <button mat-menu-item *ngIf="!isInactiveChatSelected"
-      (click)="enterSelectionMode(); toggleMessageSelection(message)">
+      (click)="enterSelectionMode(); toggleMessageSelection(message)" data-testid="chs-message-menu-select">
       <mat-icon>checklist</mat-icon>
       <span class="montserratfont">Select</span>
     </button>
-    <button mat-menu-item *ngIf="adminRole && !isInactiveChatSelected" (click)="pinMessage(message)">
+    <button mat-menu-item *ngIf="adminRole && !isInactiveChatSelected" (click)="pinMessage(message)" data-testid="chs-message-menu-pin">
       <mat-icon>push_pin</mat-icon>
       <span class="montserratfont">{{message.pinned ? 'UNPIN' : 'PIN'}}</span>
     </button>
@@ -543,7 +543,7 @@
   <!-- Attached Files (PDFs, docs, etc.) -->
   <div class="channel-files-section" *ngIf="message.files && message.files.length > 0">
     <div *ngFor="let file of message.files" class="channel-file-card"
-         (click)="openChannelFile(file)">
+         (click)="openChannelFile(file)" data-testid="chs-channel-file-card">
       <div class="channel-file-icon-wrap">
         <mat-icon class="channel-file-icon">{{ getChannelFileIcon(file.url || file.name) }}</mat-icon>
       </div>
@@ -560,7 +560,7 @@
     <a *ngFor="let link of message.links"
        [href]="link.url"
        target="_blank"
-       class="channel-link-chip">
+       class="channel-link-chip" data-testid="chs-channel-link">
       <mat-icon class="channel-link-icon">link</mat-icon>
       <span>{{ link.label || link.url }}</span>
       <mat-icon class="channel-link-ext">open_in_new</mat-icon>
@@ -573,7 +573,7 @@
   <a *ngFor="let btn of parseChannelButtons(message.buttons)"
     [href]="btn.url"
     target="_blank"
-    class="channel-action-btn">
+    class="channel-action-btn" data-testid="chs-channel-action-btn">
     <mat-icon class="channel-btn-icon">open_in_new</mat-icon>
     <span>{{ btn.label }}</span>
   </a>
@@ -594,7 +594,7 @@
 
 <!-- Files -->
 <div *ngIf="!isChannelSelected && message.files && message.files.length > 0" class="message-files">
-  <div *ngFor="let file of message.files" class="file-attachment" (click)="openImage(file)">
+  <div *ngFor="let file of message.files" class="file-attachment" (click)="openImage(file)" data-testid="chs-message-file-attachment">
     <div class="file-info">
       <mat-icon class="file-icon">{{ getFileIcon(file.filetype) }}</mat-icon>
       <div class="file-details">
@@ -603,13 +603,13 @@
       </div>
     </div>
     <button mat-icon-button class="download-btn" matTooltip="Download"
-      (click)="$event.stopPropagation()">
+      (click)="$event.stopPropagation()" data-testid="chs-message-file-download">
       <mat-icon>download</mat-icon>
     </button>
   </div>
   <div *ngFor="let file of message.files" class="image-preview">
     <img *ngIf="file?.filetype?.startsWith('image/')" [src]="file?.fileurl" (click)="openImage(file)"
-      loading="lazy" class="message-image">
+      loading="lazy" class="message-image" data-testid="chs-message-image">
   </div>
 </div>
 
@@ -627,7 +627,7 @@
 <!-- Channel participant count button — only for channel messages -->
 <div *ngIf="isChannelSelected" class="channel-participant-btn-wrap">
   <button class="channel-participant-btn"
-          (click)="$event.stopPropagation(); openChannelParticipants(message)"
+          (click)="$event.stopPropagation(); openChannelParticipants(message)" data-testid="chs-channel-participant"
           [matTooltip]="getReadCount(message) + ' / ' + getTotalParticipantsCount(message) + ' seen'">
     <mat-icon class="participant-icon">people</mat-icon>
     <span class="participant-count-label">
@@ -654,7 +654,7 @@
       <div *ngIf="attachedFiles.length > 0 && !isInactiveChatSelected" class="file-preview-area" #previewContainer>
         <div class="preview-header">
           <h4>Attached Files ({{ attachedFiles.length }})</h4>
-          <button mat-icon-button (click)="attachedFiles = []" matTooltip="Clear All">
+          <button mat-icon-button (click)="attachedFiles = []" matTooltip="Clear All" data-testid="chs-file-preview-clear-all">
             <mat-icon>clear_all</mat-icon>
           </button>
         </div>
@@ -663,7 +663,7 @@
             <!-- Image Preview -->
             <div *ngIf="file.fileurl" class="image-preview-thumb">
               <img [src]="file.fileurl">
-              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)">
+              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)" data-testid="chs-file-preview-remove-image">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -675,7 +675,7 @@
                 <span class="file-name">{{ file.filename }}</span>
                 <span class="file-size">{{ formatFileSize(file.file.size) }}</span>
               </div>
-              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)">
+              <button mat-icon-button class="remove-file" (click)="removeAttachedFile(i)" data-testid="chs-file-preview-remove-file">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -687,7 +687,7 @@
       <div *ngIf="isChannelSelected && !isInactiveChatSelected" class="channel-send-bar">
         <mat-icon class="channel-send-bar-icon">campaign</mat-icon>
         <span class="channel-send-bar-label">This is a one-way communication channel</span>
-        <button class="channel-send-cta" (click)="openChannelSendDialog()">
+        <button class="channel-send-cta" (click)="openChannelSendDialog()" data-testid="chs-channel-send">
           <mat-icon>send</mat-icon>
           Send
         </button>
@@ -725,18 +725,18 @@
 
         <div class="input-container">
           <input #fileInput type="file" multiple style="display:none" (change)="onFileSelected($event)"
-            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z">
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z" data-testid="chs-input-file">
 
           <mat-form-field class="message-input" appearance="outline">
             <textarea matInput #messageInput [(ngModel)]="newMessage" placeholder="Type a message..." rows="4"
-              (input)="onMessageInputChange($event)" (keydown)="onKeyPress($event)"></textarea>
+              (input)="onMessageInputChange($event)" (keydown)="onKeyPress($event)" data-testid="chs-message-textarea"></textarea>
           </mat-form-field>
 
-          <button mat-icon-button [matMenuTriggerFor]="attachMenu" matTooltip="Attach File" class="attach-btn">
+          <button mat-icon-button [matMenuTriggerFor]="attachMenu" matTooltip="Attach File" class="attach-btn" data-testid="chs-attach">
             <mat-icon>attach_file</mat-icon>
           </button>
           <mat-menu #attachMenu="matMenu">
-            <button mat-menu-item (click)="openFileInput()">
+            <button mat-menu-item (click)="openFileInput()" data-testid="chs-attach-choose-files">
               <mat-icon>folder</mat-icon>
               <span class="montserratfont">Choose Files</span>
             </button>
@@ -744,7 +744,7 @@
 
           <button mat-fab color="primary" class="send-button"
             [disabled]="(!newMessage.trim() && attachedFiles.length === 0) || uploadingFiles"
-            (click)="sendMessage()" matTooltip="Send Message">
+            (click)="sendMessage()" matTooltip="Send Message" data-testid="chs-send">
             <mat-spinner *ngIf="uploadingFiles" diameter="24"></mat-spinner>
             <mat-icon *ngIf="!uploadingFiles">send</mat-icon>
           </button>
@@ -766,11 +766,11 @@
   </div>
 
   <!-- Read Receipts Modal -->
-  <div *ngIf="showReadReceipts" class="read-receipts-overlay" (click)="closeReadReceipts()">
-    <div class="read-receipts-modal" (click)="$event.stopPropagation()">
+  <div *ngIf="showReadReceipts" class="read-receipts-overlay" (click)="closeReadReceipts()" data-testid="chs-read-receipts-overlay">
+    <div class="read-receipts-modal" (click)="$event.stopPropagation()" data-testid="chs-read-receipts-modal">
       <div class="modal-header">
         <h3>Message Receipts</h3>
-        <button mat-icon-button (click)="closeReadReceipts()">
+        <button mat-icon-button (click)="closeReadReceipts()" data-testid="chs-read-receipts-close">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -817,7 +817,7 @@
   <!-- participant side panel -->
   <div *ngIf="showChannelParticipants && isChannelSelected"
     class="channel-participants-panel"
-    (click)="$event.stopPropagation()">
+    (click)="$event.stopPropagation()" data-testid="chs-channel-participants-panel">
 
   <div class="participants-panel-header">
     <div class="participants-panel-title">
@@ -825,14 +825,14 @@
       <span>Participants</span>
       <span class="participants-total-badge">{{ getTotalParticipantsCount(selectedMessageForParticipants) }}</span>
     </div>
-    <button mat-icon-button (click)="closeChannelParticipants()" matTooltip="Close" style="color: white;">
+    <button mat-icon-button (click)="closeChannelParticipants()" matTooltip="Close" style="color: white;" data-testid="chs-channel-participants-close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
 
   <div class="pp-tab-strip" *ngIf="selectedMessageForParticipants">
     <button class="pp-tab" [class.pp-tab-active]="participantTab === 'sent'"
-            (click)="participantTab = 'sent'">
+            (click)="participantTab = 'sent'" data-testid="chs-pp-tab-sent">
       <mat-icon class="pp-tab-icon sent-icon">check_circle</mat-icon>
       <span>Sent</span>
       <span class="pp-tab-badge pp-badge-seen">
@@ -840,7 +840,7 @@
       </span>
     </button>
     <button class="pp-tab" [class.pp-tab-active]="participantTab === 'seen'"
-            (click)="participantTab = 'seen'">
+            (click)="participantTab = 'seen'" data-testid="chs-pp-tab-seen">
       <mat-icon class="pp-tab-icon seen-icon">check_circle</mat-icon>
       <span>Seen</span>
       <span class="pp-tab-badge pp-badge-seen">
@@ -848,7 +848,7 @@
       </span>
     </button>
     <button class="pp-tab" [class.pp-tab-active]="participantTab === 'unseen'"
-            (click)="participantTab = 'unseen'">
+            (click)="participantTab = 'unseen'" data-testid="chs-pp-tab-unseen">
       <mat-icon class="pp-tab-icon unseen-icon">cancel</mat-icon>
       <span>Not Seen</span>
       <span class="pp-tab-badge pp-badge-unseen">
@@ -912,34 +912,34 @@
 </div>
 
 <!-- dialog box -->
-<div *ngIf="showChannelSendDialog" class="csd-overlay" (click)="closeChannelSendDialog()">
-  <div class="csd-modal" (click)="$event.stopPropagation()">
+<div *ngIf="showChannelSendDialog" class="csd-overlay" (click)="closeChannelSendDialog()" data-testid="chs-csd-overlay">
+  <div class="csd-modal" (click)="$event.stopPropagation()" data-testid="chs-csd-modal">
 
     <div class="csd-header">
       <div class="csd-header-title">
         <mat-icon>campaign</mat-icon>
         <span>Send One-Way Communication</span>
       </div>
-      <button mat-icon-button (click)="closeChannelSendDialog()" style="color: white;">
+      <button mat-icon-button (click)="closeChannelSendDialog()" style="color: white;" data-testid="chs-csd-header-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
     <div class="csd-toolbar">
-      <button class="csd-import-btn" (click)="handleChannelImportClick()">
+      <button class="csd-import-btn" (click)="handleChannelImportClick()" data-testid="chs-csd-import">
         <mat-icon>upload_file</mat-icon>
         Import
       </button>
       <input #channelImportInput type="file" style="display:none"
-            accept=".xls,.xlsx" (change)="onChannelImportChange($event)">
+            accept=".xls,.xlsx" (change)="onChannelImportChange($event)" data-testid="chs-csd-import-input">
     </div>
 
     <!-- EXACT same as reference page - no extra attributes -->
-   <div class="csd-dropdown-wrap" (click)="$event.stopPropagation()">
+   <div class="csd-dropdown-wrap" (click)="$event.stopPropagation()" data-testid="chs-csd-dropdown-wrap">
   <div class="csd-custom-select">
 
     <!-- Trigger -->
-    <div class="csd-trigger" (click)="csdOpen ? closeCsd() : openCsd()">
+    <div class="csd-trigger" (click)="csdOpen ? closeCsd() : openCsd()" data-testid="chs-csd-trigger">
       <span class="csd-trigger-label">{{ getParticipantTriggerText() }}</span>
       <mat-icon>{{ csdOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
     </div>
@@ -954,9 +954,9 @@
                placeholder="Search participants..."
                [(ngModel)]="csdQuery"
                (ngModelChange)="filterCsdOptions()"
-               (click)="$event.stopPropagation()">
+               (click)="$event.stopPropagation()" data-testid="chs-csd-search-input">
         <button class="csd-clear-x" *ngIf="csdQuery"
-                (click)="csdQuery=''; filterCsdOptions(); $event.stopPropagation()">
+                (click)="csdQuery=''; filterCsdOptions(); $event.stopPropagation()" data-testid="chs-csd-search-clear">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -965,7 +965,7 @@
         <div class="csd-option"
              *ngFor="let p of csdOptions"
              [class.csd-checked]="selectedChannelParticipantIds.has(p.profileDocId)"
-             (click)="toggleChannelParticipant(p); $event.stopPropagation()">
+             (click)="toggleChannelParticipant(p); $event.stopPropagation()" data-testid="chs-csd-option">
           <mat-icon class="csd-chk-icon">
             {{ selectedChannelParticipantIds.has(p.profileDocId) ? 'check_box' : 'check_box_outline_blank' }}
           </mat-icon>
@@ -984,7 +984,7 @@
       <span class="csd-selected-count">
         {{ selectedParticipantsModel.length }} participant(s) selected
       </span>
-      <button mat-button class="csd-clear-btn" (click)="clearSelectedParticipants()">
+      <button mat-button class="csd-clear-btn" (click)="clearSelectedParticipants()" data-testid="chs-csd-clear-all">
         Clear all
       </button>
     </div>
@@ -1012,7 +1012,7 @@
               <td>
                 <button mat-icon-button class="csd-remove-btn"
                         (click)="toggleChannelParticipant(p)"
-                        matTooltip="Remove">
+                        matTooltip="Remove" data-testid="chs-csd-remove">
                   <mat-icon>close</mat-icon>
                 </button>
               </td>
@@ -1023,10 +1023,10 @@
     </div>
 
     <div class="csd-footer">
-      <button class="csd-cancel-btn" (click)="closeChannelSendDialog()">Cancel</button>
+      <button class="csd-cancel-btn" (click)="closeChannelSendDialog()" data-testid="chs-csd-cancel">Cancel</button>
       <button class="csd-proceed-btn"
               [disabled]="selectedChannelParticipantsList.length === 0"
-              (click)="proceedChannelCommunication()">
+              (click)="proceedChannelCommunication()" data-testid="chs-csd-proceed">
         <mat-icon>send</mat-icon>
         Proceed ({{ selectedChannelParticipantsList.length }})
       </button>
@@ -1034,12 +1034,12 @@
   </div>
 </div>
 <!-- ── Profile Picture Modal ─────────────────────────────────────────── -->
-<div *ngIf="showProfileModal" class="profile-modal-overlay" (click)="closeProfileModal()">
-  <div class="profile-modal" (click)="$event.stopPropagation()">
+<div *ngIf="showProfileModal" class="profile-modal-overlay" (click)="closeProfileModal()" data-testid="chs-profile-modal-overlay">
+  <div class="profile-modal" (click)="$event.stopPropagation()" data-testid="chs-profile-modal">
 
     <div class="profile-modal-header">
       <span>Profile Picture</span>
-      <button mat-icon-button (click)="closeProfileModal()">
+      <button mat-icon-button (click)="closeProfileModal()" data-testid="chs-profile-modal-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -1060,7 +1060,7 @@
     <div class="profile-modal-footer" *ngIf="!isInactiveChatSelected">
       <button mat-raised-button color="primary"
               [disabled]="profileUploading"
-              (click)="triggerProfileUpload()">
+              (click)="triggerProfileUpload()" data-testid="chs-profile-modal-upload">
         <mat-spinner *ngIf="profileUploading" diameter="18" style="display:inline-block;margin-right:6px;"></mat-spinner>
         <mat-icon *ngIf="!profileUploading">edit</mat-icon>
         {{ profileUploading ? 'Uploading...' : (profileModalChat?.chatprofile ? 'Change Picture' : 'Add Picture') }}
@@ -1070,8 +1070,8 @@
   </div>
 </div>
 <!-- ── Participants List Panel ───────────────────────────────────────── -->
-<div *ngIf="showParticipantsPanel" class="participants-list-overlay" (click)="closeParticipantsPanel()">
-  <div class="participants-list-panel" (click)="$event.stopPropagation()">
+<div *ngIf="showParticipantsPanel" class="participants-list-overlay" (click)="closeParticipantsPanel()" data-testid="chs-participants-list-overlay">
+  <div class="participants-list-panel" (click)="$event.stopPropagation()" data-testid="chs-participants-list-panel">
 
     <div class="participants-list-header">
       <div class="participants-list-title">
@@ -1079,7 +1079,7 @@
         <span>Members</span>
         <span class="participants-list-count">{{ participantsPanelList.length }}</span>
       </div>
-      <button mat-icon-button (click)="closeParticipantsPanel()">
+      <button mat-icon-button (click)="closeParticipantsPanel()" data-testid="chs-participants-list-close">
         <mat-icon>close</mat-icon>
       </button>
     </div>

@@ -22,7 +22,7 @@
         <div class="lib-scroll">
           <section class="lib-section" *ngIf="filteredStatic.length > 0">
             <div class="lib-cap">Widgets <span class="cap-count">{{ filteredStatic.length }}</span></div>
-            <button type="button" class="lib-item" *ngFor="let opt of filteredStatic"
+            <button data-testid="eif2-add-option-1" type="button" class="lib-item" *ngFor="let opt of filteredStatic"
               (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
               <span class="type-ico type-{{ opt.type }}"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
               <span class="lib-label">{{ opt.label }}</span>
@@ -34,7 +34,7 @@
 
           <section class="lib-section" *ngIf="filteredSeries.length > 0">
             <div class="lib-cap">Home Series <span class="cap-count">{{ filteredSeries.length }}</span></div>
-            <button type="button" class="lib-item" *ngFor="let opt of filteredSeries"
+            <button data-testid="eif2-add-option-2" type="button" class="lib-item" *ngFor="let opt of filteredSeries"
               (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
               <span class="type-ico type-homeseries"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
               <span class="lib-label">{{ opt.label }}</span>
@@ -46,7 +46,7 @@
 
           <section class="lib-section" *ngIf="filteredAds.length > 0">
             <div class="lib-cap">Ads <span class="cap-note">two share a row</span></div>
-            <button type="button" class="lib-item" *ngFor="let opt of filteredAds"
+            <button data-testid="eif2-add-option-3" type="button" class="lib-item" *ngFor="let opt of filteredAds"
               (click)="addOption(opt)" [disabled]="isAdded(opt.key)">
               <span class="type-ico type-ad"><mat-icon>{{ typeIcon(opt.type) }}</mat-icon></span>
               <span class="lib-label">{{ opt.label }}</span>
@@ -72,7 +72,7 @@
             </span>
           </div>
           <span class="dirty-pill" *ngIf="dirty && !isSaving">Unsaved changes</span>
-          <button mat-flat-button color="primary" type="submit" class="save-btn" [disabled]="isSaving">
+          <button data-testid="eif2-button-4" mat-flat-button color="primary" type="submit" class="save-btn" [disabled]="isSaving">
             <mat-spinner *ngIf="isSaving" diameter="20"></mat-spinner>
             <ng-container *ngIf="!isSaving"><mat-icon>save</mat-icon> Save</ng-container>
           </button>
@@ -86,8 +86,8 @@
             <div class="row-drag-preview" *cdkDragPreview>{{ groupLabel(g) }}</div>
 
             <!-- Collapsed header: always visible, one line per home row. -->
-            <div class="row-head" (click)="toggleGroup(g)">
-              <button mat-icon-button type="button" class="drag-btn" cdkDragHandle
+            <div data-testid="eif2-toggle-group-5" class="row-head" (click)="toggleGroup(g)">
+              <button data-testid="eif2-event-6" mat-icon-button type="button" class="drag-btn" cdkDragHandle
                 (click)="$event.stopPropagation()" matTooltip="Drag to reorder" aria-label="Drag to reorder">
                 <mat-icon>drag_indicator</mat-icon>
               </button>
@@ -124,13 +124,13 @@
                 </span>
               </ng-container>
 
-              <button mat-icon-button type="button" class="remove-btn"
+              <button data-testid="eif2-event-7" mat-icon-button type="button" class="remove-btn"
                 (click)="$event.stopPropagation(); removeGroup(g)"
                 [matTooltip]="g.kind === 'ads' ? 'Remove ad row' : 'Remove from home'"
                 aria-label="Remove from home screen">
                 <mat-icon>close</mat-icon>
               </button>
-              <button mat-icon-button type="button" class="chev-btn"
+              <button data-testid="eif2-event-8" mat-icon-button type="button" class="chev-btn"
                 (click)="$event.stopPropagation(); toggleGroup(g)"
                 [attr.aria-expanded]="isExpanded(g)" aria-label="Edit row">
                 <mat-icon class="chev" [class.open]="isExpanded(g)">expand_more</mat-icon>
@@ -144,7 +144,7 @@
                 <div class="slot-head" *ngIf="g.kind === 'ads'">
                   <span class="slot-num">{{ g.indices.indexOf(idx) + 1 }}</span>
                   <span class="slot-name">{{ nameOf(idx) }}</span>
-                  <button mat-icon-button type="button" class="remove-btn slot-remove"
+                  <button data-testid="eif2-remove-item-9" mat-icon-button type="button" class="remove-btn slot-remove"
                     (click)="removeItem(idx)" matTooltip="Remove this ad" aria-label="Remove this ad">
                     <mat-icon>close</mat-icon>
                   </button>
@@ -162,7 +162,7 @@
                   <div class="field-col">
                     <span class="mini-label">Show to</span>
                     <div class="seg-group" role="radiogroup" aria-label="Show to">
-                      <button type="button" class="seg" *ngFor="let s of showToOptions"
+                      <button data-testid="eif2-set-show-to-10" type="button" class="seg" *ngFor="let s of showToOptions"
                         [class.seg-on]="showtoOf(idx) === s.value"
                         [attr.aria-pressed]="showtoOf(idx) === s.value"
                         (click)="setShowTo(idx, s.value)">{{ s.label }}</button>
@@ -178,7 +178,7 @@
                   <div class="tag-editor" [class.tag-dim]="!enabletagOf(idx)">
                     <span class="tag-pill" *ngFor="let tagCtrl of itemTags(idx).controls; let t = index">
                       {{ tagCtrl.value }}
-                      <button type="button" class="pill-x" (click)="removeTag(idx, t)" aria-label="Remove tag">
+                      <button data-testid="eif2-remove-tag-11" type="button" class="pill-x" (click)="removeTag(idx, t)" aria-label="Remove tag">
                         <mat-icon>close</mat-icon>
                       </button>
                     </span>

@@ -1,7 +1,7 @@
 <div class="md-body">
   <div class="md-top">
     <div class="md-title">📅 {{ isEdit ? 'Edit Event' : 'Add Event' }}</div>
-    <button type="button" class="md-x" (click)="cancel()" aria-label="Close">✕</button>
+    <button data-testid="aed-cancel-1" type="button" class="md-x" (click)="cancel()" aria-label="Close">✕</button>
   </div>
 
   <div>
@@ -12,7 +12,7 @@
   <div>
     <div class="ml-row">
       <div class="ml">Type</div>
-      <button type="button" class="ml-link" (click)="showNewType = !showNewType">
+      <button data-testid="aed-show-new-type-2" type="button" class="ml-link" (click)="showNewType = !showNewType">
         {{ showNewType ? 'Cancel' : '+ New Type' }}
       </button>
     </div>
@@ -26,7 +26,7 @@
       <div class="new-type-row">
         <input class="mi" [(ngModel)]="newTypeName" placeholder="e.g. Bootcamp"
                (keydown.enter)="createType()" />
-        <button type="button" class="add-type-btn" (click)="createType()"
+        <button data-testid="aed-create-type-3" type="button" class="add-type-btn" (click)="createType()"
                 [disabled]="!canCreateType || isCreatingType">
           {{ isCreatingType ? '…' : '+ Add' }}
         </button>
@@ -48,7 +48,7 @@
   <div>
     <div class="ml-row">
       <div class="ml">Location (optional)</div>
-      <button type="button" class="ml-link" (click)="showNewLocation = !showNewLocation">
+      <button data-testid="aed-show-new-location-4" type="button" class="ml-link" (click)="showNewLocation = !showNewLocation">
         {{ showNewLocation ? 'Cancel' : '+ New Location' }}
       </button>
     </div>
@@ -62,7 +62,7 @@
       <div class="new-type-row">
         <input class="mi" [(ngModel)]="newLocationName" placeholder="e.g. Chennai"
                (keydown.enter)="createLocation()" />
-        <button type="button" class="add-type-btn" (click)="createLocation()"
+        <button data-testid="aed-create-location-5" type="button" class="add-type-btn" (click)="createLocation()"
                 [disabled]="!canCreateLocation || isCreatingLocation">
           {{ isCreatingLocation ? '…' : '+ Add' }}
         </button>
@@ -83,7 +83,7 @@
     </label>
   </div>
 
-  <button type="button" class="btn-primary" (click)="save()" [disabled]="isSaving">
+  <button data-testid="aed-save-6" type="button" class="btn-primary" (click)="save()" [disabled]="isSaving">
     {{ isSaving ? 'Saving…' : (isEdit ? 'Update Event' : 'Add to Calendar') }}
   </button>
 </div>

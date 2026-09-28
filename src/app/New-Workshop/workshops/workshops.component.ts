@@ -19,6 +19,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { EiflixBannerComponent } from '../eiflix-banner/eiflix-banner.component';
 import { WorkshopDialogComponent } from '../workshop-dialog/workshop-dialog.component';
 import { NewusersComponent } from '../newusers/newusers.component';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import {
+  canEditWorkshops as canEditWorkshopsRule,
+  canOpenNewUsers as canOpenNewUsersRule,
+} from '../workshop-access/workshop-access.model';
 
 
 @Component({
@@ -44,6 +49,11 @@ export class WorkshopsComponent implements OnInit {
   mapProfile: any = {};
   objectKeys = Object.keys;
 
+  // Both start closed and open only if a list names this person: nothing here
+  // is available to someone who was not picked.
+  canEdit = false;
+  canNewUsers = false;
+
   statusFilter: 'all' | 'active' | 'inactive' | 'completed' = 'all';
   sortField: 'created' | 'startDate' | 'endDate' = 'created';
   sortDirection: 'asc' | 'desc' = 'desc';
@@ -54,13 +64,36 @@ export class WorkshopsComponent implements OnInit {
     private router: Router,
     private snackBar: MatSnackBar,
     public dialog: MatDialog,
+    private accessService: WorkshopAccessService,
   ) {
     const workshopRef = collection(this.firestore, 'workshopconfiguration');
     this.workshops$ = collectionData(workshopRef, { idField: 'id' });
   }
 
   async ngOnInit() {
+    this.loadWorkshopAccess();
     await this.loadNewUserData();
+  }
+
+  /** Who may create, edit and switch workshops, and who may open the new users screen. */
+  private async loadWorkshopAccess(): Promise<void> {
+    try {
+      const [profileId, lists] = await Promise.all([
+        this.accessService.currentProfileId(),
+        this.accessService.getAdminLists(),
+      ]);
+      this.canEdit = canEditWorkshopsRule(profileId, lists);
+      this.canNewUsers = canOpenNewUsersRule(profileId, lists);
+    } catch (error) {
+      // Nothing is open by default, so a failed read leaves both closed.
+      console.error('Error loading workshop access:', error);
+      this.canEdit = false;
+      this.canNewUsers = false;
+    }
+  }
+
+  private denyEdit(): void {
+    this.snackBar.open('You do not have access to change workshops.', 'Close', { duration: 3000 });
   }
 
   private async loadNewUserData() {
@@ -119,6 +152,7 @@ export class WorkshopsComponent implements OnInit {
   }
 
   route(routeto: string, id?: any) {
+    if (!this.canEdit) { this.denyEdit(); return; }
     if (routeto === 'create') {
       // v2: open the editor on a fresh Firestore id; the document is created on the first save.
       const newId = doc(collection(this.firestore, 'workshopconfiguration')).id;
@@ -182,6 +216,10 @@ export class WorkshopsComponent implements OnInit {
 
   // Open the New Users profile page in a new browser tab.
   openNewUsersTab() {
+    if (!this.canNewUsers) {
+      this.snackBar.open('You do not have access to the new users screen.', 'Close', { duration: 3000 });
+      return;
+    }
     const url = this.router.serializeUrl(this.router.createUrlTree(['/newusersprofile']));
     window.open(url, '_blank');
   }
@@ -215,6 +253,7 @@ export class WorkshopsComponent implements OnInit {
 
   async onWorkshopStatusChange(workshop: any, event: any): Promise<void> {
     const isActive = event.checked;
+    if (!this.canEdit) { event.source.checked = !isActive; this.denyEdit(); return; }
     const title = workshop?.detailpage?.title || 'this workshop';
     const confirmed = window.confirm(
       `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}"?`
@@ -240,6 +279,7 @@ export class WorkshopsComponent implements OnInit {
 
   async onWorkshopWebStatusChange(workshop: any, event: any): Promise<void> {
     const isActive = event.checked;
+    if (!this.canEdit) { event.source.checked = !isActive; this.denyEdit(); return; }
     const title = workshop?.detailpage?.title || 'this workshop';
     const confirmed = window.confirm(
       `Are you sure you want to ${isActive ? 'activate' : 'deactivate'} "${title}" on the web?`
@@ -265,6 +305,7 @@ export class WorkshopsComponent implements OnInit {
 
   async onWorkshopCompletedChange(workshop: any, event: any): Promise<void> {
     const isCompleted = event.checked;
+    if (!this.canEdit) { event.source.checked = !isCompleted; this.denyEdit(); return; }
     const title = workshop?.detailpage?.title || 'this workshop';
     const confirmed = window.confirm(
       `Are you sure you want to mark "${title}" as ${isCompleted ? 'completed' : 'pending'}?`
@@ -299,6 +340,7 @@ export class WorkshopsComponent implements OnInit {
   }
 
   async duplicateWorkshop(workshop: any): Promise<void> {
+    if (!this.canEdit) { this.denyEdit(); return; }
     const title = workshop?.detailpage?.title || 'this workshop';
     const confirmed = window.confirm(`Are you sure you want to duplicate "${title}"?`);
     if (!confirmed) return;

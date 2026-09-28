@@ -13,7 +13,7 @@
         <div *ngFor="let field of bonusActivityForm().controls; let i = index" [formGroupName]="i">
           <mat-form-field class="inputfields me-3" appearance="outline">
             <mat-label>Activity</mat-label>
-            <mat-select formControlName="activity">
+            <mat-select [attr.data-testid]="'aqst-sel-1-' + i" formControlName="activity">
               <mat-option *ngFor="let option of mapActivity | keyvalue" [value]="option.key">{{option.value}}</mat-option>
             </mat-select>
             <mat-error *ngIf="field.get('activity').hasError('required')">
@@ -22,7 +22,7 @@
           </mat-form-field>
           <mat-form-field class="inputfields me-3" appearance="outline">
             <mat-label>Specialist</mat-label>
-            <mat-select formControlName="participants" multiple>
+            <mat-select [attr.data-testid]="'aqst-sel-2-' + i" formControlName="participants" multiple>
               <mat-option>
                 <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -37,17 +37,17 @@
               Required
             </mat-error>
           </mat-form-field>
-          <button mat-icon-button type="button" (click)="removeBonusArray(i)" *ngIf="!field.get('mandatory').value">
+          <button [attr.data-testid]="'aqst-btn-3-' + i" mat-icon-button type="button" (click)="removeBonusArray(i)" *ngIf="!field.get('mandatory').value">
             <mat-icon>remove_circle_outline</mat-icon>
           </button>
           <span class="mandatory-tag" *ngIf="field.get('mandatory').value">Mandatory</span>
         </div>
       </div>
-      <button mat-raised-button (click)="addBonusArray()">
+      <button data-testid="aqst-btn-4" mat-raised-button (click)="addBonusArray()">
         Add Other Specialists
       </button>
       <div class="w-100 text-center mt-4">
-        <button mat-stroked-button class="cancelbtn me-3" type="button" (click)="dialogRef.close(null)">Close</button>
+        <button data-testid="aqst-btn-5" mat-stroked-button class="cancelbtn me-3" type="button" (click)="dialogRef.close(null)">Close</button>
         <button mat-stroked-button class="submitbtn" type="submit" [disabled]="activityForm.invalid" data-testid="aqs-submit">Confirm Specialist</button>
       </div>
     </form>

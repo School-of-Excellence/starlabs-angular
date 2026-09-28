@@ -4,7 +4,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Profile Name</mat-label>
-        <mat-select formControlName="selectedprofile" >
+        <mat-select data-testid="apa-sel-1" formControlName="selectedprofile" >
           <mat-option *ngFor="let option of profileList" [value]="option['id']">{{option['name']}}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -12,7 +12,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Mandatory Forms</mat-label>
-        <mat-select formControlName="selectedform" multiple>
+        <mat-select data-testid="apa-sel-2" formControlName="selectedform" multiple>
           <mat-option>
             <ngx-mat-select-search [formControl]="searchdeliveryform" [placeholderLabel]="'Search Arena VideoAsk'"
               [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -24,7 +24,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Mandatory Action</mat-label>
-        <mat-select formControlName="selectedaction" multiple>
+        <mat-select data-testid="apa-sel-3" formControlName="selectedaction" multiple>
           <mat-option *ngFor="let option of mandatoryAction | keyvalue" [value]="option.key">{{option.value}}</mat-option>
         </mat-select>
       </mat-form-field>
@@ -32,7 +32,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Arena VideoAsk</mat-label>
-        <mat-select formControlName="videoaskpending" multiple>
+        <mat-select data-testid="apa-sel-4" formControlName="videoaskpending" multiple>
           <mat-option>
             <ngx-mat-select-search [formControl]="searchvideoask" [placeholderLabel]="'Search Arena VideoAsk'"
               [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -46,7 +46,7 @@
     <div>
       <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Quiz to Cohort</mat-label>
-        <mat-select formControlName="quiz" multiple>
+        <mat-select data-testid="apa-sel-5" formControlName="quiz" multiple>
           <mat-option>
             <ngx-mat-select-search [formControl]="searchQuiz" [placeholderLabel]="'Search quiz'"
               [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
@@ -56,8 +56,8 @@
       </mat-form-field>
     </div>
     <div>
-      <button mat-stroked-button class="cancelbtn" type="button" (click)="close()">Close</button>
-      <button mat-stroked-button class="submitbtn" type="submit" (click)="onSubmit()">Update Activity</button>
+      <button data-testid="apa-btn-6" mat-stroked-button class="cancelbtn" type="button" (click)="close()">Close</button>
+      <button data-testid="apa-btn-7" mat-stroked-button class="submitbtn" type="submit" (click)="onSubmit()">Update Activity</button>
     </div>
   </div>
 </div>

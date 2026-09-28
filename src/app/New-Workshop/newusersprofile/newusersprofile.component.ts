@@ -37,6 +37,8 @@ import {
   writeBatch
 } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
+import { WorkshopAccessService } from '../workshop-access/workshop-access.service';
+import { canOpenNewUsers as canOpenNewUsersRule } from '../workshop-access/workshop-access.model';
 import { AssignTagsDialogComponent } from './assign-tags-dialog/assign-tags-dialog.component';
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 
@@ -160,14 +162,41 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   private workshopFilterVersion = 0;
   private destroy$ = new Subject<void>();
 
+  // Access to this screen is granted in a workshop's Dashboard Access settings.
+  // The check starts in the constructor, as asked, and everything this screen
+  // loads waits on it — an unauthorised visit must not read the data at all.
+  accessAllowed = false;
+  accessChecked = false;
+  private readonly accessCheck: Promise<boolean>;
+
   constructor(
     private firestore: Firestore,
     private authguard: AuthguardService,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
     private http: HttpClient,
-    private snackbarService: SnackbarService
-  ) {}
+    private snackbarService: SnackbarService,
+    private accessService: WorkshopAccessService,
+  ) {
+    this.accessCheck = (async () => {
+      try {
+        const [profileId, lists] = await Promise.all([
+          this.accessService.currentProfileId(),
+          this.accessService.getAdminLists(),
+        ]);
+        return canOpenNewUsersRule(profileId, lists);
+      } catch (error) {
+        // Nothing is open by default, so a failed read keeps the screen closed.
+        console.error('Error checking new users access:', error);
+        return false;
+      }
+    })().then(allowed => {
+      this.accessAllowed = allowed;
+      this.accessChecked = true;
+      if (!allowed) this.loading = false;
+      return allowed;
+    });
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();
@@ -175,6 +204,10 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.accessCheck.then(allowed => { if (allowed) this.loadNewUsersScreen(); });
+  }
+
+  private loadNewUsersScreen(): void {
     this.authguard.getParticipantMetaMap()
       .then(res => (this.metaMap = res?.map || {}))
       .catch(err => console.error('Error loading participant meta map:', err));

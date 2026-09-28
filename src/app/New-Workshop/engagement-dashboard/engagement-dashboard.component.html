@@ -8,10 +8,10 @@
               <h1 style="margin: 0; font-weight: bold; font-size: 28px;">
                 Engagement Dashboard: <span class="month" style="color:#FFD600;">{{ selectedMonth }}</span>
               </h1>
-              <button mat-raised-button color="primary" (click)="exportFullDashboardToCsv()" style="margin-top: 12px;">
+              <button data-testid="ed-export-full-dashboard-to-csv-1" mat-raised-button color="primary" (click)="exportFullDashboardToCsv()" style="margin-top: 12px;">
                 <mat-icon>file_download</mat-icon> Export Month
               </button>
-              <button mat-raised-button color="accent" (click)="confirmAndSaveEngagement()"
+              <button data-testid="ed-confirm-and-save-engagement-2" mat-raised-button color="accent" (click)="confirmAndSaveEngagement()"
                 [disabled]="loading || isSavingSnapshot || snapshotStatus === 'locked' || !canSaveEngagement()"
                 [matTooltip]="getSaveButtonTooltip()" matTooltipPosition="below" matTooltipClass="save-button-tooltip"
                 style="margin-left: 20px; margin-top: 12px;">
@@ -21,18 +21,18 @@
               </button>
             </div>
             <div class="calendar-picker-container">
-              <button class="calendar-toggle-btn" (click)="toggleMonthPicker()" matTooltip="Change Month">
+              <button data-testid="ed-toggle-month-picker-3" class="calendar-toggle-btn" (click)="toggleMonthPicker()" matTooltip="Change Month">
                 <mat-icon>calendar_month</mat-icon>
                 <span>{{ getMonthLabel() }}</span>
               </button>
               <div class="month-picker-popup" *ngIf="monthPickerOpen" [@slideIn]>
                 <div class="year-navigation">
-                  <button mat-icon-button (click)="decrementYear()" class="year-nav-btn"><mat-icon>chevron_left</mat-icon></button>
+                  <button data-testid="ed-decrement-year-4" mat-icon-button (click)="decrementYear()" class="year-nav-btn"><mat-icon>chevron_left</mat-icon></button>
                   <span class="year-display">{{ currentYear }}</span>
-                  <button mat-icon-button (click)="incrementYear()" class="year-nav-btn"><mat-icon>chevron_right</mat-icon></button>
+                  <button data-testid="ed-increment-year-5" mat-icon-button (click)="incrementYear()" class="year-nav-btn"><mat-icon>chevron_right</mat-icon></button>
                 </div>
                 <div class="month-grid">
-                  <button *ngFor="let month of months; let i = index" class="month-btn"
+                  <button data-testid="ed-select-month-6" *ngFor="let month of months; let i = index" class="month-btn"
                     [class.selected]="currentMonth === i && currentYear === getMonthPickerYear()" (click)="selectMonth(i)">
                     {{ month.substring(0, 3) }}
                   </button>
@@ -41,7 +41,7 @@
             </div>
           </div>
           <div class="filter-toggle-container" style="margin-top: 35px; text-align: right; margin-left:0px">
-            <mat-button-toggle-group [value]="engagementFilter" exclusive="true" appearance="legacy" class="filter-toggle-group"
+            <mat-button-toggle-group data-testid="ed-change-on-engagement-filter-change-7" [value]="engagementFilter" exclusive="true" appearance="legacy" class="filter-toggle-group"
               (change)="onEngagementFilterChange($event.value)">
               <mat-button-toggle value="both">Both</mat-button-toggle>
               <mat-button-toggle value="product">Content</mat-button-toggle>
@@ -49,22 +49,22 @@
             </mat-button-toggle-group>
           </div>
           <div class="dashboard-status-toggle-bar" style="margin-top: 16px; margin-right: 0px;">
-            <button mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'active'}"
+            <button data-testid="ed-on-status-toggle-8" mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'active'}"
               (click)="onStatusToggle('active')">Active</button>
-            <button mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'inactive'}"
+            <button data-testid="ed-on-status-toggle-9" mat-raised-button color="accent" [ngClass]="{'selected-status-btn': participantStatusMode === 'inactive'}"
               (click)="onStatusToggle('inactive')">Non active</button>
           </div>
         </mat-card-content>
       </mat-card>
 
-      <div class="month-picker-overlay" *ngIf="monthPickerOpen" (click)="closeMonthPicker()"></div>
+      <div data-testid="ed-close-month-picker-10" class="month-picker-overlay" *ngIf="monthPickerOpen" (click)="closeMonthPicker()"></div>
       <div *ngIf="loading" class="loading-section">
         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
         <p>Loading engagement data...</p>
       </div>
 
       <div *ngIf="!loading" class="metrics-grid">
-        <mat-card class="metric-card clickable-metric" (click)="openAllActiveParticipantsPanel()">
+        <mat-card data-testid="ed-open-all-active-participants-panel-11" class="metric-card clickable-metric" (click)="openAllActiveParticipantsPanel()">
           <mat-card-content class="metric-content" style="padding-left: 10px;">
             <mat-icon class="metric-icon" style="margin-left: 20px;">group</mat-icon>
             <div class="metric-info">
@@ -74,7 +74,7 @@
           </mat-card-content>
         </mat-card>
 
-        <mat-card class="metric-card clickable-metric" (click)="openAllEngagedParticipantsPanel()">
+        <mat-card data-testid="ed-open-all-engaged-participants-panel-12" class="metric-card clickable-metric" (click)="openAllEngagedParticipantsPanel()">
           <mat-card-content class="metric-content" style="padding-left: 10px;">
             <mat-icon class="metric-icon" style="margin-left: 20px; color: #4caf50;">check_circle</mat-icon>
             <div class="metric-info">
@@ -84,7 +84,7 @@
           </mat-card-content>
         </mat-card>
 
-        <mat-card class="metric-card clickable-metric" (click)="openAllNotEngagedParticipantsPanel()">
+        <mat-card data-testid="ed-open-all-not-engaged-participants-panel-13" class="metric-card clickable-metric" (click)="openAllNotEngagedParticipantsPanel()">
           <mat-card-content class="metric-content" style="padding-left: 10px;">
             <mat-icon class="metric-icon" style="margin-left: 20px; color: #f44336;">cancel</mat-icon>
             <div class="metric-info">
@@ -121,9 +121,9 @@
                 </mat-panel-title>
                 <mat-panel-description>
                   <div class="challenge-summary-chips">
-                    <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
-                    <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
-                    <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                    <mat-chip data-testid="ed-event-14" class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                    <mat-chip data-testid="ed-event-15" class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                    <mat-chip data-testid="ed-event-16" class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
                   </div>
                 </mat-panel-description>
               </mat-expansion-panel-header>
@@ -133,11 +133,11 @@
                   <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
                 </div>
                 <div class="status-indicators">
-                  <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                  <div data-testid="ed-open-engaged-panel-17" class="status-item clickable" (click)="openEngagedPanel(j)">
                     <span class="status-dot completed"></span>
                     <span>{{ j.engaged }} Engaged</span>
                   </div>
-                  <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                  <div data-testid="ed-open-not-engaged-panel-18" class="status-item clickable" (click)="openNotEngagedPanel(j)">
                     <span class="status-dot notstarted"></span>
                     <span>{{ j.count - j.engaged }} Not Engaged</span>
                   </div>
@@ -154,15 +154,15 @@
         </mat-card-header>
         <mat-card-content>
           <div class="event-tabs-container">
-            <button class="event-tab" [class.active]="selectedEventTab === 'journey'" (click)="selectedEventTab = 'journey'">
+            <button data-testid="ed-selected-event-tab-19" class="event-tab" [class.active]="selectedEventTab === 'journey'" (click)="selectedEventTab = 'journey'">
               <mat-icon>category</mat-icon>
               <span>Journey-wise Events({{ getJourneyEventUniqueCount() }})</span>
             </button>
-            <button class="event-tab" [class.active]="selectedEventTab === 'individual'" (click)="selectedEventTab = 'individual'">
+            <button data-testid="ed-selected-event-tab-20" class="event-tab" [class.active]="selectedEventTab === 'individual'" (click)="selectedEventTab = 'individual'">
               <mat-icon>event</mat-icon>
               <span>Individual Events({{ getIndividualEventUniqueCount() }})</span>
             </button>
-            <button class="event-tab" [class.active]="selectedEventTab === 'appointment'" (click)="selectedEventTab = 'appointment'">
+            <button data-testid="ed-selected-event-tab-21" class="event-tab" [class.active]="selectedEventTab === 'appointment'" (click)="selectedEventTab = 'appointment'">
               <mat-icon>schedule</mat-icon>
               <span>Appointments({{ getAppointmentUniqueCount() }})</span>
             </button>
@@ -181,9 +181,9 @@
                   </mat-panel-title>
                   <mat-panel-description>
                     <div class="challenge-summary-chips">
-                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
-                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
-                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                      <mat-chip data-testid="ed-event-22" class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                      <mat-chip data-testid="ed-event-23" class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                      <mat-chip data-testid="ed-event-24" class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
                     </div>
                   </mat-panel-description>
                 </mat-expansion-panel-header>
@@ -193,11 +193,11 @@
                     <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
                   </div>
                   <div class="status-indicators">
-                    <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                    <div data-testid="ed-open-engaged-panel-25" class="status-item clickable" (click)="openEngagedPanel(j)">
                       <span class="status-dot completed"></span>
                       <span>{{ j.engaged }} Engaged in events</span>
                     </div>
-                    <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                    <div data-testid="ed-open-not-engaged-panel-26" class="status-item clickable" (click)="openNotEngagedPanel(j)">
                       <span class="status-dot notstarted"></span>
                       <span>{{ j.count - j.engaged }} Not Engaged</span>
                     </div>
@@ -221,9 +221,9 @@
                   </mat-panel-title>
                   <mat-panel-description>
                     <div class="challenge-summary-chips">
-                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEventEngagedPanel(event)">{{ event.engagedCount }} Engaged</mat-chip>
-                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openEventNotEngagedPanel(event)">{{ event.notEngagedCount }} Not Engaged</mat-chip>
-                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openEventAllPanel(event)">{{ event.engagedCount + event.notEngagedCount }} Total</mat-chip>
+                      <mat-chip data-testid="ed-event-27" class="completed-chip clickable" (click)="$event.stopPropagation(); openEventEngagedPanel(event)">{{ event.engagedCount }} Engaged</mat-chip>
+                      <mat-chip data-testid="ed-event-28" class="pending-chip clickable" (click)="$event.stopPropagation(); openEventNotEngagedPanel(event)">{{ event.notEngagedCount }} Not Engaged</mat-chip>
+                      <mat-chip data-testid="ed-event-29" class="progress-chip clickable" (click)="$event.stopPropagation(); openEventAllPanel(event)">{{ event.engagedCount + event.notEngagedCount }} Total</mat-chip>
                       <span *ngIf="event.date > today" class="upcoming-tag-inline">Upcoming</span>
                       <span *ngIf="eventType(event) === 'workshop'" class="workshop-tag-inline">Workshop</span>
                       <span *ngIf="eventType(event) === 'queue'" class="queue-tag-inline">queue</span>
@@ -236,11 +236,11 @@
                     <div class="progress-segment notstarted" [style.width.%]="(event.engagedCount + event.notEngagedCount) > 0 ? (event.notEngagedCount / (event.engagedCount + event.notEngagedCount)) * 100 : 0"></div>
                   </div>
                   <div class="status-indicators">
-                    <div class="status-item clickable" (click)="openEventEngagedPanel(event)">
+                    <div data-testid="ed-open-event-engaged-panel-30" class="status-item clickable" (click)="openEventEngagedPanel(event)">
                       <span class="status-dot completed"></span>
                       <span>{{ event.engagedCount }} Engaged</span>
                     </div>
-                    <div class="status-item clickable" (click)="openEventNotEngagedPanel(event)">
+                    <div data-testid="ed-open-event-not-engaged-panel-31" class="status-item clickable" (click)="openEventNotEngagedPanel(event)">
                       <span class="status-dot notstarted"></span>
                       <span>{{ event.notEngagedCount }} Not Engaged</span>
                     </div>
@@ -262,9 +262,9 @@
                   </mat-panel-title>
                   <mat-panel-description>
                     <div class="challenge-summary-chips">
-                      <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openAppointmentEngagedPanel(appt)">{{ appt.engagedCount }} Attended</mat-chip>
-                      <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openAppointmentNotEngagedPanel(appt)">{{ appt.notEngagedCount }} Cancelled</mat-chip>
-                      <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAppointmentAllPanel(appt)">{{ appt.engagedCount + appt.notEngagedCount }} Total</mat-chip>
+                      <mat-chip data-testid="ed-event-32" class="completed-chip clickable" (click)="$event.stopPropagation(); openAppointmentEngagedPanel(appt)">{{ appt.engagedCount }} Attended</mat-chip>
+                      <mat-chip data-testid="ed-event-33" class="pending-chip clickable" (click)="$event.stopPropagation(); openAppointmentNotEngagedPanel(appt)">{{ appt.notEngagedCount }} Cancelled</mat-chip>
+                      <mat-chip data-testid="ed-event-34" class="progress-chip clickable" (click)="$event.stopPropagation(); openAppointmentAllPanel(appt)">{{ appt.engagedCount + appt.notEngagedCount }} Total</mat-chip>
                     </div>
                   </mat-panel-description>
                 </mat-expansion-panel-header>
@@ -274,11 +274,11 @@
                     <div class="progress-segment notstarted" [style.width.%]="(appt.engagedCount + appt.notEngagedCount) > 0 ? (appt.notEngagedCount / (appt.engagedCount + appt.notEngagedCount)) * 100 : 0"></div>
                   </div>
                   <div class="status-indicators">
-                    <div class="status-item clickable" (click)="openAppointmentEngagedPanel(appt)">
+                    <div data-testid="ed-open-appointment-engaged-panel-35" class="status-item clickable" (click)="openAppointmentEngagedPanel(appt)">
                       <span class="status-dot completed"></span>
                       <span>{{ appt.engagedCount }} Attended</span>
                     </div>
-                    <div class="status-item clickable" (click)="openAppointmentNotEngagedPanel(appt)">
+                    <div data-testid="ed-open-appointment-not-engaged-panel-36" class="status-item clickable" (click)="openAppointmentNotEngagedPanel(appt)">
                       <span class="status-dot notstarted"></span>
                       <span>{{ appt.notEngagedCount }} Cancelled</span>
                     </div>
@@ -306,9 +306,9 @@
                 </mat-panel-title>
                 <mat-panel-description>
                   <div class="challenge-summary-chips">
-                    <mat-chip class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
-                    <mat-chip class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
-                    <mat-chip class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
+                    <mat-chip data-testid="ed-event-37" class="completed-chip clickable" (click)="$event.stopPropagation(); openEngagedPanel(j)">{{ j.engaged }} Engaged</mat-chip>
+                    <mat-chip data-testid="ed-event-38" class="pending-chip clickable" (click)="$event.stopPropagation(); openNotEngagedPanel(j)">{{ j.count - j.engaged }} Not Engaged</mat-chip>
+                    <mat-chip data-testid="ed-event-39" class="progress-chip clickable" (click)="$event.stopPropagation(); openAllParticipantsPanel(j)">{{ j.count }} Total</mat-chip>
                   </div>
                 </mat-panel-description>
               </mat-expansion-panel-header>
@@ -318,11 +318,11 @@
                   <div class="progress-segment notstarted" [style.width.%]="j.count > 0 ? ((j.count - j.engaged) / j.count) * 100 : 0"></div>
                 </div>
                 <div class="status-indicators">
-                  <div class="status-item clickable" (click)="openEngagedPanel(j)">
+                  <div data-testid="ed-open-engaged-panel-40" class="status-item clickable" (click)="openEngagedPanel(j)">
                     <span class="status-dot completed"></span>
                     <span>{{ j.engaged }} Engaged (content OR events)</span>
                   </div>
-                  <div class="status-item clickable" (click)="openNotEngagedPanel(j)">
+                  <div data-testid="ed-open-not-engaged-panel-41" class="status-item clickable" (click)="openNotEngagedPanel(j)">
                     <span class="status-dot notstarted"></span>
                     <span>{{ j.count - j.engaged }} Not Engaged (no activity)</span>
                   </div>
@@ -344,23 +344,23 @@
         <p class="panel-subtitle-text">{{ panelSubtitle }}</p>
       </div>
       <div class="panel-actions">
-        <button *ngIf="showPanelFilter" mat-icon-button class="filter-button" [class.filter-active]="panelEventFilter !== 'all'"
+        <button data-testid="ed-toggle-panel-filter-42" *ngIf="showPanelFilter" mat-icon-button class="filter-button" [class.filter-active]="panelEventFilter !== 'all'"
           (click)="togglePanelFilter()" matTooltip="Filter Events">
           <mat-icon>filter_list</mat-icon>
         </button>
-        <button mat-icon-button class="notification-button email-button" (click)="sendMail()"
+        <button data-testid="ed-send-mail-43" mat-icon-button class="notification-button email-button" (click)="sendMail()"
           matTooltip="Send Email to Selected Participants" [disabled]="panelParticipants.length === 0">
           <mat-icon>mail</mat-icon>
         </button>
-        <button mat-icon-button class="notification-button whatsapp-button" (click)="$event.stopPropagation(); sendWatti()"
+        <button data-testid="ed-event-44" mat-icon-button class="notification-button whatsapp-button" (click)="$event.stopPropagation(); sendWatti()"
           matTooltip="Send WhatsApp to Selected Participants" [disabled]="panelParticipants.length === 0">
           <i class="fa-brands fa-whatsapp" style="color: #25D366; font-size: 20px;"></i>
         </button>
-        <button mat-icon-button class="notification-button inapp-button" (click)="sendNotificationinBreakthrough()"
+        <button data-testid="ed-send-notificationin-breakthrough-45" mat-icon-button class="notification-button inapp-button" (click)="sendNotificationinBreakthrough()"
           matTooltip="Send In-App Notification" [disabled]="panelParticipants.length === 0">
           <mat-icon>notifications_active</mat-icon>
         </button>
-        <button mat-icon-button class="close-button" (click)="closePanel()">
+        <button data-testid="ed-close-panel-46" mat-icon-button class="close-button" (click)="closePanel()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -388,12 +388,12 @@
           <span class="count">{{ panelParticipants.length }}</span>
           <span class="label">{{ panelType === 'engaged' ? 'Engaged' : panelType === 'not-engaged' ? 'Not Engaged' : 'Total' }} Participants</span>
         </div>
-        <button class="export-btn" (click)="exportParticipants()" matTooltip="Export to CSV">
+        <button data-testid="ed-export-participants-47" class="export-btn" (click)="exportParticipants()" matTooltip="Export to CSV">
           <mat-icon>download</mat-icon>
         </button>
       </div>
       <div *ngIf="panelType === 'engaged' || panelType === 'not-engaged' || panelType === 'all'" class="participants-list">
-        <div *ngFor="let p of panelParticipants" class="participant-item-detailed clickable-participant"
+        <div data-testid="ed-navigate-to-profile-48" *ngFor="let p of panelParticipants" class="participant-item-detailed clickable-participant"
           [class.not-engaged-item]="panelType === 'not-engaged' || p.status === 'not-engaged'"
           (click)="navigateToProfile(p.profileid)" [attr.title]="'Click to view ' + p.name + '\'s profile'">
 
@@ -602,5 +602,5 @@
     </div>
   </div>
 
-  <div class="panel-overlay" [class.overlay-visible]="panelVisible" (click)="closePanel()"></div>
+  <div data-testid="ed-close-panel-49" class="panel-overlay" [class.overlay-visible]="panelVisible" (click)="closePanel()"></div>
 </div>

@@ -7,7 +7,7 @@
       </mat-icon>
       <h2 mat-dialog-title>{{ title }}</h2>
     </div>
-    <button mat-icon-button (click)="onClose()">
+    <button data-testid="rpz-onclose" mat-icon-button (click)="onClose()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -26,7 +26,7 @@
 
     <!-- Bulk apply: tick a zone for everyone eligible for it -->
     <div *ngIf="data.type === 'conflict' && zoneOptions.length" class="apply-zone-bar">
-      <button type="button"
+      <button data-testid="rpz-applyzonetoall" type="button"
               class="apply-zone-btn"
               *ngFor="let zone of zoneOptions"
               (click)="applyZoneToAll(zone.zoneId)">
@@ -55,10 +55,10 @@
 
   <!-- Actions -->
   <mat-dialog-actions>
-    <button mat-button (click)="onClose()">
+    <button data-testid="rpz-onclose-2" mat-button (click)="onClose()">
       {{ data.type === 'unassigned' ? 'Close' : 'Cancel' }}
     </button>
-    <button *ngIf="data.type === 'conflict'" mat-raised-button color="primary" (click)="onSubmit()">
+    <button data-testid="rpz-onsubmit" *ngIf="data.type === 'conflict'" mat-raised-button color="primary" (click)="onSubmit()">
       Resolve & Submit
     </button>
   </mat-dialog-actions>

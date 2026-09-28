@@ -9,7 +9,7 @@
     <div class="msg-con" *ngIf="this.profilesNeedAttention.length > 0">
       <p> Some Profiles Subsciptions need attention </p>
       <div class="actions-btn">
-        <button mat-stroked-button [class.showprofile]="showProfilesNeedAttention"
+        <button data-testid="sd-filter-attention-1" mat-stroked-button [class.showprofile]="showProfilesNeedAttention"
           (click)="filterTable(!this.showProfilesNeedAttention)">{{this.profilesNeedAttention.length}} Profiles Need
           Attention</button>
         <!-- <button  mat-stroked-button *ngIf="this.profilesNeedAttention.length > 0" (click)="updateProfilesNeedAttention()">Update list</button> -->
@@ -20,14 +20,14 @@
     <table mat-table [dataSource]="dataSource" matSort>
       <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>
-              <mat-checkbox (change)="$event ? masterToggle() : null"
+              <mat-checkbox data-testid="sd-select-all-2" (change)="$event ? masterToggle() : null"
                 [checked]="selection.hasValue() && isAllSelected()"
                 [indeterminate]="selection.hasValue() && !isAllSelected()"
                 [aria-label]="checkboxLabel()">
               </mat-checkbox>
           </th>
-          <td mat-cell *matCellDef="let row">
-              <mat-checkbox (click)="$event.stopPropagation()"
+          <td mat-cell *matCellDef="let row; let rowi = index">
+              <mat-checkbox [attr.data-testid]="'sd-row-check-' + rowi" (click)="$event.stopPropagation()"
                 (change)="$event ? selectRow(row) : null"
                 [checked]="selection.isSelected(row)"
                 [aria-label]="checkboxLabel(row)">
@@ -62,7 +62,7 @@
     </table>
   </div>  
   <div style="margin-top: 20px;" class="btnbox">
-    <form [formGroup]="subscriptionform" (ngSubmit)="submit()">
+    <form data-testid="sd-form-3" [formGroup]="subscriptionform" (ngSubmit)="submit()">
       <div>
         <mat-form-field appearance="outline">
           <mat-label>Select Extend Type</mat-label>
@@ -111,8 +111,8 @@
     </form>
   </div>   
   <div class="btnbox">
-    <button mat-stroked-button class="cancelbtn" (click)="cancel()">Cancel</button>
-    <button mat-stroked-button class="submitbtn" (click)="submit()" [disabled]="disableSubmitButton()">Submit</button>
+    <button data-testid="sd-cancel-4" mat-stroked-button class="cancelbtn" (click)="cancel()">Cancel</button>
+    <button data-testid="sd-submit-5" mat-stroked-button class="submitbtn" (click)="submit()" [disabled]="disableSubmitButton()">Submit</button>
   </div>
 </main>
 

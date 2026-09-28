@@ -26,7 +26,7 @@
             Only uppercase letters and numbers allowed
           </mat-error>
         </mat-form-field>
-        <button
+        <button data-testid="wd2-save-code-1"
           mat-raised-button
           color="primary"
           class="save-code-btn"
@@ -54,8 +54,8 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button (click)="close()">Close</button>
-    <button
+    <button data-testid="wd2-close-2" mat-button (click)="close()">Close</button>
+    <button data-testid="wd2-update-3"
       mat-raised-button
       color="primary"
       (click)="update()"

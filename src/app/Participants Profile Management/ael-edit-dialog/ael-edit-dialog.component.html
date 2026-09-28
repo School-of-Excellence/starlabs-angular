@@ -205,6 +205,6 @@
   </form>
 </mat-dialog-content>
 <mat-dialog-actions>
-  <button mat-button (click)="dialogRef.close()">Cancel</button>
-  <button mat-button [disabled]="updating" (click)="save()">Update</button>
+  <button data-testid="aed-cancel-1" mat-button (click)="dialogRef.close()">Cancel</button>
+  <button data-testid="aed-save-2" mat-button [disabled]="updating" (click)="save()">Update</button>
 </mat-dialog-actions>

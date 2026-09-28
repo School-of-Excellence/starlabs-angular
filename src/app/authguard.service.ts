@@ -1842,7 +1842,10 @@ export class AuthguardService {
     hosts: Array<string>,
     participantid: string,
     title: string,
-    metadata: {}
+    metadata: {},
+    // Cloud hosting this room's cluster ('aws' | 'oci'). Instant meetings stamp it from
+    // the activeprovider doc; omitted = default (oci) resolved at join time.
+    mediaProvider?: string
   }){
     const roomDoc = doc(this.firestore, "openviduroom", roomData["roomid"])
     await setDoc(roomDoc, roomData, {merge: true})

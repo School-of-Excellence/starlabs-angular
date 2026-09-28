@@ -12,8 +12,8 @@
         <mat-form-field appearance="outline">
           <mat-label>Fetch By Date Range</mat-label>
           <mat-date-range-input [rangePicker]="picker">
-            <input matStartDate [(ngModel)]="startDate" placeholder="Start date" (dateChange)="onDateSelect()">
-            <input matEndDate [(ngModel)]="endDate" placeholder="End date" (dateChange)="onDateSelect()">
+            <input data-testid="aenl-inp-1" matStartDate [(ngModel)]="startDate" placeholder="Start date" (dateChange)="onDateSelect()">
+            <input data-testid="aenl-inp-2" matEndDate [(ngModel)]="endDate" placeholder="End date" (dateChange)="onDateSelect()">
           </mat-date-range-input>
           <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
           <mat-date-range-picker #picker></mat-date-range-picker>
@@ -22,7 +22,7 @@
       <div class="actionitem">
         <mat-form-field appearance="outline">
           <mat-label>Filter Type</mat-label>
-          <mat-select placeholder="Notification Type" [(value)]="selectedNotificationType" (selectionChange)="onNotificationTypeFilterChange()">
+          <mat-select data-testid="aenl-sel-3" placeholder="Notification Type" [(value)]="selectedNotificationType" (selectionChange)="onNotificationTypeFilterChange()">
             <mat-option value="">All Types</mat-option>
             <mat-option *ngFor="let type of notificationTypes" [value]="type">{{type}}</mat-option>
           </mat-select>
@@ -35,7 +35,7 @@
         </mat-form-field>
       </div>
       <div class="actionitem text-right">
-        <button mat-stroked-button (click)="exportCSV()">Export CSV</button>
+        <button data-testid="aenl-btn-4" mat-stroked-button (click)="exportCSV()">Export CSV</button>
       </div>
     </div>
     <table mat-table [dataSource]="dataSource" matSort>

@@ -2,7 +2,7 @@
     <div class="form-actions" *ngIf="developer">
         <p>Version Number : <b>{{logNumber}}</b></p>
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="!logform.valid" (click)="addLog()">
+        <button data-testid="crl-addlog" mat-raised-button color="primary" type="submit" [disabled]="!logform.valid" (click)="addLog()">
             Submit
         </button>
     </div>
@@ -13,21 +13,21 @@
                 <div *ngFor="let item of itemsArray.controls; let i=index" [formGroupName]="i" class="note-row">
                     <mat-form-field appearance="outline" class="log-input">
                         <mat-label>Log {{i+1}}</mat-label>
-                        <input matInput placeholder="Enter the update" formControlName="log">
+                        <input data-testid="crl-log" matInput placeholder="Enter the update" formControlName="log">
                         <mat-error *ngIf="item.get('log')?.invalid && item.get('log')?.touched">
                             Log entry is required
                         </mat-error>
                     </mat-form-field>
             
                     <div class="action-buttons">
-                        <button mat-icon-button color="primary" type="button" 
+                        <button data-testid="crl-additem" mat-icon-button color="primary" type="button" 
                                 (click)="addItem()" 
                                 *ngIf="i === itemsArray.length - 1"
                                 matTooltip="Add new log">
                             <mat-icon>add_circle</mat-icon>
                         </button>
                 
-                        <button mat-icon-button color="warn" type="button" 
+                        <button data-testid="crl-removeitem" mat-icon-button color="warn" type="button" 
                                 (click)="removeItem(i)"
                                 *ngIf="itemsArray.length > 1"
                                 matTooltip="Remove log">
@@ -68,7 +68,7 @@
     </div>
   
     <div mat-dialog-actions>
-      <button mat-button (click)="dialogRef.close()">Close</button>
+      <button data-testid="crl-dialogref-close" mat-button (click)="dialogRef.close()">Close</button>
     </div>
   </div>
   

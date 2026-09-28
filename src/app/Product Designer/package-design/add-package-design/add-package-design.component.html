@@ -84,8 +84,8 @@
         </mat-form-field>
       </div>
       <div class="w-100 text-center mt-3">
-        <button mat-stroked-button class="btn cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-        <button mat-stroked-button class="btn submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Save Package Design'}}</button>
+        <button data-testid="apd-close-1" mat-stroked-button class="btn cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button data-testid="apd-button-2" mat-stroked-button class="btn submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Save Package Design'}}</button>
       </div>
     </form>
 </div>

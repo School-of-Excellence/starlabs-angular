@@ -13,15 +13,15 @@
       <mat-form-field appearance="outline" class="datefield">
         <mat-label>Date Range</mat-label>
         <mat-date-range-input [rangePicker]="picker">
-          <input matStartDate [(ngModel)]="startDate" (click)="picker.open()" placeholder="Start date">
-          <input matEndDate [(ngModel)]="endDate" (click)="picker.open()" (dateChange)="showUtility()" placeholder="End date">
+          <input data-testid="cu-picker-1" matStartDate [(ngModel)]="startDate" (click)="picker.open()" placeholder="Start date">
+          <input data-testid="cu-picker-2" matEndDate [(ngModel)]="endDate" (click)="picker.open()" (dateChange)="showUtility()" placeholder="End date">
         </mat-date-range-input>
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
       </mat-form-field>
     </div>
     <div>
-      <button class="exportbtn" mat-stroked-button (click)="exportCSV()">Export csv</button>
+      <button data-testid="cu-export-csv-3" class="exportbtn" mat-stroked-button (click)="exportCSV()">Export csv</button>
     </div>
   </div>
   <div #TABLE class="mat-elevation-z3">

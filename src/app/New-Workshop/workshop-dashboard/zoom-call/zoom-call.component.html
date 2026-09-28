@@ -3,16 +3,16 @@
     <div class="left-section">
       <h5>Column A - Name | Column B - Email</h5>
       <div class="file-upload-section">
-        <button mat-raised-button color="primary" (click)="fileInput.click()">
+        <button data-testid="zc-file-input-1" mat-raised-button color="primary" (click)="fileInput.click()">
           <mat-icon>file_upload</mat-icon>
           Import Excel/CSV
         </button>
-        <input #fileInput type="file" 
+        <input data-testid="zc-change-on-file-change-2" #fileInput type="file" 
                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                (change)="onFileChange($event)" 
                style="display: none;">
       </div>
-      <button mat-raised-button color="accent" (click)="exportToCSV()" class="export-btn">
+      <button data-testid="zc-export-to-csv-3" mat-raised-button color="accent" (click)="exportToCSV()" class="export-btn">
         <mat-icon>file_download</mat-icon>
         Export CSV
       </button>
@@ -75,7 +75,7 @@
     <ng-container matColumnDef="delete">
     <mat-header-cell *matHeaderCellDef mat-sort-header sortAction="asc"></mat-header-cell>
     <mat-cell *matCellDef="let row; let i = index">
-      <button mat-icon-button color="warn" (click)="deleteRow(i)">
+      <button data-testid="zc-delete-row-4" mat-icon-button color="warn" (click)="deleteRow(i)">
         <mat-icon>
           delete
         </mat-icon>
@@ -98,7 +98,7 @@
         <mat-header-cell *matHeaderCellDef mat-sort-header>Name</mat-header-cell>
         <mat-cell *matCellDef="let row; let i = index">
           <ng-container *ngIf="editingRowIndex !== i">
-            <span (click)="startEdit(i)" class="editable-cell">
+            <span data-testid="zc-start-edit-5" (click)="startEdit(i)" class="editable-cell">
               {{ row.name || 'Select Name' }}
             </span>
           </ng-container>
@@ -149,9 +149,9 @@
     <mat-paginator [pageSizeOptions]="[50, 200, 500]" showFirstLastButtons></mat-paginator>
   </div>
   <div class="dialog-actions">
-    <button mat-button (click)="onClose()">Close</button>
+    <button data-testid="zc-on-close-6" mat-button (click)="onClose()">Close</button>
 
-    <button mat-raised-button color="primary" [disabled]="dataSource.data.length === 0" (click)="onUpdate()">
+    <button data-testid="zc-on-update-7" mat-raised-button color="primary" [disabled]="dataSource.data.length === 0" (click)="onUpdate()">
       Update
     </button>
   </div>

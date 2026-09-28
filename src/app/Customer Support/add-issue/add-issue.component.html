@@ -210,24 +210,24 @@
             </div>
           </div>
           <div style="float: right;margin-top: 15px;">
-            <mat-icon (click)="openNotes()" style="cursor: pointer;">add_circle_outline</mat-icon>
+            <mat-icon data-testid="cai-opennotes" (click)="openNotes()" style="cursor: pointer;">add_circle_outline</mat-icon>
             <mat-hint style="margin-left: 5px;">Add Notes</mat-hint>
           </div>
           <br>
           <div>
-            <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
-            <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+            <button data-testid="cai-button" mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
+            <mat-menu data-testid="cai-event" #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+              <button data-testid="cai-choosetype" mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
+              <button data-testid="cai-choosetype-2" mat-icon-button (click)="chooseType('video')" class="attach"><mat-icon>videocam</mat-icon></button>
               <br>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
+              <button data-testid="cai-choosetype-3" mat-icon-button (click)="chooseType('audio')" class="attach"><mat-icon>music_note</mat-icon></button>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
+              <button data-testid="cai-choosetype-4" mat-icon-button (click)="chooseType('files')" class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
             </mat-menu>
-            <input style="display: none;" #fileInput type="file" [accept]="filetype" (click)="onClick($event)"
+            <input data-testid="cai-onclick" style="display: none;" #fileInput type="file" [accept]="filetype" (click)="onClick($event)"
             (change)="selectFiles($event)" multiple>
               <div>
                 <span *ngIf="addissue.controls['files'].value != 0">
@@ -236,7 +236,7 @@
                         <span class="lastmessage">
                             <p>{{file.name}}</p>
                         </span>
-                        <button mat-icon-button (click)="removeFile(i)"><mat-icon>close</mat-icon></button>
+                        <button data-testid="cai-removefile" mat-icon-button (click)="removeFile(i)"><mat-icon>close</mat-icon></button>
                     </div>
                   </div>
                 </span>
@@ -247,8 +247,8 @@
     </div>
 
     <div class="btnarea">
-      <button mat-raised-button color="primary" type="button" class="closebtn" (click)="onNoClick()">Back</button>
-      <button mat-raised-button color="primary" type="submit" class="submitbtn" [disabled]="!addissue.valid"  (click)="onsubmit(addissue.value)">Submit</button>
+      <button data-testid="cai-onnoclick" mat-raised-button color="primary" type="button" class="closebtn" (click)="onNoClick()">Back</button>
+      <button data-testid="cai-onsubmit" mat-raised-button color="primary" type="submit" class="submitbtn" [disabled]="!addissue.valid"  (click)="onsubmit(addissue.value)">Submit</button>
     </div>
   </form>
 </div>

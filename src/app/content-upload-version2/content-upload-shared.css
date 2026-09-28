@@ -269,6 +269,42 @@
 }
 .search-box { flex: 1 1 0; min-width: 0; }
 
+/* Bulk availability action bar */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--primary-soft);
+  border: 1px solid var(--bdr-lt);
+  border-radius: var(--r);
+}
+.bulk-bar .bulk-count { font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 13px; color: var(--primary-dark); }
+.bulk-bar .bulk-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn-ghost {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  height: 42px;
+  padding: 0 16px;
+  background: var(--card);
+  color: var(--txt);
+  border: 1px solid var(--bdr);
+  border-radius: var(--r);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.btn-ghost:hover:not(:disabled) { background: var(--hover); border-color: var(--primary); }
+.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost .mat-icon { font-size: 18px; width: 18px; height: 18px; }
+
 
 .select-box {
   flex: 0 0 220px;

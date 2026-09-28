@@ -3,7 +3,7 @@
   <div class="sep">
     <div class="sep-lbl">Active &amp; Scheduled Campaigns</div>
     <div class="sep-line"></div>
-    <button type="button" class="btn-new-camp" (click)="openNewCampaignDialog()">+ New Campaign</button>
+    <button data-testid="cam-open-new-campaign-dialog-1" type="button" class="btn-new-camp" (click)="openNewCampaignDialog()">+ New Campaign</button>
   </div>
 
   @if (loading) {
@@ -50,7 +50,7 @@
             <div class="cc-asset-chips">
               @for (a of c.assets; track $index) {
                 @if (a.url) {
-                  <a class="asset-chip" [href]="a.url" target="_blank" rel="noopener" [title]="a.name">
+                  <a data-testid="cam-a-2" class="asset-chip" [href]="a.url" target="_blank" rel="noopener" [title]="a.name">
                     <span>{{ a.icon }}</span><span class="asset-chip-type">{{ a.type }}</span><span class="asset-chip-name">{{ a.name }}</span>
                   </a>
                 } @else {
@@ -64,14 +64,14 @@
         }
 
         <div class="cc-actions">
-          <button type="button" class="cbtn" (click)="openEditDialog(c.raw)">✎ Edit</button>
-          <button type="button" class="cbtn cbtn-sale">+ Add Sale</button>
-          <button type="button" class="cbtn">📊 Analytics</button>
+          <button data-testid="cam-open-edit-dialog-3" type="button" class="cbtn" (click)="openEditDialog(c.raw)">✎ Edit</button>
+          <button data-testid="cam-button-4" type="button" class="cbtn cbtn-sale">+ Add Sale</button>
+          <button data-testid="cam-button-5" type="button" class="cbtn">📊 Analytics</button>
         </div>
       </div>
     }
 
-    <div class="empty-camp" (click)="openNewCampaignDialog()">
+    <div data-testid="cam-open-new-campaign-dialog-6" class="empty-camp" (click)="openNewCampaignDialog()">
       <span class="empty-plus">+</span>
       <span>New Campaign</span>
     </div>

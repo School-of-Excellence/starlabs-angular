@@ -18,7 +18,7 @@
       (drop)="onDrop($event)"
     >
       <mat-icon class="upload-icon">cloud_upload</mat-icon>
-      <p>Drag files here or <span class="browse-text" (click)="fileInput.click()">browse</span> to upload</p>
+      <p>Drag files here or <span data-testid="manual-file-input-1" class="browse-text" (click)="fileInput.click()">browse</span> to upload</p>
       <p class="upload-hint">Maximum file size: {{maxFileSize}}MB</p>
       
       <!-- Hidden file input -->
@@ -54,21 +54,21 @@
     <div class="file-list" *ngIf="files.length > 0">
       <div class="file-list-header">
         <h3>Selected Files ({{files.length}})</h3>
-        <button mat-button color="warn" (click)="clearAllFiles()" *ngIf="files.length > 0 && ['create', 'rework'].includes(viewType)">
+        <button data-testid="manual-clear-all-files-2" mat-button color="warn" (click)="clearAllFiles()" *ngIf="files.length > 0 && ['create', 'rework'].includes(viewType)">
           Clear All
         </button>
       </div>
   
       <div class="file-list-items">
         <div class="file-item" *ngFor="let file of files; let i = index">
-          <div class="file-icon" (click)="openPreview(file)">
+          <div data-testid="manual-open-preview-3" class="file-icon" (click)="openPreview(file)">
             <mat-icon>{{getFileIcon(file)}}</mat-icon>
           </div>
-          <div class="file-info" (click)="openPreview(file)">
+          <div data-testid="manual-open-preview-4" class="file-info" (click)="openPreview(file)">
             <div class="file-name" [title]="file.name">{{file.name}}</div>
             <div class="file-size">{{getReadableFileSize(file.size)}}</div>
           </div>
-          <button mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file" *ngIf="['create', 'rework'].includes(viewType)">
+          <button data-testid="manual-remove-file-5" mat-icon-button color="warn" (click)="removeFile(i)" aria-label="Remove file" *ngIf="['create', 'rework'].includes(viewType)">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -76,11 +76,11 @@
     </div>
   
     <!-- File preview modal -->
-    <div class="preview-modal" *ngIf="previewVisible" (click)="closePreview()">
-      <div class="preview-content" (click)="$event.stopPropagation()">
+    <div data-testid="manual-close-preview-6" class="preview-modal" *ngIf="previewVisible" (click)="closePreview()">
+      <div data-testid="manual-event-7" class="preview-content" (click)="$event.stopPropagation()">
         <div class="preview-header">
           <h3>{{previewFile?.name}}</h3>
-          <button mat-icon-button (click)="closePreview()">
+          <button data-testid="manual-close-preview-8" mat-icon-button (click)="closePreview()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -107,7 +107,7 @@
             <mat-icon>error_outline</mat-icon>
             <p>Preview not available for this file type</p>
           </div>
-          <button mat-raised-button color="primary" (click)="downloadFile(previewFile)">Download File</button>
+          <button data-testid="manual-download-file-9" mat-raised-button color="primary" (click)="downloadFile(previewFile)">Download File</button>
         </div>
       </div>
     </div>

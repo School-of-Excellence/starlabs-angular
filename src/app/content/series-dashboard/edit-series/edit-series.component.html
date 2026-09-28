@@ -3,7 +3,7 @@
   <form #myForm="ngForm">
     <mat-form-field appearance="outline" class="name">
       <mat-label>Series Name:</mat-label>
-      <input type="text" placeholder="Series" [(ngModel)]="seriesName" 
+      <input data-testid="edser-inp-001" type="text" placeholder="Series" [(ngModel)]="seriesName" 
             matInput 
             name="name"
             #name="ngModel"
@@ -12,7 +12,7 @@
     </mat-form-field>
     <mat-form-field appearance="outline" class="description">
       <mat-label class='description'>Description</mat-label>
-      <input type="text" placeholder="Description" [(ngModel)]="description"
+      <input data-testid="edser-inp-002" type="text" placeholder="Description" [(ngModel)]="description"
             matInput
             name="description"
             #name="ngModel"
@@ -22,7 +22,7 @@
     </mat-form-field>
     <!-- <mat-form-field appearance="outline" class="category">
       <mat-label>Category</mat-label>
-      <mat-select [(ngModel)]="selectedCategory"  name="Categorys" #Categorys="ngModel">
+      <mat-select data-testid="edser-msel-003" [(ngModel)]="selectedCategory"  name="Categorys" #Categorys="ngModel">
         <mat-option *ngFor="let data of category" [value]="data.id">
           {{data.category}}
         </mat-option>
@@ -42,25 +42,25 @@
   </form>
   <div class="file">
     <label for="file">Choose an heroImage</label><br>
-    <input type="file" accept="image/*" (change)="previewheroImage($event)">
+    <input data-testid="edser-inp-004" type="file" accept="image/*" (change)="previewheroImage($event)">
     <img *ngIf="heroImageUrl" [src]="heroImageUrl" controls style="width: 100px;height: 100px;">
   </div>
 
   <div class="file">
     <label for="file">Choose an Image</label><br>
-    <input type="file" accept="image/*" (change)="previewImage($event)">
+    <input data-testid="edser-inp-005" type="file" accept="image/*" (change)="previewImage($event)">
     <img *ngIf="imageUrl" [src]="imageUrl" controls style="width: 100px;height: 100px;">
   </div>
 
   <mat-form-field class="filter">
     <mat-label>Filter</mat-label>
-    <input matInput  placeholder="Search" #input (keyup)="ApplyFilter($event)">
+    <input data-testid="edser-inp-006" matInput  placeholder="Search" #input (keyup)="ApplyFilter($event)">
   </mat-form-field>
 
   <table mat-table [dataSource]="dataSource" class="mat-elevation-z8"  matSort>
     <ng-container matColumnDef="Select">
       <th mat-header-cell *matHeaderCellDef>
-        <mat-checkbox color="primary"
+        <mat-checkbox data-testid="edser-matcheckbox-007" color="primary"
                       (change)="$event ? masterToggle() : null"
                       [checked]="selection.hasValue() && isAllSelected()"
                       [indeterminate]="selection.hasValue() && !isAllSelected()"
@@ -68,7 +68,7 @@
         </mat-checkbox>
       </th> 
       <td mat-cell *matCellDef="let row"> 
-        <mat-checkbox color="primary"
+        <mat-checkbox data-testid="edser-matcheckbox-008" color="primary"
                       (click)="$event.stopPropagation()"
                       (change)="selection.toggle(row); updateSelectedRows()"
                       [checked]="selection.isSelected(row)">
@@ -102,7 +102,7 @@
       </ng-container>
       
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;"  (click)="selection.toggle(row)"></tr>
+      <tr data-testid="edser-tr-009" mat-row *matRowDef="let row; columns: displayedColumns;"  (click)="selection.toggle(row)"></tr>
   </table>
 
   <mat-paginator [pageSizeOptions]="[10, 25, 100]"></mat-paginator>
@@ -121,8 +121,8 @@
   </div>
   <br>
   <div class="d-flex flex-row justify-content-center">
-    <button class="btn" mat-raised-button color="primary" (click)="onSubmit()">Update</button>&nbsp;&nbsp;
-    <!-- <button  class="Updatebtn" mat-raised-button color="primary" (click)="oncancel()">Cancel</button> -->
+    <button data-testid="edser-btn-010" class="btn" mat-raised-button color="primary" (click)="onSubmit()">Update</button>&nbsp;&nbsp;
+    <!-- <button data-testid="edser-btn-011"  class="Updatebtn" mat-raised-button color="primary" (click)="oncancel()">Cancel</button> -->
   </div>
   
 </main>

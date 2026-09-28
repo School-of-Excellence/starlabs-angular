@@ -116,13 +116,13 @@
       </div>
     </div>
   </div>
-  <button *ngIf="profileHost && isJoined" class="float" (click)="onClick()" title="Capture">
+  <button data-testid="zcv-btn-1" *ngIf="profileHost && isJoined" class="float" (click)="onClick()" title="Capture">
     <mat-icon>photo_camera</mat-icon>
     <span>Capture</span>
   </button>
 
   <!-- Host-only quick jump to the Prescribe ATC step of Dynamic Studio -->
-  <button *ngIf="profileHost && isJoined" class="prescribe-bubble" (click)="goToPrescribeAtc()"
+  <button data-testid="zcv-btn-2" *ngIf="profileHost && isJoined" class="prescribe-bubble" (click)="goToPrescribeAtc()"
           title="Prescribe ATC">
     <mat-icon>add_circle</mat-icon>
     <span>Prescribe ATC</span>
@@ -150,10 +150,10 @@
         Zoom window to {{ recordingPromptKind === 'paused' ? 'resume' : 'start' }} recording.</span>
       </div>
       <div class="rec-prompt-card__actions">
-        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="resumeRecordingNow()">
+        <button data-testid="zcv-btn-3" class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="resumeRecordingNow()">
           {{ recordingPromptKind === 'paused' ? 'Resume recording' : 'Start recording' }}
         </button>
-        <button class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
+        <button data-testid="zcv-btn-4" class="rec-prompt-card__btn" (click)="dismissRecordingPrompt()">Dismiss for 30s</button>
       </div>
     </div>
   </div>
@@ -173,7 +173,7 @@
         this Zoom call keeps running here.
       </p>
       <div class="rec-prompt-card__actions">
-        <button class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="dismissPrescribeHint()">Got it</button>
+        <button data-testid="zcv-btn-5" class="rec-prompt-card__btn rec-prompt-card__btn--primary" (click)="dismissPrescribeHint()">Got it</button>
       </div>
     </div>
   </div>
@@ -182,12 +182,12 @@
        invisibly in Safari (bisect-confirmed inherent bug), so on Safari we show
        our own bar wired to the real Zoom actions. Chrome uses the native bar. -->
   <!-- Device menu, anchored above the pill (opens upward) -->
-  <div class="sx-zc-menu" *ngIf="menuKind && isSafariBrowser" (click)="$event.stopPropagation()"
+  <div data-testid="zcv-act-6" class="sx-zc-menu" *ngIf="menuKind && isSafariBrowser" (click)="$event.stopPropagation()"
        [style.left.px]="menuLeft" [style.bottom.px]="menuBottom">
     <div class="sx-zc-menu-title">{{ menuKind === 'audio' ? 'Audio' : menuKind === 'video' ? 'Camera' : 'More' }} options</div>
     <ng-container *ngFor="let it of menuItems; let i = index">
       <div *ngIf="it.header" class="sx-zc-menu-item sx-zc-menu-item--header">{{ it.label }}</div>
-      <button *ngIf="!it.header" type="button" class="sx-zc-menu-item"
+      <button [attr.data-testid]="'zcv-btn-7-' + i" *ngIf="!it.header" type="button" class="sx-zc-menu-item"
               [class.sx-zc-menu-item--checked]="it.checked" (click)="clickDeviceItem(i, it)">
         <mat-icon>{{ it.checked ? 'check' : '' }}</mat-icon>
         <span>{{ it.label }}</span>
@@ -196,51 +196,51 @@
     <div class="sx-zc-menu-item sx-zc-menu-item--header" *ngIf="!menuItems.length">No devices found</div>
   </div>
 
-  <div class="sx-zoom-controls" *ngIf="isJoined && isSafariBrowser" (click)="$event.stopPropagation()">
+  <div data-testid="zcv-act-8" class="sx-zoom-controls" *ngIf="isJoined && isSafariBrowser" (click)="$event.stopPropagation()">
     <div class="sx-zc-group">
-      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customMuted"
+      <button data-testid="zcv-btn-9" type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customMuted"
               (click)="toggleCustomMute()" [title]="customMuted ? 'Unmute' : 'Mute'">
         <mat-icon>{{ customMuted ? 'mic_off' : 'mic' }}</mat-icon>
         <span>{{ customMuted ? 'Unmute' : 'Mute' }}</span>
       </button>
-      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'audio'"
+      <button data-testid="zcv-btn-10" type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'audio'"
               (click)="toggleDeviceMenu('audio', $event)" title="Audio device options">
         <mat-icon>expand_less</mat-icon>
       </button>
     </div>
     <div class="sx-zc-group">
-      <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="!customVideoOn"
+      <button data-testid="zcv-btn-11" type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="!customVideoOn"
               (click)="toggleVideo()" [title]="customVideoOn ? 'Stop Video' : 'Start Video'">
         <mat-icon>{{ customVideoOn ? 'videocam' : 'videocam_off' }}</mat-icon>
         <span>{{ customVideoOn ? 'Stop Video' : 'Start Video' }}</span>
       </button>
-      <button type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'video'"
+      <button data-testid="zcv-btn-12" type="button" class="sx-zc-caret" [class.sx-zc-caret--open]="menuKind === 'video'"
               (click)="toggleDeviceMenu('video', $event)" title="Camera device options">
         <mat-icon>expand_less</mat-icon>
       </button>
     </div>
-    <button type="button" class="sx-zc-btn" (click)="toggleParticipants()" title="Participants">
+    <button data-testid="zcv-btn-13" type="button" class="sx-zc-btn" (click)="toggleParticipants()" title="Participants">
       <mat-icon>groups</mat-icon><span>Participants</span>
     </button>
-    <button type="button" class="sx-zc-btn" (click)="toggleChat()" title="Chat">
+    <button data-testid="zcv-btn-14" type="button" class="sx-zc-btn" (click)="toggleChat()" title="Chat">
       <mat-icon>chat</mat-icon><span>Chat</span>
     </button>
-    <button type="button" class="sx-zc-btn" (click)="shareScreen()" title="Share Screen">
+    <button data-testid="zcv-btn-15" type="button" class="sx-zc-btn" (click)="shareScreen()" title="Share Screen">
       <mat-icon>screen_share</mat-icon><span>Share</span>
     </button>
-    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customHandRaised"
+    <button data-testid="zcv-btn-16" type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="customHandRaised"
             (click)="toggleHand()" [title]="customHandRaised ? 'Lower Hand' : 'Raise Hand'">
       <mat-icon>front_hand</mat-icon><span>{{ customHandRaised ? 'Lower' : 'Raise' }}</span>
     </button>
-    <button type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="menuKind === 'more'"
+    <button data-testid="zcv-btn-17" type="button" class="sx-zc-btn" [class.sx-zc-btn--muted]="menuKind === 'more'"
             (click)="toggleDeviceMenu('more', $event)" title="More">
       <mat-icon>more_horiz</mat-icon><span>More</span>
     </button>
     <span class="sx-zc-sep"></span>
-    <button type="button" class="sx-zc-btn sx-zc-btn--leave" (click)="leaveCall()" title="Leave meeting">
+    <button data-testid="zcv-btn-18" type="button" class="sx-zc-btn sx-zc-btn--leave" (click)="leaveCall()" title="Leave meeting">
       <mat-icon>call_end</mat-icon><span>Leave</span>
     </button>
-    <button type="button" class="sx-zc-btn sx-zc-btn--leave" *ngIf="profileHost"
+    <button data-testid="zcv-btn-19" type="button" class="sx-zc-btn sx-zc-btn--leave" *ngIf="profileHost"
             (click)="endForAll()" title="End meeting for all">
       <mat-icon>cancel</mat-icon><span>End all</span>
     </button>

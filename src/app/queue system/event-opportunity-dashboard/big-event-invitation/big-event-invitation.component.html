@@ -4,14 +4,14 @@
       <div class="w-100 text-center">
         <mat-form-field class="formfield" appearance="outline">
           <mat-label>B!G Product</mat-label>
-          <mat-select [(ngModel)]="selectedProduct">
+          <mat-select data-testid="bevi-sel-1" [(ngModel)]="selectedProduct">
             <mat-option *ngFor="let product of bigProduct" [value]="product['id']">{{product.product}}</mat-option>
           </mat-select>
         </mat-form-field>
         <br>
         <mat-form-field class="formfield" appearance="outline">
           <mat-label>Participant Name</mat-label>
-          <mat-select [(ngModel)]="selectedProfiles" multiple>
+          <mat-select data-testid="bevi-sel-2" [(ngModel)]="selectedProfiles" multiple>
             <mat-option>
               <ngx-mat-select-search [(ngModel)]="filterText" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
             </mat-option>
@@ -26,14 +26,14 @@
         <br>
         <mat-form-field class="formfield" appearance="outline">
           <mat-label>Expiry Date</mat-label>
-          <input matInput [(ngModel)]="expirydate" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
+          <input data-testid="bevi-inp-3" matInput [(ngModel)]="expirydate" [matDatepicker]="picker" (click)="picker.open()" placeholder="MM-DD-YYYY">
           <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
         <br>
         <mat-form-field class="formfield" appearance="outline">
           <mat-label>Select Big Marathon</mat-label>
-          <mat-select [(ngModel)]="bigmarathonref">
+          <mat-select data-testid="bevi-sel-4" [(ngModel)]="bigmarathonref">
             <mat-option *ngFor="let marathon of bigMarathonList" [value]="marathon['ref']">{{marathon['title']}}</mat-option>
           </mat-select>
         </mat-form-field>
@@ -52,9 +52,9 @@
         <label *ngFor="let id of invitedParticipants">{{mapProfile[id["profileid"]]}},&nbsp;</label>
       </div>
       <div class="text-center mt-2">
-        <button class="closebtn"  style="margin-right: 10px;" mat-stroked-button (click)="close()">Close</button>
+        <button data-testid="bevi-btn-5" class="closebtn"  style="margin-right: 10px;" mat-stroked-button (click)="close()">Close</button>
         <!-- <button class="submitbtn ml-3" mat-stroked-button (click)="sendInvitation()" [disabled]="this.selectedProfiles.length != 0 && selectedProduct == null || (this.selectedProfiles.length == 0 && expirydate == null)">Send Invitation</button> -->
-        <button 
+        <button data-testid="bevi-btn-6" 
           class="submitbtn ml-3" 
           mat-stroked-button 
           (click)="sendInvitation()" 

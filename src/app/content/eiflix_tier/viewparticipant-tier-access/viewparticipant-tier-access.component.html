@@ -26,10 +26,10 @@
         <div class="filters-row">
           <div class="input-box search-box">
             <mat-icon class="ib-icon">search</mat-icon>
-            <input type="text" class="ib-input" placeholder="Search members..."
+            <input data-testid="vpt-inp-001" type="text" class="ib-input" placeholder="Search members..."
               [(ngModel)]="memberSearchText" (keyup)="onMemberSearch()" autocomplete="off" />
           </div>
-          <button class="btn-primary" (click)="openDialog()">
+          <button data-testid="vpt-btn-002" class="btn-primary" (click)="openDialog()">
             <mat-icon>add</mat-icon>
             <span>Add Tier</span>
           </button>
@@ -40,7 +40,7 @@
             <div class="vp-tier-header">
               <span class="vp-tier-name">{{ key != 'Tierless Participant' ? maptier[key] : key }}</span>&nbsp;&nbsp;
               <span class="chip chip-sm">{{ testTier[key].length }}</span>
-              <button class="a-btn a-edit" *ngIf="key != 'Tierless Participant'" (click)="onEditDialog(key)" style="margin-left: auto;">
+              <button data-testid="vpt-btn-003" class="a-btn a-edit" *ngIf="key != 'Tierless Participant'" (click)="onEditDialog(key)" style="margin-left: auto;">
                 <mat-icon>edit</mat-icon>
               </button>
             </div>
@@ -73,10 +73,10 @@
         <div class="filters-row">
           <div class="input-box search-box">
             <mat-icon class="ib-icon">search</mat-icon>
-            <input type="text" class="ib-input" placeholder="Search tier access..."
+            <input data-testid="vpt-inp-004" type="text" class="ib-input" placeholder="Search tier access..."
               [(ngModel)]="tierAccessSearchText" (keyup)="onTierAccessSearch()" autocomplete="off" />
           </div>
-          <button class="btn-primary" (click)="onAddTierAccess()">
+          <button data-testid="vpt-btn-005" class="btn-primary" (click)="onAddTierAccess()">
             <mat-icon>add</mat-icon>
             <span>Add Config</span>
           </button>
@@ -88,10 +88,10 @@
               <span class="vp-tier-name">{{ maptier[row.tierid] }}</span>
               <span class="chip chip-sm">{{ row.tieraccessby }}</span>
               <div style="margin-left: auto; display: flex; gap: 2px;">
-                <button class="a-btn a-edit" (click)="onEditTierAccess(row)">
+                <button data-testid="vpt-btn-006" class="a-btn a-edit" (click)="onEditTierAccess(row)">
                   <mat-icon>edit</mat-icon>
                 </button>
-                <button class="a-btn a-del" (click)="onDeleteTierAccess(row)">
+                <button data-testid="vpt-btn-007" class="a-btn a-del" (click)="onDeleteTierAccess(row)">
                   <mat-icon>delete_outline</mat-icon>
                 </button>
               </div>
@@ -158,29 +158,29 @@
         <div class="filters-row">
           <div class="input-box search-box">
             <mat-icon class="ib-icon">search</mat-icon>
-            <input type="text" class="ib-input"
+            <input data-testid="vpt-inp-008" type="text" class="ib-input"
               [placeholder]="seriesViewMode === 'series' ? 'Search series...' : 'Search tiers...'"
               [(ngModel)]="seriesSearchText" (keyup)="onSeriesSearch()" autocomplete="off" />
           </div>
           <div class="vp-btn-group" *ngIf="seriesViewMode === 'series'">
-            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'az'" (click)="seriesSortMode = 'az'; applySortAndFilter()">
+            <button data-testid="vpt-btn-009" class="vp-btn-toggle" [class.active]="seriesSortMode === 'az'" (click)="seriesSortMode = 'az'; applySortAndFilter()">
               <i class="fa-solid fa-arrow-down-a-z"></i>
             </button>
-            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'za'" (click)="seriesSortMode = 'za'; applySortAndFilter()">
+            <button data-testid="vpt-btn-010" class="vp-btn-toggle" [class.active]="seriesSortMode === 'za'" (click)="seriesSortMode = 'za'; applySortAndFilter()">
               <i class="fa-solid fa-arrow-down-z-a"></i>
             </button>
-            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'newest'" (click)="seriesSortMode = 'newest'; applySortAndFilter()">
+            <button data-testid="vpt-btn-011" class="vp-btn-toggle" [class.active]="seriesSortMode === 'newest'" (click)="seriesSortMode = 'newest'; applySortAndFilter()">
               <mat-icon>arrow_downward</mat-icon> Newest
             </button>
-            <button class="vp-btn-toggle" [class.active]="seriesSortMode === 'oldest'" (click)="seriesSortMode = 'oldest'; applySortAndFilter()">
+            <button data-testid="vpt-btn-012" class="vp-btn-toggle" [class.active]="seriesSortMode === 'oldest'" (click)="seriesSortMode = 'oldest'; applySortAndFilter()">
               <mat-icon>arrow_upward</mat-icon> Oldest
             </button>
           </div>
           <div class="vp-btn-group">
-            <button class="vp-btn-toggle" [class.active]="seriesViewMode === 'series'" (click)="seriesViewMode = 'series'; applySortAndFilter()">
+            <button data-testid="vpt-btn-013" class="vp-btn-toggle" [class.active]="seriesViewMode === 'series'" (click)="seriesViewMode = 'series'; applySortAndFilter()">
               <mat-icon>video_library</mat-icon> Series
             </button>
-            <button class="vp-btn-toggle" [class.active]="seriesViewMode === 'tier'" (click)="seriesViewMode = 'tier'; applySortAndFilter()">
+            <button data-testid="vpt-btn-014" class="vp-btn-toggle" [class.active]="seriesViewMode === 'tier'" (click)="seriesViewMode = 'tier'; applySortAndFilter()">
               <mat-icon>layers</mat-icon> Tier
             </button>
           </div>
@@ -190,7 +190,7 @@
             <div class="vp-tier-header">
               <span class="vp-tier-name">{{ series.seriesName }}</span>
               <span class="chip chip-sm">{{ series.tiers.length }}</span>
-              <button class="a-btn a-edit" (click)="onAssignEditDialog(series)" style="margin-left: auto;">
+              <button data-testid="vpt-btn-015" class="a-btn a-edit" (click)="onAssignEditDialog(series)" style="margin-left: auto;">
                 <mat-icon>edit</mat-icon>
               </button>
             </div>

@@ -194,7 +194,9 @@ export class CreateupcomingworkshopsComponent {
     const group = this.fb.group({
       eventdate: [null, Validators.required],
       type: ['', Validators.required],
-      cost: ['', Validators.required],
+      // Optional: an unset Cost is stored as an empty string, never null (the save path
+      // below normalises it), so nothing downstream has to handle a missing value.
+      cost: [''],
       title: ['', Validators.required],
       with: [''],
       location: [''],

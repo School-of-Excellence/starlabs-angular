@@ -25,20 +25,20 @@
                     <mat-form-field appearance="outline" class="flex-item">
                         <mat-label>Search all columns</mat-label>
                         <input matInput [(ngModel)]="globalSearchTab1" (ngModelChange)="applyProfileFilter()" placeholder="Search all columns">
-                        <button mat-icon-button matSuffix *ngIf="globalSearchTab1" (click)="clearGlobalSearchTab1()" aria-label="Clear">
+                        <button data-testid="em-clear-global-search-tab1-1" mat-icon-button matSuffix *ngIf="globalSearchTab1" (click)="clearGlobalSearchTab1()" aria-label="Clear">
                             <mat-icon>close</mat-icon>
                         </button>
                     </mat-form-field>
                 </div>
                 
                 <div style="display: flex; align-items: center;"> 
-                    <button *ngIf="this.selection.size > 0" mat-fab class="custom-green-button" (click)="makeLive(null)" aria-label="make live" style="margin-right: 8px;" matTooltip="Make Live to participant">
+                    <button data-testid="em-make-live-2" *ngIf="this.selection.size > 0" mat-fab class="custom-green-button" (click)="makeLive(null)" aria-label="make live" style="margin-right: 8px;" matTooltip="Make Live to participant">
                         <mat-icon>live_tv</mat-icon>
                     </button>
-                    <button *ngIf="this.selection.size > 0" mat-fab color="warn" (click)="clearSelection()" aria-label="clear selection" matTooltip="clear selected" style="margin-right: 8px;">
+                    <button data-testid="em-clear-selection-3" *ngIf="this.selection.size > 0" mat-fab color="warn" (click)="clearSelection()" aria-label="clear selection" matTooltip="clear selected" style="margin-right: 8px;">
                         <mat-icon>clear</mat-icon>
                     </button>
-                    <button *ngIf="this.selection.size == 0" mat-fab color="primary" (click)="addEvolution()" matTooltip="create" aria-label="add evolution">
+                    <button data-testid="em-add-evolution-4" *ngIf="this.selection.size == 0" mat-fab color="primary" (click)="addEvolution()" matTooltip="create" aria-label="add evolution">
                         <mat-icon>add_box</mat-icon>
                     </button>
                 </div>
@@ -50,7 +50,7 @@
                     </th>
                     <td mat-cell *matCellDef="let row">
                         <span *ngIf="row.urllive" style="color: red;font-weight: bold;">Live</span>
-                        <mat-checkbox *ngIf="!row.urllive"
+                        <mat-checkbox data-testid="em-event-5" *ngIf="!row.urllive"
                             (click)="$event.stopPropagation()"
                             (change)="toggleSelection($event, row)"
                             [checked]="isSelected(row)"
@@ -80,7 +80,7 @@
                 <ng-container matColumnDef="video">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Video </th>
                     <td mat-cell *matCellDef="let row">
-                        <button mat-fab class="custom-green-button" matTooltip="play video" (click)="videoPlay(row.videourl)" aria-label="video icon">
+                        <button data-testid="em-video-play-6" mat-fab class="custom-green-button" matTooltip="play video" (click)="videoPlay(row.videourl)" aria-label="video icon">
                             <mat-icon>video_library</mat-icon>
                         </button>
                     </td>
@@ -92,7 +92,7 @@
                 <ng-container matColumnDef="Edit">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Edit </th>
                     <td mat-cell *matCellDef="let row">
-                        <button mat-fab color="primary" (click)="edit(row)" matTooltip="edit" aria-label="edit icon">
+                        <button data-testid="em-edit-7" mat-fab color="primary" (click)="edit(row)" matTooltip="edit" aria-label="edit icon">
                             <mat-icon>edit</mat-icon>
                         </button>
                     </td>
@@ -100,7 +100,7 @@
                 <ng-container matColumnDef="Delete">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Delete </th>
                     <td mat-cell *matCellDef="let row">
-                        <button mat-fab color="warn" (click)="confirmDelete(row)" matTooltip="delete" aria-label="delete icon">
+                        <button data-testid="em-confirm-delete-8" mat-fab color="warn" (click)="confirmDelete(row)" matTooltip="delete" aria-label="delete icon">
                             <mat-icon>delete</mat-icon>
                         </button>
                     </td>
@@ -141,7 +141,7 @@
                     <mat-form-field appearance="outline" class="flex-item">
                         <mat-label>Search all columns</mat-label>
                         <input matInput [(ngModel)]="globalSearchTab2" (ngModelChange)="applyProfileFilterLive()" placeholder="Search all columns">
-                        <button mat-icon-button matSuffix *ngIf="globalSearchTab2" (click)="clearGlobalSearchTab2()" aria-label="Clear">
+                        <button data-testid="em-clear-global-search-tab2-9" mat-icon-button matSuffix *ngIf="globalSearchTab2" (click)="clearGlobalSearchTab2()" aria-label="Clear">
                             <mat-icon>close</mat-icon>
                         </button>
                     </mat-form-field>
@@ -160,7 +160,7 @@
             <table mat-table [dataSource]="dataSource2" matSort>
                 <ng-container matColumnDef="Name">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header> Name </th>
-                    <td mat-cell *matCellDef="let row" (click)="makeLive(row)" style="cursor: pointer;">
+                    <td data-testid="em-make-live-10" mat-cell *matCellDef="let row" (click)="makeLive(row)" style="cursor: pointer;">
                     <span style="display: flex; align-items: center; gap: 8px;">
                     <app-profile-picture
                         [profileId]="row.profileid"
@@ -173,17 +173,17 @@
                 </ng-container>
                 <ng-container matColumnDef="Livestatus">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Status </th>
-                    <td mat-cell (click)="makeLive(row)" style="cursor: pointer;" *matCellDef="let row" [ngStyle]="{'color': row.live ? 'green' : 'red','font-weight':'bold'}"> {{row.live ? 'Live' : 'Not Live'}} </td>
+                    <td data-testid="em-make-live-11" mat-cell (click)="makeLive(row)" style="cursor: pointer;" *matCellDef="let row" [ngStyle]="{'color': row.live ? 'green' : 'red','font-weight':'bold'}"> {{row.live ? 'Live' : 'Not Live'}} </td>
                 </ng-container>
                 <ng-container matColumnDef="Title">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Title </th>
-                    <td mat-cell (click)="makeLive(row)" style="cursor: pointer;" *matCellDef="let row"> {{row.title}} </td>
+                    <td data-testid="em-make-live-12" mat-cell (click)="makeLive(row)" style="cursor: pointer;" *matCellDef="let row"> {{row.title}} </td>
                 </ng-container>
                 <ng-container matColumnDef="VideoList">
                     <th mat-header-cell *matHeaderCellDef mat-sort-header> Video List </th>
                     <td mat-cell *matCellDef="let row">
                         <div class="video-list">
-                            <button 
+                            <button data-testid="em-video-play-13" 
                                 *ngFor="let videoUrl of row.videolist; let i = index" 
                                 mat-icon-button 
                                 (click)="videoPlay(videoUrl)" 

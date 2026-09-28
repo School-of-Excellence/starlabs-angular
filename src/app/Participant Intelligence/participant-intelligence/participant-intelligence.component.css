@@ -1,0 +1,462 @@
+/* Design tokens: on :host for the page, and on the overlay container for its dialogs and menus. */
+:host,
+::ng-deep .cdk-overlay-container {
+  --pi-bg: #f2f2f7;
+  --pi-surface: #ffffff;
+  --pi-surface-2: #fafafc;
+  --pi-surface-3: #ececf1;
+  --pi-fill: rgba(118, 118, 128, 0.12);
+  --pi-border: rgba(60, 60, 67, 0.1);
+  --pi-border-strong: rgba(60, 60, 67, 0.18);
+
+  --pi-text: #1c1c1e;
+  --pi-text-2: rgba(60, 60, 67, 0.62);
+  --pi-text-3: rgba(60, 60, 67, 0.34);
+
+  --pi-accent: #007aff;
+  --pi-accent-2: #0a84ff;
+  --pi-accent-bg: rgba(0, 122, 255, 0.1);
+  --pi-accent-text: #0060df;
+
+  --pi-radius: 12px;
+  --pi-radius-sm: 8px;
+  --pi-radius-lg: 16px;
+
+  --pi-shadow-sm: 0 0.5px 2px rgba(20, 30, 40, 0.05);
+  --pi-shadow: 0 4px 16px rgba(20, 30, 40, 0.07), 0 1px 3px rgba(20, 30, 40, 0.05);
+  --pi-shadow-lg: 0 14px 44px rgba(20, 30, 40, 0.16);
+
+  --pi-status-active: #30b85a;
+  --pi-status-active-bg: rgba(52, 199, 89, 0.14);
+  --pi-status-late: #e8870e;
+  --pi-status-late-bg: rgba(255, 149, 0, 0.16);
+  --pi-status-discontinued: #8a8a8e;
+  --pi-status-discontinued-bg: rgba(142, 142, 147, 0.18);
+  --pi-status-banned: #e8443a;
+  --pi-status-banned-bg: rgba(255, 59, 48, 0.13);
+  --pi-status-none: #a0a0a6;
+  --pi-status-none-bg: rgba(142, 142, 147, 0.12);
+}
+
+:host {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, 'Segoe UI', sans-serif;
+}
+.shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* fills the content area beneath the app's sticky 64px toolbar */
+  height: calc(100vh - 64px);
+  overflow: hidden;
+  background: var(--pi-bg);
+}
+
+/* topbar — translucent iOS navigation bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 20px;
+  background: rgba(242, 242, 247, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--pi-border-strong);
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.brand .logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--pi-accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.titles {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.titles h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.titles .sub {
+  font-size: 12.5px;
+  color: var(--pi-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 420px;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--pi-surface-3);
+  border: 1px solid transparent;
+  border-radius: var(--pi-radius);
+  transition: all 0.12s ease;
+}
+.search:focus-within {
+  background: #fff;
+  border-color: var(--pi-accent);
+  box-shadow: 0 0 0 3px var(--pi-accent-bg);
+}
+.search > .material-symbols-rounded {
+  font-size: 20px;
+  color: var(--pi-text-3);
+}
+.search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--pi-text);
+  min-width: 0;
+}
+.search .clear {
+  border: none;
+  background: none;
+  color: var(--pi-text-3);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+}
+.search .clear:hover {
+  color: var(--pi-text);
+}
+.search .clear .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--pi-border-strong);
+  border-radius: var(--pi-radius);
+  background: var(--pi-surface);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pi-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tbtn:hover {
+  border-color: var(--pi-accent);
+}
+.tbtn.active {
+  background: var(--pi-accent-bg);
+  border-color: var(--pi-accent);
+  color: var(--pi-accent-text);
+}
+.tbtn .material-symbols-rounded {
+  font-size: 19px;
+  color: var(--pi-text-2);
+}
+.tbtn.active .material-symbols-rounded {
+  color: var(--pi-accent);
+}
+.tbtn .pill {
+  background: var(--pi-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+.tbtn .pill.warn {
+  background: var(--pi-status-late);
+}
+
+.sep {
+  width: 1px;
+  height: 26px;
+  background: var(--pi-border);
+  margin: 0 2px;
+}
+
+.iconbtn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--pi-radius);
+  background: var(--pi-surface);
+  color: var(--pi-text-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.iconbtn:hover {
+  background: var(--pi-surface-3);
+  color: var(--pi-text);
+}
+.iconbtn .material-symbols-rounded {
+  font-size: 20px;
+}
+.iconbtn .badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--pi-status-banned);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--pi-surface);
+}
+
+/* body */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.rail {
+  width: 300px;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 14px 18px 18px;
+  background: var(--pi-surface);
+  border: 1px solid var(--pi-border);
+  border-radius: var(--pi-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--pi-shadow-sm);
+}
+
+/* menu item icons (menu content carries this component's scope) */
+.mi {
+  margin-right: 10px;
+  font-size: 19px;
+  vertical-align: middle;
+  color: var(--pi-text-2);
+}
+
+@media (max-width: 1100px) {
+  .titles h1 {
+    display: none;
+  }
+  .tbtn .lbl {
+    display: none;
+  }
+  .tbtn {
+    padding: 0 10px;
+  }
+}
+
+/* Dialogs and menus render in the CDK overlay, outside this component's view, so their
+   styles are ::ng-deep and scoped by class (panelClass `pi-dialog`, menu class `pi-comms-menu`). */
+::ng-deep .pi-dialog .mat-mdc-dialog-surface {
+  border-radius: var(--pi-radius-lg);
+  box-shadow: var(--pi-shadow-lg);
+}
+::ng-deep .pi-dialog .dlg {
+  display: flex;
+  flex-direction: column;
+  max-height: 84vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+  color: var(--pi-text);
+}
+::ng-deep .pi-dialog .dlg-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--pi-border);
+}
+::ng-deep .pi-dialog .dlg-head .ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--pi-accent-bg);
+  color: var(--pi-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+::ng-deep .pi-dialog .dlg-head .ic .material-symbols-rounded {
+  font-size: 21px;
+}
+::ng-deep .pi-dialog .dlg-head h2 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+}
+::ng-deep .pi-dialog .dlg-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--pi-text-2);
+}
+::ng-deep .pi-dialog .dlg-head .x {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--pi-text-3);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 6px;
+}
+::ng-deep .pi-dialog .dlg-head .x:hover {
+  background: var(--pi-surface-3);
+  color: var(--pi-text);
+}
+::ng-deep .pi-dialog .dlg-body {
+  padding: 18px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+::ng-deep .pi-dialog .dlg-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--pi-border);
+  background: var(--pi-surface-2);
+}
+::ng-deep .pi-dialog .dlg-foot .spacer {
+  margin-right: auto;
+}
+::ng-deep .pi-dialog .dlg-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pi-text-2);
+  margin: 0 0 6px;
+}
+::ng-deep .pi-dialog .dlg-field {
+  margin-bottom: 16px;
+}
+::ng-deep .pi-dialog .dlg-input,
+::ng-deep .pi-dialog .dlg-textarea,
+::ng-deep .pi-dialog .dlg-select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--pi-text);
+  border: 1px solid var(--pi-border-strong);
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.1s ease;
+}
+::ng-deep .pi-dialog .dlg-input:focus,
+::ng-deep .pi-dialog .dlg-textarea:focus,
+::ng-deep .pi-dialog .dlg-select:focus {
+  border-color: var(--pi-accent);
+  box-shadow: 0 0 0 3px var(--pi-accent-bg);
+}
+::ng-deep .pi-dialog .dlg-textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.5;
+}
+::ng-deep .pi-dialog .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.1s ease;
+}
+::ng-deep .pi-dialog .btn .material-symbols-rounded {
+  font-size: 18px;
+}
+::ng-deep .pi-dialog .btn-primary {
+  background: var(--pi-accent);
+  color: #fff;
+}
+::ng-deep .pi-dialog .btn-primary:hover:not(:disabled) {
+  background: var(--pi-accent-2);
+}
+::ng-deep .pi-dialog .btn-primary:disabled {
+  background: var(--pi-border-strong);
+  color: #fff;
+  cursor: default;
+}
+::ng-deep .pi-dialog .btn-ghost {
+  background: transparent;
+  color: var(--pi-text-2);
+  border-color: var(--pi-border-strong);
+}
+::ng-deep .pi-dialog .btn-ghost:hover {
+  background: var(--pi-surface-3);
+  color: var(--pi-text);
+}
+::ng-deep .pi-dialog .btn-danger {
+  background: var(--pi-status-banned-bg);
+  color: var(--pi-status-banned);
+}
+::ng-deep .pi-dialog .btn-danger:hover {
+  background: #f6dcd8;
+}
+
+::ng-deep .pi-comms-menu.mat-mdc-menu-panel {
+  max-width: 420px;
+}
+::ng-deep .pi-comms-menu .mat-mdc-menu-content {
+  padding: 0;
+}

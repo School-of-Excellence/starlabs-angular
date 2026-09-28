@@ -1,5 +1,5 @@
 <div class="dialog-header">
-    <button mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
+    <button data-testid="rd-close-1" mat-icon-button (click)="closeDialog()" aria-label="Close" class="close-button">
       <mat-icon>close</mat-icon>
     </button>
 </div>
@@ -11,10 +11,11 @@
 <div *ngIf="!loading">
     <h2 style="color: rgb(248, 44, 44);font-weight: bold;">{{mapProfile[profileid]}}'s Reports</h2>
     <div class="tabs">
-        <button 
-            *ngFor="let report of data.element.reports; let i = index" 
-            class="tab-button" 
-            [class.active]="selectedTab === i" 
+        <button
+            [attr.data-testid]="'rd-tab-' + i"
+            *ngFor="let report of data.element.reports; let i = index"
+            class="tab-button"
+            [class.active]="selectedTab === i"
             (click)="selectTab(i, report)">
           {{ reportDisplayNames[report] || report  }}
         </button>

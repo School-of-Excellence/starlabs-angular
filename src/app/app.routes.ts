@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
-import { ContentAnalyticsv2Component } from './content/content-analytics-v2/content-analytics-v2.component';
+import { ContentAnalyticsV2Component } from './content/content-analytics-v2/content-analytics-v2.component';
 import { content } from 'html2canvas/dist/types/css/property-descriptors/content';
 
 export const routes: Routes = [
@@ -109,12 +109,13 @@ export const routes: Routes = [
   {path: 'videodashboard', loadComponent: () => import('./content/episodes-dashboard/episodes-dashboard.component').then(m => m.EpisodesDashboardComponent), canActivate:[authGuard]},
   {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics/content-analytics.component').then(m => m.ContentAnalyticsComponent), canActivate:[authGuard]},
   {path: 'content-analytics-dashboard', loadComponent: () => import('./content/content-analytics-dashboard/content-analytics-dashboard.component').then(m => m.ContentAnalyticsDashboardComponent), canActivate:[authGuard]},
+  // {path: 'contentanalytics', loadComponent: () => import('./content/content-analytics-v2/content-analytics-v2.component').then(m => m.ContentAnalyticsV2Component), canActivate:[authGuard]},
   {path: 'accessscreen', loadComponent: () => import('./content/access-screen/access-screen.component').then(m => m.AccessScreenComponent), canActivate:[authGuard]},
   {path: 'seriesdashboard', loadComponent: () => import('./content/series-dashboard/series-dashboard.component').then(m => m.SeriesDashboardComponent), canActivate:[authGuard], children: [
     {path:'addseries', loadComponent: () => import('./content/series-dashboard/add-series/add-series.component').then(m => m.AddSeriesComponent), canActivate: [authGuard]},
     {path:'editseries', loadComponent: () => import('./content/series-dashboard/edit-series/edit-series.component').then(m => m.EditSeriesComponent), canActivate:[authGuard]},
   ]},
-  {path: 'ContentAnalyticsv2', loadComponent:() => import('./content/content-analytics-v2/content-analytics-v2.component').then(m => m.ContentAnalyticsv2Component)},
+  {path: 'ContentAnalyticsv2', loadComponent:() => import('./content/content-analytics-v2/content-analytics-v2.component').then(m => m.ContentAnalyticsV2Component)},
   {path: 'category-dashboard', loadComponent: () => import('./content/category-dashboard/category-dashboard.component').then(m => m.CategoryDashboardComponent), canActivate:[authGuard]},
   {path: 'zoomaccount', loadComponent: () => import('./queue system/zoom-account/zoom-account.component').then(m => m.ZoomAccountComponent), canActivate:[authGuard]},
   {path: 'arenastudioactivity', loadComponent: () => import('./queue system/arenastudioactivity/arenastudioactivity.component').then(m => m.ArenastudioactivityComponent), canActivate:[authGuard, roleGuard(['developer','admin','ah'])]},
@@ -222,6 +223,7 @@ export const routes: Routes = [
 
   // Journey Onboarding
   {path: 'salesleads', loadComponent: () => import('./Journey Onboarding/saleslead/saleslead.component').then(m => m.SalesleadComponent), canActivate:[authGuard]},
+  {path: 'participant-intelligence', loadComponent: () => import('./Participant Intelligence/participant-intelligence/participant-intelligence.component').then(m => m.ParticipantIntelligenceComponent), canActivate: [authGuard]},
   {path: 'sales-numbers', loadComponent: () => import('./Journey Onboarding/sales-numbers/sales-numbers.component').then(m => m.SalesNumbersComponent), canActivate:[authGuard]},
   {path: 'sales-teams', loadComponent: () => import('./Journey Onboarding/sales-teams/sales-teams.component').then(m => m.SalesTeamsComponent), canActivate:[authGuard]},
   {path: 'onboardingremarks', loadComponent: () => import('./Journey Onboarding/onboarding-remark/onboarding-remark.component').then(m => m.OnboardingRemarkComponent), canActivate: [authGuard]},
@@ -264,7 +266,7 @@ export const routes: Routes = [
   {path: 'notificationrecord', loadComponent: () => import('./AppEngagement/notification-record/notification-record.component').then(m => m.NotificationRecordComponent), canActivate:[authGuard]},
 
   // Chat
-  {path: 'group-chat', loadComponent: () => import('./Events/Chat/chat-screen/chat-screen.component').then(m => m.ChatScreenComponent), canActivate:[authGuard]},
+  {path: 'group-chat', loadComponent: () => import('./Events/Chat/group-chat-screen/group-chat-screen.component').then(m => m.GroupChatScreenComponent), canActivate:[authGuard]},
 
   // Communication Center
   {path: 'zoom-recording-dashboard', loadComponent: () => import('./Communication Center/zoom-recording-dashboard/zoom-recording-dashboard.component').then(m => m.ZoomRecordingDashboardComponent), canActivate:[authGuard]},
@@ -310,10 +312,16 @@ export const routes: Routes = [
 
   // OpenVidu
   {path: 'monitorliveassignment', loadComponent: () => import('./OpenVidu/monitor-liveassignment/monitor-liveassignment.component').then(m => m.MonitorLiveassignmentComponent), canActivate: [authGuard]},
-  {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+  // DEPRECATED 2026-07-17: join-openvidu-call is AWS-only. All /joinroom traffic (appointments,
+  // queue links) now lands on the provider-aware LiveKit component below. Old line kept for rollback.
+  // {path: 'joinroom/:roomid', loadComponent: () => import('./OpenVidu/join-openvidu-call/join-openvidu-call.component').then(m => m.JoinOpenviduCallComponent), canActivate: [authGuard]},
+  {path: 'joinroom/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
 
   // LiveKit (new call flow with DeepFilterNet3 client-side noise suppression)
   {path: 'joinlivekit/:roomid', loadComponent: () => import('./LiveKit/join-livekit-call/join-livekit-call.component').then(m => m.JoinLivekitCallComponent), canActivate: [authGuard]},
+  // LiveKit Cloud + Krisp variant. NOTE: enter via a full page load (not client-side nav) so the
+  // coi-serviceworker COEP exemption for this path takes effect — Krisp requires NO cross-origin isolation.
+  {path: 'livekit-cloud-room/:roomid', loadComponent: () => import('./LiveKit-Cloud/livekit-cloud-room/livekit-cloud-room.component').then(m => m.LivekitCloudRoomComponent), canActivate: [authGuard]},
   {path: 'participantstudio', loadComponent: () => import('./OpenVidu/list-openvidu-room/list-openvidu-room.component').then(m => m.ListOpenviduRoomComponent), canActivate: [authGuard]},
   {path: 'openvidurecordings', loadComponent: () => import('./OpenVidu/openvidu-recording/openvidu-recording.component').then(m => m.OpenviduRecordingComponent), canActivate: [authGuard]},
 

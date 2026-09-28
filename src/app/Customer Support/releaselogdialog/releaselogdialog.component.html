@@ -2,7 +2,7 @@
     <div class="form-actions" *ngIf="developer">
         <p>Version Number : <b>{{logNumber}}</b></p>
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="!logform.valid" (click)="addLog()">
+        <button data-testid="csrl-addlog" mat-raised-button color="primary" type="submit" [disabled]="!logform.valid" (click)="addLog()">
             Submit
         </button>
     </div>
@@ -20,14 +20,14 @@
                     </mat-form-field>
             
                     <div class="action-buttons">
-                        <button mat-icon-button color="primary" type="button" 
+                        <button data-testid="csrl-additem" mat-icon-button color="primary" type="button" 
                                 (click)="addItem()" 
                                 *ngIf="i === itemsArray.length - 1"
                                 matTooltip="Add new log">
                             <mat-icon>add_circle</mat-icon>
                         </button>
                 
-                        <button mat-icon-button color="warn" type="button" 
+                        <button data-testid="csrl-removeitem" mat-icon-button color="warn" type="button" 
                                 (click)="removeItem(i)"
                                 *ngIf="itemsArray.length > 1"
                                 matTooltip="Remove log">
@@ -68,7 +68,7 @@
     </div>
   
     <div mat-dialog-actions>
-      <button mat-button (click)="dialogRef.close()">Close</button>
+      <button data-testid="csrl-dialogref" mat-button (click)="dialogRef.close()">Close</button>
     </div>
   </div>
   

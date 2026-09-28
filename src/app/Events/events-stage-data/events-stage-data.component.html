@@ -2,13 +2,13 @@
 
   <!-- Steps indicator -->
   <div class="steps">
-    <button type="button" class="stp" [class.on]="step==='events'" (click)="goToEvents()">1. Event</button>
+    <button type="button" data-testid="esd-steps-event" class="stp" [class.on]="step==='events'" (click)="goToEvents()">1. Event</button>
     <span class="arw">›</span>
-    <button type="button" class="stp" [class.on]="step==='arenas'" (click)="goToArenas()" [disabled]="!selectedEvent">2. Arena event</button>
+    <button type="button" data-testid="esd-steps-arena" class="stp" [class.on]="step==='arenas'" (click)="goToArenas()" [disabled]="!selectedEvent">2. Arena event</button>
     <span class="arw">›</span>
-    <button type="button" class="stp" [class.on]="step==='queues'" (click)="goToQueues()" [disabled]="!selectedArena">3. Queues</button>
+    <button type="button" data-testid="esd-steps-queues" class="stp" [class.on]="step==='queues'" (click)="goToQueues()" [disabled]="!selectedArena">3. Queues</button>
     <span class="arw">›</span>
-    <button type="button" class="stp" [class.on]="step==='plan'" (click)="goToPlan()" [disabled]="!selectedQueueIds.length">4. Plan</button>
+    <button type="button" data-testid="esd-steps-plan" class="stp" [class.on]="step==='plan'" (click)="goToPlan()" [disabled]="!selectedQueueIds.length">4. Plan</button>
   </div>
 
   <!-- ============ Step 1: pick an event ============ -->
@@ -17,16 +17,16 @@
     <p class="hint">Step 1 · Select an event</p>
 
     <div class="row">
-      <label><input type="radio" name="mode" [checked]="mode==='upcoming'" (change)="setMode('upcoming')"> Upcoming</label>
-      <label><input type="radio" name="mode" [checked]="mode==='past'" (change)="setMode('past')"> Past</label>
+      <label><input type="radio" data-testid="esd-events-mode-upcoming" name="mode" [checked]="mode==='upcoming'" (change)="setMode('upcoming')"> Upcoming</label>
+      <label><input type="radio" data-testid="esd-events-mode-past" name="mode" [checked]="mode==='past'" (change)="setMode('past')"> Past</label>
       <span class="search-wrap">
         <span class="search-i">⌕</span>
-        <input class="search" type="text" [(ngModel)]="searchEvents" (ngModelChange)="onEventSearch()" placeholder="Search event name">
+        <input class="search" data-testid="esd-events-search" type="text" [(ngModel)]="searchEvents" (ngModelChange)="onEventSearch()" placeholder="Search event name">
       </span>
     </div>
 
     <p *ngIf="loadingEvents">Loading events…</p>
-    <p *ngIf="eventsError" class="err">Couldn't load events. <button (click)="retryEvents()">Retry</button></p>
+    <p *ngIf="eventsError" class="err">Couldn't load events. <button data-testid="esd-events-retry" (click)="retryEvents()">Retry</button></p>
 
     <table *ngIf="!loadingEvents && !eventsError">
       <thead><tr><th>Event</th><th>Dates</th><th></th></tr></thead>
@@ -34,7 +34,7 @@
         <tr *ngFor="let row of pagedEvents">
           <td>{{ row.name }}</td>
           <td>{{ row.dateLabel || '—' }}</td>
-          <td><button (click)="selectEvent(row)">Select</button></td>
+          <td><button data-testid="esd-events-select" (click)="selectEvent(row)">Select</button></td>
         </tr>
         <tr *ngIf="filteredEvents.length === 0"><td colspan="3" class="empty">No events</td></tr>
       </tbody>
@@ -49,7 +49,7 @@
     <p class="hint">Step 2 · Select an arena event</p>
 
     <p *ngIf="loadingArenas">Loading arena events…</p>
-    <p *ngIf="arenasError" class="err">Couldn't load arena events. <button (click)="selectedEvent && loadArenas(selectedEvent)">Retry</button></p>
+    <p *ngIf="arenasError" class="err">Couldn't load arena events. <button data-testid="esd-arenas-retry" (click)="selectedEvent && loadArenas(selectedEvent)">Retry</button></p>
 
     <table *ngIf="!loadingArenas && !arenasError">
       <thead><tr><th>Product</th><th>Type</th><th></th></tr></thead>
@@ -57,7 +57,7 @@
         <tr *ngFor="let row of arenaRows">
           <td>{{ row.productName }}</td>
           <td>{{ row.type }}</td>
-          <td><button (click)="selectArena(row)">Select</button></td>
+          <td><button data-testid="esd-arenas-select" (click)="selectArena(row)">Select</button></td>
         </tr>
         <tr *ngIf="arenaRows.length === 0"><td colspan="3" class="empty">No arena events for this event</td></tr>
       </tbody>
@@ -73,7 +73,7 @@
     <div class="row">
       <span>Queues:</span>
       <label class="qchk" *ngFor="let q of visibleQueues">
-        <input type="checkbox" [checked]="isQueueSelected(q.id)" (change)="toggleQueue(q.id, $any($event.target).checked)">
+        <input type="checkbox" data-testid="esd-queues-toggle" [checked]="isQueueSelected(q.id)" (change)="toggleQueue(q.id, $any($event.target).checked)">
         {{ q.name }}<span class="mapped" *ngIf="q.mapped"> (mapped)</span>
         <span class="qstatus" [class.ended]="!q.live">{{ q.live ? 'Active' : 'Ended · ' + queueEndLabel(q) }}</span>
       </label>
@@ -81,13 +81,13 @@
       <span *ngIf="loadingQueue">loading…</span>
     </div>
 
-    <button type="button" class="load-more-link" *ngIf="queues.length > queueLimit" (click)="loadMoreQueues()">Load more ({{ queues.length - queueLimit }} more)</button>
+    <button type="button" data-testid="esd-queues-load-more" class="load-more-link" *ngIf="queues.length > queueLimit" (click)="loadMoreQueues()">Load more ({{ queues.length - queueLimit }} more)</button>
 
     <div class="row queue-nav">
       <span class="nav-note" *ngIf="!selectedQueueIds.length">Select at least one queue to continue.</span>
       <span class="count" *ngIf="selectedQueueIds.length">{{ selectedQueueIds.length }} queue(s) selected</span>
       <span class="spacer"></span>
-      <button class="btn-primary cta-continue" (click)="goToPlan()" [disabled]="!selectedQueueIds.length">Continue to plan →</button>
+      <button class="btn-primary cta-continue" data-testid="esd-queues-continue" (click)="goToPlan()" [disabled]="!selectedQueueIds.length">Continue to plan →</button>
     </div>
   </div>
 
@@ -101,13 +101,13 @@
       <div class="fbar">
         <span class="search-wrap">
           <span class="search-i">⌕</span>
-          <input class="search" type="text" [(ngModel)]="searchStage" (ngModelChange)="onStageSearch()" placeholder="Search name, email, phone, stage">
+          <input class="search" data-testid="esd-plan-search" type="text" [(ngModel)]="searchStage" (ngModelChange)="onStageSearch()" placeholder="Search name, email, phone, stage">
         </span>
-        <button type="button" class="fbtn" (click)="filtersOpen = !filtersOpen">
+        <button type="button" data-testid="esd-plan-filters-toggle" class="fbtn" (click)="filtersOpen = !filtersOpen">
           <span>Filters</span><span class="fbtn-n" *ngIf="activeFilterCount">{{ activeFilterCount }}</span>
         </button>
-        <button type="button" class="fchip" *ngFor="let f of activeFilters" (click)="f.clear()">{{ f.label }} ×</button>
-        <button type="button" class="fclear" *ngIf="activeFilterCount" (click)="clearFilters()">Clear all</button>
+        <button type="button" data-testid="esd-plan-filter-chip" class="fchip" *ngFor="let f of activeFilters" (click)="f.clear()">{{ f.label }} ×</button>
+        <button type="button" data-testid="esd-plan-clear-filters" class="fclear" *ngIf="activeFilterCount" (click)="clearFilters()">Clear all</button>
       </div>
       <div class="filters fpanel" *ngIf="filtersOpen">
         <label>Request:
@@ -123,7 +123,7 @@
             (valueChange)="customerFilter=$event; onFilterChange()" placeholder="All" searchPlaceholder="Search status…"></app-searchable-select>
         </label>
         <label *ngIf="journeyOptions.length" class="jf-label">Journey:
-          <span class="jf-chip" *ngFor="let j of journeyOptions" [class.on]="isJourneyFiltered(j)" (click)="toggleJourneyFilter(j)">{{ j }}</span>
+          <span class="jf-chip" data-testid="esd-plan-journey-filter" *ngFor="let j of journeyOptions" [class.on]="isJourneyFiltered(j)" (click)="toggleJourneyFilter(j)">{{ j }}</span>
         </label>
         <label *ngIf="variationOptions.length">Variation:
           <app-searchable-select [options]="ssVariationOpts" [value]="variationFilter"
@@ -144,19 +144,19 @@
             (valueChange)="eligibilityFilter=$event; onFilterChange()" placeholder="Any" searchPlaceholder="Search queue…"></app-searchable-select>
         </label>
         <label>Completed date:
-          <input type="date" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
+          <input type="date" data-testid="esd-plan-completed-from" [(ngModel)]="completedFrom" (ngModelChange)="onFilterChange()">
           <span>–</span>
-          <input type="date" [(ngModel)]="completedTo" (ngModelChange)="onFilterChange()">
+          <input type="date" data-testid="esd-plan-completed-to" [(ngModel)]="completedTo" (ngModelChange)="onFilterChange()">
           <app-searchable-select *ngIf="completedFrom || completedTo" [options]="ssCompletedStageOpts" [value]="completedStage"
             (valueChange)="completedStage=$event; onFilterChange()" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
         </label>
         <label>Slot date:
-          <input type="date" [(ngModel)]="slotFrom" (ngModelChange)="onFilterChange()">
+          <input type="date" data-testid="esd-plan-slot-from" [(ngModel)]="slotFrom" (ngModelChange)="onFilterChange()">
           <span>–</span>
-          <input type="date" [(ngModel)]="slotTo" (ngModelChange)="onFilterChange()">
+          <input type="date" data-testid="esd-plan-slot-to" [(ngModel)]="slotTo" (ngModelChange)="onFilterChange()">
         </label>
         <label class="notbooked" [class.on]="notBookedOnly">
-          <input type="checkbox" [(ngModel)]="notBookedOnly" (ngModelChange)="onFilterChange()"> Not booked only
+          <input type="checkbox" data-testid="esd-plan-not-booked" [(ngModel)]="notBookedOnly" (ngModelChange)="onFilterChange()"> Not booked only
         </label>
       </div>
     </div>
@@ -173,37 +173,37 @@
         <button type="button" class="cs-config-btn" (click)="configOpen = !configOpen">{{ configOpen ? 'Done' : 'Config' }}</button>
         --></div>
       <div class="cs-stats">
-        <div class="cs-stat cs-stat-queue" [class.active]="cardFilter==='inqueue'" (click)="toggleCardFilter('inqueue')">
+        <div class="cs-stat cs-stat-queue" data-testid="esd-plan-card-inqueue" [class.active]="cardFilter==='inqueue'" (click)="toggleCardFilter('inqueue')">
           <div class="cs-label">Total in queue <span class="cs-tag-q">queue-wide</span></div>
           <div class="cs-total">{{ summaryInQueue.total }}<span class="cs-of" *ngIf="cohortTotal > summaryInQueue.total"> of {{ cohortTotal }}</span></div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryInQueue.active, summaryInQueue.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryInQueue.active, summaryInQueue.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryInQueue.active }}</span><span class="cs-lg-n">Non-active {{ summaryInQueue.nonactive }}</span></div>
         </div>
-        <div class="cs-stat" [class.active]="cardFilter==='requested'" (click)="toggleCardFilter('requested')">
+        <div class="cs-stat" data-testid="esd-plan-card-requested" [class.active]="cardFilter==='requested'" (click)="toggleCardFilter('requested')">
           <div class="cs-label">Requested</div>
           <div class="cs-total">{{ summaryRequested.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryRequested.active, summaryRequested.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryRequested.active, summaryRequested.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryRequested.active }}</span><span class="cs-lg-n">Non-active {{ summaryRequested.nonactive }}</span></div>
         </div>
-        <div class="cs-stat" [class.active]="cardFilter==='approved'" (click)="toggleCardFilter('approved')">
+        <div class="cs-stat" data-testid="esd-plan-card-approved" [class.active]="cardFilter==='approved'" (click)="toggleCardFilter('approved')">
           <div class="cs-label">Approved</div>
           <div class="cs-total">{{ summaryApproved.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryApproved.active, summaryApproved.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryApproved.active, summaryApproved.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryApproved.active }}</span><span class="cs-lg-n">Non-active {{ summaryApproved.nonactive }}</span></div>
         </div>
-        <div class="cs-stat cs-stat-warn" [class.active]="cardFilter==='approved-nq'" (click)="toggleCardFilter('approved-nq')">
+        <div class="cs-stat cs-stat-warn" data-testid="esd-plan-card-approved-nq" [class.active]="cardFilter==='approved-nq'" (click)="toggleCardFilter('approved-nq')">
           <div class="cs-label">Approved · not in queue</div>
           <div class="cs-total">{{ summaryApprovedNotQueued.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryApprovedNotQueued.active, summaryApprovedNotQueued.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryApprovedNotQueued.active, summaryApprovedNotQueued.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryApprovedNotQueued.active }}</span><span class="cs-lg-n">Non-active {{ summaryApprovedNotQueued.nonactive }}</span></div>
         </div>
-        <div class="cs-stat" [class.active]="cardFilter==='ready'" (click)="toggleCardFilter('ready')">
+        <div class="cs-stat" data-testid="esd-plan-card-ready" [class.active]="cardFilter==='ready'" (click)="toggleCardFilter('ready')">
           <div class="cs-label">Ready for the event</div>
           <div class="cs-total">{{ summaryReady.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryReady.active, summaryReady.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryReady.active, summaryReady.total)"></span></div>
           <div class="cs-legend"><span class="cs-lg-a">Active {{ summaryReady.active }}</span><span class="cs-lg-n">Non-active {{ summaryReady.nonactive }}</span></div>
         </div>
-        <div class="cs-stat" [class.active]="cardFilter==='dfu'" (click)="toggleCardFilter('dfu')">
+        <div class="cs-stat" data-testid="esd-plan-card-dfu" [class.active]="cardFilter==='dfu'" (click)="toggleCardFilter('dfu')">
           <div class="cs-label">DFU Ongoing</div>
           <div class="cs-total">{{ summaryDfu.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(summaryDfu.active, summaryDfu.total)"></span><span class="cs-n" [style.width.%]="100 - pct(summaryDfu.active, summaryDfu.total)"></span></div>
@@ -212,7 +212,7 @@
       </div>
       <!-- #4: one clickable card per configured "Yet to complete <stage>" definition -->
       <div class="cs-stats" *ngIf="stageDefCards.length">
-        <div class="cs-stat" *ngFor="let c of stageDefCards" [class.active]="cardFilter==='sd:'+c.id" (click)="toggleCardFilter('sd:'+c.id)">
+        <div class="cs-stat" data-testid="esd-plan-card-stagedef" *ngFor="let c of stageDefCards" [class.active]="cardFilter==='sd:'+c.id" (click)="toggleCardFilter('sd:'+c.id)">
           <div class="cs-label">Yet to complete {{ c.label }}</div>
           <div class="cs-total">{{ c.total }}</div>
           <div class="cs-bar"><span class="cs-a" [style.width.%]="pct(c.active, c.total)"></span><span class="cs-n" [style.width.%]="100 - pct(c.active, c.total)"></span></div>
@@ -222,7 +222,7 @@
 
       <!-- Ready-for-the-event: collapsible per-queue stage picker (collapsed to save space) -->
       <div class="cs-readycfg" *ngIf="selectedQueues.length">
-        <button type="button" class="cs-readytoggle" (click)="readyCfgOpen = !readyCfgOpen">
+        <button type="button" data-testid="esd-plan-ready-toggle" class="cs-readytoggle" (click)="readyCfgOpen = !readyCfgOpen">
           <span class="cs-readycfg-lbl">Ready for the event when at / past</span>
           <span class="cs-readysum" *ngIf="!readyCfgOpen && readyStageSummary">{{ readyStageSummary }}</span>
           <span class="cs-readysum cs-readynone" *ngIf="!readyCfgOpen && !readyStageSummary">not set</span>
@@ -241,18 +241,18 @@
       <div class="cs-config" *ngIf="configOpen">
         <div class="cs-config-sec">
           <span class="cs-config-lbl">Queue</span>
-          <button type="button" class="cs-cfg-chip" *ngFor="let q of queues" [class.on]="isQueueSelected(q.id)" (click)="toggleQueue(q.id, !isQueueSelected(q.id))">{{ q.name }}</button>
+          <button type="button" data-testid="esd-plan-config-queue-chip" class="cs-cfg-chip" *ngFor="let q of queues" [class.on]="isQueueSelected(q.id)" (click)="toggleQueue(q.id, !isQueueSelected(q.id))">{{ q.name }}</button>
           <span class="cs-config-hint" *ngIf="!queues.length">No queues for this arena.</span>
         </div>
         <div class="cs-config-sec" *ngIf="readyStageOptions.length">
           <span class="cs-config-lbl">Ready when current stage is</span>
-          <button type="button" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
+          <button type="button" data-testid="esd-plan-config-readystage-chip" class="cs-cfg-chip" *ngFor="let s of readyStageOptions" [class.on]="isReadyStage(s)" (click)="toggleReadyStage(s)">{{ s }}</button>
         </div>
         <div class="cs-config-sec" *ngIf="selectedQueues.length">
           <span class="cs-config-lbl">Eligible products per queue (unconsumed)</span>
           <div class="cs-elig-q" *ngFor="let q of selectedQueues">
             <span class="cs-elig-qn">{{ q.name }}</span>
-            <button type="button" class="cs-cfg-chip on" *ngFor="let pid of (queueEligibility[q.id] || [])" (click)="toggleEligibleProduct(q.id, pid)">{{ productName(pid) }} &times;</button>
+            <button type="button" data-testid="esd-plan-config-eligible-remove" class="cs-cfg-chip on" *ngFor="let pid of (queueEligibility[q.id] || [])" (click)="toggleEligibleProduct(q.id, pid)">{{ productName(pid) }} &times;</button>
             <app-searchable-select [options]="ssEligibleAddOpts(q.id)" [value]="''"
               (valueChange)="$event && toggleEligibleProduct(q.id, $event)" placeholder="+ Add product" searchPlaceholder="Search product…"></app-searchable-select>
           </div>
@@ -260,39 +260,39 @@
         <div class="cs-config-sec cs-sd-sec" *ngIf="selectedQueues.length">
           <span class="cs-config-lbl">Yet-to-complete stages</span>
           <div class="cs-sd" *ngFor="let sd of stageDefs">
-            <input class="cs-grp-name cs-sd-name" type="text" [(ngModel)]="sd.label" (blur)="saveStageDefs()" placeholder="Label (e.g. SE)">
+            <input class="cs-grp-name cs-sd-name" data-testid="esd-plan-stagedef-label" type="text" [(ngModel)]="sd.label" (blur)="saveStageDefs()" placeholder="Label (e.g. SE)">
             <span class="cs-sd-q" *ngFor="let q of selectedQueues">
               <span class="cs-sd-qn">{{ q.name }}</span>
               <app-searchable-select [options]="ssStagesFor(q.id)" [value]="sd.byQueue[q.id] || ''"
                 (valueChange)="setStageDefStage(sd, q.id, $event)" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
             </span>
-            <button type="button" class="cs-grp-x" (click)="removeStageDef(sd.id)" aria-label="Remove">&times;</button>
+            <button type="button" data-testid="esd-plan-stagedef-remove" class="cs-grp-x" (click)="removeStageDef(sd.id)" aria-label="Remove">&times;</button>
           </div>
-          <button type="button" class="cs-grp-add" (click)="addStageDef()">+ Add stage</button>
+          <button type="button" data-testid="esd-plan-stagedef-add" class="cs-grp-add" (click)="addStageDef()">+ Add stage</button>
         </div>
         <span class="cs-config-hint" *ngIf="!selectedQueueIds.length">Pick a queue above to choose its ready stages.</span>
       </div>
       <div class="cs-jhead">
         <span>Journey-wise split</span>
-        <button type="button" class="cs-edit" (click)="groupsEditorOpen = !groupsEditorOpen">{{ groupsEditorOpen ? 'Done' : 'Group journeys' }}</button>
+        <button type="button" data-testid="esd-plan-groups-toggle" class="cs-edit" (click)="groupsEditorOpen = !groupsEditorOpen">{{ groupsEditorOpen ? 'Done' : 'Group journeys' }}</button>
       </div>
       <div class="cs-grp-editor" *ngIf="groupsEditorOpen">
         <div class="cs-grp-hint" style="margin-top:0">Group journeys locally (just for you — not saved). Name a group and tick the journeys to combine.</div>
         <div class="cs-grp" *ngFor="let g of journeyGroups; let i = index">
           <div class="cs-grp-top">
-            <input class="cs-grp-name" type="text" [(ngModel)]="g.name" placeholder="Group name (e.g. Accelerators)">
-            <button type="button" class="cs-grp-x" (click)="removeJourneyGroup(i)" aria-label="Remove group">&times;</button>
+            <input class="cs-grp-name" data-testid="esd-plan-group-name" type="text" [(ngModel)]="g.name" placeholder="Group name (e.g. Accelerators)">
+            <button type="button" data-testid="esd-plan-group-remove" class="cs-grp-x" (click)="removeJourneyGroup(i)" aria-label="Remove group">&times;</button>
           </div>
           <div class="cs-grp-journeys">
             <label class="cs-grp-j" *ngFor="let j of cohortJourneys">
-              <input type="checkbox" [checked]="isInGroup(i, j.id)" (change)="toggleGroupJourney(i, j.id)">
+              <input type="checkbox" data-testid="esd-plan-group-journey" [checked]="isInGroup(i, j.id)" (change)="toggleGroupJourney(i, j.id)">
               <span>{{ j.name }} <span class="cs-grp-cnt">{{ j.count }}</span></span>
             </label>
           </div>
         </div>
         <div class="cs-grp-actions">
-          <button type="button" class="cs-grp-add" (click)="addJourneyGroup()">+ Add group</button>
-          <button type="button" class="cs-grp-save" (click)="groupsEditorOpen = false">Done</button>
+          <button type="button" data-testid="esd-plan-group-add" class="cs-grp-add" (click)="addJourneyGroup()">+ Add group</button>
+          <button type="button" data-testid="esd-plan-groups-done" class="cs-grp-save" (click)="groupsEditorOpen = false">Done</button>
         </div>
         <div class="cs-grp-hint" *ngIf="!cohortJourneys.length">No journeys found for this cohort yet.</div>
       </div>
@@ -338,24 +338,24 @@
       <div class="cb-queues">
         <span class="cb-q-head">Queues</span>
         <span class="qchip" *ngFor="let q of selectedQueues">{{ q.name }}<span class="mapped" *ngIf="q.mapped"> (mapped)</span></span>
-        <button class="link-btn" (click)="goToQueues()">Change</button>
+        <button class="link-btn" data-testid="esd-plan-colbuilder-change" (click)="goToQueues()">Change</button>
       </div>
       <div class="cb-title">Add a stage column</div>
       <div class="cb-hint">Pick one stage from each queue — together they form one column.</div>
       <div class="cb-row">
-        <input class="cb-name" type="text" [(ngModel)]="builderName" placeholder="Column name">
+        <input class="cb-name" data-testid="esd-plan-builder-name" type="text" [(ngModel)]="builderName" placeholder="Column name">
         <span class="cb-q" *ngFor="let q of selectedQueues">
           <span class="cb-q-lbl">{{ q.name }}</span>
           <app-searchable-select [options]="ssStagesFor(q.id)" [value]="builderSel[q.id] || ''"
             (valueChange)="setBuilderStage(q.id, $event)" placeholder="Any stage" searchPlaceholder="Search stage…"></app-searchable-select>
         </span>
-        <button class="btn-primary" (click)="addCombinedCol()" [disabled]="!builderCanAdd">Add column</button>
+        <button class="btn-primary" data-testid="esd-plan-builder-add" (click)="addCombinedCol()" [disabled]="!builderCanAdd">Add column</button>
       </div>
       <div class="cb-cols" *ngIf="combinedCols.length">
         <div class="cb-col" *ngFor="let cc of combinedCols">
           <span class="cb-col-name">{{ cc.name }}</span>
           <span class="cb-tag" *ngFor="let t of combinedColTags(cc)">{{ t.queueName }} · {{ t.stage }}</span>
-          <button class="cb-x" (click)="removeCombinedCol(cc.id)" title="Remove">×</button>
+          <button class="cb-x" data-testid="esd-plan-combined-remove" (click)="removeCombinedCol(cc.id)" title="Remove">×</button>
         </div>
       </div>
     </div>
@@ -376,9 +376,9 @@
           <span class="seg seg-none" [style.flex]="s.notBooked || 0"></span>
         </div>
         <div class="t-legend">
-          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':completed'" (click)="toggleCardFilter('cc:'+s.id+':completed')"><i class="dot d-done"></i>{{ s.completed }} done</span>
-          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':booked'" (click)="toggleCardFilter('cc:'+s.id+':booked')"><i class="dot d-book"></i>{{ s.booked }} booked</span>
-          <span class="t-clk" [class.on]="cardFilter==='cc:'+s.id+':notbooked'" (click)="toggleCardFilter('cc:'+s.id+':notbooked')"><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
+          <span class="t-clk" data-testid="esd-plan-tile-completed" [class.on]="cardFilter==='cc:'+s.id+':completed'" (click)="toggleCardFilter('cc:'+s.id+':completed')"><i class="dot d-done"></i>{{ s.completed }} done</span>
+          <span class="t-clk" data-testid="esd-plan-tile-booked" [class.on]="cardFilter==='cc:'+s.id+':booked'" (click)="toggleCardFilter('cc:'+s.id+':booked')"><i class="dot d-book"></i>{{ s.booked }} booked</span>
+          <span class="t-clk" data-testid="esd-plan-tile-notbooked" [class.on]="cardFilter==='cc:'+s.id+':notbooked'" (click)="toggleCardFilter('cc:'+s.id+':notbooked')"><i class="dot d-none"></i>{{ s.notBooked }} not booked</span>
         </div>
       </div>
       <div class="tile tile-hint" *ngIf="!combinedCols.length">
@@ -390,7 +390,7 @@
       <span class="count" *ngIf="!loadingStage && !stageError">{{ filteredStageRows.length }} participant(s)</span>
       <span class="spacer"></span>
       <div class="toolbar-actions">
-        <button class="btn btn-primary" (click)="exportCsv()" [disabled]="loadingStage || !filteredStageRows.length">Export CSV</button>
+        <button class="btn btn-primary" data-testid="esd-plan-export-csv" (click)="exportCsv()" [disabled]="loadingStage || !filteredStageRows.length">Export CSV</button>
       </div>
     </div>
 
@@ -400,8 +400,8 @@
         <b>Sheet comparison</b>
         <span class="rec-file" *ngIf="reconcileFileName">{{ reconcileFileName }}</span>
         <span class="spacer"></span>
-        <button *ngIf="!reconcileError && (extraInTable.length || extraInSheet.length)" (click)="exportReconcile()">Export diff CSV</button>
-        <button class="rec-x" (click)="closeReconcile()" title="Close">×</button>
+        <button data-testid="esd-plan-reconcile-export" *ngIf="!reconcileError && (extraInTable.length || extraInSheet.length)" (click)="exportReconcile()">Export diff CSV</button>
+        <button class="rec-x" data-testid="esd-plan-reconcile-close" (click)="closeReconcile()" title="Close">×</button>
       </div>
       <p class="err" *ngIf="reconcileError">{{ reconcileError }}</p>
       <div *ngIf="!reconcileError">
@@ -426,7 +426,7 @@
     </div>
 
     <p *ngIf="loadingStage">Loading participants…</p>
-    <p *ngIf="stageError" class="err">Couldn't load participants. <button (click)="selectedArena && selectArena(selectedArena)">Retry</button></p>
+    <p *ngIf="stageError" class="err">Couldn't load participants. <button data-testid="esd-plan-participants-retry" (click)="selectedArena && selectArena(selectedArena)">Retry</button></p>
 
     <div class="tbl-wrap" *ngIf="!loadingStage && !stageError">
       <table>
@@ -442,7 +442,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of pagedStageRows" class="prow" [class.psel]="selectedParticipant===r" (click)="openParticipant(r)">
+          <tr *ngFor="let r of pagedStageRows" data-testid="esd-plan-participant-row" class="prow" [class.psel]="selectedParticipant===r" (click)="openParticipant(r)">
             <td>{{ r.name || '—' }}<span *ngIf="r.metaMissing" class="miss"> (no metadata)</span></td>
             <td>{{ journeyDisplay(r) || '—' }}</td>
             <td>
@@ -466,11 +466,11 @@
       [pageSizeOptions]="[25, 50, 100]" [pageIndex]="stagePageIndex" (page)="onStagePage($event)"></mat-paginator>
 
     <!-- Participant detail panel (Email, Phone, Customer status, Segments, Request, Variation) -->
-    <div class="pdrawer-backdrop" *ngIf="selectedParticipant" (click)="closeParticipant()"></div>
+    <div class="pdrawer-backdrop" data-testid="esd-plan-drawer-backdrop" *ngIf="selectedParticipant" (click)="closeParticipant()"></div>
     <div class="pdrawer" *ngIf="selectedParticipant">
       <div class="pdrawer-head">
         <b>{{ selectedParticipant.name || '—' }}</b>
-        <button type="button" class="pdrawer-x" (click)="closeParticipant()" aria-label="Close">×</button>
+        <button type="button" data-testid="esd-plan-drawer-close" class="pdrawer-x" (click)="closeParticipant()" aria-label="Close">×</button>
       </div>
       <div class="pdrawer-body">
         <div class="pdrawer-row"><span class="pk">Journey</span><span class="pv">{{ journeyDisplay(selectedParticipant) || '—' }}</span></div>

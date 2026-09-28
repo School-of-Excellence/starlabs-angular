@@ -28,7 +28,7 @@
           <div class="probox" *ngFor="let procedure of adjustment.procedure; let k = index">
             - {{procedure.name}} <span *ngIf="procedure.mandatory" style="color: red;">*</span>
             <mat-form-field class="ml-3" appearance="outline">
-              <mat-select [(ngModel)]="procedure.studioid" panelClass="fit-content">
+              <mat-select [attr.data-testid]="'apst-sel-1-' + k" [(ngModel)]="procedure.studioid" panelClass="fit-content">
                 <mat-select-trigger>
                   {{ getSelectedParticipantNames(procedure.studioid) }}
                 </mat-select-trigger>
@@ -51,8 +51,8 @@
       </div>
     </div>
     <div class="actionbox">
-      <button class="btn btn-outline-primary mr-3 me-2" (click)="dialogref.close(null)">close</button>
-      <button class="btn btn-outline-success" (click)="assignStudio()">{{loading ? 'Updating.....' : 'Confirm Assignment'}}</button>
+      <button data-testid="apst-btn-2" class="btn btn-outline-primary mr-3 me-2" (click)="dialogref.close(null)">close</button>
+      <button data-testid="apst-btn-3" class="btn btn-outline-success" (click)="assignStudio()">{{loading ? 'Updating.....' : 'Confirm Assignment'}}</button>
     </div>
   </div>
   

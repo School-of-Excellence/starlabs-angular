@@ -1,6 +1,6 @@
 <div class="media-upload" [class.is-video]="isVideo">
   <!-- hidden native picker, type-filtered -->
-  <input
+  <input data-testid="mu-change-on-file-selected-1"
     #fileInput
     type="file"
     class="hidden-input"
@@ -8,7 +8,7 @@
     (change)="onFileSelected($event)" />
 
   <!-- EMPTY STATE: dropzone + choose button -->
-  <div
+  <div data-testid="mu-open-picker-2"
     *ngIf="!value && !isUploading"
     class="dropzone"
     [class.dragging]="dragging"
@@ -21,7 +21,7 @@
       <strong>{{ chooseLabel }}</strong>
       <span>Drag &amp; drop or click to browse · {{ formatHint }}</span>
     </div>
-    <button type="button" mat-flat-button color="primary" class="dz-btn" (click)="openPicker(); $event.stopPropagation()">
+    <button data-testid="mu-open-picker-3" type="button" mat-flat-button color="primary" class="dz-btn" (click)="openPicker(); $event.stopPropagation()">
       <mat-icon>upload</mat-icon> {{ chooseLabel }}
     </button>
   </div>
@@ -50,10 +50,10 @@
       </div>
 
       <div class="preview-actions">
-        <button type="button" mat-stroked-button class="replace-btn" (click)="openPicker()" [disabled]="disabled">
+        <button data-testid="mu-open-picker-4" type="button" mat-stroked-button class="replace-btn" (click)="openPicker()" [disabled]="disabled">
           <mat-icon>swap_horiz</mat-icon> Replace
         </button>
-        <button type="button" mat-stroked-button class="remove-btn" (click)="remove()" [disabled]="disabled">
+        <button data-testid="mu-remove-5" type="button" mat-stroked-button class="remove-btn" (click)="remove()" [disabled]="disabled">
           <mat-icon>delete_outline</mat-icon> Remove
         </button>
       </div>
@@ -78,7 +78,7 @@
         (blur)="applyUrl()"
         (keydown.enter)="onUrlEnter($event)" />
 
-      <button
+      <button data-testid="mu-apply-url-6"
         *ngIf="urlDirty"
         type="button"
         mat-flat-button
@@ -89,7 +89,7 @@
         Use
       </button>
 
-      <button
+      <button data-testid="mu-copy-url-7"
         *ngIf="value && !urlDirty"
         type="button"
         mat-icon-button

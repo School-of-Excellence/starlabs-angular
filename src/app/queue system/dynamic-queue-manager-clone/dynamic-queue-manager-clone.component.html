@@ -7,7 +7,7 @@
           <mat-icon>people_outline</mat-icon>
           <b>{{selectedChatStage}} {{selectedChatStageType}}</b>
         </h3>
-        <button mat-icon-button (click)="snav.close(); selectedStages = []; selectedTokens.clear()"
+        <button data-testid="dqmc-btn-1" mat-icon-button (click)="snav.close(); selectedStages = []; selectedTokens.clear()"
           class="close-panel-btn">
           <mat-icon>close</mat-icon>
         </button>
@@ -18,7 +18,7 @@
         <section class="stage-select-section">
           <mat-form-field appearance="outline" class="w-100">
             <mat-label>Select Stages</mat-label>
-            <mat-select [(ngModel)]="selectedStages" multiple (selectionChange)="onStageSelectionChange()">
+            <mat-select data-testid="dqmc-sel-2" [(ngModel)]="selectedStages" multiple (selectionChange)="onStageSelectionChange()">
               <mat-option *ngFor="let stage of getAvailableStagesForComm()" [value]="stage.stageKey">
                 {{ getStageDisplayName(stage) }} ({{ stage.tokenlist?.length || 0 }})
               </mat-option>
@@ -39,32 +39,32 @@
 
         <!-- Communication Buttons -->
         <section class="communication-buttons">
-          <button class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
+          <button data-testid="dqmc-btn-3" class="comm-btn whatsapp-btn" [class.active]="selectedCommType === 'whatsapp'"
             (click)="selectCommType('whatsapp')" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-whatsapp"></i>
             Whatsapp(<span data-testid="qm-comms-recipient-count">{{getSelectedTokens().length}}</span>)
           </button>
-          <button class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
+          <button data-testid="dqmc-btn-4" class="comm-btn email-btn" [class.active]="selectedCommType === 'email'"
             (click)="selectCommType('email')" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-envelope"></i>
             Email({{getSelectedTokens().length}})
           </button>
-          <button class="comm-btn notification-btn" [class.active]="selectedCommType === 'notification'"
+          <button data-testid="dqmc-btn-5" class="comm-btn notification-btn" [class.active]="selectedCommType === 'notification'"
             (click)="selectCommType('notification')" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-bell-fill"></i>
             Notification({{getSelectedTokens().length}})
           </button>
-          <button class="comm-btn notification-btn" (click)="onBulkInvite()"
+          <button data-testid="dqmc-btn-6" class="comm-btn notification-btn" (click)="onBulkInvite()"
             [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-bell-fill"></i>
             BulkInvite({{getSelectedTokens().length}})
           </button>
-          <button class="comm-btn notification-btn" (click)="bulkAvTest()"
+          <button data-testid="dqmc-btn-7" class="comm-btn notification-btn" (click)="bulkAvTest()"
             [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-bell-fill"></i>
             Bulk AV Test({{getSelectedTokens().length}})
           </button>
-          <button *ngIf="roles['developer'] || roles['admin'] || roles['tester'] || roles['floor']"
+          <button data-testid="dqmc-btn-8" *ngIf="roles['developer'] || roles['admin'] || roles['tester'] || roles['floor']"
             class="comm-btn notification-btn" [class.active]="selectedCommType === 'appactionpending'"
             (click)="selectCommType('appactionpending')" [disabled]="getSelectedTokens().length === 0">
             <i class="bi bi-bell-fill"></i>
@@ -75,23 +75,23 @@
             <form *ngIf="!isRoundRobinRunning" (ngSubmit)="roundRobin()" #form="ngForm" class="rr-form">
               <mat-form-field appearance="outline" class="rr-field">
                 <mat-label>Inv. Count</mat-label>
-                <input matInput type="number" name="participants"
+                <input data-testid="dqmc-inp-9" matInput type="number" name="participants"
                   [(ngModel)]="roundRobbinformData.howManyParticipantsNeeded" min="1" [max]="getSelectedTokens().length"
                   required />
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="rr-field">
                 <mat-label>Duration (mins)</mat-label>
-                <input matInput type="number" name="duration" [(ngModel)]="roundRobbinformData.duration" required />
+                <input data-testid="dqmc-inp-10" matInput type="number" name="duration" [(ngModel)]="roundRobbinformData.duration" required />
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="rr-field">
                 <mat-label>Max Attempts</mat-label>
-                <input matInput type="number" name="maxcycle" [(ngModel)]="roundRobbinformData.maxcycle" min="2"
+                <input data-testid="dqmc-inp-11" matInput type="number" name="maxcycle" [(ngModel)]="roundRobbinformData.maxcycle" min="2"
                   required />
               </mat-form-field>
 
-              <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid">
+              <button data-testid="dqmc-btn-12" mat-flat-button color="primary" type="submit" [disabled]="form.invalid">
                 Start Round Robin
               </button>
             </form>
@@ -127,7 +127,7 @@
                 </div>
               </div>
 
-              <button mat-stroked-button color="warn" (click)="cancelRoundRobin()">
+              <button data-testid="dqmc-btn-13" mat-stroked-button color="warn" (click)="cancelRoundRobin()">
                 <span *ngIf="['Success','Completed']"></span>
                 {{roundRobinStatus.status === 'Running' ? 'Cancel Round Robin' : 'Close Round Robin'}}
                 Cancel Round Robin
@@ -136,23 +136,23 @@
           </div>
           <div class="col-auto d-flex flex-column gap-2">
             <div class="d-flex gap-2">
-              <button class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
+              <button data-testid="dqmc-btn-14" class="btn btn-outline-primary" mat-stroked-button (click)="fileInput.click()">
                 <mat-icon>upload_file</mat-icon> Import
               </button>
-              <input type="file" #fileInput style="display: none" (change)="onImportData($event)"
+              <input data-testid="dqmc-inp-15" type="file" #fileInput style="display: none" (change)="onImportData($event)"
                 accept=".csv,.xlsx,.xls" />
 
-              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
+              <button data-testid="dqmc-btn-16" class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkTags()"
                 [disabled]="getSelectedTokens().length === 0">
                 <mat-icon>local_offer</mat-icon> Add Participant Tag
               </button>
             </div>
             <div class="d-flex gap-2">
-              <button class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkQueueTags()"
+              <button data-testid="dqmc-btn-17" class="btn btn-outline-secondary" mat-stroked-button (click)="addBulkQueueTags()"
                 [disabled]="getSelectedTokens().length === 0">
                 <mat-icon>local_offer</mat-icon> Add Queue Tag
               </button>
-              <button
+              <button data-testid="dqmc-btn-18"
                 class="btn btn-outline-primary"
                 mat-stroked-button
                 (click)="openBulkMovePanel()"
@@ -187,10 +187,10 @@
               <span class="select-all-text">Select All</span>
             </div> -->
           </div>
-          <input type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
+          <input data-testid="dqmc-inp-19" type="text" [(ngModel)]="participantSearchTerm"placeholder="Search participants..."style="width:100%; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin-bottom:8px;">
           <!-- Participants List - Merged from selected stages -->
           <div class="participants-list" *ngIf="selectedStages.length > 0">
-            <div *ngFor="let token of getFilteredMergedParticipants(); let i = index" class="participant-item"
+            <div [attr.data-testid]="'dqmc-act-20-' + i" *ngFor="let token of getFilteredMergedParticipants(); let i = index" class="participant-item"
               (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
@@ -253,7 +253,7 @@
 
           <!-- Participants List - Single stage (when no stages selected in dropdown) -->
           <div class="participants-list" *ngIf="selectedStages.length === 0">
-            <div *ngFor="let token of getFilteredSingleStageParticipants(); let i = index"
+            <div [attr.data-testid]="'dqmc-act-21-' + i" *ngFor="let token of getFilteredSingleStageParticipants(); let i = index"
               class="participant-item" (click)="toggleTokenSelection(token)">
 
               <!-- Checkbox -->
@@ -314,8 +314,8 @@
             <div class="talktext d-flex justify-content-start flex-column">
               <span class="d-flex justify-content-between">
                 <p>{{pinnedChat['message']}}</p>
-                <button mat-icon-button type="button">
-                  <mat-icon (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)"
+                <button [attr.data-testid]="'dqmc-btn-22-' + pinnedChat" mat-icon-button type="button">
+                  <mat-icon [attr.data-testid]="'dqmc-act-23-' + pinnedChat" (click)="onChatPinned(pinnedChat['pinned'] ? false : true,pinnedChat)"
                     style="vertical-align:top;" [ngClass]="pinnedChat['pinned'] ? 'golden' : 'white'">star
                   </mat-icon>
                 </button>
@@ -335,7 +335,7 @@
               <div class="talk-bubble round" style="float:right;">
                 <div class="talktext d-flex justify-content-end flex-column" style="text-align:end;">
                   <span class="d-flex justify-content-between">
-                    <button mat-icon-button type="button"><mat-icon
+                    <button [attr.data-testid]="'dqmc-btn-24-' + list" mat-icon-button type="button"><mat-icon [attr.data-testid]="'dqmc-act-25-' + list"
                         (click)="onChatPinned(list['pinned'] ? false : true,list)" style="vertical-align:top;"
                         [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                     <p>{{list['message']}}</p>
@@ -351,7 +351,7 @@
                 <div class="talktext d-flex justify-content-start flex-column" style="text-align:start;">
                   <span class="d-flex justify-content-between">
                     <p>{{mapProfileData[list['senderprofileid']]?.['name']}}</p>
-                    <button mat-icon-button type="button"><mat-icon style="vertical-align:top;"
+                    <button [attr.data-testid]="'dqmc-btn-26-' + list" mat-icon-button type="button"><mat-icon style="vertical-align:top;"
                         [ngClass]="list['pinned'] ? 'golden' : 'white'">star</mat-icon></button>
                   </span>
                   <span>
@@ -373,7 +373,7 @@
           <mat-icon>tune</mat-icon>
           <b>Filters</b>
         </h3>
-        <button mat-icon-button (click)="snav.close()" class="close-panel-btn">
+        <button data-testid="dqmc-btn-27" mat-icon-button (click)="snav.close()" class="close-panel-btn">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -390,7 +390,7 @@
 
         <!-- SEGMENT ROW -->
         <div class="fsb-expandable" *ngIf="availableSegments.length > 0">
-          <div class="fsb-row" [class.fsb-row-active]="selectedSegments.length > 0"
+          <div data-testid="dqmc-act-28" class="fsb-row" [class.fsb-row-active]="selectedSegments.length > 0"
             [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
             (click)="!dfuFilterActive && !isStageSlotFilterActive && (segmentDropdownOpen=!segmentDropdownOpen); !dfuFilterActive && !isStageSlotFilterActive && segmentDropdownOpen && onSegmentDropdownOpen()">
             <mat-icon class="fsb-icon">group</mat-icon>
@@ -403,14 +403,14 @@
           </div>
             <div class="fsb-dropdown" *ngIf="segmentDropdownOpen && !dfuFilterActive && !isStageSlotFilterActive">            <div class="fsb-dropdown-search">
               <mat-icon>search</mat-icon>
-              <input type="text" [(ngModel)]="segmentSearchTerm" (input)="filterSegments()"
+              <input data-testid="dqmc-inp-29" type="text" [(ngModel)]="segmentSearchTerm" (input)="filterSegments()"
                 (click)="$event.stopPropagation()" placeholder="Search segments...">
-              <button *ngIf="segmentSearchTerm" (click)="clearSegmentSearch(); $event.stopPropagation()">
+              <button data-testid="dqmc-btn-30" *ngIf="segmentSearchTerm" (click)="clearSegmentSearch(); $event.stopPropagation()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" *ngFor="let segment of filteredSegments"
+              <div [attr.data-testid]="'dqmc-act-31-' + segment" class="fsb-option" *ngFor="let segment of filteredSegments"
                 [class.fsb-option-selected]="isSegmentSelected(segment.id)"
                 (click)="toggleSegmentSelection(segment.id); onSegmentFilterChange(); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{isSegmentSelected(segment.id) ? 'check_box' :
@@ -420,7 +420,7 @@
               <div class="fsb-empty" *ngIf="filteredSegments.length === 0">No segments found</div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedSegments.length > 0">
-              <button (click)="selectedSegments=[]; onSegmentFilterChange(); $event.stopPropagation()">Clear
+              <button data-testid="dqmc-btn-32" (click)="selectedSegments=[]; onSegmentFilterChange(); $event.stopPropagation()">Clear
                 selection</button>
             </div>
           </div>
@@ -428,7 +428,7 @@
 
         <!-- TAGS ROW -->
         <div class="fsb-expandable" *ngIf="availableTags.length > 0">
-          <div class="fsb-row" [class.fsb-row-active]="selectedTags.length > 0"
+          <div data-testid="dqmc-act-33" class="fsb-row" [class.fsb-row-active]="selectedTags.length > 0"
             [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
             (click)="!dfuFilterActive && !isStageSlotFilterActive && (tagDropdownOpen=!tagDropdownOpen); !dfuFilterActive && !isStageSlotFilterActive && tagDropdownOpen && onTagDropdownOpen()">
             <mat-icon class="fsb-icon">local_offer</mat-icon>
@@ -442,9 +442,9 @@
           <div class="fsb-dropdown" *ngIf="tagDropdownOpen && !dfuFilterActive && !isStageSlotFilterActive">
             <div class="fsb-dropdown-search">
               <mat-icon>search</mat-icon>
-              <input type="text" [(ngModel)]="tagSearchTerm" (input)="filterTags()" (click)="$event.stopPropagation()"
+              <input data-testid="dqmc-inp-34" type="text" [(ngModel)]="tagSearchTerm" (input)="filterTags()" (click)="$event.stopPropagation()"
                 placeholder="Search tags...">
-              <button *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
+              <button data-testid="dqmc-btn-35" *ngIf="tagSearchTerm" (click)="clearTagSearch(); $event.stopPropagation()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -459,14 +459,14 @@
               <div class="fsb-empty" *ngIf="filteredTags.length === 0">No tags found</div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedTags.length > 0">
-              <button (click)="selectedTags=[]; onTagFilterChange(); $event.stopPropagation()">Clear selection</button>
+              <button data-testid="dqmc-btn-36" (click)="selectedTags=[]; onTagFilterChange(); $event.stopPropagation()">Clear selection</button>
             </div>
           </div>
         </div>
 
         <!-- QUEUE TAGS ROW -->
         <div class="fsb-expandable" *ngIf="availableQueueTags.length > 0">
-          <div class="fsb-row" [class.fsb-row-active]="selectedQueueTags.length > 0"
+          <div data-testid="dqmc-act-37" class="fsb-row" [class.fsb-row-active]="selectedQueueTags.length > 0"
             [class.fsb-row-disabled]="dfuFilterActive || !!selectedStageSlot"
             (click)="toggleQueueTagDropdown()">
             <mat-icon class="fsb-icon">sell</mat-icon>
@@ -480,14 +480,14 @@
           <div class="fsb-dropdown" *ngIf="queueTagDropdownOpen && !dfuFilterActive && !selectedStageSlot">
             <div class="fsb-dropdown-search">
               <mat-icon>search</mat-icon>
-              <input type="text" [(ngModel)]="queueTagSearchTerm" (input)="filterQueueTags()"
+              <input data-testid="dqmc-inp-38" type="text" [(ngModel)]="queueTagSearchTerm" (input)="filterQueueTags()"
                 (click)="$event.stopPropagation()" placeholder="Search queue tags...">
-              <button *ngIf="queueTagSearchTerm" (click)="clearQueueTagSearch(); $event.stopPropagation()">
+              <button data-testid="dqmc-btn-39" *ngIf="queueTagSearchTerm" (click)="clearQueueTagSearch(); $event.stopPropagation()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" *ngFor="let tag of filteredQueueTags"
+              <div [attr.data-testid]="'dqmc-act-40-' + tag" class="fsb-option" *ngFor="let tag of filteredQueueTags"
                 [class.fsb-option-selected]="isQueueTagSelected(tag.id)"
                 (click)="toggleQueueTagSelection(tag.id); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{isQueueTagSelected(tag.id) ? 'check_box' :
@@ -497,7 +497,7 @@
               <div class="fsb-empty" *ngIf="filteredQueueTags.length === 0">No queue tags found</div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedQueueTags.length > 0">
-              <button (click)="selectedQueueTags=[]; onQueueTagFilterChange(); $event.stopPropagation()">Clear
+              <button data-testid="dqmc-btn-41" (click)="selectedQueueTags=[]; onQueueTagFilterChange(); $event.stopPropagation()">Clear
                 selection</button>
             </div>
           </div>
@@ -505,7 +505,7 @@
 
         <!-- PREASSIGNED ROW -->
         <div class="fsb-expandable">
-          <div class="fsb-row" [class.fsb-row-active]="preassignedFilter !== 'all'"
+          <div data-testid="dqmc-act-42" class="fsb-row" [class.fsb-row-active]="preassignedFilter !== 'all'"
             [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive" (click)="togglePreassignedDropdown()">
             <mat-icon class="fsb-icon">assignment_ind</mat-icon>
             <span class="fsb-label">Preassigned</span>
@@ -517,19 +517,19 @@
           </div>
           <div class="fsb-dropdown" *ngIf="preassignedDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'all'"
+              <div data-testid="dqmc-act-43" class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'all'"
                 (click)="preassignedFilter='all'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{preassignedFilter === 'all' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
                 <span>All participants</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'preassigned'"
+              <div data-testid="dqmc-act-44" class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'preassigned'"
                 (click)="preassignedFilter='preassigned'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{preassignedFilter === 'preassigned' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
                 <span>Pre-assigned only</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'not-preassigned'"
+              <div data-testid="dqmc-act-45" class="fsb-option" [class.fsb-option-selected]="preassignedFilter === 'not-preassigned'"
                 (click)="preassignedFilter='not-preassigned'; onPreassignedFilterChange(); preassignedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{preassignedFilter === 'not-preassigned' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
@@ -541,7 +541,7 @@
 
         <!-- APPROVED ROW -->
         <div class="fsb-expandable">
-          <div class="fsb-row" [class.fsb-row-active]="approvedFilter !== 'all'"
+          <div data-testid="dqmc-act-46" class="fsb-row" [class.fsb-row-active]="approvedFilter !== 'all'"
             [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive" (click)="toggleApprovedDropdown()">
             <mat-icon class="fsb-icon">check_circle</mat-icon>
             <span class="fsb-label">Approved</span>
@@ -553,19 +553,19 @@
           </div>
           <div class="fsb-dropdown" *ngIf="approvedDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'all'"
+              <div data-testid="dqmc-act-47" class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'all'"
                 (click)="approvedFilter='all'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{approvedFilter === 'all' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
                 <span>All participants</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'approved'"
+              <div data-testid="dqmc-act-48" class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'approved'"
                 (click)="approvedFilter='approved'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{approvedFilter === 'approved' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
                 <span>Approved only</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'not-approved'"
+              <div data-testid="dqmc-act-49" class="fsb-option" [class.fsb-option-selected]="approvedFilter === 'not-approved'"
                 (click)="approvedFilter='not-approved'; onApprovedFilterChange(); approvedDropdownOpen=false; $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{approvedFilter === 'not-approved' ? 'radio_button_checked' :
                   'radio_button_unchecked'}}</mat-icon>
@@ -577,7 +577,7 @@
 
         <!-- STAGE SLOT ROW -->
         <div class="fsb-expandable">
-          <div class="fsb-row" [class.fsb-row-active]="isStageSlotFilterActive" [class.fsb-row-disabled]="dfuFilterActive"
+          <div data-testid="dqmc-act-50" class="fsb-row" [class.fsb-row-active]="isStageSlotFilterActive" [class.fsb-row-disabled]="dfuFilterActive"
             (click)="toggleStageSlotDropdown()">
             <mat-icon class="fsb-icon">layers</mat-icon>
             <span class="fsb-label">Stage Slot</span>
@@ -587,19 +587,19 @@
           </div>
           <div class="fsb-dropdown" *ngIf="stageSlotDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" [class.fsb-option-selected]="!isStageSlotFilterActive"
+              <div data-testid="dqmc-act-51" class="fsb-option" [class.fsb-option-selected]="!isStageSlotFilterActive"
                 (click)="onStageSlotChange([]); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{!isStageSlotFilterActive ? 'check_box' :
                   'check_box_outline_blank'}}</mat-icon>
                 <span>No filter</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="selectedStageSlots.length === availableStagesFromSlot.length && isStageSlotFilterActive"
+              <div data-testid="dqmc-act-52" class="fsb-option" [class.fsb-option-selected]="selectedStageSlots.length === availableStagesFromSlot.length && isStageSlotFilterActive"
                 (click)="onStageSlotChange(selectedStageSlots.length === availableStagesFromSlot.length ? [] : availableStagesFromSlot); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{selectedStageSlots.length === availableStagesFromSlot.length && isStageSlotFilterActive ? 'check_box' :
                   'check_box_outline_blank'}}</mat-icon>
                 <span>All stages (combined)</span>
               </div>
-              <div class="fsb-option" *ngFor="let stage of availableStagesFromSlot"
+              <div [attr.data-testid]="'dqmc-act-53-' + stage" class="fsb-option" *ngFor="let stage of availableStagesFromSlot"
                 [class.fsb-option-selected]="selectedStageSlots.includes(stage)"
                 (click)="onStageSlotChange(undefined, stage); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">{{selectedStageSlots.includes(stage) ? 'check_box' :
@@ -608,7 +608,7 @@
               </div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedStageSlots.length > 0">
-              <button (click)="onStageSlotChange([]); $event.stopPropagation()">Clear selection</button>
+              <button data-testid="dqmc-btn-54" (click)="onStageSlotChange([]); $event.stopPropagation()">Clear selection</button>
             </div>
           </div>
 
@@ -619,9 +619,9 @@
               <mat-form-field appearance="outline" class="fsb-date-field">
                 <mat-label>Date range</mat-label>
                 <mat-date-range-input [rangePicker]="sidenavRangePicker">
-                  <input matStartDate [ngModel]="dateRangeStart" (ngModelChange)="dateRangeStart=$event"
+                  <input data-testid="dqmc-inp-55" matStartDate [ngModel]="dateRangeStart" (ngModelChange)="dateRangeStart=$event"
                     (dateChange)="onDateRangeChange()" placeholder="Start">
-                  <input matEndDate [ngModel]="dateRangeEnd" (ngModelChange)="dateRangeEnd=$event"
+                  <input data-testid="dqmc-inp-56" matEndDate [ngModel]="dateRangeEnd" (ngModelChange)="dateRangeEnd=$event"
                     (dateChange)="onDateRangeChange()" placeholder="End">
                 </mat-date-range-input>
                 <mat-datepicker-toggle matSuffix [for]="sidenavRangePicker"></mat-datepicker-toggle>
@@ -635,14 +635,14 @@
               <span class="fsb-label">Booking status</span>
             </div>
             <div class="fsb-timeslot-list">
-              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'booked'"
+              <div data-testid="dqmc-act-57" class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'booked'"
                 (click)="selectBookingStatus('booked')">
                 <mat-icon class="fsb-option-check">
                   {{stageSlotBookingFilter === 'booked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
                 </mat-icon>
                 <span>Booked</span>
               </div>
-              <div class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'notbooked'"
+              <div data-testid="dqmc-act-58" class="fsb-option" [class.fsb-option-selected]="stageSlotBookingFilter === 'notbooked'"
                 (click)="selectBookingStatus('notbooked')">
                 <mat-icon class="fsb-option-check">
                   {{stageSlotBookingFilter === 'notbooked' ? 'radio_button_checked' : 'radio_button_unchecked'}}
@@ -658,14 +658,14 @@
                 <span class="fsb-label">Time slot</span>
               </div>
               <div class="fsb-timeslot-list">
-                <div class="fsb-option" [class.fsb-option-selected]="selectedTimeSlots.length === 0"
+                <div data-testid="dqmc-act-59" class="fsb-option" [class.fsb-option-selected]="selectedTimeSlots.length === 0"
                   (click)="selectTimeSlot(null)">
                   <mat-icon class="fsb-option-check">
                     {{selectedTimeSlots.length === 0 ? 'radio_button_checked' : 'radio_button_unchecked'}}
                   </mat-icon>
                   <span>All times ({{getTotalSlotCount()}})</span>
                 </div>
-                <div class="fsb-option" *ngFor="let slot of availableTimeSlots"
+                <div [attr.data-testid]="'dqmc-act-60-' + slot" class="fsb-option" *ngFor="let slot of availableTimeSlots"
                   [class.fsb-option-selected]="selectedTimeSlots.includes(slot.slotKey)"
                   (click)="selectTimeSlot(slot.slotKey)">
                   <mat-icon class="fsb-option-check">
@@ -683,7 +683,7 @@
 
         <!-- VARIATION FILTER ROW -->
         <div class="fsb-expandable" *ngIf="variationList.length > 0">
-          <div class="fsb-row" [class.fsb-row-active]="selectedVariations.length > 0"
+          <div data-testid="dqmc-act-61" class="fsb-row" [class.fsb-row-active]="selectedVariations.length > 0"
             (click)="variationDropdownOpen = !variationDropdownOpen">
             <mat-icon class="fsb-icon">account_tree</mat-icon>
             <span class="fsb-label">
@@ -695,7 +695,7 @@
           </div>
           <div class="fsb-dropdown" *ngIf="variationDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" *ngFor="let variation of variationList"
+              <div [attr.data-testid]="'dqmc-act-62-' + variation" class="fsb-option" *ngFor="let variation of variationList"
                 [class.fsb-option-selected]="selectedVariations.includes(variation.id)"
                 (click)="toggleVariationSelection(variation.id); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
@@ -705,7 +705,7 @@
               </div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedVariations.length > 0">
-              <button (click)="selectedVariations=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+              <button data-testid="dqmc-btn-63" (click)="selectedVariations=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                 Clear selection
               </button>
             </div>
@@ -714,7 +714,7 @@
 
         <!-- CUSTOMER SUPPORT FILTER ROW -->
         <div class="fsb-expandable" *ngIf="availableCustomerSupportCategories.length > 0">
-          <div class="fsb-row" [class.fsb-row-active]="selectedCustomerSupportCategories.length > 0"
+          <div data-testid="dqmc-act-64" class="fsb-row" [class.fsb-row-active]="selectedCustomerSupportCategories.length > 0"
             (click)="customerSupportDropdownOpen = !customerSupportDropdownOpen">
             <mat-icon class="fsb-icon">support_agent</mat-icon>
             <span class="fsb-label">Customer Support</span>
@@ -724,7 +724,7 @@
           </div>
           <div class="fsb-dropdown" *ngIf="customerSupportDropdownOpen">
             <div class="fsb-dropdown-options">
-              <div class="fsb-option" *ngFor="let category of availableCustomerSupportCategories"
+              <div [attr.data-testid]="'dqmc-act-65-' + category" class="fsb-option" *ngFor="let category of availableCustomerSupportCategories"
                 [class.fsb-option-selected]="selectedCustomerSupportCategories.includes(category)"
                 (click)="toggleCustomerSupportCategory(category); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
@@ -734,7 +734,7 @@
               </div>
             </div>
             <div class="fsb-dropdown-footer" *ngIf="selectedCustomerSupportCategories.length > 0">
-              <button
+              <button data-testid="dqmc-btn-66"
                 (click)="selectedCustomerSupportCategories=[]; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                 Clear selection
               </button>
@@ -743,7 +743,7 @@
         </div>
         <!-- EVENT PARTICIPATION FILTER ROW -->
         <div class="fsb-expandable">
-          <div class="fsb-row" [class.fsb-row-active]="!!selectedArenaEventId"
+          <div data-testid="dqmc-act-67" class="fsb-row" [class.fsb-row-active]="!!selectedArenaEventId"
             (click)="eventParticipationDropdownOpen = !eventParticipationDropdownOpen; !eventParticipationListLoaded && loadEventParticipationList()">
             <mat-icon class="fsb-icon">event</mat-icon>
             <span class="fsb-label">Event Participation</span>
@@ -768,15 +768,15 @@
             <!-- Event/Queue list -->
             <div class="fsb-dropdown-search" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
               <mat-icon>search</mat-icon>
-              <input type="text" [(ngModel)]="eventParticipationSearchTerm" (click)="$event.stopPropagation()"
+              <input data-testid="dqmc-inp-68" type="text" [(ngModel)]="eventParticipationSearchTerm" (click)="$event.stopPropagation()"
                 placeholder="Search events...">
-              <button *ngIf="eventParticipationSearchTerm"
+              <button data-testid="dqmc-btn-69" *ngIf="eventParticipationSearchTerm"
                 (click)="eventParticipationSearchTerm=''; $event.stopPropagation()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
             <div class="fsb-dropdown-options" *ngIf="!arenaEventLoading && arenaEventFilterList.length === 0">
-              <div class="fsb-option" *ngFor="let item of filteredEventParticipationList"
+              <div [attr.data-testid]="'dqmc-act-70-' + item" class="fsb-option" *ngFor="let item of filteredEventParticipationList"
                 [class.fsb-option-selected]="selectedEventParticipation?.docid === item.docid"
                 (click)="onEventParticipationSelect(item); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
@@ -797,7 +797,7 @@
             <div *ngIf="!arenaEventLoading && arenaEventFilterList.length > 0">
 
               <!-- Back button to reselect event/queue -->
-              <div class="fsb-option" style="border-bottom:1px solid #e0e0e0; color:#1976d2;"
+              <div data-testid="dqmc-act-71" class="fsb-option" style="border-bottom:1px solid #e0e0e0; color:#1976d2;"
                 (click)="selectedEventParticipation=null; arenaEventFilterList=[]; arenaEventProfileMap={}; selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check" style="color:#1976d2;">arrow_back</mat-icon>
                 <span>{{selectedEventParticipation?.name || selectedEventParticipation?.eventname}}</span>
@@ -805,7 +805,7 @@
 
               <!-- All Events option -->
               <div class="fsb-dropdown-options">
-                <div class="fsb-option" [class.fsb-option-selected]="!selectedArenaEventId"
+                <div data-testid="dqmc-act-72" class="fsb-option" [class.fsb-option-selected]="!selectedArenaEventId"
                   (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                   <mat-icon class="fsb-option-check">
                     {{!selectedArenaEventId ? 'radio_button_checked' : 'radio_button_unchecked'}}
@@ -814,7 +814,7 @@
                 </div>
 
                 <!-- Individual arena events -->
-                <div class="fsb-option" *ngFor="let event of arenaEventFilterList"
+                <div [attr.data-testid]="'dqmc-act-73-' + event" class="fsb-option" *ngFor="let event of arenaEventFilterList"
                   [class.fsb-option-selected]="selectedArenaEventId === event.docid"
                   (click)="selectedArenaEventId=event.docid; processTokensIntoStages(allTokensData); arenaEventDropdownOpen=false; $event.stopPropagation()">
                   <mat-icon class="fsb-option-check">
@@ -831,7 +831,7 @@
 
               <!-- Clear selection -->
               <div class="fsb-dropdown-footer" *ngIf="selectedArenaEventId">
-                <button
+                <button data-testid="dqmc-btn-74"
                   (click)="selectedArenaEventId=null; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                   Clear selection
                 </button>
@@ -843,7 +843,7 @@
         <div class="fsb-expandable">
 
           <!-- Main toggle row -->
-          <div class="fsb-row fsb-toggle-row" [class.fsb-row-active]="atcFilterActive" (click)="toggleATCFilter()">
+          <div data-testid="dqmc-act-75" class="fsb-row fsb-toggle-row" [class.fsb-row-active]="atcFilterActive" (click)="toggleATCFilter()">
             <mat-icon class="fsb-icon">medical_services</mat-icon>
             <span class="fsb-label">Has ATC</span>
             <span class="fsb-count" *ngIf="atcDataLoaded && getTotalATCCount() > 0">
@@ -868,7 +868,7 @@
             <div class="fsb-dropdown-options" *ngIf="atcDataLoaded">
 
               <!-- All ATC -->
-              <div class="fsb-option" [class.fsb-option-selected]="atcFilter === 'none'"
+              <div data-testid="dqmc-act-76" class="fsb-option" [class.fsb-option-selected]="atcFilter === 'none'"
                 (click)="selectATCFilter('none'); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
                   {{atcFilter === 'none' ? 'radio_button_checked' : 'radio_button_unchecked'}}
@@ -880,7 +880,7 @@
               </div>
 
               <!-- Validated -->
-              <div class="fsb-option" [class.fsb-option-selected]="atcFilter === 'validated'"
+              <div data-testid="dqmc-act-77" class="fsb-option" [class.fsb-option-selected]="atcFilter === 'validated'"
                 (click)="selectATCFilter('validated'); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
                   {{atcFilter === 'validated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
@@ -892,7 +892,7 @@
               </div>
 
               <!-- Unvalidated -->
-              <div class="fsb-option" [class.fsb-option-selected]="atcFilter === 'unvalidated'"
+              <div data-testid="dqmc-act-78" class="fsb-option" [class.fsb-option-selected]="atcFilter === 'unvalidated'"
                 (click)="selectATCFilter('unvalidated'); $event.stopPropagation()">
                 <mat-icon class="fsb-option-check">
                   {{atcFilter === 'unvalidated' ? 'radio_button_checked' : 'radio_button_unchecked'}}
@@ -907,7 +907,7 @@
 
             <!-- Clear selection footer -->
             <div class="fsb-dropdown-footer" *ngIf="atcDataLoaded && atcFilter !== 'none'">
-              <button (click)="atcFilter='none'; processTokensIntoStages(allTokensData); $event.stopPropagation()">
+              <button data-testid="dqmc-btn-79" (click)="atcFilter='none'; processTokensIntoStages(allTokensData); $event.stopPropagation()">
                 Clear selection
               </button>
             </div>
@@ -916,7 +916,7 @@
         </div>
 
         <!-- NO ATC FILTER ROW -->
-        <div class="fsb-row fsb-toggle-row"
+        <div data-testid="dqmc-act-80" class="fsb-row fsb-toggle-row"
           [class.fsb-row-active]="noAtcFilterActive"
           [class.fsb-row-disabled]="atcFilterActive"
           (click)="!atcFilterActive && toggleNoAtcFilter()">
@@ -931,7 +931,7 @@
         </div>
 
         <!-- DFU ROW -->
-        <div class="fsb-row fsb-toggle-row" [class.fsb-row-active]="dfuFilterActive"
+        <div data-testid="dqmc-act-81" class="fsb-row fsb-toggle-row" [class.fsb-row-active]="dfuFilterActive"
           [class.fsb-row-disabled]="isStageSlotFilterActive" (click)="!isStageSlotFilterActive && toggleDFUFilter()">
           <mat-icon class="fsb-icon">priority_high</mat-icon>
           <span class="fsb-label">DFU participants only</span>
@@ -948,7 +948,7 @@
             <span class="fsb-label">Evolution Mapping</span>
           </div>
           <div style="display: flex; gap: 8px; padding: 8px 12px;">
-            <button 
+            <button data-testid="dqmc-btn-82" 
               style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
               [style.background]="evolutionMappingLiveFilter === 'live' ? '#2e7d32' : 'transparent'"
               [style.color]="evolutionMappingLiveFilter === 'live' ? '#fff' : '#2e7d32'"
@@ -956,7 +956,7 @@
               (click)="setEvolutionMappingFilter(evolutionMappingLiveFilter === 'live' ? 'all' : 'live')">
                Video Live
             </button>
-            <button 
+            <button data-testid="dqmc-btn-83" 
               style="flex: 1; padding: 6px 8px; border-radius: 6px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
               [style.background]="evolutionMappingLiveFilter === 'unlive' ? '#c62828' : 'transparent'"
               [style.color]="evolutionMappingLiveFilter === 'unlive' ? '#fff' : '#c62828'"
@@ -968,7 +968,7 @@
         </div>
 
         <!-- TODAY REMINDERS ROW -->
-        <div class="fsb-row fsb-toggle-row" *ngIf="todayReminders.length > 0"
+        <div data-testid="dqmc-act-84" class="fsb-row fsb-toggle-row" *ngIf="todayReminders.length > 0"
           [class.fsb-row-active]="reminderTodayFilterActive"
           [class.fsb-row-disabled]="dfuFilterActive || isStageSlotFilterActive"
           (click)="!dfuFilterActive && !isStageSlotFilterActive && toggleReminderTodayFilter()">
@@ -1018,11 +1018,11 @@
         <div class="col-sm">
           <div *ngIf="selectedQueue != null" class="text-end d-flex align-items-center justify-content-end gap-2">
             <!-- Scroll toggle buttons -->
-            <button mat-icon-button type="button" (click)="togglescroll = 'vertical'">
+            <button data-testid="dqmc-btn-85" mat-icon-button type="button" (click)="togglescroll = 'vertical'">
               <mat-icon aria-hidden="false"
                 [ngClass]="togglescroll === 'vertical'?'forestgreen':null">swap_vertical_circle</mat-icon>
             </button>
-            <button mat-icon-button type="button" (click)="togglescroll = 'horizontal'">
+            <button data-testid="dqmc-btn-86" mat-icon-button type="button" (click)="togglescroll = 'horizontal'">
               <mat-icon aria-hidden="false"
                 [ngClass]="togglescroll === 'horizontal'?'forestgreen':null">swap_horizontal_circle</mat-icon>
             </button>
@@ -1038,14 +1038,14 @@
             <!-- Existing buttons -->
             <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
               (click)="exportCSV()" data-testid="qm-export-csv">Export CSV</button>
-            <button style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
+            <button data-testid="dqmc-btn-87" style="height:40px; margin-left: 10px;" mat-stroked-button type="button"
               (click)="sidenavMode='comms'; selectedChatStage='queueadmin'; snav.open()">Admin Stage</button>
 
-            <button mat-icon-button [matMenuTriggerFor]="quickLinksMenu" matTooltip="Quick Access" color="primary">
+            <button data-testid="dqmc-btn-88" mat-icon-button [matMenuTriggerFor]="quickLinksMenu" matTooltip="Quick Access" color="primary">
               <mat-icon>visibility</mat-icon>
             </button>
 
-            <button mat-stroked-button (click)="openQueueTimeline()">
+            <button data-testid="dqmc-btn-89" mat-stroked-button (click)="openQueueTimeline()">
               <mat-icon>timeline</mat-icon>
               View Timeline
             </button>
@@ -1061,11 +1061,11 @@
 
             <mat-menu #quickLinksMenu="matMenu" panelClass="quick-links-menu" xPosition="before">
               <!-- Existing Links -->
-              <div class="quick-links-list" (click)="$event.stopPropagation()">
+              <div data-testid="dqmc-act-90" class="quick-links-list" (click)="$event.stopPropagation()">
                 <!-- Header with Add Link button -->
                 <div class="quick-links-header">
                   <span class="quick-links-title">Quick Links</span>
-                  <button class="add-link-toggle-btn"
+                  <button data-testid="dqmc-btn-91" class="add-link-toggle-btn"
                     (click)="showAddLinkForm = !showAddLinkForm; $event.stopPropagation()">
                     <mat-icon>{{ showAddLinkForm ? 'close' : 'add' }}</mat-icon>
                     {{ showAddLinkForm ? 'Cancel' : 'Add Link' }}
@@ -1075,7 +1075,7 @@
                 <div class="add-link-form-expanded" *ngIf="showAddLinkForm">
                   <!-- Toggle -->
                   <div class="add-form-row">
-                    <div class="link-type-toggle"
+                    <div data-testid="dqmc-act-92" class="link-type-toggle"
                       (click)="newLinkData.isInternal = !newLinkData.isInternal; $event.stopPropagation()">
                       <span class="toggle-label" [class.active]="!newLinkData.isInternal">External</span>
                       <div class="toggle-switch" [class.internal]="newLinkData.isInternal">
@@ -1088,7 +1088,7 @@
                   <!-- Screen Name -->
                   <div class="add-form-row">
                     <label class="add-form-label">Screen Name</label>
-                    <input type="text" [(ngModel)]="newLinkData.screenName" placeholder="Enter screen name"
+                    <input data-testid="dqmc-inp-93" type="text" [(ngModel)]="newLinkData.screenName" placeholder="Enter screen name"
                       class="add-form-input" (click)="$event.stopPropagation()"
                       (keydown.enter)="saveQuickLink(); showAddLinkForm = false">
                   </div>
@@ -1096,14 +1096,14 @@
                   <!-- URL -->
                   <div class="add-form-row">
                     <label class="add-form-label">{{ newLinkData.isInternal ? 'Path (*add the path which is next to the starlab base url)' : 'URL' }}</label>
-                    <input type="text" [(ngModel)]="newLinkData.url"
+                    <input data-testid="dqmc-inp-94" type="text" [(ngModel)]="newLinkData.url"
                       [placeholder]="newLinkData.isInternal ? 'e.g. profilelist' : 'https://...'" class="add-form-input"
                       (click)="$event.stopPropagation()" (keydown.enter)="saveQuickLink(); showAddLinkForm = false">
                   </div>
 
                   <!-- Save Button -->
                   <div class="add-form-row add-form-save-row">
-                    <button class="add-form-save-btn"
+                    <button data-testid="dqmc-btn-95" class="add-form-save-btn"
                       (click)="saveQuickLink(); showAddLinkForm = false; $event.stopPropagation()"
                       [disabled]="!newLinkData.screenName || !newLinkData.url">
                       <mat-icon>check_circle</mat-icon>
@@ -1119,26 +1119,26 @@
                 <div class="quick-link-row" *ngFor="let link of quickLinks; let i = index">
                   <!-- Normal view -->
                   <ng-container *ngIf="editingLinkIndex !== i">
-                    <button class="link-open-btn" (click)="openLink(link.url, link.isInternal)"
+                    <button [attr.data-testid]="'dqmc-btn-96-' + i" class="link-open-btn" (click)="openLink(link.url, link.isInternal)"
                       [matTooltip]="link.screenName">
                       <mat-icon>{{ link.isInternal ? 'home' : 'open_in_new' }}</mat-icon>
                       <span>{{ link.screenName }}</span>
                     </button>
-                    <button class="link-edit-btn" (click)="startEditLink(i); $event.stopPropagation()"
+                    <button [attr.data-testid]="'dqmc-btn-97-' + i" class="link-edit-btn" (click)="startEditLink(i); $event.stopPropagation()"
                       matTooltip="Edit">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button class="link-remove-btn" (click)="removeLink(i); $event.stopPropagation()"
+                    <button [attr.data-testid]="'dqmc-btn-98-' + i" class="link-remove-btn" (click)="removeLink(i); $event.stopPropagation()"
                       matTooltip="Remove">
                       <mat-icon>close</mat-icon>
                     </button>
                   </ng-container>
                   <!-- Edit view -->
                   <ng-container *ngIf="editingLinkIndex === i">
-                    <div class="link-edit-expanded" (click)="$event.stopPropagation()">
+                    <div [attr.data-testid]="'dqmc-act-99-' + i" class="link-edit-expanded" (click)="$event.stopPropagation()">
                       <!-- Toggle -->
                       <div class="add-form-row">
-                        <div class="link-type-toggle"
+                        <div [attr.data-testid]="'dqmc-act-100-' + i" class="link-type-toggle"
                           (click)="editingLinkData.isInternal = !editingLinkData.isInternal; $event.stopPropagation()">
                           <span class="toggle-label" [class.active]="!editingLinkData.isInternal">External</span>
                           <div class="toggle-switch" [class.internal]="editingLinkData.isInternal">
@@ -1150,22 +1150,22 @@
                       <!-- Screen Name -->
                       <div class="add-form-row">
                         <label class="add-form-label">Screen Name</label>
-                        <input type="text" [(ngModel)]="editingLinkData.screenName" placeholder="Enter screen name"
+                        <input [attr.data-testid]="'dqmc-inp-101-' + i" type="text" [(ngModel)]="editingLinkData.screenName" placeholder="Enter screen name"
                           class="add-form-input" (click)="$event.stopPropagation()">
                       </div>
                       <!-- URL -->
                       <div class="add-form-row">
                         <label class="add-form-label">{{ editingLinkData.isInternal ? 'Path' : 'URL' }}</label>
-                        <input type="text" [(ngModel)]="editingLinkData.url"
+                        <input [attr.data-testid]="'dqmc-inp-102-' + i" type="text" [(ngModel)]="editingLinkData.url"
                           [placeholder]="editingLinkData.isInternal ? 'e.g. profilelist' : 'https://...'"
                           class="add-form-input" (click)="$event.stopPropagation()">
                       </div>
                       <!-- Save + Cancel -->
                       <div class="add-form-row add-form-save-row">
-                        <button class="link-cancel-btn-text" (click)="cancelEditLink(); $event.stopPropagation()">
+                        <button [attr.data-testid]="'dqmc-btn-103-' + i" class="link-cancel-btn-text" (click)="cancelEditLink(); $event.stopPropagation()">
                           Cancel
                         </button>
-                        <button class="add-form-save-btn" (click)="saveEditLink(); $event.stopPropagation()"
+                        <button [attr.data-testid]="'dqmc-btn-104-' + i" class="add-form-save-btn" (click)="saveEditLink(); $event.stopPropagation()"
                           [disabled]="!editingLinkData.screenName || !editingLinkData.url">
                           <mat-icon>check_circle</mat-icon>
                           Save
@@ -1202,7 +1202,7 @@
         <div class="fsb-row" [class.fsb-row-active]="searchFilter"
           style="background:#f5f5f5; border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px; max-width:400px;">
           <mat-icon style="color:#888; font-size:20px;">search</mat-icon>
-          <input #searchBox
+          <input data-testid="dqmc-inp-105" #searchBox
             style="border:none; background:transparent; outline:none; flex:1; font-size:14px; color:#333;"
             [(ngModel)]="searchFilter" (ngModelChange)="onSearchChange()" placeholder="Search participants..."
             [disabled]="dfuFilterActive">
@@ -1211,7 +1211,7 @@
             {{getMatchPositionText()}}
           </span>
           <span style="font-size:12px; color:#e53935;" *ngIf="searchFilter && searchMatches.length === 0">0</span>
-          <button *ngIf="searchFilter"
+          <button data-testid="dqmc-btn-106" *ngIf="searchFilter"
             style="border:none; background:none; cursor:pointer; padding:0; display:flex; align-items:center;"
             (click)="clearSearch()">
             <mat-icon style="font-size:18px; color:#888;">close</mat-icon>
@@ -1285,10 +1285,10 @@
 
         <!-- Reminder Banner -->
         <div class="reminder-chip" *ngIf="reminders.length > 0 && showReminderBanner">
-          <span class="reminder-chip-content" (click)="openReminderListModal('today')">
+          <span data-testid="dqmc-act-107" class="reminder-chip-content" (click)="openReminderListModal('today')">
             <mat-icon>notifications_active</mat-icon>
             <span>Reminders</span>
-            <span class="reminder-chip-count" (click)="toggleReminderTodayFilter(); $event.stopPropagation()"
+            <span data-testid="dqmc-act-108" class="reminder-chip-count" (click)="toggleReminderTodayFilter(); $event.stopPropagation()"
               [style.background]="reminderTodayFilterActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)'"
               [style.color]="reminderTodayFilterActive ? '#667eea' : 'white'"
               matTooltip="Click to filter today's reminders on stage">
@@ -1297,7 +1297,7 @@
           </span>
         </div>
         <!--Notes-->
-        <div class="notes-chip" *ngIf="selectedQueue" (click)="openNotesModal()">
+        <div data-testid="dqmc-act-109" class="notes-chip" *ngIf="selectedQueue" (click)="openNotesModal()">
           <span style="  font-size: 12px;font-weight: 900;color: #1976d2;">View Notes</span>
         </div>
 
@@ -1305,7 +1305,7 @@
         <div class="stage-count-chips-row" *ngIf="stageCountCards.length > 0"
           style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
 
-          <div class="stage-count-chip" (click)="showStageCountDropdown = !showStageCountDropdown"
+          <div data-testid="dqmc-act-110" class="stage-count-chip" (click)="showStageCountDropdown = !showStageCountDropdown"
             [class.active]="showStageCountDropdown">
             <span class="chip-name">Stage Counts</span>
             <mat-icon style="font-size:16px; width:16px; height:16px; transition:transform 0.2s"
@@ -1315,7 +1315,7 @@
           </div>
 
           <ng-container *ngIf="showStageCountDropdown">
-            <div class="stage-count-chip" *ngFor="let card of stageCountCards" (click)="openStageCountPanel(card)"
+            <div [attr.data-testid]="'dqmc-act-111-' + card" class="stage-count-chip" *ngFor="let card of stageCountCards" (click)="openStageCountPanel(card)"
               [class.active]="selectedStageCountCard?.docid === card.docid">
               <span class="chip-name">{{ card.stagename }}</span>
               <span class="chip-badge">{{ getStageCountTotal(card) }}</span>
@@ -1333,7 +1333,7 @@
               <mat-icon>dashboard</mat-icon>
               <span>{{ selectedStageCountCard?.stagename }}</span>
             </div>
-            <button (click)="closeStageCountPanel()"
+            <button data-testid="dqmc-btn-112" (click)="closeStageCountPanel()"
               style="background: red; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
               <mat-icon>close</mat-icon>
             </button>
@@ -1369,14 +1369,14 @@
                   <span *ngIf="column.type != null">&nbsp;(<span
                       [innerHTML]="highlightText(column.type)"></span>)</span>
                   - <span data-testid="qm-stage-count">{{column.allTokens?.length || column.tokenlist.length}}</span>
-                  <button class="m-2 text-secondary" mat-icon-button
+                  <button [attr.data-testid]="'dqmc-btn-113-' + i" class="m-2 text-secondary" mat-icon-button
                     (click)="sidenavMode='comms'; selectedChatStage=column.stagename; selectedChatStageType=column.type!=null?' - '+column.type:''; snav.open(); selectedStageType=column.type">
                     <mat-icon>message</mat-icon>
                   </button>
-                  <button *ngIf="roles['developer']" class="text-secondary" mat-icon-button
+                  <button [attr.data-testid]="'dqmc-btn-114-' + i" *ngIf="roles['developer']" class="text-secondary" mat-icon-button
                     (click)="completeQueue(column.allTokens || column.tokenlist, column.stagename)"><mat-icon>cloud_done</mat-icon>
                   </button>
-                  <button mat-icon-button class="stage-activity-btn" matTooltip="Last 24hr activity" (click)="openStageActivity(column.stagename, column.type, $event)">
+                  <button [attr.data-testid]="'dqmc-btn-115-' + i" mat-icon-button class="stage-activity-btn" matTooltip="Last 24hr activity" (click)="openStageActivity(column.stagename, column.type, $event)">
                     <mat-icon style="font-size:18px; width:18px; height:18px;" [style.color]="stageActivityCacheLoading ? '#bbb' : '#1976d2'"> people_alt</mat-icon>
                   </button>
 
@@ -1410,10 +1410,10 @@
                       </button>
 
                       <div class="move-dropdown" *ngIf="isMenuOpen(token)">
-                        <div class="search-box" (click)="$event.stopPropagation()">
-                          <input type="text" [(ngModel)]="stageSearchTerm" (input)="filterStages()"
+                        <div [attr.data-testid]="'dqmc-act-116-' + tokenIndex" class="search-box" (click)="$event.stopPropagation()">
+                          <input [attr.data-testid]="'dqmc-inp-117-' + tokenIndex" type="text" [(ngModel)]="stageSearchTerm" (input)="filterStages()"
                             (click)="$event.stopPropagation()" placeholder="Search stages...">
-                          <button *ngIf="stageSearchTerm"
+                          <button [attr.data-testid]="'dqmc-btn-118-' + tokenIndex" *ngIf="stageSearchTerm"
                             (click)="clearStageSearch(); $event.stopPropagation()">✕</button>
                         </div>
 
@@ -1433,15 +1433,15 @@
 
                     <!-- Token Menu Wrapper -->
                     <div class="token-menu-wrapper">
-                      <button class="menu-btn" (click)="toggleTokenMenu($event, token)">
+                      <button [attr.data-testid]="'dqmc-btn-119-' + tokenIndex" class="menu-btn" (click)="toggleTokenMenu($event, token)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                           fill="currentColor">
                           <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
                         </svg>
                       </button>
 
-                      <div class="token-dropdown" *ngIf="isTokenMenuOpen(token)" (click)="$event.stopPropagation()">
-                        <button class="menu-item" (click)="openPreAssignDialog(token); closeTokenMenu()">
+                      <div [attr.data-testid]="'dqmc-act-120-' + tokenIndex" class="token-dropdown" *ngIf="isTokenMenuOpen(token)" (click)="$event.stopPropagation()">
+                        <button [attr.data-testid]="'dqmc-btn-121-' + tokenIndex" class="menu-item" (click)="openPreAssignDialog(token); closeTokenMenu()">
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                             fill="currentColor">
                             <path
@@ -1450,7 +1450,7 @@
                           <span>Pre-Assign Token</span>
                         </button>
 
-                        <button class="menu-item" *ngIf="!hasNotesOrTags(token)"
+                        <button [attr.data-testid]="'dqmc-btn-122-' + tokenIndex" class="menu-item" *ngIf="!hasNotesOrTags(token)"
                           (click)="openNotesTagsDialog(token); closeTokenMenu()"
                           title="Add notes and tags to this token">
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -1461,12 +1461,12 @@
                           <span>Add Notes & Tags</span>
                         </button>
 
-                        <button class="menu-item" (click)="openReminderDialog(token); closeTokenMenu()">
+                        <button [attr.data-testid]="'dqmc-btn-123-' + tokenIndex" class="menu-item" (click)="openReminderDialog(token); closeTokenMenu()">
                           <mat-icon style="width: 18px; height: 18px; font-size: 18px;">alarm_add</mat-icon>
                           <span>Add Reminder</span>
                         </button>
 
-                        <button class="menu-item" *ngIf="hasNotesOrTags(token)"
+                        <button [attr.data-testid]="'dqmc-btn-124-' + tokenIndex" class="menu-item" *ngIf="hasNotesOrTags(token)"
                           (click)="openNotesTagsDialog(token); closeTokenMenu()" title="View or edit notes and tags">
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                             fill="currentColor">
@@ -1478,8 +1478,8 @@
 
                         <div class="menu-divider"></div>
 
-                        <label class="menu-item checkbox-item" (click)="$event.stopPropagation()">
-                          <input type="checkbox" [checked]="token.tokenstatus == 'inActive'"
+                        <label [attr.data-testid]="'dqmc-act-125-' + tokenIndex" class="menu-item checkbox-item" (click)="$event.stopPropagation()">
+                          <input [attr.data-testid]="'dqmc-inp-126-' + tokenIndex" type="checkbox" [checked]="token.tokenstatus == 'inActive'"
                             (change)="onCheckboxChange($event, token)">
                           <span class="checkmark"></span>
                           <span>Mark as unattended</span>
@@ -1487,7 +1487,7 @@
 
                         <div class="menu-divider"></div>
 
-                        <button class="menu-item" (click)="toggleVariationSubmenu($event)">
+                        <button [attr.data-testid]="'dqmc-btn-127-' + tokenIndex" class="menu-item" (click)="toggleVariationSubmenu($event)">
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                             fill="currentColor">
                             <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
@@ -1501,7 +1501,7 @@
                         </button>
 
                         <div class="submenu-expanded" *ngIf="showVariationSubmenu">
-                          <button class="submenu-item" *ngFor="let variation of variationList"
+                          <button [attr.data-testid]="'dqmc-btn-128-' + variation" class="submenu-item" *ngFor="let variation of variationList"
                             (click)="updateVariation(token, variation.id); closeTokenMenu()">
                             {{ variation.variationname }}
                           </button>
@@ -1583,7 +1583,7 @@
                     </div>
                     <div>
                       <span class="label">Audio Video Test:&nbsp;</span>
-                      <span class="textbtn" (click)="avTest(token)">{{token["avtest"] != null && token["avtest"] !=
+                      <span [attr.data-testid]="'dqmc-act-129-' + tokenIndex" class="textbtn" (click)="avTest(token)">{{token["avtest"] != null && token["avtest"] !=
                         undefined ? token["avtest"] : 'Test Now'}}</span>
                     </div>
 
@@ -1686,7 +1686,7 @@
                     </span> -->
 
                     <div class="notes-tags-indicators" *ngIf="hasNotesOrTags(token)">
-                      <div *ngIf="token.notes || (token.notesList && token.notesList.length > 0)"
+                      <div [attr.data-testid]="'dqmc-act-130-' + tokenIndex" *ngIf="token.notes || (token.notesList && token.notesList.length > 0)"
                         class="notes-indicator" (click)="openNotesTagsDialog(token)">
                         <mat-icon>event_note</mat-icon>
                         <div class="notes-preview">
@@ -1705,7 +1705,7 @@
                         </div>
                       </div>
 
-                      <div *ngIf="token.tags && token.tags.length > 0" class="tags-indicator"
+                      <div [attr.data-testid]="'dqmc-act-131-' + tokenIndex" *ngIf="token.tags && token.tags.length > 0" class="tags-indicator"
                         (click)="openNotesTagsDialog(token)">
                         <mat-icon>local_offer</mat-icon>
                         <div class="tags-preview">
@@ -1721,14 +1721,14 @@
                         </div>
                       </div>
                     </div>
-                    <div class="reminder-indicator" *ngIf="hasReminders(token.profile_id)"
+                    <div [attr.data-testid]="'dqmc-act-132-' + tokenIndex" class="reminder-indicator" *ngIf="hasReminders(token.profile_id)"
                       (click)="openReminderDialog(token)">
                       <mat-icon class="reminder-icon-badge">alarm</mat-icon>
                       <span class="reminder-count">{{getTokenReminders(token.profile_id).length}}</span>
                     </div>
                     <!-- Stage Log -->
                     <div class="stage-log-container">
-                      <div class="stage-log-toggle" (click)="fetchLogs(token)">
+                      <div [attr.data-testid]="'dqmc-act-133-' + tokenIndex" class="stage-log-toggle" (click)="fetchLogs(token)">
                         <mat-icon>history</mat-icon>
                         <span>View Stage Log</span>
                       </div>
@@ -1785,7 +1785,7 @@
                     <mat-icon class="spin">sync</mat-icon>
                     <span>Loading more...</span>
                   </div>
-                  <button *ngIf="!stageLoadingMore[column.stageKey]" mat-stroked-button class="load-more-btn"
+                  <button [attr.data-testid]="'dqmc-btn-134-' + i" *ngIf="!stageLoadingMore[column.stageKey]" mat-stroked-button class="load-more-btn"
                     (click)="loadMoreTokens(column)">
                     <mat-icon>expand_more</mat-icon>
                     Load More ({{getRemainingCount(column)}} remaining)
@@ -1800,14 +1800,14 @@
 
     <!-- Notes Modal -->
     <div class="notes-overlay" *ngIf="showNotesListModal">
-      <div class="notes-overlay-bg" (click)="closeNotesModal()"></div>
-      <div class="notes-modal" (click)="$event.stopPropagation()">
+      <div data-testid="dqmc-act-135" class="notes-overlay-bg" (click)="closeNotesModal()"></div>
+      <div data-testid="dqmc-act-136" class="notes-modal" (click)="$event.stopPropagation()">
 
         <div class="notes-modal-head">
           <div class="notes-modal-title">
             <span>Notes</span>
           </div>
-          <button mat-icon-button (click)="closeNotesModal()">
+          <button data-testid="dqmc-btn-137" mat-icon-button (click)="closeNotesModal()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -1815,8 +1815,8 @@
         <div class="notes-modal-toolbar">
           <div class="notes-search-wrap">
             <mat-icon>search</mat-icon>
-            <input [(ngModel)]="notesSearch" (ngModelChange)="buildNotesGrouped()" placeholder="Search by participant name" autocomplete="off">
-            <button *ngIf="notesSearch" (click)="notesSearch = ''">
+            <input data-testid="dqmc-inp-138" [(ngModel)]="notesSearch" (ngModelChange)="buildNotesGrouped()" placeholder="Search by participant name" autocomplete="off">
+            <button data-testid="dqmc-btn-139" *ngIf="notesSearch" (click)="notesSearch = ''">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -1824,12 +1824,12 @@
           <mat-form-field appearance="outline" class="notes-date-field">
             <mat-label>Date range</mat-label>
             <mat-date-range-input [rangePicker]="notesPicker">
-              <input matStartDate [(ngModel)]="notesDateStart" (dateChange)="buildNotesGrouped()" placeholder="Start">
-              <input matEndDate [(ngModel)]="notesDateEnd" (dateChange)="buildNotesGrouped()" placeholder="End">
+              <input data-testid="dqmc-inp-140" matStartDate [(ngModel)]="notesDateStart" (dateChange)="buildNotesGrouped()" placeholder="Start">
+              <input data-testid="dqmc-inp-141" matEndDate [(ngModel)]="notesDateEnd" (dateChange)="buildNotesGrouped()" placeholder="End">
             </mat-date-range-input>
             <mat-datepicker-toggle matSuffix [for]="notesPicker"></mat-datepicker-toggle>
             <mat-date-range-picker #notesPicker></mat-date-range-picker>
-            <button matSuffix mat-icon-button *ngIf="notesDateStart"
+            <button data-testid="dqmc-btn-142" matSuffix mat-icon-button *ngIf="notesDateStart"
               (click)="notesDateStart=null; notesDateEnd=null; buildNotesGrouped()">
               <mat-icon>clear</mat-icon>
             </button>
@@ -1870,8 +1870,8 @@
     </div>
 
     <!-- Reminder List Modal -->
-    <div class="reminder-modal-backdrop" *ngIf="showReminderListModal" (click)="closeReminderListModal()">
-      <div class="reminder-modal-dialog" (click)="$event.stopPropagation()">
+    <div data-testid="dqmc-act-143" class="reminder-modal-backdrop" *ngIf="showReminderListModal" (click)="closeReminderListModal()">
+      <div data-testid="dqmc-act-144" class="reminder-modal-dialog" (click)="$event.stopPropagation()">
 
         <!-- Modal Header -->
         <div class="modal-header">
@@ -1881,26 +1881,26 @@
             <span *ngIf="selectedReminderFilter === 'upcoming'">Upcoming Reminders</span>
             <span *ngIf="selectedReminderFilter === 'completed'">Completed Reminders</span>
           </h2>
-          <button mat-icon-button (click)="closeReminderListModal()">
+          <button data-testid="dqmc-btn-145" mat-icon-button (click)="closeReminderListModal()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
 
         <!-- Tab Navigation -->
         <div class="modal-tabs">
-          <button class="tab-btn" [class.active]="selectedReminderFilter === 'today'"
+          <button data-testid="dqmc-btn-146" class="tab-btn" [class.active]="selectedReminderFilter === 'today'"
             (click)="selectedReminderFilter = 'today'" *ngIf="todayReminders.length > 0">
             Today ({{todayReminders.length}})
           </button>
-          <button class="tab-btn" [class.active]="selectedReminderFilter === 'upcoming'"
+          <button data-testid="dqmc-btn-147" class="tab-btn" [class.active]="selectedReminderFilter === 'upcoming'"
             (click)="selectedReminderFilter = 'upcoming'" *ngIf="upcomingReminders.length > 0">
             Upcoming ({{upcomingReminders.length}})
           </button>
-          <button class="tab-btn" [class.active]="selectedReminderFilter === 'overdue'"
+          <button data-testid="dqmc-btn-148" class="tab-btn" [class.active]="selectedReminderFilter === 'overdue'"
             (click)="selectedReminderFilter = 'overdue'" *ngIf="overdueReminders.length > 0">
             Overdue ({{overdueReminders.length}})
           </button>
-          <button class="tab-btn" [class.active]="selectedReminderFilter === 'completed'"
+          <button data-testid="dqmc-btn-149" class="tab-btn" [class.active]="selectedReminderFilter === 'completed'"
             (click)="selectedReminderFilter = 'completed'" *ngIf="completedReminders.length > 0">
             Completed ({{completedReminders.length}})
           </button>
@@ -1941,18 +1941,18 @@
                 <td>
                   <!-- Normal view -->
                   <div class="action-btns" *ngIf="editingReminderId !== reminder.docid">
-                    <button mat-icon-button color="primary" (click)="goToToken(reminder)" matTooltip="Go to token">
+                    <button [attr.data-testid]="'dqmc-btn-150-' + i" mat-icon-button color="primary" (click)="goToToken(reminder)" matTooltip="Go to token">
                       <mat-icon>my_location</mat-icon>
                     </button>
-                    <button mat-icon-button color="primary" (click)="startEditReminder(reminder)"
+                    <button [attr.data-testid]="'dqmc-btn-151-' + i" mat-icon-button color="primary" (click)="startEditReminder(reminder)"
                       matTooltip="Edit reminder">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button color="accent" (click)="markReminderCompleted(reminder.docid)"
+                    <button [attr.data-testid]="'dqmc-btn-152-' + i" mat-icon-button color="accent" (click)="markReminderCompleted(reminder.docid)"
                       matTooltip="Mark complete">
                       <mat-icon>check_circle</mat-icon>
                     </button>
-                    <button mat-icon-button color="warn" (click)="deleteReminder(reminder.docid)" matTooltip="Delete">
+                    <button [attr.data-testid]="'dqmc-btn-153-' + i" mat-icon-button color="warn" (click)="deleteReminder(reminder.docid)" matTooltip="Delete">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </div>
@@ -1961,23 +1961,23 @@
                   <div class="edit-reminder-inline" *ngIf="editingReminderId === reminder.docid">
                     <mat-form-field appearance="outline" class="edit-reminder-field">
                       <mat-label>Context</mat-label>
-                      <input matInput [(ngModel)]="editingReminderContext">
+                      <input [attr.data-testid]="'dqmc-inp-154-' + i" matInput [(ngModel)]="editingReminderContext">
                     </mat-form-field>
                     <mat-form-field appearance="outline" class="edit-reminder-field">
                       <mat-label>Date</mat-label>
-                      <input matInput [matDatepicker]="editPicker" [(ngModel)]="editingReminderDate">
+                      <input [attr.data-testid]="'dqmc-inp-155-' + i" matInput [matDatepicker]="editPicker" [(ngModel)]="editingReminderDate">
                       <mat-datepicker-toggle matSuffix [for]="editPicker"></mat-datepicker-toggle>
                       <mat-datepicker #editPicker></mat-datepicker>
                     </mat-form-field>
                     <mat-form-field appearance="outline" class="edit-reminder-field">
                       <mat-label>Time</mat-label>
-                      <input matInput type="time" [(ngModel)]="editingReminderTime">
+                      <input [attr.data-testid]="'dqmc-inp-156-' + i" matInput type="time" [(ngModel)]="editingReminderTime">
                     </mat-form-field>
                     <div class="edit-reminder-actions">
-                      <button mat-icon-button color="primary" (click)="saveEditReminder()" matTooltip="Save">
+                      <button [attr.data-testid]="'dqmc-btn-157-' + i" mat-icon-button color="primary" (click)="saveEditReminder()" matTooltip="Save">
                         <mat-icon>check</mat-icon>
                       </button>
-                      <button mat-icon-button color="warn" (click)="cancelEditReminder()" matTooltip="Cancel">
+                      <button [attr.data-testid]="'dqmc-btn-158-' + i" mat-icon-button color="warn" (click)="cancelEditReminder()" matTooltip="Cancel">
                         <mat-icon>close</mat-icon>
                       </button>
                     </div>
@@ -1998,9 +1998,9 @@
   </mat-sidenav-content>
 </mat-sidenav-container>
 <!-- BULK MOVE PANEL -->
-<div class="bulk-overlay" *ngIf="showBulkMovePanel"
+<div data-testid="dqmc-act-159" class="bulk-overlay" *ngIf="showBulkMovePanel"
   (click)="closeBulkMovePanel()">
-  <div class="bulk-dialog" (click)="$event.stopPropagation()">
+  <div data-testid="dqmc-act-160" class="bulk-dialog" (click)="$event.stopPropagation()">
 
     <!-- Header -->
     <div class="bulk-header">
@@ -2013,7 +2013,7 @@
           </ng-container>
         </span>
       </div>
-      <button mat-icon-button
+      <button data-testid="dqmc-btn-161" mat-icon-button
         (click)="closeBulkMovePanel()"
         [disabled]="bulkMoveInProgress">
         <mat-icon>close</mat-icon>
@@ -2142,7 +2142,7 @@
       <p *ngIf="bulkMoveFailed" class="done-fail">
         ✗ Move failed. Please try again.
       </p>
-      <button mat-raised-button color="primary" (click)="closeBulkMovePanel()">
+      <button data-testid="dqmc-btn-162" mat-raised-button color="primary" (click)="closeBulkMovePanel()">
         Done
       </button>
     </div>
@@ -2151,14 +2151,14 @@
 </div>
 
 <!-- ── Stage Activity Panel ──────────────────────────────── -->
-<div class="stage-activity-overlay" *ngIf="showStageActivityPanel" (click)="closeStageActivityPanel()">
-  <div class="stage-activity-dialog" (click)="$event.stopPropagation()">
+<div data-testid="dqmc-act-163" class="stage-activity-overlay" *ngIf="showStageActivityPanel" (click)="closeStageActivityPanel()">
+  <div data-testid="dqmc-act-164" class="stage-activity-dialog" (click)="$event.stopPropagation()">
     <!-- Header -->
     <div class="sa-header">
       <div class="sa-header-left">
         <mat-icon style="color:#1976d2; font-size:22px;">people_alt</mat-icon>
         <div>
-          <mat-select class="sa-stage-select"
+          <mat-select data-testid="dqmc-sel-165" class="sa-stage-select"
             [(ngModel)]="selectedStageForActivity"
             (ngModelChange)="onStageActivityFilterChange($event)"
             [disabled]="stageActivityCacheLoading">
@@ -2170,17 +2170,17 @@
         </div>
       </div>
       <div class="sa-header-right">
-        <button mat-icon-button matTooltip="Refresh" (click)="fetchStageActivity()" [disabled]="stageActivityCacheLoading">
+        <button data-testid="dqmc-btn-166" mat-icon-button matTooltip="Refresh" (click)="fetchStageActivity()" [disabled]="stageActivityCacheLoading">
           <mat-icon>refresh</mat-icon>
         </button>
-        <button mat-stroked-button (click)="exportStageActivity()" [disabled]="stageActivityCacheLoading"
+        <button data-testid="dqmc-btn-167" mat-stroked-button (click)="exportStageActivity()" [disabled]="stageActivityCacheLoading"
           style="font-size:12px; height:32px; line-height:32px;">
           <mat-icon style="font-size:16px; width:16px; height:16px;">
             download
           </mat-icon>
           Export CSV
         </button>
-        <button mat-icon-button (click)="closeStageActivityPanel()">
+        <button data-testid="dqmc-btn-168" mat-icon-button (click)="closeStageActivityPanel()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -2188,7 +2188,7 @@
 
     <!-- Tabs -->
     <div class="sa-tabs">
-      <button
+      <button data-testid="dqmc-btn-169"
         class="sa-tab"
         [class.sa-tab-active]="stageActivityTab === 'cameIn'"
         (click)="stageActivityTab = 'cameIn'">
@@ -2201,7 +2201,7 @@
           {{stageActivityData.cameIn.length}}
         </span>
       </button>
-      <button
+      <button data-testid="dqmc-btn-170"
         class="sa-tab"
         [class.sa-tab-active]="stageActivityTab === 'wentOut'"
         (click)="stageActivityTab = 'wentOut'">
@@ -2328,7 +2328,7 @@
 </div>
 
 <div *ngIf="showTimelineOverlay" class="timeline-overlay">
-  <div class="timeline-backdrop" (click)="closeQueueTimeline()"></div>
+  <div data-testid="dqmc-act-171" class="timeline-backdrop" (click)="closeQueueTimeline()"></div>
 
   <div class="timeline-panel">
 
@@ -2344,7 +2344,7 @@
         <span class="live-badge">
           <span class="live-dot"></span> Live
         </span>
-        <button mat-icon-button (click)="closeQueueTimeline()">
+        <button data-testid="dqmc-btn-172" mat-icon-button (click)="closeQueueTimeline()">
           <mat-icon style="color:#fff;">close</mat-icon>
         </button>
       </div>
@@ -2353,18 +2353,18 @@
     <!-- Search bar -->
     <div class="timeline-search-bar">
       <mat-icon class="timeline-search-icon">search</mat-icon>
-      <input
+      <input data-testid="dqmc-inp-173"
         class="timeline-search-input"
         [(ngModel)]="timelineSearchQuery"
         placeholder="Search by name or profile ID…"
         autocomplete="off" />
-      <button *ngIf="timelineSearchQuery"
+      <button data-testid="dqmc-btn-174" *ngIf="timelineSearchQuery"
               class="timeline-search-clear"
               (click)="timelineSearchQuery = ''">
         <mat-icon>close</mat-icon>
       </button>
 
-      <button *ngIf="hasActiveTimelineFilters"
+      <button data-testid="dqmc-btn-175" *ngIf="hasActiveTimelineFilters"
               type="button"
               class="timeline-clear-filters"
               (click)="clearChannelFilters()"
@@ -2394,7 +2394,7 @@
                   ? 'No profiles match the current filters'
                   : 'No notifications found for this queue') }}
         </p>
-        <button *ngIf="hasActiveTimelineFilters"
+        <button data-testid="dqmc-btn-176" *ngIf="hasActiveTimelineFilters"
                 type="button"
                 class="timeline-clear-filters timeline-clear-filters-inline"
                 (click)="clearChannelFilters()">
@@ -2416,13 +2416,13 @@
                 Push
               </div>
               <div class="th-filter-chips">
-                <button type="button" class="th-filter-chip success"
+                <button data-testid="dqmc-btn-177" type="button" class="th-filter-chip success"
                         [class.active]="channelFilters.push === 'success'"
                         (click)="toggleChannelFilter('push', 'success')"
                         matTooltip="Filter: last push succeeded">
                   ✓ {{ channelLastStatusCounts.push.success }}
                 </button>
-                <button type="button" class="th-filter-chip failure"
+                <button data-testid="dqmc-btn-178" type="button" class="th-filter-chip failure"
                         [class.active]="channelFilters.push === 'failure'"
                         (click)="toggleChannelFilter('push', 'failure')"
                         matTooltip="Filter: last push failed">
@@ -2436,13 +2436,13 @@
                 WhatsApp
               </div>
               <div class="th-filter-chips">
-                <button type="button" class="th-filter-chip success"
+                <button data-testid="dqmc-btn-179" type="button" class="th-filter-chip success"
                         [class.active]="channelFilters.whatsapp === 'success'"
                         (click)="toggleChannelFilter('whatsapp', 'success')"
                         matTooltip="Filter: last WhatsApp succeeded">
                   ✓ {{ channelLastStatusCounts.whatsapp.success }}
                 </button>
-                <button type="button" class="th-filter-chip failure"
+                <button data-testid="dqmc-btn-180" type="button" class="th-filter-chip failure"
                         [class.active]="channelFilters.whatsapp === 'failure'"
                         (click)="toggleChannelFilter('whatsapp', 'failure')"
                         matTooltip="Filter: last WhatsApp failed">
@@ -2456,13 +2456,13 @@
                 Email
               </div>
               <div class="th-filter-chips">
-                <button type="button" class="th-filter-chip success"
+                <button data-testid="dqmc-btn-181" type="button" class="th-filter-chip success"
                         [class.active]="channelFilters.email === 'success'"
                         (click)="toggleChannelFilter('email', 'success')"
                         matTooltip="Filter: last email succeeded">
                   ✓ {{ channelLastStatusCounts.email.success }}
                 </button>
-                <button type="button" class="th-filter-chip failure"
+                <button data-testid="dqmc-btn-182" type="button" class="th-filter-chip failure"
                         [class.active]="channelFilters.email === 'failure'"
                         (click)="toggleChannelFilter('email', 'failure')"
                         matTooltip="Filter: last email failed">
@@ -2478,7 +2478,7 @@
           <ng-container *ngFor="let p of filteredProfileSummaries; let i = index">
 
             <!-- Summary row -->
-            <tr class="summary-row"
+            <tr [attr.data-testid]="'dqmc-act-183-' + i" class="summary-row"
                 [class.open]="expandedProfileId === p.profileId"
                 (click)="toggleProfileTimeline(p.profileId)">
 
@@ -2617,7 +2617,7 @@
                              class="h-node-wrap">
                           <div class="h-node-row">
                             <div class="h-line"></div>
-                            <div class="h-node wa"
+                            <div [attr.data-testid]="'dqmc-act-184-' + item" class="h-node wa"
                                  [class.success]="item.status === 'success'"
                                  [class.failure]="item.status === 'failure'"
                                  [matTooltip]="item.title"
@@ -2648,7 +2648,7 @@
                               {{ selectedWhatsappPreview?.item?.status === 'success' ? '✓ Sent' : '✗ Failed' }}
                             </span>
                           </div>
-                          <button class="whatsapp-preview-close" (click)="selectedWhatsappPreview = null; $event.stopPropagation()">
+                          <button [attr.data-testid]="'dqmc-btn-185-' + i" class="whatsapp-preview-close" (click)="selectedWhatsappPreview = null; $event.stopPropagation()">
                             <mat-icon>close</mat-icon>
                           </button>
                         </div>
@@ -2690,7 +2690,7 @@
                           <div class="h-node-row">
                             <div class="h-line"></div>
                     
-                            <div class="h-node email" [class.success]="item.status === 'success'"
+                            <div [attr.data-testid]="'dqmc-act-186-' + item" class="h-node email" [class.success]="item.status === 'success'"
                               [class.failure]="item.status === 'failure'" [matTooltip]="item.title" matTooltipClass="multiline-tooltip"
                               (click)="toggleEmailPreview(item, p.profileId); $event.stopPropagation()">
                               <mat-icon class="h-node-icon">email</mat-icon>
@@ -2717,7 +2717,7 @@
                               {{ selectedEmailPreview?.item?.status === 'success' ? '✓ Sent' : '✗ Failed' }}
                             </span>
                           </div>
-                          <button class="email-preview-close" (click)="selectedEmailPreview = null; $event.stopPropagation()">
+                          <button [attr.data-testid]="'dqmc-btn-187-' + i" class="email-preview-close" (click)="selectedEmailPreview = null; $event.stopPropagation()">
                             <mat-icon>close</mat-icon>
                           </button>
                         </div>
@@ -2740,15 +2740,15 @@
 </div>
 
 <!-- Reminder Dialog Modal -->
-<div class="reminder-modal-overlay" *ngIf="showReminderDialog" (click)="closeReminderDialog()">
-  <div class="reminder-modal" (click)="$event.stopPropagation()">
+<div data-testid="dqmc-act-188" class="reminder-modal-overlay" *ngIf="showReminderDialog" (click)="closeReminderDialog()">
+  <div data-testid="dqmc-act-189" class="reminder-modal" (click)="$event.stopPropagation()">
     <!-- Header -->
     <div class="reminder-header">
       <div class="reminder-title">
         <mat-icon>alarm</mat-icon>
         <h3>Participant Reminder - Token #{{selectedReminderToken?.tokennumber}}</h3>
       </div>
-      <button mat-icon-button (click)="closeReminderDialog()">
+      <button data-testid="dqmc-btn-190" mat-icon-button (click)="closeReminderDialog()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -2769,14 +2769,14 @@
 
       <mat-form-field appearance="outline" class="w-100">
         <mat-label>Reminder Context</mat-label>
-        <textarea matInput [(ngModel)]="newReminderContext" placeholder="Enter reminder details..." rows="3"
+        <textarea data-testid="dqmc-txt-191" matInput [(ngModel)]="newReminderContext" placeholder="Enter reminder details..." rows="3"
           maxlength="500"></textarea>
         <mat-hint align="end">{{newReminderContext.length}}/500</mat-hint>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="w-100">
         <mat-label>Reminder Date</mat-label>
-        <input matInput [matDatepicker]="reminderPicker" [(ngModel)]="newReminderDate" [min]="minReminderDate"
+        <input data-testid="dqmc-inp-192" matInput [matDatepicker]="reminderPicker" [(ngModel)]="newReminderDate" [min]="minReminderDate"
           placeholder="Select date">
         <mat-datepicker-toggle matSuffix [for]="reminderPicker"></mat-datepicker-toggle>
         <mat-datepicker #reminderPicker></mat-datepicker>
@@ -2784,9 +2784,9 @@
 
       <mat-form-field appearance="outline" class="w-100">
         <mat-label>Reminder Time</mat-label>
-        <input matInput type="time" [(ngModel)]="newReminderTime" placeholder="Select time">
+        <input data-testid="dqmc-inp-193" matInput type="time" [(ngModel)]="newReminderTime" placeholder="Select time">
       </mat-form-field>
-      <button mat-raised-button color="primary" (click)="addReminder()"
+      <button data-testid="dqmc-btn-194" mat-raised-button color="primary" (click)="addReminder()"
         [disabled]="!newReminderContext.trim() || !newReminderDate || !newReminderTime">
         <mat-icon>add_alarm</mat-icon>
         Add Reminder
@@ -2815,11 +2815,11 @@
         </div>
 
         <div class="reminder-actions">
-          <button mat-icon-button color="primary" (click)="markReminderCompleted(reminder.docid)"
+          <button [attr.data-testid]="'dqmc-btn-195-' + reminder" mat-icon-button color="primary" (click)="markReminderCompleted(reminder.docid)"
             matTooltip="Mark as completed">
             <mat-icon>check_circle</mat-icon>
           </button>
-          <button mat-icon-button color="warn" (click)="deleteReminder(reminder.docid)" matTooltip="Delete reminder">
+          <button [attr.data-testid]="'dqmc-btn-196-' + reminder" mat-icon-button color="warn" (click)="deleteReminder(reminder.docid)" matTooltip="Delete reminder">
             <mat-icon>delete</mat-icon>
           </button>
         </div>
@@ -2843,7 +2843,7 @@
         Reminder Alert
         <span class="reminder-count-badge">{{ dueRemindersToShow.length }}</span>
       </h3>
-      <button mat-icon-button class="close-all-btn" (click)="closeReminderNotification()">
+      <button data-testid="dqmc-btn-197" mat-icon-button class="close-all-btn" (click)="closeReminderNotification()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -2875,7 +2875,7 @@
           </div>
         </div>
         <div class="reminder-card-actions">
-          <button mat-button (click)="markReminderCompleted(reminder.docid)">
+          <button [attr.data-testid]="'dqmc-btn-198-' + i" mat-button (click)="markReminderCompleted(reminder.docid)">
             <mat-icon>check_circle</mat-icon>
             Mark Complete
           </button>
@@ -2886,8 +2886,8 @@
 </div>
 
 <!-- Notification Timeline Dialog -->
-<div class="reminder-modal-overlay" *ngIf="showTimelineDialog" (click)="closeTimelineDialog()">
-  <div class="reminder-modal" (click)="$event.stopPropagation()"
+<div data-testid="dqmc-act-199" class="reminder-modal-overlay" *ngIf="showTimelineDialog" (click)="closeTimelineDialog()">
+  <div data-testid="dqmc-act-200" class="reminder-modal" (click)="$event.stopPropagation()"
     style="max-width:500px; width:90vw; max-height:80vh; overflow-y:auto;">
 
     <!-- Header -->
@@ -2900,7 +2900,7 @@
           (#{{selectedTimelineToken?.tokennumber}})
         </h3>
       </div>
-      <button mat-icon-button (click)="closeTimelineDialog()">
+      <button data-testid="dqmc-btn-201" mat-icon-button (click)="closeTimelineDialog()">
         <mat-icon>close</mat-icon>
       </button>
     </div>

@@ -35,7 +35,7 @@
 
     <!-- Needs Validation (rework) Filter -->
     <div class="filter-section" *ngIf="selectedMarathonId">
-      <mat-checkbox
+      <mat-checkbox data-testid="validate-change-on-toggle-rework-filter-1"
         [checked]="onlyReworkFilter"
         (change)="onToggleReworkFilter($event.checked)">
         Needs Validation (Review)
@@ -44,7 +44,7 @@
 
     <!-- Created by me Filter -->
     <div class="filter-section" *ngIf="selectedMarathonId">
-      <mat-checkbox
+      <mat-checkbox data-testid="validate-change-on-toggle-my-activities-2"
         [checked]="onlyMyActivities"
         (change)="onToggleMyActivities($event.checked)">
         Activity Given by Me
@@ -139,19 +139,19 @@
       <div class="top-bar-right">
         <!-- Communication Buttons -->
         <div class="comm-buttons">
-          <button 
+          <button data-testid="validate-send-notification-3" 
             class="comm-btn" 
             (click)="sendNotification()" 
             [matTooltip]="getTotalSelectedCount() > 0 ? 'Send notification to ' + getTotalSelectedCount() + ' selected' : 'Send notification to all'">
             <mat-icon>notifications</mat-icon>
           </button>
-          <button 
+          <button data-testid="validate-send-email-4" 
             class="comm-btn" 
             (click)="sendEmail()" 
             [matTooltip]="getTotalSelectedCount() > 0 ? 'Send email to ' + getTotalSelectedCount() + ' selected' : 'Send email to all'">
             <mat-icon>email</mat-icon>
           </button>
-          <button 
+          <button data-testid="validate-send-whats-app-5" 
             class="comm-btn whatsapp" 
             (click)="sendWhatsApp()" 
             [matTooltip]="getTotalSelectedCount() > 0 ? 'Send WhatsApp to ' + getTotalSelectedCount() + ' selected' : 'Send WhatsApp to all'">
@@ -165,10 +165,10 @@
         
         <div class="divider-vertical"></div>
         
-        <button class="icon-btn primary" (click)="bigChat()" matTooltip="Support Chat">
+        <button data-testid="validate-big-chat-6" class="icon-btn primary" (click)="bigChat()" matTooltip="Support Chat">
           <mat-icon>support_agent</mat-icon>
         </button>
-        <button class="icon-btn" (click)="toggleDetailsPanel()" matTooltip="Toggle Details">
+        <button data-testid="validate-toggle-details-panel-7" class="icon-btn" (click)="toggleDetailsPanel()" matTooltip="Toggle Details">
           <mat-icon>{{ showDetailsPanel ? 'chevron_right' : 'info' }}</mat-icon>
         </button>
       </div>
@@ -228,7 +228,7 @@
 
           <!-- Select All & Move Bar -->
           <div class="column-actions-bar">
-            <button 
+            <button data-testid="validate-toggle-select-all-8" 
               class="select-all-btn"
               [class.active]="isAllSelected(status)"
               (click)="toggleSelectAll(status)">
@@ -259,7 +259,7 @@
               class="participant-card"
               [class.selected]="selectedParticipantAssignments[status]?.[p.docid]">
               
-              <mat-checkbox 
+              <mat-checkbox data-testid="validate-change-on-select-participant-assignment-9" 
                 [checked]="selectedParticipantAssignments[status]?.[p.docid] || false"
                 (change)="onSelectParticipantAssignment(status, p.docid, $event)"
                 class="participant-checkbox">
@@ -326,7 +326,7 @@
   <aside class="right-sidebar" *ngIf="selectedAssignment && showDetailsPanel">
     <div class="sidebar-header">
       <span class="sidebar-title">Details</span>
-      <button class="close-btn" (click)="toggleDetailsPanel()">
+      <button data-testid="validate-toggle-details-panel-10" class="close-btn" (click)="toggleDetailsPanel()">
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -374,7 +374,7 @@
 
       <!-- Mark Complete -->
       <div class="detail-card">
-        <mat-checkbox 
+        <mat-checkbox data-testid="validate-change-mark-assignment-completion-11" 
           [checked]="selectedAssignment.status === 'completed'" 
           (change)="markAssignmentCompletion($event)"
           class="completion-checkbox">
@@ -403,7 +403,7 @@
           [(ngModel)]="summary"
           placeholder="Add notes..."
           rows="4"></textarea>
-        <button class="save-btn" [style.background]="themeColor" (click)="onUpdateSummary()">
+        <button data-testid="validate-on-update-summary-12" class="save-btn" [style.background]="themeColor" (click)="onUpdateSummary()">
           <mat-icon>save</mat-icon>
           Save Notes
         </button>

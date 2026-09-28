@@ -40,12 +40,13 @@
       </mat-form-field>
       <br>
       <div class="country-dropdown-wrapper">
-        <div class="country-selected" (click)="toggleCountryDropdown()">
+        <div data-testid="upf-country-toggle-1" class="country-selected" (click)="toggleCountryDropdown()">
           <span>{{ selectedCountry?.iso }} {{ selectedCountry?.code }}</span>
           <mat-icon>arrow_drop_down</mat-icon>
         </div>
         <div class="country-panel" *ngIf="countryDropdownOpen">
           <input
+            data-testid="upf-country-search-5"
             class="country-search"
             placeholder="Search country..."
             [(ngModel)]="countrySearchText"
@@ -55,6 +56,7 @@
           />
           <div class="country-list">
             <div
+              [attr.data-testid]="'upf-country-' + country.code"
               class="country-option"
               *ngFor="let country of filteredCountries"
               (click)="selectCountry(country)"
@@ -99,7 +101,7 @@
           </mat-error>
         </mat-form-field>
         <!-- Change Email Button -->
-        <button *ngIf="emailLocked" mat-stroked-button color="primary" type="button" class="change-email-btn" (click)="changeEmail()">
+        <button data-testid="upf-change-email-2" *ngIf="emailLocked" mat-stroked-button color="primary" type="button" class="change-email-btn" (click)="changeEmail()">
           Change Email
         </button>
       </div>
@@ -125,8 +127,8 @@
       <mat-checkbox formControlName="testuser">Mark as Testuser</mat-checkbox>
       <br>
       <div class="actionbox">
-        <button class="closebtn" mat-stroked-button type="button" (click)="close()" [disabled]="loading">Close</button>
-        <button class="submitbtn" mat-stroked-button type="button" (click)="createProfile()" [disabled]="loading">{{loading ? 'Updating....' : 'Submit'}}</button>
+        <button data-testid="upf-close-3" class="closebtn" mat-stroked-button type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button data-testid="upf-submit-4" class="submitbtn" mat-stroked-button type="button" (click)="createProfile()" [disabled]="loading">{{loading ? 'Updating....' : 'Submit'}}</button>
       </div>
     </form>
 </div>

@@ -1,7 +1,7 @@
 <div class="fill-form-container">
   <!-- Header -->
   <div class="form-header">
-    <button class="back-btn" (click)="onClose()">
+    <button data-testid="ahff-btn-1" class="back-btn" (click)="onClose()">
       <i class="material-icons">arrow_back_ios_new</i>
     </button>
     <div class="header-content">
@@ -13,7 +13,7 @@
         <span class="progress-text">{{ getCompletionPercentage() }}% Complete</span>
       </div>
     </div>
-    <button class="save-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
+    <button data-testid="ahff-btn-2" class="save-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
       <i class="material-icons" *ngIf="!saving">check</i>
       <div class="spinner-small" *ngIf="saving"></div>
     </button>
@@ -39,7 +39,7 @@
             <p class="field-description" *ngIf="field.fielddescription">
               {{ field.fielddescription }}
             </p>
-            <input
+            <input [attr.data-testid]="'ahff-inp-3-' + field"
               type="text"
               class="text-input"
               [class.error]="getValidationError(field.fieldname)"
@@ -60,7 +60,7 @@
             <p class="field-description" *ngIf="field.fielddescription">
               {{ field.fielddescription }}
             </p>
-            <textarea
+            <textarea [attr.data-testid]="'ahff-txt-4-' + field"
               class="textarea-input"
               [class.error]="getValidationError(field.fieldname)"
               [placeholder]="field.fieldnotes || 'Enter ' + field.fieldname"
@@ -81,7 +81,7 @@
             <p class="field-description" *ngIf="field.fielddescription">
               {{ field.fielddescription }}
             </p>
-            <input
+            <input [attr.data-testid]="'ahff-inp-5-' + field"
               type="number"
               class="text-input number-input"
               [class.error]="getValidationError(field.fieldname)"
@@ -96,7 +96,7 @@
 
           <!-- Checkbox Field -->
           <div class="field-wrapper checkbox-wrapper" *ngSwitchCase="'checkbox'">
-            <label class="checkbox-container" (click)="onFieldChange(field, !field.value)">
+            <label [attr.data-testid]="'ahff-act-6-' + field" class="checkbox-container" (click)="onFieldChange(field, !field.value)">
               <div class="checkbox" [class.checked]="field.value">
                 <i class="material-icons" *ngIf="field.value">check</i>
               </div>
@@ -120,7 +120,7 @@
                   {{ field.fielddescription }}
                 </p>
               </div>
-              <div class="toggle" [class.active]="field.value" (click)="onFieldChange(field, !field.value)">
+              <div [attr.data-testid]="'ahff-act-7-' + field" class="toggle" [class.active]="field.value" (click)="onFieldChange(field, !field.value)">
                 <div class="toggle-thumb"></div>
               </div>
             </div>
@@ -134,7 +134,7 @@
             <p class="field-description" *ngIf="field.fielddescription">
               {{ field.fielddescription }}
             </p>
-            <select
+            <select [attr.data-testid]="'ahff-sel-8-' + field"
               class="select-input"
               [class.error]="getValidationError(field.fieldname)"
               [value]="field.value || ''"
@@ -159,7 +159,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="radio-group">
-              <label
+              <label [attr.data-testid]="'ahff-act-9-' + option"
                 class="radio-option"
                 *ngFor="let option of field.options"
                 (click)="onFieldChange(field, option)"
@@ -184,7 +184,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="multiselect-options">
-              <div
+              <div [attr.data-testid]="'ahff-act-10-' + option"
                 class="multiselect-chip"
                 *ngFor="let option of field.options"
                 [class.selected]="isOptionSelected(field, option)"
@@ -208,7 +208,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="chips-container">
-              <div
+              <div [attr.data-testid]="'ahff-act-11-' + option"
                 class="chip"
                 *ngFor="let option of field.options"
                 [class.selected]="isOptionSelected(field, option)"
@@ -231,7 +231,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="date-input-wrapper">
-              <input
+              <input [attr.data-testid]="'ahff-inp-12-' + field"
                 type="date"
                 class="text-input date-input"
                 [class.error]="getValidationError(field.fieldname)"
@@ -254,7 +254,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="date-input-wrapper">
-              <input
+              <input [attr.data-testid]="'ahff-inp-13-' + field"
                 type="datetime-local"
                 class="text-input date-input"
                 [class.error]="getValidationError(field.fieldname)"
@@ -277,7 +277,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="date-input-wrapper">
-              <input
+              <input [attr.data-testid]="'ahff-inp-14-' + field"
                 type="time"
                 class="text-input time-input"
                 [class.error]="getValidationError(field.fieldname)"
@@ -300,7 +300,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="slider-container">
-              <input
+              <input [attr.data-testid]="'ahff-inp-15-' + field"
                 type="range"
                 class="slider-input"
                 min="0"
@@ -321,7 +321,7 @@
               {{ field.fielddescription }}
             </p>
             <div class="rating-container">
-              <i
+              <i [attr.data-testid]="'ahff-act-16-' + star"
                 class="material-icons star"
                 *ngFor="let star of getRatingArray()"
                 [class.filled]="star <= (field.value || 0)"
@@ -334,7 +334,7 @@
 
           <!-- Array/Section Field -->
           <div class="field-wrapper section-wrapper" *ngSwitchCase="'array'">
-            <div class="section-header" (click)="toggleSection(field.fieldname)">
+            <div [attr.data-testid]="'ahff-act-17-' + field" class="section-header" (click)="toggleSection(field.fieldname)">
               <div class="section-info">
                 <i class="material-icons section-icon">folder</i>
                 <span class="section-title">{{ field.fieldname }}</span>
@@ -358,7 +358,7 @@
                     <label class="field-label" [class.required]="nestedField.required">
                       {{ nestedField.fieldname }}
                     </label>
-                    <input
+                    <input [attr.data-testid]="'ahff-inp-18-' + nestedField"
                       type="text"
                       class="text-input"
                       [placeholder]="nestedField.fieldnotes || 'Enter ' + nestedField.fieldname"
@@ -372,7 +372,7 @@
                     <label class="field-label" [class.required]="nestedField.required">
                       {{ nestedField.fieldname }}
                     </label>
-                    <textarea
+                    <textarea [attr.data-testid]="'ahff-txt-19-' + nestedField"
                       class="textarea-input"
                       [placeholder]="nestedField.fieldnotes || 'Enter ' + nestedField.fieldname"
                       [value]="nestedField.value || ''"
@@ -386,7 +386,7 @@
                     <label class="field-label" [class.required]="nestedField.required">
                       {{ nestedField.fieldname }}
                     </label>
-                    <input
+                    <input [attr.data-testid]="'ahff-inp-20-' + nestedField"
                       type="number"
                       class="text-input number-input"
                       [value]="nestedField.value"
@@ -396,7 +396,7 @@
 
                   <!-- Nested Checkbox -->
                   <div class="field-wrapper checkbox-wrapper nested" *ngSwitchCase="'checkbox'">
-                    <label class="checkbox-container" (click)="onFieldChange(nestedField, !nestedField.value)">
+                    <label [attr.data-testid]="'ahff-act-21-' + nestedField" class="checkbox-container" (click)="onFieldChange(nestedField, !nestedField.value)">
                       <div class="checkbox" [class.checked]="nestedField.value">
                         <i class="material-icons" *ngIf="nestedField.value">check</i>
                       </div>
@@ -409,7 +409,7 @@
                     <label class="field-label" [class.required]="nestedField.required">
                       {{ nestedField.fieldname }}
                     </label>
-                    <select
+                    <select [attr.data-testid]="'ahff-sel-22-' + nestedField"
                       class="select-input"
                       [value]="nestedField.value || ''"
                       (change)="onFieldChange(nestedField, $any($event.target).value)"
@@ -426,7 +426,7 @@
                     <label class="field-label" [class.required]="nestedField.required">
                       {{ nestedField.fieldname }}
                     </label>
-                    <input
+                    <input [attr.data-testid]="'ahff-inp-23-' + nestedField"
                       type="text"
                       class="text-input"
                       [value]="nestedField.value || ''"
@@ -447,7 +447,7 @@
             <p class="field-description" *ngIf="field.fielddescription">
               {{ field.fielddescription }}
             </p>
-            <input
+            <input [attr.data-testid]="'ahff-inp-24-' + field"
               type="text"
               class="text-input"
               [placeholder]="field.fieldnotes || 'Enter ' + field.fieldname"
@@ -470,11 +470,11 @@
 
   <!-- Bottom Actions -->
   <div class="bottom-actions" *ngIf="!loading && formFields.length > 0">
-    <button class="reset-btn" [disabled]="!hasChanges" (click)="resetForm()">
+    <button data-testid="ahff-btn-25" class="reset-btn" [disabled]="!hasChanges" (click)="resetForm()">
       <i class="material-icons">refresh</i>
       Reset
     </button>
-    <button class="submit-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
+    <button data-testid="ahff-btn-26" class="submit-btn" [disabled]="saving || !hasChanges" (click)="saveForm()">
       <span *ngIf="!saving">Save Form</span>
       <div class="spinner-small" *ngIf="saving"></div>
     </button>

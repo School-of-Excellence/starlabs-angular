@@ -81,7 +81,7 @@
       <input matInput (keyup)="applyFilter($event)" placeholder="Search products..." />
     </mat-form-field>
 
-    <button mat-flat-button color="primary" (click)="openAddDialog()">
+    <button data-testid="pp-open-add-dialog-1" mat-flat-button color="primary" (click)="openAddDialog()">
       <mat-icon>add</mat-icon>
       Add Product
     </button>
@@ -109,7 +109,7 @@
     <ng-container matColumnDef="claimlink">
       <th mat-header-cell *matHeaderCellDef mat-sort-header> Claim Link </th>
       <td mat-cell *matCellDef="let p">
-        <a [href]="p.claimlink" target="_blank">Open</a>
+        <a data-testid="pp-a-2" [href]="p.claimlink" target="_blank">Open</a>
       </td>
     </ng-container>
 
@@ -129,10 +129,10 @@
     <ng-container matColumnDef="actions">
       <th mat-header-cell *matHeaderCellDef> Actions </th>
       <td mat-cell *matCellDef="let p; let i = index">
-        <button mat-icon-button color="primary" (click)="openEditDialog(p, i)">
+        <button data-testid="pp-open-edit-dialog-3" mat-icon-button color="primary" (click)="openEditDialog(p, i)">
           <mat-icon>edit</mat-icon>
         </button>
-        <button mat-icon-button color="warn" (click)="deleteProduct(i)">
+        <button data-testid="pp-delete-product-4" mat-icon-button color="warn" (click)="deleteProduct(i)">
           <mat-icon>delete</mat-icon>
         </button>
       </td>

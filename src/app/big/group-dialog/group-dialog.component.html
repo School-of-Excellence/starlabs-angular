@@ -7,7 +7,7 @@
           <mat-label>Add Tag</mat-label>
           <input matInput formControlName="newTag" placeholder="Enter tag"/>
         </mat-form-field>    
-        <button class="ms-2" mat-raised-button color="primary" [disabled]="!tagForm?.valid" (click)="addtags()">Add</button>
+        <button data-testid="gdlg-addtags-1" class="ms-2" mat-raised-button color="primary" [disabled]="!tagForm?.valid" (click)="addtags()">Add</button>
     </form>
   </div>
 
@@ -32,6 +32,6 @@
     
     <br>
     <div class="d-flex justify-content-center mt-4">
-      <button mat-raised-button color="primary" (click)="addparticipantTags()" [disabled]="!selectedTags.length">Add</button>
+      <button data-testid="gdlg-addparticipant-tags-2" mat-raised-button color="primary" (click)="addparticipantTags()" [disabled]="!selectedTags.length">Add</button>
     </div>
 </div>

@@ -7,7 +7,7 @@
       <i class="fa-regular fa-paper-plane header-icon"></i>
       <h2 class="title">Send Message</h2>
     </div>
-    <button mat-icon-button class="close-btn" (click)="close()">
+    <button data-testid="sen-close-1" mat-icon-button class="close-btn" (click)="close()">
       <i class="fa-solid fa-xmark"></i>
     </button>
   </div>
@@ -83,7 +83,7 @@
       <div class="tab-content">
         <form [formGroup]="whatsappForm" class="form">
           <div class="selected-profiles-section" *ngIf="data?.selectedprofiles?.length > 0">
-            <div class="profiles-header" (click)="profilesExpanded = !profilesExpanded">
+            <div data-testid="sen-profiles-expanded-2" class="profiles-header" (click)="profilesExpanded = !profilesExpanded">
               <div class="profiles-header-left">
                 <i class="fa-solid fa-users"></i>
                 <span class="profiles-title">Selected Recipients</span>
@@ -132,7 +132,7 @@
                         {{ template.elementName }}
                         <span class="template-badge">utility</span>
                       </span>
-                      <button mat-icon-button class="pin-btn" [class.pinned]="isPinned(template.elementName)"
+                      <button data-testid="sen-toggle-pin-3" mat-icon-button class="pin-btn" [class.pinned]="isPinned(template.elementName)"
                         (click)="togglePin(template, $event); $event.stopPropagation(); false"
                         (mousedown)="$event.stopPropagation()" type="button">
                         <i class="fa-solid fa-thumbtack"></i>
@@ -146,7 +146,7 @@
                 </mat-option>
               </mat-select>
               <mat-error *ngIf="whatsappForm.get('templateName')?.hasError('required')">Template is required</mat-error>
-              <button mat-icon-button matSuffix (click)="refreshTemplates(); $event.stopPropagation()" 
+              <button data-testid="sen-refresh-templates-4" mat-icon-button matSuffix (click)="refreshTemplates(); $event.stopPropagation()" 
                       [disabled]="isLoadingTemplates" title="Refresh templates" class="refresh-btn">
                 <i class="fa-solid fa-rotate"></i>
               </button>
@@ -158,11 +158,11 @@
             </div>
             <div class="pinned-chips">
               <mat-chip-set>
-                <mat-chip *ngFor="let template of pinnedTemplates"
+                <mat-chip data-testid="sen-select-pinned-template-5" *ngFor="let template of pinnedTemplates"
                   (click)="selectPinnedTemplate(template)"
                   [highlighted]="whatsappForm.get('templateName')?.value === template.elementName">
                   {{ template.elementName }}
-                  <button matChipRemove (click)="removePinnedTemplate(template, $event)">
+                  <button data-testid="sen-remove-pinned-template-6" matChipRemove (click)="removePinnedTemplate(template, $event)">
                     <i class="fa-solid fa-xmark"></i>
                   </button>
                 </mat-chip>
@@ -215,19 +215,19 @@
 
                 <!-- Cache Menu -->
                 <mat-menu #cacheMenu="matMenu" class="cache-menu">
-                  <div class="cache-menu-header" (click)="$event.stopPropagation()">
+                  <div data-testid="sen-event-7" class="cache-menu-header" (click)="$event.stopPropagation()">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>Recent Messages</span>
                   </div>
                   
-                  <div *ngIf="getCachedMessagesForTemplate().length === 0" class="cache-empty" (click)="$event.stopPropagation()">
+                  <div data-testid="sen-event-8" *ngIf="getCachedMessagesForTemplate().length === 0" class="cache-empty" (click)="$event.stopPropagation()">
                     <i class="fa-regular fa-folder-open"></i>
                     <span>No saved messages yet</span>
                     <small>Messages will appear here after sending</small>
                   </div>
                   
                   <ng-container *ngIf="getCachedMessagesForTemplate().length > 0">
-                    <button mat-menu-item *ngFor="let cached of getCachedMessagesForTemplate()" 
+                    <button data-testid="sen-load-cached-message-9" mat-menu-item *ngFor="let cached of getCachedMessagesForTemplate()" 
                             class="cache-item" (click)="loadCachedMessage(cached)">
                       <div class="cache-item-content">
                         <div class="cache-item-preview">{{ cached.previewText }}</div>
@@ -236,7 +236,7 @@
                             <i class="fa-regular fa-clock"></i>
                             {{ formatCacheTimestamp(cached.timestamp) }}
                           </span>
-                          <button mat-icon-button class="cache-delete-btn" 
+                          <button data-testid="sen-delete-cached-message-10" mat-icon-button class="cache-delete-btn" 
                                   (click)="deleteCachedMessage(cached, $event)"
                                   matTooltip="Delete">
                             <i class="fa-solid fa-trash-can"></i>
@@ -246,7 +246,7 @@
                     </button>
                     
                     <mat-divider></mat-divider>
-                    <button mat-menu-item class="cache-clear-all" (click)="clearAllCacheForTemplate()">
+                    <button data-testid="sen-clear-all-cache-for-template-11" mat-menu-item class="cache-clear-all" (click)="clearAllCacheForTemplate()">
                       <i class="fa-solid fa-broom"></i>
                       <span>Clear all for this template</span>
                     </button>
@@ -322,13 +322,13 @@
             </div>
           </div>
           <div class="actions">
-            <button mat-stroked-button class="btn-cancel" (click)="close()">
+            <button data-testid="sen-close-12" mat-stroked-button class="btn-cancel" (click)="close()">
               <i class="fa-solid fa-xmark"></i> Cancel
             </button>
-            <button mat-flat-button class="btn-storelocal" (click)="saveToCache()">
+            <button data-testid="sen-save-to-cache-13" mat-flat-button class="btn-storelocal" (click)="saveToCache()">
               <i class="fa-regular fa-bookmark"></i> Store Local
             </button>
-            <button mat-flat-button class="btn-whatsapp" (click)="sendWhatsApp()">
+            <button data-testid="sen-send-whats-app-14" mat-flat-button class="btn-whatsapp" (click)="sendWhatsApp()">
               <i class="fa-brands fa-whatsapp"></i> Send WhatsApp
             </button>
           </div>

@@ -125,14 +125,14 @@
               <i class="fa-solid fa-book-open"></i> Directive<p>
             <p class="directive-preview" *ngIf="activity.selectedForExpansion !== true">
               {{ activity.directive?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.directive?.split(' ').length > 10"
+              <a data-testid="pab-activity-1" *ngIf="activity.directive?.split(' ').length > 10"
                  (click)="activity.selectedForExpansion = true" class="read-more">
                 Read more
               </a>
             </p>
             <div class="directive-expanded" *ngIf="activity.selectedForExpansion === true">
               <p>{{activity.directive}}</p>
-              <a (click)="activity.selectedForExpansion = false" class="read-less">
+              <a data-testid="pab-activity-2" (click)="activity.selectedForExpansion = false" class="read-less">
                 Read less
               </a>
             </div>
@@ -148,7 +148,7 @@
                *ngIf="activity.selectedForExpansion3 !== true &&
                       activity.summary && activity.summary.length > 0">
               {{ activity.summary[0]?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.summary[0]?.split(' ').length > 10 ||
+              <a data-testid="pab-activity-3" *ngIf="activity.summary[0]?.split(' ').length > 10 ||
                         activity.summary.length > 1"
                  (click)="activity.selectedForExpansion3 = true" class="read-more">
                 Read more
@@ -163,7 +163,7 @@
                   {{ note }}
                 </li>
               </ul>
-              <a (click)="activity.selectedForExpansion3 = false" class="read-less">
+              <a data-testid="pab-activity-4" (click)="activity.selectedForExpansion3 = false" class="read-less">
                 Read less
               </a>
             </div>
@@ -183,7 +183,7 @@
                       activity.activityLog[activity.activityLog.length -1]['notes'] &&
                       activity.activityLog[activity.activityLog.length -1]['notes'].length > 0">
               {{ activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').slice(0, 10).join(' ') }}
-              <a *ngIf="activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').length > 10 ||
+              <a data-testid="pab-activity-5" *ngIf="activity.activityLog[activity.activityLog.length -1]['notes'][0]?.split(' ').length > 10 ||
                         activity.activityLog[activity.activityLog.length -1]['notes'].length > 1"
                  (click)="activity.selectedForExpansion2 = true" class="read-more">
                 Read more
@@ -200,7 +200,7 @@
                   {{ note }}
                 </li>
               </ul>
-              <a (click)="activity.selectedForExpansion2 = false" class="read-less">
+              <a data-testid="pab-activity-6" (click)="activity.selectedForExpansion2 = false" class="read-less">
                 Read less
               </a>
             </div>

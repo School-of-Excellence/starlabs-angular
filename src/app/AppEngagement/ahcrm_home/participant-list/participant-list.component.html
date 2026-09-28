@@ -45,7 +45,7 @@
         >
       </div>
 
-      <button
+      <button data-testid="ahpl-btn-1"
         class="icon-btn"
         [class.active]="filterActive"
         (click)="openFilterModal()"
@@ -58,13 +58,13 @@
     <div class="search-container">
       <div class="search-box">
         <i class="material-icons search-icon">search</i>
-        <input
+        <input data-testid="ahpl-inp-2"
           type="text"
           placeholder="Search participants..."
           [ngModel]="searchText"
           (input)="onSearchChange($event)"
         />
-        <button class="clear-btn" *ngIf="searchText" (click)="clearSearch()">
+        <button data-testid="ahpl-btn-3" class="clear-btn" *ngIf="searchText" (click)="clearSearch()">
           <i class="material-icons">close</i>
         </button>
       </div>
@@ -91,7 +91,7 @@
     <!-- </mat-chip-listbox> -->
     <!-- <p *ngIf="eventList.length === 0">No Ongoing events</p> -->
     <div class="filter-chips">
-      <div
+      <div [attr.data-testid]="'ahpl-act-4-' + event"
         class="chip"
         [class.active]="selectedEvents.includes(event?.docid)"
         *ngFor="let event of eventList"
@@ -99,7 +99,7 @@
       >
         <span class="chip-dot"></span>
         <span class="chip-label">{{ event["name"] ?? "-" }}</span>
-        <button class="chip-close">×</button>
+        <button [attr.data-testid]="'ahpl-btn-5-' + event" class="chip-close">×</button>
       </div>
     </div>
   </div>
@@ -108,7 +108,7 @@
   <div class="filters-container" *ngIf="getActiveFilterChips().length > 0">
     <div class="filters-header">
       <p>Active Events</p>
-      <button (click)="clearAllFilters()">clear all</button>
+      <button data-testid="ahpl-btn-6" (click)="clearAllFilters()">clear all</button>
     </div>
     <div class="filter-chips">
       <!-- <div class="chip" *ngFor="let chip of getActiveFilterChips()">
@@ -122,7 +122,7 @@
       >
         <span class="chip-dot"></span>
         <span class="chip-label">{{ chip.label }}</span>
-        <button class="chip-close" (click)="removeFilter(chip)">×</button>
+        <button [attr.data-testid]="'ahpl-btn-7-' + chip" class="chip-close" (click)="removeFilter(chip)">×</button>
       </div>
     </div>
   </div>
@@ -160,14 +160,14 @@
         filteredProfileIds.length > 0
       "
     >
-      <div
+      <div [attr.data-testid]="'ahpl-act-8-' + profileId"
         class="participant-card"
         *ngFor="let profileId of filteredProfileIds; trackBy: trackByProfileId"
         (click)="openDetailView(profileId)"
       >
         <ng-container *ngIf="getParticipant(profileId) as profile">
           <!-- Profile Image - Clickable -->
-          <div
+          <div [attr.data-testid]="'ahpl-act-9-' + profileId"
             class="profile-image"
             (click)="openImagePreviewPopup(profile, $event)"
           >
@@ -207,7 +207,7 @@
           </div>
 
           <!-- Add Note Button -->
-          <button
+          <button [attr.data-testid]="'ahpl-btn-10-' + profileId"
             class="add-note-btn"
             (click)="openAddNoteModal(profile, $event)"
           >
@@ -226,7 +226,7 @@
   </div>
 
   <!-- Scroll to Top FAB -->
-  <button
+  <button data-testid="ahpl-btn-11"
     class="fab-scroll-top"
     [class.visible]="isScrolled"
     (click)="scrollToTop()"
@@ -235,12 +235,12 @@
   </button>
 
   <!-- Filter Modal -->
-  <div
+  <div data-testid="ahpl-act-12"
     class="modal-overlay"
     *ngIf="showFilterModal"
     (click)="closeFilterModal()"
   >
-    <div class="filter-modal" (click)="$event.stopPropagation()">
+    <div data-testid="ahpl-act-13" class="filter-modal" (click)="$event.stopPropagation()">
       <div class="modal-handle"></div>
 
       <div class="modal-header">
@@ -259,21 +259,21 @@
           >
             Events
           </button> -->
-          <button
+          <button data-testid="ahpl-btn-14"
             class="category-btn"
             [class.active]="filterbox === 1"
             (click)="selectFilterTab(1)"
           >
             Queues
           </button>
-          <button
+          <button data-testid="ahpl-btn-15"
             class="category-btn"
             [class.active]="filterbox === 2"
             (click)="selectFilterTab(2)"
           >
             Ecosystem
           </button>
-          <button
+          <button data-testid="ahpl-btn-16"
             class="category-btn"
             [class.active]="filterbox === 3"
             (click)="selectFilterTab(3)"
@@ -315,7 +315,7 @@
               <i class="material-icons">inbox</i>
               <span>No queues available</span>
             </div>
-            <div
+            <div [attr.data-testid]="'ahpl-act-17-' + queue"
               class="option-item"
               *ngFor="let queue of queueList"
               [class.selected]="selectedQueues.includes(queue.id)"
@@ -344,7 +344,7 @@
               <i class="material-icons">inbox</i>
               <span>No ecosystem items available</span>
             </div>
-            <div
+            <div [attr.data-testid]="'ahpl-act-18-' + ecosystem"
               class="option-item"
               *ngFor="let ecosystem of ecosystemJourneysList"
               [class.selected]="selectedEcosystem.includes(ecosystem)"
@@ -370,7 +370,7 @@
               <i class="material-icons">inbox</i>
               <span>No DFU items available</span>
             </div>
-            <div
+            <div [attr.data-testid]="'ahpl-act-19-' + dfu"
               class="option-item"
               *ngFor="let dfu of dfuJourneysList"
               [class.selected]="selectedDFU.includes(dfu)"
@@ -388,8 +388,8 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn-clear" (click)="clearAllFilters()">Clear All</button>
-        <button class="btn-apply" (click)="applyFilterSelection()">
+        <button data-testid="ahpl-btn-20" class="btn-clear" (click)="clearAllFilters()">Clear All</button>
+        <button data-testid="ahpl-btn-21" class="btn-apply" (click)="applyFilterSelection()">
           Apply Filters
         </button>
       </div>
@@ -397,12 +397,12 @@
   </div>
 
   <!-- Quick Add Note Modal -->
-  <div
+  <div data-testid="ahpl-act-22"
     class="modal-overlay"
     *ngIf="showQuickNoteModal"
     (click)="closeQuickNoteModal()"
   >
-    <div class="quick-note-modal" (click)="$event.stopPropagation()">
+    <div data-testid="ahpl-act-23" class="quick-note-modal" (click)="$event.stopPropagation()">
       <div class="modal-handle"></div>
 
       <div class="quick-note-header">
@@ -434,19 +434,19 @@
             </ng-container>
           </div>
         </div>
-        <button class="close-btn" (click)="closeQuickNoteModal()">
+        <button data-testid="ahpl-btn-24" class="close-btn" (click)="closeQuickNoteModal()">
           <i class="material-icons">close</i>
         </button>
       </div>
 
       <div class="quick-note-content">
         <div class="quick-note-input-container">
-          <textarea
+          <textarea data-testid="ahpl-txt-25"
             [(ngModel)]="quickNoteText"
             placeholder="Write your note here..."
             rows="4"
           ></textarea>
-          <button
+          <button data-testid="ahpl-btn-26"
             mat-icon-button
             matSuffix
             class="mic-btn"
@@ -459,10 +459,10 @@
       </div>
 
       <div class="quick-note-actions">
-        <button class="btn-cancel" (click)="closeQuickNoteModal()">
+        <button data-testid="ahpl-btn-27" class="btn-cancel" (click)="closeQuickNoteModal()">
           Cancel
         </button>
-        <button
+        <button data-testid="ahpl-btn-28"
           class="btn-save"
           [disabled]="!quickNoteText.trim() || quickNoteSaving"
           (click)="saveQuickNote()"
@@ -475,13 +475,13 @@
   </div>
 
   <!-- Image Preview Popup -->
-  <div
+  <div data-testid="ahpl-act-29"
     class="image-preview-overlay"
     *ngIf="showImagePreviewPopup"
     (click)="closeImagePreviewPopup()"
   >
-    <div class="image-preview-popup" (click)="$event.stopPropagation()">
-      <button class="close-preview-btn" (click)="closeImagePreviewPopup()">
+    <div data-testid="ahpl-act-30" class="image-preview-popup" (click)="$event.stopPropagation()">
+      <button data-testid="ahpl-btn-31" class="close-preview-btn" (click)="closeImagePreviewPopup()">
         <i class="material-icons">close</i>
       </button>
 
@@ -504,7 +504,7 @@
       </div>
 
       <div class="preview-actions">
-        <button class="btn-upload-image" (click)="switchToUploadFromPreview()">
+        <button data-testid="ahpl-btn-32" class="btn-upload-image" (click)="switchToUploadFromPreview()">
           <i class="material-icons">cloud_upload</i>
           <span>{{
             getProfileImage(imagePreviewProfile)
@@ -518,17 +518,17 @@
 </div>
 
 <!-- Image Upload Modal - OUTSIDE main container so it works from detail view -->
-<div
+<div data-testid="ahpl-act-33"
   class="modal-overlay"
   *ngIf="showImageUploadModal"
   (click)="closeImageUploadModal()"
 >
-  <div class="image-upload-modal" (click)="$event.stopPropagation()">
+  <div data-testid="ahpl-act-34" class="image-upload-modal" (click)="$event.stopPropagation()">
     <div class="modal-handle"></div>
 
     <div class="image-upload-header">
       <h3>Upload Profile Image</h3>
-      <button class="close-btn" (click)="closeImageUploadModal()">
+      <button data-testid="ahpl-btn-35" class="close-btn" (click)="closeImageUploadModal()">
         <i class="material-icons">close</i>
       </button>
     </div>
@@ -556,7 +556,7 @@
       </div>
 
       <div class="upload-area">
-        <input
+        <input data-testid="ahpl-inp-36"
           type="file"
           id="imageInput"
           accept="image/*"
@@ -577,10 +577,10 @@
     </div>
 
     <div class="image-upload-actions">
-      <button class="btn-cancel" (click)="closeImageUploadModal()">
+      <button data-testid="ahpl-btn-37" class="btn-cancel" (click)="closeImageUploadModal()">
         Cancel
       </button>
-      <button
+      <button data-testid="ahpl-btn-38"
         class="btn-upload"
         [disabled]="!selectedImageFile || imageUploading"
         (click)="uploadProfileImage()"
@@ -596,12 +596,12 @@
   class="bottom-filters"
   *ngIf="selectedEvents.length > 0 && !showFilterModal"
 >
-  <div class="filter-pill" (click)="openEventDilaog('cohort')">
+  <div data-testid="ahpl-act-39" class="filter-pill" (click)="openEventDilaog('cohort')">
     <mat-icon>groups_2</mat-icon>
     <span>Cohorts</span>
   </div>
 
-  <div
+  <div data-testid="ahpl-act-40"
     class="filter-pill"
     [class.active]="false"
     (click)="openEventDilaog('journey')"
@@ -610,7 +610,7 @@
     <span>Journey</span>
   </div>
 
-  <div class="filter-pill" (click)="openEventDilaog('product')">
+  <div data-testid="ahpl-act-41" class="filter-pill" (click)="openEventDilaog('product')">
     <mat-icon>inventory_2</mat-icon>
     <span>Products</span>
   </div>
@@ -630,7 +630,7 @@
           </p>
         </div>
       </div>
-      <button mat-icon-button mat-dialog-close>
+      <button data-testid="ahpl-btn-42" mat-icon-button mat-dialog-close>
         <mat-icon>close</mat-icon>
       </button>
     </div>
@@ -640,10 +640,10 @@
         >{{ eventDilaogConfig.selectedOptionsList.length }} selected</span
       >
       <div>
-        <button mat-button class="select-all-btn" (click)="selectAll()">
+        <button data-testid="ahpl-btn-43" mat-button class="select-all-btn" (click)="selectAll()">
           Select All
         </button>
-        <button mat-button class="deselect-all-btn" (click)="clearAll()">
+        <button data-testid="ahpl-btn-44" mat-button class="deselect-all-btn" (click)="clearAll()">
           Clear All
         </button>
       </div>
@@ -694,7 +694,7 @@
         </div>
     </mat-dialog-content>
     <div class="dialog-actions">
-      <button
+      <button data-testid="ahpl-btn-45"
         mat-flat-button
         color="primary"
         class="select-btn"

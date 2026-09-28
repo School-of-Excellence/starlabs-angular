@@ -38,7 +38,7 @@
           </div>
         </div>
 
-        <button
+        <button data-testid="eif1-reset-1"
           type="button"
           mat-stroked-button
           class="reset-btn"
@@ -48,7 +48,7 @@
           <mat-icon>undo</mat-icon> Reset
         </button>
 
-        <button
+        <button data-testid="eif1-button-2"
           type="submit"
           mat-flat-button
           color="primary"
@@ -66,7 +66,7 @@
     <div class="workspace">
       <!-- Left section navigator -->
       <aside class="side-nav">
-        <button
+        <button data-testid="eif1-active-section-3"
           type="button"
           class="nav-item"
           *ngFor="let s of sections"
@@ -82,7 +82,7 @@
 
     <!-- Section 1 -->
     <div class="section-pane" [hidden]="activeSection !== 1">
-      <button
+      <button data-testid="eif1-section1-open-4"
         type="button"
         class="section-header"
         (click)="section1Open = !section1Open"
@@ -200,7 +200,7 @@
                   <mat-label>Proof</mat-label>
                   <input matInput formControlName="proof" placeholder="Lives Reached" autocomplete="off" />
                 </mat-form-field>
-                <button
+                <button data-testid="eif1-remove-proof-5"
                   type="button"
                   mat-icon-button
                   class="proof-remove"
@@ -210,7 +210,7 @@
                 </button>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addProof()">
+              <button data-testid="eif1-add-proof-6" type="button" mat-stroked-button class="add-proof-btn" (click)="addProof()">
                 <mat-icon>add</mat-icon> Add proof
               </button>
             </div>
@@ -221,7 +221,7 @@
 
     <!-- Section 2 -->
     <div class="section-pane" [hidden]="activeSection !== 2">
-      <button
+      <button data-testid="eif1-section2-open-7"
         type="button"
         class="section-header"
         (click)="section2Open = !section2Open"
@@ -292,12 +292,12 @@
                   <mat-label>Publication</mat-label>
                   <input matInput [formControlName]="i" placeholder="Forbes India" autocomplete="off" />
                 </mat-form-field>
-                <button type="button" mat-icon-button class="proof-remove" (click)="removePublication(i)" matTooltip="Remove">
+                <button data-testid="eif1-remove-publication-8" type="button" mat-icon-button class="proof-remove" (click)="removePublication(i)" matTooltip="Remove">
                   <mat-icon>close</mat-icon>
                 </button>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addPublication()">
+              <button data-testid="eif1-add-publication-9" type="button" mat-stroked-button class="add-proof-btn" (click)="addPublication()">
                 <mat-icon>add</mat-icon> Add publication
               </button>
             </div>
@@ -325,7 +325,7 @@
                     <span class="award-emoji" *ngIf="row.get('emoji')?.value">{{ row.get('emoji')?.value }}</span>
                     Award {{ i + 1 }}
                   </span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAward(i)" matTooltip="Remove award">
+                  <button data-testid="eif1-remove-award-10" type="button" mat-icon-button class="proof-remove" (click)="removeAward(i)" matTooltip="Remove award">
                     <mat-icon>close</mat-icon>
                   </button>
                 </div>
@@ -347,12 +347,12 @@
 
                 <div class="award-emoji-row">
                   <span class="award-emoji-label">Emoji</span>
-                  <button type="button" mat-stroked-button class="emoji-pick-btn" (click)="toggleEmoji(i)">
+                  <button data-testid="eif1-toggle-emoji-11" type="button" mat-stroked-button class="emoji-pick-btn" (click)="toggleEmoji(i)">
                     <span class="emoji-current" *ngIf="row.get('emoji')?.value">{{ row.get('emoji')?.value }}</span>
                     <mat-icon *ngIf="!row.get('emoji')?.value">mood</mat-icon>
                     {{ row.get('emoji')?.value ? 'Change' : 'Pick emoji' }}
                   </button>
-                  <button type="button" mat-icon-button class="proof-remove" *ngIf="row.get('emoji')?.value" (click)="clearEmoji(i)" matTooltip="Clear emoji">
+                  <button data-testid="eif1-clear-emoji-12" type="button" mat-icon-button class="proof-remove" *ngIf="row.get('emoji')?.value" (click)="clearEmoji(i)" matTooltip="Clear emoji">
                     <mat-icon>backspace</mat-icon>
                   </button>
                 </div>
@@ -369,7 +369,7 @@
                 </div>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAward()">
+              <button data-testid="eif1-add-award-13" type="button" mat-stroked-button class="add-proof-btn" (click)="addAward()">
                 <mat-icon>add</mat-icon> Add award
               </button>
             </div>
@@ -381,7 +381,7 @@
 
     <!-- Section 3 -->
     <div class="section-pane" [hidden]="activeSection !== 3">
-      <button
+      <button data-testid="eif1-section3-open-14"
         type="button"
         class="section-header"
         (click)="section3Open = !section3Open"
@@ -452,7 +452,7 @@
                     <mat-icon class="award-lead-icon">movie</mat-icon>
                     Video {{ i + 1 }}
                   </span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeScienceVideo(i)" matTooltip="Remove video">
+                  <button data-testid="eif1-remove-science-video-15" type="button" mat-icon-button class="proof-remove" (click)="removeScienceVideo(i)" matTooltip="Remove video">
                     <mat-icon>close</mat-icon>
                   </button>
                 </div>
@@ -469,7 +469,7 @@
                 </div>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addScienceVideo()">
+              <button data-testid="eif1-add-science-video-16" type="button" mat-stroked-button class="add-proof-btn" (click)="addScienceVideo()">
                 <mat-icon>add</mat-icon> Add video
               </button>
             </div>
@@ -481,7 +481,7 @@
 
     <!-- Section 4 -->
     <div class="section-pane" [hidden]="activeSection !== 4">
-      <button
+      <button data-testid="eif1-section4-open-17"
         type="button"
         class="section-header"
         (click)="section4Open = !section4Open"
@@ -544,7 +544,7 @@
                     <mat-icon class="award-lead-icon">movie</mat-icon>
                     Video {{ i + 1 }}
                   </span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAhVideo(i)" matTooltip="Remove video">
+                  <button data-testid="eif1-remove-ah-video-18" type="button" mat-icon-button class="proof-remove" (click)="removeAhVideo(i)" matTooltip="Remove video">
                     <mat-icon>close</mat-icon>
                   </button>
                 </div>
@@ -566,7 +566,7 @@
                 </div>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAhVideo()">
+              <button data-testid="eif1-add-ah-video-19" type="button" mat-stroked-button class="add-proof-btn" (click)="addAhVideo()">
                 <mat-icon>add</mat-icon> Add video
               </button>
             </div>
@@ -578,7 +578,7 @@
 
     <!-- Section 5 -->
     <div class="section-pane" [hidden]="activeSection !== 5">
-      <button
+      <button data-testid="eif1-section5-open-20"
         type="button"
         class="section-header"
         (click)="section5Open = !section5Open"
@@ -672,7 +672,7 @@
               <div class="award-card" *ngFor="let row of eiVideoRows.controls; let i = index" [formGroupName]="i">
                 <div class="award-head">
                   <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeEiVideo(i)" matTooltip="Remove video">
+                  <button data-testid="eif1-remove-ei-video-21" type="button" mat-icon-button class="proof-remove" (click)="removeEiVideo(i)" matTooltip="Remove video">
                     <mat-icon>close</mat-icon>
                   </button>
                 </div>
@@ -687,7 +687,7 @@
                   </div>
                 </div>
               </div>
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addEiVideo()">
+              <button data-testid="eif1-add-ei-video-22" type="button" mat-stroked-button class="add-proof-btn" (click)="addEiVideo()">
                 <mat-icon>add</mat-icon> Add video
               </button>
             </div>
@@ -769,7 +769,7 @@
 
     <!-- Section 6 -->
     <div class="section-pane" [hidden]="activeSection !== 6">
-      <button type="button" class="section-header" (click)="section6Open = !section6Open" [attr.aria-expanded]="section6Open">
+      <button data-testid="eif1-section6-open-23" type="button" class="section-header" (click)="section6Open = !section6Open" [attr.aria-expanded]="section6Open">
         <div class="section-header-left">
           <span class="section-index">6</span>
           <div class="section-title-text"><h2>Reflection of Growth</h2><p>Love-letter intro &amp; the participant letters.</p></div>
@@ -821,7 +821,7 @@
               <div class="award-card" *ngFor="let row of loveLetterRows.controls; let i = index" [formGroupName]="i">
                 <div class="award-head">
                   <span class="award-title"><mat-icon class="award-lead-icon">favorite</mat-icon> Letter {{ i + 1 }}</span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeLoveLetter(i)" matTooltip="Remove letter"><mat-icon>close</mat-icon></button>
+                  <button data-testid="eif1-remove-love-letter-24" type="button" mat-icon-button class="proof-remove" (click)="removeLoveLetter(i)" matTooltip="Remove letter"><mat-icon>close</mat-icon></button>
                 </div>
                 <mat-form-field appearance="outline" class="text-field" subscriptSizing="dynamic">
                   <mat-label>Participant</mat-label>
@@ -834,7 +834,7 @@
                   <ngx-editor [editor]="getLetterEditor(i)" formControlName="letter" [outputFormat]="'html'" placeholder="Write the letter…"></ngx-editor>
                 </div></div>
               </div>
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addLoveLetter()"><mat-icon>add</mat-icon> Add letter</button>
+              <button data-testid="eif1-add-love-letter-25" type="button" mat-stroked-button class="add-proof-btn" (click)="addLoveLetter()"><mat-icon>add</mat-icon> Add letter</button>
             </div>
           </section>
 
@@ -844,7 +844,7 @@
 
     <!-- Section 7 -->
     <div class="section-pane" [hidden]="activeSection !== 7">
-      <button type="button" class="section-header" (click)="section7Open = !section7Open" [attr.aria-expanded]="section7Open">
+      <button data-testid="eif1-section7-open-26" type="button" class="section-header" (click)="section7Open = !section7Open" [attr.aria-expanded]="section7Open">
         <div class="section-header-left">
           <span class="section-index">7</span>
           <div class="section-title-text"><h2>Live From The Arena</h2><p>Intro &amp; the live-arena videos.</p></div>
@@ -885,7 +885,7 @@
               <div class="award-card" *ngFor="let row of liveArenaVideoRows.controls; let i = index" [formGroupName]="i">
                 <div class="award-head">
                   <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeLiveArenaVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
+                  <button data-testid="eif1-remove-live-arena-video-27" type="button" mat-icon-button class="proof-remove" (click)="removeLiveArenaVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
                 </div>
                 <div class="ahvideo-uploads">
                   <div class="ahvideo-upload"><span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
@@ -896,7 +896,7 @@
                   </div>
                 </div>
               </div>
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addLiveArenaVideo()"><mat-icon>add</mat-icon> Add video</button>
+              <button data-testid="eif1-add-live-arena-video-28" type="button" mat-stroked-button class="add-proof-btn" (click)="addLiveArenaVideo()"><mat-icon>add</mat-icon> Add video</button>
             </div>
           </section>
 
@@ -906,7 +906,7 @@
 
     <!-- Section 8 -->
     <div class="section-pane" [hidden]="activeSection !== 8">
-      <button type="button" class="section-header" (click)="section8Open = !section8Open" [attr.aria-expanded]="section8Open">
+      <button data-testid="eif1-section8-open-29" type="button" class="section-header" (click)="section8Open = !section8Open" [attr.aria-expanded]="section8Open">
         <div class="section-header-left">
           <span class="section-index">8</span>
           <div class="section-title-text"><h2>Antano &amp; Prodigies</h2><p>Prodigies, videos, the Ads block &amp; rights reserved.</p></div>
@@ -947,7 +947,7 @@
               <div class="award-card" *ngFor="let row of prodigiesVideoRows.controls; let i = index" [formGroupName]="i">
                 <div class="award-head">
                   <span class="award-title"><mat-icon class="award-lead-icon">movie</mat-icon> Video {{ i + 1 }}</span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeProdigiesVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
+                  <button data-testid="eif1-remove-prodigies-video-30" type="button" mat-icon-button class="proof-remove" (click)="removeProdigiesVideo(i)" matTooltip="Remove video"><mat-icon>close</mat-icon></button>
                 </div>
                 <div class="ahvideo-uploads">
                   <div class="ahvideo-upload"><span class="upload-label"><mat-icon>videocam</mat-icon> Video</span>
@@ -958,7 +958,7 @@
                   </div>
                 </div>
               </div>
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addProdigiesVideo()"><mat-icon>add</mat-icon> Add video</button>
+              <button data-testid="eif1-add-prodigies-video-31" type="button" mat-stroked-button class="add-proof-btn" (click)="addProdigiesVideo()"><mat-icon>add</mat-icon> Add video</button>
             </div>
           </section>
 
@@ -981,7 +981,7 @@
               <div class="award-card" *ngFor="let row of adRows.controls; let i = index" [formGroupName]="i">
                 <div class="award-head">
                   <span class="award-title"><mat-icon class="award-lead-icon">ad_units</mat-icon> Ad {{ i + 1 }}</span>
-                  <button type="button" mat-icon-button class="proof-remove" (click)="removeAd(i)" matTooltip="Remove ad"><mat-icon>close</mat-icon></button>
+                  <button data-testid="eif1-remove-ad-32" type="button" mat-icon-button class="proof-remove" (click)="removeAd(i)" matTooltip="Remove ad"><mat-icon>close</mat-icon></button>
                 </div>
 
                 <div class="ad-editor">
@@ -1040,13 +1040,13 @@
                       <mat-label>Proof</mat-label>
                       <input matInput formControlName="proof" placeholder="Lives Reached" autocomplete="off" />
                     </mat-form-field>
-                    <button type="button" mat-icon-button class="proof-remove" (click)="removeAdProof(i, j)" matTooltip="Remove proof"><mat-icon>close</mat-icon></button>
+                    <button data-testid="eif1-remove-ad-proof-33" type="button" mat-icon-button class="proof-remove" (click)="removeAdProof(i, j)" matTooltip="Remove proof"><mat-icon>close</mat-icon></button>
                   </div>
-                  <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAdProof(i)"><mat-icon>add</mat-icon> Add proof</button>
+                  <button data-testid="eif1-add-ad-proof-34" type="button" mat-stroked-button class="add-proof-btn" (click)="addAdProof(i)"><mat-icon>add</mat-icon> Add proof</button>
                 </div>
               </div>
 
-              <button type="button" mat-stroked-button class="add-proof-btn" (click)="addAd()"><mat-icon>add</mat-icon> Add ad</button>
+              <button data-testid="eif1-add-ad-35" type="button" mat-stroked-button class="add-proof-btn" (click)="addAd()"><mat-icon>add</mat-icon> Add ad</button>
             </div>
           </section>
 

@@ -71,7 +71,7 @@
             </mat-select>
         </mat-form-field>
 
-        <button type="button" mat-mini-fab color="primary" #tooltip="matTooltip" (click)="exportCSV()"
+        <button data-testid="vas-export-csv-1" type="button" mat-mini-fab color="primary" #tooltip="matTooltip" (click)="exportCSV()"
           matTooltip="clear filter"
           aria-label="Button that displays a tooltip that can be programmatically disabled"><mat-icon>ios_share</mat-icon>
         </button>    
@@ -99,8 +99,8 @@
             <td *ngIf="fileds != 'docid'">{{fields != 'Timing' ? data[fields] : data[fields].toDate() | date: 'short'}}</td>
           </ng-container>
           <td>
-            <button type="button" mat-raised-button (click)="openDialog(data,i)">Edit</button>
-            <button type="button" mat-raised-button color="primary" *ngIf="!data['validated']" (click)="validateArenaSpace(data,i)">Validate</button>
+            <button data-testid="vas-open-dialog-2" type="button" mat-raised-button (click)="openDialog(data,i)">Edit</button>
+            <button data-testid="vas-validate-arena-space-3" type="button" mat-raised-button color="primary" *ngIf="!data['validated']" (click)="validateArenaSpace(data,i)">Validate</button>
           </td>
         </tr>
       </tbody>
@@ -113,17 +113,17 @@
       </div>
       
       <div class="pagination-controls">
-        <button class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">
+        <button data-testid="vas-prev-page-4" class="pagination-button" [disabled]="currentPage === 1" (click)="prevPage()">
           Previous
         </button>
         
-        <button class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">
+        <button data-testid="vas-go-to-page-5" class="pagination-button page-number" *ngIf="pageNumbers[0] > 1" (click)="goToPage(1)">
           1
         </button>
         
         <span class="ellipsis" *ngIf="pageNumbers[0] > 2">...</span>
         
-        <button 
+        <button data-testid="vas-go-to-page-6" 
           *ngFor="let page of pageNumbers" 
           class="pagination-button page-number" 
           [class.active]="currentPage === page"
@@ -133,21 +133,21 @@
         
         <span class="ellipsis" *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages - 1">...</span>
         
-        <button 
+        <button data-testid="vas-go-to-page-7" 
           class="pagination-button page-number" 
           *ngIf="pageNumbers[pageNumbers.length - 1] < totalPages" 
           (click)="goToPage(totalPages)">
           {{ totalPages }}
         </button>
         
-        <button class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">
+        <button data-testid="vas-next-page-8" class="pagination-button" [disabled]="currentPage === totalPages" (click)="nextPage()">
           Next
         </button>
       </div>
       
       <div class="pagination-size">
         <label for="page-size">Items per page:</label>
-        <select id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
+        <select data-testid="vas-change-current-page-9" id="page-size" [(ngModel)]="pageSize" (change)="currentPage = 1; updatePaginatedData()">
           <option value="5">5</option>
           <option value="10">10</option>
           <option value="25">25</option>

@@ -5,8 +5,8 @@
       <div class="title">My Appointment Studio</div>
     </div>
     <div class="col-sm text-end">
-      <span class="mycalendarbtn" (click)="openMyCalendar()">Go to My Calendar</span>
-      <span *ngIf="lastUnmarkedAppointment" class="mycalendarbtn" (click)="updateStatus(lastUnmarkedAppointment)">Action Required</span>
+      <span data-testid="as-open-my-calendar-1" class="mycalendarbtn" (click)="openMyCalendar()">Go to My Calendar</span>
+      <span data-testid="as-update-status-2" *ngIf="lastUnmarkedAppointment" class="mycalendarbtn" (click)="updateStatus(lastUnmarkedAppointment)">Action Required</span>
     </div>
   </div>
 
@@ -36,7 +36,7 @@
           <div>
             <div class="appointmenttitle">
               <span>{{mapAppointment[appointment.meta.appointment.id]}} -&nbsp;</span>
-              <span (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile"> 
+              <span data-testid="as-open-profile-3" (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile"> 
                 {{appointment.meta.clientname}}
                 <mat-icon class="text-success">arrow_outward</mat-icon>
               </span>
@@ -47,7 +47,7 @@
             <div class="appointmentdetails">
               <p>
                 <strong>Client:</strong>
-                <span (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile">{{appointment.meta.clientname}}</span>
+                <span data-testid="as-open-profile-4" (click)="openProfile(appointment.meta.bookedby.id)" class="openprofile">{{appointment.meta.clientname}}</span>
               </p>
               <p>
                 <strong>Active journey:</strong> 
@@ -60,7 +60,7 @@
                 <strong>Streaming Platform:</strong>
                 <label *ngIf="superRole; else platform">
                   <label [class.zoomenable]="appointment.meta['platform'] == 'zoom'">Zoom </label>
-                  <mat-slide-toggle class="platformtoggle" [checked]="appointment.meta['platform'] == 'openvidu'" (change)="onPlatformChange($event.checked, appointment.meta)"></mat-slide-toggle>
+                  <mat-slide-toggle data-testid="as-change-on-platform-change-5" class="platformtoggle" [checked]="appointment.meta['platform'] == 'openvidu'" (change)="onPlatformChange($event.checked, appointment.meta)"></mat-slide-toggle>
                   <label [class.openviduenable]="appointment.meta['platform'] == 'openvidu'">Openvidu</label>
                 </label>
 
@@ -76,8 +76,8 @@
           <div *ngIf="i == 0">
             <div class="zoomcontent" *ngIf="liveAppointmentStatus == 'LIVE' || (Array.isArray(liveAppointmentStatus) && liveAppointmentStatus[0] == 0) && liveAppointmentStatus[1] <= 5; else watingmessage">
               <div>
-                <button class="zoomlaunchbtn" mat-button (click)="startMeeting(appointment)">Launch Meeting Now</button>
-                <button class="ms-4 journeyplanbtn" mat-button (click)="openJourneyPlan(appointment)">Open Journey Plan</button>
+                <button data-testid="as-start-meeting-6" class="zoomlaunchbtn" mat-button (click)="startMeeting(appointment)">Launch Meeting Now</button>
+                <button data-testid="as-open-journey-plan-7" class="ms-4 journeyplanbtn" mat-button (click)="openJourneyPlan(appointment)">Open Journey Plan</button>
               </div>
             </div>
             <ng-template #watingmessage>
@@ -107,7 +107,7 @@
           <!-- <h3 class="appointment-title">{{matched.title}}</h3> -->
           <h3 class="appointment-title">
             <span>{{mapAppointment[matched.meta.appointment.id]}} -&nbsp;</span>
-            <span (click)="openProfile(matched.meta.bookedby.id)" class="openprofile"> 
+            <span data-testid="as-open-profile-8" (click)="openProfile(matched.meta.bookedby.id)" class="openprofile"> 
               {{mapProfile[matched.meta.bookedby.id]}}
               <mat-icon class="text-success">arrow_outward</mat-icon>
             </span>

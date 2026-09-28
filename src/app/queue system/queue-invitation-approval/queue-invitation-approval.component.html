@@ -51,14 +51,14 @@
       </div>
 
       <div class="tabs">
-        <button
+        <button data-testid="qiap-btn-1"
           mat-button
           [class.active]="activeGame === 'target'"
           (click)="switchGame('target')">
           🎯 Quick Tap
         </button>
 
-        <button
+        <button data-testid="qiap-btn-2"
           mat-button
           [class.active]="activeGame === 'memory'"
           (click)="switchGame('memory')">
@@ -70,7 +70,7 @@
       <div class="game" [class.target-cursor]="activeGame === 'target'">
 
         <!-- TARGET GAME -->
-        <div
+        <div data-testid="qiap-act-3"
           *ngIf="activeGame === 'target'"
           class="target"
           [style.left.%]="target.x"
@@ -90,7 +90,7 @@
 
         <!-- MEMORY GAME -->
         <div *ngIf="activeGame === 'memory'" class="memory">
-          <div
+          <div [attr.data-testid]="'qiap-act-4-' + card"
             class="card"
             *ngFor="let card of cards"
             [class.flipped]="card.flipped || card.matched"

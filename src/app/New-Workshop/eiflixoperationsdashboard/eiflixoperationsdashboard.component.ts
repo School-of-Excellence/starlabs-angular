@@ -3,16 +3,24 @@ import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
-  Firestore, collection, collectionData, getDocs, query, where, documentId, Timestamp,
+  Firestore, collection, collectionData, getDocs, query, where, orderBy, documentId, Timestamp,
   doc, setDoc, serverTimestamp
 } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { trigger, transition, style, animate } from '@angular/animations';
 import { Subject, takeUntil } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { EodDialogService } from './eod-dialog/eod-dialog.service';
+
+/** One `loginlog` document as the EiFlix Mobile App Logs table shows it. */
+interface LogRow {
+  id: string; profileid: string; name: string;
+  date: Date | null; dateLabel: string;
+  device_os: string; current_version: string;
+}
 
 type Accent = 'indigo' | 'emerald' | 'amber' | 'violet' | 'rose' | 'orange' | 'red';
 type RangeKey = 'today' | '7d' | '30d' | 'custom';
@@ -77,7 +85,7 @@ interface ContentRow {
 @Component({
   selector: 'app-eiflixoperationsdashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, A11yModule, MatSelectModule, MatFormFieldModule],
+  imports: [CommonModule, FormsModule, MatIconModule, A11yModule, MatSelectModule, MatFormFieldModule, NgxMatSelectSearchModule],
   templateUrl: './eiflixoperationsdashboard.component.html',
   styleUrl: './eiflixoperationsdashboard.component.css',
   animations: [
@@ -321,6 +329,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   // ==================== lifecycle ====================
 
   ngOnInit(): void {
+    this.loadLoginLogs();
     this.nudReady = new Promise<void>(res => (this.nudReadyResolve = res));
 
     // Single realtime listener over new_user_data: feeds the Users cards
@@ -375,6 +384,140 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.loadNaRegister();
     this.fetchEngagement();
   }
+
+  // ==================== EiFlix Mobile App Logs (loginlog) ====================
+  /** Range in days: 1 = today (since local midnight), 7, 30. */
+  logRange: 1 | 7 | 30 = 1;
+  logLoading = false;
+  logError = false;
+  /** Every EiFlix row in the range, newest first — filters/sort/paging derive from this. */
+  logAll: LogRow[] = [];
+  logShown: LogRow[] = [];
+  logPage: LogRow[] = [];
+  logSearch = '';
+  logNameFilter = 'all';
+  logOsFilter = 'all';
+  /** Distinct people in the loaded rows, labelled by name — the name filter's options. */
+  logNameOptions: { profileid: string; name: string }[] = [];
+  /** Typed into the name filter's search row; narrows the options, not the table. */
+  logNameSearch = '';
+  get logNameOptionsShown(): { profileid: string; name: string }[] {
+    const q = this.logNameSearch.trim().toLowerCase();
+    return q ? this.logNameOptions.filter(o => o.name.toLowerCase().includes(q)) : this.logNameOptions;
+  }
+  /** How many different people are behind the rows (all in range, and those currently shown). */
+  get logUniquePeople(): number { return new Set(this.logAll.map(r => r.profileid).filter(Boolean)).size; }
+  get logUniquePeopleShown(): number { return new Set(this.logShown.map(r => r.profileid).filter(Boolean)).size; }
+  logOsOptions: string[] = [];
+  logSortKey: 'name' | 'date' | 'device_os' | 'current_version' = 'date';
+  logSortDir: 'asc' | 'desc' = 'desc';
+  logPageIndex = 0;
+  logPageSize = 25;
+  readonly logPageSizes = [10, 25, 50];
+
+  get logPageCount(): number { return Math.max(1, Math.ceil(this.logShown.length / this.logPageSize)); }
+  get logRangeLabel(): string { return this.logRange === 1 ? 'today' : 'last ' + this.logRange + ' days'; }
+
+  setLogRange(days: 1 | 7 | 30): void {
+    if (this.logRange === days && this.logAll.length) return;
+    this.logRange = days;
+    this.loadLoginLogs();
+  }
+
+  /** Local midnight `days - 1` days ago: today = since 00:00 today; 7D = today plus the six days before. */
+  private logRangeStart(days: number): Date {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (days - 1)); return d;
+  }
+
+  /**
+   * One query on `loginlog`, bounded by `date` (a Timestamp) from the range start — a single-field
+   * range, no composite index. The app filter is applied client-side afterwards, as requested, so a
+   * document without the field is simply not an EiFlix row.
+   */
+  async loadLoginLogs(): Promise<void> {
+    this.logLoading = true; this.logError = false;
+    try {
+      const snap = await getDocs(query(
+        collection(this.firestore, 'loginlog'),
+        where('date', '>=', Timestamp.fromDate(this.logRangeStart(this.logRange))),
+        orderBy('date', 'desc'),
+      ));
+      await Promise.all([this.pmReady, this.nudReady]).catch(() => undefined);
+      const rows: LogRow[] = [];
+      snap.docs.forEach(d => {
+        const data = d.data() || {};
+        if (data['app'] !== 'EiFlix') return;
+        const date = this.toDate(data['date']);
+        const profileid = String(data['profileid'] ?? '').trim();
+        rows.push({
+          id: d.id, profileid,
+          name: this.logNameFor(profileid),
+          date, dateLabel: date ? formatDate(date, 'dd MMM yyyy, h:mm a', 'en-IN') : '—',
+          device_os: String(data['device_os'] ?? '').trim(),
+          current_version: String(data['current_version'] ?? '').trim(),
+        });
+      });
+      this.logAll = rows;
+      const names = new Map<string, string>();
+      const os = new Set<string>();
+      rows.forEach(r => { if (r.profileid) names.set(r.profileid, r.name); if (r.device_os) os.add(r.device_os); });
+      this.logNameOptions = Array.from(names, ([profileid, name]) => ({ profileid, name })).sort((a, b) => a.name.localeCompare(b.name));
+      this.logOsOptions = Array.from(os).sort();
+      if (this.logNameFilter !== 'all' && !names.has(this.logNameFilter)) this.logNameFilter = 'all';
+      if (this.logOsFilter !== 'all' && !os.has(this.logOsFilter)) this.logOsFilter = 'all';
+      this.logPageIndex = 0;
+      this.applyLogFilters();
+    } catch (err) {
+      console.error('eiflixoperationsdashboard: loginlog load failed', err);
+      this.logError = true; this.logAll = []; this.logShown = []; this.logPage = [];
+    } finally {
+      this.logLoading = false;
+    }
+  }
+
+  /** Name from the participant directory, then new_user_data; the id itself when neither knows them. */
+  private logNameFor(profileid: string): string {
+    if (!profileid) return '—';
+    const pm = this.pmMap.get(profileid); if (pm?.name) return String(pm.name);
+    const nud = this.nudMap.get(profileid); if (nud?.name) return String(nud.name);
+    return profileid;
+  }
+
+  applyLogFilters(): void {
+    const q = this.logSearch.trim().toLowerCase();
+    const dir = this.logSortDir === 'asc' ? 1 : -1;
+    const key = this.logSortKey;
+    this.logShown = this.logAll
+      .filter(r => this.logNameFilter === 'all' || r.profileid === this.logNameFilter)
+      .filter(r => this.logOsFilter === 'all' || r.device_os === this.logOsFilter)
+      .filter(r => !q || `${r.name} ${r.profileid} ${r.device_os} ${r.current_version} ${r.dateLabel}`.toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (key === 'date') return ((a.date?.getTime() || 0) - (b.date?.getTime() || 0)) * dir;
+        return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+      });
+    if (this.logPageIndex > this.logPageCount - 1) this.logPageIndex = this.logPageCount - 1;
+    this.slicePage();
+  }
+
+  private slicePage(): void {
+    const start = this.logPageIndex * this.logPageSize;
+    this.logPage = this.logShown.slice(start, start + this.logPageSize);
+  }
+
+  setLogSort(key: 'name' | 'date' | 'device_os' | 'current_version'): void {
+    if (this.logSortKey === key) this.logSortDir = this.logSortDir === 'asc' ? 'desc' : 'asc';
+    else { this.logSortKey = key; this.logSortDir = key === 'date' ? 'desc' : 'asc'; }
+    this.applyLogFilters();
+  }
+  onLogFilterChange(): void { this.logPageIndex = 0; this.applyLogFilters(); }
+  clearLogFilters(): void { this.logSearch = ''; this.logNameSearch = ''; this.logNameFilter = 'all'; this.logOsFilter = 'all'; this.onLogFilterChange(); }
+  get logFilterCount(): number { return (this.logSearch.trim() ? 1 : 0) + (this.logNameFilter !== 'all' ? 1 : 0) + (this.logOsFilter !== 'all' ? 1 : 0); }
+  setLogPageSize(size: number): void { this.logPageSize = Number(size) || 25; this.logPageIndex = 0; this.slicePage(); }
+  logPrev(): void { if (this.logPageIndex > 0) { this.logPageIndex--; this.slicePage(); } }
+  logNext(): void { if (this.logPageIndex < this.logPageCount - 1) { this.logPageIndex++; this.slicePage(); } }
+  get logPageFrom(): number { return this.logShown.length ? this.logPageIndex * this.logPageSize + 1 : 0; }
+  get logPageTo(): number { return Math.min(this.logShown.length, (this.logPageIndex + 1) * this.logPageSize); }
+  trackLog(_: number, r: LogRow): string { return r.id; }
 
   ngOnDestroy(): void {
     this.destroy$.next();

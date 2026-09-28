@@ -1,16 +1,16 @@
 <div class="page-container">
 
-<button mat-raised-button color="primary" (click)="openQuizDialog()">
+<button data-testid="qz-openquizdialog" mat-raised-button color="primary" (click)="openQuizDialog()">
   Create Quiz 
 </button>&nbsp;&nbsp;
-<button mat-raised-button color="primary" (click)="viewQuiz()">
+<button data-testid="qz-viewquiz" mat-raised-button color="primary" (click)="viewQuiz()">
   View
 </button>
 
 
 <mat-form-field appearance="outline" class="full-width mt-16">
   <mat-label>Search Quiz</mat-label>
-  <input
+  <input data-testid="qz-search-by-question-or-type"
     matInput
     (keyup)="applyFilter($event)"
     placeholder="Search by question or type">
@@ -48,14 +48,14 @@
     <ng-container matColumnDef="actions">
       <th mat-header-cell *matHeaderCellDef>Actions</th>
       <td mat-cell *matCellDef="let quiz">
-        <button
+        <button data-testid="qz-event-stoppropagation"
         mat-icon-button
         color="accent"
         (click)="$event.stopPropagation(); openEditDialog(quiz)">
         <mat-icon>edit</mat-icon>
         </button>
 
-        <button mat-icon-button color="warn">
+        <button data-testid="qz-button" mat-icon-button color="warn">
           <mat-icon>delete</mat-icon>
         </button>
       </td>

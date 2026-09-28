@@ -1,2 +1,7 @@
 /* Enrollment page — all rules live in the shared v2 stylesheet. */
 @import './wc2-shared.css';
+
+/* Shown instead of the editor when the signed-in person may not edit workshops. */
+.wc2-blocked { max-width: 520px; margin: 64px auto; padding: 32px; border: 1px solid var(--border); border-radius: 14px; background: #fff; text-align: center; }
+.wc2-blocked h1 { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: var(--t1); }
+.wc2-blocked p { margin: 0 0 20px; font-size: 13.5px; color: var(--t3); line-height: 1.6; }

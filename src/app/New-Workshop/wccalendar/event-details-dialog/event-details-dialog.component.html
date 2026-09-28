@@ -1,17 +1,17 @@
 <div class="md-body">
   <div class="md-top">
     @if (showBack) {
-      <button type="button" class="md-back" (click)="back()" aria-label="Back">‹</button>
+      <button data-testid="edd-back-1" type="button" class="md-back" (click)="back()" aria-label="Back">‹</button>
     }
     <div class="md-title">{{ selected ? '📌 Event Details' : '🗓 ' + (dayLabel || 'Events') }}</div>
-    <button type="button" class="md-x" (click)="close()" aria-label="Close">✕</button>
+    <button data-testid="edd-close-2" type="button" class="md-x" (click)="close()" aria-label="Close">✕</button>
   </div>
 
   @if (!selected) {
     <!-- Day list view -->
     <div class="ev-list">
       @for (e of events; track e.id) {
-        <div class="ev-row" (click)="pick(e)">
+        <div data-testid="edd-pick-3" class="ev-row" (click)="pick(e)">
           <span class="ev-chip {{ typeClass(e) }}">{{ typeLabel(e) }}</span>
           <div class="ev-row-main">
             <div class="ev-row-title">{{ e.title }}</div>
@@ -36,8 +36,8 @@
     </div>
 
     <div class="ev-actions">
-      <button type="button" class="ev-btn" (click)="edit()">✎ Edit</button>
-      <button type="button" class="ev-btn ev-btn-danger" (click)="remove()" [disabled]="isDeleting">
+      <button data-testid="edd-edit-4" type="button" class="ev-btn" (click)="edit()">✎ Edit</button>
+      <button data-testid="edd-remove-5" type="button" class="ev-btn ev-btn-danger" (click)="remove()" [disabled]="isDeleting">
         {{ isDeleting ? 'Deleting…' : (deleteArmed ? 'Confirm Delete?' : '🗑 Delete') }}
       </button>
     </div>

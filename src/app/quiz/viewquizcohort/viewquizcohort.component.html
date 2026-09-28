@@ -7,13 +7,13 @@
         <p class="page-subtitle">View participant choices by quiz</p>
       </div>
       <div class="header-actions">
-        <button class="btn-filter" [class.active]="showFilters" (click)="toggleFilters()">
+        <button data-testid="vqc-togglefilters" class="btn-filter" [class.active]="showFilters" (click)="toggleFilters()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
           </svg>
           Filters
         </button>
-        <button
+        <button data-testid="vqc-exporttoexcel"
           class="btn-export"
           (click)="exportToExcel()"
           [disabled]="!selectedQuiz || filteredResponses.length === 0"
@@ -42,7 +42,7 @@
     <div *ngIf="quizzes.length > 0" class="quiz-selector-wrapper">
       <mat-form-field appearance="outline" class="quiz-select-field">
         <mat-label>Select Quiz</mat-label>
-        <mat-select [value]="selectedQuiz?.id" (selectionChange)="onQuizChange($event.value)">
+        <mat-select data-testid="vqc-mat-select" [value]="selectedQuiz?.id" (selectionChange)="onQuizChange($event.value)">
           <mat-option *ngFor="let quiz of quizzes" [value]="quiz.id">
             <div class="quiz-option">
               <span class="quiz-option-text">{{ quiz.question }}</span>
@@ -60,7 +60,7 @@
       <div class="filters-grid">
         <div class="filter-group">
           <label class="filter-label">Profile ID</label>
-          <input 
+          <input data-testid="vqc-search-by-profile" 
             type="text" 
             class="filter-input"
             placeholder="Search by profile..."
@@ -70,7 +70,7 @@
         
         <div class="filter-group">
           <label class="filter-label">Selected Option</label>
-          <select 
+          <select data-testid="vqc-select" 
             class="filter-select"
             [(ngModel)]="filterOptionText"
             (ngModelChange)="applyFilters()">
@@ -84,7 +84,7 @@
         
         <div class="filter-group">
           <label class="filter-label">From Date</label>
-          <input 
+          <input data-testid="vqc-input" 
             type="date" 
             class="filter-input"
             [ngModel]="filterDateFrom | date:'yyyy-MM-dd'"
@@ -93,7 +93,7 @@
         
         <div class="filter-group">
           <label class="filter-label">To Date</label>
-          <input 
+          <input data-testid="vqc-input-2" 
             type="date" 
             class="filter-input"
             [ngModel]="filterDateTo | date:'yyyy-MM-dd'"
@@ -101,7 +101,7 @@
         </div>
       </div>
       
-      <button class="btn-clear-filters" (click)="clearFilters()">
+      <button data-testid="vqc-clearfilters" class="btn-clear-filters" (click)="clearFilters()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -250,7 +250,7 @@
         <p class="empty-text" *ngIf="!filterProfileId && !filterOptionText && !filterDateFrom && !filterDateTo">
           No participant responses have been recorded for this quiz yet.
         </p>
-        <button *ngIf="filterProfileId || filterOptionText || filterDateFrom || filterDateTo" class="btn-clear-filters large" (click)="clearFilters()">
+        <button data-testid="vqc-clearfilters-2" *ngIf="filterProfileId || filterOptionText || filterDateFrom || filterDateTo" class="btn-clear-filters large" (click)="clearFilters()">
           Clear all filters
         </button>
       </div>

@@ -9,15 +9,15 @@
   <mat-card class="navigation-header">
     <mat-card-content>
       <div class="nav-buttons">
-        <button mat-raised-button [color]="viewMode === 'list' ? 'primary' : ''" (click)="switchToListView()">
+        <button data-testid="cet-switchtolistview" mat-raised-button [color]="viewMode === 'list' ? 'primary' : ''" (click)="switchToListView()">
           <mat-icon>list</mat-icon>
           View Templates
         </button>
-        <button mat-raised-button [color]="viewMode === 'create' ? 'primary' : ''" (click)="switchToCreateView()">
+        <button data-testid="cet-switchtocreateview" mat-raised-button [color]="viewMode === 'create' ? 'primary' : ''" (click)="switchToCreateView()">
           <mat-icon>add</mat-icon>
           {{isEditMode ? 'Edit Template' : 'Create Template'}}
         </button>
-        <button mat-button *ngIf="viewMode === 'preview'" (click)="switchToListView()">
+        <button data-testid="cet-switchtolistview-2" mat-button *ngIf="viewMode === 'preview'" (click)="switchToListView()">
           <mat-icon>arrow_back</mat-icon>
           Back to List
         </button>
@@ -45,17 +45,17 @@
           <div class="filters-grid">
             <mat-form-field appearance="outline">
               <mat-label>Search templates...</mat-label>
-              <input matInput [(ngModel)]="searchTerm" (input)="onSearchChange()"
+              <input data-testid="cet-search-by-name-alias-subject-or-no" matInput [(ngModel)]="searchTerm" (input)="onSearchChange()"
                 placeholder="Search by name, alias, subject, or notes">
               <mat-icon matPrefix>search</mat-icon>
-              <button matSuffix mat-icon-button *ngIf="searchTerm" (click)="searchTerm=''; onSearchChange()">
+              <button data-testid="cet-searchterm-onsearchchange" matSuffix mat-icon-button *ngIf="searchTerm" (click)="searchTerm=''; onSearchChange()">
                 <mat-icon>clear</mat-icon>
               </button>
             </mat-form-field>
 
             <mat-form-field appearance="outline">
               <mat-label>Category</mat-label>
-              <mat-select [(value)]="selectedCategory" (selectionChange)="onCategoryFilterChange()">
+              <mat-select data-testid="cet-mat-select" [(value)]="selectedCategory" (selectionChange)="onCategoryFilterChange()">
                 <mat-option value="">All Categories</mat-option>
                 <mat-option *ngFor="let category of categories" [value]="category">
                   {{category}}
@@ -66,7 +66,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Sub-Category</mat-label>
-              <mat-select [(value)]="selectedSubCategory" (selectionChange)="onFilterChange()">
+              <mat-select data-testid="cet-mat-select-2" [(value)]="selectedSubCategory" (selectionChange)="onFilterChange()">
                 <mat-option value="">All Sub-Categories</mat-option>
                 <mat-option *ngFor="let subCategory of getFilteredSubCategories()" [value]="subCategory">
                   {{subCategory}}
@@ -77,7 +77,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Status</mat-label>
-              <mat-select [(value)]="selectedStatus" (selectionChange)="onFilterChange()">
+              <mat-select data-testid="cet-mat-select-3" [(value)]="selectedStatus" (selectionChange)="onFilterChange()">
                 <mat-option value="">All Statuses</mat-option>
                 <mat-option *ngFor="let status of getUniqueStatuses()" [value]="status">
                   {{status | titlecase}}
@@ -88,7 +88,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Validation</mat-label>
-              <mat-select [(value)]="selectedValidation" (selectionChange)="onFilterChange()">
+              <mat-select data-testid="cet-mat-select-4" [(value)]="selectedValidation" (selectionChange)="onFilterChange()">
                 <mat-option value="">All Templates</mat-option>
                 <mat-option value="validated">Validated Only</mat-option>
                 <mat-option value="pending">Pending Validation</mat-option>
@@ -98,7 +98,7 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Server</mat-label>
-              <mat-select [(value)]="selectedServerName" (selectionChange)="onFilterChange()">
+              <mat-select data-testid="cet-mat-select-5" [(value)]="selectedServerName" (selectionChange)="onFilterChange()">
                 <mat-option value="">All Servers</mat-option>
                 <mat-option *ngFor="let server of serverNames" [value]="server">
                   {{server}}
@@ -107,7 +107,7 @@
               <mat-icon matSuffix>dns</mat-icon>
             </mat-form-field>
 
-            <button mat-mini-fab (click)="clearFilters()" matTooltip="Clear Filters">
+            <button data-testid="cet-clearfilters" mat-mini-fab (click)="clearFilters()" matTooltip="Clear Filters">
               <mat-icon>refresh</mat-icon>
             </button>
           </div>
@@ -150,7 +150,7 @@
                 <div class="header-content">
                   <mat-icon>category</mat-icon>
                   Category
-                  <button mat-icon-button matTooltip="Manage Categories"
+                  <button data-testid="cet-openmanagedialog" mat-icon-button matTooltip="Manage Categories"
                     (click)="openManageDialog('categories', $event)" class="manage-btn">
                     <mat-icon>settings</mat-icon>
                   </button>
@@ -169,7 +169,7 @@
                 <div class="header-content">
                   <mat-icon>category</mat-icon>
                   Sub-Category
-                  <button mat-icon-button matTooltip="Manage Sub-Categories"
+                  <button data-testid="cet-openmanagedialog-2" mat-icon-button matTooltip="Manage Sub-Categories"
                     (click)="openManageDialog('subcategories', $event)" class="manage-btn">
                     <mat-icon>settings</mat-icon>
                   </button>
@@ -270,23 +270,23 @@
               </th>
               <td mat-cell *matCellDef="let template" class="actions-cell">
                 <div class="action-buttons">
-                  <button mat-icon-button (click)="switchToPreviewView(template)" matTooltip="Preview Template"
+                  <button data-testid="cet-switchtopreviewview" mat-icon-button (click)="switchToPreviewView(template)" matTooltip="Preview Template"
                     class="action-btn preview-btn">
                     <mat-icon>visibility</mat-icon>
                   </button>
-                  <button mat-icon-button (click)="editTemplate(template)" matTooltip="Edit Template"
+                  <button data-testid="cet-edittemplate" mat-icon-button (click)="editTemplate(template)" matTooltip="Edit Template"
                     class="action-btn edit-btn">
                     <mat-icon>edit</mat-icon>
                   </button>
-                  <button mat-icon-button (click)="duplicateTemplate(template)" matTooltip="Duplicate Template"
+                  <button data-testid="cet-duplicatetemplate" mat-icon-button (click)="duplicateTemplate(template)" matTooltip="Duplicate Template"
                     class="action-btn duplicate-btn">
                     <mat-icon>content_copy</mat-icon>
                   </button>
-                  <button mat-icon-button *ngIf="!template.templatevalidated" (click)="approveTemplate(template)"
+                  <button data-testid="cet-approvetemplate" mat-icon-button *ngIf="!template.templatevalidated" (click)="approveTemplate(template)"
                     matTooltip="Approve Template" class="action-btn approve-btn">
                     <mat-icon>check</mat-icon>
                   </button>
-                  <button mat-icon-button (click)="deleteTemplate(template)" matTooltip="Delete Template"
+                  <button data-testid="cet-deletetemplate" mat-icon-button (click)="deleteTemplate(template)" matTooltip="Delete Template"
                     class="action-btn delete-btn">
                     <mat-icon>delete</mat-icon>
                   </button>
@@ -314,12 +314,12 @@
             <p *ngIf="!searchTerm && !selectedCategory && !selectedStatus && !selectedValidation">
               Create your first email template to get started
             </p>
-            <button mat-raised-button color="primary" (click)="switchToCreateView()"
+            <button data-testid="cet-switchtocreateview-2" mat-raised-button color="primary" (click)="switchToCreateView()"
               *ngIf="existingTemplates.length === 0">
               <mat-icon>add</mat-icon>
               Create First Template
             </button>
-            <button mat-stroked-button (click)="clearFilters()" *ngIf="existingTemplates.length > 0">
+            <button data-testid="cet-clearfilters-2" mat-stroked-button (click)="clearFilters()" *ngIf="existingTemplates.length > 0">
               <mat-icon>clear_all</mat-icon>
               Clear Filters
             </button>
@@ -330,11 +330,11 @@
   </div>
 
   <!-- Manage Categories / Sub-Categories Dialog (OUTSIDE the table) -->
-  <div class="manage-overlay" *ngIf="manageDialogOpen" (click)="closeManageDialog()">
-    <div class="manage-dialog" (click)="$event.stopPropagation()">
+  <div data-testid="cet-closemanagedialog" class="manage-overlay" *ngIf="manageDialogOpen" (click)="closeManageDialog()">
+    <div data-testid="cet-event-stoppropagation" class="manage-dialog" (click)="$event.stopPropagation()">
       <div class="manage-header">
         <h3>Manage {{manageType === 'categories' ? 'Categories' : 'Sub-Categories'}}</h3>
-        <button mat-icon-button (click)="closeManageDialog()">
+        <button data-testid="cet-closemanagedialog-2" mat-icon-button (click)="closeManageDialog()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -343,9 +343,9 @@
       <div class="manage-add-row">
         <mat-form-field appearance="outline" class="manage-input">
           <mat-label>New {{manageType === 'categories' ? 'Category' : 'Sub-Category'}}</mat-label>
-          <input matInput [(ngModel)]="newItemName" (keyup.enter)="addItem()" placeholder="Enter name...">
+          <input data-testid="cet-enter-name" matInput [(ngModel)]="newItemName" (keyup.enter)="addItem()" placeholder="Enter name...">
         </mat-form-field>
-        <button mat-raised-button color="primary" [disabled]="!newItemName.trim() || isSaving" (click)="addItem()">
+        <button data-testid="cet-additem" mat-raised-button color="primary" [disabled]="!newItemName.trim() || isSaving" (click)="addItem()">
           <mat-icon>add</mat-icon> Add
         </button>
       </div>
@@ -354,7 +354,7 @@
       <div class="manage-list">
         <div class="manage-item" *ngFor="let item of getManageList(); let i = index">
           <mat-chip color="primary" selected>{{item}}</mat-chip>
-          <button mat-icon-button color="warn" matTooltip="Remove" [disabled]="isSaving" (click)="removeItem(item)">
+          <button data-testid="cet-removeitem" mat-icon-button color="warn" matTooltip="Remove" [disabled]="isSaving" (click)="removeItem(item)">
             <mat-icon>delete</mat-icon>
           </button>
         </div>
@@ -374,11 +374,11 @@
           Preview: {{previewTemplate.templatename}}
         </mat-card-title>
         <div class="preview-actions">
-          <button mat-button (click)="editTemplate(previewTemplate)">
+          <button data-testid="cet-edittemplate-2" mat-button (click)="editTemplate(previewTemplate)">
             <mat-icon>edit</mat-icon>
             Edit Template
           </button>
-          <button mat-raised-button *ngIf="!previewTemplate.templatevalidated" color="primary"
+          <button data-testid="cet-approvetemplate-2" mat-raised-button *ngIf="!previewTemplate.templatevalidated" color="primary"
             (click)="approveTemplate(previewTemplate)">
             <mat-icon>check</mat-icon>
             Approve Template
@@ -409,10 +409,10 @@
                     <mat-icon>{{getAttachmentIcon(attachment.type)}}</mat-icon>
                   </div>
                   <div class="attachment-details">
-                    <a [href]="attachment.url" target="_blank" class="attachment-name">{{attachment.name}}</a>
+                    <a data-testid="cet-link" [href]="attachment.url" target="_blank" class="attachment-name">{{attachment.name}}</a>
                     <span class="attachment-size">{{formatFileSize(attachment.size)}}</span>
                   </div>
-                  <a [href]="attachment.url" target="_blank" mat-icon-button matTooltip="Download">
+                  <a data-testid="cet-link-2" [href]="attachment.url" target="_blank" mat-icon-button matTooltip="Download">
                     <mat-icon>download</mat-icon>
                   </a>
                 </div>
@@ -427,10 +427,10 @@
         <div class="preview-container">
           <div class="preview-toggle-container">
             <mat-button-toggle-group value="desktop" aria-label="Preview Mode">
-              <mat-button-toggle value="desktop" (click)="isMobilePreview = false" [class.active]="!isMobilePreview">
+              <mat-button-toggle data-testid="cet-mat-button-toggle" value="desktop" (click)="isMobilePreview = false" [class.active]="!isMobilePreview">
                 <mat-icon>desktop_mac</mat-icon>
               </mat-button-toggle>
-              <mat-button-toggle value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
+              <mat-button-toggle data-testid="cet-mat-button-toggle-2" value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
                 <mat-icon>phone_android</mat-icon>
               </mat-button-toggle>
             </mat-button-toggle-group>
@@ -455,10 +455,10 @@
                 <div class="sender-email">to me</div>
               </div>
               <div class="email-actions" *ngIf="!isMobilePreview">
-                <button mat-icon-button class="action-btn">
+                <button data-testid="cet-button" mat-icon-button class="action-btn">
                   <mat-icon>reply</mat-icon>
                 </button>
-                <button mat-icon-button class="action-btn">
+                <button data-testid="cet-button-2" mat-icon-button class="action-btn">
                   <mat-icon>more_vert</mat-icon>
                 </button>
               </div>
@@ -486,7 +486,7 @@
         <div class="form-row">
           <mat-form-field appearance="outline" class="form-field">
             <mat-label>Template Name *</mat-label>
-            <input matInput formControlName="templateName" (input)="onTemplateNameChange()"
+            <input data-testid="cet-templatename" matInput formControlName="templateName" (input)="onTemplateNameChange()"
               placeholder="Enter template name">
             <mat-icon matSuffix>title</mat-icon>
             <mat-spinner matSuffix diameter="16" *ngIf="isCheckingName"></mat-spinner>
@@ -498,7 +498,7 @@
 
           <mat-form-field appearance="outline" class="form-field">
             <mat-label>Template Alias *</mat-label>
-            <input matInput formControlName="templateAlias" placeholder="template_alias">
+            <input data-testid="cet-templatealias" matInput formControlName="templateAlias" placeholder="template_alias">
             <mat-icon matSuffix>alternate_email</mat-icon>
             <mat-spinner matSuffix diameter="16" *ngIf="isCheckingAlias"></mat-spinner>
             <mat-hint>Only letters, numbers, '.', '-', '_' allowed</mat-hint>
@@ -510,11 +510,11 @@
 
           <mat-form-field appearance="outline" class="form-field">
             <mat-label>Category *</mat-label>
-            <mat-select formControlName="category">
+            <mat-select data-testid="cet-category" formControlName="category">
               <mat-option value="">Select Category</mat-option>
               <mat-option *ngFor="let cat of categories" [value]="cat">{{cat}}</mat-option>
             </mat-select>
-            <button matSuffix mat-icon-button type="button"
+            <button data-testid="cet-openmanagedialog-3" matSuffix mat-icon-button type="button"
               (click)="openManageDialog('categories', $event)" matTooltip="Manage categories">
               <mat-icon>add_circle</mat-icon>
             </button>
@@ -523,11 +523,11 @@
 
           <mat-form-field appearance="outline" class="form-field">
             <mat-label>Sub-Category *</mat-label>
-            <mat-select formControlName="subCategory">
+            <mat-select data-testid="cet-subcategory" formControlName="subCategory">
               <mat-option value="">Select Sub-Category</mat-option>
               <mat-option *ngFor="let subCat of subCategories" [value]="subCat">{{subCat}}</mat-option>
             </mat-select>
-            <button matSuffix mat-icon-button type="button"
+            <button data-testid="cet-openmanagedialog-4" matSuffix mat-icon-button type="button"
               (click)="openManageDialog('subcategories', $event)" matTooltip="Manage sub-categories">
               <mat-icon>add_circle</mat-icon>
             </button>
@@ -536,7 +536,7 @@
 
           <mat-form-field appearance="outline" class="form-field">
             <mat-label>Server Name *</mat-label>
-            <mat-select formControlName="serverName">
+            <mat-select data-testid="cet-servername" formControlName="serverName">
               <mat-option value="">Select Server</mat-option>
               <mat-option *ngFor="let server of serverNames" [value]="server">{{server}}</mat-option>
             </mat-select>
@@ -544,7 +544,7 @@
             <mat-error *ngIf="serverName?.hasError('required')">Server name is required</mat-error>
           </mat-form-field>
 
-          <button mat-fab color="primary" type="button" (click)="refreshForm()" matTooltip="Refresh Form"
+          <button data-testid="cet-refreshform" mat-fab color="primary" type="button" (click)="refreshForm()" matTooltip="Refresh Form"
             aria-label="Refresh">
             <mat-icon>refresh</mat-icon>
           </button>
@@ -555,12 +555,12 @@
     <!-- Action Buttons -->
     <mat-card class="form-actions">
       <mat-card-actions align="end">
-        <button mat-stroked-button type="button" (click)="onReset()">
+        <button data-testid="cet-onreset" mat-stroked-button type="button" (click)="onReset()">
           <mat-icon>refresh</mat-icon>
           Reset
         </button>
         &nbsp;&nbsp;
-        <button mat-raised-button (click)="onSubmit()" color="primary" type="submit"
+        <button data-testid="cet-onsubmit" mat-raised-button (click)="onSubmit()" color="primary" type="submit"
           [disabled]="!templateForm.valid || isCheckingName || isCheckingAlias">
           <mat-icon>save</mat-icon>
           {{isEditMode ? 'Update Template' : 'Create Template'}}
@@ -580,7 +580,7 @@
             <!-- Subject Field -->
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>Subject *</mat-label>
-              <input matInput formControlName="subject" placeholder="Enter email subject">
+              <input data-testid="cet-subject" matInput formControlName="subject" placeholder="Enter email subject">
               <mat-icon matSuffix>subject</mat-icon>
               <mat-error *ngIf="subject?.hasError('required')">Subject is required</mat-error>
             </mat-form-field>
@@ -598,22 +598,22 @@
 
             <!-- Button Actions for Editor -->
             <div class="editor-actions">
-              <button mat-raised-button color="accent" type="button" (click)="addCTAButton()">
+              <button data-testid="cet-addctabutton" mat-raised-button color="accent" type="button" (click)="addCTAButton()">
                 <mat-icon>link</mat-icon>
                 Add CTA Button
               </button>
-              <button mat-raised-button color="warn" type="button" (click)="addImage()">
+              <button data-testid="cet-addimage" mat-raised-button color="warn" type="button" (click)="addImage()">
                 <mat-icon>image</mat-icon>
                 Add Image
               </button>
-              <button mat-raised-button type="button" (click)="attachmentFileInput.click()"
+              <button data-testid="cet-attachmentfileinput-click" mat-raised-button type="button" (click)="attachmentFileInput.click()"
                 [disabled]="isUploadingAttachment"
                 style="background-color: #546e7a; color: white;">
                 <mat-spinner diameter="16" *ngIf="isUploadingAttachment"></mat-spinner>
                 <mat-icon *ngIf="!isUploadingAttachment">attach_file</mat-icon>
                 {{isUploadingAttachment ? 'Uploading...' : 'Attach File'}}
               </button>
-              <input type="file" #attachmentFileInput (change)="onAttachmentSelected($event)"
+              <input data-testid="cet-onattachmentselected" type="file" #attachmentFileInput (change)="onAttachmentSelected($event)"
                 multiple
                 accept=".pdf,.xls,.xlsx,.doc,.docx,.ppt,.pptx,.csv,.txt,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp"
                 style="display: none;">
@@ -631,14 +631,14 @@
                     <mat-icon>{{getAttachmentIcon(attachment.type)}}</mat-icon>
                   </div>
                   <div class="attachment-details">
-                    <a [href]="attachment.url" target="_blank" class="attachment-name">{{attachment.name}}</a>
+                    <a data-testid="cet-link-3" [href]="attachment.url" target="_blank" class="attachment-name">{{attachment.name}}</a>
                     <span class="attachment-size">{{formatFileSize(attachment.size)}}</span>
                   </div>
                   <div class="attachment-actions-inline">
-                    <a [href]="attachment.url" target="_blank" mat-icon-button matTooltip="Download">
+                    <a data-testid="cet-link-4" [href]="attachment.url" target="_blank" mat-icon-button matTooltip="Download">
                       <mat-icon>download</mat-icon>
                     </a>
-                    <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeAttachment(i)">
+                    <button data-testid="cet-removeattachment" mat-icon-button color="warn" matTooltip="Remove" (click)="removeAttachment(i)">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
@@ -686,19 +686,19 @@
                 <form [formGroup]="imageEditForm" class="form-grid">
                   <mat-form-field appearance="outline">
                     <mat-label>Image URL *</mat-label>
-                    <input matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
+                    <input data-testid="cet-imageurl" matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
                     <mat-icon matSuffix>link</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Alt Text *</mat-label>
-                    <input matInput formControlName="imageAlt" placeholder="Image description">
+                    <input data-testid="cet-imagealt" matInput formControlName="imageAlt" placeholder="Image description">
                     <mat-icon matSuffix>description</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline" *ngIf="!imageEditForm.get('isResponsive')?.value">
                     <mat-label>Width (px) *</mat-label>
-                    <input matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
+                    <input data-testid="cet-imagewidth" matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
                     <mat-icon matSuffix>photo_size_select_large</mat-icon>
                     <mat-hint>Width in pixels (50-1200)</mat-hint>
                     <mat-error *ngIf="imageEditForm.get('imageWidth')?.hasError('min')">Minimum width is
@@ -709,14 +709,14 @@
 
                   <mat-form-field appearance="outline" *ngIf="!imageEditForm.get('isResponsive')?.value">
                     <mat-label>Height (px)</mat-label>
-                    <input matInput formControlName="imageHeight" placeholder="auto or number">
+                    <input data-testid="cet-imageheight" matInput formControlName="imageHeight" placeholder="auto or number">
                     <mat-icon matSuffix>height</mat-icon>
                     <mat-hint>Height in pixels or 'auto'</mat-hint>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Alignment *</mat-label>
-                    <mat-select formControlName="imageAlignment">
+                    <mat-select data-testid="cet-imagealignment" formControlName="imageAlignment">
                       <mat-option value="left">
                         <mat-icon>format_align_left</mat-icon>
                         Left
@@ -744,22 +744,22 @@
                   <div class="size-presets-section">
                     <h4>Quick Size Presets:</h4>
                     <div class="preset-buttons">
-                      <button mat-stroked-button type="button" (click)="setImagePresetSize(200, 'auto')"
+                      <button data-testid="cet-setimagepresetsize" mat-stroked-button type="button" (click)="setImagePresetSize(200, 'auto')"
                         color="primary">
                         <mat-icon>smartphone</mat-icon>
                         Small (200px)
                       </button>
-                      <button mat-stroked-button type="button" (click)="setImagePresetSize(400, 'auto')"
+                      <button data-testid="cet-setimagepresetsize-2" mat-stroked-button type="button" (click)="setImagePresetSize(400, 'auto')"
                         color="primary">
                         <mat-icon>tablet</mat-icon>
                         Medium (400px)
                       </button>
-                      <button mat-stroked-button type="button" (click)="setImagePresetSize(600, 'auto')"
+                      <button data-testid="cet-setimagepresetsize-3" mat-stroked-button type="button" (click)="setImagePresetSize(600, 'auto')"
                         color="primary">
                         <mat-icon>desktop_mac</mat-icon>
                         Large (600px)
                       </button>
-                      <button mat-stroked-button type="button" (click)="setImageResponsive()" color="accent">
+                      <button data-testid="cet-setimageresponsive" mat-stroked-button type="button" (click)="setImageResponsive()" color="accent">
                         <mat-icon>devices</mat-icon>
                         Full Width
                       </button>
@@ -790,15 +790,15 @@
               </mat-card-content>
 
               <mat-card-actions align="end">
-                <button mat-button (click)="cancelImageEdit()">
+                <button data-testid="cet-cancelimageedit" mat-button (click)="cancelImageEdit()">
                   <mat-icon>close</mat-icon>
                   Cancel
                 </button>
-                <button mat-button (click)="resetImageToOriginal()" color="warn">
+                <button data-testid="cet-resetimagetooriginal" mat-button (click)="resetImageToOriginal()" color="warn">
                   <mat-icon>restore</mat-icon>
                   Reset
                 </button>
-                <button mat-raised-button color="primary" (click)="updateImageInline()"
+                <button data-testid="cet-updateimageinline" mat-raised-button color="primary" (click)="updateImageInline()"
                   [disabled]="!imageEditForm.valid">
                   <mat-icon>save</mat-icon>
                   Update Image
@@ -819,13 +819,13 @@
                 <form [formGroup]="buttonForm" class="form-grid">
                   <mat-form-field appearance="outline">
                     <mat-label>Button Text *</mat-label>
-                    <input matInput formControlName="buttonText" placeholder="Call to Action">
+                    <input data-testid="cet-buttontext" matInput formControlName="buttonText" placeholder="Call to Action">
                     <mat-icon matSuffix>text_fields</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Button URL *</mat-label>
-                    <input matInput type="url" formControlName="buttonUrl" placeholder="https://example.com">
+                    <input data-testid="cet-buttonurl" matInput type="url" formControlName="buttonUrl" placeholder="https://example.com">
                     <mat-icon matSuffix>link</mat-icon>
                     <mat-error *ngIf="buttonForm.get('buttonUrl')?.hasError('required')">URL is required</mat-error>
                     <mat-error *ngIf="buttonForm.get('buttonUrl')?.hasError('pattern')">Please enter a valid URL
@@ -834,23 +834,23 @@
 
                   <mat-form-field appearance="outline">
                     <mat-label>Background Color *</mat-label>
-                    <input matInput formControlName="buttonColor" placeholder="#28a745">
-                    <input matInput type="color" formControlName="buttonColor"
+                    <input data-testid="cet-buttoncolor" matInput formControlName="buttonColor" placeholder="#28a745">
+                    <input data-testid="cet-buttoncolor-2" matInput type="color" formControlName="buttonColor"
                       style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border: none; background: none; cursor: pointer;">
                     <mat-icon matSuffix>palette</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Text Color *</mat-label>
-                    <input matInput formControlName="buttonTextColor" placeholder="#ffffff">
-                    <input matInput type="color" formControlName="buttonTextColor"
+                    <input data-testid="cet-buttontextcolor" matInput formControlName="buttonTextColor" placeholder="#ffffff">
+                    <input data-testid="cet-buttontextcolor-2" matInput type="color" formControlName="buttonTextColor"
                       style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border: none; background: none; cursor: pointer;">
                     <mat-icon matSuffix>format_color_text</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Button Size *</mat-label>
-                    <mat-select formControlName="buttonSize">
+                    <mat-select data-testid="cet-buttonsize" formControlName="buttonSize">
                       <mat-option value="small">Small</mat-option>
                       <mat-option value="medium">Medium</mat-option>
                       <mat-option value="large">Large</mat-option>
@@ -861,11 +861,11 @@
               </mat-card-content>
 
               <mat-card-actions align="end">
-                <button mat-button (click)="cancelButtonForm()">
+                <button data-testid="cet-cancelbuttonform" mat-button (click)="cancelButtonForm()">
                   <mat-icon>close</mat-icon>
                   Cancel
                 </button>
-                <button mat-raised-button color="primary" (click)="insertButton()" [disabled]="!buttonForm.valid">
+                <button data-testid="cet-insertbutton" mat-raised-button color="primary" (click)="insertButton()" [disabled]="!buttonForm.valid">
                   <mat-icon>add</mat-icon>
                   Insert Button
                 </button>
@@ -886,14 +886,14 @@
                   <div class="upload-section">
                     <mat-label>Upload Image</mat-label>
                     <div class="upload-area">
-                      <input type="file" #fileInput (change)="onFileSelected($event)" accept="image/*"
+                      <input data-testid="cet-onfileselected" type="file" #fileInput (change)="onFileSelected($event)" accept="image/*"
                         style="display: none;">
-                      <button mat-stroked-button (click)="fileInput.click()" [disabled]="isUploadingImage">
+                      <button data-testid="cet-fileinput-click" mat-stroked-button (click)="fileInput.click()" [disabled]="isUploadingImage">
                         <mat-icon>upload</mat-icon>
                         Choose Image
                       </button>
                       <span class="file-info" *ngIf="selectedFile">{{selectedFile.name}}</span>
-                      <button mat-raised-button color="accent" (click)="uploadImage()"
+                      <button data-testid="cet-uploadimage" mat-raised-button color="accent" (click)="uploadImage()"
                         [disabled]="!selectedFile || isUploadingImage">
                         <mat-spinner diameter="16" *ngIf="isUploadingImage"></mat-spinner>
                         <mat-icon *ngIf="!isUploadingImage">cloud_upload</mat-icon>
@@ -905,31 +905,31 @@
 
                   <mat-form-field appearance="outline">
                     <mat-label>Image URL *</mat-label>
-                    <input matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
+                    <input data-testid="cet-imageurl-2" matInput type="url" formControlName="imageUrl" placeholder="https://example.com/image.jpg">
                     <mat-icon matSuffix>link</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Alt Text *</mat-label>
-                    <input matInput formControlName="imageAlt" placeholder="Image description">
+                    <input data-testid="cet-imagealt-2" matInput formControlName="imageAlt" placeholder="Image description">
                     <mat-icon matSuffix>description</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline" *ngIf="!imageForm.get('isResponsive')?.value">
                     <mat-label>Width (px) *</mat-label>
-                    <input matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
+                    <input data-testid="cet-imagewidth-2" matInput type="number" formControlName="imageWidth" placeholder="400" min="50" max="1200">
                     <mat-icon matSuffix>photo_size_select_large</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline" *ngIf="!imageForm.get('isResponsive')?.value">
                     <mat-label>Height (px)</mat-label>
-                    <input matInput formControlName="imageHeight" placeholder="auto or number">
+                    <input data-testid="cet-imageheight-2" matInput formControlName="imageHeight" placeholder="auto or number">
                     <mat-icon matSuffix>height</mat-icon>
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>Alignment *</mat-label>
-                    <mat-select formControlName="imageAlignment">
+                    <mat-select data-testid="cet-imagealignment-2" formControlName="imageAlignment">
                       <mat-option value="left">Left</mat-option>
                       <mat-option value="center">Center</mat-option>
                       <mat-option value="right">Right</mat-option>
@@ -946,11 +946,11 @@
               </mat-card-content>
 
               <mat-card-actions align="end">
-                <button mat-button (click)="cancelImageForm()">
+                <button data-testid="cet-cancelimageform" mat-button (click)="cancelImageForm()">
                   <mat-icon>close</mat-icon>
                   Cancel
                 </button>
-                <button mat-raised-button color="primary" (click)="insertImage()" [disabled]="!imageForm.valid">
+                <button data-testid="cet-insertimage" mat-raised-button color="primary" (click)="insertImage()" [disabled]="!imageForm.valid">
                   <mat-icon>add</mat-icon>
                   Insert Image
                 </button>
@@ -960,7 +960,7 @@
             <!-- Notes Section -->
             <mat-form-field appearance="outline" class="full-width notes-section">
               <mat-label>Notes for creating these emails to Participants</mat-label>
-              <textarea matInput formControlName="notes" rows="4"
+              <textarea data-testid="cet-notes" matInput formControlName="notes" rows="4"
                 placeholder="Enter any notes or instructions..."></textarea>
               <mat-icon matSuffix>notes</mat-icon>
             </mat-form-field>
@@ -975,11 +975,11 @@
             <mat-card-title>Preview</mat-card-title>
             <div class="preview-toggle">
               <mat-button-toggle-group value="desktop" aria-label="Preview Mode">
-                <mat-button-toggle value="desktop" (click)="isMobilePreview = false"
+                <mat-button-toggle data-testid="cet-mat-button-toggle-3" value="desktop" (click)="isMobilePreview = false"
                   [class.active]="!isMobilePreview">
                   <mat-icon>desktop_mac</mat-icon>
                 </mat-button-toggle>
-                <mat-button-toggle value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
+                <mat-button-toggle data-testid="cet-mat-button-toggle-4" value="mobile" (click)="isMobilePreview = true" [class.active]="isMobilePreview">
                   <mat-icon>phone_android</mat-icon>
                 </mat-button-toggle>
               </mat-button-toggle-group>
@@ -1006,16 +1006,16 @@
                   <div class="sender-email">to me</div>
                 </div>
                 <div class="email-actions" *ngIf="!isMobilePreview">
-                  <button mat-icon-button class="action-btn">
+                  <button data-testid="cet-button-3" mat-icon-button class="action-btn">
                     <mat-icon>reply</mat-icon>
                   </button>
-                  <button mat-icon-button class="action-btn">
+                  <button data-testid="cet-button-4" mat-icon-button class="action-btn">
                     <mat-icon>more_vert</mat-icon>
                   </button>
                 </div>
               </div>
 
-              <div class="email-content" [innerHTML]="getPreviewContent()" (click)="onImageClick($event)"
+              <div data-testid="cet-onimageclick" class="email-content" [innerHTML]="getPreviewContent()" (click)="onImageClick($event)"
                 style="cursor: pointer;">
                 <div class="empty-content" *ngIf="!getPreviewContent()">
                   <mat-icon>drafts</mat-icon>

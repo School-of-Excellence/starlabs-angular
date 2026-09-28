@@ -54,6 +54,15 @@
         ]
       },
       {
+        "source": "/livekit-cloud-room/**",
+        "headers": [
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin"
+          }
+        ]
+      },
+      {
         "source": "**",
         "headers": [
           {

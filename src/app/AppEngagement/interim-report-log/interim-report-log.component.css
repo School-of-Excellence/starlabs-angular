@@ -916,3 +916,9 @@ table {
 @media (max-width: 640px) {
   .love-letter-section { grid-template-columns: 1fr; }
 }
+/* Export button above the Ask A&H / Love Letter tables */
+.export-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}

@@ -3,7 +3,7 @@
     <div class="field"  style="display: flex; justify-content: space-between;">
         <mat-form-field appearance="outline">
             <mat-label>Title</mat-label>
-            <input matInput placeholder="Title" type="text" formControlName="title">
+            <input matInput data-testid="adl-title" placeholder="Title" type="text" formControlName="title">
             <!-- <mat-error *ngIf="LayerForm.get('title').hasError('required')">
                 Required
             </mat-error> -->
@@ -11,11 +11,11 @@
     
         <mat-form-field appearance="outline" style="margin-left: 20px;">
             <mat-label>Description</mat-label>
-            <input matInput placeholder="Description" type="text" formControlName="description">
+            <input matInput data-testid="adl-description" placeholder="Description" type="text" formControlName="description">
         </mat-form-field>
    
-        <mat-icon style="text-align: center;margin-top: 20px;margin-left: 5px;cursor: pointer;" (click)="addDescription()">add_circle</mat-icon>
-        <mat-icon style="text-align: center;margin-top: 20px;margin-left: 5px;cursor: pointer;" (click)="removeDescription()">remove_circle</mat-icon>
+        <mat-icon data-testid="adl-add-description" style="text-align: center;margin-top: 20px;margin-left: 5px;cursor: pointer;" (click)="addDescription()">add_circle</mat-icon>
+        <mat-icon data-testid="adl-remove-description" style="text-align: center;margin-top: 20px;margin-left: 5px;cursor: pointer;" (click)="removeDescription()">remove_circle</mat-icon>
     </div>    
     <div formArrayName="additionalDescriptions" style="margin-left: 10px;margin-top: 20px;">
         <div *ngFor="let control of additionalDescriptionsControls; let i = index">
@@ -28,7 +28,7 @@
     <div>
         <mat-form-field class="matfield" appearance="outline" style="margin-left: 10px;">
             <mat-label>Select Event</mat-label>
-            <mat-select   formControlName="event">
+            <mat-select data-testid="adl-event-select" formControlName="event">
               <mat-option>
                   <ngx-mat-select-search [(ngModel)]="event"  [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
               </mat-option>
@@ -39,16 +39,16 @@
             </mat-error> -->
         </mat-form-field>
         <label style="margin-top: 30px;margin-left: 10px;">Select image : </label>
-        <input #thumbnails type="file" multiple accept=".png,.jpg,.jpeg" formControlName="thumbnails" (change)="onFileSelected($event)">
+        <input #thumbnails type="file" data-testid="adl-image-upload" multiple accept=".png,.jpg,.jpeg" formControlName="thumbnails" (change)="onFileSelected($event)">
         <div *ngIf="previewImages.length > 0" style="margin-top: 10px;">
             <div *ngFor="let image of previewImages let i = index" class="image-preview">
               <img [src]="image" alt="Preview">
-              <mat-icon style="cursor: pointer;" (click)="removePreview(i)">close</mat-icon>
+              <mat-icon data-testid="adl-remove-preview" style="cursor: pointer;" (click)="removePreview(i)">close</mat-icon>
             </div>
         </div>
     </div>
     <div class="d-flex flex-row justify-content-center">
-        <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Layer'}}</button>&nbsp;&nbsp;
-        <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+        <button mat-stroked-button class="submitbtn" type="submit" data-testid="adl-submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Layer'}}</button>&nbsp;&nbsp;
+        <button mat-stroked-button class="cancelbtn" type="button" data-testid="adl-close" (click)="close()" [disabled]="loading">Close</button>
     </div>
 </form>

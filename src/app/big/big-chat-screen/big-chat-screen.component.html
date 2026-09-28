@@ -24,7 +24,7 @@
               <h4>Choose Marathon</h4>
               <div class="marathon-list">
                 <div *ngFor="let marathon of marathons" class="marathon-container">
-                  <div class="marathon-item"
+                  <div data-testid="bchat-toggle-marathon-1" class="marathon-item"
                       [class.active]="selectedMarathonId === marathon.id"
                       (click)="toggleMarathon(marathon.id, marathon.title)">
                     <span class="marathon-title">{{ marathon.title }}</span>
@@ -46,7 +46,7 @@
                     </div>
                     
                     <div *ngIf="!loadingAssignments && marathon.assignments?.length > 0" class="assignments-list">
-                      <div *ngFor="let assignment of marathon.assignments" 
+                      <div data-testid="bchat-select-assignment-2" *ngFor="let assignment of marathon.assignments" 
                           class="assignment-item"
                           (click)="selectAssignment(assignment)">
                         <div class="assignment-id">{{ assignment.title }}</div>
@@ -84,7 +84,7 @@
                       </div>
                     </div>
                     <div class="header-right">
-                      <button *ngIf="sender === 'admin'" class="menu-button" (click)="toggleSidenav()">
+                      <button data-testid="bchat-toggle-sidenav-3" *ngIf="sender === 'admin'" class="menu-button" (click)="toggleSidenav()">
                         <i class="fa-solid fa-person-running"></i>
                       </button>
                     </div>
@@ -95,7 +95,7 @@
                         <h4>Participants</h4>
                       </div> -->
                       <div class="sidebar-header">
-                        <button *ngIf="!isSelectingParticipants" class="new-broadcast-btn" (click)="startParticipantSelection()">
+                        <button data-testid="bchat-start-participant-selection-4" *ngIf="!isSelectingParticipants" class="new-broadcast-btn" (click)="startParticipantSelection()">
                           <i class="fa-solid fa-bullhorn"></i> New Broadcast
                         </button>
                         <div *ngIf="isSelectingParticipants" class="broadcast-creation-container">
@@ -106,12 +106,12 @@
                             </mat-form-field>
                           </div>
                           <div class="broadcast-actions">
-                            <button class="broadcast-create-btn" 
+                            <button data-testid="bchat-create-new-broadcast-5" class="broadcast-create-btn" 
                                     [disabled]="selectedParticipantIds.length === 0 || !broadcastName?.trim()" 
                                     (click)="createNewBroadcast()">
                               <i class="fa-solid fa-check"></i> Create
                             </button>
-                            <button class="broadcast-cancel-btn" (click)="cancelParticipantSelection()">
+                            <button data-testid="bchat-cancel-participant-selection-6" class="broadcast-cancel-btn" (click)="cancelParticipantSelection()">
                               <i class="fa-solid fa-times"></i> Cancel
                             </button>
                           </div>
@@ -119,7 +119,7 @@
                       </div>
                       <div *ngIf="isSelectingParticipants" class="select-all-container">
                         <div class="checkbox-wrapper">
-                          <input 
+                          <input data-testid="bchat-change-toggle-select-all-participants-7" 
                             type="checkbox" 
                             id="selectAllCheckbox" 
                             [checked]="areAllParticipantsSelected()" 
@@ -129,7 +129,7 @@
                         </div>
                       </div>
                     
-                      <div *ngIf="isGroupChat && !isSelectingParticipants" 
+                      <div data-testid="bchat-select-group-chat-8" *ngIf="isGroupChat && !isSelectingParticipants" 
                           class="participant-item" 
                           [class.active]="selectedParticipant === 'group'"
                           (click)="selectGroupChat()">
@@ -144,7 +144,7 @@
                       </div>
                     
                       <div class="participants-list">
-                        <div *ngFor="let participant of participants" 
+                        <div data-testid="bchat-is-selecting-participants-9" *ngFor="let participant of participants" 
                              class="participant-item"
                              [class.active]="selectedParticipant === participant && !isSelectingParticipants"
                              [class.self]="participant === loggedInProfileId"
@@ -152,7 +152,7 @@
                              [class.checkbox-enabled]="isSelectingParticipants"
                              (click)="isSelectingParticipants ? toggleParticipantSelection(participant) : (participant !== loggedInProfileId && selectParticipant(participant))">
                           <div *ngIf="isSelectingParticipants && participant !== loggedInProfileId" class="participant-checkbox">
-                            <input 
+                            <input data-testid="bchat-event-10" 
                               type="checkbox" 
                               [id]="'participant-' + participant" 
                               [checked]="isParticipantSelected(participant)"
@@ -254,7 +254,7 @@
                                     <div *ngFor="let attachment of msg.attachments" class="attachment-item">
                                       <!-- Image attachments -->
                                       <div *ngIf="attachment.type.startsWith('image/')" class="image-attachment">
-                                        <a [href]="attachment.url" target="_blank">
+                                        <a data-testid="bchat-a-11" [href]="attachment.url" target="_blank">
                                           <img [src]="attachment.url" alt="Image attachment" class="attachment-image">
                                         </a>
                                       </div>
@@ -280,7 +280,7 @@
                                                  !attachment.type.startsWith('audio/') && 
                                                  !attachment.type.startsWith('video/')" 
                                            class="file-attachment">
-                                        <a [href]="attachment.url" target="_blank" class="file-attachment-link">
+                                        <a data-testid="bchat-a-12" [href]="attachment.url" target="_blank" class="file-attachment-link">
                                           <i class="fa-solid fa-file attachment-icon"></i>
                                           <div class="file-attachment-info">
                                             <div class="file-attachment-name">{{attachment.name}}</div>
@@ -387,7 +387,7 @@
                             </div>
                             
                             <!-- Remove button - only show when not uploading -->
-                            <span *ngIf="fileUploadProgress[file.name] === undefined" 
+                            <span data-testid="bchat-remove-selected-file-13" *ngIf="fileUploadProgress[file.name] === undefined" 
                                   class="remove-file-btn" 
                                   (click)="removeSelectedFile(i); $event.stopPropagation()">
                               <i class="fa-solid fa-times"></i>
@@ -405,14 +405,14 @@
                                 [disabled]="isSending || uploadingAttachments">
                           
                           <!-- Attachment button - disabled during upload -->
-                          <button mat-icon-button 
+                          <button data-testid="bchat-attachment-14" mat-icon-button 
                                   (click)="attachment()" 
                                   [disabled]="isSending || uploadingAttachments">
                             <i class="fa-solid fa-paperclip"></i>
                           </button>
                           
                           <!-- Send button - with loading spinner when uploading -->
-                          <button mat-icon-button 
+                          <button data-testid="bchat-send-message-15" mat-icon-button 
                                   (click)="sendMessage()" 
                                   [disabled]="(!newMessage.trim() && selectedFiles.length === 0) || isSending || uploadingAttachments">
                             <ng-container *ngIf="!isSending && !uploadingAttachments">

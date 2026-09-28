@@ -3,7 +3,7 @@
     
     <mat-form-field class="w-100" appearance="outline">
       <mat-label>Select Queue</mat-label>
-      <mat-select [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
+      <mat-select data-testid="iepr-sel-1" [(ngModel)]="selectedEvent" (selectionChange)="onEventSelect()">
         <mat-option>
           <ngx-mat-select-search [(ngModel)]="searchQueue" [ngModelOptions]="{standalone: true}"
             placeholderLabel="Columns" [placeholderLabel]="'Search'"
@@ -16,7 +16,7 @@
     <div class="arena-events-list">
       <div class="arena-event-item" *ngFor="let arena of arenaEventList"
         [class.selected]="selectedArena?.docid === arena.docid" [attr.data-type]="arena['type']">
-        <div class="event-info" (click)="onArenaEventSelect(arena)">
+        <div [attr.data-testid]="'iepr-act-2-' + arena" class="event-info" (click)="onArenaEventSelect(arena)">
           <div class="event-title-row">
             <h4 class="event-title">{{mapProduct[arena["productref"].id]}}</h4>
             <span class="participant-count">
@@ -57,10 +57,10 @@
           </div>
         </div>
         <div class="event-actions">
-          <button mat-icon-button matTooltip="View Participants" (click)="viewArenaParticipants(arena, $event)">
+          <button [attr.data-testid]="'iepr-btn-3-' + arena" mat-icon-button matTooltip="View Participants" (click)="viewArenaParticipants(arena, $event)">
             <mat-icon>visibility</mat-icon>
           </button>
-          <button mat-icon-button matTooltip="Export Participants" (click)="exportArenaParticipants(arena, $event)">
+          <button [attr.data-testid]="'iepr-btn-4-' + arena" mat-icon-button matTooltip="Export Participants" (click)="exportArenaParticipants(arena, $event)">
             <mat-icon>download</mat-icon>
           </button>
         </div>
@@ -82,13 +82,13 @@
     <div *ngIf="selectedArena">
       <div class="setupbox">
         <div *ngIf="eventRequestedNonEligibleProfile.length != 0" class="d-flex align-items-center mb-3">
-          <mat-icon class="text-danger me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedNonEligibleProfile)" (click)="openBottomSheet(eventRequestedNonEligibleProfile)">warning</mat-icon>
+          <mat-icon data-testid="iepr-act-5" class="text-danger me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedNonEligibleProfile)" (click)="openBottomSheet(eventRequestedNonEligibleProfile)">warning</mat-icon>
           <span>
             {{eventRequestedNonEligibleProfile.length}} Participant(s) requested for participation but no <b>{{mapProduct[selectedArena["productref"].id]}}</b> product available in their purchase.
           </span>
         </div>
         <div *ngIf="eventRequestedEligibleProfile.length != 0" class="d-flex align-items-center mb-3">
-          <mat-icon class="text-success me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedEligibleProfile)" (click)="openBottomSheet(eventRequestedEligibleProfile)">pan_tool</mat-icon>
+          <mat-icon data-testid="iepr-act-6" class="text-success me-2 pointer" [matTooltip]="viewParticipantName(eventRequestedEligibleProfile)" (click)="openBottomSheet(eventRequestedEligibleProfile)">pan_tool</mat-icon>
           <span>
             {{eventRequestedEligibleProfile.length}} Participant(s) are eligible for participation and have the <b>{{mapProduct[selectedArena['productref'].id]}}</b> product in their purchase.
           </span>
@@ -97,7 +97,7 @@
           <div class="section-title">Select Product Delivery Sequence to Initiate Product</div>
           <mat-form-field class="formfield w-100" appearance="outline" subscriptSizing="dynamic">
             <mat-label>Delivery Set</mat-label>
-            <mat-select [(ngModel)]="selectedDeliverySet" (selectionChange)="ngAfterViewInit()">
+            <mat-select data-testid="iepr-sel-7" [(ngModel)]="selectedDeliverySet" (selectionChange)="ngAfterViewInit()">
               <mat-select-trigger *ngIf="selectedDeliverySet">
                 {{selectedDeliverySet}}
               </mat-select-trigger>
@@ -121,7 +121,7 @@
           </div>
           <mat-form-field *ngIf="queueVariationList.length != 0" class="formfield w-100 mb-2" appearance="outline" subscriptSizing="dynamic">
             <mat-label>Stage Variation</mat-label>
-            <mat-select [(ngModel)]="selectedQueueVariation">
+            <mat-select data-testid="iepr-sel-8" [(ngModel)]="selectedQueueVariation">
               <mat-select-trigger *ngIf="selectedQueueVariation">
                 {{mapQueueVariation[selectedQueueVariation]}}
               </mat-select-trigger>
@@ -147,7 +147,7 @@
             <div class="action-left">
               <mat-form-field appearance="outline" class="formfield filter-field" subscriptSizing="dynamic">
                 <mat-label>Filter Participants</mat-label>
-                <input matInput [(ngModel)]="filterValue" (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
+                <input data-testid="iepr-inp-9" matInput [(ngModel)]="filterValue" (keyup)="applyFilter(input.value)" placeholder="Search participants" #input>
                 <mat-icon matSuffix>search</mat-icon>
               </mat-form-field>
 
@@ -180,7 +180,7 @@
                     </div>
                   </div>
                   <div class="assign-btn-row">
-                    <button class="assign-btn" (click)="assignProductFromSearch(searchResult.unassigned)">
+                    <button data-testid="iepr-btn-10" class="assign-btn" (click)="assignProductFromSearch(searchResult.unassigned)">
                       Assign product ({{searchResult.unassigned.length}})
                     </button>
                   </div>
@@ -189,15 +189,15 @@
               </div>
             </div>
             <div class="action-right">
-              <button mat-raised-button class="btn-initiate" *ngIf="selection.selected.length != 0" (click)="initiateEventProduct()">
+              <button data-testid="iepr-btn-11" mat-raised-button class="btn-initiate" *ngIf="selection.selected.length != 0" (click)="initiateEventProduct()">
                 Initiate Product for {{selection.selected.length}} Participants
               </button>
 
-              <button mat-mini-fab (click)="downloadSampleExcel()" matTooltip="Download Sample Excel">
+              <button data-testid="iepr-btn-12" mat-mini-fab (click)="downloadSampleExcel()" matTooltip="Download Sample Excel">
                 <mat-icon>download</mat-icon>
               </button>
 
-              <button mat-raised-button color="primary" class="btn-import ml-2" (click)="importParticipant()">
+              <button data-testid="iepr-btn-13" mat-raised-button color="primary" class="btn-import ml-2" (click)="importParticipant()">
                 Import Participants
               </button>
             </div>
@@ -223,7 +223,7 @@
               <div class="missing-content">
                 <div class="missing-participants-header">
                   <p>The following participants from your Excel file were not found in the system:</p>
-                  <button mat-mini-fab color="primary" type="button" (click)="exportMissingParticipants()">
+                  <button data-testid="iepr-btn-14" mat-mini-fab color="primary" type="button" (click)="exportMissingParticipants()">
                     <i class="fa-solid fa-file-arrow-down"></i>
                   </button>
                 </div>
@@ -282,7 +282,7 @@
   
           <ng-container matColumnDef="action">
             <th mat-header-cell *matHeaderCellDef>
-              <mat-checkbox
+              <mat-checkbox data-testid="iepr-change-15"
                 (change)="$event ? masterToggle() : null"
                 [checked]="selection.hasValue() && isAllSelected()"
                 [indeterminate]="selection.hasValue() && !isAllSelected()"
@@ -290,7 +290,7 @@
               </mat-checkbox>
             </th>
             <td mat-cell *matCellDef="let row">
-              <mat-checkbox
+              <mat-checkbox data-testid="iepr-change-16"
                 (click)="$event.stopPropagation()"
                 (change)="$event ? selection.toggle(row) : null"
                 [checked]="selection.isSelected(row)"
@@ -329,14 +329,14 @@
           </p>
         </div>
       </div>
-      <button mat-icon-button (click)="closeSheet()" class="close-btn">
+      <button data-testid="iepr-btn-17" mat-icon-button (click)="closeSheet()" class="close-btn">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
     <div class="sheet-controls">
       <div class="controls-left">
-        <mat-checkbox 
+        <mat-checkbox data-testid="iepr-change-18" 
           (change)="masterToggleBottomSheet()"
           [checked]="isAllBottomSheetSelected()"
           [indeterminate]="bottomSheetSelection.hasValue() && !isAllBottomSheetSelected()"
@@ -348,7 +348,7 @@
 
       <!-- Status Container in Row -->
       <div class="status-container" *ngIf="bottomSheetSelection.selected.length > 0">
-        <button mat-stroked-button class="status-btn whatsapp" (click)="sendWhatsApp()">
+        <button data-testid="iepr-btn-19" mat-stroked-button class="status-btn whatsapp" (click)="sendWhatsApp()">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -358,7 +358,7 @@
           <span class="status-label">WhatsApp ({{bottomSheetSelection.selected.length}})</span>
         </button>
 
-        <button mat-stroked-button class="status-btn email" (click)="sendEmail()">
+        <button data-testid="iepr-btn-20" mat-stroked-button class="status-btn email" (click)="sendEmail()">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -368,7 +368,7 @@
           <span class="status-label">Email ({{bottomSheetSelection.selected.length}})</span>
         </button>
 
-        <button mat-stroked-button class="status-btn notification" (click)="sendNotification()">
+        <button data-testid="iepr-btn-21" mat-stroked-button class="status-btn notification" (click)="sendNotification()">
           <div class="status-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -382,11 +382,11 @@
 
     <div class="sheet-content">
       <div class="participant-list">
-        <div class="participant-item"
+        <div [attr.data-testid]="'iepr-act-22-' + i" class="participant-item"
             *ngFor="let participant of data; let i = index"
             [class.selected]="isBottomSheetSelected(participant.profileId)"
             (click)="toggleBottomSheetSelection(participant.profileId)">
-          <mat-checkbox
+          <mat-checkbox [attr.data-testid]="'iepr-change-23-' + i"
             [checked]="isBottomSheetSelected(participant.profileId)"
             (click)="$event.stopPropagation()"
             (change)="toggleBottomSheetSelection(participant.profileId)"
@@ -437,7 +437,7 @@
     </div>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-flat-button color="primary" mat-dialog-close>OK</button>
+    <button data-testid="iepr-btn-24" mat-flat-button color="primary" mat-dialog-close>OK</button>
   </mat-dialog-actions>
 </ng-template>
 <ng-template #importPreviewDialog let-dialogRef>
@@ -446,7 +446,7 @@
     <!-- Header -->
     <div class="import-preview-header">
       <span>Import Participants – Preview</span>
-      <mat-icon class="close-icon" (click)="dialog.closeAll()">close</mat-icon>
+      <mat-icon data-testid="iepr-act-25" class="close-icon" (click)="dialog.closeAll()">close</mat-icon>
     </div>
     <p class="import-preview-subtitle">Review the import summary before confirming. Skipped rows will not be added.</p>
 
@@ -488,7 +488,7 @@
             <span class="status-badge ready-badge">Ready</span>
           </div>
         </ng-container>
-        <div *ngIf="importPreviewData.willBeAdded.length > 3"
+        <div data-testid="iepr-act-26" *ngIf="importPreviewData.willBeAdded.length > 3"
             class="more-label will-add-more"
             (click)="expandedSections['willBeAdded'] = !expandedSections['willBeAdded']"
             style="cursor: pointer;">
@@ -511,7 +511,7 @@
             <span class="status-badge queue-badge">Already in Queue</span>
           </div>
         </ng-container>
-        <div *ngIf="importPreviewData.alreadyInQueue.length > 3"
+        <div data-testid="iepr-act-27" *ngIf="importPreviewData.alreadyInQueue.length > 3"
             class="more-label in-queue-more"
             (click)="expandedSections['alreadyInQueue'] = !expandedSections['alreadyInQueue']"
             style="cursor: pointer;">
@@ -523,20 +523,20 @@
       <div *ngIf="importPreviewData.noProduct.length > 0" class="section">
         <div class="section-header no-product-header" style="display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <mat-checkbox (change)="toggleAllNoProduct($event.checked)"
+            <mat-checkbox data-testid="iepr-change-28" (change)="toggleAllNoProduct($event.checked)"
               [checked]="noProductSelection.selected.length === importPreviewData.noProduct.length && importPreviewData.noProduct.length > 0"
               [indeterminate]="noProductSelection.selected.length > 0 && noProductSelection.selected.length < importPreviewData.noProduct.length">
             </mat-checkbox>
             <span>NO PRODUCT ASSIGNED</span>
             <span class="section-badge no-product-badge">{{ importPreviewData.noProduct.length }}</span>
           </div>
-          <button mat-raised-button color="warn" *ngIf="noProductSelection.selected.length > 0" (click)="assignProduct()"> Assign Product ({{ noProductSelection.selected.length }})</button>
+          <button data-testid="iepr-btn-29" mat-raised-button color="warn" *ngIf="noProductSelection.selected.length > 0" (click)="assignProduct()"> Assign Product ({{ noProductSelection.selected.length }})</button>
         </div>
 
         <ng-container *ngFor="let p of (expandedSections['noProduct']  ? importPreviewData.noProduct  : (importPreviewData.noProduct | slice:0:3))">
-          <div class="participant-card no-product-card" style="cursor:pointer" (click)="noProductSelection.toggle(p.email)">
+          <div [attr.data-testid]="'iepr-act-30-' + p" class="participant-card no-product-card" style="cursor:pointer" (click)="noProductSelection.toggle(p.email)">
             <div style="display:flex;align-items:center;gap:8px;">
-              <mat-checkbox [checked]="noProductSelection.isSelected(p.email)" (click)="$event.stopPropagation()" (change)="noProductSelection.toggle(p.email)"></mat-checkbox>
+              <mat-checkbox [attr.data-testid]="'iepr-change-31-' + p" [checked]="noProductSelection.isSelected(p.email)" (click)="$event.stopPropagation()" (change)="noProductSelection.toggle(p.email)"></mat-checkbox>
               <div>
                 <div class="participant-name">{{ p.name }}</div>
                 <div class="participant-email">{{ p.email }}</div>
@@ -545,7 +545,7 @@
           </div>
         </ng-container>
 
-        <div *ngIf="importPreviewData.noProduct.length > 3"
+        <div data-testid="iepr-act-32" *ngIf="importPreviewData.noProduct.length > 3"
             class="more-label no-product-more"
             (click)="expandedSections['noProduct'] = !expandedSections['noProduct']"
             style="cursor:pointer;">
@@ -557,8 +557,8 @@
 
     <!-- Footer Actions -->
     <div class="import-preview-footer">
-      <button mat-stroked-button [mat-dialog-close]="false">Cancel</button>
-      <button mat-flat-button color="primary" [disabled]="importPreviewData.willBeAdded.length === 0" [mat-dialog-close]="true">
+      <button data-testid="iepr-btn-33" mat-stroked-button [mat-dialog-close]="false">Cancel</button>
+      <button data-testid="iepr-btn-34" mat-flat-button color="primary" [disabled]="importPreviewData.willBeAdded.length === 0" [mat-dialog-close]="true">
         Initiate Product for {{ importPreviewData.willBeAdded.length }} Participants
       </button>
     </div>

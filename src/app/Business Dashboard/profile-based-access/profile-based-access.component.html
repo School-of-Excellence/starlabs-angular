@@ -135,7 +135,7 @@
         <!-- Search Input -->
         <mat-form-field appearance="outline" class="header-search">
           <mat-label>Search</mat-label>
-          <input
+          <input data-testid="pba-ex-path-or-dashboard"
             matInput
             [(ngModel)]="filters.search"
             (input)="accessFilter()"
@@ -147,7 +147,7 @@
         <mat-form-field appearance="outline" class="header-profile-search">
           <mat-label>Search Profile</mat-label>
 
-          <mat-select
+          <mat-select data-testid="pba-select-profiles"
             [(ngModel)]="filters.profileIds"
             [ngModelOptions]="{ standalone: true }"
             multiple
@@ -192,7 +192,7 @@
         <mat-form-field appearance="outline">
           <mat-label>Access Type</mat-label>
 
-          <mat-select
+          <mat-select data-testid="pba-select-access-type"
             placeholder="Select Access Type"
             [(ngModel)]="filters.accessType"
             (selectionChange)="accessFilter()"
@@ -249,7 +249,7 @@
                 </span>
                 } } @if (access.profileid.length > 3 &&
                 !showFullProfiles.includes(accessIndex)) {
-                <span
+                <span data-testid="pba-showprofiles"
                   class="more-chip"
                   [matTooltip]="getMoreUsersTooltip(access.profileid)"
                   (click)="showProfiles(accessIndex)"
@@ -257,7 +257,7 @@
                   +{{ access.profileid.length - 3 }} more
                 </span>
                 } @else if (showFullProfiles.includes(accessIndex)) {
-                <span class="less-chip" (click)="showProfiles(accessIndex)">
+                <span data-testid="pba-showprofiles-2" class="less-chip" (click)="showProfiles(accessIndex)">
                   Show Less
                 </span>
                 }
@@ -265,7 +265,7 @@
             </td>
 
             <td class="actions">
-              <button
+              <button data-testid="pba-openeditdialog"
                 mat-icon-button
                 (click)="openEditDialog(access)"
                 matTooltip="Edit"
@@ -312,7 +312,7 @@
       
         <div class="form-group">
           <label>Dashboard Name</label>
-          <input
+          <input data-testid="pba-dashboard"
             type="text"
             [(ngModel)]="ahcrmScreenName"
             placeholder="Dashboard"
@@ -322,7 +322,7 @@
 
         <div class="form-group user-select-group">
           <label>Profiles</label>
-          <mat-select
+          <mat-select data-testid="pba-select-profiles-2"
             [(ngModel)]="ahcrmSelectedProfileIds"
             multiple
             class="user-select"
@@ -368,11 +368,11 @@
         </div>
 
         <div class="form-btn">
-          <button mat-button class="refresh-btn" (click)="clearAhcrmForm()">
+          <button data-testid="pba-clearahcrmform" mat-button class="refresh-btn" (click)="clearAhcrmForm()">
             <mat-icon>refresh</mat-icon>
             clear
           </button>
-          <button
+          <button data-testid="pba-addahcrmscreenaccess"
             mat-raised-button
             color="primary"
             (click)="addAhcrmScreenAccess()"
@@ -403,7 +403,7 @@
             >
               <span class="chip-avatar">{{ getInitials(profileId) }}</span>
               {{ getProfileFields(profileId, "name") }}
-              <button matChipRemove>
+              <button data-testid="pba-button" matChipRemove>
                 <mat-icon>cancel</mat-icon>
               </button>
             </div>
@@ -509,7 +509,7 @@
                 </span>
                 } } @if (ahcrmScreenAccess[access].length > 3 &&
                 !showAhcrmFullProfiles.includes(access)) {
-                <span
+                <span data-testid="pba-showahcrmprofiles"
                   class="more-chip"
                   [matTooltip]="getMoreUsersTooltip(ahcrmScreenAccess[access])"
                   (click)="showAhcrmProfiles(access)"
@@ -517,7 +517,7 @@
                   +{{ ahcrmScreenAccess[access].length - 3 }} more
                 </span>
                 } @else if (showAhcrmFullProfiles.includes(access)) {
-                <span class="less-chip" (click)="showAhcrmProfiles(access)">
+                <span data-testid="pba-showahcrmprofiles-2" class="less-chip" (click)="showAhcrmProfiles(access)">
                   Show Less
                 </span>
                 }
@@ -525,7 +525,7 @@
             </td>
 
             <td class="actions">
-              <button
+              <button data-testid="pba-openahcmeditdialog"
                 mat-icon-button
                 (click)="openAhcmEditDialog(access)"
                 matTooltip="Edit"
@@ -565,7 +565,7 @@
 </div>
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Profiles</mat-label>
-      <mat-select [(ngModel)]="editRoute.profileid" multiple>
+      <mat-select data-testid="pba-mat-select" [(ngModel)]="editRoute.profileid" multiple>
         <mat-select-trigger>
           {{ getProfileNamesFromIds(editRoute?.profileid) }}
         </mat-select-trigger>
@@ -611,7 +611,7 @@
         <div class="user-chip">
           <span class="chip-avatar">{{ getInitials(profileId) }}</span>
           {{ getProfileFields(profileId, "name") }}
-          <button matChipRemove>
+          <button data-testid="pba-button-2" matChipRemove>
             <mat-icon>cancel</mat-icon>
           </button>
         </div>
@@ -620,8 +620,8 @@
   </div>
 
   <div mat-dialog-actions align="end">
-    <button mat-button mat-dialog-close>Cancel</button>
-    <button
+    <button data-testid="pba-button-3" mat-button mat-dialog-close>Cancel</button>
+    <button data-testid="pba-button-4"
       mat-raised-button
       color="primary"
       [disabled]="editRoute?.profileid?.length < 0"
@@ -641,7 +641,7 @@
 </div>
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Profiles</mat-label>
-      <mat-select [(ngModel)]="ahcrmEditForm.profileid" multiple>
+      <mat-select data-testid="pba-mat-select-2" [(ngModel)]="ahcrmEditForm.profileid" multiple>
         <mat-select-trigger>
           {{ getProfileNamesFromIds(ahcrmEditForm?.profileid) }}
         </mat-select-trigger>
@@ -687,7 +687,7 @@
         <div class="user-chip">
           <span class="chip-avatar">{{ getInitials(profileId) }}</span>
           {{ getProfileFields(profileId, "name") }}
-          <button matChipRemove>
+          <button data-testid="pba-button-5" matChipRemove>
             <mat-icon>cancel</mat-icon>
           </button>
         </div>
@@ -696,8 +696,8 @@
   </div>
 
   <div mat-dialog-actions align="end">
-    <button mat-button mat-dialog-close>Cancel</button>
-    <button
+    <button data-testid="pba-button-6" mat-button mat-dialog-close>Cancel</button>
+    <button data-testid="pba-button-7"
       mat-raised-button
       color="primary"
       [disabled]="ahcrmEditForm?.profileid?.length < 0"

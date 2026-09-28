@@ -54,8 +54,8 @@
       </app-auto-complete-with-chip>
 
       <div style="display: flex; justify-content: center; align-items: center; margin-top: 16px;">
-        <button mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button> &nbsp;&nbsp;&nbsp;
-        <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>
+        <button data-testid="ca-dialog-ref-1" mat-stroked-button type="button" (click)="dialogRef.close()">Cancel</button> &nbsp;&nbsp;&nbsp;
+        <button data-testid="ca-on-submit-2" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="form.invalid">Submit</button>
       </div>
 
     </form>

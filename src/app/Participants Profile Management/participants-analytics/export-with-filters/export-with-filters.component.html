@@ -1,7 +1,7 @@
 <div class="export-dialog">
     <div class="dialog-header">
         <h4 mat-dialog-title>Export Data</h4>
-        <button mat-icon-button (click)="closeDialog()">
+        <button data-testid="ewf-close-1" mat-icon-button (click)="closeDialog()">
             <mat-icon>close</mat-icon>
         </button>
     </div>
@@ -72,14 +72,14 @@
                                         [disabled]="consumedProducts.length === 1" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button> -->
-                                    <button mat-icon-button color="warn" (click)="removeConsumedProduct(i)" type="button">
+                                    <button [attr.data-testid]="'ewf-remove-consumed-' + i" mat-icon-button color="warn" (click)="removeConsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
                             </div>
                         </div>
         
-                        <button mat-stroked-button color="primary" (click)="addConsumedProduct()" type="button">
+                        <button data-testid="ewf-add-consumed-2" mat-stroked-button color="primary" (click)="addConsumedProduct()" type="button">
                             <mat-icon>add</mat-icon>
                             Add Consumed Product
                         </button>
@@ -143,14 +143,14 @@
                                         [disabled]="unconsumedProducts.length === 1" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button> -->
-                                    <button mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)" type="button">
+                                    <button [attr.data-testid]="'ewf-remove-unconsumed-' + i" mat-icon-button color="warn" (click)="removeUnconsumedProduct(i)" type="button">
                                         <mat-icon>delete</mat-icon>
                                     </button>
                                 </div>
                             </div>
                         </div>
         
-                        <button mat-stroked-button color="primary" (click)="addUnconsumedProduct()" type="button">
+                        <button data-testid="ewf-add-unconsumed-3" mat-stroked-button color="primary" (click)="addUnconsumedProduct()" type="button">
                             <mat-icon>add</mat-icon>
                             Add Unconsumed Product
                         </button>
@@ -161,12 +161,12 @@
                         <!-- <button mat-stroked-button (click)="resetFilters()" type="button">
                             Reset
                         </button> -->
-                        <button mat-flat-button color="primary" (click)="applyFilter()" type="button" [disabled]="isLoading">
+                        <button data-testid="ewf-apply-filter-4" mat-flat-button color="primary" (click)="applyFilter()" type="button" [disabled]="isLoading">
                             <mat-icon *ngIf="!isLoading">search</mat-icon>
                             <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
                             {{ isLoading ? 'Searching...' : 'Apply Filter' }}
                         </button>
-                        <button mat-stroked-button (click)="clearFilters()" type="button">
+                        <button data-testid="ewf-clear-filters-5" mat-stroked-button (click)="clearFilters()" type="button">
                             <mat-icon *ngIf="!isLoading">clear</mat-icon>
                             Clear Filters
                         </button>
@@ -179,7 +179,7 @@
         <div class="table-container" *ngIf="filteredData.length > 0">
             <div class="table-info">
                 <span>{{ filteredData.length }} records</span>
-                <button mat-button (click)="exportToExcel()" class="export-btn"> Export </button>
+                <button data-testid="ewf-export-6" mat-button (click)="exportToExcel()" class="export-btn"> Export </button>
             </div>
 
             <div class="table-wrapper">
@@ -242,7 +242,7 @@
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-        <button mat-button (click)="closeDialog()">Cancel</button>
+        <button data-testid="ewf-cancel-7" mat-button (click)="closeDialog()">Cancel</button>
         <!-- <button mat-flat-button color="primary" [disabled]="filteredData.length === 0" (click)="exportData()">
             Export ({{ filteredData.length }})
         </button> -->

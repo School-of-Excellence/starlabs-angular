@@ -6,7 +6,7 @@ import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { lastValueFrom, Subject, Subscription, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
-import { collection, collectionSnapshots, deleteDoc, doc, Firestore, getDocs, orderBy, query, where } from '@angular/fire/firestore';
+import { collection, collectionSnapshots, deleteDoc, doc, Firestore, getDocs, orderBy, query, updateDoc, where } from '@angular/fire/firestore';
 import { ref, uploadBytes, getDownloadURL, Storage, deleteObject } from '@angular/fire/storage';
 import { ContentUploadDialogComponent } from './content-upload-dialog/content-upload-dialog.component';
 import { Clipboard } from '@angular/cdk/clipboard';
@@ -16,6 +16,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { CommonModule } from '@angular/common';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 import * as XLSX from 'xlsx';
 import { environment } from '../../../environments/environment';
@@ -32,6 +33,7 @@ import { HttpClient } from '@angular/common/http';
     CommonModule,
     MatTableModule,
     MatPaginatorModule,
+    MatCheckboxModule,
     MatSnackBarModule,
   ],
   templateUrl: './content-upload.component.html',
@@ -49,7 +51,10 @@ export class ContentUploadComponent {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
-  displayedColumns: string[] = ['serialNo', 'added', 'title', 'videosize', 'thumbnailsize','duration' ,'available', 'convertedtohls', 'tags', 'edit'];
+  displayedColumns: string[] = ['select', 'serialNo', 'added', 'title', 'videosize', 'thumbnailsize','duration' ,'available', 'convertedtohls', 'tags', 'edit'];
+  /** docids of rows the user has multi-selected for bulk availability changes */
+  selectedIds = new Set<string>();
+  bulkUpdating = false;
   // displayedColumns: string[] = ['serialNo', 'added', 'title', 'thumbnail', 'thumbnailsize', 'available', 'convertedtohls', 'tags', 'edit', 'delete'];
   contentData = new MatTableDataSource();
   mapTaxonomy = {}
@@ -116,6 +121,71 @@ export class ContentUploadComponent {
       this.contentData.paginator.firstPage();
     }
   }
+
+  // ---- Multi-select for bulk availability changes ----
+  isSelected(row: any): boolean {
+    return this.selectedIds.has(row?.docid);
+  }
+
+  toggleRow(row: any) {
+    const id = row?.docid;
+    if (!id) return;
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+    } else {
+      this.selectedIds.add(id);
+    }
+  }
+
+  /** rows currently visible after the search filter */
+  private get filteredRows(): any[] {
+    return (this.contentData.filteredData as any[]) || [];
+  }
+
+  isAllSelected(): boolean {
+    const rows = this.filteredRows;
+    return rows.length > 0 && rows.every(r => this.selectedIds.has(r.docid));
+  }
+
+  isSomeSelected(): boolean {
+    const rows = this.filteredRows;
+    return rows.some(r => this.selectedIds.has(r.docid)) && !this.isAllSelected();
+  }
+
+  masterToggle() {
+    if (this.isAllSelected()) {
+      this.filteredRows.forEach(r => this.selectedIds.delete(r.docid));
+    } else {
+      this.filteredRows.forEach(r => r.docid && this.selectedIds.add(r.docid));
+    }
+  }
+
+  clearSelection() {
+    this.selectedIds.clear();
+  }
+
+  /** Bulk set `available` on every selected row. value=false unchecks availability. */
+  async setSelectedAvailability(value: boolean) {
+    if (this.selectedIds.size === 0 || this.bulkUpdating) return;
+    const ids = Array.from(this.selectedIds);
+    this.bulkUpdating = true;
+    try {
+      await Promise.all(
+        ids.map(id => updateDoc(doc(this.firestore, 'content_urls', id), { available: value }))
+      );
+      this.openSnackBar(
+        `${ids.length} item(s) marked ${value ? 'Available' : 'Not Available'}`,
+        'OK'
+      );
+      this.clearSelection();
+    } catch (error) {
+      console.error(error);
+      this.openSnackBar('Something went wrong updating availability', '');
+    } finally {
+      this.bulkUpdating = false;
+    }
+  }
+
   formatDuration(seconds: number): string {
     if (!seconds || isNaN(seconds)) return '—';
 

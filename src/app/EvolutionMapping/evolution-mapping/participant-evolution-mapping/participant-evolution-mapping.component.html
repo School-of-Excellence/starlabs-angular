@@ -4,7 +4,7 @@
       <strong>Congratulations!</strong>
       <p>You've successfully finished your Evolution Mapping.</p>
     </div>
-    <span class="toast-close" (click)="showCongrats = false; reload()">✕</span>
+    <span data-testid="pem-show-congrats-1" class="toast-close" (click)="showCongrats = false; reload()">✕</span>
   </div>
   <div *ngIf="loading">
         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
@@ -89,7 +89,7 @@
           <mat-checkbox class="example-margin" [(ngModel)]="enableCheck"><b>I have watched both Pre and Post videos.</b></mat-checkbox>
       </section>
       
-      <button *ngIf="![null,undefined,''].includes(this.queueToken['currentstage']) && this.incomingStageName === this.queueToken['currentstage'] && !submitted && enableCheck"   
+      <button data-testid="pem-movetonext-stage-2" *ngIf="![null,undefined,''].includes(this.queueToken['currentstage']) && this.incomingStageName === this.queueToken['currentstage'] && !submitted && enableCheck"   
         class="button" type="button" (click)="movetonextStage()">
               Mark as Completed
       </button>

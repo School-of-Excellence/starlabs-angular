@@ -1,7 +1,7 @@
 <div class="user-dialog-container">
         <div class="dialog-header">
         <h2 mat-dialog-title class="dialog-title">New User Profiles</h2>
-        <button mat-icon-buttonclass="close-btn"(click)="dialogRef.close()">X</button>
+        <button data-testid="new1-dialog-ref-1" mat-icon-buttonclass="close-btn"(click)="dialogRef.close()">X</button>
       </div>
 
   <mat-dialog-content>
@@ -16,8 +16,8 @@
       </mat-form-field>
 
       <div class="header-btn">
-      <button mat-stroked-button appearance="outline" (click)="AllUsers()">All Users ({{originalData.length}})</button>
-      <button mat-stroked-button appearance="outline" (click)="SubscribersOnly()">Subscribers Only ({{subscribersCount}})</button>   
+      <button data-testid="new1-all-users-2" mat-stroked-button appearance="outline" (click)="AllUsers()">All Users ({{originalData.length}})</button>
+      <button data-testid="new1-subscribers-only-3" mat-stroked-button appearance="outline" (click)="SubscribersOnly()">Subscribers Only ({{subscribersCount}})</button>   
      </div>
 
      <!-- <div class="panel-actions"><button mat-stroked-button class="selected"><mat-icon>check_circle</mat-icon>Selected: {{ selectedUsers.length }}</button>     <button mat-icon-button class="close-button" (click)="sendMail()"><i class="fa-solid fa-envelope"></i>
@@ -39,11 +39,11 @@
              class="users-table">
         <ng-container matColumnDef="select">
           <th mat-header-cell *matHeaderCellDef>
-            <mat-checkbox [checked]="isAllSelected()" (change)="masterToggle($event)">
+            <mat-checkbox data-testid="new1-change-master-toggle-4" [checked]="isAllSelected()" (change)="masterToggle($event)">
             </mat-checkbox>
           </th>
           <td mat-cell *matCellDef="let user">
-            <mat-checkbox [checked]="selectedUsers.includes(user)" (change)="toggleUser(user, $event)">
+            <mat-checkbox data-testid="new1-change-toggle-user-5" [checked]="selectedUsers.includes(user)" (change)="toggleUser(user, $event)">
             </mat-checkbox>
           </td>
         </ng-container>

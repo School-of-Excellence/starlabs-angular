@@ -193,7 +193,7 @@
         <!-- Checkbox with improved styling -->
         <ng-container *ngIf="['Checkbox'].includes(form.type)">
           <div class="checkbox-container">
-            <mat-checkbox 
+            <mat-checkbox data-testid="fa-change-auto-save-1" 
               [formControlName]="form.formcontrol"
               [required]="![null,undefined].includes(form.required) ? form.required : false"
               (change)="autoSave(this.deliveryForm.value)" 
@@ -222,7 +222,7 @@
           <div class="slider-container">
             <span class="slider-min-label">{{form.options[0]}}</span>
             <!-- [required]="![null,undefined].includes(form.required) ? form.required : false" -->
-            <mat-slider 
+            <mat-slider data-testid="fa-change-auto-save-2" 
               class="custom-slider"
               [min]="1"
               [max]="form.options.length"
@@ -294,7 +294,7 @@
             </h3>
             <p class="field-description">{{form.fielddescription}}</p>
           </div>
-          <mat-radio-group [formControlName]="form.formcontrol" 
+          <mat-radio-group data-testid="fa-change-auto-save-3" [formControlName]="form.formcontrol" 
             class="radio-group"
             [required]="![null,undefined].includes(form.required) ? form.required : false" 
             (change)="autoSave(this.deliveryForm.value)">
@@ -341,7 +341,7 @@
                     (change)="onSliderFlippingValueChange($event,flippingvalue.key,form);autoSave(this.deliveryForm.value)">
                     <input matSliderThumb [value]="+clientform.formarray[i].flippingquestion.value[$any(flippingvalue.key)]">
                   </mat-slider> -->
-                  <mat-slider
+                  <mat-slider data-testid="fa-change-on-slider-flipping-value-change-4"
                     class="custom-slider"
                     [min]="1"
                     [max]="10"
@@ -473,7 +473,7 @@
                   <!-- Checkbox in array -->
                   <ng-container *ngIf="['Checkbox'].includes(obj.type)">
                     <div class="array-field checkbox-container">
-                      <mat-checkbox [formControlName]="obj.formarraycontrol"
+                      <mat-checkbox data-testid="fa-change-auto-save-5" [formControlName]="obj.formarraycontrol"
                         [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                         (change)="autoSave(this.deliveryForm.value)">
                         <span class="checkbox-label">
@@ -495,7 +495,7 @@
                         {{obj.fieldname}}
                         <span class="required-indicator" *ngIf="![null,undefined].includes(obj.required) ? obj.required : false">*</span>
                       </h5>
-                      <mat-radio-group [formControlName]="obj.formarraycontrol" 
+                      <mat-radio-group data-testid="fa-change-auto-save-6" [formControlName]="obj.formarraycontrol" 
                         class="radio-group"
                         [required]="![null,undefined].includes(obj.required) ? obj.required : false"
                         (change)="autoSave(this.deliveryForm.value)">
@@ -516,7 +516,7 @@
               
               <!-- Array item actions -->
               <div class="form-array-actions">
-                <button *ngIf="j == (getFormArray(form.formcontrol).length - 1)" 
+                <button data-testid="fa-on-add-7" *ngIf="j == (getFormArray(form.formcontrol).length - 1)" 
                   type="button" 
                   mat-mini-fab 
                   color="primary" 
@@ -524,7 +524,7 @@
                   class="array-action-button add-button">
                   <mat-icon>add</mat-icon>
                 </button>
-                <button *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)" 
+                <button data-testid="fa-on-remove-8" *ngIf="j != 0 && j == (getFormArray(form.formcontrol).length - 1)" 
                   type="button" 
                   mat-mini-fab 
                   color="warn" 
@@ -567,7 +567,7 @@
     </div> -->
     <!-- Form submission buttons with improved styling -->
     <div class="form-actions">
-      <button *ngIf="!formpatch" 
+      <button data-testid="fa-on-submit-9" *ngIf="!formpatch" 
         mat-raised-button 
         color="primary" 
         type="button" 
@@ -578,7 +578,7 @@
         Preview & Submit
       </button>
       
-      <button *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" 
+      <button data-testid="fa-on-update-10" *ngIf="patchformid === 'KqHfM292QPXRLpv9RQNi'" 
         mat-raised-button 
         color="primary" 
         type="button" 
@@ -670,7 +670,7 @@
           
           <!-- Only show action buttons for current reviews, not old results or completed assignments -->
           <div class="note-actions" *ngIf="!isOldResult && !isCompletedAssignment">
-            <button 
+            <button data-testid="fa-add-note-11" 
               *ngIf="i === reviewNotesForm.length - 1"
               mat-mini-fab 
               color="primary" 
@@ -681,7 +681,7 @@
               <mat-icon>add</mat-icon>
             </button>
             
-            <button 
+            <button data-testid="fa-remove-note-12" 
               *ngIf="canRemoveNote()"
               mat-mini-fab 
               color="warn" 
@@ -704,7 +704,7 @@
 
     <!-- Review Action Buttons - Only show for current reviews -->
     <div class="action-buttons" *ngIf="!isOldResult && !isCompletedAssignment">
-      <button 
+      <button data-testid="fa-complete-assignment-13" 
         mat-raised-button 
         color="primary" 
         (click)="completeAssignment()"
@@ -713,7 +713,7 @@
         Assignment Complete
       </button>
       
-      <button 
+      <button data-testid="fa-rework-assignment-14" 
         mat-raised-button 
         color="warn" 
         (click)="reworkAssignment()"

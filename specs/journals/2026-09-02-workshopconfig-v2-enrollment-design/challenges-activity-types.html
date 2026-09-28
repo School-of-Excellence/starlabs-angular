@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Configuration v2 — Challenges: activity types &amp; states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{--primary:#1a3c5e;--accent:#c8a96e;--success:#2e7d52;--success-bg:#e8f5ed;--danger:#c0392b;--danger-bg:#fdecea;--warn:#a8630f;--warn-bg:#fff4e0;--info:#1565c0;--info-bg:#e3f0ff;--bg:#f4f6f9;--border:#dde3ec;--border-light:#edf0f5;--t1:#1a2535;--t2:#5a6880;--t3:#8a98ac;--sh-sm:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);--sh-lg:0 8px 24px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.06);}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'DM Sans',system-ui,sans-serif;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased;}
+  .i{width:16px;height:16px;flex-shrink:0;} .i14{width:14px;height:14px;flex-shrink:0;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:6px;font-size:13px;font-weight:500;line-height:1;border:1px solid var(--border);background:#fff;color:var(--t1);white-space:nowrap;}
+  .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn-danger{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .btn-sm{height:32px;padding:0 12px;font-size:12.5px;}
+  .btn.off{opacity:.45;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--sh-sm);}
+  .page{max-width:1440px;margin:0 auto;padding:32px 36px 40px;display:flex;flex-direction:column;gap:20px;}
+  .cap{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);}
+  .cap-note{font-size:12.5px;color:var(--t2);line-height:1.45;margin-top:-6px;}
+  .panel{display:flex;flex-direction:column;gap:12px;min-width:0;}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start;}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px;font-weight:600;}
+  .counter{font-size:11.5px;font-weight:500;color:var(--t3);white-space:nowrap;}
+  .link{font-size:11.5px;font-weight:600;color:var(--primary);white-space:nowrap;}
+  .input{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:13.5px;min-width:0;}
+  .input .txt{flex:1 1 0;width:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .input .ph{color:var(--t3);}
+  .input.ro{background:#f8fafd;color:var(--t2);}
+  .input.chips{height:auto;min-height:40px;padding:6px 12px;flex-wrap:wrap;}
+  .mono{font-family:'DM Mono',ui-monospace,monospace;font-size:12.5px;color:var(--t2);}
+  .caret{color:var(--t3);display:inline-flex;}
+  .help{font-size:12px;color:var(--t3);line-height:1.4;} .help.warn{color:var(--warn);} .help.err{color:var(--danger);font-weight:500;}
+  .chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;font-size:12px;font-weight:500;color:var(--primary);background:#eef3f9;white-space:nowrap;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;height:40px;}
+  .seg>span{display:flex;align-items:center;padding:0 14px;font-size:13px;font-weight:500;color:var(--t2);}
+  .seg>span.on{background:var(--primary);color:#fff;}
+  .row{display:flex;align-items:center;gap:10px;} .row.between{justify-content:space-between;}
+  .toggle{width:36px;height:20px;border-radius:10px;background:#c9d2df;position:relative;flex-shrink:0;}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .toggle.on{background:var(--primary);} .toggle.on::after{left:18px;}
+  .tog{display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff;}
+  .thumb{width:22px;height:22px;border-radius:4px;background:#eef3f9;display:flex;align-items:center;justify-content:center;color:var(--primary);flex-shrink:0;padding:2px;}
+  .badge{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}
+  .b-video{background:#e3f0ff;color:#1565c0;} .b-audio{background:#efe8fb;color:#6d3fc4;} .b-form{background:#e7f6ee;color:#1a8f5b;} .b-videoask{background:#fde8f1;color:#b8266a;} .b-quiz{background:#fff4e0;color:#a8630f;} .b-assignment{background:#e0f4f4;color:#0f7a7a;} .b-resource{background:#f1f3f7;color:#5a6880;} .b-offer{background:#fbf3dc;color:#8a6a14;} .b-note{background:#eceff5;color:#3f4b63;} .b-evolution{background:#eef2ff;color:#4f46e5;} .b-zoom{background:#e3f0ff;color:#1565c0;}
+  .type-box{border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh-sm);}
+  .tb-title{font-size:12px;font-weight:600;color:var(--t2);display:flex;align-items:center;gap:8px;}
+  .rt{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff;}
+  .rt-bar{display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--border-light);background:#fafbfd;}
+  .rt-b{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:4px;font-size:12.5px;font-weight:600;color:var(--t2);}
+  .rt-body{padding:12px 14px;font-size:13.5px;line-height:1.5;min-height:52px;color:var(--t3);}
+  .menu{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh-lg);padding:8px;display:flex;flex-direction:column;gap:2px;width:300px;}
+  .menu .mi{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:6px;font-size:13px;}
+  .menu .mi.hd{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);height:28px;}
+  .menu .mi.on{background:#eef3f9;color:var(--primary);font-weight:600;}
+  .menu .n{width:20px;height:20px;border-radius:50%;background:#f1f3f7;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--t2);}
+  .dialog{background:#fff;border-radius:14px;box-shadow:var(--sh-lg);padding:22px 24px;display:flex;flex-direction:column;gap:12px;}
+  .dim{background:rgba(26,37,53,.35);border-radius:14px;padding:32px 24px;}
+  .banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:var(--warn-bg);border:1px solid #f1d9a8;color:var(--warn);font-size:13px;font-weight:500;}
+  .empty{border:1px dashed var(--border);border-radius:14px;padding:36px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;background:#fff;}
+  .win{display:flex;align-items:center;gap:6px;} .win .input{padding:0 8px;} .win .input.date{flex:1 1 112px;} .win .input.time{flex:0 0 88px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div>
+    <div class="cap">Challenges tab · activity types &amp; states</div>
+    <div style="font-size:20px;font-weight:600;">Every activity type's fields, plus the states the build must cover</div>
+    <div class="cap-note" style="margin-top:4px;">The activity header (grip · number · name · type badge · summary · delete) is the same for all types. Below the common Name / Type / Description row, each type shows one "Type fields" box.</div>
+  </div>
+
+  <div class="grid">
+
+    <div class="panel">
+      <div class="cap">Video</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-video">Video</span> Type fields</div>
+        <div class="tog"><span>Preview video</span><span class="toggle on"></span></div>
+        <div class="field"><div class="label"><span>Episode</span><span class="counter">from episodes</span></div><div class="input"><span class="txt">Ep. 14 · Welcome from your coach</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+        <div class="field"><div class="label"><span>Thumbnail</span><span class="counter">workshop images · thumbnail</span></div><div class="input"><span class="thumb" style="width:32px;height:22px;border-radius:3px;background:linear-gradient(135deg,#dfe7f2,#c9d6e6);"></span><span class="txt">Coach on blue</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Audio</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-audio">Audio</span> Type fields</div>
+        <div class="field"><div class="label"><span>Solar Voice</span><span class="counter">from solar voice audios</span></div><div class="input"><span class="txt">Breathe low · 6 min</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+        <div class="field"><div class="label"><span>Thumbnail</span></div><div class="input ph"><span class="txt">Choose a thumbnail…</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Form</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-form">Form</span> Type fields</div>
+        <div class="field"><div class="label"><span>Form</span><span class="link">New form (builder)</span></div><div class="input"><span class="txt">Daily check-in (4 fields)</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div><div class="help">delivery forms where formfor = workshop, by name.</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">VideoAsk</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-videoask">VideoAsk</span> Type fields</div>
+        <div class="field"><div class="label"><span>VideoAsk template</span><span class="link">New template ↗</span></div><div class="input"><span class="txt">Day 14 · Your map (3 questions)</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+        <div class="field"><div class="label"><span>Final evolution mapping</span><span class="counter">2 of 2 used</span></div>
+          <div class="row"><div class="tog" style="flex:0 0 auto;gap:10px;"><span class="toggle on"></span>Enabled</div><div class="input" style="flex:1;"><span class="txt">After</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+          <div class="help">Only before / after, each once. A third activity's toggle is disabled: "Only 2 activities can have Final Evolution Mapping enabled."</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Quiz</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-quiz">Quiz</span> Type fields</div>
+        <div class="field"><div class="label"><span>Quizzes</span><span class="link">New quiz (dialog)</span></div>
+          <div class="input chips"><span class="chip">Day 1 recap <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span><span class="chip">Feelings vocabulary <svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span><span class="txt ph">Add quiz…</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div>
+          <div class="help">Multiple allowed; chips removable.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Assignment · form</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-assignment">Assignment</span> Type fields</div>
+        <div class="tog"><span>Review assignment</span><span class="toggle on"></span></div>
+        <div class="field"><div class="label"><span>Assignment type</span></div><div class="seg"><span class="on">Form</span><span>Question</span></div></div>
+        <div class="field"><div class="label"><span>Form</span><span class="link">New form (builder)</span></div><div class="input"><span class="txt">Week 1 reflection</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Assignment · question</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-assignment">Assignment</span> Type fields</div>
+        <div class="tog"><span>Review assignment</span><span class="toggle"></span></div>
+        <div class="field"><div class="label"><span>Assignment type</span></div><div class="seg"><span>Form</span><span class="on">Question</span></div></div>
+        <div class="field"><div class="label"><span>Topic</span></div><div class="input"><span class="txt">One moment you handled differently</span></div></div>
+        <div class="field"><div class="label"><span>Description</span></div><div class="input"><span class="txt">Describe what happened and what you did.</span></div></div>
+        <div class="row">
+          <div class="field" style="flex:1;"><div class="label"><span>Submission</span></div><div class="seg"><span class="on">Upload</span><span>Text</span></div></div>
+          <div class="field" style="flex:1;"><div class="label"><span>Upload type</span></div><div class="input"><span class="txt">PDF</span><span class="caret"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></span></div></div>
+        </div>
+        <div class="field"><div class="label"><span>Rich description</span></div><div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body">Optional longer brief…</div></div></div>
+        <div class="help">Upload type: pdf · doc · image · video · audio · any.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Resource</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-resource">Resource</span> Type fields</div>
+        <div class="row"><span class="btn btn-sm"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>Upload file</span><span class="help">to workshop/resource/</span></div>
+        <div class="field"><div class="label"><span>Resource title</span></div><div class="input"><span class="txt">Emotion wheel (printable)</span></div></div>
+        <div class="field"><div class="label"><span>Resource URL</span><span class="link">Open ↗</span></div><div class="input ro"><span class="txt mono">https://firebasestorage.googleapis.com/…/emotion-wheel.pdf</span></div><div class="help">Read-only, filled by the upload.</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Offer</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-offer">Offer</span> Type fields</div>
+        <div class="field"><div class="label"><span>Reward head</span></div><div class="input"><span class="txt">You finished week 1</span></div></div>
+        <div class="field"><div class="label"><span>Reward description</span></div><div class="input"><span class="txt">Unlock the coach Q&amp;A recording</span></div></div>
+        <div class="field"><div class="label"><span>Reward link</span></div><div class="input"><span class="txt mono">https://…</span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Note</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-note">Note</span> Type fields</div>
+        <div class="field"><div class="label"><span>Note head</span></div><div class="input"><span class="txt">Before you start</span></div></div>
+        <div class="field"><div class="label"><span>Note description</span></div><div class="input"><span class="txt">Find a quiet 20 minutes.</span></div></div>
+        <div class="field"><div class="label"><span>Note (rich)</span></div><div class="rt"><div class="rt-bar"><span class="rt-b">B</span><span class="rt-b" style="font-style:italic;">I</span><span class="rt-b" style="text-decoration:underline;">U</span><span class="rt-b">H2</span><span class="rt-b">•</span></div><div class="rt-body">Formatted note shown in the app…</div></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Evolution mapping</div>
+      <div class="type-box">
+        <div class="tb-title"><span class="badge b-evolution">Evolution mapping</span> Type fields</div>
+        <div class="field"><div class="label"><span>Title</span></div><div class="input"><span class="txt">Your before and after</span></div></div>
+        <div class="field"><div class="label"><span>Description</span></div><div class="input"><span class="txt">Watch day 1 next to day 14.</span></div></div>
+        <div class="tog"><span>Final before / after</span><span class="toggle on"></span></div>
+        <div class="help">Enabled only once a "before" and an "after" VideoAsk activity exist. Otherwise the toggle is disabled with: "Both 'before' and 'after' types must be selected in VideoAsk activities first."</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Legacy Zoom-call activity</div>
+      <div class="type-box" style="opacity:.85;">
+        <div class="tb-title"><span class="badge b-zoom">Zoom call</span> Type fields · read-only legacy</div>
+        <div class="field"><div class="label"><span>Zoom link</span></div><div class="input ro"><span class="txt mono">https://zoom.us/j/…</span></div></div>
+        <div class="field"><div class="label"><span>Meet date</span></div><div class="input ro"><span class="txt">14 Mar 2025 18:00</span></div></div>
+        <div class="help warn">Retired type: not offered in the Type menu, but old data still renders so nothing is lost.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="cap" style="margin-top:8px;">States</div>
+  <div class="grid">
+
+    <div class="panel">
+      <div class="cap">Add activity · insert after</div>
+      <div class="cap-note">First activity: plain button. From then on the button opens this menu, and every gap between rows has an "Insert activity here" affordance on hover. New activity opens expanded and scrolls into view.</div>
+      <div class="menu">
+        <div class="mi hd">Add activity…</div>
+        <div class="mi on"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>At the end</div>
+        <div class="mi hd">Insert after</div>
+        <div class="mi"><span class="n">1</span>Welcome from your coach</div>
+        <div class="mi"><span class="n">2</span>Morning practice</div>
+        <div class="mi"><span class="n">3</span>Your starting point</div>
+        <div class="mi"><span class="n">4</span>Day 1 check-in</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Activity type menu</div>
+      <div class="cap-note">Ten types, each with its badge colour. Choosing a different type asks before clearing the type fields (today it clears silently).</div>
+      <div class="menu">
+        <div class="mi"><span class="badge b-video">Video</span></div>
+        <div class="mi"><span class="badge b-audio">Audio</span></div>
+        <div class="mi"><span class="badge b-form">Form</span></div>
+        <div class="mi on"><span class="badge b-videoask">VideoAsk</span></div>
+        <div class="mi"><span class="badge b-quiz">Quiz</span></div>
+        <div class="mi"><span class="badge b-assignment">Assignment</span></div>
+        <div class="mi"><span class="badge b-resource">Resource</span></div>
+        <div class="mi"><span class="badge b-offer">Offer</span></div>
+        <div class="mi"><span class="badge b-note">Note</span></div>
+        <div class="mi"><span class="badge b-evolution">Evolution mapping</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Delete set / activity</div>
+      <div class="cap-note">Styled confirm replaces the native confirm(). Deleting a set names its activity count.</div>
+      <div class="dim"><div class="dialog">
+        <div style="font-size:16px;font-weight:600;">Delete "Day 1: Notice"?</div>
+        <div style="font-size:13.5px;color:#5a6880;line-height:1.5;">This set and its <strong>5 activities</strong> are removed from the curriculum when you save. Participants who already started it lose access.</div>
+        <div class="row" style="justify-content:flex-end;gap:8px;margin-top:4px;"><span class="btn">Keep</span><span class="btn btn-danger">Delete set</span></div>
+      </div></div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Workshop active · locked</div>
+      <div class="cap-note">Same rule as today: while Settings → Workshop Active is on, set order, activity order and unlock dates cannot change. Everything else stays editable.</div>
+      <div class="banner"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 018 0v4"></path></svg>Workshop is active: order and unlock dates are locked.</div>
+      <div class="field"><div class="label"><span>Unlocks on</span><span class="counter" style="color:#a8630f;">Locked</span></div>
+        <div class="win"><div class="input date ro"><span class="txt">20 Sep 2026</span></div><div class="input time ro"><span class="txt">07:00</span></div></div>
+      </div>
+      <div class="help">Grip handles turn grey with a "Locked while active" tooltip; drag does nothing.</div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Empty curriculum</div>
+      <div class="empty">
+        <div style="font-size:15px;font-weight:600;">No sets yet</div>
+        <div class="help">A set is a day of activities or a live Zoom call. Add the first one to start the curriculum.</div>
+        <span class="btn btn-primary"><svg class="i14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add set</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="cap">Categories not saved yet</div>
+      <div class="cap-note">The category picker lists only categories saved under Settings → Access → Category based. When none exist it says so instead of showing an empty dropdown.</div>
+      <div class="field"><div class="label"><span>Categories</span></div>
+        <div class="input ro"><span class="txt ph">No categories saved for this workshop</span></div>
+        <div class="help">Create and select categories in <span class="link">Settings → Category based</span> first.</div>
+      </div>
+      <div class="cap" style="margin-top:6px;">Set-level validation</div>
+      <div class="help err">Set 3 has an activity with no type. Fix it before saving.</div>
+      <div class="help">The save bar names the set; the set header shows a red dot; the activity row shows the field error.</div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

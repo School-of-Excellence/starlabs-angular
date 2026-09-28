@@ -233,7 +233,9 @@ constructor(
 
       const classifyDocRef = doc(this.firestore, "classify/communityposttype");
       docData(classifyDocRef).subscribe((snap: any) => {
-        this.postTypeList = snap['name'];
+        // classify/communityposttype may not exist (docData emits undefined) — guard the name read so the
+        // screen mounts on an empty project instead of throwing "reading 'name'".
+        this.postTypeList = snap?.['name'];
       });
 
     // } else {

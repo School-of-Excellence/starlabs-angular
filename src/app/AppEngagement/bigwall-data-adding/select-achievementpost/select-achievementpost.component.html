@@ -34,7 +34,7 @@
     <ng-container matColumnDef="share">
       <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
       <td mat-cell *matCellDef="let row">
-        <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+        <button data-testid="aesap-btn-1" mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
       </td>
     </ng-container>
 

@@ -1,6 +1,6 @@
 <div class="mainscreen">
     <h4 class="title">Add {{newCustomer ? 'New Customer' : 'Purchase'}}</h4>
-    <form [formGroup]="purchaseForm" (ngSubmit)="addPurchase()">
+    <form data-testid="ap-form-1" [formGroup]="purchaseForm" (ngSubmit)="addPurchase()">
       <div>
         <mat-form-field class="inputfields" appearance="outline">
           <mat-label>Purchased Journey</mat-label>
@@ -56,7 +56,7 @@
           <input matInput type="text" disabled [(ngModel)]="dialogData.profile.name" [ngModelOptions]="{standalone: true}">
         </mat-form-field>
       </div>
-      <button mat-stroked-button class="cancelbtn" type="button" (click)="close(false)" [disabled]="loading">Close</button>
-      <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Add Purchase'}}</button>
+      <button data-testid="ap-close-2" mat-stroked-button class="cancelbtn" type="button" (click)="close(false)" [disabled]="loading">Close</button>
+      <button data-testid="ap-submit-3" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Add Purchase'}}</button>
     </form>
 </div>

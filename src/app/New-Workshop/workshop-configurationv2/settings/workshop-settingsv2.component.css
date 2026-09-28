@@ -72,3 +72,51 @@
   .setting { flex-wrap: wrap; }
   .grid3 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Dashboard Access ───────────────────────────────────────────────────────
+   Lives inside Settings but writes its own documents, so it carries its own
+   state line and its own save bar. The banner exists because the three shared
+   lists are edited from inside one workshop yet apply to all of them — the one
+   thing about this screen that is genuinely surprising. */
+.acc-banner { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid #ffe2b8; border-radius: 10px; background: #fff8ec; font-size: 12.5px; line-height: 1.55; color: #7a4d06; }
+.acc-banner svg, .acc-banner .i { flex-shrink: 0; margin-top: 1px; }
+.acc-banner b { font-weight: 700; }
+
+.acc-state { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 10px; background: var(--success-bg); }
+.acc-state.off { background: #f1f3f7; }
+.acc-state .help { margin: 0; }
+
+.acc-sub { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: #fafbfd; }
+.acc-sub-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.acc-sub-head > div:first-child { flex: 1 1 320px; min-width: 0; }
+.acc-add { flex: 0 1 280px; min-width: 220px; }
+
+.acc-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.acc-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.acc-name { font-size: 13.5px; font-weight: 600; color: var(--t1); }
+.acc-mail { font-size: 11.5px; color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.acc-row-head .grow { flex: 1; }
+
+.acc-ticks { display: flex; flex-wrap: wrap; gap: 8px; }
+.acc-tick { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 9px; border-radius: 15px; border: 1.5px solid var(--border); background: #fff; font-size: 12.5px; font-weight: 500; color: var(--t2); cursor: pointer; }
+.acc-tick:hover { border-color: var(--primary); color: var(--primary); }
+.acc-tick .box { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.acc-tick.on { border-color: var(--primary); background: #eef3f9; color: var(--primary); font-weight: 600; }
+.acc-tick.on .box { background: var(--primary); border-color: var(--primary); }
+
+.acc-legend { font-size: 12px; color: var(--t3); }
+.acc-legend summary { cursor: pointer; font-weight: 600; color: var(--t2); }
+.acc-legend ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
+.acc-legend b { color: var(--t1); }
+
+.acc-save { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
+.acc-save .grow { flex: 1; }
+
+@media (max-width: 720px) {
+  .acc-sub-head { flex-direction: column; }
+  .acc-add { flex: 1 1 auto; width: 100%; }
+  .acc-mail { max-width: 100%; }
+}
+
+/* Full names in this section's pickers, however long they are. */
+.acc-sub .pop-row .n, .field .pop-row .n { white-space: normal; overflow-wrap: anywhere; }

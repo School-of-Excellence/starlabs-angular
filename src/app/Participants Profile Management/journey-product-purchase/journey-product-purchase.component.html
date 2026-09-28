@@ -47,10 +47,10 @@
               <mat-option *ngFor="let option of journeystatusOption; trackBy: trackByIndex" [value]="option.toLowerCase()">{{option}}</mat-option>
             </mat-select>
           </mat-form-field>
-          <button mat-icon-button *ngIf="journey.purchaseref == null || journey.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
+          <button [attr.data-testid]="'jpp-remove-journey-' + i" mat-icon-button *ngIf="journey.purchaseref == null || journey.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
             <mat-icon>remove</mat-icon>
           </button>
-          <button mat-icon-button *ngIf="journey.journeyproductlogs?.length > 0" class="iconbtn" (click)="historyExpanded[journey.participantjourneyproductref] = !historyExpanded[journey.participantjourneyproductref]">
+          <button [attr.data-testid]="'jpp-journey-history-' + i" mat-icon-button *ngIf="journey.journeyproductlogs?.length > 0" class="iconbtn" (click)="historyExpanded[journey.participantjourneyproductref] = !historyExpanded[journey.participantjourneyproductref]">
             <mat-icon>history</mat-icon>
           </button>
           <div class="rowhistory" *ngIf="historyExpanded[journey.participantjourneyproductref] && journey.journeyproductlogs?.length > 0">
@@ -76,7 +76,7 @@
             </div>
           </div>
         </div>
-        <button class="btn border border-success text-success mb-4" (click)="newPurchase('journey')">Add Purchase</button>
+        <button data-testid="jpp-add-purchase-journey-1" class="btn border border-success text-success mb-4" (click)="newPurchase('journey')">Add Purchase</button>
       </div>
 
       <div>
@@ -123,10 +123,10 @@
               Required
             </mat-hint>
           </mat-form-field>
-          <button mat-icon-button *ngIf="purchase.purchaseref == null || purchase.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
+          <button [attr.data-testid]="'jpp-remove-purchase-' + i" mat-icon-button *ngIf="purchase.purchaseref == null || purchase.journeystatus == null" class="iconbtn" (click)="removePurchase(i)">
             <mat-icon>remove</mat-icon>
           </button>
-          <button mat-icon-button *ngIf="purchase.purchaselogs?.length > 0" class="iconbtn" (click)="historyExpanded[purchase.purchaseref] = !historyExpanded[purchase.purchaseref]">
+          <button [attr.data-testid]="'jpp-purchase-history-' + i" mat-icon-button *ngIf="purchase.purchaselogs?.length > 0" class="iconbtn" (click)="historyExpanded[purchase.purchaseref] = !historyExpanded[purchase.purchaseref]">
             <mat-icon>history</mat-icon>
           </button>
           <div class="rowhistory" *ngIf="historyExpanded[purchase.purchaseref] && purchase.purchaselogs?.length > 0">
@@ -152,7 +152,7 @@
             </div>
           </div>
           <div class="removed-inline" *ngIf="purchase.removedProductLogs?.length > 0">
-            <button mat-icon-button class="iconbtn" (click)="historyExpanded['removed_' + purchase.purchaseref] = !historyExpanded['removed_' + purchase.purchaseref]">
+            <button [attr.data-testid]="'jpp-removed-history-' + i" mat-icon-button class="iconbtn" (click)="historyExpanded['removed_' + purchase.purchaseref] = !historyExpanded['removed_' + purchase.purchaseref]">
               <mat-icon>history</mat-icon>
             </button>
             <span class="removed-title">Removed Products ({{purchase.removedProductLogs.length}})</span>
@@ -230,17 +230,17 @@
             </mat-form-field>
 
             <mat-checkbox class="me-3" [(ngModel)]="product.unlimited">Unlimited</mat-checkbox>
-            <button class="iconbtn" style="margin-top: 10px;" mat-button [matMenuTriggerFor]="menu" >move</button>
+            <button [attr.data-testid]="'jpp-move-' + i + '-' + j" class="iconbtn" style="margin-top: 10px;" mat-button [matMenuTriggerFor]="menu" >move</button>
             <mat-menu #menu="matMenu">
-              <button *ngFor="let item of participantPurchase; let m = index; trackBy: trackByPurchaseRef" mat-menu-item [disabled]="m === i" xPosition="after" (click)="purchaseExchange(i,j,m)">{{m+1}} - {{(item['watsonpurchaselabel'])}}</button>
+              <button [attr.data-testid]="'jpp-move-target-' + i + '-' + j + '-' + m" *ngFor="let item of participantPurchase; let m = index; trackBy: trackByPurchaseRef" mat-menu-item [disabled]="m === i" xPosition="after" (click)="purchaseExchange(i,j,m)">{{m+1}} - {{(item['watsonpurchaselabel'])}}</button>
             </mat-menu>
-            <button mat-icon-button class="iconbtn" *ngIf="j+1 == purchase.products.length" (click)="newProduct(i)">
+            <button [attr.data-testid]="'jpp-new-product-' + i" mat-icon-button class="iconbtn" *ngIf="j+1 == purchase.products.length" (click)="newProduct(i)">
               <mat-icon>add</mat-icon>
             </button>
-            <button mat-icon-button class="iconbtn" *ngIf="(product.participantproductid == null || product.status == null) && purchase.products.length != 1" (click)="removeProduct(i, j)">
+            <button [attr.data-testid]="'jpp-remove-product-' + i + '-' + j" mat-icon-button class="iconbtn" *ngIf="(product.participantproductid == null || product.status == null) && purchase.products.length != 1" (click)="removeProduct(i, j)">
               <mat-icon>remove</mat-icon>
             </button>
-            <button mat-icon-button class="iconbtn" *ngIf="product.rowlogs?.length > 0" (click)="historyExpanded[product.participantproductid] = !historyExpanded[product.participantproductid]">
+            <button [attr.data-testid]="'jpp-product-history-' + i + '-' + j" mat-icon-button class="iconbtn" *ngIf="product.rowlogs?.length > 0" (click)="historyExpanded[product.participantproductid] = !historyExpanded[product.participantproductid]">
               <mat-icon>history</mat-icon>
             </button>
             <div class="rowhistory" *ngIf="historyExpanded[product.participantproductid] && product.rowlogs?.length > 0">
@@ -272,13 +272,13 @@
       </div>
 
       <div>
-        <button class="btn border border-success text-success mb-3" (click)="newPurchase('product')">
+        <button data-testid="jpp-add-addon-2" class="btn border border-success text-success mb-3" (click)="newPurchase('product')">
           Add Add-Ons
         </button>
       </div>
 
       <div class="text-center">
-        <button class="btn btn-success" (click)="reviewPurchase()">
+        <button data-testid="jpp-review-purchase-3" class="btn btn-success" (click)="reviewPurchase()">
           Review Purchase
         </button>
       </div>
@@ -344,7 +344,7 @@
             <tr class="example-custom-placeholder"></tr>
             <tr class="example-box" *ngFor="let product of participantProductList; let i=index; trackBy: trackByProductId" cdkDrag>
               <td>
-                <button class="dragbtn" mat-icon-button cdkDragHandle>
+                <button [attr.data-testid]="'jpp-drag-' + i" class="dragbtn" mat-icon-button cdkDragHandle>
                   <mat-icon>reorder</mat-icon>
                 </button>
               </td>
@@ -418,8 +418,8 @@
         <p *ngIf="hasMissingReviewNotes" class="missing-notes-warning">
           Please add notes for all changed and removed rows before saving.
         </p>
-        <button class="cancelbtn" mat-stroked-button (click)="reviewMode = false">Go Back</button>
-        <button class="submitbtn" mat-stroked-button
+        <button data-testid="jpp-review-goback-4" class="cancelbtn" mat-stroked-button (click)="reviewMode = false">Go Back</button>
+        <button data-testid="jpp-update-purchase-5" class="submitbtn" mat-stroked-button
                 [disabled]="hasMissingReviewNotes"
                 (click)="updateProduct()">Update Purchase</button>
       </div>
@@ -440,7 +440,7 @@
     <p>Are you sure you want to initiate <strong>{{data.productName}}</strong>?</p>
   </mat-dialog-content>
   <mat-dialog-actions align="end">
-    <button mat-button [mat-dialog-close]="false">Cancel</button>
-    <button mat-flat-button color="primary" [mat-dialog-close]="true">Yes, Initiate</button>
+    <button data-testid="jpp-confirm-cancel-6" mat-button [mat-dialog-close]="false">Cancel</button>
+    <button data-testid="jpp-confirm-initiate-7" mat-flat-button color="primary" [mat-dialog-close]="true">Yes, Initiate</button>
   </mat-dialog-actions>
 </ng-template>

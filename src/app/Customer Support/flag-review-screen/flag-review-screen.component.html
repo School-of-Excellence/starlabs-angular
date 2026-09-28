@@ -32,16 +32,16 @@
                     </div>
                 </div>
             </div>
-            <button mat-raised-button class="flagbtn" color="primary" [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger" (click)="updateFlag()">{{[null, undefined, false].includes(currentIssueData['flag']) ? 'Flag' : 'Unflag'}}</button>
+            <button mat-raised-button class="flagbtn" color="primary" data-testid="frs-flag-toggle" [matMenuTriggerFor]="flagmenu" #menuTrigger="matMenuTrigger" (click)="updateFlag()">{{[null, undefined, false].includes(currentIssueData['flag']) ? 'Flag' : 'Unflag'}}</button>
             <td style="width: 10vw;">
             <div class="flagnegligence" *ngIf="enableFlag"> 
                 <mat-form-field appearance="outline">
                     <mat-label>Severity</mat-label>
-                    <mat-select [(ngModel)]="flagseverity" (click)="$event.stopPropagation()">
+                    <mat-select [(ngModel)]="flagseverity" data-testid="frs-flag-severity" (click)="$event.stopPropagation()">
                         <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
                     </mat-select>
                 </mat-form-field>
-                <button mat-stroked-button color="primary" (click)="updateData()" mat-menu-close>Flag Negligence</button>
+                <button mat-stroked-button color="primary" data-testid="frs-flag-negligence" (click)="updateData()" mat-menu-close>Flag Negligence</button>
             </div>
         </div>
 
@@ -49,7 +49,7 @@
             <p><b>Interaction History</b></p>
             <div style="max-height: 50vh; overflow: auto;">
                 <div *ngFor="let log of clientTicketsLog">
-                    <div (click)="changeTicket(log)"
+                    <div [attr.data-testid]="'frs-log-' + log['id']" (click)="changeTicket(log)"
                         [ngClass]="log['id'] == currentIssueData['id'] ? 'selected-container' : 'history-container'">
                         <div style="display: flex; flex-direction: row; justify-content: space-between;">
                             <p>{{log['issueno']}} - {{log['reporteddate']?.toDate() | date : 'mediumDate'}}</p>
@@ -87,8 +87,8 @@
             <div *ngIf="loading == false">
                 <div style="background-color: rgb(241, 235, 235); position: sticky; top: 0; width: 100%; z-index: 20; padding: 8px;">
                     <div class="row" style="justify-content: space-evenly;">
-                        <button color="primary" (click)="scrollToNextTicket(true)" mat-raised-button>Scroll to Next Ticket</button>
-                        <button color="warn"(click)="scrollToNextTicket(false)" mat-raised-button>Scroll to previous Ticket</button>
+                        <button color="primary" data-testid="frs-scroll-next" (click)="scrollToNextTicket(true)" mat-raised-button>Scroll to Next Ticket</button>
+                        <button color="warn" data-testid="frs-scroll-prev" (click)="scrollToNextTicket(false)" mat-raised-button>Scroll to previous Ticket</button>
                     </div>
                 </div>
                 <div #itemElement *ngFor="let chat of clientMessages; let idx = index" [ngClass]="mapTicketData[chat['ticketno']]['assign'].includes(loggedinprofile_id) ? 'assignedTicket' : ''" [attr.data-ticketno]="chat.ticketno">
@@ -120,29 +120,30 @@
                                         <!-- Negligence Field -->
                                         <mat-form-field appearance="outline" class="custom-form-field">
                                             <mat-label>Category</mat-label>
-                                            <mat-select formControlName="category">
+                                            <mat-select formControlName="category" [attr.data-testid]="'frs-timegap-cat-' + idx">
                                                 <mat-option *ngFor="let negligence of negligencelist"
                                                     [value]="negligence">{{negligence}}</mat-option>
                                             </mat-select>
                                         </mat-form-field>
-    
+
                                         <!-- Status Field -->
                                         <mat-form-field appearance="outline" class="custom-form-field">
                                             <mat-label>Severity</mat-label>
-                                            <mat-select formControlName="severity">
+                                            <mat-select formControlName="severity" [attr.data-testid]="'frs-timegap-sev-' + idx">
                                                 <mat-option *ngFor="let severity of severityList"
                                                     [value]="severity">{{severity}}</mat-option>
                                             </mat-select>
                                         </mat-form-field>
-    
+
                                         <!-- Rating Field -->
                                         <mat-form-field appearance="outline" class="custom-form-field">
                                             <mat-label>Rating</mat-label>
-                                            <input matInput type="number" placeholder="Rate 0 - 10" formControlName="rating" min="0" max="10"(keypress)="validateKeyPress($event)"(input)="validateInput($event)">                                
+                                            <input matInput type="number" placeholder="Rate 0 - 10" [attr.data-testid]="'frs-timegap-rating-' + idx" formControlName="rating" min="0" max="10"(keypress)="validateKeyPress($event)"(input)="validateInput($event)">
                                         </mat-form-field>
-    
+
                                         <!-- Submit Button -->
                                         <button mat-raised-button type="button" class="submitbtn"
+                                            [attr.data-testid]="'frs-timegap-submit-' + idx"
                                             (click)="submitReview(chat, idx, 'timegap', timegapform.value)">
                                             Submit
                                         </button>
@@ -178,7 +179,7 @@
                                             </p>
                                         </div>
                                         <div>
-                                            <button type="button" mat-icon-button [matMenuTriggerFor]="menu3"
+                                            <button type="button" mat-icon-button [matMenuTriggerFor]="menu3" [attr.data-testid]="'frs-msg-menu-' + idx"
                                                 style="float: inline-end;"><mat-icon>more_vert</mat-icon></button>
                                             <mat-menu #menu3="matMenu">
                                                 <!-- <button mat-menu-item (click)="insertMessage(chat)">Insert Chat</button> -->
@@ -194,11 +195,11 @@
                                                 style="display:inline-flex;flex-direction: column;justify-content: center;min-width: 30%;max-width: 65%;">
                                                 <span *ngFor="let image of chat['files']">
                                                     <span style="margin-left: 5px;margin-top: 5px;">
-                                                        <span *ngIf="image['mediatype']?.includes('image')" (click)="downloadFiles(image['fileurl'])">
+                                                        <span *ngIf="image['mediatype']?.includes('image')" [attr.data-testid]="'frs-file-image-' + idx" (click)="downloadFiles(image['fileurl'])">
                                                             <br>
                                                             <img style="margin-bottom: 5px; width: 22vw;" [src]="image['fileurl']" alt="">
                                                         </span>
-                                                        <span #myvideo *ngIf="image['mediatype']?.includes('video')" (click)="downloadFiles(image['fileurl'])">
+                                                        <span #myvideo *ngIf="image['mediatype']?.includes('video')" [attr.data-testid]="'frs-file-video-' + idx" (click)="downloadFiles(image['fileurl'])">
                                                             <video style="margin-bottom: 5px; width: 22vw;" height="350" controls id="myvideo">
                                                                 <source [src]="image['fileurl']">
                                                             </video>
@@ -220,7 +221,7 @@
                                                             </span>
                                                             <span class="lastmessage" style="width: 12vw; font-size: 14px;">
                                                                 {{image['filename']}}
-                                                                <button mat-icon-button
+                                                                <button mat-icon-button [attr.data-testid]="'frs-file-download-' + idx"
                                                                     (click)="downloadFiles(image['fileurl'])"><mat-icon>download</mat-icon></button>
                                                             </span>
                                                         </span>
@@ -274,7 +275,7 @@
                                     <!-- <mat-form-field appearance="outline" class="custom-form-field" *ngIf="idx > 0 && clientMessages[idx-1]['ticketno'] == clientMessages[idx]['ticketno']"> -->
                                     <mat-form-field appearance="outline" class="custom-form-field">
                                         <mat-label>Category</mat-label>
-                                        <mat-select formControlName="category" (selectionChange)="negligenceCheck[idx] = true">
+                                        <mat-select formControlName="category" [attr.data-testid]="'frs-flag-cat-' + idx" (selectionChange)="negligenceCheck[idx] = true">
                                             <mat-option *ngFor="let negligence of negligencelist" [value]="negligence">{{negligence}}</mat-option>
                                         </mat-select>
                                     </mat-form-field>
@@ -283,7 +284,7 @@
                                     <!-- <mat-form-field appearance="outline" class="custom-form-field" *ngIf="negligenceCheck[idx] || (clientMessages[idx-1]?.ticketno != clientMessages[idx]?.ticketno)"> -->
                                     <mat-form-field appearance="outline" class="custom-form-field">
                                         <mat-label>Severity</mat-label>
-                                        <mat-select formControlName="severity">
+                                        <mat-select formControlName="severity" [attr.data-testid]="'frs-flag-sev-' + idx">
                                             <mat-option *ngFor="let severity of severityList" [value]="severity">{{severity}}</mat-option>
                                         </mat-select>
                                     </mat-form-field>
@@ -291,11 +292,12 @@
                                     <!-- Rating Field -->
                                     <mat-form-field appearance="outline" class="custom-form-field">
                                         <mat-label>Rating</mat-label>
-                                        <input matInput type="number" placeholder="Rate 0 - 10" formControlName="rating" min="0" max="10" (keypress)="validateKeyPress($event)" (input)="validateInput($event)">                                
+                                        <input matInput type="number" placeholder="Rate 0 - 10" [attr.data-testid]="'frs-flag-rating-' + idx" formControlName="rating" min="0" max="10" (keypress)="validateKeyPress($event)" (input)="validateInput($event)">
                                     </mat-form-field>
 
                                     <!-- Submit Button -->
                                     <button mat-raised-button type="button" class="submitbtn"
+                                        [attr.data-testid]="'frs-flag-submit-' + idx"
                                         (click)="submitReview(chat, idx, 'flag', flagform.value)">
                                         Submit
                                     </button>
@@ -359,7 +361,7 @@
                     </div>
                     <div style="display: flex; flex-direction: row; justify-content: space-between;" *ngIf="idx > 0 && (idx+1 == clientMessages.length || clientMessages[idx]['ticketid'] != clientMessages[idx+1]['ticketid'])">
                         <p></p>
-                        <button mat-raised-button *ngIf="!reviewedTickets.includes(clientMessages[idx]['ticketid'])" class="reviewbtn" (click)="updateMarked(clientMessages[idx]['ticketid'])">Mark Reviewed</button>
+                        <button mat-raised-button *ngIf="!reviewedTickets.includes(clientMessages[idx]['ticketid'])" class="reviewbtn" [attr.data-testid]="'frs-mark-reviewed-' + idx" (click)="updateMarked(clientMessages[idx]['ticketid'])">Mark Reviewed</button>
                         <p class="reviewedbtn" *ngIf="reviewedTickets.includes(clientMessages[idx]['ticketid'])"><b>REVIEWED</b></p>
                         <p></p>
                     </div>

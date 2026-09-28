@@ -98,26 +98,26 @@
       <h1 class="rp-title">Recommended Playlists</h1>
       <p class="rp-sub">Manage recommended mix playlists for participants</p>
     </div>
-    <button class="rp-sort-dir-btn" matTooltip="Refresh data" (click)="loadData()">
+    <button data-testid="mrp-btn-1" class="rp-sort-dir-btn" matTooltip="Refresh data" (click)="loadData()">
       <mat-icon>refresh</mat-icon>
     </button>
   </div>
   <div class="rp-date-range-row">
     <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rp-date-field">
       <mat-label>Start Date</mat-label>
-      <input matInput [matDatepicker]="startPicker" [(ngModel)]="dateRangeStart">
+      <input data-testid="mrp-inp-2" matInput [matDatepicker]="startPicker" [(ngModel)]="dateRangeStart">
       <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
       <mat-datepicker #startPicker></mat-datepicker>
     </mat-form-field>
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rp-date-field">
       <mat-label>End Date</mat-label>
-      <input matInput [matDatepicker]="endPicker" [(ngModel)]="dateRangeEnd">
+      <input data-testid="mrp-inp-3" matInput [matDatepicker]="endPicker" [(ngModel)]="dateRangeEnd">
       <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
       <mat-datepicker #endPicker></mat-datepicker>
     </mat-form-field>
 
-    <button class="rp-btn-filter" (click)="onDateFilter()" [disabled]="!dateRangeStart || !dateRangeEnd || isLoading">
+    <button data-testid="mrp-btn-4" class="rp-btn-filter" (click)="onDateFilter()" [disabled]="!dateRangeStart || !dateRangeEnd || isLoading">
       <mat-icon>filter_list</mat-icon>
       <span>Filter</span>
     </button>
@@ -136,7 +136,7 @@
 
         <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
           <mat-label>Sort By</mat-label>
-          <mat-select [(value)]="groupSortField" (selectionChange)="onGroupSortChange($event.value)">
+          <mat-select data-testid="mrp-sel-5" [(value)]="groupSortField" (selectionChange)="onGroupSortChange($event.value)">
             <mat-option value="">None</mat-option>
             <mat-option value="title">Title</mat-option>
             <mat-option value="date">Date</mat-option>
@@ -144,22 +144,22 @@
           </mat-select>
         </mat-form-field>
 
-        <button class="rp-sort-dir-btn" (click)="onGroupSortChange(groupSortField)" [disabled]="!groupSortField"
+        <button data-testid="mrp-btn-6" class="rp-sort-dir-btn" (click)="onGroupSortChange(groupSortField)" [disabled]="!groupSortField"
           [matTooltip]="groupSortDirection === 'asc' ? 'Ascending' : 'Descending'">
           <mat-icon>{{ groupSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
         </button>
 
         <mat-form-field class="rp-filter-select rp-filter-select-wide" appearance="outline" subscriptSizing="dynamic">
           <mat-label>Filter by Profiles</mat-label>
-          <mat-select multiple [(value)]="selectedProfileIds" (selectionChange)="onProfileFilterChange()">
+          <mat-select data-testid="mrp-sel-7" multiple [(value)]="selectedProfileIds" (selectionChange)="onProfileFilterChange()">
             <div style="padding:8px 12px;">
-              <input class="rp-search-input" style="width:100%;border:1.5px solid var(--bdr);border-radius:var(--r);height:36px;padding:0 10px;" 
+              <input data-testid="mrp-inp-8" class="rp-search-input" style="width:100%;border:1.5px solid var(--bdr);border-radius:var(--r);height:36px;padding:0 10px;" 
                 placeholder="Search profiles..." [(ngModel)]="profileSearchText" autocomplete="off" (click)="$event.stopPropagation()" />
             </div>
             <mat-option *ngFor="let p of filteredProfileList" [value]="p.id">{{ p.name }}</mat-option>
           </mat-select>
         </mat-form-field>
-        <button *ngIf="hasGroupFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters" (click)="clearGroupFilters()">
+        <button data-testid="mrp-btn-9" *ngIf="hasGroupFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters" (click)="clearGroupFilters()">
         <mat-icon>close</mat-icon>
       </button>
       </div>
@@ -211,9 +211,9 @@
                     <div class="rp-item-row">
                       <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                       <div class="rp-stats-chips">
-                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'eiflix', j, 'all')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.total }}</span>
-                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'eiflix', j, 'completed')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.completed }}</span>
-                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'eiflix', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.notCompleted }}</span>
+                        <span [attr.data-testid]="'mrp-act-10-' + j" class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'eiflix', j, 'all')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.total }}</span>
+                        <span [attr.data-testid]="'mrp-act-11-' + j" class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'eiflix', j, 'completed')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.completed }}</span>
+                        <span [attr.data-testid]="'mrp-act-12-' + j" class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'eiflix', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.eiflix?.[j]?.notCompleted }}</span>
                       </div>
                     </div>
                     <!-- <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
@@ -227,15 +227,15 @@
                       {{ mapEpisodes[seq?.id]}}
                     </span>
                     <div class="rp-sequence-chips">
-                      <span class="rp-chip rp-chip-seq" matTooltip="Total"
+                      <span [attr.data-testid]="'mrp-act-13-' + k" class="rp-chip rp-chip-seq" matTooltip="Total"
                         (click)="openContentPanel(row, 'eiflix', j, 'all', k)" style="cursor:pointer;">
                         {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.completed + row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.notCompleted }}
                       </span>
-                      <span class="rp-chip rp-chip-yes" matTooltip="Completed"
+                      <span [attr.data-testid]="'mrp-act-14-' + k" class="rp-chip rp-chip-yes" matTooltip="Completed"
                         (click)="openContentPanel(row, 'eiflix', j, 'completed', k)" style="cursor:pointer;">
                         {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.completed }}
                       </span>
-                      <span class="rp-chip rp-chip-no" matTooltip="Pending"
+                      <span [attr.data-testid]="'mrp-act-15-' + k" class="rp-chip rp-chip-no" matTooltip="Pending"
                         (click)="openContentPanel(row, 'eiflix', j, 'notcompleted', k)" style="cursor:pointer;">
                         {{ row._stats?.eiflix?.[j]?.sequenceStats?.[k]?.notCompleted }}
                       </span>
@@ -258,9 +258,9 @@
                     <div class="rp-item-row">
                       <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                       <div class="rp-stats-chips">
-                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'generalcontent', j, 'all')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.total }}</span>
-                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'generalcontent', j, 'completed')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.completed }}</span>
-                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'generalcontent', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.notCompleted }}</span>
+                        <span [attr.data-testid]="'mrp-act-16-' + j" class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'generalcontent', j, 'all')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.total }}</span>
+                        <span [attr.data-testid]="'mrp-act-17-' + j" class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'generalcontent', j, 'completed')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.completed }}</span>
+                        <span [attr.data-testid]="'mrp-act-18-' + j" class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'generalcontent', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.generalcontent?.[j]?.notCompleted }}</span>
                       </div>
                     </div>
                   </div>
@@ -279,9 +279,9 @@
                     <div class="rp-item-row">
                       <span class="rp-playlist-item">{{ mapPlaylist[name.id] }}</span>
                       <div class="rp-stats-chips">
-                        <span class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'solarvoice', j, 'all')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.total }}</span>
-                        <span class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'solarvoice', j, 'completed')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.completed }}</span>
-                        <span class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.notCompleted }}</span>
+                        <span [attr.data-testid]="'mrp-act-19-' + j" class="rp-chip" matTooltip="Total" (click)="openContentPanel(row, 'solarvoice', j, 'all')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.total }}</span>
+                        <span [attr.data-testid]="'mrp-act-20-' + j" class="rp-chip rp-chip-yes" matTooltip="Completed" (click)="openContentPanel(row, 'solarvoice', j, 'completed')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.completed }}</span>
+                        <span [attr.data-testid]="'mrp-act-21-' + j" class="rp-chip rp-chip-no" matTooltip="Pending" (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted')" style="cursor:pointer;">{{ row._stats?.solarvoice?.[j]?.notCompleted }}</span>
                       </div>
                     </div>
                     <!-- <div class="rp-sequence-list" *ngIf="mapPlaylistMeta[name.id]?.sequence?.length">
@@ -295,15 +295,15 @@
                           {{ mapAudio[seq?.id]}}
                         </span>
                         <div class="rp-sequence-chips">
-                          <span class="rp-chip rp-chip-seq" matTooltip="Total"
+                          <span [attr.data-testid]="'mrp-act-22-' + k" class="rp-chip rp-chip-seq" matTooltip="Total"
                             (click)="openContentPanel(row, 'solarvoice', j, 'all', k)" style="cursor:pointer;">
                             {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.completed + row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.notCompleted }}
                           </span>
-                          <span class="rp-chip rp-chip-yes" matTooltip="Completed"
+                          <span [attr.data-testid]="'mrp-act-23-' + k" class="rp-chip rp-chip-yes" matTooltip="Completed"
                             (click)="openContentPanel(row, 'solarvoice', j, 'completed', k)" style="cursor:pointer;">
                             {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.completed }}
                           </span>
-                          <span class="rp-chip rp-chip-no" matTooltip="Pending"
+                          <span [attr.data-testid]="'mrp-act-24-' + k" class="rp-chip rp-chip-no" matTooltip="Pending"
                             (click)="openContentPanel(row, 'solarvoice', j, 'notcompleted', k)" style="cursor:pointer;">
                             {{ row._stats?.solarvoice?.[j]?.sequenceStats?.[k]?.notCompleted }}
                           </span>
@@ -332,7 +332,7 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Deeplink</th>
             <td mat-cell *matCellDef="let row">
               <div class="rp-title-cell">
-                <button class="rp-icon-btn" (click)="copyToClipboardgroup(row)" title="Copy link">
+                <button data-testid="mrp-btn-25" class="rp-icon-btn" (click)="copyToClipboardgroup(row)" title="Copy link">
                   <mat-icon>content_copy</mat-icon>
                 </button>
               </div>
@@ -353,7 +353,7 @@
                 <span class="rp-chip" *ngFor="let id of (expandedProfiles.has(i) ? row.profileid : row.profileid?.slice(0, 5))">
                   {{ mapProfile[id] || id }}
                 </span>
-                <button *ngIf="row.profileid?.length > 5" class="rp-show-more-btn" (click)="toggleProfiles(i)">
+                <button data-testid="mrp-btn-26" *ngIf="row.profileid?.length > 5" class="rp-show-more-btn" (click)="toggleProfiles(i)">
                   {{ expandedProfiles.has(i) ? 'Show less' : '+' + (row.profileid.length - 5) + ' more' }}
                 </button>
               </div>
@@ -365,7 +365,7 @@
               <!-- <button class="rp-icon-btn" (click)="onEditGroup(row)" matTooltip="Edit">
                 <i class="fa-regular fa-pen-to-square"></i>
               </button> -->
-              <button class="rp-icon-btn" (click)="onEditGroup(row)" matTooltip="Edit" [disabled]="row.delete === true">
+              <button data-testid="mrp-btn-27" class="rp-icon-btn" (click)="onEditGroup(row)" matTooltip="Edit" [disabled]="row.delete === true">
                 <i class="fa-regular fa-pen-to-square"></i>
               </button>
               <!-- <button class="rp-icon-btn"
@@ -376,7 +376,7 @@
                 <i *ngIf="row.delete === true" class="fa-solid fa-circle-check text-success"></i>
 
               </button> -->
-              <mat-slide-toggle
+              <mat-slide-toggle data-testid="mrp-change-28"
                 [checked]="row.delete !== true"
                 (change)="onToggleGroupDelete(row, $event)"
                 [matTooltip]="row.delete ? 'Enable Group' : 'Disable Group'">
@@ -400,7 +400,7 @@
       <mat-icon class="rp-search-icon">search</mat-icon>
       <input type="text" class="rp-search-input" placeholder="Search playlists..." (keyup)="applyFilter($event)" #input autocomplete="off" />
     </div>
-    <button class="rp-btn-export" (click)="exportPlaylistExcel()">
+    <button data-testid="mrp-btn-29" class="rp-btn-export" (click)="exportPlaylistExcel()">
       <mat-icon>download</mat-icon>
       <span>Export</span>
     </button>
@@ -473,7 +473,7 @@
           <td mat-cell *matCellDef="let row">
             <div class="rp-title-cell">
               <span class="rp-cell-name">{{ row.title }}</span>
-              <button *ngIf="row['type'] == 'generalcontent'" class="rp-icon-btn" (click)="copyToClipboard(row)" title="Copy link">
+              <button data-testid="mrp-btn-30" *ngIf="row['type'] == 'generalcontent'" class="rp-icon-btn" (click)="copyToClipboard(row)" title="Copy link">
                 <mat-icon>content_copy</mat-icon>
               </button>
             </div>
@@ -497,7 +497,7 @@
         <ng-container matColumnDef="delete">
           <th mat-header-cell *matHeaderCellDef class="rp-col-act">Status</th>
           <td mat-cell *matCellDef="let row" class="rp-col-act">
-            <mat-slide-toggle
+            <mat-slide-toggle data-testid="mrp-change-31"
               [checked]="!row.delete"
               (change)="onToggleDeletePlaylist(row, $event)"
               [matTooltip]="row.delete ? 'Enable' : 'Disable'">
@@ -507,8 +507,8 @@
         <ng-container matColumnDef="delete_all">
           <th mat-header-cell *matHeaderCellDef class="rp-col-act">Batch</th>
           <td mat-cell *matCellDef="let row" class="rp-col-act">
-            <button *ngIf="row.delete != true" class="rp-btn-disable" (click)="onDeleteAllPlaylist(row, true)">Disable All</button>
-            <button *ngIf="row.delete == true" class="rp-btn-enable" (click)="onDeleteAllPlaylist(row, false)">Enable All</button>
+            <button data-testid="mrp-btn-32" *ngIf="row.delete != true" class="rp-btn-disable" (click)="onDeleteAllPlaylist(row, true)">Disable All</button>
+            <button data-testid="mrp-btn-33" *ngIf="row.delete == true" class="rp-btn-enable" (click)="onDeleteAllPlaylist(row, false)">Enable All</button>
           </td>
         </ng-container>
 
@@ -532,7 +532,7 @@
 <mat-tab label="Personalised">
   <div style="padding: 15px;">
   <div class="rp-stats-section">
-    <button class="rp-stats-toggle" (click)="personalisedStatsExpanded = !personalisedStatsExpanded">
+    <button data-testid="mrp-btn-34" class="rp-stats-toggle" (click)="personalisedStatsExpanded = !personalisedStatsExpanded">
       <mat-icon>{{ personalisedStatsExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
       <span>Statistics</span>
       <span class="rp-stats-summary">
@@ -579,7 +579,7 @@
 
       <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
         <mat-label>Recommended By</mat-label>
-        <mat-select [(value)]="selectedRecommenderId" (selectionChange)="applyPersonalisedFilters()">
+        <mat-select data-testid="mrp-sel-35" [(value)]="selectedRecommenderId" (selectionChange)="applyPersonalisedFilters()">
           <mat-option value="">All</mat-option>
           <mat-option *ngFor="let r of recommenderList" [value]="r.id">{{ r.name }}</mat-option>
         </mat-select>
@@ -587,7 +587,7 @@
 
       <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
         <mat-label>Status</mat-label>
-        <mat-select [(value)]="personalisedStatusFilter" (selectionChange)="applyPersonalisedFilters()">
+        <mat-select data-testid="mrp-sel-36" [(value)]="personalisedStatusFilter" (selectionChange)="applyPersonalisedFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="active">Active</mat-option>
           <mat-option value="disabled">Disabled</mat-option>
@@ -596,7 +596,7 @@
 
       <mat-form-field class="rp-filter-select" appearance="outline" subscriptSizing="dynamic">
         <mat-label>Content Type</mat-label>
-        <mat-select [(value)]="personalisedContentFilter" (selectionChange)="applyPersonalisedFilters()">
+        <mat-select data-testid="mrp-sel-37" [(value)]="personalisedContentFilter" (selectionChange)="applyPersonalisedFilters()">
           <mat-option value="">All</mat-option>
           <mat-option value="eiflix">EiFlix</mat-option>
           <mat-option value="generalcontent">General Content</mat-option>
@@ -604,7 +604,7 @@
         </mat-select>
       </mat-form-field>
 
-      <button *ngIf="hasPersonalisedFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters"
+      <button data-testid="mrp-btn-38" *ngIf="hasPersonalisedFilters" class="rp-sort-dir-btn" matTooltip="Clear all filters"
         (click)="clearPersonalisedFilters()">
         <mat-icon>close</mat-icon>
       </button>
@@ -637,7 +637,7 @@
                   *ngFor="let id of (expandedPersonalisedProfiles.has(i) ? row.profileid : row.profileid?.slice(0, 5))">
                   {{ mapProfile[id] || id }}
                 </span>
-                <button *ngIf="row.profileid?.length > 5" class="rp-show-more-btn"
+                <button data-testid="mrp-btn-39" *ngIf="row.profileid?.length > 5" class="rp-show-more-btn"
                   (click)="togglePersonalisedProfiles(i)">
                   {{ expandedPersonalisedProfiles.has(i) ? 'Show less' : '+' + (row.profileid.length - 5) + ' more' }}
                 </button>
@@ -682,7 +682,7 @@
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef class="rp-col-act">Status</th>
             <td mat-cell *matCellDef="let row" class="rp-col-act">
-              <mat-slide-toggle [checked]="row.delete !== true"
+              <mat-slide-toggle data-testid="mrp-change-40" [checked]="row.delete !== true"
                 (change)="onTogglePersonalisedDelete(row, $event)"
                 [matTooltip]="row.delete ? 'Enable' : 'Disable'">
               </mat-slide-toggle>
@@ -709,17 +709,17 @@
   </div>
 </mat-tab>
 </mat-tab-group>
-<div class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
+<div data-testid="mrp-act-41" class="rp-overlay" *ngIf="sidePanelOpen" (click)="closeSidePanel()"></div>
 <div class="rp-side-panel" [class.rp-side-panel-open]="sidePanelOpen">
   <div class="rp-side-panel-header">
     <h3 class="rp-side-panel-title">{{ sidePanelTitle }}</h3>
-    <button mat-icon-button class="close-button" (click)="sendWatti()">
+    <button data-testid="mrp-btn-42" mat-icon-button class="close-button" (click)="sendWatti()">
       <i class="fa-brands fa-whatsapp"></i>
     </button>
-    <button mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
+    <button data-testid="mrp-btn-43" mat-icon-button class="close-button" (click)="sendNotificationinBreakthrough()">
       <mat-icon>notifications_active</mat-icon>
     </button>
-    <button mat-icon-button class="close-button" (click)="closeSidePanel()">
+    <button data-testid="mrp-btn-44" mat-icon-button class="close-button" (click)="closeSidePanel()">
       <mat-icon>close</mat-icon>
     </button>
   </div>

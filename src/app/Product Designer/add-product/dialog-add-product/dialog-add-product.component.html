@@ -118,17 +118,17 @@
       </mat-form-field>
     </div>
     <label for="fileupload">Product Image Upload :</label>&nbsp;&nbsp;
-    <input #fileupload type="file" accept="image/png" (change)="uploadImage(fileupload.value)" [disabled]="productimage.previewurl != null || productimage.url != null">
+    <input data-testid="dap-change-upload-image-1" #fileupload type="file" accept="image/png" (change)="uploadImage(fileupload.value)" [disabled]="productimage.previewurl != null || productimage.url != null">
     <div *ngIf="productimage.previewurl != null || productimage.url != null" style="display:flex;flex-direction: column;">
       <img [src]="productimage.previewurl || productimage.url"alt="" height="200" width="310">
-      <button mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
+      <button data-testid="dap-on-image-remove-2" mat-stroked-button type="button" (click)="onImageRemove()">Remove Image</button>
     </div>
     <label>Attachments :</label>&nbsp;&nbsp;
-    <input type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
+    <input data-testid="dap-change-on-attachment-selected-3" type="file" multiple (change)="onAttachmentSelected($event)" #attachmentInput [disabled]="attachments.length >= 5">
     <div *ngFor="let att of attachments; let i = index" style="display:flex; align-items:center; gap:8px; margin-top:8px">
       <mat-icon>insert_drive_file</mat-icon>
       <span>{{ att.name }}</span>
-      <button mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
+      <button data-testid="dap-remove-attachment-4" mat-stroked-button type="button" (click)="removeAttachment(i)">Remove</button>
     </div>
     <div *ngIf="uploadProgress !== null" style="margin-top: 8px;">
       <span>Uploading... {{uploadProgress}}%</span>
@@ -155,8 +155,8 @@
       </mat-form-field>
     </div>
     <div class="formrow">
-      <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-      <button  [disabled]="addProductForm.invalid || crossmatch" mat-raised-button color="primary" (click)="onformsubmit(addProductForm.value)">{{submitbutton}}</button>
+      <button data-testid="dap-on-cancel-5" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+      <button data-testid="dap-onformsubmit-6"  [disabled]="addProductForm.invalid || crossmatch" mat-raised-button color="primary" (click)="onformsubmit(addProductForm.value)">{{submitbutton}}</button>
     </div>
   </div>
 </div>
@@ -165,7 +165,7 @@
   <div mat-dialog-title><h2>Delete Product</h2></div>
   <div mat-dialog content><h3>Are you sure you want to delete?</h3></div>
   <div mat-dialog-action>
-    <button mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
+    <button data-testid="dap-on-cancel-7" mat-raised-button color="primary" (click)="onCancel()">Cancel</button>
+    <button data-testid="dap-ondelete-8" mat-raised-button color="primary" (click)="ondelete(data.id)"> Delete </button>
   </div>
 </div>

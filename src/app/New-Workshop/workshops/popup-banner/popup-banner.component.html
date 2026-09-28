@@ -2,7 +2,7 @@
      plain paragraph (the heading dropdown only lists h1-h6, and Clear formatting
      only strips marks), so a heading was otherwise permanent. -->
 <ng-template #wc2Normal>
-  <button type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
+  <button data-testid="pb-to-normal-1" type="button" class="wc2-normal" title="Normal text — remove the heading from this block"
           (mousedown)="$event.preventDefault()" (click)="toNormal()">Normal</button>
 </ng-template>
 <div class="pb">
@@ -16,7 +16,7 @@
     <span class="pb-state" *ngIf="!loading && !loadError" [class.on]="form?.get('enable')?.value">
       {{ form?.get('enable')?.value ? 'Live' : 'Off' }}
     </span>
-    <button type="button" class="pb-x" (click)="close()" aria-label="Close">
+    <button data-testid="pb-close-2" type="button" class="pb-x" (click)="close()" aria-label="Close">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -42,7 +42,7 @@
             <div class="pb-toggle-title">Show this popup</div>
             <div class="help">Turn this off to hide the popup from the app without clearing anything you have written here.</div>
           </div>
-          <button type="button" class="toggle" [class.on]="form.get('enable')?.value"
+          <button data-testid="pb-toggle-enable-3" type="button" class="toggle" [class.on]="form.get('enable')?.value"
                   (click)="toggleEnable()" [attr.aria-pressed]="form.get('enable')?.value"
                   aria-label="Show this popup"></button>
         </div>
@@ -89,7 +89,7 @@
           <div class="pb-slot" *ngFor="let s of slots">
             <div class="label"><span>{{ s.label }}</span></div>
 
-            <div class="pb-drop" [class.busy]="uploading[s.key]"
+            <div data-testid="pb-pick-image-4" class="pb-drop" [class.busy]="uploading[s.key]"
                  (dragover)="onDragOver($event)" (drop)="onDrop(s, $event)"
                  (click)="pickImage(s)" role="button" tabindex="0"
                  [attr.aria-label]="'Upload the ' + s.label + ' image'" [attr.aria-busy]="!!uploading[s.key]"
@@ -112,8 +112,8 @@
             <div class="help pb-hint">{{ s.hint }}</div>
 
             <div class="pb-slot-actions" *ngIf="form.get(s.key)?.value && !uploading[s.key]">
-              <button type="button" class="btn btn-sm" (click)="pickImage(s)">Replace</button>
-              <button type="button" class="btn btn-sm btn-ghost" (click)="clearImage(s)">Remove</button>
+              <button data-testid="pb-pick-image-5" type="button" class="btn btn-sm" (click)="pickImage(s)">Replace</button>
+              <button data-testid="pb-clear-image-6" type="button" class="btn btn-sm btn-ghost" (click)="clearImage(s)">Remove</button>
             </div>
 
             <div class="pb-url" *ngIf="form.get(s.key)?.value" [title]="form.get(s.key)?.value">
@@ -133,8 +133,8 @@
     <span class="pill pill-ok" *ngIf="justSaved && !dirty && !saving">Saved just now</span>
     <span class="help" *ngIf="anyUploading">An image is still uploading.</span>
     <span class="grow"></span>
-    <button type="button" class="btn" (click)="close()">Close</button>
-    <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving || anyUploading">
+    <button data-testid="pb-close-7" type="button" class="btn" (click)="close()">Close</button>
+    <button data-testid="pb-save-8" type="button" class="btn btn-primary" (click)="save()" [disabled]="saving || anyUploading">
       <span class="spin" *ngIf="saving"></span>
       <span>{{ saving ? 'Saving' : 'Save banner' }}</span>
     </button>

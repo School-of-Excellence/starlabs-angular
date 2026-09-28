@@ -104,7 +104,7 @@
       <span *ngIf="roomDetail.recordingstatus === 'ended' || roomDetail?.recordingstatus === 'idle'">Recording is stopped</span>
 
       <!-- Host buttons only -->
-      <button 
+      <button data-testid="joc-toggle-recording-1" 
         *ngIf="(
           roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']
         ) && roomDetail.recordingstatus === 'started'" 
@@ -113,7 +113,7 @@
         Stop Recording
       </button>
 
-      <button 
+      <button data-testid="joc-toggle-recording-2" 
         *ngIf="(
           roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']
         ) && (roomDetail?.recordingstatus === 'ended' || roomDetail?.recordingstatus === 'idle')" 
@@ -156,19 +156,19 @@
           </div>
 
           <!-- Host controls (optional) -->
-          <button *ngIf="isHost()" class="participant-options-btn" [matMenuTriggerFor]="spotlightRemoteMenu" (click)="$event.stopPropagation()">
+          <button data-testid="joc-event-3" *ngIf="isHost()" class="participant-options-btn" [matMenuTriggerFor]="spotlightRemoteMenu" (click)="$event.stopPropagation()">
             <span class="material-icons">more_vert</span>
           </button>
           <mat-menu #spotlightRemoteMenu="matMenu">
-            <button mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
+            <button data-testid="joc-toggle-participant-mute-4" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
               <mat-icon>mic_off</mat-icon>
               <span>Mute</span>
             </button>
-            <button mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
+            <button data-testid="joc-button-5" mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
               <mat-icon>mic_off</mat-icon>
               <span>Already Muted</span>
             </button>
-            <button mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
+            <button data-testid="joc-remove-panticipant-6" mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
               <mat-icon>person_remove</mat-icon>
               <span>Remove from Call</span>
             </button>
@@ -223,8 +223,8 @@
       </div>
       
       <!-- PiP minimize/expand control -->
-      <div class="pip-controls" (click)="$event.stopPropagation()">
-        <button (click)="togglePipSize(); $event.stopPropagation()">
+      <div data-testid="joc-event-7" class="pip-controls" (click)="$event.stopPropagation()">
+        <button data-testid="joc-toggle-pip-size-8" (click)="togglePipSize(); $event.stopPropagation()">
           {{ videoLayout.isPipMinimized() ? '⬜' : '—' }}
         </button>
       </div>
@@ -347,19 +347,19 @@
         </app-openvidu-video-element>
 
         <!-- Host controls menu -->
-        <button *ngIf="isHost()" class="participant-options-btn" [matMenuTriggerFor]="remoteTileMenu" (click)="$event.stopPropagation()">
+        <button data-testid="joc-event-9" *ngIf="isHost()" class="participant-options-btn" [matMenuTriggerFor]="remoteTileMenu" (click)="$event.stopPropagation()">
           <span class="material-icons">more_vert</span>
         </button>
         <mat-menu #remoteTileMenu="matMenu">
-          <button mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
+          <button data-testid="joc-toggle-participant-mute-10" mat-menu-item *ngIf="!isRemoteAudioMuted(remote.participantIdentity)" (click)="toggleParticipantMute(remote.participantIdentity, remote.participantName, false)">
             <mat-icon>mic_off</mat-icon>
             <span>Mute</span>
           </button>
-          <button mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
+          <button data-testid="joc-button-11" mat-menu-item disabled *ngIf="isRemoteAudioMuted(remote.participantIdentity)">
             <mat-icon>mic_off</mat-icon>
             <span>Already Muted</span>
           </button>
-          <button mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
+          <button data-testid="joc-remove-panticipant-12" mat-menu-item class="text-danger" (click)="removePanticipant(remote.participantIdentity, remote.participantName)">
             <mat-icon>person_remove</mat-icon>
             <span>Remove from Call</span>
           </button>
@@ -397,42 +397,42 @@
 
     <div class="zoom-controls">
 
-      <button class="zoom-btn" [class.muted]="isAudioMuted()" (click)="toggleMute()">
+      <button data-testid="joc-toggle-mute-13" class="zoom-btn" [class.muted]="isAudioMuted()" (click)="toggleMute()">
         <span class="material-icons">{{isAudioMuted() ? "mic_off" : "mic"}}</span>
         <span class="zoom-btn-label">{{isAudioMuted() ? "Unmute" : "Mute"}}</span>
       </button>
 
       <div class="camera-btn-group">
-        <button class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
+        <button data-testid="joc-toggle-camera-14" class="zoom-btn" [class.muted]="isVideoHidden()" (click)="toggleCamera()">
           <span class="material-icons">{{isVideoHidden() ? "videocam_off" : "videocam"}}</span>
           <span class="zoom-btn-label">{{isVideoHidden() ? "Start Video" : "Stop Video"}}</span>
         </button>
-        <button class="zoom-btn blur-menu-trigger" [matMenuTriggerFor]="blurMenu">
+        <button data-testid="joc-button-15" class="zoom-btn blur-menu-trigger" [matMenuTriggerFor]="blurMenu">
           <span class="material-icons">expand_less</span>
         </button>
       </div>
 
       <mat-menu #blurMenu="matMenu">
-        <button mat-menu-item (click)="applyBlur('mid')" [disabled]="blurLevel === 'mid'">
+        <button data-testid="joc-apply-blur-16" mat-menu-item (click)="applyBlur('mid')" [disabled]="blurLevel === 'mid'">
           <mat-icon>blur_on</mat-icon>
           <span>Blur Mid (60%)</span>
         </button>
-        <button mat-menu-item (click)="applyBlur('high')" [disabled]="blurLevel === 'high'">
+        <button data-testid="joc-apply-blur-17" mat-menu-item (click)="applyBlur('high')" [disabled]="blurLevel === 'high'">
           <mat-icon>blur_on</mat-icon>
           <span>Blur High (100%)</span>
         </button>
-        <button mat-menu-item (click)="applyBlur('none')" [disabled]="blurLevel === 'none'">
+        <button data-testid="joc-apply-blur-18" mat-menu-item (click)="applyBlur('none')" [disabled]="blurLevel === 'none'">
           <mat-icon>blur_off</mat-icon>
           <span>Remove Blur</span>
         </button>
       </mat-menu>
 
-      <button class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
+      <button data-testid="joc-toggle-screen-share-19" class="zoom-btn" [class.active]="isScreenSharing()" (click)="toggleScreenShare()">
         <span class="material-icons">{{isScreenSharing() ? "stop_screen_share" : "screen_share"}}</span>
         <span class="zoom-btn-label">{{isScreenSharing() ? "Stop Share" : "Share"}}</span>
       </button>
 
-      <button class="zoom-btn" [class.fullscreen]="isFullscreen" (click)="toggleFullscreen()">
+      <button data-testid="joc-toggle-fullscreen-20" class="zoom-btn" [class.fullscreen]="isFullscreen" (click)="toggleFullscreen()">
         <span class="material-icons">fullscreen</span>
         <span class="zoom-btn-label">Full Screen</span>
       </button>
@@ -444,7 +444,7 @@
 
     </div>
 
-    <button 
+    <button data-testid="joc-is-fullscreen-21" 
       *ngIf="roomDetail.hosts.includes(loggedinProfileid) || loggedinProfileRole['developer'] || loggedinProfileRole['tester']; else leaveMenu"
       class="zoom-btn-end" mat-icon-button [matMenuTriggerFor]="userMenu" (click)="isFullscreen ? toggleFullscreen() : null"
     >
@@ -452,18 +452,18 @@
       <span class="zoom-btn-label">End Meeting</span>
     </button>
     <mat-menu #userMenu="matMenu">
-      <button class="text-danger" mat-menu-item (click)="endCall()">
+      <button data-testid="joc-end-call-22" class="text-danger" mat-menu-item (click)="endCall()">
         <mat-icon>call_end</mat-icon>
         <span>End Meeting for All</span>
       </button>
-      <button mat-menu-item (click)="leaveRoom(true)">
+      <button data-testid="joc-leave-room-23" mat-menu-item (click)="leaveRoom(true)">
         <mat-icon>exit_to_app</mat-icon>
         <span>Leave Meeting</span>
       </button>
     </mat-menu>
 
     <ng-template #leaveMenu>
-      <button class="zoom-btn-end" (click)="leaveRoom(true)">
+      <button data-testid="joc-leave-room-24" class="zoom-btn-end" (click)="leaveRoom(true)">
         <span class="material-icons">call_end</span>
         <span class="zoom-btn-label">Leave Meeting</span>
       </button>

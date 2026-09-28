@@ -28,17 +28,17 @@
           </div>
         </div>
       </div>
-      <button mat-icon-button type="button" color="warn" (click)="deleteDraft(draft, i)"><mat-icon>delete</mat-icon></button>
+      <button [attr.data-testid]="'dqpd-btn-1-' + i" mat-icon-button type="button" color="warn" (click)="deleteDraft(draft, i)"><mat-icon>delete</mat-icon></button>
     </mat-list-option>
   </mat-selection-list>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button (click)="onCancel()">
+  <button data-testid="dqpd-btn-2" mat-button (click)="onCancel()">
     <mat-icon>close</mat-icon>
     Skip & Close Draft
   </button>
-  <button mat-raised-button color="primary" [disabled]="!selectedDraft || selectedDraft.length === 0"
+  <button data-testid="dqpd-btn-3" mat-raised-button color="primary" [disabled]="!selectedDraft || selectedDraft.length === 0"
     (click)="onLoadDraft()">
     <mat-icon>file_open</mat-icon>
     Load Selected Draft

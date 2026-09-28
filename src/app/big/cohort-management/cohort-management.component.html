@@ -32,12 +32,12 @@
 
     <div class="topbar-actions">
       <!-- Marathon Selection (ghost pill + Material menu) -->
-      <button class="btn-ghost-sm" [matMenuTriggerFor]="marathonMenu" title="Marathon">
+      <button data-testid="cman-button-1" class="btn-ghost-sm" [matMenuTriggerFor]="marathonMenu" title="Marathon">
         {{getMarathonLabel()}}
         <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <mat-menu #marathonMenu="matMenu" class="bc-menu">
-        <button mat-menu-item *ngFor="let option of marathonList"
+        <button data-testid="cman-select-single-marathon-2" mat-menu-item *ngFor="let option of marathonList"
           [class.active]="selectedMarathon === option.docid"
           (click)="selectSingleMarathon(option.docid)">
           <mat-icon *ngIf="selectedMarathon === option.docid">check</mat-icon>
@@ -46,12 +46,12 @@
       </mat-menu>
 
       <!-- Event Selection -->
-      <button class="btn-ghost-sm" [matMenuTriggerFor]="eventMenu" title="Event">
+      <button data-testid="cman-button-3" class="btn-ghost-sm" [matMenuTriggerFor]="eventMenu" title="Event">
         {{getEventLabel()}}
         <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <mat-menu #eventMenu="matMenu" class="bc-menu">
-        <button mat-menu-item *ngFor="let option of searchableEventList"
+        <button data-testid="cman-event-4" mat-menu-item *ngFor="let option of searchableEventList"
           [class.active]="isEventSelected(option.ref.id)"
           (click)="$event.stopPropagation(); toggleEventInSelection(option.ref.id)">
           <mat-icon>{{isEventSelected(option.ref.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -60,12 +60,12 @@
       </mat-menu>
 
       <!-- Queue Selection -->
-      <button class="btn-ghost-sm" [matMenuTriggerFor]="queueMenu" title="Queue">
+      <button data-testid="cman-button-5" class="btn-ghost-sm" [matMenuTriggerFor]="queueMenu" title="Queue">
         {{getQueueLabel()}}
         <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <mat-menu #queueMenu="matMenu" class="bc-menu">
-        <button mat-menu-item *ngFor="let option of searchableQueueList"
+        <button data-testid="cman-event-6" mat-menu-item *ngFor="let option of searchableQueueList"
           [class.active]="isQueueSelected(option.docid)"
           (click)="$event.stopPropagation(); toggleQueueInSelection(option.docid)">
           <mat-icon>{{isQueueSelected(option.docid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -74,12 +74,12 @@
       </mat-menu>
 
       <!-- Zone Selection -->
-      <button class="btn-ghost-sm" [matMenuTriggerFor]="zoneMenu" title="Zone">
+      <button data-testid="cman-button-7" class="btn-ghost-sm" [matMenuTriggerFor]="zoneMenu" title="Zone">
         {{getZoneLabel()}}
         <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <mat-menu #zoneMenu="matMenu" class="bc-menu">
-        <button mat-menu-item *ngFor="let option of searchableZoneEventList"
+        <button data-testid="cman-event-8" mat-menu-item *ngFor="let option of searchableZoneEventList"
           [class.active]="isZoneSelected(option.ref.id)"
           (click)="$event.stopPropagation(); toggleZoneInSelection(option.ref.id)">
           <mat-icon>{{isZoneSelected(option.ref.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -95,7 +95,7 @@
       <!-- <button class="icon-btn" title="Settings" (click)="$event.preventDefault()"><mat-icon>settings</mat-icon></button>
       <button class="icon-btn" title="Notifications" (click)="toggleActivitySidenav()"><mat-icon>notifications_none</mat-icon></button> -->
 
-      <button class="btn-create" (click)="onCreateCohort()">
+      <button data-testid="cman-on-create-cohort-9" class="btn-create" (click)="onCreateCohort()">
         <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
@@ -103,12 +103,12 @@
         Create
       </button>
 
-      <button class="icon-btn export-btn" (click)="exportCohortsData()" title="Export all">
+      <button data-testid="cman-export-cohorts-data-10" class="icon-btn export-btn" (click)="exportCohortsData()" title="Export all">
         <mat-icon>download</mat-icon>
       </button>
 
       <div class="mode-seg">
-        <button class="mode-btn" [class.active]="modeView === 'plan'" (click)="setModeView('plan')">
+        <button data-testid="cman-set-mode-view-11" class="mode-btn" [class.active]="modeView === 'plan'" (click)="setModeView('plan')">
           <svg class="ico sm" viewBox="0 0 24 24">
             <rect x="3" y="3" width="7" height="7" />
             <rect x="14" y="3" width="7" height="7" />
@@ -117,7 +117,7 @@
           </svg>
           Plan
         </button>
-        <button class="mode-btn" [class.active]="modeView === 'floor'" (click)="setModeView('floor')">
+        <button data-testid="cman-set-mode-view-12" class="mode-btn" [class.active]="modeView === 'floor'" (click)="setModeView('floor')">
           <span class="floor-dot"></span>
           Floor
         </button>
@@ -130,7 +130,7 @@
       <span class="refine-label">REFINE</span>
 
       <div class="select-wrap">
-        <select [value]="typeFilter" (change)="setTypeFilter($any($event).target.value)">
+        <select data-testid="cman-change-set-type-filter-13" [value]="typeFilter" (change)="setTypeFilter($any($event).target.value)">
           <option value="all">Type · All</option>
           <option value="general">Type · General</option>
           <option value="event">Type · Event</option>
@@ -139,7 +139,7 @@
       </div>
 
       <div class="select-wrap">
-        <select [value]="categoryFilter" (change)="setCategoryFilter($any($event).target.value)">
+        <select data-testid="cman-change-set-category-filter-14" [value]="categoryFilter" (change)="setCategoryFilter($any($event).target.value)">
           <option value="all">Category · All</option>
           <option value="readiness">Category · Readiness</option>
           <option value="studio">Category · Studio</option>
@@ -150,7 +150,7 @@
       </div>
 
       <div class="select-wrap">
-        <select [value]="statusFilter" (change)="setStatusFilter($any($event).target.value)">
+        <select data-testid="cman-change-set-status-filter-15" [value]="statusFilter" (change)="setStatusFilter($any($event).target.value)">
           <option value="all">Status · All</option>
           <option value="active">Status · Active</option>
           <option value="nonactive">Status · Non Active</option>
@@ -158,23 +158,23 @@
         <svg class="select-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
       </div>
 
-      <button class="tag-btn" [matMenuTriggerFor]="tagMenu" title="Tags">
+      <button data-testid="cman-button-16" class="tag-btn" [matMenuTriggerFor]="tagMenu" title="Tags">
         <span class="tag-label-pill">Tag</span>
         {{getTagsLabel()}}
         <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <mat-menu #tagMenu="matMenu" class="bc-menu">
-        <button mat-menu-item *ngFor="let tag of filteredTagsList"
+        <button data-testid="cman-event-17" mat-menu-item *ngFor="let tag of filteredTagsList"
           [class.active]="isTagSelected(tag.id)"
           (click)="$event.stopPropagation(); toggleTagInSelection(tag.id)">
           <mat-icon>{{isTagSelected(tag.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
           {{tag.name || tag.tagname}}
         </button>
-        <button mat-menu-item *ngIf="!filteredTagsList?.length" disabled>No tags available</button>
+        <button data-testid="cman-button-18" mat-menu-item *ngIf="!filteredTagsList?.length" disabled>No tags available</button>
       </mat-menu>
 
       <label class="toggle-label">
-        <input type="checkbox" [checked]="showTemporaryOnly" (change)="toggleTemporaryOnly()">
+        <input data-testid="cman-change-toggle-temporary-only-19" type="checkbox" [checked]="showTemporaryOnly" (change)="toggleTemporaryOnly()">
         Temporary only
       </label>
 
@@ -195,9 +195,9 @@
       <span class="refine-label">ACTIVE</span>
       <span class="filter-chip" *ngFor="let chip of getActiveFilterChips(); trackBy: trackByChip">
         <span class="chip-key">{{chip.key}}:</span> {{chip.value}}
-        <button class="chip-remove" type="button" (click)="removeFilterChip(chip)" title="Remove">×</button>
+        <button data-testid="cman-remove-filter-chip-20" class="chip-remove" type="button" (click)="removeFilterChip(chip)" title="Remove">×</button>
       </span>
-      <button class="clear-all-btn" type="button" (click)="clearAllFilters()">Clear all</button>
+      <button data-testid="cman-clear-all-filters-21" class="clear-all-btn" type="button" (click)="clearAllFilters()">Clear all</button>
     </div>
   </div>
 
@@ -207,11 +207,11 @@
   <div class="main-content">
 
     <!-- ─── LEFT: Unassigned Sidebar ─── -->
-    <div class="sidebar" (click)="sidebarCollapsed && toggleSidebarCollapse(); $event.stopPropagation()">
+    <div data-testid="cman-sidebar-collapsed-22" class="sidebar" (click)="sidebarCollapsed && toggleSidebarCollapse(); $event.stopPropagation()">
       <div class="sidebar-header">
         <span class="sidebar-title">Unassigned</span>
         <span class="unassigned-badge" *ngIf="selectedAcceleratorEvent.length > 0">{{this.filterUnassignParticipants.length}}</span>
-        <button class="icon-btn sidebar-collapse" title="Collapse" (click)="toggleSidebarCollapse(); $event.stopPropagation()">
+        <button data-testid="cman-toggle-sidebar-collapse-23" class="icon-btn sidebar-collapse" title="Collapse" (click)="toggleSidebarCollapse(); $event.stopPropagation()">
           <svg class="ico sm" viewBox="0 0 24 24">
             <path [attr.d]="sidebarCollapsed ? 'm9 18 6-6-6-6' : 'm15 18-6-6 6-6'" />
           </svg>
@@ -229,11 +229,11 @@
 
       <div class="up-select-bar" *ngIf="filterUnassignParticipants.length > 0">
         <div class="box" style="justify-content : flex-start;">
-          <button class="up-toggle" [class.on]="selectedUnassignParticipants" (click)="toggleUnassignedSelectMode()">
+          <button data-testid="cman-toggle-unassigned-select-mode-24" class="up-toggle" [class.on]="selectedUnassignParticipants" (click)="toggleUnassignedSelectMode()">
             <mat-icon>{{selectedUnassignParticipants ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
             {{selectedUnassignParticipants ? 'Cancel' : 'Select'}}
           </button>
-          <button class="up-all" *ngIf="selectedUnassignParticipants" (click)="selectAllUnassignedParticipants()">
+          <button data-testid="cman-select-all-unassigned-participants-25" class="up-all" *ngIf="selectedUnassignParticipants" (click)="selectAllUnassignedParticipants()">
             <mat-icon>select_all</mat-icon> All
           </button>
         </div>
@@ -242,19 +242,19 @@
             {{selectedUnassignParticipants.size}} selected
           </span>
           <span style="flex:1"></span>
-          <button class="up-assign" *ngIf="selectedUnassignParticipants && selectedUnassignParticipants.size > 0"
+          <button data-testid="cman-button-26" class="up-assign" *ngIf="selectedUnassignParticipants && selectedUnassignParticipants.size > 0"
             [matMenuTriggerFor]="cohortMenu">
             <mat-icon>group_add</mat-icon> Assign to cohort…
           </button>
         </div>
         <mat-menu #cohortMenu="matMenu" class="up-cohort-menu">
-          <div class="up-cohort-search" (click)="$event.stopPropagation()">
+          <div data-testid="cman-event-27" class="up-cohort-search" (click)="$event.stopPropagation()">
             <mat-icon>search</mat-icon>
-            <input type="text" placeholder="Search cohort…" [(ngModel)]="unassignCohortSearchQuery"
+            <input data-testid="cman-event-28" type="text" placeholder="Search cohort…" [(ngModel)]="unassignCohortSearchQuery"
               (click)="$event.stopPropagation()">
           </div>
           <div class="up-cohort-list">
-            <button mat-menu-item *ngFor="let cohort of getCohortsForUnassign()" (click)="unassignToCohort(cohort)">
+            <button data-testid="cman-unassign-to-cohort-29" mat-menu-item *ngFor="let cohort of getCohortsForUnassign()" (click)="unassignToCohort(cohort)">
               <span class="up-cohort-name">{{cohort.name}}</span>
               <small class="up-cohort-sub">{{cohort.participantidlist?.length || 0}} ppl</small>
             </button>
@@ -265,7 +265,7 @@
 
       <div class="participant-list" *ngIf="selectedAcceleratorEvent.length > 0">
 
-        <div class="participant-row" draggable="true"
+        <div data-testid="cman-selected-unassign-participants-30" class="participant-row" draggable="true"
           (dragstart)="onParticipantDragStart($event, unassign?.participantId, null)"
           *ngFor="let unassign of this.filterUnassignParticipants ?? []"
            [class.selectable]="selectedUnassignParticipants"
@@ -310,7 +310,7 @@
         <span class="grid-title">Cohorts</span>
         <span class="grid-count">{{filteredCohortsList.length}}</span>
         <div class="grid-spacer"></div>
-        <button class="btn-select" (click)="toggleSelectMode()">
+        <button data-testid="cman-toggle-select-mode-31" class="btn-select" (click)="toggleSelectMode()">
           <svg class="ico sm" viewBox="0 0 24 24">
             <polyline points="9 11 12 14 22 4" />
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
@@ -318,27 +318,27 @@
           Select
         </button>
         <span class="divider-v">|</span>
-        <button class="btn-group-by" [matMenuTriggerFor]="groupByMenu">
+        <button data-testid="cman-button-32" class="btn-group-by" [matMenuTriggerFor]="groupByMenu">
           {{getGroupByLabel()}}
           <svg class="ico sm" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <mat-menu #groupByMenu="matMenu" class="bc-menu">
-          <button mat-menu-item [class.active]="groupBy === 'none'" (click)="setGroupBy('none')">
+          <button data-testid="cman-set-group-by-33" mat-menu-item [class.active]="groupBy === 'none'" (click)="setGroupBy('none')">
             <mat-icon *ngIf="groupBy === 'none'">check</mat-icon> No Grouping
           </button>
-          <button mat-menu-item [class.active]="groupBy === 'category'" (click)="setGroupBy('category')">
+          <button data-testid="cman-set-group-by-34" mat-menu-item [class.active]="groupBy === 'category'" (click)="setGroupBy('category')">
             <mat-icon *ngIf="groupBy === 'category'">check</mat-icon> By Category
           </button>
-          <button mat-menu-item [class.active]="groupBy === 'levels'" (click)="setGroupBy('levels')">
+          <button data-testid="cman-set-group-by-35" mat-menu-item [class.active]="groupBy === 'levels'" (click)="setGroupBy('levels')">
             <mat-icon *ngIf="groupBy === 'levels'">check</mat-icon> Level Based
           </button>
-          <button mat-menu-item [class.active]="groupBy === 'studio'" (click)="setGroupBy('studio')">
+          <button data-testid="cman-set-group-by-36" mat-menu-item [class.active]="groupBy === 'studio'" (click)="setGroupBy('studio')">
             <mat-icon *ngIf="groupBy === 'studio'">check</mat-icon> Studio Based
           </button>
-          <button mat-menu-item [class.active]="groupBy === 'zone'" (click)="setGroupBy('zone')">
+          <button data-testid="cman-set-group-by-37" mat-menu-item [class.active]="groupBy === 'zone'" (click)="setGroupBy('zone')">
             <mat-icon *ngIf="groupBy === 'zone'">check</mat-icon> Zone Based
           </button>
-          <button mat-menu-item [class.active]="groupBy === 'daterange'" (click)="setGroupBy('daterange')">
+          <button data-testid="cman-set-group-by-38" mat-menu-item [class.active]="groupBy === 'daterange'" (click)="setGroupBy('daterange')">
             <mat-icon *ngIf="groupBy === 'daterange'">check</mat-icon> Date Range
           </button>
         </mat-menu>
@@ -349,7 +349,7 @@
         <mat-icon>folder_open</mat-icon>
         <h3>No cohorts found</h3>
         <p>Try adjusting your filters, or create a new cohort.</p>
-        <button class="btn btn-primary" (click)="onCreateCohort()">
+        <button data-testid="cman-on-create-cohort-39" class="btn btn-primary" (click)="onCreateCohort()">
           <mat-icon>add</mat-icon> Create Cohort
         </button>
       </div>
@@ -375,11 +375,11 @@
             (drop)="onCohortDrop($event, cohorts)"
             *ngFor="let cohorts of groupedCohorts[groupKey]">
             <div class="card-top">
-              <span class="card-check select-overlay" *ngIf="selectMode" (click)="toggleCohortSelected(cohorts['docid']); $event.stopPropagation()" title="Select cohort">
+              <span data-testid="cman-toggle-cohort-selected-40" class="card-check select-overlay" *ngIf="selectMode" (click)="toggleCohortSelected(cohorts['docid']); $event.stopPropagation()" title="Select cohort">
                 <mat-icon>{{isCohortSelected(cohorts['docid']) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
               </span>
-              <span class="card-name" (click)="onEditCohort(cohorts); $event.stopPropagation()" title="Click to edit cohort">{{cohorts['name']}}</span>
-              <button class="card-open-btn" title="Open studio view" (click)="openCohortStudio(cohorts, $event , 'participants');">
+              <span data-testid="cman-on-edit-cohort-41" class="card-name" (click)="onEditCohort(cohorts); $event.stopPropagation()" title="Click to edit cohort">{{cohorts['name']}}</span>
+              <button data-testid="cman-open-cohort-studio-42" class="card-open-btn" title="Open studio view" (click)="openCohortStudio(cohorts, $event , 'participants');">
                 <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"/>
                   <polyline points="12 5 19 12 12 19"/>
@@ -415,7 +415,7 @@
             </div>
             <div class="card-stats"
               [class]="(modeView === 'floor' || selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio' ? 'cols-5' : 'cols-2'">
-              <div class="stat" (click)="openCohortStudio(cohorts, $event , 'participants');">
+              <div data-testid="cman-open-cohort-studio-43" class="stat" (click)="openCohortStudio(cohorts, $event , 'participants');">
                 <div class="stat-val">
                   <span *ngIf="!participantSearchQuery" class="stat-val">{{cohorts['participantidlist']?.length
                     || 0}}</span>
@@ -425,12 +425,12 @@
                 </div>
                 <div class="stat-key">PARTICIPANTS</div>
               </div>
-              <div class="stat" (click)="openCohortStudio(cohorts, $event , 'activities');">
+              <div data-testid="cman-open-cohort-studio-44" class="stat" (click)="openCohortStudio(cohorts, $event , 'activities');">
                 <div class="stat-val">{{getActivitiesCount(cohorts['docid'])}}</div>
                 <div class="stat-key">ACTIVITIES</div>
               </div>
               <ng-container *ngIf="(selectedQueueEvent.length > 0) && cohorts['cohortCategory'] == 'studio'">
-                <div class="stat" (click)="openCohortStudio(cohorts, $event , 'studios');">
+                <div data-testid="cman-open-cohort-studio-45" class="stat" (click)="openCohortStudio(cohorts, $event , 'studios');">
                   <div class="stat-val">
                     {{getCohortTotalStudiosCount(cohorts)}}
                   </div>
@@ -466,7 +466,7 @@
             </span>
 
             <div class="card-tabs">
-              <button class="card-tab" [class.active]="cohorts['contentview'] === 'participants'"
+              <button data-testid="cman-cohorts-46" class="card-tab" [class.active]="cohorts['contentview'] === 'participants'"
                 (click)="cohorts['contentview'] = 'participants'; $event.stopPropagation()">
                 <svg class="ico sm" viewBox="0 0 24 24">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -477,7 +477,7 @@
                 <span *ngIf="participantSearchQuery">{{getMatchingParticipantCount(cohorts)}}/{{cohorts['participantidlist']?.length || 0}}</span>
                 )
               </button>
-              <button class="card-tab" [class.active]="cohorts['contentview'] === 'activities'"
+              <button data-testid="cman-cohorts-47" class="card-tab" [class.active]="cohorts['contentview'] === 'activities'"
                 (click)="cohorts['contentview'] = 'activities'; $event.stopPropagation()">Activities
                 ({{getActivitiesCount(cohorts['docid'])}})</button>
 
@@ -487,35 +487,35 @@
                 {{selectedParticipantIds.size}}
               </span>
 
-              <button class="card-tab-action" [class.on]="isParticipantSelectActive(cohorts['docid'])"
+              <button data-testid="cman-toggle-participant-select-mode-48" class="card-tab-action" [class.on]="isParticipantSelectActive(cohorts['docid'])"
                 *ngIf="cohorts['contentview'] === 'participants' && cohorts['participantidlist']?.length > 0"
                 (click)="toggleParticipantSelectMode(cohorts['docid']); $event.stopPropagation()">
                 <mat-icon class="cta-check">{{isParticipantSelectActive(cohorts['docid']) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
                 {{isParticipantSelectActive(cohorts['docid']) ? 'Cancel' : 'Select'}}
               </button>
 
-              <button class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
+              <button data-testid="cman-event-49" class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
                 [matMenuTriggerFor]="moveMultiMenuOut" (menuOpened)="onMoveMenuOpen(cohorts)"
                 (click)="$event.stopPropagation()">
                 <mat-icon>swap_horiz</mat-icon> Move
               </button>
 
-              <button class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
+              <button data-testid="cman-delete-participant-from-cohort-50" class="p-move-btn" *ngIf="isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0"
                 (click)="deleteParticipantFromCohort(cohorts);$event.stopPropagation();">
                 <mat-icon>delete</mat-icon> Delete
               </button>
 
               <mat-menu #moveMultiMenuOut="matMenu" class="move-participant-menu">
-                <div class="move-menu-header" (click)="$event.stopPropagation()">
+                <div data-testid="cman-event-51" class="move-menu-header" (click)="$event.stopPropagation()">
                   <span class="move-menu-title">Move {{selectedParticipantIds.size}} to Cohort</span>
                 </div>
-                <div class="move-menu-search" (click)="$event.stopPropagation()">
+                <div data-testid="cman-event-52" class="move-menu-search" (click)="$event.stopPropagation()">
                   <mat-icon>search</mat-icon>
-                  <input type="text" placeholder="Search cohorts…" [(ngModel)]="moveMenuSearchQuery"
+                  <input data-testid="cman-event-53" type="text" placeholder="Search cohorts…" [(ngModel)]="moveMenuSearchQuery"
                     (input)="onMoveMenuSearch($event, cohorts)" (click)="$event.stopPropagation()">
                 </div>
                 <div class="move-menu-list">
-                  <button mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
+                  <button data-testid="cman-move-selected-participants-to-54" mat-menu-item *ngFor="let targetCohort of moveMenuFilteredCohorts"
                     (click)="moveSelectedParticipantsTo(cohorts, targetCohort)" [disabled]="isMovingParticipant">
                     <span>{{targetCohort.name}}</span>
                     <small style="opacity:.6;margin-left:6px">{{targetCohort.participantidlist?.length || 0}} ppl</small>
@@ -541,7 +541,7 @@
                 </div>
 
                 <div>
-                  <div class="cp-row row"
+                  <div data-testid="cman-is-participant-select-active-55" class="cp-row row"
                     *ngFor="let participant of (isParticipantExpanded(cohorts['docid'])
                       ? getFilteredParticipants(cohorts)
                       : getFilteredParticipants(cohorts).slice(0,4))"
@@ -567,7 +567,7 @@
                     <span class="cp-name">{{mapProfile[participant] || participant}}</span>
                     <span class="active-dot" *ngIf="isParticipantLive(cohorts['queueref']?.id,participant)"></span>
                   </div>
-                  <div class="cp-more"
+                  <div data-testid="cman-toggle-participant-expanded-56" class="cp-more"
                     *ngIf="getFilteredParticipants(cohorts).length > 4"
                     (click)="toggleParticipantExpanded(cohorts['docid'], $event)">
                     {{ isParticipantExpanded(cohorts['docid'])
@@ -601,14 +601,14 @@
                         <div class="act-title">{{mapBigAssignment[$any(assignment.key)]?.['title'] || 'Untitled'}}</div>
                 
                         <div class="act-actions">
-                          <button class="act-action-btn edit" type="button"
+                          <button data-testid="cman-on-edit-assignment-57" class="act-action-btn edit" type="button"
                             (click)="onEditAssignment(cohorts , mapBigAssignment[$any(assignment.key)],$event); $event.stopPropagation();"
                             title="Edit activity">
                             <mat-icon>edit</mat-icon>
                             <span>Edit</span>
                           </button>
                 
-                          <button class="act-action-btn validate" type="button"
+                          <button data-testid="cman-on-validate-participant-assignment-58" class="act-action-btn validate" type="button"
                             (click)="onValidateParticipantAssignment($any(assignment.key), cohorts['docid']); $event.stopPropagation();"
                             title="Validate participant assignments">
                             <mat-icon>fact_check</mat-icon>
@@ -661,7 +661,7 @@
               </div>
               <span class="act-badge draft">draft</span>
             </div> -->
-                <button class="add-activity-btn" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
+                <button data-testid="cman-on-create-assignment-59" class="add-activity-btn" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
                   <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
@@ -673,24 +673,24 @@
 
             <div class="card-foot"
               *ngIf="!(isParticipantSelectActive(cohorts['docid']) && selectedParticipantIds.size > 0)">
-              <button class="foot-btn" (click)="sendCohortNotification(cohorts); $event.stopPropagation()" title="Notify all">
+              <button data-testid="cman-send-cohort-notification-60" class="foot-btn" (click)="sendCohortNotification(cohorts); $event.stopPropagation()" title="Notify all">
                 <mat-icon>notifications_none</mat-icon> <span class="foot-lbl">Notify</span>
               </button>
-              <button class="foot-btn" (click)="sendCohortWhatsapp(cohorts); $event.stopPropagation()" title="WhatsApp all">
+              <button data-testid="cman-send-cohort-whatsapp-61" class="foot-btn" (click)="sendCohortWhatsapp(cohorts); $event.stopPropagation()" title="WhatsApp all">
                 <i class="fa-brands fa-whatsapp"></i> <span class="foot-lbl">WhatsApp</span>
               </button>
-              <button class="foot-btn" (click)="sendCohortEmail(cohorts); $event.stopPropagation()" title="Email all">
+              <button data-testid="cman-send-cohort-email-62" class="foot-btn" (click)="sendCohortEmail(cohorts); $event.stopPropagation()" title="Email all">
                 <mat-icon>mail_outline</mat-icon> <span class="foot-lbl">Email</span>
               </button>
-              <button class="foot-btn" (click)="sendCohortRecommendedPlaylist(cohorts); $event.stopPropagation()" title="Recommend playlist">
+              <button data-testid="cman-send-cohort-recommended-playlist-63" class="foot-btn" (click)="sendCohortRecommendedPlaylist(cohorts); $event.stopPropagation()" title="Recommend playlist">
                 <mat-icon>music_note</mat-icon> <span class="foot-lbl">Playlist</span>
               </button>
-              <button class="foot-btn icon-only" (click)="openCohortChat(cohorts); $event.stopPropagation()" title="Chat">
+              <button data-testid="cman-open-cohort-chat-64" class="foot-btn icon-only" (click)="openCohortChat(cohorts); $event.stopPropagation()" title="Chat">
                 <mat-icon>chat_bubble_outline</mat-icon>
               </button>
 
               <div class="foot-spacer"></div>
-              <button class="btn-activity" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
+              <button data-testid="cman-on-create-assignment-65" class="btn-activity" (click)="onCreateAssignment(cohorts); $event.stopPropagation()">
                 <svg class="ico sm" viewBox="0 0 24 24" stroke-width="2.5">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
@@ -705,11 +705,11 @@
               <span class="foot-label"><mat-icon>people</mat-icon> Send to <b>{{selectedParticipantIds.size}}</b>
                 selected</span>
               <span class="foot-spacer"></span>
-              <button class="foot-btn" (click)="sendSelectedNotification(cohorts); $event.stopPropagation()"
+              <button data-testid="cman-send-selected-notification-66" class="foot-btn" (click)="sendSelectedNotification(cohorts); $event.stopPropagation()"
                 title="Notify selected"><mat-icon>notifications</mat-icon></button>
-              <button class="foot-btn" (click)="sendSelectedEmail(cohorts); $event.stopPropagation()"
+              <button data-testid="cman-send-selected-email-67" class="foot-btn" (click)="sendSelectedEmail(cohorts); $event.stopPropagation()"
                 title="Email selected"><mat-icon>email</mat-icon></button>
-              <button class="foot-btn whatsapp" (click)="sendSelectedWhatsapp(cohorts); $event.stopPropagation()"
+              <button data-testid="cman-send-selected-whatsapp-68" class="foot-btn whatsapp" (click)="sendSelectedWhatsapp(cohorts); $event.stopPropagation()"
                 title="WhatsApp selected">
                 <i class="fa-brands fa-whatsapp"></i>
               </button>
@@ -724,7 +724,7 @@
 
     <!-- ─── RIGHT: Activity Sidenav ─── -->
     <div class="activity-sidenav" [class.collapsed]="activitySidenavCollapsed">
-      <div class="activity-sidenav-tab" (click)="toggleActivitySidenav();$event.stopPropagation()" *ngIf="activitySidenavCollapsed" title="Open activity">
+      <div data-testid="cman-toggle-activity-sidenav-69" class="activity-sidenav-tab" (click)="toggleActivitySidenav();$event.stopPropagation()" *ngIf="activitySidenavCollapsed" title="Open activity">
         <span class="activity-vlabel">BIG COHORTS ACTIVITY LOG</span>
       </div>
       <ng-container *ngIf="!activitySidenavCollapsed">
@@ -734,9 +734,9 @@
           </button> -->
           <span class="activity-title">Cohorts Activity Log</span>
           <span class="activity-count">{{filteredProgressionProfiles.length}}</span>
-          <span class="done-by-me" [class.active]="activityLogFilters['assigntome']" (click)="toggleLogedToMe($event)">Done By me</span>
+          <span data-testid="cman-toggle-loged-to-me-70" class="done-by-me" [class.active]="activityLogFilters['assigntome']" (click)="toggleLogedToMe($event)">Done By me</span>
           <span class="activity-spacer"></span>
-          <button class="activity-collapse-btn" title="Expand log" (click)="toggleActivitySidenav();$event.stopPropagation()"><svg class="ico sm" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+          <button data-testid="cman-toggle-activity-sidenav-71" class="activity-collapse-btn" title="Expand log" (click)="toggleActivitySidenav();$event.stopPropagation()"><svg class="ico sm" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
         </div>
 
         <div class="sidebar-search">
@@ -878,41 +878,41 @@
     <div class="sb-main-row">
       <span class="selectbar-count"><b>{{selectedCohortIds.size}}</b> selected</span>
       <span class="sb-divider"></span>
-      <button class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
+      <button data-testid="cman-select-all-cohorts-72" class="sb-btn ghost" (click)="selectAllCohorts()" title="Select / clear all">
         <mat-icon>select_all</mat-icon> All
       </button>
 
-      <button class="sb-fab-toggle" *ngIf="selectedCohortIds.size > 0"
+      <button data-testid="cman-selectbar-expanded-73" class="sb-fab-toggle" *ngIf="selectedCohortIds.size > 0"
         (click)="selectbarExpanded = !selectbarExpanded"
         [attr.aria-expanded]="selectbarExpanded"
         title="More actions">
         <mat-icon>{{selectbarExpanded ? 'close' : 'more_horiz'}}</mat-icon>
       </button>
 
-      <button class="sb-btn ghost" (click)="toggleSelectMode(); selectbarExpanded = false" title="Exit select mode">
+      <button data-testid="cman-toggle-select-mode-74" class="sb-btn ghost" (click)="toggleSelectMode(); selectbarExpanded = false" title="Exit select mode">
         <mat-icon>close</mat-icon>
       </button>
     </div>
 
     <ng-container *ngIf="selectedCohortIds.size > 0">
       <div class="sb-action-row">
-        <button class="sb-btn ghost icon-only" (click)="sendSelectedCohortsNotification()" title="Notify selected cohorts">
+        <button data-testid="cman-send-selected-cohorts-notification-75" class="sb-btn ghost icon-only" (click)="sendSelectedCohortsNotification()" title="Notify selected cohorts">
           <mat-icon>notifications</mat-icon><span class="sb-lbl">Notify</span>
         </button>
-        <button class="sb-btn ghost icon-only" (click)="sendSelectedCohortsEmail()" title="Email selected cohorts">
+        <button data-testid="cman-send-selected-cohorts-email-76" class="sb-btn ghost icon-only" (click)="sendSelectedCohortsEmail()" title="Email selected cohorts">
           <mat-icon>email</mat-icon><span class="sb-lbl">Email</span>
         </button>
-        <button class="sb-btn ghost wa icon-only" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
+        <button data-testid="cman-send-selected-cohorts-whatsapp-77" class="sb-btn ghost wa icon-only" (click)="sendSelectedCohortsWhatsapp()" title="WhatsApp selected cohorts">
           <i class="fa-brands fa-whatsapp"></i><span class="sb-lbl">WhatsApp</span>
         </button>
-        <button class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()"
+        <button data-testid="cman-send-selected-cohorts-playlist-78" class="sb-btn primary" (click)="sendSelectedCohortsPlaylist()"
           title="recommend playlist selected cohorts">
           <mat-icon>music_note</mat-icon> <span class="sb-lbl">Recommend Playlist</span>
         </button>
-        <button class="sb-btn primary" (click)="exportSelectedCohorts()" title="Export selected cohorts">
+        <button data-testid="cman-export-selected-cohorts-79" class="sb-btn primary" (click)="exportSelectedCohorts()" title="Export selected cohorts">
           <mat-icon>download</mat-icon> <span class="sb-lbl">Export ({{selectedCohortIds.size}})</span>
         </button>
-        <button class="sb-btn danger" (click)="makeSelectedCohortsInactive()" title="Mark selected cohorts inactive">
+        <button data-testid="cman-make-selected-cohorts-inactive-80" class="sb-btn danger" (click)="makeSelectedCohortsInactive()" title="Mark selected cohorts inactive">
           <mat-icon>visibility_off</mat-icon> <span class="sb-lbl">Make Inactive</span>
         </button>
       </div>
@@ -947,7 +947,7 @@
             <div class="participant-name">{{ mapProfile[participant.profileId] }}</div>
 
             <div class="chat-options">
-              <mat-checkbox *ngFor="let chat of participant.cohorts;" [checked]="chat.selected"
+              <mat-checkbox data-testid="cman-change-on-chat-toggle-81" *ngFor="let chat of participant.cohorts;" [checked]="chat.selected"
                 (change)="onChatToggle(chat, $event)" class="chat-option">
                 {{ chat.name }}
               </mat-checkbox>
@@ -969,6 +969,6 @@
   </mat-dialog-content>
 
   <mat-dialog-actions align="end" class="dialog-actions">
-    <button mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Apply</button>
+    <button data-testid="cman-chat-model-close-82" mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Apply</button>
   </mat-dialog-actions>
 </ng-template>

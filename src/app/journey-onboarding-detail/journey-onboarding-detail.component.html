@@ -10,30 +10,30 @@
   <!-- 3 Nav Cards -->
   <div class="nav-btn-row">
 
-    <button class="nav-card nav-card--blue">
+    <button data-testid="jodt-button" class="nav-card nav-card--blue">
       <span class="nav-card__status" [class.filled]="isOrientationFilled">
         <span *ngIf="isOrientationFilled" class="tick-icon">✓</span>
       </span>
       <span class="nav-card__title">Journey Orientation</span>
-      <button class="update-btn" (click)="openModal('orientation')">Update</button>
+      <button data-testid="jodt-openmodal" class="update-btn" (click)="openModal('orientation')">Update</button>
     </button>
 
-    <button class="nav-card nav-card--purple">
+    <button data-testid="jodt-button-2" class="nav-card nav-card--purple">
       <span class="nav-card__status" [class.filled]="isTimeCompressionFilled">
         <span *ngIf="isTimeCompressionFilled" class="tick-icon">✓</span>
       </span>
       <span class="nav-card__title">Time Compression</span>
-      <button class="update-btn" (click)="openModal('timecompression')">Update</button>
+      <button data-testid="jodt-openmodal-2" class="update-btn" (click)="openModal('timecompression')">Update</button>
     </button>
 
-    <button class="nav-card nav-card--teal" (click)="openModal('applocked')">
+    <button data-testid="jodt-openmodal-3" class="nav-card nav-card--teal" (click)="openModal('applocked')">
       <span class="nav-card__title">App Locked Content</span>
       <span class="nav-card__sub">classify / applockedcontent</span>
     </button>
 
   </div>
 
-  <button class="add-btn" (click)="openModal('detail')">
+  <button data-testid="jodt-openmodal-4" class="add-btn" (click)="openModal('detail')">
     <span class="nav-card__title">+ Add Onboarding Detail</span>
   </button>
 
@@ -44,7 +44,7 @@
       <ng-container matColumnDef="journey">
         <th mat-header-cell *matHeaderCellDef>Journey</th>
         <td mat-cell *matCellDef="let row; let i = index">
-          <span class="row-link" (click)="editRow(row, i)">{{ row.journeyTitle || '—' }}</span>
+          <span data-testid="jodt-editrow" class="row-link" (click)="editRow(row, i)">{{ row.journeyTitle || '—' }}</span>
         </td>
       </ng-container>
 
@@ -64,7 +64,7 @@
 </div>
 
 <!-- BACKDROP -->
-<div class="modal-backdrop" *ngIf="activeModal && activeModal !== 'detail'" (click)="closeModal()"></div>
+<div data-testid="jodt-closemodal" class="modal-backdrop" *ngIf="activeModal && activeModal !== 'detail'" (click)="closeModal()"></div>
 
 
 <!-- ══════════════════════════════════════════════════════
@@ -76,7 +76,7 @@
       <h2>Journey Orientation</h2>
       <span class="collection-tag">classify / journeyorientation</span>
     </div>
-    <button class="modal-close-btn" (click)="closeModal()">✕</button>
+    <button data-testid="jodt-closemodal-2" class="modal-close-btn" (click)="closeModal()">✕</button>
   </div>
   <div class="modal-body">
     <form [formGroup]="orientationForm" autocomplete="off">
@@ -95,7 +95,7 @@
              [formGroupName]="i">
           <div class="array-card-header">
             <span class="array-index">#{{ i }}</span>
-            <button mat-icon-button type="button" color="warn"
+            <button data-testid="jodt-removeintroitem" mat-icon-button type="button" color="warn"
                     (click)="removeIntroItem(i)" *ngIf="introItems.length > 1">
               <mat-icon>close</mat-icon>
             </button>
@@ -112,15 +112,15 @@
           </mat-form-field>
         </div>
       </div>
-      <button mat-stroked-button type="button" class="add-btn" (click)="addIntroItem()">
+      <button data-testid="jodt-addintroitem" mat-stroked-button type="button" class="add-btn" (click)="addIntroItem()">
         + Add Introduction Item
       </button>
 
     </form>
   </div>
   <div class="modal-footer">
-    <button mat-button type="button" (click)="closeModal()">Cancel</button>
-    <button mat-raised-button color="primary" type="button"
+    <button data-testid="jodt-closemodal-3" mat-button type="button" (click)="closeModal()">Cancel</button>
+    <button data-testid="jodt-saveorientation" mat-raised-button color="primary" type="button"
             [disabled]="orientationSaving" (click)="saveOrientation()">
       <span *ngIf="!orientationSaving && !orientationSaved">Save</span>
       <span *ngIf="orientationSaving">Saving…</span>
@@ -139,7 +139,7 @@
       <h2>Time Compression</h2>
       <span class="collection-tag">classify / timecompression</span>
     </div>
-    <button class="modal-close-btn" (click)="closeModal()">✕</button>
+    <button data-testid="jodt-closemodal-4" class="modal-close-btn" (click)="closeModal()">✕</button>
   </div>
   <div class="modal-body">
     <form [formGroup]="timeCompressionForm" autocomplete="off">
@@ -193,8 +193,8 @@
     </form>
   </div>
   <div class="modal-footer">
-    <button mat-button type="button" (click)="closeModal()">Cancel</button>
-    <button mat-raised-button color="primary" type="button"
+    <button data-testid="jodt-closemodal-5" mat-button type="button" (click)="closeModal()">Cancel</button>
+    <button data-testid="jodt-savetimecompression" mat-raised-button color="primary" type="button"
             [disabled]="timeCompressionSaving" (click)="saveTimeCompression()">
       <span *ngIf="!timeCompressionSaving && !timeCompressionSaved">Save</span>
       <span *ngIf="timeCompressionSaving">Saving…</span>
@@ -213,7 +213,7 @@
       <h2>App Locked Content</h2>
       <span class="collection-tag">classify / applockedcontent</span>
     </div>
-    <button class="modal-close-btn" (click)="closeModal()">✕</button>
+    <button data-testid="jodt-closemodal-6" class="modal-close-btn" (click)="closeModal()">✕</button>
   </div>
 
   <div class="modal-body" [formGroup]="appLockedForm">
@@ -272,8 +272,8 @@
   </div>
 
   <div class="modal-footer">
-    <button mat-button (click)="closeModal()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="saveAppLocked()">Save</button>
+    <button data-testid="jodt-closemodal-7" mat-button (click)="closeModal()">Cancel</button>
+    <button data-testid="jodt-saveapplocked" mat-raised-button color="primary" (click)="saveAppLocked()">Save</button>
   </div>
 </div>
 
@@ -432,7 +432,7 @@
             <p style="color:#C6168D;font-size:13px;font-weight:700;margin:0 0 12px">Your Journey to Experience</p>
 
             <!-- Product cards -->
-            <div *ngFor="let prod of productincluded.controls; let i = index"
+            <div [attr.data-testid]="'jodt-openpreviewsheet-' + i" *ngFor="let prod of productincluded.controls; let i = index"
                  (click)="openPreviewSheet(prod.get('type')?.value)"
                  style="cursor:pointer;margin-bottom:10px;background:#e3f7fd;border-radius:8px;padding:10px 12px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -480,7 +480,7 @@
                   <p style="font-size:12px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:8px">
                     {{ detailForm.get('eventdescripition.title')?.value || 'Event Title' }}
                   </p>
-                  <div (click)="goBackToExperience()"
+                  <div data-testid="jodt-gobacktoexperience" (click)="goBackToExperience()"
                        style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
                     <span style="font-size:9px;color:#fff;line-height:1">✕</span>
                   </div>
@@ -500,7 +500,7 @@
               </div>
               <!-- Footer -->
               <div style="padding:8px 12px 12px;flex-shrink:0">
-                <div (click)="goBackToExperience()"
+                <div data-testid="jodt-gobacktoexperience-2" (click)="goBackToExperience()"
                      style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
                   Back
                 </div>
@@ -528,7 +528,7 @@
                   <p style="font-size:12px;font-weight:700;color:#C6168D;margin:0;flex:1;line-height:1.4;padding-right:8px">
                     {{ detailForm.get('otherdescripition.title')?.value || 'Other Title' }}
                   </p>
-                  <div (click)="goBackToExperience()"
+                  <div data-testid="jodt-gobacktoexperience-3" (click)="goBackToExperience()"
                        style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
                     <span style="font-size:9px;color:#fff;line-height:1">✕</span>
                   </div>
@@ -538,7 +538,7 @@
                 </p>
               </div>
               <div style="padding:8px 12px 12px;flex-shrink:0">
-                <div (click)="goBackToExperience()"
+                <div data-testid="jodt-gobacktoexperience-4" (click)="goBackToExperience()"
                      style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
                   Back
                 </div>
@@ -565,7 +565,7 @@
                 <!-- Header -->
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
                   <p style="font-size:11px;font-weight:700;color:#C6168D;margin:0;flex:1">{{ detailForm.get('queuedescripition.title')?.value || 'Title' }}</p>
-                  <div (click)="goBackToExperience()"
+                  <div data-testid="jodt-gobacktoexperience-5" (click)="goBackToExperience()"
                        style="width:18px;height:18px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
                     <span style="font-size:9px;color:#fff;line-height:1">✕</span>
                   </div>
@@ -585,7 +585,7 @@
                      style="width:100%;border-radius:8px;object-fit:cover;max-height:80px;margin-bottom:10px" />
 
                 <!-- View Full Process button -->
-                <div (click)="openProcessSteps()"
+                <div data-testid="jodt-openprocesssteps" (click)="openProcessSteps()"
                     style="font-size:11px;font-weight:700;color:#C6168D;margin:0;cursor:pointer;display:flex;align-items:center;gap:4px">
                   <span>View Full Process</span>
                   <span style="font-size:12px">›</span>
@@ -641,7 +641,7 @@
               </div>
               <!-- Footer -->
               <div style="padding:8px 12px 12px;flex-shrink:0">
-                <div (click)="goBackToExperience()"
+                <div data-testid="jodt-gobacktoexperience-6" (click)="goBackToExperience()"
                      style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
                   Back
                 </div>
@@ -702,7 +702,7 @@
 
             <!-- Footer -->
             <div style="padding:8px 12px 14px;flex-shrink:0;border-top:1px solid #f0f0f0">
-              <div (click)="goBackToQueue()"
+              <div data-testid="jodt-gobacktoqueue" (click)="goBackToQueue()"
                   style="background:#00AEEF;border-radius:8px;padding:9px;text-align:center;font-size:12px;font-weight:600;color:#fff;cursor:pointer">
                 Back
               </div>
@@ -779,7 +779,7 @@
         <h2>{{ editingIndex !== null ? 'Edit' : 'Add' }} Journey Onboarding Detail</h2>
         <span class="collection-tag">journeyonboardingdetail / &#123;docid&#125;</span>
       </div>
-      <button class="modal-close-btn" (click)="closeModal()">✕</button>
+      <button data-testid="jodt-closemodal-8" class="modal-close-btn" (click)="closeModal()">✕</button>
     </div>
 
     <!-- Body -->
@@ -794,7 +794,7 @@
       <!-- Error banner -->
       <div class="save-error-banner" *ngIf="detailSaveError">
         <span>⚠ {{ detailSaveError }}</span>
-        <button type="button" (click)="detailSaveError = ''">✕</button>
+        <button data-testid="jodt-detailsaveerror" type="button" (click)="detailSaveError = ''">✕</button>
       </div>
 
       <!-- Success state -->
@@ -802,8 +802,8 @@
         <div class="success-icon">✓</div>
         <p>Saved to <strong>journeyonboardingdetail / {{ detailForm.value.docid }}</strong></p>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <button mat-stroked-button (click)="closeModal()">Close</button>
-          <button mat-raised-button color="primary" (click)="detailSubmitted = false">
+          <button data-testid="jodt-closemodal-9" mat-stroked-button (click)="closeModal()">Close</button>
+          <button data-testid="jodt-detailsubmitted" mat-raised-button color="primary" (click)="detailSubmitted = false">
             Continue Editing
           </button>
         </div>
@@ -841,7 +841,7 @@
 
             <!-- Tab bar -->
             <div class="detail-tab-bar">
-              <button *ngFor="let tab of detailTabs; let i = index"
+              <button [attr.data-testid]="'jodt-ontabchange-' + i" *ngFor="let tab of detailTabs; let i = index"
                       class="detail-tab"
                       [class.detail-tab--active]="detailTabIndex === i"
                       (click)="onTabChange(i, tab)">
@@ -863,7 +863,7 @@
                 introductionvideo <span class="url-tag">file upload</span>
                 <span class="ratio-badge">9 : 16</span>
               </div>
-              <div class="img-upload-box img-upload-box--portrait"
+              <div data-testid="jodt-triggerfileinput" class="img-upload-box img-upload-box--portrait"
                    (click)="triggerFileInput('introductionvideo')">
                 <ng-container *ngIf="!imagePreviews['introductionvideo'] && !detailForm.get('introductionvideo')?.value">
                   <mat-icon class="upload-icon">cloud_upload</mat-icon>
@@ -878,11 +878,11 @@
                        class="img-preview"
                        [src]="detailForm.get('introductionvideo')?.value || imagePreviews['introductionvideo']"
                        alt="preview" />
-                  <button class="img-clear-btn" type="button"
+                  <button data-testid="jodt-clearimage" class="img-clear-btn" type="button"
                           (click)="clearImage($event, 'introductionvideo', 'introductionvideo')">✕</button>
                 </ng-container>
               </div>
-              <input type="file" accept="image/*,video/*" class="hidden-file-input"
+              <input data-testid="jodt-onfilechange" type="file" accept="image/*,video/*" class="hidden-file-input"
                      id="file-introductionvideo"
                      (change)="onFileChange($event, 'introductionvideo', 'introductionvideo')" />
               <div class="img-validation-error" *ngIf="imageValidationError['introductionvideo']">
@@ -961,7 +961,7 @@
                   imageurl <span class="url-tag">file upload</span>
                   <span class="ratio-badge">16 : 9</span>
                 </div>
-                <div class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
+                <div data-testid="jodt-triggerfileinput-2" class="img-upload-box" (click)="triggerFileInput('journeydetail_imageurl')">
                   <ng-container *ngIf="!imagePreviews['journeydetail_imageurl'] && !detailForm.get('journeydetail.imageurl')?.value">
                     <mat-icon class="upload-icon">cloud_upload</mat-icon>
                     <span class="upload-label">Click to upload image (16:9)</span>
@@ -970,11 +970,11 @@
                     <img class="img-preview"
                          [src]="imagePreviews['journeydetail_imageurl'] || detailForm.get('journeydetail.imageurl')?.value"
                          alt="preview" />
-                    <button class="img-clear-btn" type="button"
+                    <button data-testid="jodt-clearimage-2" class="img-clear-btn" type="button"
                             (click)="clearImage($event, 'journeydetail_imageurl', 'journeydetail.imageurl')">✕</button>
                   </ng-container>
                 </div>
-                <input type="file" accept="image/*" class="hidden-file-input"
+                <input data-testid="jodt-onfilechange-2" type="file" accept="image/*" class="hidden-file-input"
                        id="file-journeydetail_imageurl"
                        (change)="onFileChange($event, 'journeydetail_imageurl', 'journeydetail.imageurl')" />
                 <div class="img-validation-error" *ngIf="imageValidationError['journeydetail_imageurl']">
@@ -1003,7 +1003,7 @@
                   imageurl <span class="url-tag">file upload</span>
                   <span class="ratio-badge">16 : 9</span>
                 </div>
-                <div class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
+                <div data-testid="jodt-triggerfileinput-3" class="img-upload-box" (click)="triggerFileInput('subscription_imageurl')">
                   <ng-container *ngIf="!imagePreviews['subscription_imageurl'] && !detailForm.get('subscription.imageurl')?.value">
                     <mat-icon class="upload-icon">cloud_upload</mat-icon>
                     <span class="upload-label">Click to upload image (16:9)</span>
@@ -1012,11 +1012,11 @@
                     <img class="img-preview"
                          [src]="imagePreviews['subscription_imageurl'] || detailForm.get('subscription.imageurl')?.value"
                          alt="preview" />
-                    <button class="img-clear-btn" type="button"
+                    <button data-testid="jodt-clearimage-3" class="img-clear-btn" type="button"
                             (click)="clearImage($event, 'subscription_imageurl', 'subscription.imageurl')">✕</button>
                   </ng-container>
                 </div>
-                <input type="file" accept="image/*" class="hidden-file-input"
+                <input data-testid="jodt-onfilechange-3" type="file" accept="image/*" class="hidden-file-input"
                        id="file-subscription_imageurl"
                        (change)="onFileChange($event, 'subscription_imageurl', 'subscription.imageurl')" />
                 <div class="img-validation-error" *ngIf="imageValidationError['subscription_imageurl']">
@@ -1051,7 +1051,7 @@
                       [formGroupName]="i">
                     <div class="array-card-header">
                       <span class="array-index">#{{ i }}</span>
-                      <button mat-icon-button type="button" color="warn"
+                      <button data-testid="jodt-removeproduct" mat-icon-button type="button" color="warn"
                               (click)="removeProduct(i)" *ngIf="productincluded.length > 1">
                         <mat-icon>close</mat-icon>
                       </button>
@@ -1076,7 +1076,7 @@
                     </mat-form-field>
 
                     <!-- Fill Details button — only shown when type is selected -->
-                    <button *ngIf="prod.get('type')?.value"
+                    <button data-testid="jodt-gotoproductdetailstab" *ngIf="prod.get('type')?.value"
                             mat-stroked-button type="button" class="fill-details-btn"
                             (click)="goToProductDetailsTab(prod.get('type')?.value)">
                       <mat-icon style="font-size:16px;height:16px;width:16px;margin-right:4px">edit</mat-icon>
@@ -1086,7 +1086,7 @@
 
                   </div>
                 </div>
-                <button mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
+                <button data-testid="jodt-addproduct" mat-stroked-button type="button" class="add-btn" (click)="addProduct()">
                   + Add Product
                 </button>
 
@@ -1095,21 +1095,21 @@
                     *ngIf="hasProductType('event') || hasProductType('others') || hasProductType('queue')">
                   <p style="font-size:11px;color:#aaa;margin:0">Configured detail sections:</p>
 
-                  <div *ngIf="hasProductType('event')"
+                  <div data-testid="jodt-gotoproductdetailstab-2" *ngIf="hasProductType('event')"
                       style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
                       (click)="goToProductDetailsTab('event')">
                     <span style="font-size:12px;font-weight:500">Event Description</span>
                     <mat-icon style="font-size:16px;color:#aaa">arrow_forward</mat-icon>
                   </div>
 
-                  <div *ngIf="hasProductType('others')"
+                  <div data-testid="jodt-gotoproductdetailstab-3" *ngIf="hasProductType('others')"
                       style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
                       (click)="goToProductDetailsTab('others')">
                     <span style="font-size:12px;font-weight:500">Other Description</span>
                     <mat-icon style="font-size:16px;color:#aaa">arrow_forward</mat-icon>
                   </div>
 
-                  <div *ngIf="hasProductType('queue')"
+                  <div data-testid="jodt-gotoproductdetailstab-4" *ngIf="hasProductType('queue')"
                       style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer"
                       (click)="goToProductDetailsTab('queue')">
                     <span style="font-size:12px;font-weight:500">Queue Description</span>
@@ -1121,7 +1121,7 @@
               <!-- ── EVENT DETAILS SUB-PAGE ── -->
               <ng-container *ngIf="showProductDetailsPage === 'event'">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
-                  <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                  <button data-testid="jodt-gobacktoexperiencetab" mat-icon-button type="button" (click)="goBackToExperienceTab()">
                     <mat-icon>arrow_back</mat-icon>
                   </button>
                   <div>
@@ -1158,7 +1158,7 @@
               <!-- ── OTHER DETAILS SUB-PAGE ── -->
               <ng-container *ngIf="showProductDetailsPage === 'others'">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
-                  <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                  <button data-testid="jodt-gobacktoexperiencetab-2" mat-icon-button type="button" (click)="goBackToExperienceTab()">
                     <mat-icon>arrow_back</mat-icon>
                   </button>
                   <div>
@@ -1187,7 +1187,7 @@
                 <!-- Queue main fields -->
                 <ng-container *ngIf="!showProcessStepsPage">
                   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
-                    <button mat-icon-button type="button" (click)="goBackToExperienceTab()">
+                    <button data-testid="jodt-gobacktoexperiencetab-3" mat-icon-button type="button" (click)="goBackToExperienceTab()">
                       <mat-icon>arrow_back</mat-icon>
                     </button>
                     <div>
@@ -1212,7 +1212,7 @@
                       processimage <span class="url-tag">file upload</span>
                       <span class="ratio-badge">16 : 9</span>
                     </div>
-                    <div class="img-upload-box" (click)="triggerFileInput('processimage')">
+                    <div data-testid="jodt-triggerfileinput-4" class="img-upload-box" (click)="triggerFileInput('processimage')">
                       <ng-container *ngIf="!imagePreviews['processimage'] && !detailForm.get('queuedescripition.processimage')?.value">
                         <mat-icon class="upload-icon">cloud_upload</mat-icon>
                         <span class="upload-label">Click to upload process image (16:9)</span>
@@ -1221,11 +1221,11 @@
                         <img class="img-preview"
                             [src]="imagePreviews['processimage'] || detailForm.get('queuedescripition.processimage')?.value"
                             alt="preview" />
-                        <button class="img-clear-btn" type="button"
+                        <button data-testid="jodt-clearimage-4" class="img-clear-btn" type="button"
                                 (click)="clearImage($event, 'processimage', 'queuedescripition.processimage')">✕</button>
                       </ng-container>
                     </div>
-                    <input type="file" accept="image/*" class="hidden-file-input"
+                    <input data-testid="jodt-onfilechange-4" type="file" accept="image/*" class="hidden-file-input"
                           id="file-processimage"
                           (change)="onFileChange($event, 'processimage', 'queuedescripition.processimage')" />
                     <div class="img-validation-error" *ngIf="imageValidationError['processimage']">
@@ -1247,7 +1247,7 @@
                       </mat-form-field>
                     </div>
 
-                    <button mat-stroked-button type="button"
+                    <button data-testid="jodt-openprocesssteps-2" mat-stroked-button type="button"
                             style="width:100%;margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:10px 16px"
                             (click)="openProcessSteps()">
                       <span style="display:flex;align-items:center;gap:8px">
@@ -1263,7 +1263,7 @@
                 <!-- Process Steps sub-sub-page -->
                 <ng-container *ngIf="showProcessStepsPage">
                   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--color-border-tertiary,#eee)">
-                    <button mat-icon-button type="button" (click)="goBackToQueue()">
+                    <button data-testid="jodt-gobacktoqueue-2" mat-icon-button type="button" (click)="goBackToQueue()">
                       <mat-icon>arrow_back</mat-icon>
                     </button>
                     <div>
@@ -1300,7 +1300,7 @@
                             [formGroupName]="i">
                           <div class="array-card-header">
                             <span class="array-index">Step {{ i + 1 }}</span>
-                            <button mat-icon-button type="button" color="warn"
+                            <button data-testid="jodt-removeprocessstep" mat-icon-button type="button" color="warn"
                                     (click)="removeProcessStep(i)" *ngIf="processSteps.length > 1">
                               <mat-icon>close</mat-icon>
                             </button>
@@ -1319,7 +1319,7 @@
                             imageurl <span class="url-tag">file upload</span>
                             <span class="ratio-badge">1 : 1</span>
                           </div>
-                          <div class="img-upload-box img-upload-box--square"
+                          <div data-testid="jodt-triggerfileinput-5" class="img-upload-box img-upload-box--square"
                               (click)="triggerFileInput('step_imageurl_' + i)">
                             <ng-container *ngIf="!imagePreviews['step_imageurl_' + i] && !s.get('imageurl')?.value">
                               <mat-icon class="upload-icon">cloud_upload</mat-icon>
@@ -1329,11 +1329,11 @@
                               <img class="img-preview"
                                   [src]="imagePreviews['step_imageurl_' + i] || s.get('imageurl')?.value"
                                   alt="preview" />
-                              <button class="img-clear-btn" type="button"
+                              <button data-testid="jodt-clearstepimage" class="img-clear-btn" type="button"
                                       (click)="clearStepImage($event, i)">✕</button>
                             </ng-container>
                           </div>
-                          <input type="file" accept="image/*" class="hidden-file-input"
+                          <input data-testid="jodt-onstepfilechange" type="file" accept="image/*" class="hidden-file-input"
                                 [id]="'file-step_imageurl_' + i"
                                 (change)="onStepFileChange($event, i)" />
                           <div class="img-validation-error" *ngIf="imageValidationError['step_imageurl_' + i]">
@@ -1343,7 +1343,7 @@
                       </div>
                     </div>
                   </div>
-                  <button mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
+                  <button data-testid="jodt-addprocessstep" mat-stroked-button type="button" class="add-btn" (click)="addProcessStep()">
                     + Add Step
                   </button>
                 </ng-container>
@@ -1366,7 +1366,7 @@
                   imageurl <span class="url-tag">file upload</span>
                   <span class="ratio-badge">16 : 9</span>
                 </div>
-                <div class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
+                <div data-testid="jodt-triggerfileinput-6" class="img-upload-box" (click)="triggerFileInput('journeypath_imageurl')">
                   <ng-container *ngIf="!imagePreviews['journeypath_imageurl'] && !detailForm.get('journeypath.imageurl')?.value">
                     <mat-icon class="upload-icon">cloud_upload</mat-icon>
                     <span class="upload-label">Click to upload image (16:9)</span>
@@ -1375,11 +1375,11 @@
                     <img class="img-preview"
                         [src]="imagePreviews['journeypath_imageurl'] || detailForm.get('journeypath.imageurl')?.value"
                         alt="preview" />
-                    <button class="img-clear-btn" type="button"
+                    <button data-testid="jodt-clearimage-5" class="img-clear-btn" type="button"
                             (click)="clearImage($event, 'journeypath_imageurl', 'journeypath.imageurl')">✕</button>
                   </ng-container>
                 </div>
-                <input type="file" accept="image/*" class="hidden-file-input"
+                <input data-testid="jodt-onfilechange-5" type="file" accept="image/*" class="hidden-file-input"
                       id="file-journeypath_imageurl"
                       (change)="onFileChange($event, 'journeypath_imageurl', 'journeypath.imageurl')" />
                 <div class="img-validation-error" *ngIf="imageValidationError['journeypath_imageurl']">
@@ -1477,12 +1477,12 @@
 
             <!-- Prev / Next navigation -->
             <div class="detail-tab-nav">
-              <button mat-stroked-button type="button"
+              <button data-testid="jodt-prevdetailtab" mat-stroked-button type="button"
                       (click)="prevDetailTab()" [disabled]="detailTabIndex === 0">
                 ← Previous
               </button>
               <span class="tab-counter">{{ detailTabIndex + 1 }} / {{ detailTabs.length }}</span>
-              <button mat-stroked-button type="button"
+              <button data-testid="jodt-nextdetailtab" mat-stroked-button type="button"
                       (click)="nextDetailTab()" [disabled]="detailTabIndex === detailTabs.length - 1">
                 Next →
               </button>
@@ -1496,14 +1496,14 @@
 
     <!-- Footer -->
     <div class="modal-footer">
-      <button mat-button type="button" (click)="closeModal()">Cancel</button>
-      <button mat-raised-button color="primary" type="button"
+      <button data-testid="jodt-closemodal-10" mat-button type="button" (click)="closeModal()">Cancel</button>
+      <button data-testid="jodt-savedetail" mat-raised-button color="primary" type="button"
               [disabled]="detailLoading" (click)="saveDetail()"
               *ngIf="!detailSubmitted">
         <span *ngIf="!detailLoading">Save</span>
         <span *ngIf="detailLoading">Saving…</span>
       </button>
-      <button mat-stroked-button type="button" (click)="closeModal()"
+      <button data-testid="jodt-closemodal-11" mat-stroked-button type="button" (click)="closeModal()"
               *ngIf="detailSubmitted">
         Done
       </button>

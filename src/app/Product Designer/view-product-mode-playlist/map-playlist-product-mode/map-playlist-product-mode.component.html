@@ -47,19 +47,19 @@
     </mat-form-field>
     <mat-form-field>
       <mat-label>Message</mat-label>
-      <input type="text" matInput (change)="onMessageInput($event)">
+      <input data-testid="mppm-change-on-message-input-1" type="text" matInput (change)="onMessageInput($event)">
     </mat-form-field>
     <mat-label>Rearrange message order</mat-label>
     <div cdkDropList class="example-list" (cdkDropListDropped)="drop($event)">
       <div class="example-box" *ngFor="let text of modePlaylistDoc.messages;let i = index;" cdkDrag>
         <div class="example-custom-placeholder" *cdkDragPlaceholder></div>
         {{text}}&nbsp;&nbsp;&nbsp;&nbsp;
-        <button mat-icon-button type="button" (click)="onMessageDelete(i)"><mat-icon>delete</mat-icon></button>
+        <button data-testid="mppm-on-message-delete-2" mat-icon-button type="button" (click)="onMessageDelete(i)"><mat-icon>delete</mat-icon></button>
       </div>
     </div>
   </div>
   <div class="d-flex flex-row justify-content-center">
-    <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
-    <button mat-stroked-button type="button" (click)="onSubmit()">Submit</button>&nbsp;&nbsp;
+    <button data-testid="mppm-on-dialog-cancel-3" mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+    <button data-testid="mppm-on-submit-4" mat-stroked-button type="button" (click)="onSubmit()">Submit</button>&nbsp;&nbsp;
   </div>
 </div>

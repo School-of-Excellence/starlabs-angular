@@ -6,12 +6,12 @@
           *ngFor="let option of form.get(controlName)?.value || []; let i = index"
           (removed)="remove(i)">
           {{option}}
-          <button matChipRemove>
+          <button data-testid="fmc-button" matChipRemove>
             <mat-icon>cancel</mat-icon>
           </button>
         </mat-chip-row>
         
-        <input 
+        <input data-testid="fmc-type-your-input" 
           placeholder="type your input..."
           [matChipInputFor]="chipList"
           [matChipInputSeparatorKeyCodes]="separatorKeysCodes"

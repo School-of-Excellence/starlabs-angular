@@ -13,7 +13,7 @@
       <div class="row">
         <mat-form-field class="participant-select">
           <mat-label>Select participants to Show</mat-label>
-          <mat-select [(ngModel)]="selectedProfilesToAllow" multiple (selectionChange)="saveProfiles()">
+          <mat-select data-testid="hpc-mat-select" [(ngModel)]="selectedProfilesToAllow" multiple (selectionChange)="saveProfiles()">
           <mat-option disabled class="search-option">
             <ngx-mat-select-search
               [formControl]="profileFilterCtrl"
@@ -37,7 +37,7 @@
                     [removable]="true"
                     (removed)="removeProfileToAllow(profile)">
             {{ mapProfile[profile] }}
-            <button matChipRemove>
+            <button data-testid="hpc-button" matChipRemove>
               <mat-icon>cancel</mat-icon>
             </button>
           </mat-chip>
@@ -47,7 +47,7 @@
       <div class="row">
         <mat-form-field class="participant-select">
           <mat-label>Select For Group HPC</mat-label>
-          <mat-select [(ngModel)]="selectedProfilesGroup" multiple (selectionChange)="saveProfiles()">
+          <mat-select data-testid="hpc-mat-select-2" [(ngModel)]="selectedProfilesGroup" multiple (selectionChange)="saveProfiles()">
           <mat-option disabled class="search-option">
             <ngx-mat-select-search
               [formControl]="profileFilterCtrl"
@@ -72,7 +72,7 @@
                     [removable]="true"
                     (removed)="removeProfile(profile)">
             {{ mapProfile[profile] }}
-            <button matChipRemove>
+            <button data-testid="hpc-button-2" matChipRemove>
               <mat-icon>cancel</mat-icon>
             </button>
           </mat-chip>
@@ -82,7 +82,7 @@
       <div class="row" style="margin-top: 30px;">
         <mat-form-field class="accelerator-input">
           <mat-label>Add Accelerator</mat-label>
-          <input matInput [(ngModel)]="newAccelerator" (keyup.enter)="addAccelerator()">
+          <input data-testid="hpc-input" matInput [(ngModel)]="newAccelerator" (keyup.enter)="addAccelerator()">
         </mat-form-field>
       </div>
 
@@ -93,7 +93,7 @@
                     [removable]="true"
                     (removed)="confirmRemove(acc)">
             {{ acc }}
-            <button matChipRemove>
+            <button data-testid="hpc-button-3" matChipRemove>
               <mat-icon>cancel</mat-icon>
             </button>
           </mat-chip>
@@ -104,7 +104,7 @@
 
         <mat-form-field appearance="outline" style="width:100%; margin-top:10px;">
           <mat-label>Prompt</mat-label>
-          <textarea
+          <textarea data-testid="hpc-textarea"
             matInput
             rows="5"
             [(ngModel)]="contrastFramePrompt">
@@ -112,7 +112,7 @@
         </mat-form-field>
 
         <div class="example-button-container">
-          <button mat-fab extended (click)="saveContrastPrompt()">
+          <button data-testid="hpc-savecontrastprompt" mat-fab extended (click)="saveContrastPrompt()">
             <mat-icon>save</mat-icon>
             Save Prompt
           </button>
@@ -123,25 +123,25 @@
         <h3>Notification (Individual)</h3>
         <mat-form-field appearance="outline" class="accelerator-input">
           <mat-label>Title</mat-label>
-          <input matInput [(ngModel)]="notificationTitle" >
+          <input data-testid="hpc-input-2" matInput [(ngModel)]="notificationTitle" >
         </mat-form-field>
         <mat-form-field appearance="outline" style="width: 100%; margin-top:15px;">
           <mat-label>Description</mat-label>
-          <textarea matInput rows="4" [(ngModel)]="notificationDescription"></textarea>
+          <textarea data-testid="hpc-textarea-2" matInput rows="4" [(ngModel)]="notificationDescription"></textarea>
         </mat-form-field>
       </div>
       <div style="margin-top: 30px;">
         <h3>Notification (Group)</h3>
         <mat-form-field appearance="outline" class="accelerator-input">
           <mat-label>Title</mat-label>
-          <input matInput [(ngModel)]="notificationTitleGroup" >
+          <input data-testid="hpc-input-3" matInput [(ngModel)]="notificationTitleGroup" >
         </mat-form-field>
         <mat-form-field appearance="outline" style="width: 100%; margin-top:15px;">
           <mat-label>Description</mat-label>
-          <textarea matInput rows="4" [(ngModel)]="notificationDescriptionGroup"></textarea>
+          <textarea data-testid="hpc-textarea-3" matInput rows="4" [(ngModel)]="notificationDescriptionGroup"></textarea>
         </mat-form-field>
         <div class="example-button-container">
-          <button mat-fab extended (click)="saveProfiles()">
+          <button data-testid="hpc-saveprofiles" mat-fab extended (click)="saveProfiles()">
             <mat-icon>save</mat-icon>
             Save
           </button>
@@ -175,13 +175,13 @@
     <div class="filter-row" *ngIf="!isLoadingHpc">
       <mat-form-field appearance="outline" class="search-field">
         <mat-label>Search</mat-label>
-        <input matInput [(ngModel)]="searchText" (ngModelChange)="onFilterChange()" placeholder="Search ID, name...">
+        <input data-testid="hpc-search-id-name" matInput [(ngModel)]="searchText" (ngModelChange)="onFilterChange()" placeholder="Search ID, name...">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="filter-select">
         <mat-label>Status</mat-label>
-        <mat-select [(ngModel)]="selectedHpcView" (selectionChange)="onFilterChange()">
+        <mat-select data-testid="hpc-mat-select-3" [(ngModel)]="selectedHpcView" (selectionChange)="onFilterChange()">
           <mat-option value="all">All</mat-option>
           <mat-option value="completed">Completed</mat-option>
           <mat-option value="in-progress">In Progress</mat-option>
@@ -190,7 +190,7 @@
 
       <mat-form-field appearance="outline" class="filter-select">
         <mat-label>Type</mat-label>
-        <mat-select [(ngModel)]="typeFilter" (selectionChange)="onFilterChange()">
+        <mat-select data-testid="hpc-mat-select-4" [(ngModel)]="typeFilter" (selectionChange)="onFilterChange()">
           <mat-option value="all">All</mat-option>
           <mat-option value="group">Group</mat-option>
           <mat-option value="individual">Individual</mat-option>
@@ -199,19 +199,19 @@
 
       <mat-form-field appearance="outline" class="filter-select">
         <mat-label>Sort Date</mat-label>
-        <mat-select [(ngModel)]="sortOrder" (selectionChange)="onFilterChange()">
+        <mat-select data-testid="hpc-mat-select-5" [(ngModel)]="sortOrder" (selectionChange)="onFilterChange()">
           <mat-option value="desc">Newest First</mat-option>
           <mat-option value="asc">Oldest First</mat-option>
         </mat-select>
       </mat-form-field>
-      <button mat-stroked-button color="warn" (click)="clearAllFilters()" 
+      <button data-testid="hpc-clearallfilters" mat-stroked-button color="warn" (click)="clearAllFilters()" 
               class="clear-filters-btn"
               [disabled]="searchText === '' && selectedHpcView === 'all' && typeFilter === 'all' && sortOrder === 'desc'">
         <mat-icon>filter_alt_off</mat-icon>
         Clear
       </button>
         <div class="expand-collapse-btns">
-          <button mat-mini-fab [color]="allExpanded ? 'primary' : 'accent'" 
+          <button data-testid="hpc-toggleallcards" mat-mini-fab [color]="allExpanded ? 'primary' : 'accent'" 
                   (click)="toggleAllCards()" 
                   [matTooltip]="allExpanded ? 'Collapse All' : 'Expand All'">
             <mat-icon>{{ allExpanded ? 'unfold_less' : 'unfold_more' }}</mat-icon>
@@ -225,44 +225,44 @@
     </div>
 
     <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
-      <div class="stat-item clickable" (click)="openStatPanel('total')">
+      <div data-testid="hpc-openstatpanel" class="stat-item clickable" (click)="openStatPanel('total')">
         <mat-icon class="stat-icon total">folder</mat-icon>
         <span class="stat-number">{{ allHpcData.length }}</span>
         <span class="stat-label">Total Sessions</span>
       </div>
-      <div class="stat-item clickable" (click)="openStatPanel('completed')">
+      <div data-testid="hpc-openstatpanel-2" class="stat-item clickable" (click)="openStatPanel('completed')">
         <mat-icon class="stat-icon completed">check_circle</mat-icon>
         <span class="stat-number">{{ completedCount }}</span>
         <span class="stat-label">Completed</span>
       </div>
-      <div class="stat-item clickable" (click)="openStatPanel('in-progress')">
+      <div data-testid="hpc-openstatpanel-3" class="stat-item clickable" (click)="openStatPanel('in-progress')">
         <mat-icon class="stat-icon pending">pending</mat-icon>
         <span class="stat-number">{{ inProgressCount }}</span>
         <span class="stat-label">In Progress</span>
       </div>
-      <div class="stat-item clickable" (click)="openStatPanel('group')">
+      <div data-testid="hpc-openstatpanel-4" class="stat-item clickable" (click)="openStatPanel('group')">
         <mat-icon class="stat-icon multiple">groups</mat-icon>
         <span class="stat-number">{{ groupCount }}</span>
         <span class="stat-label">Group Sessions</span>
       </div>
-      <div class="stat-item clickable" (click)="openStatPanel('individual')">
+      <div data-testid="hpc-openstatpanel-5" class="stat-item clickable" (click)="openStatPanel('individual')">
         <mat-icon class="stat-icon individual">person</mat-icon>
         <span class="stat-number">{{ individualCount }}</span>
         <span class="stat-label">Individual</span>
       </div>
     </div>
     <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
-      <div class="stat-item clickable" (click)="openStatPanel('group-persons')">
+      <div data-testid="hpc-openstatpanel-6" class="stat-item clickable" (click)="openStatPanel('group-persons')">
         <mat-icon class="stat-icon group-persons">people_alt</mat-icon>
         <span class="stat-number">{{ totalPersonsInGroups }}</span>
         <span class="stat-label">Persons in Groups</span>
       </div>
-      <div class="stat-item stat-completed clickable" (click)="openStatPanel('group-persons-completed')">
+      <div data-testid="hpc-openstatpanel-7" class="stat-item stat-completed clickable" (click)="openStatPanel('group-persons-completed')">
         <mat-icon class="stat-icon">how_to_reg</mat-icon>
         <span class="stat-number">{{ totalPersonsInGroupsCompleted }}</span>
         <span class="stat-label">Group Persons (Completed)</span>
       </div>
-      <div class="stat-item stat-pending clickable" (click)="openStatPanel('group-persons-inprogress')">
+      <div data-testid="hpc-openstatpanel-8" class="stat-item stat-pending clickable" (click)="openStatPanel('group-persons-inprogress')">
         <mat-icon class="stat-icon">person_outline</mat-icon>
         <span class="stat-number">{{ totalPersonsInGroupsInProgress }}</span>
         <span class="stat-label">Group Persons (In Progress)</span>
@@ -270,17 +270,17 @@
     </div>
 
     <div *ngIf="!isLoadingHpc && allHpcData.length > 0" class="stats-row">
-      <div class="stat-item highlight clickable" (click)="openStatPanel('total-participants')">
+      <div data-testid="hpc-openstatpanel-9" class="stat-item highlight clickable" (click)="openStatPanel('total-participants')">
         <mat-icon class="stat-icon overall">supervisor_account</mat-icon>
         <span class="stat-number">{{ overallParticipants }}</span>
         <span class="stat-label">Total Participants</span>
       </div>
-      <div class="stat-item highlight-completed clickable" (click)="openStatPanel('participants-completed')">
+      <div data-testid="hpc-openstatpanel-10" class="stat-item highlight-completed clickable" (click)="openStatPanel('participants-completed')">
         <mat-icon class="stat-icon">verified</mat-icon>
         <span class="stat-number">{{ overallParticipantsCompleted }}</span>
         <span class="stat-label">Participants (Completed)</span>
       </div>
-      <div class="stat-item highlight-pending clickable" (click)="openStatPanel('participants-inprogress')">
+      <div data-testid="hpc-openstatpanel-11" class="stat-item highlight-pending clickable" (click)="openStatPanel('participants-inprogress')">
         <mat-icon class="stat-icon">schedule</mat-icon>
         <span class="stat-number">{{ overallParticipantsInProgress }}</span>
         <span class="stat-label">Participants (In Progress)</span>
@@ -291,7 +291,7 @@
     </div>
     <div *ngIf="!isLoadingHpc" class="hpc-list">
         <mat-card *ngFor="let hpc of filteredHpcData; let i = index" class="hpc-card-compact">
-          <div class="card-header-row" (click)="toggleCard(hpc.id)">
+          <div data-testid="hpc-togglecard" class="card-header-row" (click)="toggleCard(hpc.id)">
             <div class="header-left">
               <mat-icon [class]="'status-icon ' + (hpc.status === 'completed' ? 'completed' : 'pending')">
                 {{ hpc.status === 'completed' ? 'check_circle' : 'pending' }}
@@ -336,7 +336,7 @@
                 <span class="value">{{ hpc.multiple ? 'Group' : 'Individual' }}</span>
               </div>
               <div class="delete-cell" *ngIf="!hpc.multiple"> 
-                <button mat-icon-button color="warn" (click)="onDelete(hpc)">
+                <button data-testid="hpc-ondelete" mat-icon-button color="warn" (click)="onDelete(hpc)">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>
@@ -375,7 +375,7 @@
                     </span>
                   </div>
                   <div class="detail-cell" *ngIf="hpc.finalrecording && allowtoview">
-                    <a [href]="hpc.finalrecording" target="_blank" class="recording-btn">
+                    <a data-testid="hpc-link" [href]="hpc.finalrecording" target="_blank" class="recording-btn">
                       <mat-icon>play_circle</mat-icon> Play
                     </a>
                   </div>
@@ -434,7 +434,7 @@
                           </span>
                         </div>
                         <div class="detail-cell" *ngIf="hpc.persons[personKey].finalrecording && allowtoview">
-                          <a [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
+                          <a data-testid="hpc-link-2" [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
                             <mat-icon>play_circle</mat-icon> Play
                           </a>
                         </div>
@@ -487,7 +487,7 @@
                           </span>
                         </div>
                         <div class="detail-cell" *ngIf="hpc.persons[personKey].finalrecording && allowtoview">
-                          <a [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
+                          <a data-testid="hpc-link-3" [href]="hpc.persons[personKey].finalrecording" target="_blank" class="recording-btn">
                             <mat-icon>play_circle</mat-icon> Play
                           </a>
                         </div>
@@ -522,7 +522,7 @@
     <div class="side-panel" [class.open]="isPanelOpen">
       <div class="panel-header">
         <h3>{{ panelTitle }}</h3>
-        <button mat-icon-button (click)="closePanel()">
+        <button data-testid="hpc-closepanel" mat-icon-button (click)="closePanel()">
           <mat-icon>close</mat-icon>
         </button>
       </div>
@@ -533,14 +533,14 @@
       <div class="panel-content">
         <div class="profile-list">
         <ng-container *ngIf="panelType.includes('group-persons') || panelType.includes('participants')">
-          <div class="profile-item simple clickable" *ngFor="let item of panelData; let i = index" (click)="filterByName(item.name)">
+          <div data-testid="hpc-filterbyname" class="profile-item simple clickable" *ngFor="let item of panelData; let i = index" (click)="filterByName(item.name)">
             <span class="profile-rank">{{ i + 1 }}</span>
             <mat-icon class="person-icon">person</mat-icon>
             <span class="profile-name">{{ item.name }}</span>
           </div>
         </ng-container>
           <ng-container *ngIf="!panelType.includes('group-persons') && !panelType.includes('participants')">
-            <div class="profile-item" *ngFor="let item of panelData; let i = index" (click)="filterByProfile(item.profileId)">
+            <div data-testid="hpc-filterbyprofile" class="profile-item" *ngFor="let item of panelData; let i = index" (click)="filterByProfile(item.profileId)">
               <span class="profile-rank">{{ i + 1 }}</span>
               <span class="profile-name">{{ item.name }}</span>
               <span class="profile-count">
@@ -552,7 +552,7 @@
         </div>
       </div>
     </div>
-    <div class="panel-overlay" [class.open]="isPanelOpen" (click)="closePanel()"></div>
+    <div data-testid="hpc-closepanel-2" class="panel-overlay" [class.open]="isPanelOpen" (click)="closePanel()"></div>
   </mat-tab>
 </mat-tab-group>
 </ng-container>

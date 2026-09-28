@@ -33,7 +33,7 @@
     </form>
   </div>
   <div mat-dialog-actions class="d-flex justify-content-center">
-    <button mat-stroked-button (click)="onCancel()" >cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
-    <button mat-stroked-button (click)="onSubmit()" [disabled]="bigMarathonForm.invalid">Submit</button>
+    <button data-testid="cmar-on-cancel-1" mat-stroked-button (click)="onCancel()" >cancel</button>&nbsp;&nbsp;&nbsp;&nbsp;
+    <button data-testid="cmar-on-submit-2" mat-stroked-button (click)="onSubmit()" [disabled]="bigMarathonForm.invalid">Submit</button>
   </div>
 </main>

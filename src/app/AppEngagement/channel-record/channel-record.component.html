@@ -5,19 +5,19 @@
     <div class="date-range-container">
       <mat-form-field appearance="outline" class="date-field">
         <mat-label>Start Date</mat-label>
-        <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="startPicker" [(ngModel)]="startDate">
+        <input data-testid="aecr-inp-1" matInput placeholder="DD/MM/YYYY" [matDatepicker]="startPicker" [(ngModel)]="startDate">
         <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
         <mat-datepicker #startPicker (dateChange)="onDateChange()"></mat-datepicker>
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="date-field">
         <mat-label>End Date</mat-label>
-        <input matInput placeholder="DD/MM/YYYY" [matDatepicker]="endPicker" [(ngModel)]="endDate">
+        <input data-testid="aecr-inp-2" matInput placeholder="DD/MM/YYYY" [matDatepicker]="endPicker" [(ngModel)]="endDate">
         <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
         <mat-datepicker #endPicker (dateChange)="onDateChange()"></mat-datepicker>
       </mat-form-field>
     </div>
-    <button mat-raised-button style="margin-bottom: 20px;" (click)="onDateChange()" [disabled]="!startDate && !endDate">
+    <button data-testid="aecr-btn-3" mat-raised-button style="margin-bottom: 20px;" (click)="onDateChange()" [disabled]="!startDate && !endDate">
       <mat-icon>date_range</mat-icon>
       Fetch Channel Records
     </button>
@@ -28,12 +28,12 @@
     <!-- Search -->
     <mat-form-field appearance="outline" class="search-field">
       <mat-icon matPrefix>search</mat-icon>
-      <input matInput placeholder="Search..." [(ngModel)]="searchText" (input)="onSearchChange()">
+      <input data-testid="aecr-inp-4" matInput placeholder="Search..." [(ngModel)]="searchText" (input)="onSearchChange()">
     </mat-form-field>
 
     <!-- Category Filter — options from classify/channelcategories -->
     <mat-form-field appearance="outline" class="filter-dropdown">
-      <mat-select placeholder="Category" [(value)]="selectedCategory" (selectionChange)="onFilterChange()">
+      <mat-select data-testid="aecr-sel-5" placeholder="Category" [(value)]="selectedCategory" (selectionChange)="onFilterChange()">
         <mat-option value="">All Categories</mat-option>
         <!-- value = category ID so the filter can match against metadata.category -->
         <mat-option *ngFor="let cat of categoryOptions" [value]="cat.id">{{cat.name}}</mat-option>
@@ -43,7 +43,7 @@
 
     <!-- Channel Name Filter — names from supportchat, value = channel ID -->
     <mat-form-field appearance="outline" class="filter-dropdown">
-      <mat-select placeholder="Channel" [(value)]="selectedChannel" (selectionChange)="onFilterChange()">
+      <mat-select data-testid="aecr-sel-6" placeholder="Channel" [(value)]="selectedChannel" (selectionChange)="onFilterChange()">
         <mat-option value="">All Channels</mat-option>
         <mat-option *ngFor="let ch of channelOptions" [value]="ch.id">{{ch.name}}</mat-option>
       </mat-select>
@@ -54,7 +54,7 @@
     <mat-form-field appearance="outline" class="filter-dropdown search-person">
       <mat-label>Filter by Profile</mat-label>
       <mat-icon matPrefix>person_search</mat-icon>
-      <input type="text"
+      <input data-testid="aecr-inp-7" type="text"
              matInput
              [(ngModel)]="profileSearchText"
              [matAutocomplete]="profileAuto"
@@ -71,7 +71,7 @@
       </mat-autocomplete>
     </mat-form-field>
 
-    <button mat-raised-button color="accent" style="margin-bottom: 20px;" (click)="clearFilters()">
+    <button data-testid="aecr-btn-8" mat-raised-button color="accent" style="margin-bottom: 20px;" (click)="clearFilters()">
       Clear Filters
     </button>
   </div>
@@ -105,7 +105,7 @@
       </div>
     </div>
 
-        <div class="followup-card" (click)="openFailuresDialog()">
+        <div data-testid="aecr-act-9" class="followup-card" (click)="openFailuresDialog()">
           <div class="followup-card-header">
             <div class="followup-icon-wrap">
               <mat-icon class="send-icon">send</mat-icon>
@@ -138,8 +138,8 @@
         </div>
         </div>
 
-        <div *ngIf="showFailuresDialog" class="failures-overlay" (click)="closeFailuresDialog()">
-          <div class="failures-panel" (click)="$event.stopPropagation()">
+        <div data-testid="aecr-act-10" *ngIf="showFailuresDialog" class="failures-overlay" (click)="closeFailuresDialog()">
+          <div data-testid="aecr-act-11" class="failures-panel" (click)="$event.stopPropagation()">
 
             <div class="failures-header">
           <div>
@@ -151,7 +151,7 @@
           </div>
 
           <div class="failures-header-actions">
-            <button mat-raised-button class="action-btn-compact whatsapp-btn"
+            <button data-testid="aecr-btn-12" mat-raised-button class="action-btn-compact whatsapp-btn"
                     [disabled]="selectedFailureCount === 0"
                     (click)="sendFailureFollowUpWhatsApp(); $event.stopPropagation()">
               <mat-icon>chat</mat-icon>
@@ -159,7 +159,7 @@
               <span class="count-bubble" *ngIf="selectedFailureCount > 0">{{ selectedFailureCount }}</span>
             </button>
 
-            <button mat-raised-button class="action-btn-compact email-btn"
+            <button data-testid="aecr-btn-13" mat-raised-button class="action-btn-compact email-btn"
                     [disabled]="selectedFailureCount === 0"
                     (click)="sendFailureFollowUpEmail(); $event.stopPropagation()">
               <mat-icon>email</mat-icon>
@@ -167,14 +167,14 @@
               <span class="count-bubble" *ngIf="selectedFailureCount > 0">{{ selectedFailureCount }}</span>
             </button>
 
-            <button mat-icon-button (click)="closeFailuresDialog()">
+            <button data-testid="aecr-btn-14" mat-icon-button (click)="closeFailuresDialog()">
               <mat-icon>close</mat-icon>
             </button>
           </div>
         </div>
 
             <div class="failures-tabs">
-              <button
+              <button [attr.data-testid]="'aecr-btn-15-' + tab"
                 *ngFor="let tab of failureTabs"
                 class="failure-tab"
                 [class.active]="activeFailureTab === tab.key"
@@ -192,7 +192,7 @@
           <th mat-header-cell *matHeaderCellDef>PARTICIPANT</th>
           <td mat-cell *matCellDef="let row">
             <div class="Participant-cell">
-              <mat-checkbox
+              <mat-checkbox data-testid="aecr-change-16"
                 *ngIf="row.channelStatus === 'Not sent'"
                 [checked]="row.selected"
                 (change)="toggleFailureSelection(row)"
@@ -363,7 +363,7 @@
 
     <span *ngIf="!hasButtons(element)" class="no-buttons-dash">—</span>
 
-    <button *ngIf="hasButtons(element)"
+    <button data-testid="aecr-btn-17" *ngIf="hasButtons(element)"
             mat-stroked-button
             class="action-clicks-btn"
             (click)="openButtonClicksDialog(element, $event)">
@@ -386,7 +386,7 @@
       <ng-container matColumnDef="sentTo">
         <th mat-header-cell *matHeaderCellDef mat-sort-header>Sent To</th>
         <td mat-cell *matCellDef="let element">
-          <button mat-flat-button (click)="openParticipantDialog(element)">
+          <button data-testid="aecr-btn-18" mat-flat-button (click)="openParticipantDialog(element)">
             <mat-icon style="padding: 5px;">group</mat-icon>
             <span style="color: green;">✓ {{element.profilesuccess?.length || 0}} </span>
             <span style="color: red;">✗ {{element.profilefailed?.length || 0}} </span>
@@ -416,12 +416,12 @@
     <mat-paginator [pageSizeOptions]="[25, 50, 100]" showFirstLastButtons></mat-paginator>
   </div>
 
-  <div *ngIf="showParticipantsDialog" class="Participants-overlay" (click)="closeParticipantsDialog()">
-    <div class="Participants-dialog" (click)="$event.stopPropagation()">
+  <div data-testid="aecr-act-19" *ngIf="showParticipantsDialog" class="Participants-overlay" (click)="closeParticipantsDialog()">
+    <div data-testid="aecr-act-20" class="Participants-dialog" (click)="$event.stopPropagation()">
       <div class="dialog-header">
         <h3>Participant Details</h3>
         <div class="header-actions">
-          <button mat-stroked-button
+          <button data-testid="aecr-btn-21" mat-stroked-button
                   *ngIf="!allLogsLoaded"
                   color="accent"
                   (click)="loadAllLogsForExport()"
@@ -430,7 +430,7 @@
             {{isLoadingAllLogs ? 'Loading... ' + logsLoadingProgress + '%' : 'Load All Logs'}}
           </button>
 
-          <button mat-raised-button
+          <button data-testid="aecr-btn-22" mat-raised-button
                   color="primary"
                   (click)="exportParticipantsToExcel()"
                   [disabled]="!allLogsLoaded || isExporting"
@@ -439,7 +439,7 @@
             {{isExporting ? 'Exporting...' : 'Export'}}
           </button>
 
-          <button mat-icon-button (click)="closeParticipantsDialog()">
+          <button data-testid="aecr-btn-23" mat-icon-button (click)="closeParticipantsDialog()">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -458,7 +458,7 @@
         </div>
 
         <div class="tab-buttons">
-          <button mat-flat-button
+          <button data-testid="aecr-btn-24" mat-flat-button
                   [class.active-tab]="selectedTab === 'success'"
                   [color]="selectedTab === 'success' ? 'primary' : ''"
                   (click)="switchTab('success')"
@@ -466,7 +466,7 @@
             <mat-icon>check_circle</mat-icon>
             Success ({{filteredSuccessParticipants.length}})
           </button>
-          <button mat-flat-button
+          <button data-testid="aecr-btn-25" mat-flat-button
                   [class.active-tab]="selectedTab === 'failed'"
                   [color]="selectedTab === 'failed' ? 'warn' : ''"
                   (click)="switchTab('failed')"
@@ -478,7 +478,7 @@
 
         <mat-form-field appearance="outline" class="search-Participants">
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput placeholder="Search by name..." [(ngModel)]="ParticipantSearchText" (input)="filterParticipants()">
+          <input data-testid="aecr-inp-26" matInput placeholder="Search by name..." [(ngModel)]="ParticipantSearchText" (input)="filterParticipants()">
         </mat-form-field>
 
         <div *ngIf="logsLoadingCount > 0" class="loading-indicator">
@@ -684,13 +684,13 @@
     </div>
   </div>
 
-<div *ngIf="buttonClicksDialogOpen" class="Participants-overlay" (click)="closeButtonClicksDialog()">
-  <div class="Participants-dialog" (click)="$event.stopPropagation()">
+<div data-testid="aecr-act-27" *ngIf="buttonClicksDialogOpen" class="Participants-overlay" (click)="closeButtonClicksDialog()">
+  <div data-testid="aecr-act-28" class="Participants-dialog" (click)="$event.stopPropagation()">
 
     <div class="dialog-header">
       <h3>Action Button Clicks</h3>
       <div class="header-actions">
-        <button mat-icon-button (click)="closeButtonClicksDialog()">
+        <button data-testid="aecr-btn-29" mat-icon-button (click)="closeButtonClicksDialog()">
           <mat-icon>close</mat-icon>
         </button>
       </div>

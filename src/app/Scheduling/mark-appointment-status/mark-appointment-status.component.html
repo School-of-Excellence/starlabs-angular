@@ -47,7 +47,7 @@
     </mat-form-field>
   </div>
   <div class="btnbox">
-    <button class="cancelbtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
-    <button class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="loading">{{loading ? 'Please wait...' : 'Update Status'}}</button>
+    <button data-testid="mas-close-1" class="cancelbtn" mat-stroked-button (click)="close()" [disabled]="loading">Close</button>
+    <button data-testid="mas-submit-2" class="submitbtn" mat-stroked-button (click)="submit()" [disabled]="loading">{{loading ? 'Please wait...' : 'Update Status'}}</button>
   </div>
 </div>

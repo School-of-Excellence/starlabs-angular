@@ -4,15 +4,15 @@
     <div class="actionitem">
       <mat-form-field class="w-50" appearance="outline">
         <mat-label>Filter Touch Points</mat-label>
-        <mat-select [(ngModel)]="filterTouchPoint" (selectionChange)="calculateTimeDelay()" multiple>
+        <mat-select data-testid="ptp-mat-select" [(ngModel)]="filterTouchPoint" (selectionChange)="calculateTimeDelay()" multiple>
           <mat-option *ngFor="let touchpoint of touchPointList" [value]="touchpoint">{{touchpoint}}</mat-option>
         </mat-select>
       </mat-form-field>
       <mat-form-field class="w-25" appearance="outline">
         <mat-label>Filter Date</mat-label>
         <mat-date-range-input [rangePicker]="rangePicker">
-          <input matStartDate (click)="rangePicker.open()" [(ngModel)]="startDate" (dateChange)="fetchData()" placeholder="Start date">
-          <input matEndDate (click)="rangePicker.open()" [(ngModel)]="endDate" (dateChange)="fetchData()" placeholder="End date">
+          <input data-testid="ptp-rangepicker-open" matStartDate (click)="rangePicker.open()" [(ngModel)]="startDate" (dateChange)="fetchData()" placeholder="Start date">
+          <input data-testid="ptp-rangepicker-open-2" matEndDate (click)="rangePicker.open()" [(ngModel)]="endDate" (dateChange)="fetchData()" placeholder="End date">
         </mat-date-range-input>
         <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
         <mat-date-range-picker #rangePicker></mat-date-range-picker>
@@ -21,7 +21,7 @@
     <div class="mt-2 mb-2">
       <mat-label class="fw-bold">Average Time Delay from Selected: {{timeDelayAvg}}</mat-label>
       <br>
-      <mat-checkbox *ngFor="let touchpoint of filterTouchPoint; let i = index" [checked]="timedelayTouchPoint.includes(touchpoint)" (change)="updateTimeDelayTouchPoint(touchpoint)">{{touchpoint}}</mat-checkbox>
+      <mat-checkbox data-testid="ptp-updatetimedelaytouchpoint" *ngFor="let touchpoint of filterTouchPoint; let i = index" [checked]="timedelayTouchPoint.includes(touchpoint)" (change)="updateTimeDelayTouchPoint(touchpoint)">{{touchpoint}}</mat-checkbox>
     </div>
   </div>
   <div class="body mat-elevation-z2">

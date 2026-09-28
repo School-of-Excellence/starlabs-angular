@@ -28,7 +28,7 @@
               <mat-icon matPrefix>search</mat-icon>
               <input matInput (keyup)="applyComingSoonFilter($event)" placeholder="Search workshops" />
             </mat-form-field>
-            <button mat-flat-button color="primary" class="add-btn" (click)="openDialog()">
+            <button data-testid="upc-open-dialog-1" mat-flat-button color="primary" class="add-btn" (click)="openDialog()">
               <mat-icon>add</mat-icon>
               Add Workshop
             </button>
@@ -119,7 +119,7 @@
                 <ng-container matColumnDef="view">
                   <th mat-header-cell *matHeaderCellDef>View</th>
                   <td mat-cell *matCellDef="let w">
-                    <button mat-stroked-button color="primary" class="view-btn" (click)="openResponses(w)">
+                    <button data-testid="upc-open-responses-2" mat-stroked-button color="primary" class="view-btn" (click)="openResponses(w)">
                       <mat-icon>visibility</mat-icon>
                       View
                     </button>
@@ -129,10 +129,10 @@
                 <ng-container matColumnDef="actions">
                   <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
                   <td mat-cell *matCellDef="let w" class="actions-col">
-                    <button mat-icon-button matTooltip="Edit" (click)="openDialog(w)">
+                    <button data-testid="upc-open-dialog-3" mat-icon-button matTooltip="Edit" (click)="openDialog(w)">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(w)">
+                    <button data-testid="upc-delete-widget-4" mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(w)">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </td>
@@ -162,7 +162,7 @@
               <mat-icon matPrefix>search</mat-icon>
               <input matInput (keyup)="applyAdsFilter($event)" placeholder="Search ads" />
             </mat-form-field>
-            <button mat-flat-button color="primary" class="add-btn" (click)="openAdsDialog()">
+            <button data-testid="upc-open-ads-dialog-5" mat-flat-button color="primary" class="add-btn" (click)="openAdsDialog()">
               <mat-icon>add</mat-icon>
               Add Ad
             </button>
@@ -239,10 +239,10 @@
                 <ng-container matColumnDef="actions">
                   <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
                   <td mat-cell *matCellDef="let a" class="actions-col">
-                    <button mat-icon-button matTooltip="Edit" (click)="openAdsDialog(a)">
+                    <button data-testid="upc-open-ads-dialog-6" mat-icon-button matTooltip="Edit" (click)="openAdsDialog(a)">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(a)">
+                    <button data-testid="upc-delete-widget-7" mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteWidget(a)">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </td>
@@ -272,7 +272,7 @@
               <mat-icon matPrefix>search</mat-icon>
               <input matInput (keyup)="applySeriesFilter($event)" placeholder="Search home series" />
             </mat-form-field>
-            <button mat-flat-button color="primary" class="add-btn" (click)="openHomeSeriesDialog()">
+            <button data-testid="upc-open-home-series-dialog-8" mat-flat-button color="primary" class="add-btn" (click)="openHomeSeriesDialog()">
               <mat-icon>add</mat-icon>
               Add Home Series
             </button>
@@ -308,10 +308,10 @@
                 <ng-container matColumnDef="actions">
                   <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
                   <td mat-cell *matCellDef="let s" class="actions-col">
-                    <button mat-icon-button matTooltip="Edit" (click)="openHomeSeriesDialog(s)">
+                    <button data-testid="upc-open-home-series-dialog-9" mat-icon-button matTooltip="Edit" (click)="openHomeSeriesDialog(s)">
                       <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteSeries(s)">
+                    <button data-testid="upc-delete-series-10" mat-icon-button matTooltip="Delete" class="del-btn" (click)="deleteSeries(s)">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </td>

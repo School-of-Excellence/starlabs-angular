@@ -7,6 +7,7 @@ import { CommonModule } from '@angular/common';
 import { OpenviduVideoElementComponent } from '../openvidu-video-element/openvidu-video-element.component';
 import { environment } from '../../../environments/environment';
 import { AuthguardService } from '../../authguard.service';
+import { DfnInfo } from '../../LiveKit/dfn/dfn-state.service';
 import { OpenviduAudioElementComponent } from '../openvidu-audio-element/openvidu-audio-element.component';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { MatDialog } from '@angular/material/dialog';
@@ -50,13 +51,24 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
   // Per-participant state — compound key "roomId:::identity"
   participantsMute    = signal<Map<string, boolean>>(new Map());
   participantsQuality = signal<Map<string, ConnectionQuality>>(new Map());
+  // Noise-reduction state per participant, from their DFN data broadcasts. The shared
+  // DfnStateService only tracks one room; the monitor watches many, so we keep our own
+  // per-room map (same pattern as mute/quality above).
+  participantsDfn     = signal<Map<string, DfnInfo>>(new Map());
   activeSpeakersMap: { [roomId: string]: string[] } = {};
 
   // Room connection state — true while connecting, false once connected
   roomConnecting = signal<Map<string, boolean>>(new Map());
 
   infraStatus: InfrastructureStatus | null = null;
+  // OCI twin of infraStatus — separate doc (OCI_System/instance_status), same shape.
+  ociInfraStatus: InfrastructureStatus | null = null;
+  // Which cloud is allowed to act (openvidu server/mediaprovider). Drives which cards
+  // render, which controls are live, and both CF controllers' lifecycle gates.
+  activeProvider: 'aws' | 'oci' = 'aws';
   infraActionInProgress = false;
+  // Separate in-progress flag so OCI clicks don't disable AWS buttons (and vice versa).
+  ociActionInProgress = false;
   infraError: string | null = null;
   infraSuccess: string | null = null;
   private destroy$ = new Subject<void>();
@@ -95,7 +107,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         }
       })
 
-      if(roles["developer"]) this.loadInfrastructureStatus();
+      if(roles["developer"]) {
+        this.loadInfrastructureStatus();
+        this.loadOciInfrastructureStatus();
+        this.loadActiveProvider();
+      }
     })
   }
 
@@ -194,6 +210,7 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
         // Clean up per-participant state immediately
         this.participantsMute.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
         this.participantsQuality.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
+        this.participantsDfn.update(m => { m.delete(`${roomName}:::${participant.identity}`); return m; });
 
         // Count non-ghost participants
         const participantJoined = (this.mapOpenViduRoom[roomName] ?? {})["participantjoined"] ?? []
@@ -225,6 +242,20 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     // Track network quality
     room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant: Participant) => {
       this.participantsQuality.update(m => { m.set(`${roomName}:::${participant.identity}`, quality); return m; });
+    });
+
+    // Track each participant's noise-reduction (DFN) state from their data broadcasts.
+    // Same message shape the join screen sends: { type:'dfn', dfn, atten, norm }.
+    room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg && msg.type === 'dfn' && participant) {
+          this.participantsDfn.update(m => {
+            m.set(`${roomName}:::${participant.identity}`, { dfn: !!msg.dfn, atten: Number(msg.atten), norm: Number(msg.norm) });
+            return m;
+          });
+        }
+      } catch {}
     });
 
     // Track active speakers
@@ -289,7 +320,23 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     const participantName = (this.loggedinProfileRole["name"] || 'Guest') + this.ghostID;
 
     console.log({roomName, participantId, participantName})
-    
+
+    // Cloud rooms: fully-managed token endpoint — no capacity/503 handshake, so no retry loop.
+    if (this.getProvider(roomID) === 'livekit-cloud') {
+      return await firstValueFrom(
+        this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createLivekitCloudToken`, {
+          roomName,
+          participantName,
+          participantId
+        })
+      );
+    }
+
+    // OpenVidu self-hosted: existing capacity-aware retry loop. The room's mediaProvider
+    // (aws/oci) tells the token function which cluster to issue for. Missing mediaProvider
+    // == oci (matches the join-livekit-call fallback and the server-side default), so the
+    // monitor joins the same cluster the participants do.
+    const mediaProvider = this.mapOpenViduRoom[roomID]?.['mediaProvider'] || 'oci';
     let retryCount = 0;
 
     while (retryCount <= 3) {
@@ -298,7 +345,8 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
           this.http.post<any>(`https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/createOpenViduToken`, {
             roomName,
             participantName,
-            participantId
+            participantId,
+            provider: mediaProvider
           })
         );
       } catch (error: any) {
@@ -320,7 +368,9 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     if(confirm("Sure, do you want to close this meeting for all?")){
       var progress = this.dialog.open(LoadingProgressComponent, {data:{msg: "Ending Call..."},disableClose:true})
       try {
-        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/openViduCloseRoom`;
+        // Close on the correct backend for this room's provider.
+        const closeFn = this.getProvider(RoomId) === 'livekit-cloud' ? 'livekitCloudCloseRoom' : 'openViduCloseRoom';
+        const url = `https://us-central1-${environment.firebase.projectId}.cloudfunctions.net/${closeFn}`;
         const response = await lastValueFrom(
           this.http.post(url, {
             roomName: RoomId
@@ -347,6 +397,11 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
       return m;
     });
     this.participantsQuality.update(m => {
+      for (const key of Array.from(m.keys()))
+        if (key.startsWith(`${RoomId}:::`)) m.delete(key);
+      return m;
+    });
+    this.participantsDfn.update(m => {
       for (const key of Array.from(m.keys()))
         if (key.startsWith(`${RoomId}:::`)) m.delete(key);
       return m;
@@ -416,6 +471,172 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
           console.error('Infrastructure status error:', err);
         }
       });
+  }
+
+  loadOciInfrastructureStatus() {
+    this.infraService.getOciStatus()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (status) => {
+          if (status) {
+            this.ociInfraStatus = status;
+          }
+        },
+        error: (err) => {
+          console.error('OCI infrastructure status error:', err);
+        }
+      });
+  }
+
+  getOciMasterState(): string {
+    return this.ociInfraStatus?.master?.state || 'unknown';
+  }
+
+  getOciMasterStateClass(): string {
+    const state = this.ociInfraStatus?.master?.state;
+    if (state === 'running') return 'state-running';
+    if (state === 'stopped') return 'state-stopped';
+    if (state === 'starting' || state === 'stopping') return 'state-transitioning';
+    return 'state-unknown';
+  }
+
+  getOciMediaStateClass(): string {
+    const status = this.ociInfraStatus?.media?.scalingStatus;
+    if (status === 'stable') return 'state-stable';
+    if (status === 'scaling-up' || status === 'scaling-down') return 'state-transitioning';
+    return 'state-unknown';
+  }
+
+  loadActiveProvider() {
+    this.infraService.getActiveProvider()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          this.activeProvider = data?.activeprovider === 'oci' ? 'oci' : 'aws';
+        },
+        error: (err) => {
+          console.error('Active provider read error:', err);
+        }
+      });
+  }
+
+  async switchProvider(provider: 'aws' | 'oci') {
+    if (provider === this.activeProvider) return;
+    if (!confirm(`Switch active media provider to ${provider.toUpperCase()}? New rooms and the schedulers will use ${provider.toUpperCase()} from now on.`)) return;
+    try {
+      await this.infraService.setActiveProvider(provider);
+      this.infraSuccess = `Active provider switched to ${provider.toUpperCase()}`;
+      setTimeout(() => this.infraSuccess = null, 5000);
+    } catch (err: any) {
+      this.infraError = err?.message || 'Failed to switch provider';
+    }
+  }
+
+  /** Inactive-provider danger: anything of that cloud still up? (master running or media present) */
+  isInactiveServerRunning(provider: 'aws' | 'oci'): boolean {
+    if (provider === this.activeProvider) return false;
+    const status = provider === 'aws' ? this.infraStatus : this.ociInfraStatus;
+    if (!status) return false;
+    const masterUp = status.master?.state === 'running' || status.master?.state === 'starting';
+    const mediaUp = (status.media?.instanceStates?.total || 0) > 0 || (status.media?.desiredCapacity || 0) > 0;
+    return masterUp || mediaUp;
+  }
+
+  // ---- OCI manual controls (twins of the AWS handlers below; shared alert strip) ----
+
+  startOciMasterNode() {
+    if (!confirm('Start OCI master node?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.startOciMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI master node starting...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to start OCI master';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  stopOciMasterNode() {
+    if (!confirm('Stop OCI master node?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.stopOciMaster()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI master node stopping...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to stop OCI master';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  scaleOciMediaUp() {
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.scaleOciUp()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI media scaling up...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale OCI media up';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  scaleOciMediaDown() {
+    if (!confirm('Scale down OCI media nodes?')) return;
+    this.ociActionInProgress = true;
+    this.infraError = null;
+    this.infraService.scaleOciDown()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.infraSuccess = 'OCI media scaling down...';
+          this.ociActionInProgress = false;
+          setTimeout(() => this.infraSuccess = null, 5000);
+        },
+        error: (err) => {
+          this.infraError = err.error?.error || 'Failed to scale OCI media down';
+          this.ociActionInProgress = false;
+        }
+      });
+  }
+
+  canStartOciMaster(): boolean {
+    return this.ociInfraStatus?.master?.state === 'stopped' && !this.ociActionInProgress;
+  }
+
+  canStopOciMaster(): boolean {
+    return this.ociInfraStatus?.master?.state === 'running' && !this.ociActionInProgress;
+  }
+
+  canScaleOciUp(): boolean {
+    return !this.ociActionInProgress &&
+           !!this.ociInfraStatus?.media &&
+           this.ociInfraStatus.media.desiredCapacity < this.ociInfraStatus.media.maxSize;
+  }
+
+  canScaleOciDown(): boolean {
+    return !this.ociActionInProgress &&
+           !!this.ociInfraStatus?.media &&
+           this.ociInfraStatus.media.desiredCapacity > this.ociInfraStatus.media.minSize;
   }
 
   startMasterNode() {
@@ -539,8 +760,25 @@ export class MonitorLiveassignmentComponent implements OnDestroy {
     return 'state-unknown';
   }
 
+  /** Which backend this room runs on. Missing provider == self-hosted (default). */
+  getProvider(roomId: string): 'livekit-cloud' | 'openvidu' {
+    return this.mapOpenViduRoom[roomId]?.['provider'] === 'livekit-cloud' ? 'livekit-cloud' : 'openvidu';
+  }
+
+  /** Human label for the provider badge (reflects the actual media backend). */
+  getProviderLabel(roomId: string): string {
+    if (this.getProvider(roomId) === 'livekit-cloud') return 'LiveKit Cloud';
+    const media = (this.mapOpenViduRoom[roomId]?.['mediaProvider'] || 'oci').toString().toUpperCase();
+    return `OpenVidu ${media}`;
+  }
+
   isParticipantMuted(roomId: string, identity: string): boolean {
     return this.participantsMute().get(`${roomId}:::${identity}`) ?? false;
+  }
+
+  /** Noise-reduction state for a participant, or undefined if not yet broadcast. */
+  getDfnInfo(roomId: string, identity: string): DfnInfo | undefined {
+    return this.participantsDfn().get(`${roomId}:::${identity}`);
   }
 
   isActiveSpeaker(roomId: string, identity: string): boolean {

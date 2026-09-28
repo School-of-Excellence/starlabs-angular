@@ -103,7 +103,7 @@
         </p>
       </div>
       <div class="cards">
-        <div class="card" *ngFor="let s of screens; let i = index"
+        <div data-testid="cuv-openscreen" class="card" *ngFor="let s of screens; let i = index"
              [style.animation-delay]="i * 80 + 'ms'"
              (click)="openScreen(s)">
 

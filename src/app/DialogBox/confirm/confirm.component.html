@@ -5,10 +5,10 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-stroked-button color="primary" (click)="onCancel()">
+  <button data-testid="dbc-oncancel" mat-stroked-button color="primary" (click)="onCancel()">
     {{ data.cancelText || 'Cancel' }}
   </button>
-  <button *ngIf="data.confirmText && data.confirmText.trim() !== ''" mat-flat-button color="warn" (click)="onConfirm()">
+  <button data-testid="dbc-onconfirm" *ngIf="data.confirmText && data.confirmText.trim() !== ''" mat-flat-button color="warn" (click)="onConfirm()">
     {{ data.confirmText || 'OK' }}
   </button>
 </mat-dialog-actions>

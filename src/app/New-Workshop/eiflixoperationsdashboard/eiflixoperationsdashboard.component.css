@@ -1328,3 +1328,49 @@ section.eod-section:focus { outline: none; }
     padding-left: 53px;
   }
 }
+
+/* ==================== EiFlix Mobile App Logs ==================== */
+.eod-logcard { padding: 14px 16px 12px; }
+.eod-log-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 10px; }
+.eod-log-search { flex: 1 1 240px; min-width: 200px; height: 38px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--eod-hairline); border-radius: 10px; background: var(--eod-surface); }
+.eod-log-search:focus-within { border-color: var(--eod-indigo); box-shadow: 0 0 0 3px var(--eod-indigo-tint); }
+.eod-log-search mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--eod-ink-3); }
+.eod-log-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--eod-ink); }
+.eod-log-search input::placeholder { color: var(--eod-ink-3); }
+.eod-log-select { width: 220px; }
+.eod-log-select-sm { width: 150px; }
+.eod-log-select .mat-mdc-text-field-wrapper { height: 38px; }
+.eod-log-clear { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px 0 6px; border: 0; border-radius: 9px; background: transparent; color: #b3452e; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.eod-log-clear mat-icon { font-size: 17px; width: 17px; height: 17px; }
+.eod-log-clear:hover { background: rgba(179, 69, 46, 0.08); }
+.eod-log-count { margin-left: auto; font-size: 12px; color: var(--eod-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.eod-log-count strong { color: var(--eod-ink); font-weight: 600; }
+.eod-log-skel { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
+.eod-log-skelrow { display: block; height: 30px; border-radius: 6px; }
+.eod-log-tablewrap { overflow-x: auto; border: 1px solid var(--eod-hairline); border-radius: 10px; }
+.eod-log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.eod-log-table th { text-align: left; padding: 0 12px; height: 38px; background: #fafaf7; border-bottom: 1px solid var(--eod-hairline); white-space: nowrap; }
+.eod-log-th { display: inline-flex; align-items: center; gap: 2px; border: 0; background: transparent; padding: 0; font-family: 'Geist Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--eod-ink-3); cursor: pointer; }
+.eod-log-th mat-icon { font-size: 15px; width: 15px; height: 15px; opacity: .55; }
+.eod-log-th.on, .eod-log-th:hover { color: var(--eod-ink); }
+.eod-log-th.on mat-icon { opacity: 1; color: var(--eod-indigo); }
+.eod-log-table td { padding: 8px 12px; border-bottom: 1px solid var(--eod-hairline); color: var(--eod-ink); vertical-align: middle; }
+.eod-log-table tbody tr:last-child td { border-bottom: 0; }
+.eod-log-table tbody tr:hover td { background: #fafaf7; }
+.eod-log-name { display: flex; flex-direction: column; gap: 1px; }
+.eod-log-nm { font-weight: 600; }
+.eod-log-mono { font-family: 'Geist Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.eod-log-os { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 11.5px; font-weight: 600; background: #f2f2ee; color: var(--eod-ink-2); }
+.eod-log-os[data-os="android"], .eod-log-os[data-os="Android"] { background: var(--eod-emerald-tint); color: var(--eod-emerald); }
+.eod-log-os[data-os="ios"], .eod-log-os[data-os="iOS"] { background: var(--eod-indigo-tint); color: var(--eod-indigo); }
+.eod-log-none { text-align: center; color: var(--eod-ink-3); padding: 22px 12px !important; }
+.eod-log-pager { display: flex; align-items: center; gap: 10px; padding: 10px 4px 0; font-size: 12px; color: var(--eod-ink-3); }
+.eod-log-pagesize { display: inline-flex; align-items: center; gap: 6px; }
+.eod-log-pagesize select { height: 28px; border: 1px solid var(--eod-hairline); border-radius: 7px; background: var(--eod-surface); font: inherit; font-size: 12px; color: var(--eod-ink); padding: 0 6px; }
+.eod-log-pagelabel { margin-left: auto; font-variant-numeric: tabular-nums; }
+.eod-log-pgbtn { width: 30px; height: 30px; border: 1px solid var(--eod-hairline); border-radius: 8px; background: var(--eod-surface); color: var(--eod-ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.eod-log-pgbtn mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.eod-log-pgbtn:hover:not([disabled]) { border-color: var(--eod-indigo); color: var(--eod-indigo); }
+.eod-log-pgbtn[disabled] { opacity: .4; cursor: not-allowed; }
+@media (max-width: 720px) { .eod-log-select, .eod-log-select-sm { width: 100%; } .eod-log-count { margin-left: 0; } }
+.eod-log-dot { margin: 0 6px; color: var(--eod-ink-3); }

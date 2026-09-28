@@ -5,14 +5,14 @@
   <span *ngIf="!loading">
       <div style="display: flex;flex-direction: row;justify-content: space-between;">
           <h2>Broadcast Templates</h2>
-          <button type="button" mat-raised-button (click)="createtemplate()"><mat-icon>add</mat-icon>Create Template</button>
+          <button data-testid="bc-create-template-1" type="button" mat-raised-button (click)="createtemplate()"><mat-icon>add</mat-icon>Create Template</button>
       </div>
       <br>
 
       <div style="max-height: 70vh;min-height: 100px;overflow-y: auto;">
           <div *ngFor="let item of templateList,let i = index">
               <div style="display: flex;flex-direction: row;">
-                  <button mat-mini-fab type="button" (click)="selectedbroadcast = item" [ngClass]="selectedbroadcast != null && selectedbroadcast['docid'] == item.docid ? 'selected' : 'notselected' "><mat-icon>check</mat-icon></button>
+                  <button [attr.data-testid]="'bc-select-' + i" mat-mini-fab type="button" (click)="selectedbroadcast = item" [ngClass]="selectedbroadcast != null && selectedbroadcast['docid'] == item.docid ? 'selected' : 'notselected' "><mat-icon>check</mat-icon></button>
                   &nbsp;&nbsp;
                   <mat-accordion style="width: 100%;margin-bottom: 5px;">
                       <mat-expansion-panel (opened)="panelOpenState = true" (closed)="panelOpenState = false">
@@ -65,10 +65,10 @@
                       </mat-expansion-panel>
                       </mat-accordion>
                       
-                      <button mat-icon-button [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
+                      <button [attr.data-testid]="'bc-menu-' + i" mat-icon-button [matMenuTriggerFor]="menu"><mat-icon>more_vert</mat-icon></button>
                       <mat-menu #menu="matMenu">
-                          <button mat-menu-item type="button" (click)="openDupliacte(item.docid)"><mat-icon>content_copy</mat-icon> Duplicate</button>
-                          <button mat-menu-item type="button" [disabled]="!item.draft"><mat-icon>edit_note</mat-icon>Edit Template</button>
+                          <button [attr.data-testid]="'bc-duplicate-' + i" mat-menu-item type="button" (click)="openDupliacte(item.docid)"><mat-icon>content_copy</mat-icon> Duplicate</button>
+                          <button [attr.data-testid]="'bc-edit-' + i" mat-menu-item type="button" [disabled]="!item.draft"><mat-icon>edit_note</mat-icon>Edit Template</button>
                       </mat-menu>
                     <br>
               </div>
@@ -76,8 +76,8 @@
       </div>
       <br>
       <span style="display: flex;flex-direction: row;justify-content: space-between;">
-          <button mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
-          <button mat-stroked-button type="button" (click)="onSubmit()" [disabled]="selectedbroadcast == null">Submit</button>
+          <button data-testid="bc-cancel-2" mat-stroked-button type="button" (click)="onDialogCancel()">Cancel</button>&nbsp;&nbsp;
+          <button data-testid="bc-submit-3" mat-stroked-button type="button" (click)="onSubmit()" [disabled]="selectedbroadcast == null">Submit</button>
       </span>
   </span>
 </main>

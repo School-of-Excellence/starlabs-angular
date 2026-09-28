@@ -2,7 +2,7 @@
   <!-- Header -->
   <div class="dialog-header">
     <h2 class="dialog-title">{{getDialogTitle()}}</h2>
-    <button mat-icon-button class="close-btn" (click)="onCancel()">
+    <button data-testid="mcoh-on-cancel-1" mat-icon-button class="close-btn" (click)="onCancel()">
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -27,19 +27,19 @@
         <label class="form-label">Category <span class="required">*</span></label>
         <div class="radio-group">
           <label class="radio-option">
-            <input type="radio" formControlName="cohortCategory" value="studio" (click)="clearActivity()">
+            <input data-testid="mcoh-clear-activity-2" type="radio" formControlName="cohortCategory" value="studio" (click)="clearActivity()">
             <span class="radio-label">Studio Group</span>
           </label>
           <label class="radio-option">
-            <input type="radio" formControlName="cohortCategory" value="readiness" (click)="clearActivity()">
+            <input data-testid="mcoh-clear-activity-3" type="radio" formControlName="cohortCategory" value="readiness" (click)="clearActivity()">
             <span class="radio-label">Readiness</span>
           </label>
           <label class="radio-option">
-            <input type="radio" formControlName="cohortCategory" value="educational" (click)="clearActivity()">
+            <input data-testid="mcoh-clear-activity-4" type="radio" formControlName="cohortCategory" value="educational" (click)="clearActivity()">
             <span class="radio-label">Educational</span>
           </label>
           <label class="radio-option">
-            <input type="radio" formControlName="cohortCategory" value="operational" (click)="clearActivity()">
+            <input data-testid="mcoh-clear-activity-5" type="radio" formControlName="cohortCategory" value="operational" (click)="clearActivity()">
             <span class="radio-label">Operational</span>
           </label>
         </div>
@@ -160,21 +160,21 @@
       <!-- Tags Selection -->
       <div class="form-group">
         <label class="form-label">Tags</label>
-        <div class="tags-dropdown" (click)="tagDropdownOpen = !tagDropdownOpen; $event.stopPropagation()">
+        <div data-testid="mcoh-tag-dropdown-open-6" class="tags-dropdown" (click)="tagDropdownOpen = !tagDropdownOpen; $event.stopPropagation()">
           <span class="tags-display">{{getSelectedTagsDisplay()}}</span>
           <mat-icon class="dropdown-arrow">{{tagDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
           
-          <div class="tags-dropdown-menu" *ngIf="tagDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="mcoh-event-7" class="tags-dropdown-menu" *ngIf="tagDropdownOpen" (click)="$event.stopPropagation()">
             <div class="tags-search">
               <mat-icon>search</mat-icon>
               <input type="text" placeholder="Search tags..." [(ngModel)]="tagSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onTagSearch()">
             </div>
             <div class="tags-header" *ngIf="selectedTags.length > 0">
               <span>{{selectedTags.length}} selected</span>
-              <button class="clear-tags" (click)="clearTags(); $event.stopPropagation()">Clear</button>
+              <button data-testid="mcoh-clear-tags-8" class="clear-tags" (click)="clearTags(); $event.stopPropagation()">Clear</button>
             </div>
             <div class="tags-list">
-              <div class="tag-item" *ngFor="let tag of filteredTagsList" 
+              <div data-testid="mcoh-toggle-tag-selection-9" class="tag-item" *ngFor="let tag of filteredTagsList" 
                    [class.selected]="selectedTags.includes(tag.id)"
                    (click)="toggleTagSelection(tag.id); $event.stopPropagation()">
                 <mat-icon>{{selectedTags.includes(tag.id) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -192,13 +192,13 @@
           Mentors
           <span class="mentor-count" *ngIf="selectedMentors.length > 0">({{selectedMentors.length}} selected)</span>
         </label>
-        <div class="mentors-dropdown" (click)="mentorDropdownOpen = !mentorDropdownOpen; $event.stopPropagation()">
+        <div data-testid="mcoh-mentor-dropdown-open-10" class="mentors-dropdown" (click)="mentorDropdownOpen = !mentorDropdownOpen; $event.stopPropagation()">
           <span class="mentors-display" [class.has-selection]="selectedMentors.length > 0">
             {{getSelectedMentorsDisplay()}}
           </span>
           <mat-icon class="dropdown-arrow">{{mentorDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
           
-          <div class="mentors-dropdown-menu" *ngIf="mentorDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="mcoh-event-11" class="mentors-dropdown-menu" *ngIf="mentorDropdownOpen" (click)="$event.stopPropagation()">
             <div class="mentors-search">
               <mat-icon>search</mat-icon>
               <input type="text" placeholder="Search mentors..." [(ngModel)]="mentorSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onMentorSearch()">
@@ -212,10 +212,10 @@
             
             <div class="mentors-header" *ngIf="selectedMentors.length > 0 && !loadingMentors">
               <span>{{selectedMentors.length}} selected</span>
-              <button class="clear-mentors" (click)="clearMentors($event)">Clear</button>
+              <button data-testid="mcoh-clear-mentors-12" class="clear-mentors" (click)="clearMentors($event)">Clear</button>
             </div>
 
-            <div class="select-all-option" *ngIf="!loadingMentors && filteredMentorsList.length > 0" 
+            <div data-testid="mcoh-is-all-mentors-selected-13" class="select-all-option" *ngIf="!loadingMentors && filteredMentorsList.length > 0" 
                 (click)="isAllMentorsSelected() ? clearMentors($event) : selectAllMentors($event)">
               <mat-icon>{{isAllMentorsSelected() ? 'check_box' : 'select_all'}}</mat-icon>
               <span>{{isAllMentorsSelected() ? 'Deselect All' : 'Select All'}} ({{filteredMentorsList.length}})</span>
@@ -223,7 +223,7 @@
             
             <!-- Mentors List -->
             <div class="mentors-list" *ngIf="!loadingMentors">
-              <div class="mentor-item" *ngFor="let mentor of filteredMentorsList" 
+              <div data-testid="mcoh-toggle-mentor-selection-14" class="mentor-item" *ngFor="let mentor of filteredMentorsList" 
                    [class.selected]="isMentorSelected(mentor.profileid)"
                    (click)="toggleMentorSelection(mentor.profileid, $event)">
                 <mat-icon>{{isMentorSelected(mentor.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -244,7 +244,7 @@
           <div class="mentor-chip" *ngFor="let mentorId of selectedMentors">
             <mat-icon class="mentor-chip-icon">person</mat-icon>
             <span>{{getMentorName(mentorId)}}</span>
-            <mat-icon class="remove-mentor" (click)="toggleMentorSelection(mentorId, $event)">close</mat-icon>
+            <mat-icon data-testid="mcoh-toggle-mentor-selection-15" class="remove-mentor" (click)="toggleMentorSelection(mentorId, $event)">close</mat-icon>
           </div>
         </div>
         
@@ -260,13 +260,13 @@
           Team
           <span class="mentor-count" *ngIf="selectedTeam.length > 0">({{selectedTeam.length}} selected)</span>
         </label>
-        <div class="mentors-dropdown" (click)="teamDropdownOpen = !teamDropdownOpen; $event.stopPropagation()">
+        <div data-testid="mcoh-team-dropdown-open-16" class="mentors-dropdown" (click)="teamDropdownOpen = !teamDropdownOpen; $event.stopPropagation()">
           <span class="mentors-display" [class.has-selection]="selectedTeam.length > 0">
             {{getSelectedTeamDisplay()}}
           </span>
           <mat-icon class="dropdown-arrow">{{teamDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
           
-          <div class="mentors-dropdown-menu" *ngIf="teamDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="mcoh-event-17" class="mentors-dropdown-menu" *ngIf="teamDropdownOpen" (click)="$event.stopPropagation()">
             <div class="mentors-search">
               <mat-icon>search</mat-icon>
               <input type="text" placeholder="Search Team..." [(ngModel)]="teamSearchQuery" [ngModelOptions]="{standalone: true}" (input)="onTeamSearch()">
@@ -280,10 +280,10 @@
             
             <div class="mentors-header" *ngIf="selectedTeam.length > 0 && !loadingTeam">
               <span>{{selectedTeam.length}} selected</span>
-              <button class="clear-mentors" (click)="clearTeam($event)">Clear</button>
+              <button data-testid="mcoh-clear-team-18" class="clear-mentors" (click)="clearTeam($event)">Clear</button>
             </div>
 
-            <div class="select-all-option" *ngIf="!loadingTeam && filteredTeamList.length > 0" 
+            <div data-testid="mcoh-is-all-team-selected-19" class="select-all-option" *ngIf="!loadingTeam && filteredTeamList.length > 0" 
                 (click)="isAllTeamSelected() ? clearTeam($event) : selectAllTeam($event)">
               <mat-icon>{{isAllTeamSelected() ? 'check_box' : 'select_all'}}</mat-icon>
               <span>{{isAllTeamSelected() ? 'Deselect All' : 'Select All'}} ({{filteredTeamList.length}})</span>
@@ -291,7 +291,7 @@
             
             <!-- Team List -->
             <div class="mentors-list" *ngIf="!loadingTeam">
-              <div class="mentor-item" *ngFor="let team of filteredTeamList" 
+              <div data-testid="mcoh-toggle-team-selection-20" class="mentor-item" *ngFor="let team of filteredTeamList" 
                    [class.selected]="isTeamSelected(team.profileid)"
                    (click)="toggleTeamSelection(team.profileid, $event)">
                 <mat-icon>{{isTeamSelected(team.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -312,7 +312,7 @@
           <div class="mentor-chip" *ngFor="let teamId of selectedTeam">
             <mat-icon class="mentor-chip-icon">person</mat-icon>
             <span>{{getTeamName(teamId)}}</span>
-            <mat-icon class="remove-mentor" (click)="toggleTeamSelection(teamId, $event)">close</mat-icon>
+            <mat-icon data-testid="mcoh-toggle-team-selection-21" class="remove-mentor" (click)="toggleTeamSelection(teamId, $event)">close</mat-icon>
           </div>
         </div>
         
@@ -331,7 +331,7 @@
           </label>
           
           <!-- Import Excel Button -->
-          <button 
+          <button data-testid="mcoh-participant-excel-input-22" 
             type="button" 
             class="import-excel-btn"
             (click)="participantExcelInput.click()"
@@ -344,7 +344,7 @@
         </div>
 
         <!-- Hidden Excel Input -->
-        <input 
+        <input data-testid="mcoh-change-import-participants-from-excel-23" 
           #participantExcelInput
           type="file" 
           accept=".xlsx,.xls,.csv" 
@@ -360,7 +360,7 @@
             <span *ngIf="participantImportResults.notFound.length > 0" class="not-found-count">
               ({{ participantImportResults.notFound.length }} not found)
             </span>
-            <button mat-icon-button (click)="clearParticipantImportResults()" matTooltip="Dismiss" class="dismiss-btn">
+            <button data-testid="mcoh-clear-participant-import-results-24" mat-icon-button (click)="clearParticipantImportResults()" matTooltip="Dismiss" class="dismiss-btn">
               <mat-icon>close</mat-icon>
             </button>
           </div>
@@ -380,13 +380,13 @@
           <span>Showing only approved participants for the selected event</span>
         </div>
         
-        <div class="participants-dropdown" (click)="participantDropdownOpen = !participantDropdownOpen; $event.stopPropagation()">
+        <div data-testid="mcoh-participant-dropdown-open-25" class="participants-dropdown" (click)="participantDropdownOpen = !participantDropdownOpen; $event.stopPropagation()">
           <span class="participants-display" [class.has-selection]="selectedParticipants.length > 0">
             {{getSelectedParticipantsDisplay()}}
           </span>
           <mat-icon class="dropdown-arrow">{{participantDropdownOpen ? 'expand_less' : 'expand_more'}}</mat-icon>
           
-          <div class="participants-dropdown-menu" *ngIf="participantDropdownOpen" (click)="$event.stopPropagation()">
+          <div data-testid="mcoh-event-26" class="participants-dropdown-menu" *ngIf="participantDropdownOpen" (click)="$event.stopPropagation()">
             <div class="participants-search">
               <mat-icon>search</mat-icon>
               <input type="text" placeholder="Search participants..." [(ngModel)]="participantSearchQuery" [ngModelOptions]="{standalone: true}">
@@ -394,10 +394,10 @@
             
             <div class="participants-header" *ngIf="getParticipantsInListCount() > 0">
               <span>{{getParticipantsInListCount()}} selected from list</span>
-              <button class="clear-participants" (click)="clearParticipants($event)">Clear All</button>
+              <button data-testid="mcoh-clear-participants-27" class="clear-participants" (click)="clearParticipants($event)">Clear All</button>
             </div>
 
-            <div class="select-all-option" *ngIf="getFilteredParticipantList().length > 0" 
+            <div data-testid="mcoh-is-all-participants-selected-28" class="select-all-option" *ngIf="getFilteredParticipantList().length > 0" 
                 (click)="isAllParticipantsSelected() ? clearParticipants($event) : selectAllParticipants($event)">
               <mat-icon>{{isAllParticipantsSelected() ? 'check_box' : 'select_all'}}</mat-icon>
               <span>{{isAllParticipantsSelected() ? 'Deselect All' : 'Select All'}} ({{getFilteredParticipantList().length}})</span>
@@ -405,7 +405,7 @@
             
             <!-- Participants List -->
             <div class="participants-list">
-              <div class="participant-item" *ngFor="let participant of getFilteredParticipantList()" 
+              <div data-testid="mcoh-toggle-participant-selection-29" class="participant-item" *ngFor="let participant of getFilteredParticipantList()" 
                    [class.selected]="isParticipantSelected(participant.profileid)"
                    (click)="toggleParticipantSelection(participant.profileid, $event)">
                 <mat-icon>{{isParticipantSelected(participant.profileid) ? 'check_box' : 'check_box_outline_blank'}}</mat-icon>
@@ -427,7 +427,7 @@
             <div class="participant-chip" *ngIf="check(participantId)">
               <mat-icon class="participant-chip-icon">person</mat-icon>
               <span>{{getParticipantName(participantId)}}</span>
-              <mat-icon class="remove-participant" (click)="toggleParticipantSelection(participantId, $event)">close</mat-icon>
+              <mat-icon data-testid="mcoh-toggle-participant-selection-30" class="remove-participant" (click)="toggleParticipantSelection(participantId, $event)">close</mat-icon>
             </div>
           </ng-container>
         </div>
@@ -440,7 +440,7 @@
               <span class="existing-title">Existing Participants</span>
               <span class="existing-count">({{existingParticipantsNotInList.length}} not in current list)</span>
             </div>
-            <button class="clear-existing-btn" (click)="clearExistingParticipants($event)" matTooltip="Remove all existing participants">
+            <button data-testid="mcoh-clear-existing-participants-31" class="clear-existing-btn" (click)="clearExistingParticipants($event)" matTooltip="Remove all existing participants">
               <mat-icon>delete_sweep</mat-icon>
               <span>Remove All</span>
             </button>
@@ -458,7 +458,7 @@
                 <span class="existing-chip-name">{{participant.name || participant.displayName || 'Unknown'}}</span>
                 <span class="existing-chip-email" *ngIf="participant.email">{{participant.email}}</span>
               </div>
-              <mat-icon class="remove-existing" (click)="removeExistingParticipant(participant.profileid, $event)" matTooltip="Remove from cohort">close</mat-icon>
+              <mat-icon data-testid="mcoh-remove-existing-participant-32" class="remove-existing" (click)="removeExistingParticipant(participant.profileid, $event)" matTooltip="Remove from cohort">close</mat-icon>
             </div>
           </div>
         </div>
@@ -511,8 +511,8 @@
 
   <!-- Footer Actions -->
   <div class="dialog-footer">
-    <button class="btn btn-secondary" (click)="onCancel()">Cancel</button>
-    <button class="btn btn-primary" (click)="onSubmit()" 
+    <button data-testid="mcoh-on-cancel-33" class="btn btn-secondary" (click)="onCancel()">Cancel</button>
+    <button data-testid="mcoh-on-submit-34" class="btn btn-primary" (click)="onSubmit()" 
         [disabled]="cohortsForm.invalid 
         || (cohortsForm.controls['cohortCategory'].value == 'studio' && ([null , undefined , ''].includes(cohortsForm.controls['bigactivity']?.value)))
         || ( isEventType() && [null , undefined , ''].includes(cohortsForm.controls['eventref']?.value))

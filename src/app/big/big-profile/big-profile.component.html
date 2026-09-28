@@ -164,7 +164,7 @@
       <div class="video-content" *ngIf="videoAsk.length > 0">
         <div class="video-grid">
           <div class="video-item" *ngFor="let video of videoAsk; let i = index">
-            <div *ngIf="i !== selectedVideoIndex" class="video-thumbnail" (click)="playVideo(i)">
+            <div data-testid="bprof-play-video-1" *ngIf="i !== selectedVideoIndex" class="video-thumbnail" (click)="playVideo(i)">
               <div class="play-button">
                 <i class="icon-play"></i>
               </div>

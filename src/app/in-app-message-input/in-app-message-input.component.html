@@ -1,6 +1,6 @@
 <header class="header color-teal">
     <h1 class="title">In-App Message</h1>
-    <button mat-icon-button mat-dialog-close class="close-button">
+    <button data-testid="iam-button" mat-icon-button mat-dialog-close class="close-button">
       <mat-icon style="color:white">close</mat-icon>
     </button>
   </header>
@@ -10,9 +10,9 @@
     <div class="d-flex flex-column content">
     
       <div class="row justify-content-center">
-        <button mat-raised-button (click)="view = 'select'" [ngStyle]="view == 'select' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Template Message</button>
+        <button data-testid="iam-button-2" mat-raised-button (click)="view = 'select'" [ngStyle]="view == 'select' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Template Message</button>
         &nbsp;&nbsp;
-        <button mat-raised-button (click)="view = 'create'" [ngStyle]="view == 'create' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Type & Send</button>
+        <button data-testid="iam-button-3" mat-raised-button (click)="view = 'create'" [ngStyle]="view == 'create' ? {'background-color':'green', 'color': 'white', 'font-weight': 'bold'} : {}">Type & Send</button>
       </div>
       <br>
       <div *ngIf="view == 'create'">
@@ -23,7 +23,7 @@
     
                 <mat-form-field appearance="outline" class="small-form-field" >  
                     <mat-label>Template Name</mat-label>
-                    <input matInput placeholder="Enter Template Name" formControlName="templateName" [readonly]="viewmode === 'edit'" required>
+                    <input data-testid="iam-templatename" matInput placeholder="Enter Template Name" formControlName="templateName" [readonly]="viewmode === 'edit'" required>
                     <mat-error *ngIf="templateForm.get('templateName').hasError('required')">
                         Template Name Is Required
                     </mat-error>
@@ -34,7 +34,7 @@
                 &nbsp;&nbsp;
                 <mat-form-field appearance="outline" class="small-form-field">  
                     <mat-label>Template Alias</mat-label>
-                    <input matInput placeholder="Enter Template Alias" formControlName="templateAlias" [readonly]="viewmode === 'edit'" required>
+                    <input data-testid="iam-templatealias" matInput placeholder="Enter Template Alias" formControlName="templateAlias" [readonly]="viewmode === 'edit'" required>
                     <mat-error *ngIf="!templateForm.controls['templateAlias'].valid">Template Alias Is Required</mat-error>
                     <mat-hint>Only a-z,'-','_','.' is allowed</mat-hint>
                 </mat-form-field>
@@ -42,31 +42,31 @@
                 <div class="d-flex flex-row">
                     <mat-form-field appearance="outline" class="small-form-field">
                         <mat-label>Select Category</mat-label>
-                        <mat-select formControlName="templateCategory" required>
+                        <mat-select data-testid="iam-templatecategory" formControlName="templateCategory" required>
                             <mat-option>
                                 <ngx-mat-select-search [(ngModel)]="searchCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                             </mat-option>
                             <mat-option *ngFor="let option of onSearchCategory()" [value]="option">{{option}}</mat-option>
-                            <mat-option *ngIf="onSearchCategory().length == 0 && searchCategory != '' " (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                            <mat-option data-testid="iam-addcategory" *ngIf="onSearchCategory().length == 0 && searchCategory != '' " (click)="addCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                         </mat-select>
                         <mat-error *ngIf="!templateForm.controls['templateCategory'].valid">Template Category Is Required</mat-error>
                     </mat-form-field>
-                    <button  *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addCategory()"><mat-icon>add</mat-icon></button>
+                    <button data-testid="iam-addcategory-2"  *ngIf="onSearchCategory().length == 0 && searchCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addCategory()"><mat-icon>add</mat-icon></button>
                 </div>
                 &nbsp;&nbsp;
                 <div class="d-flex flex-row">
                     <mat-form-field appearance="outline" class="small-form-field">
                         <mat-label>Select Sub-Category</mat-label>
-                        <mat-select formControlName="templateSubCategory" required>
+                        <mat-select data-testid="iam-templatesubcategory" formControlName="templateSubCategory" required>
                             <mat-option>
                                 <ngx-mat-select-search [(ngModel)]="searchSubCategory" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
                             </mat-option>
                             <mat-option *ngFor="let option of onSearchSubCategory()" [value]="option">{{option}}</mat-option>
-                            <mat-option *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
+                            <mat-option data-testid="iam-addsubcategory" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" (click)="addSubCategory()"><mat-icon>add</mat-icon>Add Category</mat-option>
                         </mat-select>
                         <mat-error *ngIf="!templateForm.controls['templateSubCategory'].valid">Template Sub Category Is Required</mat-error>
                     </mat-form-field>
-                    <button *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addSubCategory()"><mat-icon>add</mat-icon></button>
+                    <button data-testid="iam-addsubcategory-2" *ngIf="onSearchSubCategory().length == 0 && searchSubCategory != ''" mat-mini-fab style="margin-top: 10px;" (click)="addSubCategory()"><mat-icon>add</mat-icon></button>
                 </div>
                 &nbsp;&nbsp;
               </div>
@@ -76,40 +76,40 @@
     
         <mat-form-field appearance="outline" class="w-100">
           <mat-label>Title</mat-label>
-          <input matInput type="text" [(ngModel)]="bufferDoc.title">
+          <input data-testid="iam-input" matInput type="text" [(ngModel)]="bufferDoc.title">
         </mat-form-field>
     
         <mat-form-field appearance="outline" class="w-100">
           <mat-label>Sub Title</mat-label>
-          <input matInput type="text" [(ngModel)]="bufferDoc.subtitle">
+          <input data-testid="iam-input-2" matInput type="text" [(ngModel)]="bufferDoc.subtitle">
         </mat-form-field>
     
         <mat-form-field appearance="outline" class="w-100">
           <mat-label>Description</mat-label>
-          <textarea matInput name="description" rows="5" [(ngModel)]="bufferDoc.description"></textarea>
+          <textarea data-testid="iam-description" matInput name="description" rows="5" [(ngModel)]="bufferDoc.description"></textarea>
         </mat-form-field>
     
         <mat-form-field appearance="outline" class="w-100">
           <mat-label>Notes for creating these Messages to Participants</mat-label>
-          <textarea matInput name="notes" rows="5" [(ngModel)]="bufferDoc.notes" placeholder=""></textarea>
+          <textarea data-testid="iam-notes" matInput name="notes" rows="5" [(ngModel)]="bufferDoc.notes" placeholder=""></textarea>
         </mat-form-field>
       </div>
     
       <div *ngIf="view == 'select' && templateArray.length == 0">
         <div class="notemplate"><b >Oops! No Templates Found</b></div>
-        <div mat-stroked-button class="createTemplateBtn" type="button" (click)="createTemplate()">Need to Create a Template..? ></div>
+        <div data-testid="iam-createtemplate" mat-stroked-button class="createTemplateBtn" type="button" (click)="createTemplate()">Need to Create a Template..? ></div>
       </div>
       <div *ngIf="view == 'select' && templateArray.length != 0">
     
         <mat-form-field appearance="outline" class="col-md-12">
           <mat-label>Broadcast Name</mat-label>
           <br>
-          <input matInput type="text" [(ngModel)]="bufferDoc.broadcastname">
+          <input data-testid="iam-input-3" matInput type="text" [(ngModel)]="bufferDoc.broadcastname">
         </mat-form-field>
     
         <mat-form-field appearance="outline" class="col-md-12" >
           <mat-label>Select Template</mat-label>
-          <mat-select (selectionChange)="onTemplateChange($event)">
+          <mat-select data-testid="iam-mat-select" (selectionChange)="onTemplateChange($event)">
               <mat-option *ngFor="let template of templateArray" [value]="template">
                   {{template.templatename}}
               </mat-option>
@@ -118,9 +118,9 @@
   
         <br>
   
-        <div mat-stroked-button class="createTemplateBtn" type="button" (click)="createTemplate()">Need to Create a Template..? ></div>
+        <div data-testid="iam-createtemplate-2" mat-stroked-button class="createTemplateBtn" type="button" (click)="createTemplate()">Need to Create a Template..? ></div>
   
-        <input matInput type="text" [(ngModel)]="bufferDoc.broadcastname">
+        <input data-testid="iam-input-4" matInput type="text" [(ngModel)]="bufferDoc.broadcastname">
       
         <div style="padding: 15px;" *ngIf="isTemplatePresent()">
           <div class="inappcontainer">
@@ -134,7 +134,7 @@
       </div>
     
       <div class="d-flex flex-row justify-content-center" *ngIf="!sendValidation()">
-        <button mat-raised-button class="sendButton" type="button" [disabled]="sendValidation()" (click)="onSubmit(templateForm.value)">Send Message</button>
+        <button data-testid="iam-onsubmit" mat-raised-button class="sendButton" type="button" [disabled]="sendValidation()" (click)="onSubmit(templateForm.value)">Send Message</button>
       </div>
     </div>
   </div>

@@ -3,7 +3,7 @@
     <div class="forms">
         <mat-form-field class="formfield" appearance="outline">
             <mat-label autofocus="on">Sender Name</mat-label>
-            <mat-select [(ngModel)]="selectedClient">
+            <mat-select [(ngModel)]="selectedClient" data-testid="imd-sender">
                 <mat-option>
                     <ngx-mat-select-search [(ngModel)]="filteredClient" [ngModelOptions]="{standalone: true}"
                         [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
@@ -18,7 +18,7 @@
 
         <mat-form-field class="formfield" appearance="outline">
             <mat-label>Choose a Date</mat-label>
-            <input matInput [matDatepicker]="picker" [(ngModel)]="date">
+            <input matInput data-testid="imd-date" [matDatepicker]="picker" [(ngModel)]="date">
             <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
             <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
@@ -27,34 +27,34 @@
 
         <mat-form-field class="timefield" appearance="outline">
             <mat-label>Choose a Time</mat-label>
-            <input matInput type="time" [(ngModel)]="time">
+            <input matInput type="time" data-testid="imd-time" [(ngModel)]="time">
         </mat-form-field>
     </div>
     <div class="forms">
         <mat-form-field class="textarea" appearance="outline">
             <mat-label>Enter Message</mat-label>
-            <textarea matInput placeholder="Enter Message" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6" [(ngModel)]="message"></textarea>
+            <textarea matInput placeholder="Enter Message" data-testid="imd-message" cdkTextareaAutosize #autosize="cdkTextareaAutosize" cdkAutosizeMaxRows="6" cdkAutosizeMinRows="6" [(ngModel)]="message"></textarea>
         </mat-form-field>
 
         &nbsp;&nbsp;&nbsp;
 
         <div class="buttons">
-            <button mat-mini-fab [matMenuTriggerFor]="menu"><mat-icon>attach_file</mat-icon></button>
-            <mat-menu #menu="matMenu" yPosition="above" (click)="$event.stopPropagation()">
+            <button mat-mini-fab [matMenuTriggerFor]="menu" data-testid="imd-attach"><mat-icon>attach_file</mat-icon></button>
+            <mat-menu #menu="matMenu" yPosition="above" data-testid="imd-menu" (click)="$event.stopPropagation()">
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
+              <button mat-icon-button data-testid="imd-attach-image" (click)="chooseType('image')" class="attach"><mat-icon>image</mat-icon></button>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('video')"
+              <button mat-icon-button data-testid="imd-attach-video" (click)="chooseType('video')"
                 class="attach"><mat-icon>videocam</mat-icon></button>
               <br>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('audio')"
+              <button mat-icon-button data-testid="imd-attach-audio" (click)="chooseType('audio')"
                 class="attach"><mat-icon>music_note</mat-icon></button>
               &nbsp;&nbsp;
-              <button mat-icon-button (click)="chooseType('files')"
+              <button mat-icon-button data-testid="imd-attach-files" (click)="chooseType('files')"
                 class="attach"><mat-icon>picture_as_pdf</mat-icon></button>
             </mat-menu>
-            <input style="display: none;" #fileInput type="file" [accept]="this['filetype']" (click)="onClick($event)"
+            <input style="display: none;" #fileInput type="file" data-testid="imd-file-input" [accept]="this['filetype']" (click)="onClick($event)"
               (change)="selectFiles($event)" multiple>
           </div>
     </div>
@@ -65,13 +65,13 @@
                 <span class="lastmessage">
                     <p>{{file.filename}}</p>
                 </span>
-                <button mat-icon-button (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
+                <button mat-icon-button [attr.data-testid]="'imd-file-remove-' + index" (click)="removeFile(index)"><mat-icon>close</mat-icon></button>
             </div>
         </div>
     </span>
     <div style="display: flex; flex-direction: row; justify-content: space-evenly; width: 80%">
-        <button type="button" mat-stroked-button color="warn" (click)="dialogRef.close()">Close</button>
-        <button type="button" mat-stroked-button color="primary" (click)="insertMessage()" *ngIf="selectedClient != '' && message != ''">Insert Message</button>
+        <button type="button" mat-stroked-button color="warn" data-testid="imd-close" (click)="dialogRef.close()">Close</button>
+        <button type="button" mat-stroked-button color="primary" data-testid="imd-insert" (click)="insertMessage()" *ngIf="selectedClient != '' && message != ''">Insert Message</button>
     </div>
 </div>
 

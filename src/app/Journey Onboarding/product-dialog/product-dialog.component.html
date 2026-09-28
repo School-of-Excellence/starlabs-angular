@@ -7,7 +7,7 @@
   <div *ngIf="!loading">
     <header class="header">
       <h1 class="title">Purchases of {{![null,undefined,''].includes(participantjourneyproduct['name']) ? participantjourneyproduct['name'] : ''}}</h1>
-      <button mat-icon-button mat-dialog-close class="close-button">
+      <button data-testid="jpd-btn-001" mat-icon-button mat-dialog-close class="close-button">
         <mat-icon>close</mat-icon>
       </button>
     </header>
@@ -15,7 +15,7 @@
     <main class="main-content">
       <section class="journey-section" *ngIf="journeyList.length != 0">
         <div class="journey-container" *ngFor="let journey of journeyList">
-          <div class="journey-card" (click)="products(journey)">
+          <div data-testid="jpd-div-002" class="journey-card" (click)="products(journey)">
             <div class="journey-info">
               <h2 class="journey-name" *ngIf="![null,undefined,''].includes(journey['journeyref'])">
                 {{mapjourneyname[journey['journeyref'].id]['journey']}}

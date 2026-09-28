@@ -319,7 +319,7 @@
       <span class="header-text">Workshop </span>
       <span class="header-highlight">Q&A</span>
     </h2>
-    <button class="close-dialog-button" (click)="closeDialog()" mat-icon-button>
+    <button data-testid="que-close-dialog-1" class="close-dialog-button" (click)="closeDialog()" mat-icon-button>
       <mat-icon>close</mat-icon>
     </button>
   </div>
@@ -355,7 +355,7 @@
       </div>
     </div>
     
-    <button 
+    <button data-testid="que-ask-question-2" 
       class="ask-now-button"
       (click)="askQuestion()">
       Ask Now
@@ -389,12 +389,12 @@
           </div>
           <div class="question-meta">
             <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
-            <button 
+            <button data-testid="que-delete-item-3" 
               class="delete-button"
               (click)="deleteItem(question.docid)">
               <mat-icon>delete</mat-icon>
             </button>
-            <button *ngIf="question['onetoone'] !== true"
+            <button data-testid="que-pin-question-4" *ngIf="question['onetoone'] !== true"
               class="pin-button"
               (click)="pinQuestion(question.docid,'unpin')">
               <mat-icon>push_pin</mat-icon>
@@ -407,7 +407,7 @@
         {{ question.question }}
       </div>
       <div class="main-reply-section">
-        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+        <div data-testid="que-start-reply-5" *ngIf="!isActiveReply('main_' + question.docid)" 
              class="reply-link"
              (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
           Reply
@@ -424,24 +424,24 @@
               #replyInput>
             </textarea>
             
-            <button class="reply-send-button" (click)="postReply(question)">
+            <button data-testid="que-post-reply-6" class="reply-send-button" (click)="postReply(question)">
               <mat-icon>send</mat-icon>
             </button>
             
-            <button class="reply-cancel-button" (click)="cancelReply()">
+            <button data-testid="que-cancel-reply-7" class="reply-cancel-button" (click)="cancelReply()">
               <mat-icon>close</mat-icon>
             </button>
           </div>
         </div>
       </div>
       <div class="replies-section">
-        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-8" *ngIf="shouldShowViewAllReplies(question.docid)" 
              class="view-all-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
           <mat-icon>expand_more</mat-icon>
         </div>
-        <div *ngIf="shouldShowHideReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-9" *ngIf="shouldShowHideReplies(question.docid)" 
              class="hide-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>Hide Replies</span>
@@ -466,7 +466,7 @@
                   </span>
                 </span>
                 <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
-                <button 
+                <button data-testid="que-delete-item-10" 
                   class="delete-button small"
                   (click)="deleteItem(reply.docid)">
                   <mat-icon>delete</mat-icon>
@@ -480,7 +480,7 @@
                 {{ reply.question }}
               </div>
               <div class="reply-to-reply-section">
-                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                <div data-testid="que-start-reply-11" *ngIf="!isActiveReply('reply_' + reply.docid)" 
                      class="reply-to-reply-link"
                      (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
                   Reply
@@ -496,11 +496,11 @@
                       (keypress)="onReplyKeyPress($event,reply)">
                     </textarea>
                     
-                    <button class="reply-send-button small" (click)="postReply(reply)">
+                    <button data-testid="que-post-reply-12" class="reply-send-button small" (click)="postReply(reply)">
                       <mat-icon>send</mat-icon>
                     </button>
                     
-                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                    <button data-testid="que-cancel-reply-13" class="reply-cancel-button small" (click)="cancelReply()">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
@@ -539,7 +539,7 @@
           </div>
           <div class="question-meta">
             <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
-            <button 
+            <button data-testid="que-delete-item-14" 
               class="delete-button"
               (click)="deleteItem(question.docid)">
               <mat-icon>delete</mat-icon>
@@ -551,7 +551,7 @@
         {{ question.question }}
       </div>
       <div class="main-reply-section">
-        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+        <div data-testid="que-start-reply-15" *ngIf="!isActiveReply('main_' + question.docid)" 
              class="reply-link"
              (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
           Reply
@@ -568,24 +568,24 @@
               #replyInput>
             </textarea>
             
-            <button class="reply-send-button" (click)="postReply(question)">
+            <button data-testid="que-post-reply-16" class="reply-send-button" (click)="postReply(question)">
               <mat-icon>send</mat-icon>
             </button>
             
-            <button class="reply-cancel-button" (click)="cancelReply()">
+            <button data-testid="que-cancel-reply-17" class="reply-cancel-button" (click)="cancelReply()">
               <mat-icon>close</mat-icon>
             </button>
           </div>
         </div>
       </div>
       <div class="replies-section">
-        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-18" *ngIf="shouldShowViewAllReplies(question.docid)" 
              class="view-all-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
           <mat-icon>expand_more</mat-icon>
         </div>
-        <div *ngIf="shouldShowHideReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-19" *ngIf="shouldShowHideReplies(question.docid)" 
              class="hide-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>Hide Replies</span>
@@ -610,7 +610,7 @@
                   </span>
                 </span>
                 <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
-                <button 
+                <button data-testid="que-delete-item-20" 
                   class="delete-button small"
                   (click)="deleteItem(reply.docid)">
                   <mat-icon>delete</mat-icon>
@@ -624,7 +624,7 @@
                 {{ reply.question }}
               </div>
               <div class="reply-to-reply-section">
-                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                <div data-testid="que-start-reply-21" *ngIf="!isActiveReply('reply_' + reply.docid)" 
                      class="reply-to-reply-link"
                      (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
                   Reply
@@ -640,11 +640,11 @@
                       (keypress)="onReplyKeyPress($event,reply)">
                     </textarea>
                     
-                    <button class="reply-send-button small" (click)="postReply(reply)">
+                    <button data-testid="que-post-reply-22" class="reply-send-button small" (click)="postReply(reply)">
                       <mat-icon>send</mat-icon>
                     </button>
                     
-                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                    <button data-testid="que-cancel-reply-23" class="reply-cancel-button small" (click)="cancelReply()">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>
@@ -675,12 +675,12 @@
               <span class="user-name">{{ getDisplayName(question.profileid, question.isadmin) }}</span>
             </span>
             <span style="font-weight: bold;color: red;size: 18;">{{question['onetoone']? 'Private': ''}}</span>
-            <button *ngIf="question['onetoone'] !== true"
+            <button data-testid="que-move-item-24" *ngIf="question['onetoone'] !== true"
               class="move-button"
               (click)="moveItem(question.docid)">
               <mat-icon>open_with</mat-icon>
             </button>
-            <button *ngIf="question['onetoone'] !== true"
+            <button data-testid="que-pin-question-25" *ngIf="question['onetoone'] !== true"
               class="pin-button"
               (click)="pinQuestion(question.docid,'pin')">
               <mat-icon>push_pin</mat-icon>
@@ -692,7 +692,7 @@
           </div>
           <div class="question-meta">
             <span class="question-date">Asked on {{ formatDate(question.date) }}</span>
-            <button 
+            <button data-testid="que-delete-item-26" 
               class="delete-button"
               (click)="deleteItem(question.docid)">
               <mat-icon>delete</mat-icon>
@@ -704,7 +704,7 @@
         {{ question.question }}
       </div>
       <div class="main-reply-section">
-        <div *ngIf="!isActiveReply('main_' + question.docid)" 
+        <div data-testid="que-start-reply-27" *ngIf="!isActiveReply('main_' + question.docid)" 
              class="reply-link"
              (click)="startReply(question.docid, question.profileid, 'main_' + question.docid)">
           Reply
@@ -720,24 +720,24 @@
               (keypress)="onReplyKeyPress($event,question)">
             </textarea>
             
-            <button class="reply-send-button" (click)="postReply(question)">
+            <button data-testid="que-post-reply-28" class="reply-send-button" (click)="postReply(question)">
               <mat-icon>send</mat-icon>
             </button>
             
-            <button class="reply-cancel-button" (click)="cancelReply()">
+            <button data-testid="que-cancel-reply-29" class="reply-cancel-button" (click)="cancelReply()">
               <mat-icon>close</mat-icon>
             </button>
           </div>
         </div>
       </div>
       <div class="replies-section">
-        <div *ngIf="shouldShowViewAllReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-30" *ngIf="shouldShowViewAllReplies(question.docid)" 
              class="view-all-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>View All {{ getRepliesForQuestion(question.docid).length }} Replies</span>
           <mat-icon>expand_more</mat-icon>
         </div>
-        <div *ngIf="shouldShowHideReplies(question.docid)" 
+        <div data-testid="que-toggle-show-all-replies-31" *ngIf="shouldShowHideReplies(question.docid)" 
              class="hide-replies"
              (click)="toggleShowAllReplies(question.docid)">
           <span>Hide Replies</span>
@@ -762,7 +762,7 @@
                   </span>
                 </span>
                 <span class="reply-date">Replied on {{ formatDate(reply.date) }}</span>
-                <button 
+                <button data-testid="que-delete-item-32" 
                   class="delete-button small"
                   (click)="deleteItem(reply.docid)">
                   <mat-icon>delete</mat-icon>
@@ -776,7 +776,7 @@
                 {{ reply.question }}
               </div>
               <div class="reply-to-reply-section">
-                <div *ngIf="!isActiveReply('reply_' + reply.docid)" 
+                <div data-testid="que-start-reply-33" *ngIf="!isActiveReply('reply_' + reply.docid)" 
                      class="reply-to-reply-link"
                      (click)="startReply(reply.replyid!, reply.profileid, 'reply_' + reply.docid)">
                   Reply
@@ -792,11 +792,11 @@
                       (keypress)="onReplyKeyPress($event,reply)">
                     </textarea>
                     
-                    <button class="reply-send-button small" (click)="postReply(reply)">
+                    <button data-testid="que-post-reply-34" class="reply-send-button small" (click)="postReply(reply)">
                       <mat-icon>send</mat-icon>
                     </button>
                     
-                    <button class="reply-cancel-button small" (click)="cancelReply()">
+                    <button data-testid="que-cancel-reply-35" class="reply-cancel-button small" (click)="cancelReply()">
                       <mat-icon>close</mat-icon>
                     </button>
                   </div>

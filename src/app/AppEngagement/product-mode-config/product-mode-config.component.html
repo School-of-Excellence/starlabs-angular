@@ -5,7 +5,7 @@
       <mat-expansion-panel>
         <mat-expansion-panel-header>
           <mat-panel-title>
-          {{product["product"]}} <mat-icon class="editicon" (click)="editProduct(product)">edit</mat-icon>
+          {{product["product"]}} <mat-icon [attr.data-testid]="'pmc-act-1-' + product" class="editicon" (click)="editProduct(product)">edit</mat-icon>
           </mat-panel-title>
           <mat-panel-description></mat-panel-description>
         </mat-expansion-panel-header>
@@ -13,7 +13,7 @@
           <mat-list class="inline-list">
             <div *ngFor="let mode of product['modeflow']" mat-list-item>
               <div class="modebox">
-                <div class="modetitle" (click)="updateConfig(mode, product['id'])">{{mode}}</div>
+                <div [attr.data-testid]="'pmc-act-2-' + mode" class="modetitle" (click)="updateConfig(mode, product['id'])">{{mode}}</div>
                 <div *ngIf="productmodeConfig[product['id']+mode] != undefined && productmodeConfig[product['id']+mode] != null">
                   <ul>
                     <!-- {{productmodeConfig[product['id']+mode] | json}} -->

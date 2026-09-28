@@ -10,7 +10,7 @@
     </div>
 
     <div class="arena__head-stats">
-      <button class="arena__back" (click)="goBack()">
+      <button class="arena__back" (click)="goBack()" data-testid="arb-back">
         <mat-icon>arrow_back</mat-icon> Back
       </button>
     </div>
@@ -28,7 +28,7 @@
   <div class="arena__load-error" *ngIf="loadError" role="alert">
     <mat-icon>cloud_off</mat-icon>
     <span>{{ loadError }}</span>
-    <button type="button" class="arena__load-retry" (click)="retryLoad()">
+    <button type="button" class="arena__load-retry" (click)="retryLoad()" data-testid="arb-retry">
       <mat-icon>refresh</mat-icon> Retry
     </button>
   </div>
@@ -39,22 +39,22 @@
     <!-- ----- LEFT SIDEBAR ----- -->
     <aside class="arena__left" [class.is-closed]="!leftOpen">
       <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
-      <button class="panel-rail" *ngIf="!leftOpen" (click)="leftOpen = true" matTooltip="Show participants panel">
+      <button class="panel-rail" *ngIf="!leftOpen" (click)="leftOpen = true" matTooltip="Show participants panel" data-testid="arb-left-reopen">
         <mat-icon>chevron_right</mat-icon>
       </button>
 
       <ng-container *ngIf="leftOpen">
       <div class="panel-bar panel-bar--end">
-        <button class="panel-collapse" (click)="leftOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+        <button class="panel-collapse" (click)="leftOpen = false" matTooltip="Close this panel" aria-label="Close panel" data-testid="arb-left-collapse">
           <mat-icon>close</mat-icon>
         </button>
       </div>
       <div class="arena__left-tabs">
-        <button class="ltab" [class.ltab--active]="leftTab === 'participants'" (click)="leftTab = 'participants'">
+        <button class="ltab" [class.ltab--active]="leftTab === 'participants'" (click)="leftTab = 'participants'" data-testid="arb-lefttab-participants">
           <mat-icon>groups</mat-icon> Participants
           <span class="ltab__count">{{ waitingCount + queuedCount }}</span>
         </button>
-        <button class="ltab" [class.ltab--active]="leftTab === 'specialists'" (click)="leftTab = 'specialists'">
+        <button class="ltab" [class.ltab--active]="leftTab === 'specialists'" (click)="leftTab = 'specialists'" data-testid="arb-lefttab-specialists">
           <mat-icon>person</mat-icon> Specialists
           <span class="ltab__count">{{ stageStudios.length }}</span>
         </button>
@@ -163,7 +163,7 @@
                   {{ sp.name }}<span class="kc__role-act" *ngIf="sp.activity"> · {{ sp.activity }}</span><span *ngIf="!last">, </span>
                 </span>
               </div>
-              <button type="button" class="kc__chat-btn" (click)="rightTab = 'chat'; openStudioChat(s.docid)" matTooltip="Open chat">
+              <button type="button" class="kc__chat-btn" (click)="rightTab = 'chat'; openStudioChat(s.docid)" matTooltip="Open chat" [attr.data-testid]="'arb-idle-chat-' + s.docid">
                 <mat-icon>chat</mat-icon>
                 <span *ngIf="getStudioUnreadCount(s.docid) > 0" class="kc__chat-badge">
                   {{ getStudioUnreadCount(s.docid) > 99 ? '99+' : getStudioUnreadCount(s.docid) }}
@@ -204,7 +204,7 @@
                 {{ inviteCountdown(item.invitation) }}
               </span>
               <button type="button" class="kc__chat-btn kc__chat-btn--inline" *ngIf="item.studio"
-                      (click)="rightTab = 'chat'; openStudioChat(item.studio.docid)" matTooltip="Open chat">
+                      (click)="rightTab = 'chat'; openStudioChat(item.studio.docid)" matTooltip="Open chat" [attr.data-testid]="'arb-inviting-chat-' + item.studio.docid">
                 <mat-icon>chat</mat-icon>
                 <span *ngIf="getStudioUnreadCount(item.studio.docid) > 0" class="kc__chat-badge">
                   {{ getStudioUnreadCount(item.studio.docid) > 99 ? '99+' : getStudioUnreadCount(item.studio.docid) }}
@@ -272,7 +272,7 @@
                 <mat-icon style="font-size:12px;width:12px;height:12px;line-height:12px;">hourglass_top</mat-icon>
                 {{ sinceStudioEntry(a) }}
               </span>
-              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat">
+              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat" [attr.data-testid]="'arb-joined-chat-' + a.studioid">
                 <mat-icon>chat</mat-icon>
                 <span *ngIf="getStudioUnreadCount(a.studioid) > 0" class="kc__chat-badge">
                   {{ getStudioUnreadCount(a.studioid) > 99 ? '99+' : getStudioUnreadCount(a.studioid) }}
@@ -402,7 +402,7 @@
                 <span class="kc__timer-label">{{ callEnded(a) ? 'Total time' : 'Running for' }}</span>
                 {{ sessionElapsed(a) }}
               </span>
-              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat">
+              <button type="button" class="kc__chat-btn kc__chat-btn--inline" (click)="rightTab = 'chat'; openStudioChat(a.studioid)" matTooltip="Open chat" [attr.data-testid]="'arb-active-chat-' + a.studioid">
                 <mat-icon>chat</mat-icon>
                 <span *ngIf="getStudioUnreadCount(a.studioid) > 0" class="kc__chat-badge">
                   {{ getStudioUnreadCount(a.studioid) > 99 ? '99+' : getStudioUnreadCount(a.studioid) }}
@@ -418,21 +418,21 @@
     <!-- ----- RIGHT PANEL ----- -->
     <aside class="arena__right" [class.is-closed]="!rightOpen">
       <!-- Collapsed: thin rail with a reopen control (kept inside the sidenav) -->
-      <button class="panel-rail" *ngIf="!rightOpen" (click)="rightOpen = true" matTooltip="Show done panel">
+      <button class="panel-rail" *ngIf="!rightOpen" (click)="rightOpen = true" matTooltip="Show done panel" data-testid="arb-right-reopen">
         <mat-icon>chevron_left</mat-icon>
       </button>
 
       <ng-container *ngIf="rightOpen">
       <div class="panel-bar panel-bar--start">
-        <button class="panel-collapse" (click)="rightOpen = false" matTooltip="Close this panel" aria-label="Close panel">
+        <button class="panel-collapse" (click)="rightOpen = false" matTooltip="Close this panel" aria-label="Close panel" data-testid="arb-right-collapse">
           <mat-icon>close</mat-icon>
         </button>
       </div>
       <div class="arena__right-tabs">
-        <button class="rtab" [class.rtab--active]="rightTab === 'done'" (click)="rightTab = 'done'">
+        <button class="rtab" [class.rtab--active]="rightTab === 'done'" (click)="rightTab = 'done'" data-testid="arb-righttab-done">
           <mat-icon>check_circle</mat-icon> Done <span class="rtab__count">{{ seDoneCount }}</span>
         </button>
-        <button class="rtab" [class.rtab--active]="rightTab === 'chat'" (click)="rightTab = 'chat'; backToChatList()">
+        <button class="rtab" [class.rtab--active]="rightTab === 'chat'" (click)="rightTab = 'chat'; backToChatList()" data-testid="arb-righttab-chat">
           <mat-icon>chat</mat-icon> Chat
           <span *ngIf="unreadChatCount > 0" class="rtab__badge">
             {{ unreadChatCount > 99 ? '99+' : unreadChatCount }}
@@ -454,7 +454,7 @@
         <div class="chat-thread-list" *ngIf="!selectedChatStudioId">
           <div *ngFor="let studio of studios"
               class="chat-thread-row"
-              (click)="openStudioChat(studio.docid)">
+              (click)="openStudioChat(studio.docid)" [attr.data-testid]="'arb-chat-thread-' + studio.docid">
             <div class="chat-thread-row__name">
               {{ getStudioChatName(studio.docid) }}
               <span *ngIf="getStudioUnreadCount(studio.docid) > 0" class="chat-thread-row__badge">
@@ -468,7 +468,7 @@
 
         <div class="chat-thread-active" *ngIf="selectedChatStudioId">
           <div class="chat-thread-active__head">
-            <button type="button" class="chat-back-btn" (click)="backToChatList()">
+            <button type="button" class="chat-back-btn" (click)="backToChatList()" data-testid="arb-chat-back">
               <mat-icon>arrow_back</mat-icon>
             </button>
             <span class="chat-thread-active__title">{{ getStudioChatName(selectedChatStudioId) }}</span>
@@ -476,7 +476,7 @@
 
           <div class="chat-messages" #chatMessagesScroll>
             <div *ngIf="chatHasMore" class="chat-showmore">
-              <button type="button" (click)="loadMoreChatMessages()" [disabled]="chatLoadingMore">
+              <button type="button" (click)="loadMoreChatMessages()" [disabled]="chatLoadingMore" data-testid="arb-chat-showmore">
                 {{ chatLoadingMore ? 'Loading...' : 'Show more' }}
               </button>
             </div>
@@ -489,11 +489,11 @@
               <div class="chat-msg__bubble">
                 <p *ngIf="msg['message']" [innerHTML]="processMessage(msg['message'], msg['sent_by'] === profileid ? '#ffffff' : '#1a56db')"></p>
                   <div *ngFor="let f of msg['files']">
-                    <img *ngIf="isImageFile(f.filename)" [src]="f.fileurl" class="chat-msg__img" style="cursor:pointer;" (click)="expandedImage = f.fileurl">
+                    <img *ngIf="isImageFile(f.filename)" [src]="f.fileurl" class="chat-msg__img" style="cursor:pointer;" (click)="expandedImage = f.fileurl" [attr.data-testid]="'arb-chat-img-' + f.filename">
                     <div *ngIf="!isImageFile(f.filename)" class="chat-msg__file">
                       <mat-icon>attach_file</mat-icon>
                       <span>{{ f.filename }}</span>
-                      <a [href]="f.fileurl" target="_blank" (click)="$event.stopPropagation()">
+                      <a [href]="f.fileurl" target="_blank" (click)="$event.stopPropagation()" [attr.data-testid]="'arb-chat-download-' + f.filename">
                         <mat-icon>download</mat-icon>
                       </a>
                     </div>
@@ -512,7 +512,7 @@
             <div *ngFor="let f of chatAttachedFiles; let i = index" class="chat-preview">
               <img *ngIf="f.fileurl" [src]="f.fileurl">
               <mat-icon *ngIf="!f.fileurl">attach_file</mat-icon>
-              <button type="button" (click)="removeChatFile(i)">
+              <button type="button" (click)="removeChatFile(i)" [attr.data-testid]="'arb-chat-removefile-' + i">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -521,13 +521,13 @@
           <div class="chat-input-row">
             <input #arenaChatFileInput type="file" multiple style="display:none"
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
-              (change)="onChatFileSelected($event)">
-            <textarea [(ngModel)]="chatText" placeholder="Type a message..." rows="1"(keydown)="onChatKeydown($event)"class="arena-chat-input-textarea"></textarea>
-            <button type="button" (click)="arenaChatFileInput.click()">
+              (change)="onChatFileSelected($event)" data-testid="arb-chat-fileinput">
+            <textarea [(ngModel)]="chatText" placeholder="Type a message..." rows="1"(keydown)="onChatKeydown($event)"class="arena-chat-input-textarea" data-testid="arb-chat-input"></textarea>
+            <button type="button" (click)="arenaChatFileInput.click()" data-testid="arb-chat-attach">
               <mat-icon>attach_file</mat-icon>
             </button>
             <button type="button" (click)="sendChatMessage()"
-              [disabled]="chatUploading || (!chatText.trim() && !chatAttachedFiles.length)">
+              [disabled]="chatUploading || (!chatText.trim() && !chatAttachedFiles.length)" data-testid="arb-chat-send">
               <mat-icon>{{ chatUploading ? 'hourglass_top' : 'send' }}</mat-icon>
             </button>
           </div>
@@ -536,9 +536,9 @@
       </ng-container>
     </aside>
   </main>
-  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null">
-    <div class="preview-panel" (click)="$event.stopPropagation()">
-      <button class="preview-close-btn" (click)="expandedImage = null">✕</button>
+  <div class="preview-backdrop" *ngIf="expandedImage" (click)="expandedImage = null" data-testid="arb-preview-backdrop">
+    <div class="preview-panel" (click)="$event.stopPropagation()" data-testid="arb-preview-panel">
+      <button class="preview-close-btn" (click)="expandedImage = null" data-testid="arb-preview-close">✕</button>
       <img class="preview-image" [src]="expandedImage" alt="Preview">
     </div>
   </div>

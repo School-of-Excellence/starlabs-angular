@@ -41,7 +41,7 @@
             {{ element.id ? ('workshop participant enrolled/' + element.id) : 'Not Created' }}
           </span>
 
-          <button
+          <button data-testid="cw-copy-to-clipboard-1"
             *ngIf="element.id"
             mat-icon-button
             (click)="copyToClipboard('workshop participant enrolled/' + element.id)"
@@ -59,7 +59,7 @@
             {{ element.participantworkshopid ? ('participant workshop/' + element.participantworkshopid) : 'Not Created' }}
           </span>
 
-          <button
+          <button data-testid="cw-copy-to-clipboard-2"
             *ngIf="element.participantworkshopid"
             mat-icon-button
             (click)="copyToClipboard('participant workshop/' + element.participantworkshopid)"
@@ -73,7 +73,7 @@
     <ng-container matColumnDef="actions">
     <th mat-header-cell *matHeaderCellDef> Actions </th>
     <td mat-cell *matCellDef="let element">
-        <button mat-icon-button color="warn" (click)="deleteRow(element)">
+        <button data-testid="cw-delete-row-3" mat-icon-button color="warn" (click)="deleteRow(element)">
         <mat-icon>delete</mat-icon>
         </button>
     </td>
@@ -91,5 +91,5 @@
 </div>
 
 <div mat-dialog-actions align="end">
-  <button mat-button (click)="closeDialog()">Close</button>
+  <button data-testid="cw-close-dialog-4" mat-button (click)="closeDialog()">Close</button>
 </div>

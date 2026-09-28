@@ -7,7 +7,7 @@
     
     <header class="header">
       <h1 class="title">Journey Completed - {{data['completed'].length}}</h1>
-      <button mat-icon-button mat-dialog-close class="close-button">
+      <button data-testid="jcc-btn-001" mat-icon-button mat-dialog-close class="close-button">
         <mat-icon>close</mat-icon>
       </button>
     </header>
@@ -21,12 +21,12 @@
 
                 <mat-form-field appearance="outline">
                     <mat-label>Search Name</mat-label>
-                    <input type="text" matInput formControlName="name" placeholder="Search">
+                    <input data-testid="jcc-inp-002" type="text" matInput formControlName="name" placeholder="Search">
                 </mat-form-field>
                 
                 <mat-form-field appearance="outline">
                     <mat-label>Onboarded By</mat-label>
-                    <mat-select formControlName="onboardedby">
+                    <mat-select data-testid="jcc-msel-003" formControlName="onboardedby">
                     <mat-option value="">All Coaches</mat-option>
                     <mat-option *ngFor="let coach of coachesList" [value]="mapProfile[coach]">
                         {{mapProfile[coach]}}
@@ -38,14 +38,14 @@
                     <mat-form-field appearance="outline">
                     <mat-label>Completed Date</mat-label>
                     <mat-date-range-input [rangePicker]="rangePicker">
-                        <input matStartDate formControlName="start" placeholder="Start date">
-                        <input matEndDate formControlName="end" placeholder="End date">
+                        <input data-testid="jcc-inp-004" matStartDate formControlName="start" placeholder="Start date">
+                        <input data-testid="jcc-inp-005" matEndDate formControlName="end" placeholder="End date">
                     </mat-date-range-input>
                     <mat-datepicker-toggle matSuffix [for]="rangePicker"></mat-datepicker-toggle>
                     <mat-date-range-picker #rangePicker></mat-date-range-picker>
                     </mat-form-field>
                 </div>
-                <button mat-raised-button color="primary" (click)="resetFilters()" class="reset-button">
+                <button data-testid="jcc-btn-006" mat-raised-button color="primary" (click)="resetFilters()" class="reset-button">
                     <mat-icon>filter_alt_off</mat-icon> Reset
                 </button>
             </div>
@@ -121,7 +121,7 @@
                 <span *ngIf="element['onboardingreportlog']" style="cursor: pointer;" >
                     <div class="notes-container">
                     <div *ngIf="element['onboardingreportlog']?.length > 0;">
-                        <div (click)="viewReport(element)">
+                        <div data-testid="jcc-div-007" (click)="viewReport(element)">
                         <span class="note-text" matTooltip="{{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report }}">
                             {{ element['onboardingreportlog'][element['onboardingreportlog'].length - 1].report | slice:0:20 }}...
                         </span>

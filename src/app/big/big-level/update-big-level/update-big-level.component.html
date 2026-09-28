@@ -23,7 +23,7 @@
         </mat-error>
       </mat-form-field>
     </div>
-    <button mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
-    <button mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Level'}}</button>
+    <button data-testid="ubl-close-1" mat-stroked-button class="cancelbtn" type="button" (click)="close()" [disabled]="loading">Close</button>
+    <button data-testid="ubl-button-2" mat-stroked-button class="submitbtn" type="submit" [disabled]="loading">{{loading ? 'Updating....' : 'Update Level'}}</button>
   </form>
 </div>

@@ -121,7 +121,7 @@
                 <span class="op-source-meta-item op-source-meta-item--muted" *ngIf="!scheduleValue(bucket, p)">
                   No date
                 </span>
-                <button type="button"
+                <button data-testid="jop-btn-001" type="button"
                         *ngIf="bucket.key === 'tobeonboarded' || bucket.key === 'tobeonboardedwc'"
                         class="op-source-schedule-btn"
                         (click)="openScheduleDialog(p, $event)"
@@ -164,7 +164,7 @@
               </div>
 
               <div class="op-source-card-actions">
-                <button type="button"
+                <button data-testid="jop-btn-002" type="button"
                         *ngIf="counterpartBucketKey(bucket.key)"
                         [class.op-source-move]="isWelcomeCallForward(bucket.key)"
                         [class.op-source-move-back]="!isWelcomeCallForward(bucket.key)"
@@ -182,7 +182,7 @@
                   </svg>
                   {{ moveLabelForBucket(bucket.key) }}
                 </button>
-                <button type="button"
+                <button data-testid="jop-btn-003" type="button"
                         class="op-source-add"
                         (click)="addFromSource(p, $event)">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -199,29 +199,29 @@
     </section>
 
     <!-- ─── Image lightbox ─── -->
-    <div class="op-lightbox" *ngIf="expandedImage" (click)="closeExpandedImage()">
-      <button type="button" class="op-lightbox-close" (click)="closeExpandedImage()" aria-label="Close">
+    <div data-testid="jop-div-004" class="op-lightbox" *ngIf="expandedImage" (click)="closeExpandedImage()">
+      <button data-testid="jop-btn-005" type="button" class="op-lightbox-close" (click)="closeExpandedImage()" aria-label="Close">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round">
           <path d="M18 6L6 18M6 6l12 12"/>
         </svg>
       </button>
-      <div class="op-lightbox-frame" (click)="$event.stopPropagation()">
+      <div data-testid="jop-div-006" class="op-lightbox-frame" (click)="$event.stopPropagation()">
         <img [src]="expandedImage" [alt]="expandedImageName" />
         <div class="op-lightbox-caption" *ngIf="expandedImageName">{{ expandedImageName }}</div>
       </div>
     </div>
 
     <!-- ─── Welcome-call notes modal ─── -->
-    <div class="op-overlay" *ngIf="wcModalOpen" (click)="closeWcModal()">
-      <div class="op-modal op-modal--wc" (click)="$event.stopPropagation()">
+    <div data-testid="jop-div-007" class="op-overlay" *ngIf="wcModalOpen" (click)="closeWcModal()">
+      <div data-testid="jop-div-008" class="op-modal op-modal--wc" (click)="$event.stopPropagation()">
         <div class="op-modal-head">
           <div>
             <span class="op-modal-eyebrow">Welcome call note</span>
             <h2 class="op-modal-title">Move {{ wcModalParticipant?.name || 'this participant' }}</h2>
             <p class="op-modal-sub">Destination: <strong>{{ wcModalDestLabel }}</strong></p>
           </div>
-          <button type="button" class="op-modal-close"
+          <button data-testid="jop-btn-009" type="button" class="op-modal-close"
                   (click)="closeWcModal()"
                   [disabled]="wcModalSaving" aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -257,7 +257,7 @@
           </div>
 
           <label class="op-modal-label">Add a note for this move</label>
-          <textarea class="op-modal-textarea"
+          <textarea data-testid="jop-txt-010" class="op-modal-textarea"
                     [(ngModel)]="wcModalNotes"
                     rows="4"
                     placeholder="What did you discuss? Any next steps?"
@@ -269,10 +269,10 @@
         </div>
 
         <div class="op-modal-foot">
-          <button type="button" class="op-modal-cancel"
+          <button data-testid="jop-btn-011" type="button" class="op-modal-cancel"
                   (click)="closeWcModal()"
                   [disabled]="wcModalSaving">Cancel</button>
-          <button type="button" class="op-modal-save"
+          <button data-testid="jop-btn-012" type="button" class="op-modal-save"
                   (click)="submitWcModal()"
                   [disabled]="wcModalSaving || !wcModalNotes.trim()">
             <mat-spinner *ngIf="wcModalSaving" diameter="12" strokeWidth="2"></mat-spinner>
@@ -307,9 +307,9 @@
               <circle cx="11" cy="11" r="8"/>
               <line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input [(ngModel)]="pipelineSearch" placeholder="Search pipelines…" />
+            <input data-testid="jop-inp-013" [(ngModel)]="pipelineSearch" placeholder="Search pipelines…" />
           </div>
-          <button type="button" class="op-new-pipeline" (click)="openAddPipeline()">
+          <button data-testid="jop-btn-014" type="button" class="op-new-pipeline" (click)="openAddPipeline()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.2" stroke-linecap="round">
               <path d="M12 5v14M5 12h14"/>
@@ -335,7 +335,7 @@
 
       <!-- Pipeline grid -->
       <div class="op-grid" *ngIf="pipelines.length > 0">
-        <div *ngFor="let p of filteredPipelines; let i = index"
+        <div data-testid="jop-div-015" *ngFor="let p of filteredPipelines; let i = index"
              class="op-card"
              (click)="openPipeline(p)">
           <div class="op-card-rail" [style.background]="stageAccent(i)"></div>
@@ -351,7 +351,7 @@
               </svg>
               Admin view
             </span>
-            <button class="op-card-edit"
+            <button data-testid="jop-btn-016" class="op-card-edit"
                     (click)="openEditPipeline(p, $event)"
                     matTooltip="Edit pipeline"
                     aria-label="Edit pipeline">
@@ -420,7 +420,7 @@
   <ng-container *ngIf="!loading && !accessDenied && selectedPipeline as p">
     <div class="op-stage-header">
       <div class="op-stage-header-main">
-        <button class="op-back" (click)="back()" aria-label="Back to pipelines">
+        <button data-testid="jop-btn-017" class="op-back" (click)="back()" aria-label="Back to pipelines">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -442,7 +442,7 @@
           <span class="op-stage-stat-num">{{ totalLeadsInPipeline }}</span>
           <span class="op-stage-stat-label">Leads</span>
         </div>
-        <button class="op-stage-edit" (click)="openEditPipeline(p, $event)">
+        <button data-testid="jop-btn-018" class="op-stage-edit" (click)="openEditPipeline(p, $event)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"/>
@@ -450,7 +450,7 @@
           </svg>
           Edit
         </button>
-        <button class="op-stage-add" (click)="openAddLead($event)">
+        <button data-testid="jop-btn-019" class="op-stage-add" (click)="openAddLead($event)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 5v14M5 12h14"/>
@@ -489,7 +489,7 @@
             <span class="op-col-empty-text">No leads in this stage</span>
           </div>
 
-          <article class="op-lead"
+          <article data-testid="jop-article-020" class="op-lead"
                    *ngFor="let lead of leadsByStage[stage]"
                    (click)="openLeadDetail(lead, stage)">
             <header class="op-lead-top">
@@ -560,14 +560,14 @@
     </div>
 
     <!-- ─── Lead detail modal ─── -->
-    <div class="op-overlay" *ngIf="leadModalOpen" (click)="closeLeadDetail()">
-      <div class="op-modal op-modal--lead" (click)="$event.stopPropagation()">
+    <div data-testid="jop-div-021" class="op-overlay" *ngIf="leadModalOpen" (click)="closeLeadDetail()">
+      <div data-testid="jop-div-022" class="op-modal op-modal--lead" (click)="$event.stopPropagation()">
         <div class="op-ld-bar">
           <span class="op-ld-pill" *ngIf="leadModalPipelineName">
             <span class="op-ld-pill-dot"></span>
             {{ leadModalPipelineName | titlecase }}
           </span>
-          <button type="button" class="op-modal-close" (click)="closeLeadDetail()" aria-label="Close">
+          <button data-testid="jop-btn-023" type="button" class="op-modal-close" (click)="closeLeadDetail()" aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round">
               <path d="M18 6L6 18M6 6l12 12"/>
@@ -585,7 +585,7 @@
             <div class="op-ld-id-main">
               <h2 class="op-ld-name">{{ leadModalDisplayName }}</h2>
               <div class="op-ld-contacts">
-                <button type="button" class="op-ld-copy"
+                <button data-testid="jop-btn-024" type="button" class="op-ld-copy"
                         *ngIf="leadModalDisplayEmail"
                         [class.op-ld-copy--copied]="leadModalCopiedField === 'email'"
                         (click)="leadModalCopy(leadModalDisplayEmail, 'email', 'Email')"
@@ -610,7 +610,7 @@
                     </svg>
                   </span>
                 </button>
-                <button type="button" class="op-ld-copy"
+                <button data-testid="jop-btn-025" type="button" class="op-ld-copy"
                         *ngIf="leadModalDisplayMobile"
                         [class.op-ld-copy--copied]="leadModalCopiedField === 'mobile'"
                         (click)="leadModalCopy(leadModalDisplayMobile, 'mobile', 'Phone')"
@@ -648,7 +648,7 @@
             </div>
             <div class="op-ld-flow">
               <ng-container *ngFor="let s of leadModalStages; let i = index; let last = last">
-                <button type="button"
+                <button data-testid="jop-btn-026" type="button"
                         class="op-ld-flow-step"
                         [class.op-ld-flow-step--past]="leadModalIsPast(i)"
                         [class.op-ld-flow-step--current]="s === leadModalCurrentStage && leadModalSavingStage !== s"
@@ -746,15 +746,15 @@
             </svg>
             Changes saved
           </span>
-          <button type="button" class="op-ld-done" (click)="closeLeadDetail()">Done</button>
+          <button data-testid="jop-btn-027" type="button" class="op-ld-done" (click)="closeLeadDetail()">Done</button>
         </div>
       </div>
     </div>
   </ng-container>
 
   <!-- ═══════════════ ADD-LEAD MODAL (outer level — works from both views) ═══════════════ -->
-  <div class="op-overlay" *ngIf="addLeadOpen" (click)="closeAddLeadModal()">
-    <div class="op-modal op-modal--add-lead" (click)="$event.stopPropagation()">
+  <div data-testid="jop-div-028" class="op-overlay" *ngIf="addLeadOpen" (click)="closeAddLeadModal()">
+    <div data-testid="jop-div-029" class="op-modal op-modal--add-lead" (click)="$event.stopPropagation()">
       <div class="op-al-bar">
         <div class="op-al-bar-main">
           <span class="op-al-pill" *ngIf="addLeadSelectedPipeline?.pipelinename">
@@ -763,7 +763,7 @@
           </span>
           <h2 class="op-al-title">Add lead</h2>
         </div>
-        <button type="button" class="op-modal-close"
+        <button data-testid="jop-btn-030" type="button" class="op-modal-close"
                 (click)="closeAddLeadModal()"
                 [disabled]="addLeadSaving" aria-label="Close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -786,7 +786,7 @@
             </span>
           </div>
           <div class="op-al-pipelines">
-            <button type="button"
+            <button data-testid="jop-btn-031" type="button"
                     *ngFor="let p of addLeadPipelineOptions"
                     class="op-al-pipeline"
                     [class.op-al-pipeline--active]="addLeadSelectedPipeline?.id === p.id"
@@ -807,7 +807,7 @@
             </span>
           </div>
           <div class="op-al-stages">
-            <button type="button"
+            <button data-testid="jop-btn-032" type="button"
                     *ngFor="let s of addLeadStagesList; let i = index"
                     class="op-al-stage"
                     [class.op-al-stage--active]="addLeadSelectedStageName === s"
@@ -864,11 +864,11 @@
               <circle cx="11" cy="11" r="8"/>
               <line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input [(ngModel)]="addLeadSearchQuery"
+            <input data-testid="jop-inp-033" [(ngModel)]="addLeadSearchQuery"
                    type="text"
                    placeholder="Search by name, email, or mobile…"
                    [disabled]="addLeadLoading || addLeadSaving" />
-            <button type="button" class="op-al-search-clear"
+            <button data-testid="jop-btn-034" type="button" class="op-al-search-clear"
                     *ngIf="addLeadSearchQuery"
                     (click)="clearAddLeadSearch()"
                     aria-label="Clear search">
@@ -896,7 +896,7 @@
           </div>
 
           <div class="op-al-list" *ngIf="!addLeadLoading && addLeadFilteredProfiles.length > 0">
-            <button type="button"
+            <button data-testid="jop-btn-035" type="button"
                     class="op-al-person"
                     *ngFor="let p of addLeadFilteredProfiles"
                     [class.op-al-person--selected]="addLeadSelectedProfileId === p.id"
@@ -935,10 +935,10 @@
         </span>
 
         <div class="op-al-foot-actions">
-          <button type="button" class="op-modal-cancel" (click)="closeAddLeadModal()" [disabled]="addLeadSaving">
+          <button data-testid="jop-btn-036" type="button" class="op-modal-cancel" (click)="closeAddLeadModal()" [disabled]="addLeadSaving">
             Cancel
           </button>
-          <button type="button" class="op-al-confirm"
+          <button data-testid="jop-btn-037" type="button" class="op-al-confirm"
                   [disabled]="!addLeadCanAdd"
                   (click)="submitAddLead()">
             <mat-spinner *ngIf="addLeadSaving" diameter="12" strokeWidth="2"></mat-spinner>

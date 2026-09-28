@@ -21,6 +21,43 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { limit } from '@angular/fire/firestore';  // add 'limit' to the existing firestore import
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+// Pure business rules — thresholds, bands, date maths, funnel arithmetic and label rules — live in a
+// dependency-free sibling engine so they can be unit-tested without this component's Firestore stack.
+// Extracted 2026-09-10; see delivery-dashboard.engine.ts for what moved and why.
+import {
+    appointmentStatusClass,
+    averageDaysBetween,
+    avgTimePct,
+    classifyCohorts,
+    conversionRatePct,
+    dateFromField,
+    daysDifferenceLabel,
+    daysSince,
+    escalationLevel,
+    filterDisplayText,
+    financialLabel,
+    isDateInCurrentMonth,
+    isDateInNextMonth,
+    isDateInRange,
+    isPaymentEligible,
+    isSubscriptionEnded,
+    loadingProgressPct,
+    pageNumbers,
+    pctOfMax,
+    priorityLabel,
+    productDotClass,
+    productMonogram,
+    relativeUpdatedLabel,
+    sparkMax,
+    stageColorClass,
+    stuckIssueType,
+    toDateOrNull,
+    utilTone,
+    velocityWeekLabel,
+    waitingDaysSince,
+    waitingPeriodFor,
+    weekMondayIso,
+} from './delivery-dashboard.engine';
 import { FormOverlayViewComponent } from '../../Participants Profile Management/form-overlay-view/form-overlay-view.component';
 import { ScheduleDialogComponent } from '../schedule-dialog/schedule-dialog.component';
 import { SpecialistAppointmentSlotsComponent } from '../specialist-appointment-slot/specialist-appointment-slot.component';
@@ -166,6 +203,7 @@ export class DeliveryDashboardCloneComponent {
 
     // Outer mat-tab-group selectedIndex (Overview=0, Analytics=1, Participants=2)
     outerTabIndex: number = 0;
+    private uniqueTicketId = 0;
 
     // Stages chip loading state (5-8s data fetch needs visible feedback)
     stagesLoading: boolean = false;
@@ -1004,6 +1042,17 @@ export class DeliveryDashboardCloneComponent {
         return null;
     }
 
+    private getCardIdForProduct(product: string): string {
+        const matchedProduct = this.products.find(p => p.label === product);
+        const groupName = matchedProduct?.value;
+        const isMergedGroup = !!(groupName && this.mergedGroupIds[groupName]?.size);
+
+        if (isMergedGroup) {
+            return 'group:' + groupName;
+        }
+        return this.mapProductGroupId[product];
+    }
+
     async onProductMultiFilterChange() {
         const selectedProductIds: string[] = this.productFilterControl.value ?? [];
         if (!this.allMatchedProductsRaw || this.allMatchedProductsRaw.length === 0) return;
@@ -1405,9 +1454,7 @@ export class DeliveryDashboardCloneComponent {
 
     getConversionRate(cardId: string): number {
         const funnel = this.getCardFunnel(cardId);
-        const total = this.getCardGroupedFiltered(cardId).length;
-        if (total === 0) return 0;
-        return Math.round((funnel.completed.length / total) * 100);
+        return conversionRatePct(funnel.completed.length, this.getCardGroupedFiltered(cardId).length);
     }
 
     async selectProduct(product: string) {
@@ -1418,7 +1465,7 @@ export class DeliveryDashboardCloneComponent {
             eiCustomSolutions: { totalEligible: [], onBoarding: [], diagnostics: [], implementation: [], review: [], celebrationCall: [] },
             criticalSupport: { totalEligible: [], request: [], preprocess: [], diagnostics: [], implementation: [], review: [], postForm: [], completion: [] }
         };
-        const productId = this.mapProductGroupId[product];
+        const productId = this.getCardIdForProduct(product);
         this.selectedProductLabel = product;
         this.stages = this.stagesConfig[product] || [];
 
@@ -1590,22 +1637,11 @@ export class DeliveryDashboardCloneComponent {
                 productData.eiStarterPack.totalEligible.push(...totalEligible);
             }
             else if (this.selectedProductType === 'eiCustomSolutions') {
-                for (let data of totalEligible) {
-                    const { tentativestart } = data;
-
-                    if (!tentativestart) {
-                        productData.eiCustomSolutions.totalEligible.push(data);
-                    } else {
-                        const date = tentativestart.toDate();
-                        const itemMonth = date.getMonth();
-                        const itemYear = date.getFullYear();
-                        this.handleMonthCategory(itemMonth, itemYear, data, null, productData, 'eiCustomSolutions');
-                    }
-                }
+                productData.eiCustomSolutions.totalEligible.push(...totalEligible);
             }
 
             // Total Eligible
-            const ongoingData = this.funnelData[productId]?.ongoing || [];
+            const ongoingData = this.getCardFunnel(productId)?.ongoing || [];
 
             for (let data of ongoingData) {
                 let appointments = Array.from(allAppointments.values() || [])
@@ -1631,14 +1667,7 @@ export class DeliveryDashboardCloneComponent {
                     } else if (this.selectedProductType === 'eiStarterPack') {
                         productData.eiStarterPack.totalEligible.push(mergedData);
                     } else if (this.selectedProductType === 'eiCustomSolutions') {
-                        if (!data.tentativestart) {
-                            productData.eiCustomSolutions.totalEligible.push(mergedData);
-                        } else {
-                            const date = data.tentativestart.toDate();
-                            const itemMonth = date.getMonth();
-                            const itemYear = date.getFullYear();
-                            this.handleMonthCategory(itemMonth, itemYear, data, appointments, productData, 'eiCustomSolutions');
-                        }
+                        productData.eiCustomSolutions.totalEligible.push(mergedData);
                     }
                 }
                 else if (attendedAppointments.length > 0) {
@@ -1766,7 +1795,7 @@ export class DeliveryDashboardCloneComponent {
             }
 
             // ========================= COMPLETED DATA =========================
-            const completedData = this.funnelData[productId]?.completed || [];
+            const completedData = this.getCardFunnel(productId)?.completed || [];
 
             for (let data of completedData) {
                 let appointments = Array.from(allAppointments.values() || [])
@@ -1940,11 +1969,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getStyleStatusClass(app: any): string {
-        if (app?.cancelled) return 'status-cancelled';
-        else if (app?.attended) return 'status-completed';
-        else if (app?.starttime) return 'status-scheduled';
-        else if (app?.date) return 'status-submitted';
-        else return 'status-notscheduled';
+        return appointmentStatusClass(app);
     }
 
     getFullStageName(c: any, stage: string) {
@@ -3282,31 +3307,15 @@ export class DeliveryDashboardCloneComponent {
         return Math.max(1, ...this.visibleCardIds.map(id => this.getCardOngoing(id)));
     }
     ongoingPctOfMax(cardId: string): number {
-        const v = this.getCardOngoing(cardId);
-        return Math.max(4, Math.round((v / this.ongoingMaxAcrossProducts) * 100));
+        return pctOfMax(this.getCardOngoing(cardId), this.ongoingMaxAcrossProducts);
     }
-    // Stage column → color modifier class (Stages kanban)
+    // Stage column → color modifier class (Stages kanban) — rule in delivery-dashboard.engine.ts
     stageColorClass(stage: string): string {
-        if (!stage) return 'col--eligible';
-        const s = stage.toLowerCase().trim();
-        if (s.includes('eligible')) return 'col--eligible';
-        if (s.includes('request')) return 'col--request';
-        if (s.includes('pre-process')
-            || s.includes('preprocess')
-            || s.includes('welcome')) return 'col--preprocess';
-        if (s.includes('diagnostic')) return 'col--diagnostic';
-        if (s.includes('implement')) return 'col--implement';
-        if (s.includes('review')) return 'col--review';
-        if (s.includes('complet')
-            || s.includes('post-process')
-            || s.includes('celebration')
-            || s.includes('check-in')) return 'col--completion';
-        return 'col--eligible';
+        return stageColorClass(stage);
     }
     // Dot color class for product rows (cycles through 5-color set by index)
     productDotClass(idx: number): string {
-        const palette = ['dot-indigo', 'dot-teal', 'dot-emerald', 'dot-amber', 'dot-violet'];
-        return palette[idx % palette.length];
+        return productDotClass(idx);
     }
     // Participants tab count (sum across the 3 sub-cohorts)
     get participantsTotalCount(): number {
@@ -3378,13 +3387,7 @@ export class DeliveryDashboardCloneComponent {
     // Avoids collisions when several products share a common prefix
     // (e.g., "EI Solution" vs "EI Starter Pack" both starting with "EI").
     productMonogram(name: string): string {
-        if (!name) return '?';
-        const cleaned = name.trim().replace(/^[^a-zA-Z0-9]+/, '');
-        const parts = cleaned.split(/\s+/).filter(Boolean);
-        if (parts.length === 0) return '?';
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        if (parts.length === 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-        return (parts[0][0] + parts[1][0] + parts[2][0]).toUpperCase();
+        return productMonogram(name);
     }
 
     // Per-product pipeline total for the Action Center mini-funnel rows
@@ -3429,13 +3432,12 @@ export class DeliveryDashboardCloneComponent {
     get sparkReady(): number[] { return this.buildSparkData().ready; }
     get sparkStuck(): number[] { return this.buildSparkData().stuck; }
     get sparkCompleted(): number[] { return this.buildSparkData().completed; }
-    sparkMax(arr: number[]): number { return Math.max(1, ...arr); }
+    sparkMax(arr: number[]): number { return sparkMax(arr); }
 
     // Avg-time gauge benchmark
     avgTimeTarget = 30;
     get avgTimePct(): number {
-        const v = this.kpiAvgComplete || 0;
-        return Math.min(150, Math.round((v / this.avgTimeTarget) * 100));
+        return avgTimePct(this.kpiAvgComplete || 0, this.avgTimeTarget);
     }
 
     // Live "last updated" stamp — stored string so Angular's double-check pass sees the same value.
@@ -3445,11 +3447,7 @@ export class DeliveryDashboardCloneComponent {
     private _lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
 
     private computeLastUpdatedRelative(): string {
-        const diff = Math.floor((Date.now() - this.lastUpdated.getTime()) / 1000);
-        if (diff < 5) return 'just now';
-        if (diff < 60) return diff + 's ago';
-        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-        return Math.floor(diff / 3600) + 'h ago';
+        return relativeUpdatedLabel(Math.floor((Date.now() - this.lastUpdated.getTime()) / 1000));
     }
 
     private startLastUpdatedTimer() {
@@ -3550,36 +3548,25 @@ export class DeliveryDashboardCloneComponent {
         };
     }
 
+    /** Gather the two status timestamps off each row; the mean itself is engine arithmetic. */
+    private statusSpans(items: any[], fromKey: string, toKey: string) {
+        return (items || []).map((item: any) => {
+            const sd = item['statusdate'];
+            return {
+                from: sd ? this.getDateFromFieldPublic(sd[fromKey]) : null,
+                to: sd ? this.getDateFromFieldPublic(sd[toKey]) : null,
+            };
+        });
+    }
+
     getCardAvgInitToStart(cardId: string): number {
         const funnel = this.getCardFunnel(cardId);
-        let total = 0, count = 0;
-        for (const item of funnel.started) {
-            const sd = item['statusdate'];
-            if (!sd) continue;
-            const init = this.getDateFromFieldPublic(sd['initiated']);
-            const ongoing = this.getDateFromFieldPublic(sd['ongoing']);
-            if (init && ongoing) {
-                total += Math.abs(ongoing.getTime() - init.getTime()) / (1000 * 60 * 60 * 24);
-                count++;
-            }
-        }
-        return count > 0 ? Math.round(total / count) : 0;
+        return averageDaysBetween(this.statusSpans(funnel.started, 'initiated', 'ongoing'));
     }
 
     getCardAvgStartToComplete(cardId: string): number {
         const funnel = this.getCardFunnel(cardId);
-        let total = 0, count = 0;
-        for (const item of funnel.completed) {
-            const sd = item['statusdate'];
-            if (!sd) continue;
-            const ongoing = this.getDateFromFieldPublic(sd['ongoing']);
-            const completed = this.getDateFromFieldPublic(sd['completed']);
-            if (ongoing && completed) {
-                total += Math.abs(completed.getTime() - ongoing.getTime()) / (1000 * 60 * 60 * 24);
-                count++;
-            }
-        }
-        return count > 0 ? Math.round(total / count) : 0;
+        return averageDaysBetween(this.statusSpans(funnel.completed, 'ongoing', 'completed'));
     }
 
     getCardActiveSub(cardId: string): number {
@@ -3730,24 +3717,19 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getDateFromFieldPublic(field: any): Date | null {
-        if (!field) return null;
-        return field?.toDate?.() || new Date(field);
+        return dateFromField(field);
     }
 
     isDateInCurrentMonth(date: Date): boolean {
-        const now = new Date();
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        return isDateInCurrentMonth(date);
     }
 
     isDateInNextMonth(date: Date): boolean {
-        const now = new Date();
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        return date.getMonth() === nextMonth.getMonth() && date.getFullYear() === nextMonth.getFullYear();
+        return isDateInNextMonth(date);
     }
 
     isDateInRange(date: Date | null): boolean {
-        if (!this.dateRangeStart || !this.dateRangeEnd || !date) return true;
-        return date >= this.dateRangeStart && date <= this.dateRangeEnd;
+        return isDateInRange(date, this.dateRangeStart, this.dateRangeEnd);
     }
 
     openFunnelModal(productId: string, type: string, event: Event) {
@@ -4275,6 +4257,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'issuetype', label: 'ISSUE TYPE', width: '10%', type: 'text' },
                 { key: 'date', label: 'APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
+                { key: 'recentappointmentdate', label: 'LAST APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'actualstuckdays', label: 'DAYS', width: '10%', type: 'number' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -4537,15 +4521,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getDaysDifference(targetDate: any): string {
-        const date = targetDate?.toDate
-            ? targetDate.toDate()
-            : new Date(targetDate);
-
-        const today = new Date();
-        const diffTime = today.getTime() - date.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+        return daysDifferenceLabel(targetDate);
     }
 
     showDelayDate(c: any): string {
@@ -4965,7 +4941,7 @@ export class DeliveryDashboardCloneComponent {
     getLoadingProgress(): number {
         const loaded = Object.values(this.loadingStates).filter(state => state === true).length;
         const total = Object.keys(this.loadingStates).length;
-        return (loaded / total) * 100;
+        return loadingProgressPct(loaded, total);
     }
 
     getLoadedCount(): number {
@@ -4973,21 +4949,14 @@ export class DeliveryDashboardCloneComponent {
     }
 
     calculateWaitingPeriod(onboardedtime: Date): number {
-        if (!onboardedtime) return 0;
-        let comparisonDate = new Date();
-        const timeDifference = comparisonDate.getTime() - onboardedtime.getTime();
-        const daysDifference = Math.floor(timeDifference / (1000 * 3600 * 24));
-        return daysDifference;
+        return waitingDaysSince(onboardedtime);
     }
 
     getWaitingPeriod(participant: any): number {
-        if (participant.waitingperiod !== undefined) {
-            return participant.waitingperiod;
-        }
-        if (participant.initiatedtime) {
-            return this.calculateWaitingPeriod(participant.initiatedtime?.toDate());
-        }
-        return 0;
+        return waitingPeriodFor({
+            waitingperiod: participant.waitingperiod,
+            initiatedtime: participant.initiatedtime?.toDate?.() ?? null,
+        });
     }
 
     checkAllDataLoaded() {
@@ -4995,10 +4964,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getPriorityLabel(waitingPeriod: number): string {
-        if (waitingPeriod >= 14) return 'URGENT';
-        if (waitingPeriod >= 10) return 'HIGH';
-        if (waitingPeriod >= 5) return 'MEDIUM';
-        return 'LOW';
+        return priorityLabel(waitingPeriod);
     }
 
     setCurrentMonth() {
@@ -5448,6 +5414,10 @@ export class DeliveryDashboardCloneComponent {
             return `${value || 0} DAYS`;
         }
 
+        if (header.key === 'actualstuckdays') {
+            return `${value || 0} DAYS`;
+        }
+
         if (header.key === 'generalnotes') {
             if (participant[header.key] && participant[header.key].length > 0) {
                 return participant[header.key][participant[header.key].length - 1].note || 'N/A';
@@ -5514,26 +5484,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getPageNumbers(): number[] {
-        const pages: number[] = [];
-        const maxPagesToShow = 5;
-        if (this.totalPages <= maxPagesToShow) {
-            for (let i = 1; i <= this.totalPages; i++) {
-                pages.push(i);
-            }
-        } else {
-            const halfRange = Math.floor(maxPagesToShow / 2);
-            let start = Math.max(1, this.currentPage - halfRange);
-            let end = Math.min(this.totalPages, start + maxPagesToShow - 1);
-
-            if (end === this.totalPages) {
-                start = Math.max(1, end - maxPagesToShow + 1);
-            }
-
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-        }
-        return pages;
+        return pageNumbers(this.currentPage, this.totalPages, 5);
     }
 
     onItemsPerPageChange() {
@@ -5685,42 +5636,7 @@ export class DeliveryDashboardCloneComponent {
     }
 
     getFilterDisplayText(): string {
-        switch (this.activeFilter) {
-            case 'readyForInitiation':
-                return 'Showing only participants with cleared payment';
-            case 'clearedMoreThan7Days':
-                return 'Showing only participants waiting 7+ days with cleared payment';
-            case 'clearedMoreThan30Days':
-                return 'Showing only participants waiting 30+ days with cleared payment';
-            case 'initiatedToday':
-                return 'Showing only participants initiated today';
-            case 'todayActivity':
-                return 'Showing today\'s activity (initiated and appointments)';
-            case 'last7DaysActivity':
-                return 'Showing last 7 days activity';
-            case 'last30DaysActivity':
-                return 'Showing last 30 days activity';
-            case 'thisMonthActivity':
-                return 'Showing this month\'s activity';
-            case 'welcomeCall':
-                return 'Showing participants in Welcome Call stage';
-            case 'clarityCall':
-                return 'Showing participants in Clarity Call stage';
-            case 'diagnostics':
-                return 'Showing participants in Diagnostics stage';
-            case 'implementation':
-                return 'Showing participants in Implementation stage';
-            case 'midReviewDiagnostics':
-                return 'Showing participants in Mid Review - Diagnostics stage';
-            case 'implementationPhase2':
-                return 'Showing participants in Implementation Phase 2 stage';
-            case 'finalReview':
-                return 'Showing participants in Final Review stage';
-            case 'completed':
-                return 'Showing completed participants';
-            default:
-                return '';
-        }
+        return filterDisplayText(this.activeFilter);
     }
 
     getActiveFilterCount(): number {
@@ -5922,27 +5838,17 @@ export class DeliveryDashboardCloneComponent {
     }
 
     isParticipantEligible(pid, item) {
-        const totalPaid = parseInt(this.mapMetaData?.[pid]?.['pp_totalpaid'] ?? '0') || 0;
-        const totalPurchaseValue = parseInt(this.mapMetaData?.[pid]?.['pp_totalpurchasevalue'] ?? '0') || 0;
-
-        const totalBalance = totalPurchaseValue - totalPaid;
-        const minPayment = parseInt(item?.['minimumpayment']) || 0;
-
         const mode = (this.mapMetaData[pid]?.['participantmode'] || '').trim().toLowerCase();
-
-        return !this.excludedModes.has(mode?.toLowerCase().trim()) && (totalBalance <= 0 || totalPaid >= minPayment);
+        return isPaymentEligible({
+            totalPaid: this.mapMetaData?.[pid]?.['pp_totalpaid'],
+            totalPurchaseValue: this.mapMetaData?.[pid]?.['pp_totalpurchasevalue'],
+            minimumPayment: item?.['minimumpayment'],
+            participantMode: mode,
+        }, this.excludedModes);
     }
 
     isSubscriptionEnded(item: any): boolean {
-        if (!item?.['subscriptionend']) {
-            return false;
-        }
-
-        const endDate =
-            item['subscriptionend']?.toDate?.() ||
-            new Date(item['subscriptionend']);
-
-        return endDate < new Date();
+        return isSubscriptionEnded(item?.['subscriptionend']);
     }
 
     exportProfileModal(): void {
@@ -6808,38 +6714,24 @@ export class DeliveryDashboardCloneComponent {
     }
 
     velocityWeekLabel(week: string): string {
-        // Compact label: "May 18" or just "18" depending on chart density
-        if (!week) return '';
-        const d = new Date(week);
-        const m = d.toLocaleString('en-US', { month: 'short' });
-        return `${m} ${d.getDate()}`;
+        // Compact label: "May 18" — rule in delivery-dashboard.engine.ts
+        return velocityWeekLabel(week);
     }
 
     utilTone(util: number): string {
-        if (util >= 0.85) return 'high';
-        if (util >= 0.6) return 'med';
-        if (util >= 0.3) return 'low';
-        return 'min';
+        return utilTone(util);
     }
 
     // ===== Analytics — real Firestore data =================================
 
     /** Convert any Firestore Timestamp / Date / epoch to a JS Date, or null. */
     private tsToDate(ts: any): Date | null {
-        if (!ts) return null;
-        if (ts?.toDate) return ts.toDate() as Date;
-        if (ts instanceof Date) return ts;
-        if (typeof ts === 'number') return new Date(ts);
-        return null;
+        return toDateOrNull(ts);
     }
 
     /** Return the ISO date string (YYYY-MM-DD) for the Monday of the given date's week. */
     private weekMonday(d: Date): string {
-        const day = new Date(d);
-        const dow = (day.getDay() + 6) % 7; // 0 = Mon … 6 = Sun
-        day.setDate(day.getDate() - dow);
-        day.setHours(0, 0, 0, 0);
-        return day.toISOString().slice(0, 10);
+        return weekMondayIso(d);
     }
 
     /**
@@ -7044,10 +6936,7 @@ export class DeliveryDashboardCloneComponent {
     private readonly STUCK_DAYS = 15;
 
     private daysSinceTs(ts: any): number {
-        if (!ts) return 0;
-        const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
-        if (!d || isNaN(d.getTime())) return 0;
-        return Math.max(0, Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000)));
+        return daysSince(ts);
     }
 
     populateActionableCohorts(selectedLabels: string[] = []): void {
@@ -7055,8 +6944,6 @@ export class DeliveryDashboardCloneComponent {
         const idle: any[] = [];
         const stuck: any[] = [];
         const clearedPayment: any[] = [];
-
-        const rejected = new Set(['rejected', 'cancelled', 'inactive']);
 
         for (const item of this.allMatchedProductsRaw || []) {
 
@@ -7072,7 +6959,6 @@ export class DeliveryDashboardCloneComponent {
             if (!profileId) continue;
             const meta = this.mapMetaData?.[profileId] || {};
             const status = (item?.status || '').toString().toLowerCase().trim();
-            if (status === 'completed' || rejected.has(status)) continue;
 
             const mode = (meta['participantmode'] || '').toString().toLowerCase().trim();
             const totalPaid = parseInt(meta['pp_totalpaid'] ?? '0') || 0;
@@ -7137,22 +7023,28 @@ export class DeliveryDashboardCloneComponent {
                 });
             }
 
+            // Development's cohort split (readyForInitiation vs awaiting) supersedes the engine's
+            // classifyCohorts, so the stuck predicate is inlined here to match. escalationLevel() and
+            // stuckIssueType() below still delegate — those two rules are unchanged on both sides.
             if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
                 const days = daysSinceActivity;
-                const escalation = days > 30 ? 'HIGH' : days > 21 ? 'MEDIUM' : 'LOW';
+                const escalation = escalationLevel(days);
                 stuck.push({
                     profileid: profileId,
                     activejourney: journeyName,
                     product: productName || 'N/A',
                     appointment: 'N/A',
                     appointmentstatus: 'N/A',
-                    issuetype: status === 'ongoing' ? 'Stuck mid-flow' : 'Initiated · stalled',
+                    issuetype: stuckIssueType(status),
                     date: lastActivity,
                     waitingperiod: days,
                     lastaction: status,
                     assignedto: 'Unassigned',
                     escalationlevel: escalation,
                     generalnotes: [],
+                    participantproductid: item?.docid || null,
+                    recentappointmentdate: null,
+                    actualstuckdays: null,
                 });
             }
         }
@@ -7165,9 +7057,58 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['currentJourneyInitiated'].count = idle.length;
         this.originalData['stuckCases'].data = stuck;
         this.originalData['stuckCases'].count = stuck.length;
+        this.getRecentAppointmentDetails(stuck);
 
         this.currentPage = 1;
         this.calculatePagination();
+    }
+
+    private async getRecentAppointmentDetails(stuckItems: any[]): Promise<void> {
+        const requestId = ++this.uniqueTicketId;
+
+        const participantProductIds = Array.from(new Set(stuckItems.map(item => item.participantproductid).filter(Boolean)));
+        if (participantProductIds.length === 0) return;
+
+        const recentAppointmentMap = new Map<string, any>();
+        const chunkSize = 30;
+
+        for (let i = 0; i < participantProductIds.length; i += chunkSize) {
+            const chunk = participantProductIds.slice(i, i + chunkSize);
+            try {
+                const snap = await runInInjectionContext(this.injector, () =>
+                    getDocs(query(
+                        collection(this.firestore, 'appointments'),
+                        where('participantproductid', 'in', chunk),
+                        where('attended', '==', true),
+                        orderBy('endtime', 'desc')
+                    ))
+                );
+
+                for (const appointmentDoc of snap.docs) {
+                    const appointment = appointmentDoc.data();
+                    const participantProductId = appointment['participantproductid'];
+                    const alreadyHasLatest = recentAppointmentMap.has(participantProductId);
+                    if (!alreadyHasLatest) {
+                        recentAppointmentMap.set(participantProductId, appointment);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching recent completed appointments for stuck cases:', err);
+            }
+        }
+
+        const isStaleRequest = requestId !== this.uniqueTicketId;
+        if (isStaleRequest) return;
+
+        for (const item of stuckItems) {
+            const recentAppointment = recentAppointmentMap.get(item.participantproductid);
+            if (!recentAppointment) continue;
+            item.recentappointmentdate = recentAppointment['endtime'];
+            item.actualstuckdays = daysSince(recentAppointment['endtime']);
+        }
+
+        this.calculatePagination();
+        this.cdr.detectChanges();
     }
 
     openParticipant(profileId: string) {

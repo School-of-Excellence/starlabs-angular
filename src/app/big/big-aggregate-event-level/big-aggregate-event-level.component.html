@@ -1,7 +1,7 @@
 <div class="mainscreen">
   <h4 class="title">upload B!G Participant Level</h4>
   <form [formGroup]="aggregateForm" (ngSubmit)="submit()">
-    <mat-form-field  class="inputfields" appearance="outline" (change)="onatcselect()">
+    <mat-form-field data-testid="ael-change-onatcselect-1"  class="inputfields" appearance="outline" (change)="onatcselect()">
         <mat-label>Participant</mat-label>
         <mat-select formControlName="participant">
             <mat-option>
@@ -21,7 +21,7 @@
 
     <mat-form-field class="inputfields" appearance="outline">
         <mat-label>ATC Model</mat-label>
-        <mat-select formControlName="atcmodel" (change)="onatcselect()">
+        <mat-select data-testid="ael-change-onatcselect-2" formControlName="atcmodel" (change)="onatcselect()">
             <mat-option *ngFor="let option of atcModelList" [value]="option">{{option}}</mat-option>
         </mat-select>
         <mat-error *ngIf="aggregateForm.get('atcmodel').hasError('required')">
@@ -34,7 +34,7 @@
 
     <mat-form-field class="inputfields" appearance="outline">
         <mat-label>Level</mat-label>
-        <mat-select formControlName="level" (change) = 'onlevelselect()'>
+        <mat-select data-testid="ael-mat-select-3" formControlName="level" (change) = 'onlevelselect()'>
             <mat-option *ngFor="let option of levelList" [value]="option.docid">{{option.level}}</mat-option>
         </mat-select>
         <mat-error *ngIf="aggregateForm.get('level').hasError('required')">
@@ -83,7 +83,7 @@
         <mat-option *ngFor="let option of filteredQueueList" [value]="option['docid']">{{option['queuename']}}</mat-option>
       </mat-select>
     </mat-form-field>&nbsp;&nbsp;
-    <button type="button" mat-raised-button (click)="onClearFilter()">clear</button>
+    <button data-testid="ael-on-clear-filter-4" type="button" mat-raised-button (click)="onClearFilter()">clear</button>
   </div>
   <div>
     <!-- <span *ngFor="let model of filterPerAtcmodel() | keyvalue;"> -->

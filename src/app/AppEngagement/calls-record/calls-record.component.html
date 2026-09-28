@@ -43,14 +43,14 @@
               <div class="date-inputs">
                 <mat-form-field appearance="outline" class="date-field">
                   <mat-label>Start Date</mat-label>
-                  <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+                  <input data-testid="aeclr-inp-1" matInput [matDatepicker]="startPicker" formControlName="startDate">
                   <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
                   <mat-datepicker #startPicker></mat-datepicker>
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="date-field">
                   <mat-label>End Date</mat-label>
-                  <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+                  <input data-testid="aeclr-inp-2" matInput [matDatepicker]="endPicker" formControlName="endDate">
                   <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
                   <mat-datepicker #endPicker></mat-datepicker>
                 </mat-form-field>
@@ -58,13 +58,13 @@
 
               <!-- Quick Date Buttons -->
               <div class="quick-date-buttons">
-                <button mat-stroked-button (click)="setQuickDate(1)" [class.active]="isQuickDateActive(1)">
+                <button data-testid="aeclr-btn-3" mat-stroked-button (click)="setQuickDate(1)" [class.active]="isQuickDateActive(1)">
                   Today
                 </button>
-                <button mat-stroked-button (click)="setQuickDate(7)" [class.active]="isQuickDateActive(7)">
+                <button data-testid="aeclr-btn-4" mat-stroked-button (click)="setQuickDate(7)" [class.active]="isQuickDateActive(7)">
                   Last 7 Days
                 </button>
-                <button mat-stroked-button (click)="setQuickDate(30)" [class.active]="isQuickDateActive(30)">
+                <button data-testid="aeclr-btn-5" mat-stroked-button (click)="setQuickDate(30)" [class.active]="isQuickDateActive(30)">
                   Last 30 Days
                 </button>
               </div>
@@ -75,7 +75,7 @@
               <div>
                 <mat-form-field appearance="outline" class="profile-field">
                   <mat-label>Search Profile</mat-label>
-                  <mat-select formControlName="profile" [multiple]="false">
+                  <mat-select data-testid="aeclr-sel-6" formControlName="profile" [multiple]="false">
                     <mat-option>
                       <ngx-mat-select-search [formControl]="profileSearchCtrl" placeholderLabel="Search profiles..."
                         noEntriesFoundLabel="No profiles found">
@@ -98,7 +98,7 @@
               <div>
                 <mat-form-field appearance="outline" class="status-field">
                   <mat-label>Call Status</mat-label>
-                  <mat-select formControlName="callStatus">
+                  <mat-select data-testid="aeclr-sel-7" formControlName="callStatus">
                     <mat-option value="">All Status</mat-option>
                     <mat-option value="received">
                       <mat-icon class="status-icon received">call_received</mat-icon>
@@ -115,7 +115,7 @@
               <div class="search-section">
                 <mat-form-field appearance="outline" class="search-field">
                   <mat-label>Search Number / Name</mat-label>
-                  <input matInput formControlName="searchText" placeholder="Enter phone number or name">
+                  <input data-testid="aeclr-inp-8" matInput formControlName="searchText" placeholder="Enter phone number or name">
                   <mat-icon matSuffix>search</mat-icon>
                 </mat-form-field>
               </div>
@@ -124,19 +124,19 @@
 
           <!-- Action Buttons -->
           <div class="filter-actions">
-            <button mat-raised-button color="primary" (click)="applyFilters()" [disabled]="isLoading">
+            <button data-testid="aeclr-btn-9" mat-raised-button color="primary" (click)="applyFilters()" [disabled]="isLoading">
               <mat-icon>filter_alt</mat-icon>
               Apply Filters
             </button>
-            <button mat-stroked-button (click)="clearFilters()">
+            <button data-testid="aeclr-btn-10" mat-stroked-button (click)="clearFilters()">
               <mat-icon>clear</mat-icon>
               Clear All
             </button>
-            <button mat-stroked-button (click)="refreshData()">
+            <button data-testid="aeclr-btn-11" mat-stroked-button (click)="refreshData()">
               <mat-icon>refresh</mat-icon>
               Refresh
             </button>
-            <button mat-stroked-button (click)="toggleRealTime()" [color]="isRealTimeActive ? 'warn' : 'primary'">
+            <button data-testid="aeclr-btn-12" mat-stroked-button (click)="toggleRealTime()" [color]="isRealTimeActive ? 'warn' : 'primary'">
               <mat-icon>{{isRealTimeActive ? 'wifi_off' : 'wifi'}}</mat-icon>
               {{isRealTimeActive ? 'Stop Live' : 'Start Live'}}
             </button>
@@ -224,7 +224,7 @@
               <th mat-header-cell *matHeaderCellDef>Recording</th>
               <td mat-cell *matCellDef="let element; let i = index">
                 <div class="enhanced-audio-container">
-                  <button mat-mini-fab color="primary" class="play-button" *ngIf="element.recordingurl"
+                  <button data-testid="aeclr-btn-13" mat-mini-fab color="primary" class="play-button" *ngIf="element.recordingurl"
                     (click)="toggleAudio(element, i)" [matTooltip]="audioStates[i]?.isPlaying ? 'Pause' : 'Play'">
                     <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
                   </button>
@@ -244,23 +244,23 @@
                           <span class="audio-subtitle">{{getProfileName(element.calledby)}} →
                             {{profileNumberMap[element.calledto]?.['name'] || element.calledto}}</span>
                         </div>
-                        <button mat-icon-button class="close-button" (click)="closeAudio(i)">
+                        <button data-testid="aeclr-btn-14" mat-icon-button class="close-button" (click)="closeAudio(i)">
                           <mat-icon>close</mat-icon>
                         </button>
                       </div>
 
                       <!-- Main Play Controls -->
                       <div class="main-controls">
-                        <button mat-icon-button (click)="skipBackward(audioElement, i)" matTooltip="Skip 10s backward">
+                        <button data-testid="aeclr-btn-15" mat-icon-button (click)="skipBackward(audioElement, i)" matTooltip="Skip 10s backward">
                           <mat-icon>replay_10</mat-icon>
                         </button>
 
-                        <button mat-fab color="primary" (click)="togglePlayPause(audioElement, i)"
+                        <button data-testid="aeclr-btn-16" mat-fab color="primary" (click)="togglePlayPause(audioElement, i)"
                           class="main-play-button">
                           <mat-icon>{{ audioStates[i]?.isPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
                         </button>
 
-                        <button mat-icon-button (click)="skipForward(audioElement, i)" matTooltip="Skip 10s forward">
+                        <button data-testid="aeclr-btn-17" mat-icon-button (click)="skipForward(audioElement, i)" matTooltip="Skip 10s forward">
                           <mat-icon>forward_10</mat-icon>
                         </button>
                       </div>
@@ -272,14 +272,14 @@
                         </div>
 
                         <div class="progress-container">
-                          <mat-progress-bar mode="determinate" [value]="audioStates[i]?.progress || 0"
+                          <mat-progress-bar data-testid="aeclr-act-18" mode="determinate" [value]="audioStates[i]?.progress || 0"
                             class="audio-progress-bar" (click)="seekToPosition($event, audioElement, i)">
                           </mat-progress-bar>
 
                           <!-- Custom Slider for Better Seeking -->
                           <mat-slider class="seek-slider" [min]="0" [max]="audioStates[i]?.duration || 0" [step]="1"
                             discrete>
-                            <input matSliderThumb [value]="audioStates[i]?.currentTime || 0"
+                            <input data-testid="aeclr-inp-19" matSliderThumb [value]="audioStates[i]?.currentTime || 0"
                               (input)="onSeekChange($event, audioElement, i)">
                           </mat-slider>
                         </div>
@@ -293,11 +293,11 @@
                       <div class="secondary-controls">
                         <!-- Volume Control -->
                         <div class="volume-control">
-                          <button mat-icon-button (click)="toggleMute(audioElement, i)" matTooltip="Toggle mute">
+                          <button data-testid="aeclr-btn-20" mat-icon-button (click)="toggleMute(audioElement, i)" matTooltip="Toggle mute">
                             <mat-icon>{{ audioStates[i]?.isMuted ? 'volume_off' : 'volume_up' }}</mat-icon>
                           </button>
                           <mat-slider class="volume-slider" [min]="0" [max]="1" [step]="0.1">
-                            <input matSliderThumb [value]="audioStates[i]?.volume || 1"
+                            <input data-testid="aeclr-inp-21" matSliderThumb [value]="audioStates[i]?.volume || 1"
                               (input)="onVolumeChange($event, audioElement, i)">
                           </mat-slider>
 
@@ -307,7 +307,7 @@
                         <div class="speed-control">
                           <mat-form-field appearance="outline" class="speed-selector">
                             <mat-label>Speed</mat-label>
-                            <mat-select value="1.0"
+                            <mat-select data-testid="aeclr-sel-22" value="1.0"
                               (selectionChange)="changePlaybackSpeed($event.value, audioElement, i)">
                               <mat-option value="0.5">0.5x</mat-option>
                               <mat-option value="0.75">0.75x</mat-option>
@@ -320,7 +320,7 @@
                         </div>
 
                         <!-- Download Button -->
-                        <button mat-icon-button (click)="downloadAudio(element.recordingurl, element)"
+                        <button data-testid="aeclr-btn-23" mat-icon-button (click)="downloadAudio(element.recordingurl, element)"
                           matTooltip="Download recording">
                           <mat-icon>download</mat-icon>
                         </button>

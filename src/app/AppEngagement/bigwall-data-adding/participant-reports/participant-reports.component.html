@@ -3,7 +3,7 @@
         <div class="form-container">
             <div class="form-row">
               <mat-form-field appearance="outline" class="form-field">
-                <mat-select [(ngModel)]="selectedProfile" placeholder="Select Participant">
+                <mat-select data-testid="aebpr-sel-1" [(ngModel)]="selectedProfile" placeholder="Select Participant">
                   <mat-option *ngFor="let participant of profileid" [value]="participant">
                     {{ mapProfile[participant] }}
                   </mat-option>
@@ -12,13 +12,13 @@
               
               <mat-form-field appearance="outline" class="form-field">
                 <mat-label>Title</mat-label>
-                <input matInput placeholder="Enter Title" [(ngModel)]="title">
+                <input data-testid="aebpr-inp-2" matInput placeholder="Enter Title" [(ngModel)]="title">
               </mat-form-field>
             </div>
             <div class="form-row">
               <mat-form-field appearance="outline" class="form-field">
                 <mat-label>Description</mat-label>
-                <textarea matInput placeholder="Enter Description" [(ngModel)]="description"></textarea>
+                <textarea data-testid="aebpr-txt-3" matInput placeholder="Enter Description" [(ngModel)]="description"></textarea>
               </mat-form-field>
             </div>
             <div>
@@ -33,17 +33,17 @@
             </mat-slide-toggle>
               </div>
             <h5>Upload Images</h5>
-            <input #fileInput type="file" accept="image/*" (change)="importImages($event)">
+            <input data-testid="aebpr-inp-4" #fileInput type="file" accept="image/*" (change)="importImages($event)">
             <div class="row ml-2 mt-2">
                 <div class="mr-2 text-center" *ngFor="let preview of previewImages; let imgIndex = index">
                 <img [src]="preview" height="70" width="70">
                 <br>
-                <label class="removetext" style="color: red;" (click)="removeImage(imgIndex)">Remove</label>
+                <label [attr.data-testid]="'aebpr-act-5-' + imgIndex" class="removetext" style="color: red;" (click)="removeImage(imgIndex)">Remove</label>
                 </div>
             </div>
             </div>
             <div class="button-container">
-              <button mat-raised-button color="primary" class="submit-button" [disabled]="submiting" (click)="submit()">
+              <button data-testid="aebpr-btn-6" mat-raised-button color="primary" class="submit-button" [disabled]="submiting" (click)="submit()">
                 {{submiting ? 'Uploading' : 'Submit'}}
             </button>
             </div>
@@ -91,7 +91,7 @@
            <ng-container matColumnDef="share">
              <th mat-header-cell *matHeaderCellDef mat-sort-header>Share</th>
              <td mat-cell *matCellDef="let row">
-               <button mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
+               <button data-testid="aebpr-btn-7" mat-stroked-button type="button" (click)="shareToBigWall(row)" [disabled]="[null,undefined].includes(eventid)">Share To Big Wall & Highlights</button>
              </td>
            </ng-container>
            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

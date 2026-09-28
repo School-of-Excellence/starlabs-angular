@@ -9,62 +9,61 @@ import {collection, collectionData, doc, docData, documentId, Firestore,query, w
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Subject, Subscription, takeUntil, catchError, of } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
+// Pure board rules live in arena-board.engine.ts — no Angular / Firestore / rxjs there, so they can
+// be unit-tested without standing this component up. See that file's header for why.
+import {
+  ArenaAssignment,
+  ArenaInvitation,
+  ArenaStudio,
+  ArenaToken,
+  InvitingStudioRow,
+  NamedSpecialist,
+  attemptsLabel,
+  bonusSpecialists,
+  buildChatNameCache,
+  callEnded,
+  callEndedClock,
+  callStartedClock,
+  completedFeed,
+  displayNameFromProfileDoc,
+  filterPendingInvitations,
+  idleStudios,
+  initials,
+  invitingStudios,
+  isAcceptableChatFile,
+  isImageFile,
+  inviteCountdown,
+  hasName,
+  linkifyMessage,
+  liveStudios,
+  logSubscriptionChunks,
+  logSubscriptionKey,
+  pairingSpecialists,
+  participantInCall,
+  participantName,
+  participantPresent,
+  presenceOverlay,
+  profileIdsToPreload,
+  queuedTokens,
+  sessionElapsed,
+  sinceStudioEntry,
+  sortByChatActivity,
+  specialistInCall,
+  specialistJoined,
+  specialistJoinedById,
+  specialistList,
+  specialistPresentById,
+  stageActivityCombos,
+  stageStudios,
+  tokenPosition,
+  tokensForStage,
+  unreadCountsByStudio,
+  unreadMessagesFor,
+  waitingTokens,
+} from './arena-board.engine';
 
 type ArenaTab = 'participants' | 'specialists';
 type ArenaRightTab = 'done' | 'chat';
-
-interface ArenaToken {
-  docid: string;
-  tokennumber?: number;
-  queueposition?: number;     // matches the dynamic queue manager's column
-  profile_id: string;
-  profile_name?: string;
-  status?: string;       // 'ready' | 'queued' | 'invited' | null
-  currentstage?: string;
-  queueid: string;
-  preassigned?: { [stage: string]: string[] };
-}
-
-interface ArenaStudio {
-  docid: string;
-  participants: string[];      // specialist ids
-  participantsactivity?: { [profileid: string]: string };
-  queueid: string;
-  currentstage?: string;
-  checkin?: boolean;
-  active?: boolean;
-}
-
-interface ArenaInvitation {
-  docid: string;
-  studioid: string;
-  tokenref: any;
-  stage: string;
-  status: string;             // 'pending' | 'success' | 'cancelled'
-  expirydate?: any;
-  createddate?: any;
-  participantname?: string;
-  attempts?: number;
-}
-
-interface ArenaAssignment {
-  docid: string;
-  studioid: string;
-  stagename: string;
-  status: 'live' | 'completed';
-  participantid: string;
-  pairing?: string[];
-  participantsactivity?: { [profileid: string]: string };
-  bonusactivity?: { [profileid: string]: string }; // additional-activity specialists keyed by profile id
-  specialistJoinedAt?: any;          // call START (preserved across rejoin)
-  specialistLeftAt?: any;            // stamped on host pagehide / ngOnDestroy
-  participantReadyAt?: any;
-  participantInCallAt?: any;
-  participantLeftAt?: any;           // stamped on participant pagehide / ngOnDestroy
-  token?: any;
-  zoomdata?: any;
-  created?: any;
-}
 
 @Component({
   selector: 'app-arena-board',
@@ -216,21 +215,11 @@ export class ArenaBoardComponent implements OnDestroy {
       // Sort by `queueposition` (same field the dynamic queue manager uses to
       // order the queue) so Waiting / Queued show the same canonical order.
       // Fall back to `tokennumber` if `queueposition` is missing.
-      this.tokens = (rows as ArenaToken[])
-        .filter(t => t.currentstage === this.stage)
-        .sort((a, b) => {
-          const ap = a.queueposition ?? a.tokennumber ?? Number.MAX_SAFE_INTEGER;
-          const bp = b.queueposition ?? b.tokennumber ?? Number.MAX_SAFE_INTEGER;
-          return ap - bp;
-        });
+      this.tokens = tokensForStage(rows as ArenaToken[], this.stage);
       // Lazy-load tokens' participant + preassigned specialist names so the
       // sidebar doesn't render a leading "→ —" while the auth-guard cache
       // catches up.
-      this.tokens.forEach(t => {
-        if (t.profile_id) this.ensureProfileLoaded(t.profile_id);
-        const pre = t.preassigned?.[this.stage] || [];
-        pre.forEach(id => this.ensureProfileLoaded(id));
-      });
+      profileIdsToPreload(this.tokens, this.stage).forEach(id => this.ensureProfileLoaded(id));
     });
 
     // Studios in this queue (filter to "checked-in" client-side).
@@ -263,12 +252,7 @@ export class ArenaBoardComponent implements OnDestroy {
       { idField: 'docid' }
     ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
       // Keep only pending (still alive)
-      const now = new Date();
-      this.invitations = (rows as ArenaInvitation[]).filter(inv => {
-        if (inv.status && inv.status !== 'pending') return false;
-        if (inv.expirydate && inv.expirydate.toDate && inv.expirydate.toDate() < now) return false;
-        return true;
-      });
+      this.invitations = filterPendingInvitations(rows as ArenaInvitation[]);
     });
 
     // Live assignments for this stage (in-studio / joined / active)
@@ -306,13 +290,7 @@ export class ArenaBoardComponent implements OnDestroy {
       ),
       { idField: 'docid' }
     ).pipe(takeUntil(this.destroy$), catchError(this.flagLoadError)).subscribe(rows => {
-      const list = (rows as ArenaAssignment[]).filter((a: any) => a['isactivitydone'] === true);
-      list.sort((a: any, b: any) => {
-        const tb = b?.['created']?.toMillis ? b['created'].toMillis() : 0;
-        const ta = a?.['created']?.toMillis ? a['created'].toMillis() : 0;
-        return tb - ta;
-      });
-      this.completedAssignments = list;
+      this.completedAssignments = completedFeed(rows as ArenaAssignment[]);
     });
   }
 
@@ -320,10 +298,10 @@ export class ArenaBoardComponent implements OnDestroy {
 
   // Waiting = ready tokens (next-up). Queued = queued/invited/null.
   get waitingTokens(): ArenaToken[] {
-    return this.tokens.filter(t => t.status === 'ready');
+    return waitingTokens(this.tokens);
   }
   get queuedTokens(): ArenaToken[] {
-    return this.tokens.filter(t => t.status == null || t.status === 'queued' || t.status === 'invited');
+    return queuedTokens(this.tokens);
   }
 
   // Studios that actually serve THIS stage. `this.studios` holds every
@@ -338,62 +316,37 @@ export class ArenaBoardComponent implements OnDestroy {
   // config we deliberately DON'T filter (fall back to all checked-in studios)
   // so a missing/edge config can never blank the board.
   get stageStudios(): ArenaStudio[] {
-    const combos = this.stageActivityCombos();
-    if (combos.length === 0) return this.studios;
-    return this.studios.filter(s => combos.includes(this.studioActivitySignature(s)));
-  }
-
-  private stageActivityCombos(): string[] {
-    const sp = this.queueData?.['stageproperty']?.[this.stage];
-    return Object.values(sp?.['compulsoryactivity'] ?? {}).map((c: any) =>
-      (Array.isArray(c) ? c : [c]).map(String).sort((a, b) => a.localeCompare(b)).join(',')
-    );
-  }
-
-  private studioActivitySignature(s: ArenaStudio): string {
-    return Object.values(s.participantsactivity ?? {})
-      .map(String).sort((a, b) => a.localeCompare(b)).join(',');
+    return stageStudios(this.studios, stageActivityCombos(this.queueData, this.stage));
   }
 
   // Studios in each column
   get idleStudios(): ArenaStudio[] {
     // A studio is "idle" if it is checked in but has no live assignment AND no active invitation
-    const liveStudioIds = new Set(this.liveAssignments.map(a => a.studioid));
-    const invitingStudioIds = new Set(this.invitations.map(i => i.studioid));
-    return this.stageStudios.filter(s => !liveStudioIds.has(s.docid) && !invitingStudioIds.has(s.docid));
+    return idleStudios(this.stageStudios, this.liveAssignments, this.invitations);
   }
 
   // Studios with an active live session (joined or active)
   get liveStudios(): ArenaStudio[] {
-    const liveStudioIds = new Set(this.liveAssignments.map(a => a.studioid));
-    return this.studios.filter(s => liveStudioIds.has(s.docid));
+    return liveStudios(this.studios, this.liveAssignments);
   }
-  get invitingStudios(): { studio: ArenaStudio | null, invitation: ArenaInvitation }[] {
+  get invitingStudios(): InvitingStudioRow[] {
     // Exclude invitations for studios that already have a live assignment —
     // once the participant has actually landed in the studio (live assignment
     // created), the INVITING card should disappear even if the invitation doc
     // is still pending in Firestore.
-    const liveStudioIds = new Set(this.liveAssignments.map(a => a.studioid));
-    return this.invitations
-      .filter(inv => !liveStudioIds.has(inv.studioid))
-      .map(inv => ({
-        studio: this.studios.find(s => s.docid === inv.studioid) || null,
-        invitation: inv,
-      }));
+    return invitingStudios(this.invitations, this.studios, this.liveAssignments);
   }
   // Subscribe to `live assignment log` for the currently-listed live assignments,
   // via documentId() IN chunks (Firestore caps `in` at 30). Re-subscribes only when
   // the id set changes. Keeps `logByLaId` in sync for presenceOf().
   private subscribeLiveAssignmentLogs(): void {
-    const ids = Array.from(new Set(this.liveAssignments.map(a => a?.docid).filter(Boolean)));
-    const key = ids.slice().sort().join(',');
+    const key = logSubscriptionKey(this.liveAssignments);
     if (key === this.logSubKey) return;
     this.logSubKey = key;
     this.logSubs.forEach(s => s.unsubscribe());
     this.logSubs = [];
     this.logByLaId = {};
-    for (let i = 0; i < ids.length; i += 30) {
-      const chunk = ids.slice(i, i + 30);
+    for (const chunk of logSubscriptionChunks(this.liveAssignments)) {
       const sub = collectionData(
         query(collection(this.firestore, 'live assignment log'), where(documentId(), 'in', chunk)),
         { idField: 'docid' }
@@ -411,29 +364,13 @@ export class ArenaBoardComponent implements OnDestroy {
   // pre-Zoom wait-screen state the webhook can't see). Timestamps are preserved so
   // .toDate()/.toMillis() keep working.
   private presenceOf(a: any): any {
-    const log = a?.docid ? this.logByLaId[a.docid] : null;
-    if (!log) return a;
-    const specialists: any = log['specialists'] || {};
-    const specVals: any[] = Object.values(specialists);
-    const present = specVals.some(s => s && s.joinedAt && !s.leftAt);
-    const joinedTs = specVals.map(s => s?.joinedAt).filter(Boolean);
-    const leftTs = specVals.map(s => s?.leftAt).filter(Boolean);
-    const ms = (t: any) => (typeof t?.toMillis === 'function' ? t.toMillis() : 0);
-    const overlay: any = {};
-    if (log['participantInCallAt']) overlay['participantInCallAt'] = log['participantInCallAt'];
-    if (log['participantLeftAt']) overlay['participantLeftAt'] = log['participantLeftAt'];
-    if (joinedTs.length) {
-      overlay['specialistJoinedAt'] = joinedTs.reduce((x, y) => ms(x) <= ms(y) ? x : y); // earliest join
-      overlay['specialistLeftAt'] = present ? null
-        : (leftTs.length ? leftTs.reduce((x, y) => ms(x) >= ms(y) ? x : y) : (log['meetingEndedAt'] || null)); // latest leave
-    }
-    return { ...a, ...overlay };
+    return presenceOverlay(a, a?.docid ? this.logByLaId[a.docid] : null);
   }
 
   // Specialist has joined the call at some point (log-derived). Template helper so
   // the HTML never reads the raw `specialistJoinedAt` field directly.
   specialistJoined(a: ArenaAssignment): boolean {
-    return !!this.presenceOf(a).specialistJoinedAt;
+    return specialistJoined(this.presenceOf(a));
   }
 
   // Per-specialist presence (webhook `live assignment log`, `specialists` map keyed
@@ -441,29 +378,25 @@ export class ArenaBoardComponent implements OnDestroy {
   // Lets the arena show each specialist's own status instead of one collapsed badge.
   specialistPresentById(a: ArenaAssignment, profileid: string): boolean {
     void this.nowTick;
-    const log = a?.['docid'] ? this.logByLaId[a['docid']] : null;
-    const s = log?.['specialists']?.[profileid];
-    return !!(s && s.joinedAt && !s.leftAt);
+    return specialistPresentById(a?.['docid'] ? this.logByLaId[a['docid']] : null, profileid);
   }
 
   // Has THIS specialist joined at some point (joined, may have since left)?
   specialistJoinedById(a: ArenaAssignment, profileid: string): boolean {
     void this.nowTick;
-    const log = a?.['docid'] ? this.logByLaId[a['docid']] : null;
-    const s = log?.['specialists']?.[profileid];
-    return !!(s && s.joinedAt);
+    return specialistJoinedById(a?.['docid'] ? this.logByLaId[a['docid']] : null, profileid);
   }
 
   // Joined = participant pulled into studio but Zoom not yet started
   get joinedAssignments(): ArenaAssignment[] {
-    return this.liveAssignments.filter(a => !this.presenceOf(a).specialistJoinedAt);
+    return this.liveAssignments.filter(a => !specialistJoined(this.presenceOf(a)));
   }
   // Active = the Zoom call has started OR is ending. We keep ended-but-not-
   // yet-completed sessions in this column so the coordinator can see that the
   // call has wrapped up (vs the card just disappearing). The timer freezes at
   // the last leave timestamp via sessionElapsed().
   get activeAssignments(): ArenaAssignment[] {
-    return this.liveAssignments.filter(a => !!this.presenceOf(a).specialistJoinedAt);
+    return this.liveAssignments.filter(a => specialistJoined(this.presenceOf(a)));
   }
 
   // Header counters
@@ -481,33 +414,25 @@ export class ArenaBoardComponent implements OnDestroy {
   // ---- Helpers -------------------------------------------------------------
 
   initials(name: string): string {
-    if (!name) return '?';
-    return name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('');
+    return initials(name);
   }
 
   participantName(profileid: string): string {
-    return this.mapProfile[profileid] || '—';
+    return participantName(this.mapProfile, profileid);
   }
 
   // Bonus-activity (additional) specialists for an assignment. Keyed by
   // profile id on the live assignment; we exclude the main pairing specialist
   // and the participant so the same person isn't listed twice.
-  bonusSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
-    const exclude = new Set<string>([a.participantid, ...(a.pairing || [])]);
-    return Object.keys(a.bonusactivity || {})
-      .filter(pid => !exclude.has(pid))
-      .map(pid => ({
-        id: pid,
-        name: this.participantName(pid),
-        activity: this.mapActivity[a.bonusactivity?.[pid] || ''] || ''
-      }));
+  bonusSpecialists(a: ArenaAssignment): NamedSpecialist[] {
+    return bonusSpecialists(a, this.mapProfile, this.mapActivity);
   }
 
   // True when we've resolved a real name for this id (i.e. the chip is worth
   // rendering — used to hide "→ —" rows in the Queued list when the
   // preassigned specialist hasn't loaded yet).
   hasName(profileid: string): boolean {
-    return !!profileid && !!this.mapProfile[profileid];
+    return hasName(this.mapProfile, profileid);
   }
 
   // Lazy-load a profile that isn't in the auth-guard cache. Used when a new
@@ -522,8 +447,7 @@ export class ArenaBoardComponent implements OnDestroy {
     try {
       const snap = await getDoc(doc(this.firestore, 'profile_data', profileid));
       if (snap.exists()) {
-        const d: any = snap.data();
-        const name = d?.['name'] || d?.['profilename'] || d?.['displayname'] || '';
+        const name = displayNameFromProfileDoc(snap.data());
         if (name) this.mapProfile[profileid] = name;
       }
     } catch (e) {
@@ -534,22 +458,14 @@ export class ArenaBoardComponent implements OnDestroy {
   }
 
   specialistList(studio: ArenaStudio | null): { name: string, activity: string }[] {
-    if (!studio) return [];
-    return (studio.participants || []).map(pid => ({
-      name: this.mapProfile[pid] || pid,
-      activity: this.mapActivity[studio.participantsactivity?.[pid] || ''] || '',
-    }));
+    return specialistList(studio, this.mapProfile, this.mapActivity);
   }
 
   // All paired specialists on an assignment (not just pairing[0]) so the
   // JOINED / ACTIVE cards list every specialist in the session, with their
   // activity when one is recorded.
-  pairingSpecialists(a: ArenaAssignment): { id: string, name: string, activity: string }[] {
-    return (a.pairing || []).map(pid => ({
-      id: pid,
-      name: this.participantName(pid),
-      activity: this.mapActivity[a.participantsactivity?.[pid] || ''] || '',
-    }));
+  pairingSpecialists(a: ArenaAssignment): NamedSpecialist[] {
+    return pairingSpecialists(a, this.mapProfile, this.mapActivity);
   }
 
   // Returns the queue position to display, or null when the token has no
@@ -557,30 +473,24 @@ export class ArenaBoardComponent implements OnDestroy {
   // we deliberately do NOT fall back to `tokennumber` or array index because
   // those are different concepts and would mislead the coordinator.
   positionInWaiting(token: ArenaToken): number | null {
-    return token?.queueposition ?? null;
+    return tokenPosition(token);
   }
   positionInQueued(token: ArenaToken): number | null {
-    return token?.queueposition ?? null;
+    return tokenPosition(token);
   }
   hasPosition(token: ArenaToken): boolean {
-    return token?.queueposition != null;
+    return tokenPosition(token) != null;
   }
 
   // Returns the count of attempts for an invitation
   attemptsLabel(inv: ArenaInvitation): string {
-    return `${inv.attempts ?? 1} attempt${(inv.attempts ?? 1) === 1 ? '' : 's'}`;
+    return attemptsLabel(inv);
   }
 
   // Returns "MM:SS" time remaining until an invitation expires
   inviteCountdown(inv: ArenaInvitation): string {
     void this.nowTick;
-    if (!inv?.expirydate?.toDate) return '—';
-    const diffMs = inv.expirydate.toDate().getTime() - Date.now();
-    if (diffMs <= 0) return '0:00';
-    const total = Math.floor(diffMs / 1000);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return inviteCountdown(inv);
   }
 
   // Returns time elapsed since join in MM:SS — only meaningful when the
@@ -591,51 +501,17 @@ export class ArenaBoardComponent implements OnDestroy {
   // does not stop the timer.
   sessionElapsed(assignment: ArenaAssignment): string {
     void this.nowTick;
-    const p = this.presenceOf(assignment);
-    const ts = p?.specialistJoinedAt?.toDate?.();
-    if (!ts) return '—';
-    let endMs = Date.now();
-    if (this.callEnded(assignment)) {
-      // End time = whichever party left LAST.
-      const sLeft = p?.specialistLeftAt?.toMillis?.();
-      const pLeft = p?.participantLeftAt?.toMillis?.();
-      const candidates = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
-      if (candidates.length) endMs = Math.max(...candidates);
-    }
-    const diffMs = endMs - ts.getTime();
-    if (diffMs <= 0) return '0:00';
-    const total = Math.floor(diffMs / 1000);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return sessionElapsed(this.presenceOf(assignment));
   }
 
   // Clock time the specialist joined the Zoom call (e.g. "14:32").
   callStartedClock(a: ArenaAssignment): string {
-    const ts = this.presenceOf(a)?.specialistJoinedAt?.toDate?.();
-    if (!ts) return '—';
-    return this.formatClock(ts);
+    return callStartedClock(this.presenceOf(a));
   }
 
   // Clock time the call ended (latest of the two leave timestamps).
   callEndedClock(a: ArenaAssignment): string {
-    const p = this.presenceOf(a);
-    const sLeft = p?.specialistLeftAt?.toMillis?.();
-    const pLeft = p?.participantLeftAt?.toMillis?.();
-    const cands = [sLeft, pLeft].filter((n: any) => typeof n === 'number');
-    if (!cands.length) return '—';
-    return this.formatClock(new Date(Math.max(...cands)));
-  }
-
-  // 12-hour clock with AM/PM (e.g. "9:42 AM", "2:05 PM") so coordinators read
-  // the start/end time the same way they see it on a phone, not 24-hour.
-  private formatClock(d: Date): string {
-    let h = d.getHours();
-    const m = d.getMinutes().toString().padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12;
-    if (h === 0) h = 12;
-    return `${h}:${m} ${ampm}`;
+    return callEndedClock(this.presenceOf(a));
   }
 
   // True when the participant is at the studio/wait screen. Heartbeat removed
@@ -644,8 +520,7 @@ export class ArenaBoardComponent implements OnDestroy {
   participantPresent(assignment: ArenaAssignment): boolean {
     void this.nowTick;
     // participantReadyAt stays client-stamped (pre-Zoom); participantLeftAt from log.
-    const p = this.presenceOf(assignment);
-    return !!p?.participantReadyAt && !p?.participantLeftAt;
+    return participantPresent(this.presenceOf(assignment));
   }
 
   // ---- ACTIVE-card presence helpers ----------------------------------------
@@ -657,19 +532,13 @@ export class ArenaBoardComponent implements OnDestroy {
   // Specialist is currently inside the Zoom call.
   specialistInCall(a: ArenaAssignment): boolean {
     void this.nowTick;
-    const p = this.presenceOf(a);
-    if (!p?.specialistJoinedAt) return false;
-    if (p?.specialistLeftAt) return false; // explicitly left
-    return true;
+    return specialistInCall(this.presenceOf(a));
   }
 
   // Participant is currently inside the Zoom call.
   participantInCall(a: ArenaAssignment): boolean {
     void this.nowTick;
-    const p = this.presenceOf(a);
-    if (!p?.participantInCallAt) return false;
-    if (p?.participantLeftAt) return false; // explicitly left
-    return true;
+    return participantInCall(this.presenceOf(a));
   }
 
   // Derived call-state predicates (the only state ACTIVE cards branch on)
@@ -685,22 +554,13 @@ export class ArenaBoardComponent implements OnDestroy {
   // Call ended = both parties gone AND at least one of them actually joined
   // at some point (so we're not flagging a still-loading session as ended).
   callEnded(a: ArenaAssignment): boolean {
-    if (this.specialistInCall(a) || this.participantInCall(a)) return false;
-    const p = this.presenceOf(a);
-    return !!(p?.specialistJoinedAt || p?.participantInCallAt);
+    return callEnded(this.presenceOf(a));
   }
 
   // Time since the participant entered the studio (live assignment was created)
   sinceStudioEntry(assignment: ArenaAssignment): string {
     void this.nowTick;
-    const ts = assignment?.['created']?.toDate?.();
-    if (!ts) return '—';
-    const diffMs = Date.now() - ts.getTime();
-    if (diffMs <= 0) return '0:00';
-    const total = Math.floor(diffMs / 1000);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return sinceStudioEntry(assignment);
   }
 
   goBack() {
@@ -729,12 +589,7 @@ export class ArenaBoardComponent implements OnDestroy {
     this.chatUnreadSub = collectionData(query(collectionGroup(this.firestore, 'messages'), where('pending', 'array-contains', this.profileid),where('queueid', '==', this.queueid))).pipe(takeUntil(this.destroy$)).subscribe(msgs =>
     {
       this.unreadStudioIds = new Set(msgs.map((m: any) => m['studioid']));
-      const counts: { [studioid: string]: number } = {};
-      msgs.forEach((m: any) => {
-        const sid = m['studioid'];
-        counts[sid] = (counts[sid] ?? 0) + 1;
-      });
-      this.studioUnreadCounts = counts;
+      this.studioUnreadCounts = unreadCountsByStudio(msgs);
       this.sortStudiosAndAssignments();
       msgs.forEach((m: any) => {
         const msgid = m['messageid']
@@ -753,12 +608,7 @@ export class ArenaBoardComponent implements OnDestroy {
   }
 
   private rebuildChatNameCache(): void {
-    const cache: { [studioid: string]: string } = {};
-    this.studios.forEach(s => {
-      const list = this.specialistList(s);
-      cache[s.docid] = list.length? list.map(p => `${p.name}${p.activity ? ' - ' + p.activity : ''}`).join(', '): 'Studio';
-    });
-    this.chatNameCache = cache;
+    this.chatNameCache = buildChatNameCache(this.studios, this.mapProfile, this.mapActivity);
   }
 
   backToChatList() {
@@ -847,9 +697,7 @@ export class ArenaBoardComponent implements OnDestroy {
   }
 
   private markChatRead(studioid: string) {
-    const unread = this.chatMessages.filter(m =>
-      m['sent_by'] !== this.profileid && (m['pending'] ?? []).includes(this.profileid)
-    );
+    const unread = unreadMessagesFor(this.chatMessages, this.profileid);
     if (!unread.length) return;
     const batch = writeBatch(this.firestore);
     unread.forEach(m => {
@@ -863,7 +711,7 @@ export class ArenaBoardComponent implements OnDestroy {
 
   onChatFileSelected(event: any) {
     Array.from(event.target.files as FileList).forEach((file: File) => {
-      if (file.size > 10 * 1024 * 1024) return;
+      if (!isAcceptableChatFile(file.size)) return;
       const entry: any = { file, filename: file.name, fileurl: '' };
       if (this.isImageFile(file.name)) {
         const reader = new FileReader();
@@ -879,7 +727,7 @@ export class ArenaBoardComponent implements OnDestroy {
   }
 
   isImageFile(filename: string): boolean {
-    return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename || '');
+    return isImageFile(filename);
   }
 
   async sendChatMessage() {
@@ -942,29 +790,13 @@ export class ArenaBoardComponent implements OnDestroy {
   }
 
   private sortStudiosAndAssignments(): void {
-    const score = (id: string) => {
-      const unread = this.unreadStudioIds.has(id) ? 1 : 0;
-      const time = this.chatThreads[id]?.lastmessageat?.toMillis?.() ?? 0;
-      return { unread, time };
-    };
-    this.studios = [...this.studios].sort((a, b) => {
-      const as = score(a.docid), bs = score(b.docid);
-      if (bs.unread !== as.unread) return bs.unread - as.unread;
-      return bs.time - as.time;
-    });
-    this.liveAssignments = [...this.liveAssignments].sort((a, b) => {
-      const as = score(a.studioid), bs = score(b.studioid);
-      if (bs.unread !== as.unread) return bs.unread - as.unread;
-      return bs.time - as.time;
-    });
+    this.studios = sortByChatActivity(this.studios, s => s.docid, this.unreadStudioIds, this.chatThreads);
+    this.liveAssignments = sortByChatActivity(this.liveAssignments, a => a.studioid, this.unreadStudioIds, this.chatThreads);
   }
 
   processMessage(message: string, linkColor: string = '#1a56db'): SafeHtml {
     if (!message) return '';
-    let processed = message.replace(/\n/g, '<br>');
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    processed = processed.replace(urlRegex, `<a href="$1" target="_blank" rel="noopener" style="color:${linkColor};word-break:break-word;overflow-wrap:anywhere;">$1</a>`);
-    return this.sanitizer.bypassSecurityTrustHtml(processed);
+    return this.sanitizer.bypassSecurityTrustHtml(linkifyMessage(message, linkColor));
   }
 
   getStudioUnread(studioid: string): boolean {
