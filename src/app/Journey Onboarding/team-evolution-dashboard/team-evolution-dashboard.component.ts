@@ -228,11 +228,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   selectedProductId: string | null = null;
   selectedProductName: string | null = null;
   statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
-  ahMemberProfileIds: Set<string> = new Set();
-  overviewStatusFilter: 'ongoing' | 'completed' | 'notStarted' | null = null;
-  selectedProductId: string | null = null;
-  selectedProductName: string | null = null;
-  statusView: 'ongoing' | 'notStarted' | 'needsAttention' | 'completed' | 'awaitingSignoff' = 'ongoing';
   
   // Boolean declarations
   drawerOpen = false;
