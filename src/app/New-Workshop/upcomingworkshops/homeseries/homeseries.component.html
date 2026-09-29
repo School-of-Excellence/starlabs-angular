@@ -14,6 +14,43 @@
         <mat-error *ngIf="form.get('title')?.hasError('required')">Title is required.</mat-error>
       </mat-form-field>
 
+      <!-- Series-level presentation. All optional; an empty one saves as an empty string.
+           This Subtitle is the SERIES subtitle — each episode card below has its own. -->
+      <div class="series-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Heading</mat-label>
+          <input data-testid="hom-heading" matInput formControlName="heading" placeholder="Enter heading" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Subtitle</mat-label>
+          <input data-testid="hom-subtitle" matInput formControlName="subtitle" placeholder="Enter subtitle" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Head left</mat-label>
+          <input data-testid="hom-headleft" matInput formControlName="headleft" placeholder="Enter head left" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Head right</mat-label>
+          <input data-testid="hom-headright" matInput formControlName="headright" placeholder="Enter head right" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Button text</mat-label>
+          <input data-testid="hom-buttontext" matInput formControlName="buttontext" placeholder="Enter button text" />
+        </mat-form-field>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <span class="toggle-title">Pick of the week</span>
+          <span class="toggle-desc">Feature this series as the pick of the week.</span>
+        </div>
+        <mat-slide-toggle data-testid="hom-pickoftheweek" formControlName="pickoftheweek" color="primary"></mat-slide-toggle>
+      </div>
+
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Episodes</mat-label>
         <mat-select formControlName="selectedEpisodes" multiple

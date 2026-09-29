@@ -721,3 +721,17 @@
     flex: 1;
   }
 }
+
+/* Audience picker — only one of the two selects is ever mounted, so it takes the
+   full row rather than sharing it with an empty sibling. */
+.audience-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.audience-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 520px;
+}
