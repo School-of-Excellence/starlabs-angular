@@ -93,7 +93,12 @@ export function findCompany(companies: CompanyConfig[], key: string): CompanyCon
 /** True when this company keeps the original unprefixed invoice series. */
 export function isDefaultCompany(company: CompanyConfig | null): boolean {
   if (!company) return true;
-  return company.seriesPrefix !== 'statecode';
+  // Keyed off `key`, exactly as the cloud function's resolveInvoiceSeries()
+  // does. It previously branched on `seriesPrefix`, so a non-default company
+  // stored with seriesPrefix 'none' was unprefixed here but prefixed by the
+  // server — the payment's `companyprefix` and its minted number disagreed.
+  // `seriesPrefix` is now descriptive only.
+  return [null, undefined, '', DEFAULT_COMPANY_KEY].includes(company.key);
 }
 
 /**
