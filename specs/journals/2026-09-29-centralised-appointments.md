@@ -69,7 +69,7 @@ dictated by the operator in plan-mode comments.
 |---|---|
 | Whole new screen | delete `src/app/Scheduling/specialist-appointment-studio/` and the `specialistappointmentstudio` line in `app.routes.ts` |
 | Cancel hidden for CW/Mentor in the detail dialog | remove the `disableCancel` check in `appointment-detail.component.ts` constructor |
-| Static availability (fixed:true) | remove the `fixed` block at the top of `computeSlot` in `starlabs-cloud-function/functions/components/appointment.js` and redeploy; stop writing `fixed` in `sas-add-availability.component.ts` save() |
+| Static availability (per-slot docs) | in `sas-add-availability.component.ts` save(), drop the static branch; no CF change is involved |
 
 ## Follow-up changes (same session, operator requests)
 - **Mentor view needs a product.** `mentor` flag + a non-empty `users_roles.productowner` → Mentor view.
@@ -115,3 +115,12 @@ dictated by the operator in plan-mode comments.
 ## Pushed without e2e coverage
 Operator chose to push before the starlabs-e2e-tests suite exists (breaks the CLAUDE.md "e2e before push" rule for
 this push). Hooks are in place; prefixes: sas, sah, saa, sap, sal, stt, stm, smn, sut, sst.
+
+## `fixed` flag dropped, computeSlot change discarded (operator's call)
+A static slot is its own doc with one type and a window exactly one duration long, so the **unchanged**
+computeSlot already cuts exactly one slot (checked for 15/30/45/60/90/120/300 min: the next 30-minute start
+never fits). The one-slot rule is enforced in the frontend, so `fixed: true` and the computeSlot branch were
+redundant. Removed `fixed` from the Angular write, model and labels; the CF change was discarded (never
+committed or deployed). Static and auto docs now look the same in the data.
+Deploy of the (unchanged) computeSlot to starlabs-test was blocked by the repo's predeploy guard: the emulator
+needs Java 21, this machine has 17. Nothing was deployed.

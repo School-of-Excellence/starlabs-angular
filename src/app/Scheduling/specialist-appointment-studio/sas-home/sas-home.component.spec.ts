@@ -102,7 +102,7 @@ describe('SasHomeComponent · calendar for all specialists', () => {
   it('shows every specialist\'s windows, each booking under its own specialist\'s window', async () => {
     const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + 7);
     const at = (h: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), h);
-    const win = (id: string, who: string): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['t'], fixed: false, slots: [] });
+    const win = (id: string, who: string): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['t'], slots: [] });
     const row = (id: string, who: string): ApptRow => ({ raw: {}, appt: {
       id, start: at(10), end: at(11), attended: false, cancelled: false, cancelledReason: null,
       hostIds: [who], participantId: 'p', typeId: 't', productId: null, zoomUrl: null } });

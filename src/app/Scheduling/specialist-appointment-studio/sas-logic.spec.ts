@@ -7,7 +7,7 @@ import {
 const T = (h: number, m = 0) => new Date(2026, 8, 28, h, m);
 
 const win = (over: Partial<AvailWindow> = {}): AvailWindow => ({
-  id: 'w', profileId: 'p', start: T(9), end: T(12), typeIds: ['a', 'b'], slots: [], fixed: false, ...over,
+  id: 'w', profileId: 'p', start: T(9), end: T(12), typeIds: ['a', 'b'], slots: [], ...over,
 });
 
 const appt = (over: Partial<Appt> = {}): Appt => ({
@@ -95,10 +95,11 @@ describe('sas-logic', () => {
       const r = previewSlots(T(9), T(11), [{ id: 'a', duration: 60 }]);
       expect(r['a'].map(s => s.start.getHours() * 60 + s.start.getMinutes())).toEqual([540, 570, 600]);
     });
-    it('gives a fixed window exactly one slot per type', () => {
-      const r = previewSlots(T(9), T(11), [{ id: 'a', duration: 60 }, { id: 'b', duration: 30 }], true);
-      expect(r['a'].length).toBe(1);
-      expect(r['b'][0].end.getTime()).toBe(T(11).getTime());
+    it('cuts exactly one slot when the window is one duration long (static slots)', () => {
+      for (const d of [15, 45, 60, 120]) {
+        const r = previewSlots(T(9), new Date(T(9).getTime() + d * 60000), [{ id: 'a', duration: d }]);
+        expect(r['a'].length).withContext(d + ' min').toBe(1);
+      }
     });
     it('offers nothing when the type is longer than the window', () => {
       expect(previewSlots(T(9), T(10), [{ id: 'a', duration: 120 }])['a'].length).toBe(0);

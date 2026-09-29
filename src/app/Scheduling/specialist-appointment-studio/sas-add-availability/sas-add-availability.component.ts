@@ -14,7 +14,8 @@ interface StaticRow { typePath: string | null; start: string; }
 
 /* Add availability. Auto = give a range and computeSlot cuts the start times (no flag).
    Static = the specialist's own slots: per slot a delivery type and a start time, ending after that type's
-   duration; several per day. Each slot is saved as its own fixed: true doc, so computeSlot makes exactly it.
+   duration; several per day. Each slot is saved as its own availability doc with only its type and a window exactly one duration long,
+   so the unchanged computeSlot cuts exactly that one slot (its next 30-minute start would not fit).
    Writes the same availability doc shape as add-appointment-availability. Hook prefix: saa */
 @Component({
   selector: 'app-sas-add-availability',
@@ -109,7 +110,7 @@ export class SasAddAvailabilityComponent implements OnInit {
 
   /* ---------- Static: the specialist's own slots, per picked date ----------
      Each date has its own rows; a row = one delivery type + a start time, ending after that type's
-     duration. Saved as one fixed availability doc per slot. */
+     duration. Saved as one availability doc per slot. */
   private dayRows = new Map<string, StaticRow[]>();
   dayKey(d: Date) { return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
   /* The rows for a date; a date seen for the first time starts with one empty slot. */
@@ -215,8 +216,8 @@ export class SasAddAvailabilityComponent implements OnInit {
         const appointments = this.pickedTypes().map(t => doc(this.firestore, t.path));
         for (const d of this.dates()) put({ starttime: this.at(d, this.startTime), endtime: this.at(d, this.endTime), appointments });
       } else {
-        // One fixed doc per slot, holding only its own type: computeSlot writes exactly that slot.
-        for (const x of this.intervals()) put({ starttime: x.s, endtime: x.e, appointments: [doc(this.firestore, x.typePath)], fixed: true });
+        // One doc per slot, holding only its own type, window = one duration: computeSlot writes exactly that slot.
+        for (const x of this.intervals()) put({ starttime: x.s, endtime: x.e, appointments: [doc(this.firestore, x.typePath)] });
       }
       await batch.commit();
       this.ref.close(true);

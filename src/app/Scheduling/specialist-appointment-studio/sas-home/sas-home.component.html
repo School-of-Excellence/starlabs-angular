@@ -63,7 +63,7 @@
               <div class="sas-slot" [class]="'sas-slot s-' + x.state" data-testid="sah-window">
                 @if (allMode) { <small class="sas-slot-who" data-testid="sah-window-who">{{ svc.name(x.w.profileId) }}</small> }
                 <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
-                <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}{{ x.w.fixed ? ' · fixed' : '' }}</small>
+                <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}</small>
                 <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
                 @if (x.w.start > now) {
                   <button class="sas-icon-btn sas-del" data-testid="sah-window-delete" (click)="deleteWindow(x.w, $event)" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>

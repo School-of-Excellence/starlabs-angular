@@ -42,7 +42,7 @@
                 <tbody>
                   @for (a of filteredAvail(r); track a.w.id) {
                     <tr data-testid="stt-avail-row">
-                      <td><b class="nw">{{ a.w.start | date: 'EEE d MMM' }}</b><small>{{ a.w.start | date: 'shortTime' }} – {{ a.w.end | date: 'shortTime' }}{{ a.w.fixed ? ' · static' : '' }}</small></td>
+                      <td><b class="nw">{{ a.w.start | date: 'EEE d MMM' }}</b><small>{{ a.w.start | date: 'shortTime' }} – {{ a.w.end | date: 'shortTime' }}</small></td>
                       <td>{{ typeNames(a.w) }}</td>
                       <td><span class="sas-pill" [class]="'sas-pill ' + STATUS_PILL[a.status]" data-testid="stt-avail-status">{{ a.status }}</span>
                         <small>{{ fmtHours((a.w.end.getTime() - a.w.start.getTime()) / 60000) }} given{{ a.openMin > 0 ? ' · ' + fmtHours(a.openMin) + ' still open' : '' }}</small></td>

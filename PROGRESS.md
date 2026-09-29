@@ -7,8 +7,7 @@ _Last updated: 2026-09-29 (centralised appointment system)_
 ## Current state
 - Branch `feature-test`: the new `/specialistappointmentstudio` screen is committed and **pushed** to
   `origin/feature-test`. It builds clean (production), and 58/58 of its specs pass.
-- `starlabs-cloud-function` (`development`): one **uncommitted, undeployed** change to
-  `computeSlot`, for static availability.
+- `starlabs-cloud-function`: no changes. The `computeSlot` change was discarded; static slots don't need it.
 - Nothing is deployed.
 
 ## Last session changes (2026-09-29)
@@ -34,7 +33,8 @@ _Last updated: 2026-09-29 (centralised appointment system)_
 
 ## Pending
 - A `dashboard` access entry for `specialistappointmentstudio`. Without it the guard shows "Contact Admin".
-- Deploy `computeSlot`. Until then, Static availability still gets 30-minute slots.
+- Uncommitted on `feature-test`: removal of the `fixed` flag (static slots work with the unchanged `computeSlot`).
+- CF deploys from this machine are blocked: the repo's predeploy guard runs the emulator, which needs Java 21 (installed: 17).
 - A live check on starlabs-test as a CW, a Mentor and an A&H user. The preview pane needs a login.
 - **e2e coverage is missing**: the screen was pushed before a starlabs-e2e-tests suite existed (operator's call).
   Add the suite, seed and spec next. The hook prefixes are in the journal.

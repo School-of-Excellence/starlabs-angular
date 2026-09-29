@@ -52,7 +52,7 @@ export function unionMinutes(list: Interval[]): number {
 
 /* An availability window as the screen uses it: the doc's own time plus its per-type slot arrays. */
 export interface Slot { typeId: string; start: Date; end: Date; booked: boolean; available: boolean; }
-export interface AvailWindow { id: string; profileId: string; start: Date; end: Date; typeIds: string[]; slots: Slot[]; fixed: boolean; }
+export interface AvailWindow { id: string; profileId: string; start: Date; end: Date; typeIds: string[]; slots: Slot[]; }
 
 export const windowMinutes = (w: AvailWindow) => minutesBetween(w.start, w.end);
 
@@ -164,13 +164,12 @@ export function fmtHours(min: number): string {
 
 /* ---------- Slot preview: mirrors computeSlot (starlabs-cloud-function appointment.js) ----------
    Types are taken longest first; a start is offered every 30 minutes and kept only if the slot
-   fits before the window ends. A fixed (static) window gets exactly one slot per type. */
+   fits before the window ends. */
 export interface TypeDur { id: string; duration: number; }
-export function previewSlots(start: Date, end: Date, types: TypeDur[], fixed = false): Record<string, Interval[]> {
+export function previewSlots(start: Date, end: Date, types: TypeDur[]): Record<string, Interval[]> {
   const out: Record<string, Interval[]> = {};
   const sorted = [...types].sort((a, b) => b.duration - a.duration);
   for (const t of sorted) {
-    if (fixed) { out[t.id] = end > start ? [{ start: new Date(start), end: new Date(end) }] : []; continue; }
     const list: Interval[] = [];
     let s = new Date(start);
     while (end > s) {

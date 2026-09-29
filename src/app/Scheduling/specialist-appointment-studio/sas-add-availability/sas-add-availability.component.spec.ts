@@ -102,7 +102,7 @@ describe('SasAddAvailabilityComponent', () => {
     expect(component.error).toContain('slots 1 and 2 overlap');
   });
 
-  it('static: writes one fixed doc per slot, each day with its own slots', () => {
+  it('static: writes one doc per slot, each day with its own slots', () => {
     const d = tomorrow(), d2 = new Date(d); d2.setDate(d2.getDate() + 1);
     component.mode = 'static';
     component.pickDay(d); component.pickDay(d2);

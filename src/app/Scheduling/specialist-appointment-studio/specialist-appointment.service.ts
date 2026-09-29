@@ -72,7 +72,7 @@ export class SpecialistAppointmentService {
     const slots = typeIds.flatMap(t => (d[t] ?? []).map((s: any) => ({
       typeId: t, start: toDate(s.slotstart)!, end: toDate(s.slotend)!, booked: !!s.booked, available: !!s.available,
     })));
-    return { id, profileId: d['profileref']?.id ?? '', start: toDate(d['starttime'])!, end: toDate(d['endtime'])!, typeIds, slots, fixed: d['fixed'] === true };
+    return { id, profileId: d['profileref']?.id ?? '', start: toDate(d['starttime'])!, end: toDate(d['endtime'])!, typeIds, slots };
   }
 
   /* profileIds null = every specialist (A&H). */

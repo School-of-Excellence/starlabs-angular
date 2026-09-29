@@ -12,7 +12,7 @@ describe('SasTeamTableComponent', () => {
   const base = new Date(); base.setDate(base.getDate() + 7); base.setHours(0, 0, 0, 0);
   const at = (h: number, dayOffset = 0) => new Date(base.getFullYear(), base.getMonth(), base.getDate() + dayOffset, h);
   const win = (id: string, s: number, e: number, day = 0): AvailWindow => ({
-    id, profileId: 'eis1', start: at(s, day), end: at(e, day), typeIds: ['t1'], fixed: false,
+    id, profileId: 'eis1', start: at(s, day), end: at(e, day), typeIds: ['t1'],
     slots: [{ typeId: 't1', start: at(s, day), end: at(s + 1, day), booked: false, available: true }],
   });
   const row = (id: string, h: number, day = 0, over: Partial<Appt> = {}): ApptRow => ({
