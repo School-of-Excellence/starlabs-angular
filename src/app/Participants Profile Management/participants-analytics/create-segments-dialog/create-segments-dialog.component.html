@@ -67,7 +67,15 @@
               formControlName="participantlistid" 
               multiple
               placeholder="Select participant lists">
-              <mat-option *ngFor="let list of participantLists" [value]="list.docid">
+              <mat-option>
+                <ngx-mat-select-search
+                  data-testid="csd-list-search-21"
+                  [formControl]="listSearchCtrl"
+                  placeholderLabel="Search lists..."
+                  noEntriesFoundLabel="No lists found">
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let list of filteredListOptions" [value]="list.docid">
                 {{ list.listname }}
               </mat-option>
             </mat-select>
@@ -92,12 +100,13 @@
               </mat-select-trigger>
               <mat-option>
                 <ngx-mat-select-search
+                  data-testid="csd-tag-search-22"
                   [formControl]="tagSearchCtrl"
                   placeholderLabel="Search tags..."
                   noEntriesFoundLabel="No tags found">
                 </ngx-mat-select-search>
               </mat-option>
-              <mat-option *ngFor="let tag of participantTags" [value]="tag.id">
+              <mat-option *ngFor="let tag of filteredTagOptions" [value]="tag.id">
                 {{ tag.name }}
               </mat-option>
             </mat-select>
@@ -391,7 +400,15 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Select Participant List</mat-label>
             <mat-select formControlName="participantlistid" placeholder="Choose a list">
-              <mat-option *ngFor="let list of availableListsForSelected" [value]="list.docid">
+              <mat-option>
+                <ngx-mat-select-search
+                  data-testid="csd-add-list-search-23"
+                  [formControl]="addListSearchCtrl"
+                  placeholderLabel="Search lists..."
+                  noEntriesFoundLabel="No lists found">
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let list of filteredAvailableLists" [value]="list.docid">
                 {{list.listname}}
               </mat-option>
             </mat-select>
@@ -463,7 +480,15 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Select Tag</mat-label>
             <mat-select formControlName="tagid" placeholder="Choose a tag">
-              <mat-option *ngFor="let tag of availableTagsForSelected" [value]="tag.id">
+              <mat-option>
+                <ngx-mat-select-search
+                  data-testid="csd-add-tag-search-24"
+                  [formControl]="addTagSearchCtrl"
+                  placeholderLabel="Search tags..."
+                  noEntriesFoundLabel="No tags found">
+                </ngx-mat-select-search>
+              </mat-option>
+              <mat-option *ngFor="let tag of filteredAvailableTags" [value]="tag.id">
                 <mat-icon class="tag-color-icon">label</mat-icon>
                 {{ tag.name }}
               </mat-option>
