@@ -93,3 +93,97 @@ Plan: `specs/plans/2026-09-25-participant-intelligence-round3.md`. Uncommitted; 
 
 ## Round 3 flags
 Move 4 cards to the Journey Coaching Dashboard (they stay here meanwhile) · "never consumed any in the last 6 months" (no consumption dates).
+
+---
+
+# 2026-09-29 — Load performance + frozen-column drift
+
+Reported on production: slow load, and the Participant / Financial status (frozen) columns drift from the others while scrolling. Uncommitted; the pre-change `.ts`/`.html` are in the session scratchpad as `pre-perf.*`.
+
+## Root cause
+- The table drew **every** filtered participant (`@for (p of rows())`): thousands of rows × 8+ columns, each cell calling several methods, rebuilt on every filter click. Analytics shows 25 per page.
+- ~~Sticky-cell compositing lag~~ (wrong diagnosis). **Actual cause of the "separate scrolling":** Participant and Financial status were **pinned by default** (`DEFAULT_PINNED_COLUMNS`), so they deliberately stayed in place during horizontal scrolling. The operator wants every column to scroll together.
+- Communications analytics read all of `email archive`, `wati archive` and `notificationrecord` at startup, for a popover.
+
+## CHANGE LOG & REVERT GUIDE
+| # | Change | Revert |
+|---|--------|--------|
+| P1 | **Pagination** in `ParticipantTableComponent`: `pageRows` = one page of `rows()`, sizes 25 / 50 / 100 / 200 (default 50), first / prev / next / last, "x–y of N". Resets to page 1 (and scrolls to the top) whenever the rows change. Filters, sort, selection and select-all still cover **all** filtered rows. Hooks: `pi-page-size`, `pi-page-first` / `prev` / `next` / `last`. | Loop over `rows()` again; drop the pager block and signals. |
+| P2 | **Comms analytics lazy**: `store.loadCommsAnalytics()` runs on the popover's `(menuOpened)`, cached until Refresh. The topbar queued badge therefore appears only after the popover has been opened once. | Call `getCommsAnalytics()` in `init()` again. |
+| P3 | **Faster first paint**: `forkJoin` waits only for reference + participants; audiences load alongside. | Put `audiences` back into the forkJoin. |
+| P4 | ~~Frozen cells get `will-change: transform`~~ **Withdrawn**: based on a wrong diagnosis (see below). | — |
+| P5 | **No columns frozen by default**: `DEFAULT_PINNED_COLUMNS = []`, and `frozenLefts` returns nothing when no column is pinned, so the checkbox column scrolls too. Pinning stays opt-in in the Columns menu (pinning any column still pins Participant as well). | Restore `['name', 'financialstatus']` and remove the early return. |
+| — | Sort value computed once per row (decorate-sort-undecorate), not twice per comparison. | Previous comparator. |
+
+## Verification
+`ng build` (dev) passes and `tsc --noUnusedLocals` is clean. **Not measured on production** (no login); the operator confirms load time and column alignment there.
+
+## Note
+`origin/charan-release` has an **older** copy of this component (92d6f49c + hooks 216325a8), without rounds 1–3. The operator said not to pull from it. The 7 hooks from 216325a8 (`pi-search-clear`, `pi-toggle-insights`, `pi-toggle-rail`, `pi-checklists`, `pi-comms`, `pi-refresh`, `pi-checklist-item`) are **not** in feature-test's HTML.
+
+## 2026-09-29 (cont.) — table spacing / truncation, rail close, column order
+From the operator's screenshot: wide gaps between columns, product / tag / email text cut off, a missing close for the filter panel, and the pager select showing 25 while 50 rows were displayed.
+
+| # | Change | Revert |
+|---|--------|--------|
+| T1 | `colWidth()` sized per column type (products / playlists 280, tags 230, email 230, status 132, date 124, money 120, number 96, name 250, other 160). `gridTemplate` uses fixed px, and only the **last** column stretches (`minmax(w, 1fr)`). Before, every column was `minmax(150px, 1fr)`, which spread spare width as gaps. Rows are separate grids, so widths must be fixed to stay aligned. | Old `colWidth` / `gridTemplate`. |
+| T2 | Product lines and tag chips **wrap** (`overflow-wrap: anywhere`, `.chips` flex-wrap) instead of ellipsis / `max-width: 120px`. Tags show 3 then +N (was 2). Email has a `title` tooltip. Cell padding 14 → 10px. | Old CSS. |
+| T3 | Pager select uses `[selected]` per option, because `[value]` on the select was applied before the options existed. | — |
+| T4 | Filter rail header gets a close button (`pi-filter-close`, `close` output → `railOpen.set(false)`); the topbar Filters button reopens it. | Remove the button / output. |
+| T5 | Columns menu → "Add column" sorted A–Z (`availableColumns` sorted by label). | Remove the `.sort`. |
+
+Not viewed logged-in; the operator checks on their dev server.
+| T6 | **Reopen strip**: when the filter panel is closed, a 40px vertical "Filters" strip (with the active-filter count) sits in its place (`pi-filter-open`). The operator couldn't find how to reopen after closing (the topbar Filters label is hidden under 1100px). | Remove the `@else` block + `.rail-reopen` CSS. |
+| T7 | **Default columns = Participant only** (`DEFAULT_VISIBLE_COLUMNS = ['name']`), also after Reset. Everything else is added from the (A–Z) Columns menu. | Restore the previous 8-column list. |
+| T8 | **Communications button → Notification record screen**: the 📣 button opens `/notificationrecord` in a new tab. The popover and all of its code are removed: `CommsAnalyticsPanelComponent`, `Comms*` models, `getCommsAnalytics` / `channelStats` (which read the three archives), `commsAnalytics` / `queuedTotal` / `bumpQueued`, the queued badge and `.pi-comms-menu` CSS. `pi-comms` hook restored on the button. | Restore from `pre-comms.*` in the scratchpad. |
+| T9 | **Top-bar Insights and Filters buttons removed.** Insights: a minimise button inside the cards (`pi-insights-minimize`, `minimize` output); when minimised, an "Insights · N need attention" bar expands it again (`pi-insights-expand`). Filters: the rail's close button plus the left reopen strip (T4 / T6). `toggleRail` / `toggleInsights` removed. | Re-add the two `.tbtn` buttons + methods. |
+
+---
+
+# Round 4 — testing report (2026-09-30)
+
+Plan: `specs/plans/2026-09-29-participant-intelligence-round4.md` (two testing reports, deduplicated to 27 points and discussed one by one). Built by a multi-agent workflow (engine → filter rail → page / table / tags in sequence on the single file; analytics dialogs in parallel), then reviewed, fixed and unit-tested. Uncommitted. Pre-round copies are in the session scratchpad `pre-round4/`.
+
+## CHANGE LOG & REVERT GUIDE
+Revert everything for this round: restore the 3 component files from `pre-round4/`, delete `participant-intelligence.unit.spec.ts`, and `git checkout` the two dialog folders + `participants-analytics.component.ts` (the last three were untouched before this round).
+
+| # | What changed |
+|---|---|
+| 3 | Responsive top bar: count under the title, icon-only tools below ~1200px, wraps instead of clipping |
+| 4 / 4b | "Save filter" (renamed; also in the chips strip); Saved filters list at the top of the filter rail (search, live counts, active highlight, Manage); the top dropdown keeps Lists + Segments |
+| 5 | Search in Columns → Add column; the menu stays open |
+| 6 | manage-participantlist-dialog "Filter By" and create-segments-dialog dropdowns: ngx-mat-select-search + A–Z (via analytics' `filterOptions`). create-participantlist-dialog has no dropdowns (and nothing opens it) |
+| 7 | "Journey segment" filter from `segmentboardconfig` + `segmentboardlist` (with the "updated" date) |
+| 8 / 9 / 10 | Event and Queue sections each have the status switch + search; options "Name · date (count)" |
+| 11 | Queue Completed / Live from `queue_token` split by `currentstage` (fixes Completed = 0, and Live counting finished tokens) |
+| 12 | `CountCondition` At least / At most / Exact / Is between for uP!, CPM, ATC and product rules; all saved in `pifilter` (product rules were never saved before) |
+| 13 | ATC missing → null → "—" |
+| 14 | Subscription date range picker + 8 relations (day precision, inclusive, open sides); analytics-compatible keys still written for start / end between |
+| 15 | Validators: invalid / no-op conditions aren't applied and make no chip; red inputs with messages |
+| 16 | Consistent sorting, blanks always last, sort-basis tooltip |
+| 17 | Active insight toggles off; Reset = Clear all; the top-bar count shows the active insight with ✕ |
+| 18 | The loaded audience survives refinement ("· + N filters" / "· modified" + Update saved filter) and has its own chip |
+| 19 | "· last" on non active subscription dates; Current / Last subscription start / end columns |
+| 20 / 21 | Primary "+ Create tag"; required, editable "Tag for" (live event · queue event · video ask · journey coach) |
+| 23 | HOP mismatch = HOP set and ≠ active journey; expired by day; "engaged" = real known products / journey; "Active, no remarks yet" |
+| 24 | "Finance status" category: per-status cards + "Active customer, non-active finance" (R1–R5 unchanged) |
+| 25 | Watson checklist rows: "View profile" |
+| 27 | "Multiple DFU products active" (product `type == 'DFU'`, ≥ 2 active entries) |
+| — | Saved filters now round-trip every field (`setDoc` mergeFields). **participants-analytics.component.ts**: one line, whose filter loop now skips `pifilter` |
+
+## Verification
+- Unit spec `participant-intelligence.unit.spec.ts` (repo convention `*.unit.spec.ts`, `tsconfig.unit.json`): **104 / 104 pass** (conditions, 8 relations, validation, sorting, queue split, insights, finance, DFU, Watson, include / exclude).
+- `tsc` clean for the component; the development build passes. The in-build review raised 27 findings (0 high) and 20 were fixed.
+- The follow-up adversarial verification workflow was **stopped by the operator** during its read-only find step (no edits).
+- **Not viewed logged-in.**
+
+## Operator decisions (2026-09-30)
+1. **Confirmed-event counts:** do not load all approved requests at start → **flagged**. Counts stay on-demand.
+2. **Participant count moved out of the top bar:** it now sits in a `.table-meta` line just above the table ("N of M participants" + active insight ✕; hooks `pi-count`, `pi-insight-clear`). The top bar shows only the title; the `.titles` / `.sub` / `.brand.with-insight` CSS was removed and table-wrap's top margin is 14 → 8px.
+3. **Fixed** the create-segments-dialog bug: `filterAvailableTags` / `updateAvailableTags` compared `tag.docid`, which `participant tags` docs don't have (options and `segments.tagids` use `tag.id`), so already-picked tags stayed listed as available. Both now compare `tag.id`. Revert: `git checkout` the dialog file (the #6 search change is in the same file).
+4. **e2e:** not now; the operator will say when (page spec PI-01..04 is out of sync with the new hooks).
+
+Checks after these: tsc 0 errors, dev build OK, unit spec 104 / 104.
+
+## Flags (not built)
+Backend customer-status job (Watson R2–R4 mismatches) · Onboarding status + active-by-age insights · Load approved requests for all events at start (Confirmed counts for every event option).

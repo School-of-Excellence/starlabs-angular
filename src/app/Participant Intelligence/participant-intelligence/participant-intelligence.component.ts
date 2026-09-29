@@ -6,15 +6,17 @@
  * component (ParticipantIntelligenceComponent).
  */
 
-import { ChangeDetectionStrategy, Component, Injectable, Injector, OnInit, computed, effect, inject, output, signal, untracked } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, ElementRef, Injectable, Injector, OnInit, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogConfig, MatDialogRef } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Firestore, arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { Firestore, QuerySnapshot, arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from '@angular/fire/storage';
 import { Observable, firstValueFrom, forkJoin, from } from 'rxjs';
 import { saveAs } from 'file-saver';
@@ -94,11 +96,17 @@ export interface Participant {
   bonus: string[];
   tier: string[];
   profiletags: string[];
-  atccount: number;
+  atccount: number | null; // null when the field is missing, so "no data" never reads as 0
   customersupport: { status: SupportStatus; category: string | null };
   remarks: Remark[];
+  // the subscription for the participant's status: non active / discontinued → the last one, others → the current one
   subscriptionstart: string | null;
   subscriptionend: string | null;
+  isLastSubscription: boolean; // subscriptionstart / subscriptionend come from lastsubscription*
+  currentSubscriptionStart: string | null; // subscriptionstart as stored
+  currentSubscriptionEnd: string | null;
+  lastSubscriptionStart: string | null; // lastsubscriptionstart as stored
+  lastSubscriptionEnd: string | null;
   lastpaymentdate: string | null;
   purchasedate: string | null;
   dateofbirth: string | null;
@@ -138,28 +146,85 @@ export interface Tag {
   isActive: boolean;
 }
 
+export interface ProductRef extends NamedRef {
+  type: string | null; // products.type, e.g. 'DFU'
+}
+
+// An event (start_date) or queue (created date); names repeat, so the date tells them apart.
+export interface DatedRef extends NamedRef {
+  date: string | null;
+}
+
+// A live segment board segment and its last saved member list (segmentboardlist).
+export interface JourneySegment extends NamedRef {
+  profileIds: string[];
+  lastupdated: string | null;
+}
+
 // Lookup tables loaded once; the table and filters resolve ids to names through these.
 export interface ReferenceData {
   journeys: NamedRef[];
-  products: NamedRef[];
+  products: ProductRef[];
   modes: NamedRef[];
   tiers: NamedRef[];
   tags: Tag[];
-  events: NamedRef[];
-  queues: NamedRef[];
+  events: DatedRef[]; // name A–Z, then newest first
+  queues: DatedRef[]; // name A–Z, then newest first
+  journeySegments: JourneySegment[]; // board display order
 }
 
-export type Comparison = 'eq' | 'gte' | 'lte';
+// Count conditions (uP! / CPM / ATC counts and product-count rules); both numbers are inclusive.
+export type CountOp = 'atLeast' | 'atMost' | 'exact' | 'between';
+
+export const COUNT_OPS: { value: CountOp; label: string }[] = [
+  { value: 'atLeast', label: 'At least' },
+  { value: 'atMost', label: 'At most' },
+  { value: 'exact', label: 'Exact' },
+  { value: 'between', label: 'Is between' },
+];
+const isCountOp = (v: unknown): v is CountOp => COUNT_OPS.some((o) => o.value === v);
+
+// `b` is only used by 'between'.
+export interface CountCondition {
+  op: CountOp;
+  a: number | null;
+  b: number | null;
+}
 
 export interface ProductCountRule {
   productId: string;
-  comparison: Comparison;
-  count: number;
+  comparison: CountOp;
+  count: number | null;
+  count2?: number | null; // upper bound for 'between'
 }
 
-export interface DateRange {
-  start: string | null;
-  end: string | null;
+// How a subscription (S = start, E = end) relates to the From–To range; day precision, inclusive.
+export type SubscriptionRelation =
+  | 'startBetween'
+  | 'endBetween'
+  | 'within'
+  | 'startInEndAfter'
+  | 'startBeforeEndIn'
+  | 'throughout'
+  | 'anyTime'
+  | 'notActive';
+
+export const SUBSCRIPTION_RELATIONS: { value: SubscriptionRelation; label: string }[] = [
+  { value: 'startBetween', label: 'Start between' },
+  { value: 'endBetween', label: 'End between' },
+  { value: 'within', label: 'Start and end in range' },
+  { value: 'startInEndAfter', label: 'Start in range, end after it' },
+  { value: 'startBeforeEndIn', label: 'Start before range, end in it' },
+  { value: 'throughout', label: 'Active throughout' },
+  { value: 'anyTime', label: 'Active at any time' },
+  { value: 'notActive', label: 'Not active in the range' },
+];
+
+// from / to are yyyy-mm-dd; a missing side is unbounded.
+export interface SubscriptionFilter {
+  relation: SubscriptionRelation;
+  from: string | null;
+  to: string | null;
 }
 
 export type RegisteredFilter = 'registered' | 'non-registered';
@@ -169,7 +234,7 @@ export type UpStatus = 'new' | 'returning';
 // attended = participant metadata.productevent; confirmed = approved event participation requests
 export type EventStatus = 'attended' | 'confirmed';
 
-// completed = participant metadata.queueevent; live = active + approved queue_token
+// active + approved queue_token: completed = currentstage 'Completed'; live = any other stage
 export type QueueStatus = 'completed' | 'live';
 
 // Checkbox sections: each supports include (OR within the group) and exclude.
@@ -190,6 +255,7 @@ export const CHECK_GROUPS = [
   'events',
   'queues',
   'upStatus',
+  'journeysegments',
 ] as const;
 export type CheckGroup = (typeof CHECK_GROUPS)[number];
 
@@ -211,22 +277,26 @@ export interface FilterModel {
   tier: string[];
   registered: RegisteredFilter[];
   customersupport: SupportStatus[];
-  atcCountMin: number | null;
-  upCountMin: number | null;
-  cpmCountMin: number | null;
+  journeysegments: string[]; // segment board segment ids
+  atcCount: CountCondition;
+  upCount: CountCondition;
+  cpmCount: CountCondition;
   upStatus: UpStatus[];
   ageMin: number | null;
   ageMax: number | null;
   eventStatus: EventStatus;
   queueStatus: QueueStatus;
   exclude: Partial<Record<CheckGroup, string[]>>;
-  subscriptionStart: DateRange;
-  subscriptionEnd: DateRange;
+  subscription: SubscriptionFilter;
   consumed: ProductCountRule[];
   unconsumed: ProductCountRule[];
 }
 
-function emptyFilter(): FilterModel {
+export function emptyCondition(): CountCondition {
+  return { op: 'atLeast', a: null, b: null };
+}
+
+export function emptyFilter(): FilterModel {
   return {
     search: '',
     participantmode: [],
@@ -244,17 +314,17 @@ function emptyFilter(): FilterModel {
     tier: [],
     registered: [],
     customersupport: [],
-    atcCountMin: null,
-    upCountMin: null,
-    cpmCountMin: null,
+    journeysegments: [],
+    atcCount: emptyCondition(),
+    upCount: emptyCondition(),
+    cpmCount: emptyCondition(),
     upStatus: [],
     ageMin: null,
     ageMax: null,
     eventStatus: 'attended',
     queueStatus: 'completed',
     exclude: {},
-    subscriptionStart: { start: null, end: null },
-    subscriptionEnd: { start: null, end: null },
+    subscription: { relation: 'startBetween', from: null, to: null },
     consumed: [],
     unconsumed: [],
   };
@@ -271,6 +341,9 @@ export interface Audience {
   createdBy: string;
   createdDate: string;
   filter?: FilterModel; // kind === 'filter'
+  // kind === 'filter': an end range saved next to a start range (by analytics or before relations).
+  // This screen applies one relation, so it isn't applied here, and saving leaves it in place for analytics.
+  legacySubscriptionEnd?: { from: string | null; to: string | null };
   profileIds?: string[]; // kind === 'list'
   memberAudienceIds?: string[]; // kind === 'segment'
   live?: boolean; // lists only
@@ -301,34 +374,6 @@ export interface FilterChip {
   label: string;
   value: string; // identifies the specific value to remove (or '' for whole-group resets)
   exclude?: boolean;
-}
-
-// --- communications analytics (email / whatsapp / notification) ---
-export type CommsChannel = 'email' | 'whatsapp' | 'notification';
-
-export interface CommsCampaign {
-  name: string;
-  status: string; // queued | sent | scheduled | failed | ...
-  recipients: number;
-  date: string | null; // ISO
-}
-
-export interface CommsChannelStats {
-  total: number;
-  queued: number;
-  sent: number;
-  failed: number;
-  recent: CommsCampaign[];
-}
-
-export interface CommsAnalytics {
-  email: CommsChannelStats;
-  whatsapp: CommsChannelStats;
-  notification: CommsChannelStats;
-}
-
-function emptyChannelStats(): CommsChannelStats {
-  return { total: 0, queued: 0, sent: 0, failed: 0, recent: [] };
 }
 
 // ================================================================================================
@@ -368,6 +413,10 @@ const COLUMN_CATALOG: ColumnDef[] = [
   { key: 'phonenumber', label: 'Phone', type: 'text' },
   { key: 'subscriptionstart', label: 'Subscription start', type: 'date' },
   { key: 'subscriptionend', label: 'Subscription end', type: 'date' },
+  { key: 'currentSubscriptionStart', label: 'Current subscription start', type: 'date' },
+  { key: 'currentSubscriptionEnd', label: 'Current subscription end', type: 'date' },
+  { key: 'lastSubscriptionStart', label: 'Last subscription start', type: 'date' },
+  { key: 'lastSubscriptionEnd', label: 'Last subscription end', type: 'date' },
   { key: 'purchasedate', label: 'Purchase date', type: 'date' },
   { key: 'lastpaymentdate', label: 'Last payment', type: 'date' },
   { key: 'dateofbirth', label: 'Date of birth', type: 'date' },
@@ -384,20 +433,11 @@ const COLUMN_DEF_MAP: Record<string, ColumnDef> = COLUMN_CATALOG.reduce(
   {} as Record<string, ColumnDef>
 );
 
-// What the table shows on first load.
-const DEFAULT_VISIBLE_COLUMNS = [
-  'name',
-  'financialstatus',
-  'customerstatus',
-  'activejourney',
-  'activeproduct',
-  'profiletags',
-  'atccount',
-  'subscriptionend',
-];
+// What the table shows on first load: only the participant; everything else is added from the Columns menu.
+const DEFAULT_VISIBLE_COLUMNS = ['name'];
 
-// Columns frozen (sticky-left) by default — Participant + Financial status.
-const DEFAULT_PINNED_COLUMNS = ['name', 'financialstatus'];
+// Nothing is frozen by default, so every column scrolls together; pinning is opt-in from the Columns menu.
+const DEFAULT_PINNED_COLUMNS: string[] = [];
 
 // ================================================================================================
 // Filter engine
@@ -411,10 +451,12 @@ function mapValues(map: Record<string, string[] | string> | undefined): string[]
   return map ? ([] as string[]).concat(...Object.values(map)) : [];
 }
 
-// Data that doesn't live on the participant record, used by the event / queue status filters.
+// Data that doesn't live on the participant record, used by the event / queue / journey segment filters.
 export interface FilterContext {
   confirmedByEvent?: Record<string, Set<string>>; // eventId -> profile ids with an approved request
-  liveByQueue?: Record<string, Set<string>>; // queueId -> profile ids with an active, approved token
+  completedByQueue?: Record<string, Set<string>>; // queueId -> profile ids whose active, approved token is at 'Completed'
+  liveByQueue?: Record<string, Set<string>>; // queueId -> profile ids whose active, approved token is at any other stage
+  segmentMembers?: Record<string, Set<string>>; // journey segment id -> profile ids in its saved list
 }
 
 // Does participant p have value v in a checkbox group?
@@ -431,7 +473,9 @@ function hasValue(p: Participant, f: FilterModel, g: CheckGroup, v: string, ctx:
         ? !!ctx.confirmedByEvent?.[v]?.has(p.profileid)
         : mapValues(p.productevent).includes(v);
     case 'queues':
-      return f.queueStatus === 'live' ? !!ctx.liveByQueue?.[v]?.has(p.profileid) : mapValues(p.queueevent).includes(v);
+      return !!(f.queueStatus === 'live' ? ctx.liveByQueue : ctx.completedByQueue)?.[v]?.has(p.profileid);
+    case 'journeysegments':
+      return !!ctx.segmentMembers?.[v]?.has(p.profileid);
     default: {
       const value = p[g];
       return Array.isArray(value) ? value.includes(v) : value === v;
@@ -439,25 +483,129 @@ function hasValue(p: Participant, f: FilterModel, g: CheckGroup, v: string, ctx:
   }
 }
 
-function dateInRange(value: string | null, start: string | null, end: string | null): boolean {
-  if (!start && !end) return true;
-  if (!value) return false;
-  const t = new Date(value).getTime();
-  if (start && t < new Date(start).getTime()) return false;
-  if (end && t > new Date(end).getTime() + 86400000) return false;
-  return true;
+// ---- validation: an invalid or incomplete condition is ignored by applyFilters and gets no chip ----
+
+const isCount = (n: number | null): boolean => n == null || (Number.isInteger(n) && n >= 0);
+
+// Why a count condition can't be applied, or null. Blank isn't an error: the condition is simply off.
+export function conditionError(c: CountCondition): string | null {
+  if (!isCount(c.a) || (c.op === 'between' && !isCount(c.b))) return 'Use whole numbers, 0 or more.';
+  if (c.op !== 'between') return null;
+  if ((c.a == null) !== (c.b == null)) return 'Enter both numbers.';
+  return c.a != null && c.b != null && c.a > c.b ? 'The first number is larger than the second.' : null;
+}
+
+// Filters only when complete and valid; "at least 0" matches everyone, so it counts as off too.
+export function conditionActive(c: CountCondition): boolean {
+  return c.a != null && (c.op !== 'between' || c.b != null) && !conditionError(c) && !(c.op === 'atLeast' && c.a === 0);
+}
+
+export function ruleCondition(r: ProductCountRule): CountCondition {
+  return { op: r.comparison, a: r.count, b: r.count2 ?? null };
+}
+
+// A product rule applies once it names a product and its condition is active.
+export function productRuleActive(r: ProductCountRule): boolean {
+  return !!r.productId && conditionActive(ruleCondition(r));
+}
+
+export function ageRangeError(min: number | null, max: number | null): string | null {
+  if (!isCount(min) || !isCount(max)) return 'Use whole numbers, 0 or more.';
+  return min != null && max != null && min > max ? 'Min is larger than max.' : null;
+}
+
+function ageActive(f: FilterModel): boolean {
+  return (f.ageMin != null || f.ageMax != null) && !ageRangeError(f.ageMin, f.ageMax);
+}
+
+export function subscriptionFilterError(s: SubscriptionFilter): string | null {
+  return s.from && s.to && s.from > s.to ? 'The start date is after the end date.' : null;
+}
+
+function subscriptionActive(s: SubscriptionFilter): boolean {
+  return !!(s.from || s.to) && !subscriptionFilterError(s);
+}
+
+// Anything entered in the rail, including input the engine ignores (a reversed range, a half-filled
+// "Is between", a rule without a number) and a changed switch, so Reset can clear it. The top search
+// has its own clear. Checked field by field: cycling an option off leaves an empty exclude list behind.
+export function filterTouched(f: FilterModel): boolean {
+  const blank = emptyFilter();
+  const cond = (c: CountCondition) => c.op !== blank.atcCount.op || c.a != null || c.b != null;
+  return (
+    CHECK_GROUPS.some((g) => (f[g] as string[]).length || f.exclude[g]?.length) ||
+    cond(f.atcCount) ||
+    cond(f.upCount) ||
+    cond(f.cpmCount) ||
+    f.ageMin != null ||
+    f.ageMax != null ||
+    !!f.subscription.from ||
+    !!f.subscription.to ||
+    f.subscription.relation !== blank.subscription.relation ||
+    f.eventStatus !== blank.eventStatus ||
+    f.queueStatus !== blank.queueStatus ||
+    f.consumed.length > 0 ||
+    f.unconsumed.length > 0
+  );
+}
+
+// ---- matching ----
+
+// A missing value (e.g. no atccount) never matches an active condition.
+function matchesCount(value: number | null, c: CountCondition): boolean {
+  if (value == null) return false;
+  const a = c.a ?? 0;
+  switch (c.op) {
+    case 'atLeast':
+      return value >= a;
+    case 'atMost':
+      return value <= a;
+    case 'exact':
+      return value === a;
+    case 'between':
+      return value >= a && value <= (c.b ?? a);
+  }
 }
 
 // How many times the product appears in the participant's consumed / unconsumed list.
 function matchesProductCount(products: string[], rule: ProductCountRule): boolean {
-  const count = products.filter((id) => id === rule.productId).length;
-  switch (rule.comparison) {
-    case 'eq':
-      return count === rule.count;
-    case 'gte':
-      return count >= rule.count;
-    case 'lte':
-      return count <= rule.count;
+  return matchesCount(products.filter((id) => id === rule.productId).length, ruleCondition(rule));
+}
+
+// Local calendar day as yyyy-mm-dd: subscription dates compare by day, not by time of day. A bare day
+// string is kept as it is; new Date() would read it as UTC midnight, the previous day west of UTC.
+function dayKey(value: string | Date | null): string | null {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// How the participant's subscription (S, E) relates to the From–To range, by day and inclusive.
+// A missing date never matches; an open side of the range is unbounded.
+function matchesSubscription(p: Participant, s: SubscriptionFilter): boolean {
+  const start = dayKey(p.subscriptionstart);
+  const end = dayKey(p.subscriptionend);
+  const from = s.from ?? '0000-01-01';
+  const to = s.to ?? '9999-12-31';
+  const inRange = (day: string) => from <= day && day <= to;
+  if (s.relation === 'startBetween') return !!start && inRange(start);
+  if (s.relation === 'endBetween') return !!end && inRange(end);
+  if (!start || !end) return false;
+  switch (s.relation) {
+    case 'within':
+      return inRange(start) && inRange(end);
+    case 'startInEndAfter':
+      return inRange(start) && end > to;
+    case 'startBeforeEndIn':
+      return start < from && inRange(end);
+    case 'throughout':
+      return start <= from && end >= to;
+    case 'anyTime':
+      return start <= to && end >= from;
+    case 'notActive':
+      return end < from || start > to;
   }
 }
 
@@ -472,43 +620,83 @@ function matchesSearch(p: Participant, term: string): boolean {
   );
 }
 
-// Checkbox groups: included values are OR'd, excluded values remove matches. Then the number,
-// date and product-count rules are AND'd on top.
-function applyFilters(participants: Participant[], f: FilterModel, ctx: FilterContext = {}): Participant[] {
+// Checkbox groups: included values are OR'd, excluded values remove matches. Then the count, age,
+// date and product-count rules that are active are AND'd on top.
+export function applyFilters(participants: Participant[], f: FilterModel, ctx: FilterContext = {}): Participant[] {
   const groups = CHECK_GROUPS.map((g) => ({ g, inc: f[g] as string[], exc: f.exclude[g] ?? [] })).filter(
     (x) => x.inc.length || x.exc.length
   );
+  const counts = [
+    { value: (p: Participant) => p.atccount, c: f.atcCount },
+    { value: (p: Participant) => p.upcount, c: f.upCount },
+    { value: (p: Participant) => p.cpmcount, c: f.cpmCount },
+  ].filter((x) => conditionActive(x.c));
+  const age = ageActive(f);
+  const subscription = subscriptionActive(f.subscription);
+  const consumed = f.consumed.filter(productRuleActive);
+  const unconsumed = f.unconsumed.filter(productRuleActive);
   return participants.filter((p) => {
     if (!matchesSearch(p, f.search)) return false;
     for (const { g, inc, exc } of groups) {
       if (inc.length && !inc.some((v) => hasValue(p, f, g, v, ctx))) return false;
       if (exc.some((v) => hasValue(p, f, g, v, ctx))) return false;
     }
-    if (f.atcCountMin != null && p.atccount < f.atcCountMin) return false;
-    if (f.upCountMin != null && p.upcount < f.upCountMin) return false;
-    if (f.cpmCountMin != null && p.cpmcount < f.cpmCountMin) return false;
-    if (f.ageMin != null || f.ageMax != null) {
+    for (const { value, c } of counts) if (!matchesCount(value(p), c)) return false;
+    if (age) {
       if (p.age == null) return false;
       if (f.ageMin != null && p.age < f.ageMin) return false;
       if (f.ageMax != null && p.age > f.ageMax) return false;
     }
-    if (!dateInRange(p.subscriptionstart, f.subscriptionStart.start, f.subscriptionStart.end)) return false;
-    if (!dateInRange(p.subscriptionend, f.subscriptionEnd.start, f.subscriptionEnd.end)) return false;
-    for (const rule of f.consumed) if (!matchesProductCount(p.consumedproducts, rule)) return false;
-    for (const rule of f.unconsumed) if (!matchesProductCount(p.unconsumedproducts, rule)) return false;
+    if (subscription && !matchesSubscription(p, f.subscription)) return false;
+    for (const rule of consumed) if (!matchesProductCount(p.consumedproducts, rule)) return false;
+    for (const rule of unconsumed) if (!matchesProductCount(p.unconsumedproducts, rule)) return false;
     return true;
   });
 }
 
-// Builds the removable pills shown above the table from the current filter model.
-function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
+function describeCondition(c: CountCondition): string {
+  switch (c.op) {
+    case 'atLeast':
+      return `at least ${c.a}`;
+    case 'atMost':
+      return `at most ${c.a}`;
+    case 'exact':
+      return `exactly ${c.a}`;
+    case 'between':
+      return `between ${c.a} and ${c.b}`;
+  }
+}
+
+const formatDay = (day: string): string =>
+  new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+// Event / queue names repeat, so the rail options and the chips both add the date: "Name · 12 Mar 2026".
+function datedLabel(ref: DatedRef): string {
+  const day = dayKey(ref.date);
+  return day ? `${ref.name} · ${formatDay(day)}` : ref.name;
+}
+
+// A From–To day range in words; a missing side is open.
+function describeRange(from: string | null, to: string | null): string {
+  if (from && to) return `${formatDay(from)} – ${formatDay(to)}`;
+  return from ? `from ${formatDay(from)}` : `until ${formatDay(to ?? '')}`;
+}
+
+// Builds the removable pills shown above the table from the current filter model. Conditions that
+// applyFilters ignores (invalid, incomplete, no-op) get no pill.
+export function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   const chips: FilterChip[] = [];
   const journeyName = (id: string) => ref.journeys.find((j) => j.id === id)?.name ?? id;
   const productName = (id: string) => ref.products.find((p) => p.id === id)?.name ?? id;
   const tierName = (id: string) => ref.tiers.find((t) => t.id === id)?.name ?? id;
   const tagName = (id: string) => ref.tags.find((t) => t.id === id)?.name ?? id;
-  const eventName = (id: string) => ref.events.find((e) => e.id === id)?.name ?? id;
-  const queueName = (id: string) => ref.queues.find((q) => q.id === id)?.name ?? id;
+  const dated = (list: DatedRef[], id: string) => {
+    const d = list.find((x) => x.id === id);
+    return d ? datedLabel(d) : id;
+  };
+  const eventName = (id: string) => dated(ref.events, id);
+  const queueName = (id: string) => dated(ref.queues, id);
+  const segmentName = (id: string) => ref.journeySegments.find((s) => s.id === id)?.name ?? id;
 
   const addEach = (group: CheckGroup, values: string[], prefix: string, fmt: (v: string) => string = (v) => v) => {
     for (const v of values) chips.push({ group, value: v, label: `${prefix}: ${fmt(v)}` });
@@ -520,6 +708,7 @@ function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   addEach('participantmode', f.participantmode, 'Mode', (v) => (v === 'none' ? 'None' : v));
   addEach('activejourney', f.activejourney, 'Journey', journeyName);
   addEach('lastcompletedjourney', f.lastcompletedjourney, 'Completed', journeyName);
+  addEach('journeysegments', f.journeysegments, 'Journey segment', segmentName);
   addEach('activeproduct', f.activeproduct, 'Product', productName);
   addEach('addons', f.addons, 'Add-on', productName);
   addEach('gifts', f.gifts, 'Gift', productName);
@@ -532,19 +721,58 @@ function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   addEach('customersupport', f.customersupport, 'Support');
   addEach('upStatus', f.upStatus, 'uP!', (v) => (v === 'new' ? 'New' : 'Already attended'));
 
-  if (f.atcCountMin != null) chips.push({ group: 'atcCountMin', value: '', label: `ATC ≥ ${f.atcCountMin}` });
-  if (f.upCountMin != null) chips.push({ group: 'upCountMin', value: '', label: `uP! ≥ ${f.upCountMin}` });
-  if (f.cpmCountMin != null) chips.push({ group: 'cpmCountMin', value: '', label: `CPM ≥ ${f.cpmCountMin}` });
-  if (f.ageMin != null || f.ageMax != null)
-    chips.push({ group: 'ageMin', value: '', label: `Age ${f.ageMin ?? 0}–${f.ageMax ?? '∞'}` });
-  if (f.subscriptionStart.start || f.subscriptionStart.end)
-    chips.push({ group: 'subscriptionStart', value: '', label: 'Subscription start range' });
-  if (f.subscriptionEnd.start || f.subscriptionEnd.end)
-    chips.push({ group: 'subscriptionEnd', value: '', label: 'Subscription end range' });
-  for (const r of f.consumed) chips.push({ group: 'consumed', value: r.productId, label: `Consumed ${productName(r.productId)} ${cmp(r.comparison)} ${r.count}` });
-  for (const r of f.unconsumed) chips.push({ group: 'unconsumed', value: r.productId, label: `Unconsumed ${productName(r.productId)} ${cmp(r.comparison)} ${r.count}` });
+  const addCount = (group: 'atcCount' | 'upCount' | 'cpmCount', label: string) => {
+    if (conditionActive(f[group])) chips.push({ group, value: '', label: `${label}: ${describeCondition(f[group])}` });
+  };
+  addCount('atcCount', 'ATC count');
+  addCount('upCount', 'uP! count');
+  addCount('cpmCount', 'CPM count');
+
+  if (ageActive(f)) {
+    const age =
+      f.ageMin != null && f.ageMax != null ? `${f.ageMin}–${f.ageMax}` : f.ageMin != null ? `${f.ageMin} or older` : `${f.ageMax} or younger`;
+    chips.push({ group: 'ageMin', value: '', label: `Age: ${age}` });
+  }
+
+  const s = f.subscription;
+  if (subscriptionActive(s)) {
+    const relation = SUBSCRIPTION_RELATIONS.find((r) => r.value === s.relation)?.label ?? s.relation;
+    chips.push({ group: 'subscription', value: '', label: `Subscription · ${relation}: ${describeRange(s.from, s.to)}` });
+  }
+
+  // value = the rule's index, so two rules on the same product are removed one at a time
+  const addRules = (group: 'consumed' | 'unconsumed', prefix: string) =>
+    f[group].forEach((r, i) => {
+      if (productRuleActive(r))
+        chips.push({ group, value: String(i), label: `${prefix} ${productName(r.productId)}: ${describeCondition(ruleCondition(r))}` });
+    });
+  addRules('consumed', 'Consumed');
+  addRules('unconsumed', 'Unconsumed');
 
   return chips;
+}
+
+// What a filter actually applies, independent of order: tells whether a loaded saved filter was
+// modified. Search, switched-off conditions and an event / queue switch with nothing ticked don't count.
+export function filterSignature(f: FilterModel): string {
+  const sorted = (values: string[] = []) => [...values].sort();
+  const cond = (c: CountCondition) => (conditionActive(c) ? [c.op, c.a, c.op === 'between' ? c.b : null] : null);
+  const rules = (list: ProductCountRule[]) =>
+    list
+      .filter(productRuleActive)
+      .map((r) => JSON.stringify([r.productId, cond(ruleCondition(r))]))
+      .sort();
+  const s = f.subscription;
+  return JSON.stringify([
+    CHECK_GROUPS.map((g) => [sorted(f[g] as string[]), sorted(f.exclude[g])]),
+    f.events.length || f.exclude.events?.length ? f.eventStatus : null,
+    f.queues.length || f.exclude.queues?.length ? f.queueStatus : null,
+    [cond(f.atcCount), cond(f.upCount), cond(f.cpmCount)],
+    ageActive(f) ? [f.ageMin, f.ageMax] : null,
+    subscriptionActive(s) ? [s.relation, s.from, s.to] : null,
+    rules(f.consumed),
+    rules(f.unconsumed),
+  ]);
 }
 
 // id -> name lookup for a reference list.
@@ -552,10 +780,6 @@ function toNameMap(items: { id: string; name: string }[]): Record<string, string
   const m: Record<string, string> = {};
   for (const i of items) m[i.id] = i.name;
   return m;
-}
-
-function cmp(c: string): string {
-  return c === 'eq' ? '=' : c === 'gte' ? '≥' : '≤';
 }
 
 // ================================================================================================
@@ -573,7 +797,7 @@ export interface WatsonRule {
 const FULLY_PAID_MAX_BALANCE = 1000;
 const WATSON_LIVE: FinancialStatus[] = ['regular', 'defaulted', 'locked', 'fully paid'];
 
-const WATSON_RULES: WatsonRule[] = [
+export const WATSON_RULES: WatsonRule[] = [
   {
     id: 'watson-r1',
     label: 'R1 · Regular / defaulted / locked / fully paid',
@@ -619,16 +843,27 @@ const WATSON_RULES: WatsonRule[] = [
 // "Gap" / health detectors. Each is a pure predicate over a participant; the screen
 // runs them across the base, counts matches, and turns each into a clickable cohort.
 
-export type SignalCategory = 'integrity' | 'retention' | 'financial' | 'opportunity';
+export type SignalCategory = 'integrity' | 'retention' | 'finance' | 'financial' | 'opportunity';
 export type SignalSeverity = 'critical' | 'warn' | 'opportunity';
+
+// Reference lookups some predicates need: which product / journey ids are real, which products are DFU.
+export interface SignalContext {
+  productIds: Set<string>;
+  journeyIds: Set<string>;
+  dfuProductIds: Set<string>;
+}
 
 export interface SignalDef {
   id: string;
   label: string;
+  // the active-insight chip / topbar text, when the card label only reads right under its category
+  chipLabel?: string;
   description: string;
   category: SignalCategory;
   severity: SignalSeverity;
-  predicate: (p: Participant) => boolean;
+  // a count of one status value rather than a problem: left out of "need attention"
+  breakdown?: boolean;
+  predicate: (p: Participant, ref: SignalContext) => boolean;
 }
 
 // thresholds — single place to tune the intelligence
@@ -636,12 +871,32 @@ const HIGH_ATC = 8;
 const VALUE_CONSUMED = 3;
 const LAPSED_DAYS = 183; // ~6 months
 
-const daysUntil = (iso: string | null): number | null =>
-  iso ? (new Date(iso).getTime() - Date.now()) / 86_400_000 : null;
 const daysSince = (iso: string | null): number | null =>
   iso ? (Date.now() - new Date(iso).getTime()) / 86_400_000 : null;
 
-const SIGNALS: SignalDef[] = [
+// The end date is the last active day, so a subscription has expired once that day is before today.
+const subscriptionExpired = (p: Participant): boolean => {
+  const end = dayKey(p.subscriptionend);
+  const today = dayKey(new Date());
+  return !!end && !!today && end < today;
+};
+
+// Watson finance statuses that mean the finance side is no longer live.
+const NON_ACTIVE_FINANCE: FinancialStatus[] = ['defaulted', 'locked', 'banned', 'late', 'discontinued'];
+
+// One Finance status card per Watson value; clicking one filters to it.
+const FINANCE_BREAKDOWN: { value: FinancialStatus; label: string; severity: SignalSeverity }[] = [
+  { value: 'regular', label: 'Regular', severity: 'opportunity' },
+  { value: 'fully paid', label: 'Fully paid', severity: 'opportunity' },
+  { value: 'defaulted', label: 'Defaulted', severity: 'critical' },
+  { value: 'locked', label: 'Locked', severity: 'warn' },
+  { value: 'late', label: 'Late', severity: 'warn' },
+  { value: 'banned', label: 'Banned', severity: 'critical' },
+  { value: 'discontinued', label: 'Discontinued', severity: 'warn' },
+  { value: 'none', label: 'None', severity: 'warn' },
+];
+
+export const SIGNALS: SignalDef[] = [
   // --- integrity: contradictory states to fix ---
   {
     id: 'discontinued-active-product',
@@ -654,10 +909,10 @@ const SIGNALS: SignalDef[] = [
   {
     id: 'active-sub-expired',
     label: 'Active, but subscription already expired',
-    description: 'Customer status is active while the subscription end date is in the past.',
+    description: 'Customer status is active while the last day of the subscription is before today.',
     category: 'integrity',
     severity: 'critical',
-    predicate: (p) => p.customerstatus === 'active' && (daysUntil(p.subscriptionend) ?? 1) < 0,
+    predicate: (p) => p.customerstatus === 'active' && subscriptionExpired(p),
   },
   {
     id: 'defaulted-but-active',
@@ -670,10 +925,14 @@ const SIGNALS: SignalDef[] = [
   {
     id: 'status-none-engaged',
     label: 'No customer status, but engaged',
-    description: 'Has an active product or journey yet customer status is unset.',
+    description: 'Has a known active or consumed product, or an active journey that exists, yet customer status is unset.',
     category: 'integrity',
     severity: 'warn',
-    predicate: (p) => p.customerstatus === 'none' && (p.activeproduct.length > 0 || !!p.activejourney),
+    predicate: (p, ref) =>
+      p.customerstatus === 'none' &&
+      (p.activeproduct.some((id) => ref.productIds.has(id)) ||
+        p.consumedproducts.some((id) => ref.productIds.has(id)) ||
+        (!!p.activejourney && ref.journeyIds.has(p.activejourney))),
   },
   {
     id: 'product-never-consumed',
@@ -691,6 +950,14 @@ const SIGNALS: SignalDef[] = [
     category: 'integrity',
     severity: 'critical',
     predicate: (p) => WATSON_RULES.some((r) => r.violates(p)),
+  },
+  {
+    id: 'multiple-dfu-active',
+    label: 'Multiple DFU products active',
+    description: 'Two or more active product entries are DFU products (a repeated product counts each time).',
+    category: 'integrity',
+    severity: 'warn',
+    predicate: (p, ref) => p.activeproduct.filter((id) => ref.dfuProductIds.has(id)).length >= 2,
   },
 
   // --- retention: churn risk / revive ---
@@ -741,18 +1008,34 @@ const SIGNALS: SignalDef[] = [
   {
     id: 'higher-order-mismatch',
     label: 'Higher-order purchase ≠ current journey',
-    description:
-      'Active: higher-order purchase differs from the current journey. Non active: differs from the last completed journey. A missing value on one side counts as a mismatch (same rule as analytics).',
+    description: 'Has a higher-order purchase that differs from the active journey (any status). No higher-order purchase is never a mismatch.',
     category: 'retention',
     severity: 'warn',
-    predicate: (p) =>
-      p.customerstatus === 'active'
-        ? p.higherorderpurchase !== p.activejourney
-        : p.customerstatus === 'non active'
-          ? p.higherorderpurchase !== p.lastcompletedjourney
-          : false,
+    predicate: (p) => !!p.higherorderpurchase && p.higherorderpurchase !== p.activejourney,
   },
 
+  // --- finance status: a breakdown per Watson status, plus one flag ---
+  ...FINANCE_BREAKDOWN.map(
+    ({ value, label, severity }): SignalDef => ({
+      id: `finance-${value.replace(' ', '-')}`,
+      label,
+      // prefixed so the active insight reads on its own (e.g. not just "None")
+      chipLabel: `Finance: ${label}`,
+      description: `Watson finance status ${label.toLowerCase()}.`,
+      category: 'finance',
+      severity,
+      breakdown: true,
+      predicate: (p) => p.financialstatus === value,
+    })
+  ),
+  {
+    id: 'active-customer-finance-inactive',
+    label: 'Active customer, non-active finance',
+    description: 'Customer status active while the Watson finance status is defaulted, locked, banned, late or discontinued.',
+    category: 'finance',
+    severity: 'critical',
+    predicate: (p) => p.customerstatus === 'active' && NON_ACTIVE_FINANCE.includes(p.financialstatus),
+  },
 
   // --- opportunity: upsell / relationship ---
   {
@@ -761,7 +1044,7 @@ const SIGNALS: SignalDef[] = [
     description: `High coach engagement (${HIGH_ATC}+ ATC) with no higher-order purchase — upsell.`,
     category: 'opportunity',
     severity: 'opportunity',
-    predicate: (p) => p.atccount >= HIGH_ATC && !p.higherorderpurchase,
+    predicate: (p) => p.atccount != null && p.atccount >= HIGH_ATC && !p.higherorderpurchase,
   },
   {
     id: 'fully-consumed-ready',
@@ -773,8 +1056,8 @@ const SIGNALS: SignalDef[] = [
   },
   {
     id: 'active-never-contacted',
-    label: 'Active, never contacted',
-    description: 'Active customer with no remarks on record — relationship gap.',
+    label: 'Active, no remarks yet',
+    description: 'Active customer with no remarks on record yet — relationship gap.',
     category: 'opportunity',
     severity: 'opportunity',
     predicate: (p) => p.customerstatus === 'active' && p.remarks.length === 0,
@@ -789,6 +1072,7 @@ const SIGNAL_MAP: Record<string, SignalDef> = SIGNALS.reduce(
 const SIGNAL_CATEGORIES: { key: SignalCategory; label: string }[] = [
   { key: 'integrity', label: 'Data integrity' },
   { key: 'retention', label: 'Retention risk' },
+  { key: 'finance', label: 'Finance status' },
   { key: 'financial', label: 'Financial' },
   { key: 'opportunity', label: 'Opportunity' },
 ];
@@ -847,9 +1131,9 @@ const CHECKLISTS: ChecklistDef[] = [
   {
     id: 'expired-but-active',
     label: 'Expired but active',
-    description: 'Active customers whose subscription end date has already passed.',
+    description: 'Active customers whose last subscription day is before today.',
     wired: true,
-    predicate: (p) => p.customerstatus === 'active' && !!p.subscriptionend && new Date(p.subscriptionend).getTime() < Date.now(),
+    predicate: (p) => p.customerstatus === 'active' && subscriptionExpired(p),
   },
   {
     id: 'product-event',
@@ -874,7 +1158,9 @@ const CHECKLISTS: ChecklistDef[] = [
 
 export type Dict = Record<string, any>;
 
-const arr = (x: unknown): string[] => (Array.isArray(x) ? (x as string[]) : []);
+// Id lists: blank and non-string entries are dropped so they never count as a product / tag / member.
+const arr = (x: unknown): string[] =>
+  Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : [];
 const tsToIso = (x: any): string | null => {
   if (!x) return null;
   if (typeof x?.toDate === 'function') return x.toDate().toISOString();
@@ -882,7 +1168,8 @@ const tsToIso = (x: any): string | null => {
   if (x instanceof Date) return x.toISOString();
   return null;
 };
-const dateStr = (iso: string | null): string | null => (iso ? iso.slice(0, 10) : null);
+// A saved date as yyyy-mm-dd: day strings are kept as they are, timestamps and ISO strings become their local day.
+const toDay = (x: unknown): string | null => dayKey(tsToIso(x));
 const num = (x: unknown): number | null => (x == null || x === '' || Number.isNaN(Number(x)) ? null : Number(x));
 const ageFrom = (iso: string | null): number | null => {
   if (!iso) return null;
@@ -896,6 +1183,12 @@ const ageFrom = (iso: string | null): number | null => {
 // ================================================================================================
 // Data service
 // ================================================================================================
+
+// queueId -> profile ids with an active, approved queue token, by whether the token's stage is 'Completed'.
+interface QueueMembers {
+  completed: Record<string, string[]>;
+  live: Record<string, string[]>;
+}
 
 // Reads and writes the participant collections in the configured Firebase project's Firestore.
 @Injectable()
@@ -927,73 +1220,9 @@ export class ParticipantDataService {
   getAudiences(): Observable<Audience[]> {
     return from(this.loadAudiences());
   }
-  getCommsAnalytics(): Observable<CommsAnalytics> {
-    return from(this.loadCommsAnalytics());
-  }
-
-  private async loadCommsAnalytics(): Promise<CommsAnalytics> {
-    const [email, whatsapp, notification] = await Promise.all([
-      this.channelStats('email archive'),
-      this.channelStats('wati archive'),
-      this.channelStats('notificationrecord'),
-    ]);
-    return { email, whatsapp, notification };
-  }
-
-  // Defensive aggregation — collections/field names vary, so degrade gracefully.
-  // email archive / wati archive carry a string `status`; notificationrecord does NOT —
-  // it stores success(boolean) + profilefailed[]/profilesuccess[], so classify it differently.
-  private async channelStats(collectionName: string): Promise<CommsChannelStats> {
-    try {
-      const snap = await getDocs(collection(this.firestore, collectionName));
-      const docs = snap.docs.map((d) => d.data() as Dict);
-      const isNotif = collectionName === 'notificationrecord';
-      let queued = 0;
-      let sent = 0;
-      let failed = 0;
-      for (const d of docs) {
-        if (isNotif) {
-          if (this.notifFailed(d)) failed++;
-          else sent++;
-        } else {
-          const status = (d['status'] ?? '').toString().toLowerCase();
-          if (status === 'queued' || status === 'scheduled' || status === 'pending') queued++;
-          else if (status === 'failed' || status === 'rejected' || status === 'error') failed++;
-          else sent++;
-        }
-      }
-      const recent: CommsCampaign[] = docs
-        .map((d) => ({
-          name: d['broadcastname'] ?? d['subject'] ?? d['name'] ?? d['title'] ?? '(untitled)',
-          status: isNotif ? (this.notifFailed(d) ? 'failed' : 'sent') : (d['status'] ?? 'sent').toString(),
-          recipients: this.recipientCount(d),
-          date: tsToIso(d['date'] ?? d['queuedAt'] ?? d['scheduledAt'] ?? d['createdAt'] ?? d['created']),
-        }))
-        .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
-        .slice(0, 6);
-      return { total: docs.length, queued, sent, failed, recent };
-    } catch (e) {
-      console.warn(`comms analytics: could not read "${collectionName}"`, e);
-      return emptyChannelStats();
-    }
-  }
-
-  private notifFailed(d: Dict): boolean {
-    return d['success'] === false || (Array.isArray(d['profilefailed']) && d['profilefailed'].length > 0);
-  }
-
-  private recipientCount(d: Dict): number {
-    for (const k of ['pending', 'profileid', 'numbers', 'recipients', 'profilelist', 'users']) {
-      if (Array.isArray(d[k])) return d[k].length;
-    }
-    if (typeof d['count'] === 'number') return d['count'];
-    if (typeof d['totalNumbers'] === 'number') return d['totalNumbers'];
-    return 0;
-  }
-
   private async loadReference(): Promise<ReferenceData> {
     const col = (name: string) => getDocs(collection(this.firestore, name)).catch(() => null);
-    const [journeys, products, modes, tiers, tags, events, queues] = await Promise.all([
+    const [journeys, products, modes, tiers, tags, events, queues, segmentConfigs, segmentLists] = await Promise.all([
       col('journey'),
       col('products'),
       col('modes'),
@@ -1001,9 +1230,16 @@ export class ParticipantDataService {
       col('participant tags'),
       col('event collection'),
       col('queue generation'),
+      col('segmentboardconfig'),
+      col('segmentboardlist'),
     ]);
     const named = (snap: any, field: string): NamedRef[] =>
       snap ? snap.docs.map((d: any) => ({ id: d.id, name: d.data()[field] ?? d.id })) : [];
+    // event / queue names repeat, so options are listed by name, then newest first
+    const dated = (snap: any, nameField: string, dateField: string): DatedRef[] =>
+      (snap ? snap.docs : [])
+        .map((d: any) => ({ id: d.id, name: d.data()[nameField] ?? d.id, date: tsToIso(d.data()[dateField]) }))
+        .sort((a: DatedRef, b: DatedRef) => String(a.name).localeCompare(String(b.name)) || (b.date ?? '').localeCompare(a.date ?? ''));
     const tagList: Tag[] = tags
       ? tags.docs.map((d: any) => {
           const data = d.data();
@@ -1012,14 +1248,35 @@ export class ParticipantDataService {
       : [];
     return {
       journeys: named(journeys, 'journey'),
-      products: named(products, 'product'),
+      products: products ? products.docs.map((d: any) => ({ id: d.id, name: d.data()['product'] ?? d.id, type: d.data()['type'] ?? null })) : [],
       // participant metadata stores the mode NAME, so the name is also the id
       modes: modes ? [...new Set<string>(modes.docs.map((d: any) => String(d.data()['mode'] ?? '')).filter(Boolean))].map((m) => ({ id: m, name: m })) : [],
       tiers: named(tiers, 'tier'),
       tags: tagList,
-      events: named(events, 'name'),
-      queues: named(queues, 'queuename'),
+      events: dated(events, 'name', 'start_date'),
+      queues: dated(queues, 'queuename', 'created'),
+      journeySegments: this.journeySegments(segmentConfigs, segmentLists),
     };
+  }
+
+  // Live segment board segments in board order (as the segment board), each with its saved member list.
+  // Archived and inactive segments are left out: the board places no one in an inactive segment, even
+  // though its segmentboardlist doc can still hold the last refreshed list.
+  private journeySegments(configs: QuerySnapshot | null, lists: QuerySnapshot | null): JourneySegment[] {
+    if (!configs) return [];
+    const saved = new Map<string, Dict>();
+    for (const d of lists?.docs ?? []) saved.set(d.data()['segmentid'] ?? d.id, d.data());
+    return configs.docs
+      .map((d) => ({ id: d.id, data: d.data() }))
+      .filter(({ data }) => !data['archived'] && data['status'] !== 'inactive')
+      .sort(
+        (a, b) =>
+          (a.data['displayIndex'] ?? 1e9) - (b.data['displayIndex'] ?? 1e9) || String(a.data['name'] ?? '').localeCompare(String(b.data['name'] ?? ''))
+      )
+      .map(({ id, data }) => {
+        const list = saved.get(id);
+        return { id, name: data['name'] ?? id, profileIds: arr(list?.['profilelist']), lastupdated: tsToIso(list?.['lastupdated']) };
+      });
   }
 
   private async loadParticipants(): Promise<Participant[]> {
@@ -1031,8 +1288,9 @@ export class ParticipantDataService {
     const status = (d['customerstatus'] ?? 'none') as CustomerStatus;
     // status-conditional subscription window (mirrors the original screen)
     const useLast = status === 'discontinued' || status === 'non active';
-    const subStart = tsToIso(useLast ? d['lastsubscriptionstart'] : d['subscriptionstart']);
-    const subEnd = tsToIso(useLast ? d['lastsubscriptionend'] : d['subscriptionend']);
+    const current = { start: tsToIso(d['subscriptionstart']), end: tsToIso(d['subscriptionend']) };
+    const last = { start: tsToIso(d['lastsubscriptionstart']), end: tsToIso(d['lastsubscriptionend']) };
+    const sub = useLast ? last : current;
     const consumed = arr(d['consumedproducts']);
     const dob = tsToIso(d['dateofbirth']);
     const purchasevalue = num(d['pp_totalpurchasevalue']);
@@ -1061,11 +1319,16 @@ export class ParticipantDataService {
       bonus: arr(d['bonus']),
       tier: arr(d['tier']),
       profiletags: arr(d['profiletags']),
-      atccount: Number(d['atccount'] ?? 0),
+      atccount: num(d['atccount']),
       customersupport: this.collapseSupport(d['customersupport']),
       remarks: this.mapRemarks(d['remarks']),
-      subscriptionstart: subStart,
-      subscriptionend: subEnd,
+      subscriptionstart: sub.start,
+      subscriptionend: sub.end,
+      isLastSubscription: useLast,
+      currentSubscriptionStart: current.start,
+      currentSubscriptionEnd: current.end,
+      lastSubscriptionStart: last.start,
+      lastSubscriptionEnd: last.end,
       lastpaymentdate: tsToIso(d['lastpaymentdate']),
       purchasedate: tsToIso(d['purchasedate']),
       dateofbirth: dob,
@@ -1131,6 +1394,7 @@ export class ParticipantDataService {
     const out: Audience[] = [];
     filters.docs.forEach((d) => {
       const data = d.data() as Dict;
+      const filter = this.mapSavedFilter(data);
       out.push({
         id: data['docid'] ?? d.id,
         name: data['label'] ?? 'Saved filter',
@@ -1138,7 +1402,8 @@ export class ParticipantDataService {
         isDefault: false,
         createdBy: data['createdby'] ?? '—',
         createdDate: '',
-        filter: this.mapSavedFilter(data),
+        filter,
+        legacySubscriptionEnd: this.legacySubscriptionEnd(data, filter),
       });
     });
     lists.docs.forEach((d) => {
@@ -1169,6 +1434,8 @@ export class ParticipantDataService {
     return out;
   }
 
+  // The analytics keys sit at the top level of the doc; everything only this screen filters on is in pifilter.
+  // Mode, add-ons, gifts and bonus are analytics keys too; docs this screen saved earlier have them in pifilter.
   private mapSavedFilter(d: Dict): FilterModel {
     const f = emptyFilter();
     f.customerstatus = arr(d['customerstatus']) as CustomerStatus[];
@@ -1179,12 +1446,20 @@ export class ParticipantDataService {
     f.profiletags = arr(d['profiletags']);
     f.tier = arr(d['tier']);
     f.registered = arr(d['registereduser']) as FilterModel['registered'];
-    if (d['atccount'] != null && d['atccount'] !== '') f.atcCountMin = Number(d['atccount']);
-    f.subscriptionStart = this.range(d['subscriptionstart']);
-    f.subscriptionEnd = this.range(d['subscriptionend']);
     const pi = (d['pifilter'] ?? {}) as Dict;
-    f.upCountMin = num(pi['upCountMin']);
-    f.cpmCountMin = num(pi['cpmCountMin']);
+    f.participantmode = arr(pi['participantmode'] ?? d['participantmode']);
+    f.addons = arr(pi['addons'] ?? d['addons']);
+    f.gifts = arr(pi['gifts'] ?? d['gifts']);
+    f.bonus = arr(pi['bonus'] ?? d['bonus']);
+    f.queues = arr(pi['queues']);
+    f.customersupport = arr(pi['customersupport']) as SupportStatus[];
+    f.journeysegments = arr(pi['journeysegments']);
+    // Before count conditions: this screen saved the top-level atccount as a minimum (its docs have a
+    // pifilter), analytics saves it as an exact count; upCountMin / cpmCountMin were minimums.
+    const atc = num(d['atccount']);
+    f.atcCount = this.countCondition(pi['atcCount']) ?? { op: d['pifilter'] ? 'atLeast' : 'exact', a: atc, b: null };
+    f.upCount = this.countCondition(pi['upCount']) ?? { op: 'atLeast', a: num(pi['upCountMin']), b: null };
+    f.cpmCount = this.countCondition(pi['cpmCount']) ?? { op: 'atLeast', a: num(pi['cpmCountMin']), b: null };
     f.upStatus = arr(pi['upStatus']) as UpStatus[];
     f.ageMin = num(pi['ageMin']);
     f.ageMax = num(pi['ageMax']);
@@ -1192,15 +1467,56 @@ export class ParticipantDataService {
     f.eventStatus = pi['eventStatus'] === 'confirmed' ? 'confirmed' : 'attended';
     f.queueStatus = pi['queueStatus'] === 'live' ? 'live' : 'completed';
     f.exclude = (pi['exclude'] && typeof pi['exclude'] === 'object' ? pi['exclude'] : {}) as FilterModel['exclude'];
+    f.subscription = this.subscriptionFilter(pi['subscription'], d);
+    f.consumed = this.productRules(pi['consumed']);
+    f.unconsumed = this.productRules(pi['unconsumed']);
     return f;
   }
 
-  private range(x: any): { start: string | null; end: string | null } {
-    if (!x || typeof x !== 'object') return { start: null, end: null };
-    return {
-      start: x.start ? new Date(x.start).toISOString() : null,
-      end: x.end ? new Date(x.end).toISOString() : null,
-    };
+  // A saved {op, a, b}, or null when the doc predates count conditions.
+  private countCondition(x: unknown): CountCondition | null {
+    if (!x || typeof x !== 'object') return null;
+    const c = x as Dict;
+    return { op: isCountOp(c['op']) ? c['op'] : 'atLeast', a: num(c['a']), b: num(c['b']) };
+  }
+
+  // Comparisons saved as 'gte' / 'lte' / 'eq' read as at least / at most / exact.
+  private productRules(x: unknown): ProductCountRule[] {
+    const legacy: Record<string, CountOp> = { gte: 'atLeast', lte: 'atMost', eq: 'exact' };
+    return (Array.isArray(x) ? (x as Dict[]) : [])
+      .filter((r) => r && typeof r['productId'] === 'string')
+      .map((r) => ({
+        productId: r['productId'],
+        comparison: legacy[r['comparison']] ?? (isCountOp(r['comparison']) ? r['comparison'] : 'atLeast'),
+        count: num(r['count']),
+        count2: num(r['count2']),
+      }));
+  }
+
+  // pifilter keeps the relation. Older docs (and analytics) only have the start / end ranges, read back
+  // as "Start between" or, when only the end range is set, "End between".
+  private subscriptionFilter(saved: unknown, d: Dict): SubscriptionFilter {
+    if (saved && typeof saved === 'object') {
+      const s = saved as Dict;
+      const relation = SUBSCRIPTION_RELATIONS.some((r) => r.value === s['relation']) ? (s['relation'] as SubscriptionRelation) : 'startBetween';
+      return { relation, from: toDay(s['from']), to: toDay(s['to']) };
+    }
+    const start = this.range(d['subscriptionstart']);
+    const end = this.range(d['subscriptionend']);
+    return !start.from && !start.to && (end.from || end.to) ? { relation: 'endBetween', ...end } : { relation: 'startBetween', ...start };
+  }
+
+  // This screen writes subscriptionend only for "End between", so an end range under any other relation
+  // was saved by analytics, or before relations, next to a start range.
+  private legacySubscriptionEnd(d: Dict, f: FilterModel): Audience['legacySubscriptionEnd'] {
+    const end = this.range(d['subscriptionend']);
+    return f.subscription.relation !== 'endBetween' && (end.from || end.to) ? end : undefined;
+  }
+
+  private range(x: unknown): { from: string | null; to: string | null } {
+    if (!x || typeof x !== 'object') return { from: null, to: null };
+    const r = x as Dict;
+    return { from: toDay(r['start']), to: toDay(r['end']) };
   }
 
   // ---------- writes (safe set: tags, remarks, audiences, lists) ----------
@@ -1348,16 +1664,18 @@ export class ParticipantDataService {
     return { sent: reachable.length, skipped: people.length - reachable.length };
   }
 
-  // Participants currently in a queue: active + approved tokens, queueId -> profile ids (as analytics).
-  async loadLiveQueues(): Promise<Record<string, string[]>> {
+  // Active + approved queue tokens (as analytics), queueId -> profile ids, split by stage: currentstage
+  // 'Completed' finished the queue (as analytics' Queue Event checklist), any other stage is still live.
+  async loadQueueTokens(): Promise<QueueMembers> {
     const snap = await getDocs(
       query(collection(this.firestore, 'queue_token'), where('stagestatus', '==', 'Approved'), where('tokenstatus', '==', 'Active'))
     );
-    const out: Record<string, string[]> = {};
+    const out: QueueMembers = { completed: {}, live: {} };
     for (const d of snap.docs) {
       const data = d.data() as Dict;
       const queueId = data['queueref']?.id;
-      if (queueId && data['profile_id']) (out[queueId] ??= []).push(data['profile_id']);
+      const byQueue = data['currentstage'] === 'Completed' ? out.completed : out.live;
+      if (queueId && data['profile_id']) (byQueue[queueId] ??= []).push(data['profile_id']);
     }
     return out;
   }
@@ -1396,39 +1714,65 @@ export class ParticipantDataService {
     });
   }
 
+  // as analytics' tag-participants updateTagsFor
+  async persistTagFor(tagId: string, tagsfor: string[]): Promise<void> {
+    await updateDoc(doc(this.firestore, 'participant tags', tagId), { tagsfor });
+  }
+
   async persistAudience(aud: Audience): Promise<void> {
     const f = aud.filter ?? emptyFilter();
-    await setDoc(
-      doc(this.firestore, 'searchquery', aud.id),
-      {
-        docid: aud.id,
-        label: aud.name,
-        createdby: this.loggedInProfileId,
-        customerstatus: f.customerstatus,
-        financialstatus: f.financialstatus,
-        activejourney: f.activejourney,
-        lastcompletedjourney: f.lastcompletedjourney,
-        activeproduct: f.activeproduct,
-        profiletags: f.profiletags,
-        tier: f.tier,
-        registereduser: f.registered,
-        atccount: f.atcCountMin ?? null,
-        subscriptionstart: { start: dateStr(f.subscriptionStart.start), end: dateStr(f.subscriptionStart.end) },
-        subscriptionend: { start: dateStr(f.subscriptionEnd.start), end: dateStr(f.subscriptionEnd.end) },
-        pifilter: {
-          upCountMin: f.upCountMin,
-          cpmCountMin: f.cpmCountMin,
-          upStatus: f.upStatus,
-          ageMin: f.ageMin,
-          ageMax: f.ageMax,
-          events: f.events,
-          eventStatus: f.eventStatus,
-          queueStatus: f.queueStatus,
-          exclude: f.exclude,
-        },
+    const s = f.subscription;
+    // analytics reads subscriptionstart / subscriptionend as {start, end} day ranges and atccount as an exact count
+    const analyticsRange = (relation: SubscriptionRelation) =>
+      s.relation === relation && subscriptionActive(s) ? { start: s.from, end: s.to } : { start: null, end: null };
+    const condition = (c: CountCondition) => ({ op: c.op, a: c.a, b: c.b });
+    // Firestore rejects undefined, and count2 is optional
+    const rules = (list: ProductCountRule[]) =>
+      list.map((r) => ({ productId: r.productId, comparison: r.comparison, count: r.count, count2: r.count2 ?? null }));
+    const data: Dict = {
+      docid: aud.id,
+      label: aud.name,
+      createdby: this.loggedInProfileId,
+      customerstatus: f.customerstatus,
+      financialstatus: f.financialstatus,
+      activejourney: f.activejourney,
+      lastcompletedjourney: f.lastcompletedjourney,
+      activeproduct: f.activeproduct,
+      profiletags: f.profiletags,
+      tier: f.tier,
+      registereduser: f.registered,
+      // analytics filters on these four the same way (any of the values)
+      participantmode: f.participantmode,
+      addons: f.addons,
+      gifts: f.gifts,
+      bonus: f.bonus,
+      atccount: f.atcCount.op === 'exact' && conditionActive(f.atcCount) ? f.atcCount.a : null,
+      subscriptionstart: analyticsRange('startBetween'),
+      subscriptionend: analyticsRange('endBetween'),
+      pifilter: {
+        queues: f.queues,
+        customersupport: f.customersupport,
+        journeysegments: f.journeysegments,
+        atcCount: condition(f.atcCount),
+        upCount: condition(f.upCount),
+        cpmCount: condition(f.cpmCount),
+        upStatus: f.upStatus,
+        ageMin: f.ageMin,
+        ageMax: f.ageMax,
+        events: f.events,
+        eventStatus: f.eventStatus,
+        queueStatus: f.queueStatus,
+        exclude: f.exclude,
+        subscription: { relation: s.relation, from: s.from, to: s.to },
+        consumed: rules(f.consumed),
+        unconsumed: rules(f.unconsumed),
       },
-      { merge: true }
-    );
+    };
+    // an analytics end range this screen doesn't apply stays in place unless "End between" replaces it
+    if (aud.legacySubscriptionEnd && s.relation !== 'endBetween') delete data['subscriptionend'];
+    // mergeFields replaces each written field whole (a deep merge would keep stale keys inside pifilter,
+    // e.g. a removed exclusion) and leaves fields only analytics writes untouched.
+    await setDoc(doc(this.firestore, 'searchquery', aud.id), data, { mergeFields: Object.keys(data) });
   }
 
   async persistList(aud: Audience): Promise<void> {
@@ -1454,7 +1798,21 @@ const EMPTY_REF: ReferenceData = {
   tags: [],
   events: [],
   queues: [],
+  journeySegments: [],
 };
+
+const AUDIENCE_KIND_LABEL: Record<AudienceKind, string> = { filter: 'Saved filter', list: 'List', segment: 'Segment' };
+
+// The loaded audience and how it has been refined since, e.g. "Segment X · + 2 filters" or
+// "Saved filter X · modified". refinement is null while it is used as loaded.
+export interface AudienceLabel {
+  kind: string;
+  name: string;
+  refinement: string | null;
+}
+
+const toSets = (byId: Record<string, string[]>): Record<string, Set<string>> =>
+  Object.fromEntries(Object.entries(byId).map(([id, ids]) => [id, new Set(ids)]));
 
 @Injectable()
 export class ParticipantStore {
@@ -1468,7 +1826,6 @@ export class ParticipantStore {
   readonly filter = signal<FilterModel>(emptyFilter());
   readonly audiences = signal<Audience[]>([]);
   readonly activeAudienceId = signal<string | null>(null);
-  readonly commsAnalytics = signal<CommsAnalytics | null>(null);
 
   private readonly membership = signal<Set<string> | null>(null);
   readonly signalId = signal<string | null>(null);
@@ -1479,8 +1836,10 @@ export class ParticipantStore {
   // approved (confirmed) profile ids per event, loaded on demand for the selected events
   private readonly confirmedByEvent = signal<Record<string, string[]>>({});
   readonly confirmedLoading = signal(false);
-  // active + approved queue tokens, loaded with the page (as analytics)
-  private readonly liveByQueue = signal<Record<string, string[]>>({});
+  // active + approved queue tokens split into completed / live, loaded with the page (as analytics)
+  private readonly queueTokens = signal<QueueMembers>({ completed: {}, live: {} });
+  // until then (or if the load fails) a queue's count is unknown, not 0
+  readonly queueTokensLoaded = signal(false);
   // playlist id -> name, loaded the first time a recommended-playlist column is shown
   readonly playlistNames = signal<Record<string, string>>({});
   private playlistNamesRequested = false;
@@ -1503,16 +1862,36 @@ export class ParticipantStore {
   }
 
   // --- derived state ---
-  private readonly filterContext = computed<FilterContext>(() => {
-    const toSets = (m: Record<string, string[]>) =>
-      Object.fromEntries(Object.entries(m).map(([k, ids]) => [k, new Set(ids)])) as Record<string, Set<string>>;
-    return { confirmedByEvent: toSets(this.confirmedByEvent()), liveByQueue: toSets(this.liveByQueue()) };
+  private readonly confirmedSets = computed(() => toSets(this.confirmedByEvent()));
+  private readonly queueSets = computed(() => {
+    const tokens = this.queueTokens();
+    return { completed: toSets(tokens.completed), live: toSets(tokens.live) };
+  });
+  private readonly segmentSets = computed(() => toSets(Object.fromEntries(this.reference().journeySegments.map((s) => [s.id, s.profileIds]))));
+
+  private readonly filterContext = computed<FilterContext>(() => ({
+    confirmedByEvent: this.confirmedSets(),
+    completedByQueue: this.queueSets().completed,
+    liveByQueue: this.queueSets().live,
+    segmentMembers: this.segmentSets(),
+  }));
+
+  private readonly signalContext = computed<SignalContext>(() => {
+    const ref = this.reference();
+    return {
+      productIds: new Set(ref.products.map((p) => p.id)),
+      journeyIds: new Set(ref.journeys.map((j) => j.id)),
+      dfuProductIds: new Set(ref.products.filter((p) => p.type === 'DFU').map((p) => p.id)),
+    };
   });
 
   readonly filtered = computed<Participant[]>(() => {
     let result = applyFilters(this.all(), this.filter(), this.filterContext());
-    const sigId = this.signalId();
-    if (sigId && SIGNAL_MAP[sigId]) result = result.filter(SIGNAL_MAP[sigId].predicate);
+    const sig = this.activeSignal();
+    if (sig) {
+      const ref = this.signalContext();
+      result = result.filter((p) => sig.predicate(p, ref));
+    }
     const member = this.membership();
     if (member) result = result.filter((p) => member.has(p.profileid));
     return result;
@@ -1521,38 +1900,92 @@ export class ParticipantStore {
   // overview counts computed over the WHOLE base (stable, independent of the current view)
   readonly signalCounts = computed<Record<string, number>>(() => {
     const all = this.all();
+    const ref = this.signalContext();
     const counts: Record<string, number> = {};
-    for (const s of SIGNALS) counts[s.id] = all.reduce((n, p) => (s.predicate(p) ? n + 1 : n), 0);
+    for (const s of SIGNALS) counts[s.id] = all.reduce((n, p) => (s.predicate(p, ref) ? n + 1 : n), 0);
     return counts;
   });
 
   readonly attentionCount = computed<number>(() => {
-    const all = this.all();
-    return all.reduce(
-      (n, p) => (SIGNALS.some((s) => s.severity !== 'opportunity' && s.predicate(p)) ? n + 1 : n),
-      0
-    );
+    const ref = this.signalContext();
+    const issues = SIGNALS.filter((s) => s.severity !== 'opportunity' && !s.breakdown);
+    return this.all().reduce((n, p) => (issues.some((s) => s.predicate(p, ref)) ? n + 1 : n), 0);
   });
+
+  // --- event / queue option counts (whole base) ---
+  private readonly baseIds = computed(() => new Set(this.all().map((p) => p.profileid)));
+  private readonly attendedCounts = computed<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    for (const p of this.all()) for (const id of new Set(mapValues(p.productevent))) counts[id] = (counts[id] ?? 0) + 1;
+    return counts;
+  });
+  private readonly confirmedCounts = computed(() => this.countMembers(this.confirmedSets()));
+  private readonly completedQueueCounts = computed(() => this.countMembers(this.queueSets().completed));
+  private readonly liveQueueCounts = computed(() => this.countMembers(this.queueSets().live));
+
+  // Participants per event / queue option under the section's current switch (Attended / Confirmed,
+  // Completed / Live). Confirmed counts exist only for events whose approved requests have been loaded.
+  readonly eventCounts = computed<Record<string, number>>(() =>
+    this.filter().eventStatus === 'confirmed' ? this.confirmedCounts() : this.attendedCounts()
+  );
+  readonly queueCounts = computed<Record<string, number>>(() =>
+    this.filter().queueStatus === 'live' ? this.liveQueueCounts() : this.completedQueueCounts()
+  );
+
+  // Only ids in the loaded base count, so an option's count is what ticking it alone shows.
+  private countMembers(byId: Record<string, Set<string>>): Record<string, number> {
+    const base = this.baseIds();
+    const counts: Record<string, number> = {};
+    for (const [id, members] of Object.entries(byId)) {
+      let n = 0;
+      for (const pid of members) if (base.has(pid)) n++;
+      counts[id] = n;
+    }
+    return counts;
+  }
 
   readonly activeSignal = computed<SignalDef | null>(() => {
     const id = this.signalId();
     return id ? SIGNAL_MAP[id] ?? null : null;
   });
 
-  readonly queuedTotal = computed<number>(() => {
-    const c = this.commsAnalytics();
-    return c ? c.email.queued + c.whatsapp.queued + c.notification.queued : 0;
-  });
-
-  // live member count per audience over the loaded participants
-  readonly audienceCounts = computed<Record<string, number>>(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.audiences()) counts[a.id] = this.resolveAudienceIds(a).size;
+  // live member count per audience over the loaded participants; null = not countable yet: a saved
+  // filter on Confirmed events whose approved requests only load once it is applied
+  readonly audienceCounts = computed<Record<string, number | null>>(() => {
+    const loaded = this.confirmedByEvent();
+    const counts: Record<string, number | null> = {};
+    for (const a of this.audiences()) {
+      const f = a.kind === 'filter' ? a.filter : undefined;
+      const pending = f?.eventStatus === 'confirmed' && [...f.events, ...(f.exclude.events ?? [])].some((id) => !(id in loaded));
+      counts[a.id] = pending ? null : this.resolveAudienceIds(a).size;
+    }
     return counts;
   });
 
   readonly chips = computed<FilterChip[]>(() => deriveChips(this.filter(), this.reference()));
   readonly activeFilterCount = computed(() => this.chips().length);
+  readonly filterTouched = computed(() => filterTouched(this.filter()));
+
+  // --- loaded audience (list / segment / saved filter) and its refinement ---
+  readonly activeAudience = computed<Audience | null>(() => this.audiences().find((a) => a.id === this.activeAudienceId()) ?? null);
+  // list / segment: how many filters were added on top of it
+  readonly audienceExtraFilters = computed(() => {
+    const aud = this.activeAudience();
+    return aud && aud.kind !== 'filter' ? this.activeFilterCount() : 0;
+  });
+  // saved filter: the current filter no longer matches what was saved
+  readonly audienceModified = computed(() => {
+    const aud = this.activeAudience();
+    return aud?.kind === 'filter' && !!aud.filter && filterSignature(aud.filter) !== filterSignature(this.filter());
+  });
+  readonly audienceLabel = computed<AudienceLabel | null>(() => {
+    const aud = this.activeAudience();
+    if (!aud) return null;
+    const extra = this.audienceExtraFilters();
+    const refinement = aud.kind === 'filter' ? (this.audienceModified() ? 'modified' : null) : extra ? `+ ${extra} filter${extra === 1 ? '' : 's'}` : null;
+    return { kind: AUDIENCE_KIND_LABEL[aud.kind], name: aud.name, refinement };
+  });
+
   readonly totalCount = computed(() => this.all().length);
   readonly filteredCount = computed(() => this.filtered().length);
 
@@ -1579,7 +2012,9 @@ export class ParticipantStore {
 
   readonly availableColumns = computed(() => {
     const current = new Set(this.columnOrder());
-    return Object.values(COLUMN_DEF_MAP).filter((c) => !current.has(c.key));
+    return Object.values(COLUMN_DEF_MAP)
+      .filter((c) => !current.has(c.key))
+      .sort((a, b) => a.label.localeCompare(b.label));
   });
 
   readonly allFilteredSelected = computed(() => {
@@ -1593,15 +2028,14 @@ export class ParticipantStore {
   init(): void {
     this.loading.set(true);
     this.loadError.set(false);
+    // the table only needs participants + reference names; audiences load alongside
     forkJoin({
       reference: this.data.getReferenceData(),
       participants: this.data.getParticipants(),
-      audiences: this.data.getAudiences(),
     }).subscribe({
-      next: ({ reference, participants, audiences }) => {
+      next: ({ reference, participants }) => {
         this.reference.set(reference);
         this.all.set(participants);
-        this.audiences.set(audiences);
         this.loading.set(false);
       },
       error: (e) => {
@@ -1612,28 +2046,32 @@ export class ParticipantStore {
     });
 
     this.confirmedByEvent.set({});
+    this.queueTokensLoaded.set(false);
     this.data
-      .loadLiveQueues()
-      .then((m) => this.liveByQueue.set(m))
-      .catch((e) => console.warn('live queue load failed', e));
+      .loadQueueTokens()
+      .then((m) => {
+        this.queueTokens.set(m);
+        this.queueTokensLoaded.set(true);
+      })
+      .catch((e) => console.warn('queue token load failed', e));
 
-    // comms analytics loads independently so it never blocks the table
-    this.data.getCommsAnalytics().subscribe({
-      next: (c) => this.commsAnalytics.set(c),
-      error: (e) => console.warn('comms analytics load failed', e),
+    this.data.getAudiences().subscribe({
+      next: (a) => this.audiences.set(a),
+      error: (e) => console.warn('audiences load failed', e),
     });
   }
 
   // --- filtering ---
+  // A loaded list / segment / saved filter stays loaded: new filters refine it (see audienceLabel).
   patchFilter(patch: Partial<FilterModel>): void {
     this.filter.update((f) => ({ ...f, ...patch }));
-    this.activeAudienceId.set(null);
   }
 
   setSearch(term: string): void {
     this.filter.update((f) => ({ ...f, search: term }));
   }
 
+  // Reset / Clear all: filters, the insight card and the loaded list / segment / saved filter.
   clearFilter(): void {
     this.filter.set(emptyFilter());
     this.membership.set(null);
@@ -1642,7 +2080,12 @@ export class ParticipantStore {
   }
 
   // --- intelligence signals ---
+  // Clicking the active card again turns it off; another card starts a fresh view with only that insight.
   applySignal(id: string): void {
+    if (this.signalId() === id) {
+      this.signalId.set(null);
+      return;
+    }
     this.filter.set(emptyFilter());
     this.membership.set(null);
     this.activeAudienceId.set(null);
@@ -1654,29 +2097,16 @@ export class ParticipantStore {
     this.signalId.set(null);
   }
 
-  // optimistic bump so the Communications badge reflects a just-queued broadcast
-  bumpQueued(channel: 'email' | 'whatsapp' | 'notification'): void {
-    this.commsAnalytics.update((c) => {
-      if (!c) return c;
-      const ch = c[channel];
-      return { ...c, [channel]: { ...ch, queued: ch.queued + 1, total: ch.total + 1 } };
-    });
-  }
-
   removeChip(chip: FilterChip): void {
     this.filter.update((f) => {
       const next: FilterModel = structuredClone(f);
       const g = chip.group;
-      if (g === 'atcCountMin') next.atcCountMin = null;
-      else if (g === 'upCountMin') next.upCountMin = null;
-      else if (g === 'cpmCountMin') next.cpmCountMin = null;
+      if (g === 'atcCount' || g === 'upCount' || g === 'cpmCount') next[g] = emptyCondition();
       else if (g === 'ageMin') {
         next.ageMin = null;
         next.ageMax = null;
-      } else if (g === 'subscriptionStart') next.subscriptionStart = { start: null, end: null };
-      else if (g === 'subscriptionEnd') next.subscriptionEnd = { start: null, end: null };
-      else if (g === 'consumed') next.consumed = next.consumed.filter((r) => r.productId !== chip.value);
-      else if (g === 'unconsumed') next.unconsumed = next.unconsumed.filter((r) => r.productId !== chip.value);
+      } else if (g === 'subscription') next.subscription = { ...next.subscription, from: null, to: null };
+      else if (g === 'consumed' || g === 'unconsumed') next[g] = next[g].filter((_, i) => String(i) !== chip.value);
       else if (chip.exclude) {
         const cg = g as CheckGroup;
         next.exclude = { ...next.exclude, [cg]: (next.exclude[cg] ?? []).filter((v) => v !== chip.value) };
@@ -1684,10 +2114,13 @@ export class ParticipantStore {
         const rec = next as unknown as Record<string, string[]>;
         rec[g as string] = (rec[g as string] ?? []).filter((v) => v !== chip.value);
       }
-      if (!next.events.length && !next.exclude.events?.length) next.eventStatus = 'attended';
-      if (!next.queues.length && !next.exclude.queues?.length) next.queueStatus = 'completed';
       return next;
     });
+  }
+
+  // Drops the loaded list / segment / saved filter but keeps the filters currently applied.
+  removeAudience(): void {
+    this.membership.set(null);
     this.activeAudienceId.set(null);
   }
 
@@ -1797,7 +2230,7 @@ export class ParticipantStore {
       filter: structuredClone(this.filter()),
     };
     this.audiences.update((list) => [...list, aud]);
-    this.activeAudienceId.set(aud.id);
+    this.activateSavedFilter(aud.id);
     this.data.persistAudience(aud).catch((e) => console.error('persistAudience failed', e));
     return aud;
   }
@@ -1830,15 +2263,24 @@ export class ParticipantStore {
   updateAudienceFilter(id: string): void {
     const aud = this.audiences().find((a) => a.id === id && a.kind === 'filter');
     if (!aud) return;
-    const updated: Audience = { ...aud, filter: structuredClone(this.filter()) };
+    const filter = structuredClone(this.filter());
+    // saving "End between" writes its own end range over the analytics one
+    const legacySubscriptionEnd = filter.subscription.relation === 'endBetween' ? undefined : aud.legacySubscriptionEnd;
+    const updated: Audience = { ...aud, filter, legacySubscriptionEnd };
     this.audiences.update((list) => list.map((a) => (a.id === id ? updated : a)));
-    this.activeAudienceId.set(id);
+    this.activateSavedFilter(id);
     this.data.persistAudience(updated).catch((e) => console.error('persistAudience failed', e));
+  }
+
+  // A saved filter holds no list / segment membership, so it only becomes the loaded audience when
+  // none is loaded; otherwise the label would hide the membership that still narrows the rows.
+  private activateSavedFilter(id: string): void {
+    if (!this.membership()) this.activeAudienceId.set(id);
   }
 
   deleteAudience(id: string): void {
     this.audiences.update((list) => list.filter((a) => a.id !== id));
-    if (this.activeAudienceId() === id) this.activeAudienceId.set(null);
+    if (this.activeAudienceId() === id) this.removeAudience();
   }
 
   setDefaultAudience(id: string): void {
@@ -1915,7 +2357,11 @@ export class ParticipantStore {
     const targets = this.selectedParticipants().filter((p) => p.subscriptionPurchaseId);
     const ids = new Set(targets.map((p) => p.profileid));
     this.all.update((list) =>
-      list.map((p) => (ids.has(p.profileid) ? { ...p, subscriptionend: extendedEnd(p.subscriptionend, ext).toISOString() } : p))
+      list.map((p) => {
+        if (!ids.has(p.profileid)) return p;
+        const end = extendedEnd(p.subscriptionend, ext).toISOString();
+        return { ...p, subscriptionend: end, ...(p.isLastSubscription ? { lastSubscriptionEnd: end } : { currentSubscriptionEnd: end }) };
+      })
     );
     this.data
       .extendSubscriptions(targets.map((p) => p.subscriptionPurchaseId as string), ext)
@@ -1928,6 +2374,11 @@ export class ParticipantStore {
     this.reference.update((r) => ({ ...r, tags: [...r.tags, tag] }));
     this.data.persistNewTag(tag).catch((e) => console.error('persistNewTag failed', e));
     return tag;
+  }
+
+  setTagFor(tagId: string, tagsfor: string[]): void {
+    this.reference.update((r) => ({ ...r, tags: r.tags.map((t) => (t.id === tagId ? { ...t, tagsfor } : t)) }));
+    this.data.persistTagFor(tagId, tagsfor).catch((e) => console.error('persistTagFor failed', e));
   }
 }
 
@@ -2056,9 +2507,12 @@ export class RemarksDialogComponent {
 // Dialog: tag manager
 // ================================================================================================
 
+// What a tag is used for (participant tags.tagsfor), the same four options as analytics' tag-participants
+const TAG_FOR_OPTIONS = ['live event', 'queue event', 'video ask', 'journey coach'];
+
 @Component({
   selector: 'app-tag-manager-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, MatTooltipModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="dlg">
@@ -2073,23 +2527,69 @@ export class RemarksDialogComponent {
 
       <div class="dlg-body">
         <label class="dlg-label">Select tags</label>
-        <div class="tagwrap">
+        <div class="taglist">
           @for (t of store.reference().tags; track t.id) {
-            <button class="tagchip" [class.on]="picked().has(t.id)" (click)="toggle(t.id)">
-              {{ t.name }}
-              @if (picked().has(t.id)) {
-                <span class="material-symbols-rounded">check</span>
-              }
-            </button>
+            <div class="tagrow" [class.on]="picked().has(t.id)">
+              <button class="tagpick" [attr.aria-pressed]="picked().has(t.id)" (click)="toggle(t.id)">
+                <span class="material-symbols-rounded box">{{ picked().has(t.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
+                <span class="tname">{{ t.name }}</span>
+              </button>
+              <span class="forbadges">
+                @for (f of t.tagsfor; track f) {
+                  <span class="forbadge">{{ f }}</span>
+                } @empty {
+                  <span class="forbadge none">no “tag for”</span>
+                }
+              </span>
+              <button
+                data-testid="pi-tag-edit-for"
+                class="edit"
+                [class.on]="editing() === t.id"
+                [attr.aria-expanded]="editing() === t.id"
+                matTooltip="Edit what this tag is for"
+                (click)="editing.set(editing() === t.id ? null : t.id)"
+              >
+                <span class="material-symbols-rounded">edit</span>
+              </button>
+            </div>
+            @if (editing() === t.id) {
+              <div class="tagedit">
+                <span class="for-lbl">Tag for</span>
+                @for (o of tagForOptions; track o) {
+                  <!-- a tag keeps at least one "tag for", so its last one can't be switched off -->
+                  <button
+                    data-testid="pi-tag-edit-option"
+                    class="forchip"
+                    [class.on]="t.tagsfor.includes(o)"
+                    [attr.aria-pressed]="t.tagsfor.includes(o)"
+                    [disabled]="t.tagsfor.length === 1 && t.tagsfor.includes(o)"
+                    (click)="toggleTagFor(t, o)"
+                  >
+                    {{ o }}
+                  </button>
+                }
+              </div>
+            }
+          } @empty {
+            <div class="none">No tags yet. Create one below.</div>
           }
         </div>
 
         <div class="create">
           <label class="dlg-label">Create a new tag</label>
-          <div class="create-row">
-            <input class="dlg-input" [(ngModel)]="newTag" placeholder="Tag name" (keyup.enter)="create()" />
-            <button class="btn btn-ghost" [disabled]="newTag.trim().length < 2" (click)="create()">
-              <span class="material-symbols-rounded">add</span> Create
+          <input class="dlg-input" [(ngModel)]="newTag" placeholder="Tag name" (keyup.enter)="create()" />
+          <div class="for-row">
+            <span class="for-lbl">Tag for</span>
+            @for (o of tagForOptions; track o) {
+              <button data-testid="pi-tag-for" class="forchip" [class.on]="newFor().has(o)" [attr.aria-pressed]="newFor().has(o)" (click)="toggleNewFor(o)">
+                {{ o }}
+              </button>
+            }
+          </div>
+          <div class="create-foot">
+            <span class="hint" [class.err]="nameTaken()">{{ createHint() }}</span>
+            <button data-testid="pi-tag-create" class="btn btn-primary" [disabled]="!canCreate()" (click)="create()">
+              <span class="material-symbols-rounded">add</span> Create tag
             </button>
           </div>
         </div>
@@ -2107,50 +2607,165 @@ export class RemarksDialogComponent {
     </div>
   `,
   styles: `
-    .tagwrap {
+    .taglist {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 280px;
+      overflow-y: auto;
       margin-bottom: 22px;
+      padding: 4px;
+      border: 1px solid var(--pi-border);
+      border-radius: 10px;
     }
-    .tagchip {
+    .tagrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 4px 2px 2px;
+      border-radius: 8px;
+    }
+    .tagrow:hover {
+      background: var(--pi-surface-2);
+    }
+    .tagrow.on {
+      background: var(--pi-accent-bg);
+    }
+    .tagpick {
+      flex: 1;
+      min-width: 0;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
+      border: none;
+      background: none;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--pi-text);
+      padding: 6px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .tagpick .box {
+      font-size: 19px;
+      color: var(--pi-text-3);
+    }
+    .tagrow.on .box {
+      color: var(--pi-accent);
+    }
+    .tname {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .forbadges {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+      max-width: 55%;
+    }
+    .forbadge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+      background: var(--pi-fill);
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .forbadge.none {
+      background: none;
+      color: var(--pi-text-3);
+      font-weight: 500;
+    }
+    .edit {
+      flex-shrink: 0;
+      display: inline-flex;
+      border: none;
+      background: none;
+      color: var(--pi-text-3);
+      padding: 4px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .edit:hover,
+    .edit.on {
+      color: var(--pi-accent);
+      background: var(--pi-surface-3);
+    }
+    .edit .material-symbols-rounded {
+      font-size: 17px;
+    }
+    .tagedit {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px 10px 36px;
+    }
+    .for-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .for-lbl {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--pi-text-2);
+      margin-right: 2px;
+    }
+    .forchip {
       border: 1px solid var(--pi-border-strong);
       background: #fff;
       color: var(--pi-text);
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
-      padding: 7px 12px;
+      padding: 5px 11px;
       border-radius: 999px;
       cursor: pointer;
       transition: all 0.1s ease;
     }
-    .tagchip:hover {
+    .forchip:hover:not(:disabled) {
       border-color: var(--pi-accent);
     }
-    .tagchip.on {
+    .forchip.on {
       background: var(--pi-accent);
       border-color: var(--pi-accent);
       color: #fff;
     }
-    .tagchip .material-symbols-rounded {
-      font-size: 16px;
+    .forchip:disabled {
+      cursor: default;
+      opacity: 0.7;
+    }
+    .none {
+      padding: 10px;
+      font-size: 12.5px;
+      color: var(--pi-text-3);
     }
     .create {
       border-top: 1px solid var(--pi-border);
       padding-top: 16px;
     }
-    .create-row {
+    .create-foot {
       display: flex;
+      align-items: center;
       gap: 10px;
+      margin-top: 14px;
     }
-    .create-row .dlg-input {
+    .hint {
       flex: 1;
+      font-size: 12px;
+      color: var(--pi-text-3);
     }
-    .create-row .btn {
+    .hint.err {
+      color: var(--pi-status-banned);
+    }
+    .create-foot .btn {
       flex-shrink: 0;
     }
   `,
@@ -2161,7 +2776,11 @@ export class TagManagerDialogComponent {
   readonly store = inject(ParticipantStore);
   private readonly snack = inject(MatSnackBar);
 
+  readonly tagForOptions = TAG_FOR_OPTIONS;
   readonly picked = signal<Set<string>>(new Set());
+  // the tag whose "tag for" is being edited
+  readonly editing = signal<string | null>(null);
+  readonly newFor = signal<Set<string>>(new Set());
   newTag = '';
 
   toggle(id: string): void {
@@ -2172,12 +2791,46 @@ export class TagManagerDialogComponent {
     });
   }
 
+  toggleNewFor(option: string): void {
+    this.newFor.update((s) => {
+      const next = new Set(s);
+      next.has(option) ? next.delete(option) : next.add(option);
+      return next;
+    });
+  }
+
+  toggleTagFor(tag: Tag, option: string): void {
+    const next = tag.tagsfor.includes(option) ? tag.tagsfor.filter((f) => f !== option) : [...tag.tagsfor, option];
+    if (next.length) this.store.setTagFor(tag.id, next);
+  }
+
+  nameTaken(): boolean {
+    const key = this.newTag.trim().toLowerCase();
+    return !!key && this.store.reference().tags.some((t) => t.name.trim().toLowerCase() === key);
+  }
+
+  canCreate(): boolean {
+    return this.newTag.trim().length >= 2 && this.newFor().size > 0 && !this.nameTaken();
+  }
+
+  // asks only for what is still missing
+  createHint(): string {
+    if (this.nameTaken()) return `A tag named “${this.newTag.trim()}” already exists.`;
+    const needName = this.newTag.trim().length < 2;
+    const needFor = !this.newFor().size;
+    if (needName && needFor) return 'Name it (2+ characters) and pick at least one “Tag for”.';
+    if (needName) return 'Name it (2+ characters).';
+    return needFor ? 'Pick at least one “Tag for”.' : '';
+  }
+
   create(): void {
-    const name = this.newTag.trim();
-    if (name.length < 2) return;
-    const tag = this.store.createTag(name, ['journey coach']);
+    if (!this.canCreate()) return;
+    // kept in the options' order, whatever order they were clicked in
+    const tagsfor = TAG_FOR_OPTIONS.filter((o) => this.newFor().has(o));
+    const tag = this.store.createTag(this.newTag.trim(), tagsfor);
     this.toggle(tag.id);
     this.newTag = '';
+    this.newFor.set(new Set());
   }
 
   apply(mode: 'add' | 'remove'): void {
@@ -2313,6 +2966,10 @@ export class SubscriptionDialogComponent {
 // Dialog: manage audiences
 // ================================================================================================
 
+export interface ManageAudiencesData {
+  tab: AudienceKind; // the tab it opens on
+}
+
 @Component({
   selector: 'app-manage-audiences-dialog',
   imports: [MatTooltipModule],
@@ -2354,7 +3011,7 @@ export class SubscriptionDialogComponent {
                     <span class="pi-badge live">Live</span>
                   }
                 </td>
-                <td class="num">{{ store.audienceCounts()[a.id] ?? 0 }}</td>
+                <td class="num">{{ store.audienceCounts()[a.id] ?? '—' }}</td>
                 <td class="by">{{ a.createdBy }}</td>
                 <td class="row-actions">
                   @if (a.kind !== 'segment') {
@@ -2514,6 +3171,7 @@ export class SubscriptionDialogComponent {
 })
 export class ManageAudiencesDialogComponent {
   readonly ref = inject(MatDialogRef<ManageAudiencesDialogComponent>);
+  private readonly data = inject<ManageAudiencesData | null>(MAT_DIALOG_DATA);
   readonly store = inject(ParticipantStore);
   private readonly dialog = inject(MatDialog);
   private readonly injector = inject(Injector);
@@ -2524,7 +3182,7 @@ export class ManageAudiencesDialogComponent {
     { key: 'list', label: 'Lists' },
     { key: 'segment', label: 'Segments' },
   ];
-  readonly tab = signal<AudienceKind>('filter');
+  readonly tab = signal<AudienceKind>(this.data?.tab ?? 'filter');
   readonly tabLabel = computed(() => this.kinds.find((k) => k.key === this.tab())?.label ?? '');
 
   ofKind(kind: AudienceKind): Audience[] {
@@ -2572,7 +3230,7 @@ export interface EvolutionRow {
   name: string;
   journey: string;
   tier: string;
-  atc: number;
+  atc: number | null;
   consumed: number;
   score: number;
 }
@@ -2609,7 +3267,7 @@ export interface EvolutionRow {
                 <td>{{ r.name }}</td>
                 <td>{{ r.journey }}</td>
                 <td>{{ r.tier }}</td>
-                <td class="num">{{ r.atc }}</td>
+                <td class="num">{{ r.atc ?? '—' }}</td>
                 <td class="num">{{ r.consumed }}</td>
                 <td class="num">
                   <span class="score" [style.width.%]="bar(r.score)"></span>
@@ -2695,7 +3353,7 @@ export class EvolutionDialogComponent {
         tier: p.tier.length ? tm[p.tier[0]] : '—',
         atc: p.atccount,
         consumed: p.consumedproducts.length,
-        score: p.atccount * 2 + p.consumedproducts.length * 3,
+        score: (p.atccount ?? 0) * 2 + p.consumedproducts.length * 3,
       }))
       .sort((a, b) => b.score - a.score);
   });
@@ -2747,7 +3405,7 @@ export class EvolutionDialogComponent {
           <div class="cnt">{{ data.participants.length }} participant{{ data.participants.length === 1 ? '' : 's' }} to review</div>
           <table class="cl">
             @if (data.def.watson) {
-              <thead><tr><th>Participant</th><th>Watson status</th><th>Subscription</th><th class="num">Balance</th></tr></thead>
+              <thead><tr><th>Participant</th><th>Watson status</th><th>Subscription</th><th class="num">Balance</th><th></th></tr></thead>
               <tbody>
                 @for (p of data.participants.slice(0, 250); track p.profileid) {
                   <tr>
@@ -2755,6 +3413,12 @@ export class EvolutionDialogComponent {
                     <td>{{ label(p.financialstatus) }}</td>
                     <td>{{ label(p.customerstatus) }}</td>
                     <td class="num">{{ p.balance == null ? '—' : (p.balance | number) }}</td>
+                    <td class="act">
+                      <!-- review only: statuses are corrected on the profile, never from this list -->
+                      <a data-testid="pi-watson-view-profile" class="vp" [href]="'/userprofile/' + p.profileid" target="_blank" rel="noopener">
+                        View profile <span class="material-symbols-rounded">open_in_new</span>
+                      </a>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -2796,6 +3460,10 @@ export class EvolutionDialogComponent {
     td { padding: 9px 12px; border-bottom: 0.5px solid var(--pi-border); vertical-align: middle; }
     .nm { font-weight: 600; }
     .em { font-size: 11px; color: var(--pi-text-3); }
+    .act { text-align: right; white-space: nowrap; }
+    .vp { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 600; color: var(--pi-accent); text-decoration: none; }
+    .vp:hover { text-decoration: underline; }
+    .vp .material-symbols-rounded { font-size: 15px; }
     .more { text-align: center; color: var(--pi-text-3); font-size: 12.5px; margin-top: 12px; }
     .notwired { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 40px 20px; color: var(--pi-text-2); }
     .notwired .material-symbols-rounded { font-size: 40px; color: var(--pi-text-3); }
@@ -2831,11 +3499,14 @@ export class ChecklistViewerDialogComponent {
 export interface FilterOption {
   value: string;
   label: string;
+  hint?: string; // second line, e.g. when a journey segment's list was last updated
+  count?: number | null; // participants per option (events / queues); null = not loaded yet
 }
 export interface FilterSection {
-  group: keyof FilterModel;
+  group: CheckGroup;
   label: string;
   options: FilterOption[];
+  keywords?: string; // extra words the filter search matches, e.g. the Event switch states
 }
 
 const STATUS_OPTS: FilterOption[] = [
@@ -2857,8 +3528,153 @@ const FIN_OPTS: FilterOption[] = [
   { value: 'none', label: 'None' },
 ];
 
+// What each subscription relation means, shown under its select.
+const RELATION_HELP: Record<SubscriptionRelation, string> = {
+  startBetween: 'The start date falls in the range.',
+  endBetween: 'The end date falls in the range.',
+  within: 'Both the start and the end date fall in the range.',
+  startInEndAfter: 'Starts in the range and ends after it.',
+  startBeforeEndIn: 'Starts before the range and ends in it.',
+  throughout: 'Active on every day of the range.',
+  anyTime: 'Active on at least one day of the range.',
+  notActive: 'Not active on any day of the range.',
+};
+
+const byName = (a: { name: string }, b: { name: string }): number =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+
+// yyyy-mm-dd as local midnight, for the date range picker.
+const dayToDate = (day: string | null): Date | null => (day ? new Date(`${day}T00:00:00`) : null);
+
+// A half-filled "Is between" is still being typed: it gets a prompt, not a red error.
+function conditionPending(c: CountCondition): boolean {
+  return c.op === 'between' && isCount(c.a) && isCount(c.b) && (c.a == null) !== (c.b == null);
+}
+
+// Invalid numbers or a reversed range: red inputs; the engine doesn't apply the condition.
+function conditionInvalid(c: CountCondition): boolean {
+  return !!conditionError(c) && !conditionPending(c);
+}
+
+// One count condition in words (At least / At most / Exact / Is between), shared by the ATC, uP! and
+// CPM counts and every product-count rule.
+@Component({
+  selector: 'app-count-condition',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="cond" [class.between]="value().op === 'between'">
+      <select data-testid="pi-cond-op" aria-label="Condition" (change)="setOp($any($event.target).value)">
+        @for (o of ops; track o.value) {
+          <option [value]="o.value" [selected]="o.value === value().op">{{ o.label }}</option>
+        }
+      </select>
+      <input
+        data-testid="pi-cond-a"
+        type="number"
+        min="0"
+        step="1"
+        inputmode="numeric"
+        placeholder="0"
+        [attr.aria-label]="value().op === 'between' ? 'From' : 'Count'"
+        [class.bad]="invalid()"
+        [value]="value().a ?? ''"
+        (input)="setNum('a', $any($event.target).value)"
+      />
+      @if (value().op === 'between') {
+        <span class="and">and</span>
+        <input
+          data-testid="pi-cond-b"
+          type="number"
+          min="0"
+          step="1"
+          inputmode="numeric"
+          placeholder="0"
+          aria-label="To"
+          [class.bad]="invalid()"
+          [value]="value().b ?? ''"
+          (input)="setNum('b', $any($event.target).value)"
+        />
+      }
+    </div>
+    @if (error()) {
+      <span class="msg" [class.err]="invalid()">{{ error() }}</span>
+    }
+  `,
+  styles: `
+    :host {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cond {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 72px;
+      gap: 6px;
+      align-items: center;
+    }
+    .cond.between {
+      grid-template-columns: minmax(0, 1fr) 52px auto 52px;
+      gap: 5px;
+    }
+    select,
+    input {
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--pi-text);
+      border: 1px solid var(--pi-border-strong);
+      border-radius: 8px;
+      padding: 7px 8px;
+      background: #fff;
+      width: 100%;
+      min-width: 0;
+      outline: none;
+    }
+    select:focus,
+    input:focus {
+      border-color: var(--pi-accent);
+    }
+    input.bad {
+      border-color: var(--pi-status-banned);
+      background: var(--pi-status-banned-bg);
+    }
+    .and {
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+    }
+    .msg {
+      font-size: 11.5px;
+      color: var(--pi-text-3);
+    }
+    .msg.err {
+      color: var(--pi-status-banned);
+    }
+  `,
+})
+export class CountConditionComponent {
+  readonly value = input.required<CountCondition>();
+  readonly valueChange = output<CountCondition>();
+
+  readonly ops = COUNT_OPS;
+  readonly error = computed(() => conditionError(this.value()));
+  readonly invalid = computed(() => conditionInvalid(this.value()));
+
+  // the second number only means something for "Is between"
+  setOp(op: CountOp): void {
+    const c = this.value();
+    this.valueChange.emit({ ...c, op, b: op === 'between' ? c.b : null });
+  }
+  // no clamping: a negative or fractional number is flagged, not silently changed
+  setNum(edge: 'a' | 'b', value: string): void {
+    this.valueChange.emit({ ...this.value(), [edge]: num(value) });
+  }
+}
+
+type CustomSection = 'atc' | 'programs' | 'age' | 'dates' | 'activity';
+type RuleKind = 'consumed' | 'unconsumed';
+
 @Component({
   selector: 'app-filter-rail',
+  imports: [DecimalPipe, NgTemplateOutlet, MatDatepickerModule, MatFormFieldModule, CountConditionComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rail-head">
@@ -2870,11 +3686,58 @@ const FIN_OPTS: FilterOption[] = [
         }
       </div>
       <div class="head-actions">
+        <button data-testid="pi-filter-close" class="icon" title="Close filters" (click)="close.emit()">
+          <span class="material-symbols-rounded">left_panel_close</span>
+        </button>
         <button data-testid="pi-filter-toggle-all" class="icon" [title]="allOpen() ? 'Collapse all' : 'Expand all'" (click)="toggleAll()">
           <span class="material-symbols-rounded">{{ allOpen() ? 'unfold_less' : 'unfold_more' }}</span>
         </button>
-        <button class="reset" [disabled]="!store.activeFilterCount()" (click)="store.clearFilter()">Reset</button>
+        <button class="reset" title="Clear filters, the insight and the loaded audience" [disabled]="!canReset()" (click)="store.clearFilter()">Reset</button>
       </div>
+    </div>
+
+    <div class="saved">
+      <div class="saved-head">
+        <button class="saved-toggle" [attr.aria-expanded]="savedOpen()" (click)="savedOpen.set(!savedOpen())">
+          <span class="material-symbols-rounded lead">bookmarks</span>
+          <span class="saved-title">Saved filters</span>
+          @if (savedFilters().length) {
+            <span class="sec-count">{{ savedFilters().length }}</span>
+          }
+          <span class="material-symbols-rounded chev">{{ savedOpen() ? 'expand_less' : 'expand_more' }}</span>
+        </button>
+        <button data-testid="pi-rail-saved-manage" class="link" (click)="manage.emit()">Manage</button>
+      </div>
+      @if (savedOpen()) {
+        @if (savedFilters().length) {
+          <div class="mini-search">
+            <span class="material-symbols-rounded">search</span>
+            <input data-testid="pi-rail-saved-search" type="text" placeholder="Search saved filters…" [value]="savedQuery()" (input)="savedQuery.set($any($event.target).value)" />
+          </div>
+          <div class="saved-list">
+            @for (a of visibleSaved(); track a.id) {
+              <button
+                data-testid="pi-rail-saved-item"
+                class="saved-item"
+                [class.on]="a.id === store.activeAudienceId()"
+                [attr.aria-pressed]="a.id === store.activeAudienceId()"
+                [title]="a.name"
+                (click)="store.loadAudience(a.id)"
+              >
+                <span class="saved-name">{{ a.name }}</span>
+                @if (a.id === store.activeAudienceId() && store.audienceModified()) {
+                  <span class="saved-mod">modified</span>
+                }
+                <span class="saved-count">{{ (store.audienceCounts()[a.id] | number) ?? '—' }}</span>
+              </button>
+            } @empty {
+              <div class="saved-none">No saved filters match “{{ savedQuery() }}”.</div>
+            }
+          </div>
+        } @else {
+          <div class="saved-none">None yet. Set some filters, then use Save filter below.</div>
+        }
+      }
     </div>
 
     <div class="rail-search">
@@ -2899,21 +3762,57 @@ const FIN_OPTS: FilterOption[] = [
           </button>
           @if (isOpen(sec.group)) {
             <div class="sec-body">
-              @for (o of sec.options; track o.value) {
-                <button
-                  data-testid="pi-filter-option"
-                  class="opt"
-                  role="checkbox"
-                  [attr.aria-checked]="state(sec.group, o.value) === 'in' ? 'true' : state(sec.group, o.value) === 'out' ? 'mixed' : 'false'"
-                  [class.in]="state(sec.group, o.value) === 'in'"
-                  [class.out]="state(sec.group, o.value) === 'out'"
-                  [title]="cycleHint(sec.group, o.value)"
-                  (click)="cycle(sec.group, o.value)"
-                >
-                  <span class="box"></span>
-                  <span class="opt-label">{{ o.label }}</span>
-                </button>
+              <!-- Event / Queue: the switch says what a ticked option means; the lists are long, so they get a search -->
+              @if (sec.group === 'events') {
+                <div class="seg">
+                  <button data-testid="pi-filter-event-attended" [class.on]="eventStatus() === 'attended'" (click)="setEventStatus('attended')">Attended</button>
+                  <button data-testid="pi-filter-event-confirmed" [class.on]="eventStatus() === 'confirmed'" (click)="setEventStatus('confirmed')">Confirmed</button>
+                </div>
+                <span class="hint">{{ eventHint() }}</span>
+                <div class="mini-search">
+                  <span class="material-symbols-rounded">search</span>
+                  <input data-testid="pi-filter-event-search" type="text" placeholder="Search events…" [value]="sectionQuery().events ?? ''" (input)="setSectionQuery('events', $any($event.target).value)" />
+                </div>
+              } @else if (sec.group === 'queues') {
+                <div class="seg">
+                  <button data-testid="pi-filter-queue-completed" [class.on]="queueStatus() === 'completed'" (click)="setQueueStatus('completed')">Completed</button>
+                  <button data-testid="pi-filter-queue-live" [class.on]="queueStatus() === 'live'" (click)="setQueueStatus('live')">Live</button>
+                </div>
+                <span class="hint">{{ queueStatus() === 'live' ? 'Participants currently in the ticked queues.' : 'Participants who completed the ticked queues.' }}</span>
+                <div class="mini-search">
+                  <span class="material-symbols-rounded">search</span>
+                  <input data-testid="pi-filter-queue-search" type="text" placeholder="Search queues…" [value]="sectionQuery().queues ?? ''" (input)="setSectionQuery('queues', $any($event.target).value)" />
+                </div>
               }
+              <div class="opts" [class.scroll]="sec.group === 'events' || sec.group === 'queues'">
+                @for (o of sec.options; track o.value) {
+                  <button
+                    data-testid="pi-filter-option"
+                    class="opt"
+                    role="checkbox"
+                    [attr.aria-checked]="state(sec.group, o.value) === 'in' ? 'true' : state(sec.group, o.value) === 'out' ? 'mixed' : 'false'"
+                    [class.in]="state(sec.group, o.value) === 'in'"
+                    [class.out]="state(sec.group, o.value) === 'out'"
+                    [title]="cycleHint(sec.group, o.value)"
+                    (click)="cycle(sec.group, o.value)"
+                  >
+                    <span class="box"></span>
+                    <span class="opt-text">
+                      <span class="opt-label">
+                        {{ o.label }}
+                        @if (o.count != null) {
+                          <span class="opt-count">({{ o.count | number }})</span>
+                        }
+                      </span>
+                      @if (o.hint) {
+                        <span class="opt-hint">{{ o.hint }}</span>
+                      }
+                    </span>
+                  </button>
+                } @empty {
+                  <span class="hint">{{ sectionQuery()[sec.group] ? 'No matches.' : 'Nothing to choose from yet.' }}</span>
+                }
+              </div>
             </div>
           }
         </div>
@@ -2924,17 +3823,17 @@ const FIN_OPTS: FilterOption[] = [
         <div class="section" [class.open]="isOpen('atc')">
           <button class="sec-head" (click)="toggleSection('atc')">
             <span class="sec-label">ATC count</span>
-            @if (atc != null) {
-              <span class="sec-count">1</span>
+            @if (customErrors().atc) {
+              <span class="material-symbols-rounded sec-err" title="Check the numbers">error</span>
+            } @else if (customCounts().atc) {
+              <span class="sec-count">{{ customCounts().atc }}</span>
             }
             <span class="material-symbols-rounded chev">{{ isOpen('atc') ? 'expand_less' : 'expand_more' }}</span>
           </button>
           @if (isOpen('atc')) {
             <div class="sec-body">
-              <div class="field-row">
-                <span class="field-lead">At least</span>
-                <input class="num-input" type="number" min="0" [value]="atc ?? ''" (input)="setNum('atcCountMin', $any($event.target).value)" placeholder="0" />
-              </div>
+              <app-count-condition data-testid="pi-filter-atc-count" [value]="store.filter().atcCount" (valueChange)="setCount('atcCount', $event)" />
+              <span class="hint">Participants without an ATC count are excluded.</span>
             </div>
           }
         </div>
@@ -2945,8 +3844,10 @@ const FIN_OPTS: FilterOption[] = [
         <div class="section" [class.open]="isOpen('programs')">
           <button class="sec-head" (click)="toggleSection('programs')">
             <span class="sec-label">uP! &amp; CPM</span>
-            @if (programCount()) {
-              <span class="sec-count">{{ programCount() }}</span>
+            @if (customErrors().programs) {
+              <span class="material-symbols-rounded sec-err" title="Check the numbers">error</span>
+            } @else if (customCounts().programs) {
+              <span class="sec-count">{{ customCounts().programs }}</span>
             }
             <span class="material-symbols-rounded chev">{{ isOpen('programs') ? 'expand_less' : 'expand_more' }}</span>
           </button>
@@ -2968,72 +3869,10 @@ const FIN_OPTS: FilterOption[] = [
                   <span class="opt-label">{{ o.label }}</span>
                 </button>
               }
-              <div class="field-row">
-                <span class="field-lead grow">uP! count at least</span>
-                <input data-testid="pi-filter-up-count" class="num-input" type="number" min="0" [value]="store.filter().upCountMin ?? ''" (input)="setNum('upCountMin', $any($event.target).value)" placeholder="0" />
-              </div>
-              <div class="field-row">
-                <span class="field-lead grow">CPM count at least</span>
-                <input data-testid="pi-filter-cpm-count" class="num-input" type="number" min="0" [value]="store.filter().cpmCountMin ?? ''" (input)="setNum('cpmCountMin', $any($event.target).value)" placeholder="0" />
-              </div>
-            </div>
-          }
-        </div>
-      }
-
-      <!-- event status: applies to the events ticked under Event -->
-      @if (showCustom('eventstatus')) {
-        <div class="section" [class.open]="isOpen('eventstatus')">
-          <button class="sec-head" (click)="toggleSection('eventstatus')">
-            <span class="sec-label">Event status</span>
-            @if (store.filter().eventStatus === 'confirmed') {
-              <span class="sec-count">1</span>
-            }
-            <span class="material-symbols-rounded chev">{{ isOpen('eventstatus') ? 'expand_less' : 'expand_more' }}</span>
-          </button>
-          @if (isOpen('eventstatus')) {
-            <div class="sec-body">
-              <div class="seg">
-                <button data-testid="pi-filter-event-attended" [class.on]="store.filter().eventStatus === 'attended'" (click)="setEventStatus('attended')">Attended</button>
-                <button data-testid="pi-filter-event-confirmed" [class.on]="store.filter().eventStatus === 'confirmed'" (click)="setEventStatus('confirmed')">Confirmed</button>
-              </div>
-              <span class="hint">
-                @if (!store.filter().events.length && !store.filter().exclude.events?.length) {
-                  Tick one or more events under Event.
-                } @else if (store.confirmedLoading()) {
-                  Loading confirmed participants…
-                } @else {
-                  {{ store.filter().eventStatus === 'confirmed' ? 'Approved requests' : 'Attended' }} for {{ store.filter().events.length }} event(s).
-                }
-              </span>
-            </div>
-          }
-        </div>
-      }
-
-      <!-- queue status: applies to the queues ticked under Queue -->
-      @if (showCustom('queuestatus')) {
-        <div class="section" [class.open]="isOpen('queuestatus')">
-          <button class="sec-head" (click)="toggleSection('queuestatus')">
-            <span class="sec-label">Queue status</span>
-            @if (store.filter().queueStatus === 'live') {
-              <span class="sec-count">1</span>
-            }
-            <span class="material-symbols-rounded chev">{{ isOpen('queuestatus') ? 'expand_less' : 'expand_more' }}</span>
-          </button>
-          @if (isOpen('queuestatus')) {
-            <div class="sec-body">
-              <div class="seg">
-                <button data-testid="pi-filter-queue-completed" [class.on]="store.filter().queueStatus === 'completed'" (click)="setQueueStatus('completed')">Completed</button>
-                <button data-testid="pi-filter-queue-live" [class.on]="store.filter().queueStatus === 'live'" (click)="setQueueStatus('live')">Live</button>
-              </div>
-              <span class="hint">
-                @if (!store.filter().queues.length && !store.filter().exclude.queues?.length) {
-                  Tick one or more queues under Queue.
-                } @else {
-                  {{ store.filter().queueStatus === 'live' ? 'Currently in' : 'Completed' }} the selected queue(s).
-                }
-              </span>
+              <span class="mini-label">uP! count</span>
+              <app-count-condition data-testid="pi-filter-up-count" [value]="store.filter().upCount" (valueChange)="setCount('upCount', $event)" />
+              <span class="mini-label">CPM count</span>
+              <app-count-condition data-testid="pi-filter-cpm-count" [value]="store.filter().cpmCount" (valueChange)="setCount('cpmCount', $event)" />
             </div>
           }
         </div>
@@ -3044,17 +3883,46 @@ const FIN_OPTS: FilterOption[] = [
         <div class="section" [class.open]="isOpen('age')">
           <button class="sec-head" (click)="toggleSection('age')">
             <span class="sec-label">Age</span>
-            @if (store.filter().ageMin != null || store.filter().ageMax != null) {
-              <span class="sec-count">1</span>
+            @if (customErrors().age) {
+              <span class="material-symbols-rounded sec-err" title="Check the numbers">error</span>
+            } @else if (customCounts().age) {
+              <span class="sec-count">{{ customCounts().age }}</span>
             }
             <span class="material-symbols-rounded chev">{{ isOpen('age') ? 'expand_less' : 'expand_more' }}</span>
           </button>
           @if (isOpen('age')) {
             <div class="sec-body">
               <div class="field-row two">
-                <input data-testid="pi-filter-age-min" class="num-input wide" type="number" min="0" placeholder="Min" [value]="store.filter().ageMin ?? ''" (input)="setNum('ageMin', $any($event.target).value)" />
-                <input data-testid="pi-filter-age-max" class="num-input wide" type="number" min="0" placeholder="Max" [value]="store.filter().ageMax ?? ''" (input)="setNum('ageMax', $any($event.target).value)" />
+                <input
+                  data-testid="pi-filter-age-min"
+                  class="num-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder="Min"
+                  aria-label="Minimum age"
+                  [class.bad]="ageError()"
+                  [value]="store.filter().ageMin ?? ''"
+                  (input)="setNum('ageMin', $any($event.target).value)"
+                />
+                <input
+                  data-testid="pi-filter-age-max"
+                  class="num-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder="Max"
+                  aria-label="Maximum age"
+                  [class.bad]="ageError()"
+                  [value]="store.filter().ageMax ?? ''"
+                  (input)="setNum('ageMax', $any($event.target).value)"
+                />
               </div>
+              @if (ageError()) {
+                <span class="msg">{{ ageError() }}</span>
+              }
               <span class="hint">Participants without a date of birth are excluded.</span>
             </div>
           }
@@ -3066,20 +3934,50 @@ const FIN_OPTS: FilterOption[] = [
         <div class="section" [class.open]="isOpen('dates')">
           <button class="sec-head" (click)="toggleSection('dates')">
             <span class="sec-label">Subscription dates</span>
+            @if (customErrors().dates) {
+              <span class="material-symbols-rounded sec-err" title="Check the dates">error</span>
+            } @else if (customCounts().dates) {
+              <span class="sec-count">{{ customCounts().dates }}</span>
+            }
+            @if (legacyEnd()) {
+              <span class="material-symbols-rounded sec-info" title="This saved filter has an older end date range that isn't applied here">info</span>
+            }
             <span class="material-symbols-rounded chev">{{ isOpen('dates') ? 'expand_less' : 'expand_more' }}</span>
           </button>
           @if (isOpen('dates')) {
             <div class="sec-body">
-              <span class="mini-label">Start between</span>
-              <div class="field-row two">
-                <input class="date-input" type="date" [value]="dateVal('subscriptionStart','start')" (change)="setDate('subscriptionStart','start',$any($event.target).value)" />
-                <input class="date-input" type="date" [value]="dateVal('subscriptionStart','end')" (change)="setDate('subscriptionStart','end',$any($event.target).value)" />
-              </div>
-              <span class="mini-label">End between</span>
-              <div class="field-row two">
-                <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','start')" (change)="setDate('subscriptionEnd','start',$any($event.target).value)" />
-                <input class="date-input" type="date" [value]="dateVal('subscriptionEnd','end')" (change)="setDate('subscriptionEnd','end',$any($event.target).value)" />
-              </div>
+              <span class="mini-label">Match subscriptions that…</span>
+              <select data-testid="pi-filter-sub-relation" class="rule-sel" aria-label="Match subscriptions that" (change)="setRelation($any($event.target).value)">
+                @for (r of relations; track r.value) {
+                  <option [value]="r.value" [selected]="r.value === subscription().relation">{{ r.label }}</option>
+                }
+              </select>
+              <span class="hint">{{ relationHelp[subscription().relation] }}</span>
+              <mat-form-field data-testid="pi-filter-sub-range" class="range" [class.bad]="subError()" appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Date range</mat-label>
+                <mat-date-range-input [rangePicker]="subPicker">
+                  <input data-testid="pi-filter-sub-from" matStartDate placeholder="From" [value]="subFrom()" (dateChange)="setDate('from', $event.value)" />
+                  <input data-testid="pi-filter-sub-to" matEndDate placeholder="To" [value]="subTo()" (dateChange)="setDate('to', $event.value)" />
+                </mat-date-range-input>
+                <mat-datepicker-toggle matIconSuffix [for]="subPicker" />
+                <mat-date-range-picker #subPicker />
+              </mat-form-field>
+              @if (subError()) {
+                <span class="msg">{{ subError() }}</span>
+              }
+              <span class="hint">
+                Both days count. An empty side has no limit. Non active and discontinued participants are matched on their last
+                subscription; anyone without the dates is excluded.
+              </span>
+              @if (legacyEnd(); as range) {
+                <span data-testid="pi-filter-sub-legacy" class="msg info">
+                  This saved filter also has an older end date range ({{ range }}). Only one range applies here, so it isn't
+                  applied; saving keeps it for analytics.
+                </span>
+              }
+              @if (subscription().from || subscription().to) {
+                <button data-testid="pi-filter-sub-clear" class="link start" (click)="clearDates()">Clear dates</button>
+              }
             </div>
           }
         </div>
@@ -3090,38 +3988,46 @@ const FIN_OPTS: FilterOption[] = [
         <div class="section" [class.open]="isOpen('activity')">
           <button class="sec-head" (click)="toggleSection('activity')">
             <span class="sec-label">Product activity</span>
-            @if (rules('consumed').length + rules('unconsumed').length) {
-              <span class="sec-count">{{ rules('consumed').length + rules('unconsumed').length }}</span>
+            @if (customErrors().activity) {
+              <span class="material-symbols-rounded sec-err" title="Check the numbers">error</span>
+            } @else if (customCounts().activity) {
+              <span class="sec-count">{{ customCounts().activity }}</span>
             }
             <span class="material-symbols-rounded chev">{{ isOpen('activity') ? 'expand_less' : 'expand_more' }}</span>
           </button>
           @if (isOpen('activity')) {
+            <!-- one wrapper hook per rule kind, so a spec can tell consumed from unconsumed rules -->
             <div class="sec-body">
-              @for (kind of ['consumed','unconsumed']; track kind) {
-                <span class="mini-label">{{ kind === 'consumed' ? 'Consumed count' : 'Unconsumed count' }}</span>
-                @for (rule of rules($any(kind)); track $index) {
-                  <div class="rule">
-                    <select class="rule-sel" [value]="rule.productId" (change)="updateRule($any(kind), $index, { productId: $any($event.target).value })">
+              <div data-testid="pi-filter-consumed" class="rule-kind">
+                <ng-container [ngTemplateOutlet]="ruleKind" [ngTemplateOutletContext]="{ $implicit: ruleRows().consumed }" />
+              </div>
+              <div data-testid="pi-filter-unconsumed" class="rule-kind">
+                <ng-container [ngTemplateOutlet]="ruleKind" [ngTemplateOutletContext]="{ $implicit: ruleRows().unconsumed }" />
+              </div>
+            </div>
+            <ng-template #ruleKind let-kind>
+              <span class="mini-label">{{ kind.label }}</span>
+              @for (row of kind.rules; track $index) {
+                <div data-testid="pi-filter-rule" class="rule">
+                  <div class="rule-top">
+                    <select data-testid="pi-filter-rule-product" class="rule-sel" aria-label="Product" (change)="updateRule(kind.key, $index, { productId: $any($event.target).value })">
+                      <!-- a rule on a product that no longer exists (or none) must not show another product -->
+                      <option value="" disabled [selected]="!productIds().has(row.productId)">Choose a product</option>
                       @for (p of products(); track p.id) {
-                        <option [value]="p.id">{{ p.name }}</option>
+                        <option [value]="p.id" [selected]="p.id === row.productId">{{ p.name }}</option>
                       }
                     </select>
-                    <select class="rule-cmp" [value]="rule.comparison" (change)="updateRule($any(kind), $index, { comparison: $any($event.target).value })">
-                      @for (c of comparisons; track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
-                      }
-                    </select>
-                    <input class="rule-num" type="number" min="0" [value]="rule.count" (input)="updateRule($any(kind), $index, { count: asNum($any($event.target).value) })" />
-                    <button class="rule-del" (click)="removeRule($any(kind), $index)">
+                    <button data-testid="pi-filter-rule-remove" class="rule-del" aria-label="Remove rule" (click)="removeRule(kind.key, $index)">
                       <span class="material-symbols-rounded">close</span>
                     </button>
                   </div>
-                }
-                <button class="add-rule" (click)="addRule($any(kind))">
-                  <span class="material-symbols-rounded">add</span> Add rule
-                </button>
+                  <app-count-condition [value]="row.condition" (valueChange)="setRuleCondition(kind.key, $index, $event)" />
+                </div>
               }
-            </div>
+              <button data-testid="pi-filter-rule-add" class="add-rule" (click)="addRule(kind.key)">
+                <span class="material-symbols-rounded">add</span> Add rule
+              </button>
+            </ng-template>
           }
         </div>
       }
@@ -3132,8 +4038,8 @@ const FIN_OPTS: FilterOption[] = [
     </div>
 
     <div class="rail-foot">
-      <button class="save-btn" [disabled]="!store.activeFilterCount()" (click)="save.emit()">
-        <span class="material-symbols-rounded">bookmark_add</span> Save as audience
+      <button data-testid="pi-filter-save" class="save-btn" [disabled]="!store.activeFilterCount()" (click)="save.emit()">
+        <span class="material-symbols-rounded">bookmark_add</span> Save filter
       </button>
     </div>
   `,
@@ -3209,6 +4115,119 @@ const FIN_OPTS: FilterOption[] = [
       font-weight: 600;
       cursor: pointer;
     }
+    .reset:disabled {
+      color: var(--pi-text-3);
+      cursor: default;
+    }
+    .link {
+      border: none;
+      background: none;
+      padding: 0;
+      color: var(--pi-accent);
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .link:hover {
+      text-decoration: underline;
+    }
+    .link.start {
+      align-self: flex-start;
+      margin-top: 6px;
+    }
+
+    /* saved filters: fixed above the filter search, the list scrolls on its own */
+    .saved {
+      flex-shrink: 0;
+      padding: 6px 12px 8px;
+      border-bottom: 1px solid var(--pi-border);
+    }
+    .saved-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .saved-toggle {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      border: none;
+      background: none;
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--pi-text);
+      cursor: pointer;
+      text-align: left;
+    }
+    .saved-toggle:hover {
+      background: var(--pi-surface-3);
+    }
+    .saved-toggle .lead {
+      font-size: 18px;
+      color: var(--pi-accent);
+    }
+    .saved-title {
+      flex: 1;
+    }
+    .saved-list {
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .saved-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 6px 8px;
+      border: none;
+      background: none;
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--pi-text-2);
+      cursor: pointer;
+      text-align: left;
+    }
+    .saved-item:hover {
+      background: var(--pi-surface-3);
+    }
+    .saved-item.on {
+      background: var(--pi-accent-bg);
+      color: var(--pi-accent-text);
+      font-weight: 600;
+    }
+    .saved-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .saved-mod {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--pi-status-late);
+    }
+    .saved-count {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--pi-text-3);
+      font-variant-numeric: tabular-nums;
+    }
+    .saved-none {
+      padding: 4px 4px 2px;
+      font-size: 12px;
+      color: var(--pi-text-3);
+    }
+
     .rail-search {
       display: flex;
       align-items: center;
@@ -3250,24 +4269,53 @@ const FIN_OPTS: FilterOption[] = [
     .rail-search .clear .material-symbols-rounded {
       font-size: 16px;
     }
+    /* the smaller search used by saved filters and the Event / Queue lists */
+    .mini-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 30px;
+      padding: 0 8px;
+      margin: 6px 0 4px;
+      background: var(--pi-surface-3);
+      border: 1px solid transparent;
+      border-radius: var(--pi-radius-sm);
+    }
+    .mini-search:focus-within {
+      background: #fff;
+      border-color: var(--pi-accent);
+    }
+    .mini-search .material-symbols-rounded {
+      font-size: 16px;
+      color: var(--pi-text-3);
+    }
+    .mini-search input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 12.5px;
+      color: var(--pi-text);
+    }
     .no-match {
       padding: 18px 16px;
       font-size: 12.5px;
       color: var(--pi-text-3);
     }
-    .field-lead.grow {
-      flex: 1;
-    }
-    .num-input.wide {
-      width: 100%;
-    }
-    .field-row + .field-row {
-      margin-top: 6px;
-    }
     .hint {
       font-size: 11.5px;
       color: var(--pi-text-3);
       margin-top: 6px;
+    }
+    .msg {
+      font-size: 11.5px;
+      color: var(--pi-status-banned);
+      margin-top: 4px;
+    }
+    .msg.info {
+      color: var(--pi-text-2);
     }
     .seg {
       display: inline-flex;
@@ -3289,10 +4337,6 @@ const FIN_OPTS: FilterOption[] = [
     .seg button.on {
       background: var(--pi-accent);
       color: #fff;
-    }
-    .reset:disabled {
-      color: var(--pi-text-3);
-      cursor: default;
     }
 
     .rail-body {
@@ -3338,6 +4382,14 @@ const FIN_OPTS: FilterOption[] = [
       justify-content: center;
       padding: 0 5px;
     }
+    .sec-err {
+      font-size: 18px;
+      color: var(--pi-status-banned);
+    }
+    .sec-info {
+      font-size: 18px;
+      color: var(--pi-text-3);
+    }
     .chev {
       font-size: 19px;
       color: var(--pi-text-3);
@@ -3347,6 +4399,15 @@ const FIN_OPTS: FilterOption[] = [
       display: flex;
       flex-direction: column;
       gap: 2px;
+    }
+    .opts {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .opts.scroll {
+      max-height: 280px;
+      overflow-y: auto;
     }
 
     .opt {
@@ -3377,6 +4438,19 @@ const FIN_OPTS: FilterOption[] = [
       position: relative;
       flex-shrink: 0;
       transition: all 0.1s ease;
+    }
+    .opt-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .opt-count {
+      color: var(--pi-text-3);
+      font-variant-numeric: tabular-nums;
+    }
+    .opt-hint {
+      font-size: 11px;
+      color: var(--pi-text-3);
     }
     /* include: blue tick */
     .opt.in .box {
@@ -3433,24 +4507,13 @@ const FIN_OPTS: FilterOption[] = [
       letter-spacing: 0.04em;
       margin: 8px 2px 4px;
     }
-    .field-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
     .field-row.two {
       display: grid;
       grid-template-columns: 1fr 1fr;
-    }
-    .field-lead {
-      font-size: 13px;
-      color: var(--pi-text-2);
+      gap: 8px;
     }
     .num-input,
-    .date-input,
-    .rule-num,
-    .rule-sel,
-    .rule-cmp {
+    .rule-sel {
       font-family: inherit;
       font-size: 13px;
       color: var(--pi-text);
@@ -3459,25 +4522,63 @@ const FIN_OPTS: FilterOption[] = [
       padding: 7px 9px;
       background: #fff;
       width: 100%;
+      min-width: 0;
       outline: none;
     }
     .num-input:focus,
-    .date-input:focus,
-    .rule-num:focus,
-    .rule-sel:focus,
-    .rule-cmp:focus {
+    .rule-sel:focus {
       border-color: var(--pi-accent);
     }
-    .num-input {
-      width: 90px;
+    .num-input.bad {
+      border-color: var(--pi-status-banned);
+      background: var(--pi-status-banned-bg);
     }
 
+    /* Material date range field, sized and coloured to match the rail's inputs */
+    .range {
+      width: 100%;
+      margin-top: 8px;
+      --mat-form-field-container-height: 40px;
+      --mat-form-field-container-vertical-padding: 9px;
+      --mat-form-field-container-text-size: 13px;
+      --mat-form-field-container-text-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, 'Segoe UI', sans-serif;
+      --mdc-outlined-text-field-label-text-size: 13px;
+      --mdc-outlined-text-field-label-text-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, 'Segoe UI', sans-serif;
+      --mdc-outlined-text-field-container-shape: 8px;
+      --mdc-outlined-text-field-outline-color: var(--pi-border-strong);
+      --mdc-outlined-text-field-hover-outline-color: var(--pi-accent);
+      --mdc-outlined-text-field-focus-outline-color: var(--pi-accent);
+      --mdc-outlined-text-field-focus-label-text-color: var(--pi-accent);
+      --mdc-icon-button-state-layer-size: 36px;
+    }
+    .range.bad {
+      --mdc-outlined-text-field-outline-color: var(--pi-status-banned);
+      --mdc-outlined-text-field-hover-outline-color: var(--pi-status-banned);
+      --mdc-outlined-text-field-focus-outline-color: var(--pi-status-banned);
+      --mdc-outlined-text-field-label-text-color: var(--pi-status-banned);
+      --mdc-outlined-text-field-focus-label-text-color: var(--pi-status-banned);
+    }
+
+    .rule-kind {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
     .rule {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      margin-bottom: 6px;
+      border: 1px solid var(--pi-border);
+      border-radius: 8px;
+      background: var(--pi-surface-2);
+    }
+    .rule-top {
       display: grid;
-      grid-template-columns: 1fr 52px 60px 28px;
+      grid-template-columns: minmax(0, 1fr) 24px;
       gap: 6px;
       align-items: center;
-      margin-bottom: 6px;
     }
     .rule-del {
       border: none;
@@ -3555,27 +4656,39 @@ const FIN_OPTS: FilterOption[] = [
 export class FilterRailComponent {
   readonly store = inject(ParticipantStore);
   readonly save = output<void>();
+  readonly close = output<void>();
+  readonly manage = output<void>();
 
-  readonly comparisons: { value: Comparison; label: string }[] = [
-    { value: 'gte', label: '≥' },
-    { value: 'eq', label: '=' },
-    { value: 'lte', label: '≤' },
-  ];
+  readonly relations = SUBSCRIPTION_RELATIONS;
+  readonly relationHelp = RELATION_HELP;
 
   // every section starts collapsed; clicking its name expands it
   readonly open = signal<Set<string>>(new Set());
 
   // filter-panel search: hides non-matching options and opens every section with a match
   readonly query = signal('');
+  // the Event / Queue sections' own searches: narrow the list without hiding the section
+  readonly sectionQuery = signal<Partial<Record<CheckGroup, string>>>({});
 
-  // hand-built sections (not option lists), matched by label
-  private readonly customLabels: Record<string, string> = {
+  // --- saved filters (the top block) ---
+  readonly savedOpen = signal(true);
+  readonly savedQuery = signal('');
+  readonly savedFilters = computed(() => this.store.audiences().filter((a) => a.kind === 'filter').sort(byName));
+  readonly visibleSaved = computed(() => {
+    const q = this.savedQuery().trim().toLowerCase();
+    return q ? this.savedFilters().filter((a) => a.name.toLowerCase().includes(q)) : this.savedFilters();
+  });
+
+  // Reset = Clear all, so it also clears input that makes no chip (e.g. a reversed age range), the
+  // insight and the loaded audience.
+  readonly canReset = computed(() => this.store.filterTouched() || !!this.store.activeSignal() || !!this.store.activeAudienceId());
+
+  // hand-built sections (not option lists), matched by these words
+  private readonly customLabels: Record<CustomSection, string> = {
     atc: 'ATC count',
     programs: 'uP! & CPM count attendance new already attended',
-    eventstatus: 'Event status attended confirmed',
-    queuestatus: 'Queue status completed live',
     age: 'Age',
-    dates: 'Subscription dates start end',
+    dates: 'Subscription dates start end range',
     activity: 'Product activity consumed unconsumed count',
   };
 
@@ -3584,10 +4697,41 @@ export class FilterRailComponent {
     { value: 'returning', label: 'Already attended uP!' },
   ];
 
+  readonly eventStatus = computed(() => this.store.filter().eventStatus);
+  readonly queueStatus = computed(() => this.store.filter().queueStatus);
+  readonly subscription = computed(() => this.store.filter().subscription);
+
+  readonly eventHint = computed(() => {
+    if (this.eventStatus() === 'attended') return 'Participants who attended the ticked events.';
+    return this.store.confirmedLoading()
+      ? 'Loading confirmed participants…'
+      : 'Participants with an approved request. Counts show once an event is ticked.';
+  });
+
   private opt = (arr: { id: string; name: string }[]): FilterOption[] => arr.map((a) => ({ value: a.id, label: a.name }));
+
+  // Event / queue names repeat, so the date tells them apart ("Name · 12 Mar 2026"); journey segments
+  // say when their saved list was last updated. Built per reference load, not on every filter change.
+  private readonly referenceOptions = computed(() => {
+    const ref = this.store.reference();
+    const dated = (items: DatedRef[]): FilterOption[] => items.map((d) => ({ value: d.id, label: datedLabel(d) }));
+    return {
+      events: dated(ref.events),
+      queues: dated(ref.queues),
+      segments: ref.journeySegments.map((s): FilterOption => {
+        const day = toDay(s.lastupdated);
+        return { value: s.id, label: s.name, hint: day ? `updated ${formatDay(day)}` : 'not updated yet' };
+      }),
+    };
+  });
 
   readonly sections = computed<FilterSection[]>(() => {
     const ref = this.store.reference();
+    const opts = this.referenceOptions();
+    const confirmed = this.eventStatus() === 'confirmed';
+    // a missing count is 0 once its data is loaded; Confirmed loads per ticked event, queues with the page
+    const counted = (options: FilterOption[], counts: Record<string, number>, missing: number | null) =>
+      options.map((o) => ({ ...o, count: counts[o.value] ?? missing }));
     return [
       { group: 'customerstatus', label: 'Customer status', options: STATUS_OPTS },
       { group: 'financialstatus', label: 'Financial status', options: FIN_OPTS },
@@ -3609,6 +4753,7 @@ export class FilterRailComponent {
       },
       { group: 'activejourney', label: 'Active journey', options: this.opt(ref.journeys) },
       { group: 'lastcompletedjourney', label: 'Last completed journey', options: this.opt(ref.journeys) },
+      { group: 'journeysegments', label: 'Journey segment', options: opts.segments },
       { group: 'activeproduct', label: 'Active products', options: this.opt(ref.products) },
       { group: 'tier', label: 'Tier', options: this.opt(ref.tiers) },
       { group: 'participantmode', label: 'Mode', options: [...this.opt(ref.modes), { value: 'none', label: 'None' }] },
@@ -3616,37 +4761,98 @@ export class FilterRailComponent {
       { group: 'addons', label: 'Add-ons', options: this.opt(ref.products) },
       { group: 'gifts', label: 'Gifts', options: this.opt(ref.products) },
       { group: 'bonus', label: 'Bonus', options: this.opt(ref.products) },
-      { group: 'events', label: 'Event', options: this.opt(ref.events) },
-      { group: 'queues', label: 'Queue', options: this.opt(ref.queues) },
+      {
+        group: 'events',
+        label: `Event · ${confirmed ? 'Confirmed' : 'Attended'}`,
+        keywords: 'attended confirmed',
+        options: counted(opts.events, this.store.eventCounts(), confirmed ? null : 0),
+      },
+      {
+        group: 'queues',
+        label: `Queue · ${this.queueStatus() === 'live' ? 'Live' : 'Completed'}`,
+        keywords: 'completed live',
+        options: counted(opts.queues, this.store.queueCounts(), this.store.queueTokensLoaded() ? 0 : null),
+      },
     ];
   });
 
-  readonly products = computed(() => this.store.reference().products);
+  readonly products = computed(() => [...this.store.reference().products].sort(byName));
+  readonly productIds = computed(() => new Set(this.store.reference().products.map((p) => p.id)));
 
   readonly visibleSections = computed<FilterSection[]>(() => {
     const q = this.query().trim().toLowerCase();
-    if (!q) return this.sections();
-    return this.sections()
-      .map((sec) =>
-        sec.label.toLowerCase().includes(q) ? sec : { ...sec, options: sec.options.filter((o) => o.label.toLowerCase().includes(q)) }
-      )
-      .filter((sec) => sec.options.length > 0);
+    const own = this.sectionQuery();
+    const matching = (options: FilterOption[], term: string) => options.filter((o) => o.label.toLowerCase().includes(term));
+    const shown = !q
+      ? this.sections()
+      : this.sections()
+          .map((sec) => (`${sec.label} ${sec.keywords ?? ''}`.toLowerCase().includes(q) ? sec : { ...sec, options: matching(sec.options, q) }))
+          .filter((sec) => sec.options.length > 0);
+    return shown.map((sec) => {
+      const term = own[sec.group]?.trim().toLowerCase();
+      return term ? { ...sec, options: matching(sec.options, term) } : sec;
+    });
   });
 
   private readonly allKeys = computed(() => [...this.sections().map((s) => s.group as string), ...Object.keys(this.customLabels)]);
   readonly allOpen = computed(() => this.allKeys().every((k) => this.open().has(k)));
 
-  readonly programCount = computed(() => {
+  // section badges: how many filters a hand-built section applies (invalid and no-op ones don't count)
+  readonly customCounts = computed<Record<CustomSection, number>>(() => {
     const f = this.store.filter();
-    return f.upStatus.length + (f.exclude.upStatus?.length ?? 0) + (f.upCountMin != null ? 1 : 0) + (f.cpmCountMin != null ? 1 : 0);
+    return {
+      atc: conditionActive(f.atcCount) ? 1 : 0,
+      programs: f.upStatus.length + (f.exclude.upStatus?.length ?? 0) + [f.upCount, f.cpmCount].filter(conditionActive).length,
+      age: ageActive(f) ? 1 : 0,
+      dates: subscriptionActive(f.subscription) ? 1 : 0,
+      activity: [...f.consumed, ...f.unconsumed].filter(productRuleActive).length,
+    };
+  });
+  // a red mark on the section head, so a mistake inside a collapsed section still shows
+  readonly customErrors = computed<Record<CustomSection, boolean>>(() => {
+    const f = this.store.filter();
+    return {
+      atc: conditionInvalid(f.atcCount),
+      programs: conditionInvalid(f.upCount) || conditionInvalid(f.cpmCount),
+      age: !!ageRangeError(f.ageMin, f.ageMax),
+      dates: !!subscriptionFilterError(f.subscription),
+      activity: [...f.consumed, ...f.unconsumed].some((r) => conditionInvalid(ruleCondition(r))),
+    };
   });
 
-  showCustom(key: string): boolean {
+  readonly ageError = computed(() => ageRangeError(this.store.filter().ageMin, this.store.filter().ageMax));
+  readonly subError = computed(() => subscriptionFilterError(this.subscription()));
+  // the loaded saved filter's analytics end range, which this screen doesn't apply
+  readonly legacyEnd = computed(() => {
+    const range = this.store.activeAudience()?.legacySubscriptionEnd;
+    return range ? describeRange(range.from, range.to) : null;
+  });
+
+  // the range picker works with Dates, the filter with local yyyy-mm-dd days; keyed on the day
+  // strings so the picker only gets a new Date when a day actually changes
+  private readonly subFromDay = computed(() => this.subscription().from);
+  private readonly subToDay = computed(() => this.subscription().to);
+  readonly subFrom = computed(() => dayToDate(this.subFromDay()));
+  readonly subTo = computed(() => dayToDate(this.subToDay()));
+
+  // product-count rules, with each condition built here rather than in the template so it stays the
+  // same object between change-detection passes
+  readonly ruleRows = computed(() => {
+    const f = this.store.filter();
+    const kind = (key: RuleKind, label: string) => ({
+      key,
+      label,
+      rules: f[key].map((r) => ({ productId: r.productId, condition: ruleCondition(r) })),
+    });
+    return { consumed: kind('consumed', 'Consumed count'), unconsumed: kind('unconsumed', 'Unconsumed count') };
+  });
+
+  showCustom(key: CustomSection): boolean {
     const q = this.query().trim().toLowerCase();
     return !q || this.customLabels[key].toLowerCase().includes(q);
   }
   anyCustomVisible(): boolean {
-    return Object.keys(this.customLabels).some((k) => this.showCustom(k));
+    return (Object.keys(this.customLabels) as CustomSection[]).some((k) => this.showCustom(k));
   }
 
   toggleSection(key: string): void {
@@ -3664,44 +4870,42 @@ export class FilterRailComponent {
     return !!this.query().trim() || this.open().has(key);
   }
 
+  setSectionQuery(group: CheckGroup, value: string): void {
+    this.sectionQuery.update((q) => ({ ...q, [group]: value }));
+  }
+
   // include / exclude state of one option
-  state(group: keyof FilterModel, value: string): 'in' | 'out' | null {
+  state(group: CheckGroup, value: string): 'in' | 'out' | null {
     const f = this.store.filter();
-    const g = group as CheckGroup;
-    if ((f[g] as string[]).includes(value)) return 'in';
-    if (f.exclude[g]?.includes(value)) return 'out';
+    if ((f[group] as string[]).includes(value)) return 'in';
+    if (f.exclude[group]?.includes(value)) return 'out';
     return null;
   }
-  countFor(group: keyof FilterModel): number {
+  countFor(group: CheckGroup): number {
     const f = this.store.filter();
-    const g = group as CheckGroup;
-    return (f[g] as string[]).length + (f.exclude[g]?.length ?? 0);
+    return (f[group] as string[]).length + (f.exclude[group]?.length ?? 0);
   }
-  cycleHint(group: keyof FilterModel, value: string): string {
+  cycleHint(group: CheckGroup, value: string): string {
     const st = this.state(group, value);
     return st === 'in' ? 'Included — click to exclude' : st === 'out' ? 'Excluded — click to clear' : 'Click to include';
   }
   // click cycle: off → include → exclude → off
-  cycle(group: keyof FilterModel, value: string): void {
+  cycle(group: CheckGroup, value: string): void {
     const f = this.store.filter();
-    const g = group as CheckGroup;
-    const inc = f[g] as string[];
-    const exc = f.exclude[g] ?? [];
+    const inc = f[group] as string[];
+    const exc = f.exclude[group] ?? [];
     const st = this.state(group, value);
     const nextInc = st === null ? [...inc, value] : inc.filter((v) => v !== value);
     const nextExc = st === 'in' ? [...exc, value] : exc.filter((v) => v !== value);
-    const patch = { [g]: nextInc, exclude: { ...f.exclude, [g]: nextExc } } as Partial<FilterModel>;
-    if (g === 'events' && !nextInc.length && !nextExc.length) patch.eventStatus = 'attended';
-    if (g === 'queues' && !nextInc.length && !nextExc.length) patch.queueStatus = 'completed';
-    this.store.patchFilter(patch);
+    this.store.patchFilter({ [group]: nextInc, exclude: { ...f.exclude, [group]: nextExc } } as Partial<FilterModel>);
   }
 
-  get atc(): number | null {
-    return this.store.filter().atcCountMin;
+  // no clamping: an out-of-range number is flagged by the validation instead of silently changed
+  setNum(key: 'ageMin' | 'ageMax', value: string): void {
+    this.store.patchFilter({ [key]: num(value) });
   }
-  setNum(key: 'atcCountMin' | 'upCountMin' | 'cpmCountMin' | 'ageMin' | 'ageMax', value: string): void {
-    const n = value === '' ? null : Math.max(0, Number(value));
-    this.store.patchFilter({ [key]: n == null || Number.isNaN(n) ? null : n });
+  setCount(key: 'atcCount' | 'upCount' | 'cpmCount', condition: CountCondition): void {
+    this.store.patchFilter({ [key]: condition });
   }
   setQueueStatus(status: QueueStatus): void {
     this.store.patchFilter({ queueStatus: status });
@@ -3710,34 +4914,30 @@ export class FilterRailComponent {
     this.store.patchFilter({ eventStatus: status });
   }
 
-  // date ranges
-  dateVal(group: 'subscriptionStart' | 'subscriptionEnd', edge: 'start' | 'end'): string {
-    const v = this.store.filter()[group][edge];
-    return v ? v.substring(0, 10) : '';
+  // subscription dates: the filter keeps the picker's dates as local yyyy-mm-dd days
+  setRelation(relation: SubscriptionRelation): void {
+    this.store.patchFilter({ subscription: { ...this.subscription(), relation } });
   }
-  setDate(group: 'subscriptionStart' | 'subscriptionEnd', edge: 'start' | 'end', value: string): void {
-    const cur = this.store.filter()[group];
-    this.store.patchFilter({ [group]: { ...cur, [edge]: value ? new Date(value).toISOString() : null } });
+  setDate(edge: 'from' | 'to', value: Date | null): void {
+    this.store.patchFilter({ subscription: { ...this.subscription(), [edge]: dayKey(value) } });
+  }
+  clearDates(): void {
+    this.store.patchFilter({ subscription: { ...this.subscription(), from: null, to: null } });
   }
 
   // product activity rules
-  rules(kind: 'consumed' | 'unconsumed'): ProductCountRule[] {
-    return this.store.filter()[kind];
-  }
-  addRule(kind: 'consumed' | 'unconsumed'): void {
+  addRule(kind: RuleKind): void {
     const first = this.products()[0]?.id ?? '';
-    this.store.patchFilter({ [kind]: [...this.rules(kind), { productId: first, comparison: 'gte', count: 1 }] });
+    this.store.patchFilter({ [kind]: [...this.store.filter()[kind], { productId: first, comparison: 'atLeast', count: 1, count2: null }] });
   }
-  updateRule(kind: 'consumed' | 'unconsumed', index: number, patch: Partial<ProductCountRule>): void {
-    const next = this.rules(kind).map((r, i) => (i === index ? { ...r, ...patch } : r));
-    this.store.patchFilter({ [kind]: next });
+  updateRule(kind: RuleKind, index: number, patch: Partial<ProductCountRule>): void {
+    this.store.patchFilter({ [kind]: this.store.filter()[kind].map((r, i) => (i === index ? { ...r, ...patch } : r)) });
   }
-  removeRule(kind: 'consumed' | 'unconsumed', index: number): void {
-    this.store.patchFilter({ [kind]: this.rules(kind).filter((_, i) => i !== index) });
+  setRuleCondition(kind: RuleKind, index: number, c: CountCondition): void {
+    this.updateRule(kind, index, { comparison: c.op, count: c.a, count2: c.b });
   }
-
-  asNum(v: string): number {
-    return Math.max(0, Number(v) || 0);
+  removeRule(kind: RuleKind, index: number): void {
+    this.store.patchFilter({ [kind]: this.store.filter()[kind].filter((_, i) => i !== index) });
   }
 }
 
@@ -3749,23 +4949,40 @@ export class FilterRailComponent {
   selector: 'app-active-filter-chips',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (store.chips().length || store.activeSignal()) {
+    @if (store.chips().length || store.activeSignal() || membershipAudience()) {
       <div class="bar">
         @if (store.activeSignal(); as sig) {
           <button class="chip signal" (click)="store.clearSignal()">
             <span class="material-symbols-rounded lead-ic">insights</span>
-            <span class="txt">{{ sig.label }}</span>
+            <span class="txt">{{ sig.chipLabel ?? sig.label }}</span>
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        }
+        @if (membershipAudience(); as aud) {
+          <!-- removing the loaded list / segment keeps the filters applied on top of it -->
+          <button
+            data-testid="pi-chip-audience"
+            class="chip audience"
+            [title]="'Remove the ' + aud.kind.toLowerCase() + ' and keep the other filters'"
+            (click)="store.removeAudience()"
+          >
+            <span class="material-symbols-rounded lead-ic">groups</span>
+            <span class="txt">{{ aud.kind }}: {{ aud.name }}</span>
             <span class="material-symbols-rounded">close</span>
           </button>
         }
         @if (store.chips().length) {
           <span class="lead">Filters</span>
-          @for (chip of store.chips(); track chip.label) {
+          <!-- tracked by what the chip removes: two labels can match (e.g. two product rules alike) -->
+          @for (chip of store.chips(); track chip.group + '|' + chip.value + (chip.exclude ? '|x' : '')) {
             <button class="chip" [class.exclude]="chip.exclude" (click)="store.removeChip(chip)">
               <span class="txt">{{ chip.label }}</span>
               <span class="material-symbols-rounded">close</span>
             </button>
           }
+          <button data-testid="pi-chips-save-filter" class="save" (click)="save.emit()">
+            <span class="material-symbols-rounded">bookmark_add</span> Save filter
+          </button>
         }
         <button class="clear" (click)="store.clearFilter()">Clear all</button>
       </div>
@@ -3828,7 +5045,39 @@ export class FilterRailComponent {
       color: var(--pi-status-banned);
       background: var(--pi-status-banned-bg);
     }
-    .chip.signal .lead-ic {
+    .chip.signal .lead-ic,
+    .chip.audience .lead-ic {
+      font-size: 16px;
+    }
+    .chip.audience {
+      border-color: var(--pi-accent);
+      color: var(--pi-accent-text);
+      font-weight: 600;
+    }
+    .chip.audience:hover {
+      border-color: var(--pi-status-banned);
+      color: var(--pi-status-banned);
+      background: var(--pi-status-banned-bg);
+    }
+    .save {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 4px;
+      border: 1px solid var(--pi-accent);
+      border-radius: 999px;
+      background: var(--pi-surface);
+      color: var(--pi-accent-text);
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 3px 10px 3px 8px;
+      cursor: pointer;
+    }
+    .save:hover {
+      background: var(--pi-accent-bg);
+    }
+    .save .material-symbols-rounded {
       font-size: 16px;
     }
     .clear {
@@ -3849,6 +5098,11 @@ export class FilterRailComponent {
 })
 export class ActiveFilterChipsComponent {
   readonly store = inject(ParticipantStore);
+  readonly save = output<void>();
+
+  // Only a list / segment gets a chip. A saved filter's conditions are already chips of their own
+  // (the switcher and the rail name it), so removing it would change no rows.
+  readonly membershipAudience = computed(() => (this.store.activeAudience()?.kind === 'filter' ? null : this.store.audienceLabel()));
 }
 
 // ================================================================================================
@@ -3860,11 +5114,24 @@ export class ActiveFilterChipsComponent {
   imports: [MatMenuModule, MatTooltipModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <button class="trigger" [matMenuTriggerFor]="menu">
+    <button data-testid="pi-aud-trigger" class="trigger" [matMenuTriggerFor]="menu" [title]="triggerTitle()">
       <span class="material-symbols-rounded lead">groups</span>
-      <span class="label">{{ activeName() }}</span>
+      @if (store.audienceLabel(); as aud) {
+        <span class="label"><span class="kind">{{ aud.kind }}</span> {{ aud.name }}</span>
+        @if (aud.refinement) {
+          <span class="refine" [class.mod]="aud.refinement === 'modified'">· {{ aud.refinement }}</span>
+        }
+      } @else {
+        <span class="label">All participants</span>
+      }
       <span class="material-symbols-rounded chev">expand_more</span>
     </button>
+    @if (store.audienceModified()) {
+      <button data-testid="pi-aud-update" class="update" matTooltip="Save the current filters into this saved filter" (click)="updateSavedFilter()">
+        <span class="material-symbols-rounded">save_as</span>
+        <span class="lbl">Update saved filter</span>
+      </button>
+    }
 
     <mat-menu #menu="matMenu" class="aud-menu" xPosition="before" (closed)="query.set('')">
       <div class="menu-top" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
@@ -3903,13 +5170,19 @@ export class ActiveFilterChipsComponent {
         </div>
       }
       <div class="menu-foot">
-        <button mat-menu-item (click)="manage.emit()">
+        <button mat-menu-item (click)="manage.emit(tab())">
           <span class="material-symbols-rounded">tune</span> Manage audiences
         </button>
       </div>
     </mat-menu>
   `,
   styles: `
+    :host {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
     .trigger {
       display: inline-flex;
       align-items: center;
@@ -3924,7 +5197,8 @@ export class ActiveFilterChipsComponent {
       font-weight: 600;
       color: var(--pi-text);
       cursor: pointer;
-      max-width: 280px;
+      min-width: 0;
+      max-width: 340px;
     }
     .trigger:hover {
       border-color: var(--pi-accent);
@@ -3937,11 +5211,65 @@ export class ActiveFilterChipsComponent {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .kind {
+      font-weight: 500;
+      color: var(--pi-text-2);
+    }
+    /* the refinement never truncates; the name gives way instead */
+    .refine {
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--pi-accent-text);
+    }
+    .refine.mod {
+      color: var(--pi-status-late);
     }
     .chev {
       font-size: 19px;
       color: var(--pi-text-3);
       margin-left: auto;
+    }
+    .update {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--pi-accent);
+      border-radius: var(--pi-radius);
+      background: var(--pi-accent-bg);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--pi-accent-text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .update:hover {
+      background: var(--pi-accent);
+      color: #fff;
+    }
+    .update .material-symbols-rounded {
+      font-size: 18px;
+    }
+    /* narrow: the name keeps the room (the full label stays in the tooltip) */
+    @media (max-width: 1200px) {
+      .trigger {
+        max-width: 240px;
+      }
+      .kind {
+        display: none;
+      }
+      .update {
+        padding: 0 10px;
+      }
+      .update .lbl {
+        display: none;
+      }
     }
     .menu-top {
       padding: 10px 12px 8px;
@@ -4052,22 +5380,24 @@ export class ActiveFilterChipsComponent {
 })
 export class AudienceSwitcherComponent {
   readonly store = inject(ParticipantStore);
+  private readonly snack = inject(MatSnackBar);
 
-  readonly manage = output();
+  // emits the open tab, so Manage audiences opens on the same kind
+  readonly manage = output<AudienceKind>();
 
+  // Saved filters live in the filter rail's own block; this dropdown holds lists and segments.
   readonly kinds: { key: AudienceKind; label: string; icon: string }[] = [
-    { key: 'filter', label: 'Saved filters', icon: 'filter_alt' },
     { key: 'list', label: 'Lists', icon: 'format_list_bulleted' },
     { key: 'segment', label: 'Segments', icon: 'donut_small' },
   ];
 
-  readonly tab = signal<AudienceKind>('filter');
+  readonly tab = signal<AudienceKind>('list');
   readonly query = signal('');
 
-  readonly activeName = computed(() => {
-    const id = this.store.activeAudienceId();
-    if (!id) return 'All participants';
-    return this.store.audiences().find((a) => a.id === id)?.name ?? 'All participants';
+  readonly triggerTitle = computed(() => {
+    const aud = this.store.audienceLabel();
+    if (!aud) return 'All participants';
+    return `${aud.kind}: ${aud.name}${aud.refinement ? ` · ${aud.refinement}` : ''}`;
   });
 
   readonly tabLabel = computed(() => this.kinds.find((k) => k.key === this.tab())?.label ?? '');
@@ -4080,6 +5410,13 @@ export class AudienceSwitcherComponent {
   byKind(kind: AudienceKind): Audience[] {
     return this.store.audiences().filter((a) => a.kind === kind);
   }
+
+  updateSavedFilter(): void {
+    const aud = this.store.activeAudience();
+    if (aud?.kind !== 'filter') return;
+    this.store.updateAudienceFilter(aud.id);
+    this.snack.open(`Updated "${aud.name}" with the current filters`, 'Dismiss', { duration: 3000 });
+  }
 }
 
 // ================================================================================================
@@ -4088,9 +5425,15 @@ export class AudienceSwitcherComponent {
 
 export type SortDir = 'asc' | 'desc' | null;
 
+// A–Z for labels: case-insensitive, numbers inside names in numeric order
+const LABEL_ORDER = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
+// Columns that show the last subscription's dates for non active / discontinued participants
+const LAST_SUBSCRIPTION_KEYS = new Set(['subscriptionstart', 'subscriptionend']);
+
 @Component({
   selector: 'app-participant-table',
-  imports: [MatTooltipModule],
+  imports: [DecimalPipe, MatTooltipModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (store.loading()) {
@@ -4118,7 +5461,7 @@ export type SortDir = 'asc' | 'desc' | null;
         <p>Try removing a filter chip above, or reset to see the full base.</p>
       </div>
     } @else {
-      <div class="table-scroll">
+      <div class="table-scroll" #scroller>
         <div class="table-inner" [style.min-width.px]="minWidth()">
           <div class="thead" [style.grid-template-columns]="gridTemplate()">
             <div
@@ -4147,15 +5490,15 @@ export type SortDir = 'asc' | 'desc' | null;
                 (click)="toggleSort(def.key)"
               >
                 <span class="th-label">{{ def.label }}</span>
-                @if (sortKey() === def.key && sortDir()) {
-                  <span class="material-symbols-rounded sort">{{ sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+                @if (sortKey() === def.key && sortDir(); as dir) {
+                  <span class="material-symbols-rounded sort" [matTooltip]="sortBasis(def, dir)">{{ dir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
                 }
               </div>
             }
           </div>
 
           <div class="tbody">
-            @for (p of rows(); track p.profileid) {
+            @for (p of pageRows(); track p.profileid) {
             <div
               class="tr"
               [class.selected]="store.isSelected(p.profileid)"
@@ -4188,7 +5531,7 @@ export type SortDir = 'asc' | 'desc' | null;
                     <span class="avatar">{{ initials(p) }}</span>
                     <span class="name-block">
                       <span class="name" (click)="openProfile(p, $event)">{{ p.name }}</span>
-                      <span class="email">{{ p.email }}</span>
+                      <span class="email" [title]="p.email">{{ p.email }}</span>
                     </span>
                     <span class="disc material-symbols-rounded" matTooltip="Open profile" (click)="openProfile(p, $event)">chevron_right</span>
                   }
@@ -4231,11 +5574,11 @@ export type SortDir = 'asc' | 'desc' | null;
                       <span class="muted">—</span>
                     } @else {
                       <span class="chips">
-                        @for (v of arrayValues(p, def).slice(0, 2); track v) {
+                        @for (v of arrayValues(p, def).slice(0, 3); track v) {
                           <span class="chip tag">{{ v }}</span>
                         }
-                        @if (arrayValues(p, def).length > 2) {
-                          <span class="chip tag more" [matTooltip]="arrayValues(p, def).join(', ')">+{{ arrayValues(p, def).length - 2 }}</span>
+                        @if (arrayValues(p, def).length > 3) {
+                          <span class="chip tag more" [matTooltip]="arrayValues(p, def).join(', ')">+{{ arrayValues(p, def).length - 3 }}</span>
                         }
                       </span>
                     }
@@ -4252,6 +5595,16 @@ export type SortDir = 'asc' | 'desc' | null;
                     }
                   }
 
+                  @case ('date') {
+                    @if (isLastSubscriptionDate(p, def)) {
+                      <span class="last-sub" matTooltip="Last subscription (not currently subscribed)">
+                        {{ cellText(p, def) }} <span class="last-tag">· last</span>
+                      </span>
+                    } @else {
+                      <span [class.muted]="cellText(p, def) === '—'">{{ cellText(p, def) }}</span>
+                    }
+                  }
+
                   @default {
                     <span [class.muted]="cellText(p, def) === '—'">{{ cellText(p, def) }}</span>
                   }
@@ -4263,6 +5616,34 @@ export type SortDir = 'asc' | 'desc' | null;
           </div>
         </div>
       </div>
+
+      <!-- pager: only one page of rows is drawn; filters, sort and select-all cover every filtered row -->
+      <div class="pager">
+        <span class="range">{{ rangeStart() | number }}–{{ rangeEnd() | number }} of {{ rows().length | number }}</span>
+        <label class="size">
+          Rows per page
+          <select data-testid="pi-page-size" (change)="setPageSize($any($event.target).value)">
+            @for (n of pageSizes; track n) {
+              <option [value]="n" [selected]="n === pageSize()">{{ n }}</option>
+            }
+          </select>
+        </label>
+        <div class="nav">
+          <button data-testid="pi-page-first" [disabled]="pageIndex() === 0" (click)="goTo(0)" aria-label="First page">
+            <span class="material-symbols-rounded">first_page</span>
+          </button>
+          <button data-testid="pi-page-prev" [disabled]="pageIndex() === 0" (click)="goTo(pageIndex() - 1)" aria-label="Previous page">
+            <span class="material-symbols-rounded">chevron_left</span>
+          </button>
+          <span class="page-no">Page {{ pageIndex() + 1 }} of {{ pageCount() }}</span>
+          <button data-testid="pi-page-next" [disabled]="pageIndex() >= pageCount() - 1" (click)="goTo(pageIndex() + 1)" aria-label="Next page">
+            <span class="material-symbols-rounded">chevron_right</span>
+          </button>
+          <button data-testid="pi-page-last" [disabled]="pageIndex() >= pageCount() - 1" (click)="goTo(pageCount() - 1)" aria-label="Last page">
+            <span class="material-symbols-rounded">last_page</span>
+          </button>
+        </div>
+      </div>
     }
   `,
   styles: `
@@ -4272,6 +5653,68 @@ export type SortDir = 'asc' | 'desc' | null;
       height: 100%;
       min-height: 0;
       background: var(--pi-surface);
+    }
+
+    /* wraps rather than widening the frame on a narrow screen; only the rows scroll sideways */
+    .pager {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 18px;
+      padding: 8px 14px;
+      border-top: 1px solid var(--pi-border);
+      background: var(--pi-surface-2);
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+    }
+    .pager .range {
+      font-variant-numeric: tabular-nums;
+      color: var(--pi-text);
+      font-weight: 500;
+    }
+    .pager .size {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .pager select {
+      font-family: inherit;
+      font-size: 12.5px;
+      border: 1px solid var(--pi-border-strong);
+      border-radius: 6px;
+      padding: 3px 6px;
+      background: #fff;
+    }
+    .pager .nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .pager .nav button {
+      border: none;
+      background: none;
+      color: var(--pi-text-2);
+      cursor: pointer;
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 6px;
+    }
+    .pager .nav button:hover:not(:disabled) {
+      background: var(--pi-surface-3);
+      color: var(--pi-text);
+    }
+    .pager .nav button:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .pager .nav .material-symbols-rounded {
+      font-size: 20px;
+    }
+    .pager .page-no {
+      padding: 0 6px;
+      font-variant-numeric: tabular-nums;
     }
 
     .table-scroll {
@@ -4354,7 +5797,7 @@ export type SortDir = 'asc' | 'desc' | null;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 14px;
+      padding: 6px 10px;
       font-size: 13px;
       color: var(--pi-text);
       min-width: 0;
@@ -4369,9 +5812,8 @@ export type SortDir = 'asc' | 'desc' | null;
     }
     .pline {
       font-size: 12.5px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
     }
     .pmore {
       font-size: 11.5px;
@@ -4388,6 +5830,15 @@ export type SortDir = 'asc' | 'desc' | null;
       padding: 0;
     }
     .muted {
+      color: var(--pi-text-3);
+    }
+    .last-sub {
+      white-space: nowrap;
+      color: var(--pi-text-2);
+    }
+    .last-tag {
+      font-size: 11.5px;
+      font-weight: 600;
       color: var(--pi-text-3);
     }
 
@@ -4544,7 +5995,8 @@ export type SortDir = 'asc' | 'desc' | null;
     /* chips */
     .chips {
       display: flex;
-      gap: 5px;
+      flex-wrap: wrap;
+      gap: 4px;
       align-items: center;
       min-width: 0;
     }
@@ -4555,10 +6007,8 @@ export type SortDir = 'asc' | 'desc' | null;
       border-radius: 6px;
       background: var(--pi-surface-3);
       color: var(--pi-text-2);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 120px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
     }
     .chip.more {
       background: #e7ebef;
@@ -4675,11 +6125,23 @@ export class ParticipantTableComponent {
     this.store.displayedColumns().filter((k) => k !== 'select').map((k) => COLUMN_DEF_MAP[k])
   );
 
+  // Width per column, sized to its content. Rows are separate grids, so widths must be fixed to
+  // keep columns aligned; only the last column stretches to take up spare space.
   private colWidth(c: string): number {
     if (c === 'select') return 44;
-    if (c === 'name') return 240;
-    if (c === 'atccount') return 110;
-    return 150;
+    if (c === 'name') return 250;
+    const def = COLUMN_DEF_MAP[c];
+    if (!def) return 150;
+    if (def.resolve === 'product' || def.resolve === 'playlist') return 280;
+    if (def.type === 'tags') return 230;
+    if (def.type === 'number') return 96;
+    if (def.type === 'money') return 120;
+    if (LAST_SUBSCRIPTION_KEYS.has(c)) return 150; // room for "<date> · last"
+    if (def.type === 'date') return 124;
+    if (def.type === 'status') return 132;
+    if (def.type === 'remarks') return 96;
+    if (c === 'email') return 230;
+    return 160;
   }
 
   // Frozen (sticky-left) columns = the select column + any pinned columns, taken contiguously
@@ -4688,6 +6150,7 @@ export class ParticipantTableComponent {
     const cols = this.store.displayedColumns();
     const pin = this.store.pinned();
     const map: Record<string, number> = {};
+    if (!pin.size) return map; // nothing pinned: the checkbox column scrolls with the rest too
     let left = 0;
     for (const c of cols) {
       if (c !== 'select' && !pin.has(c)) break;
@@ -4719,32 +6182,61 @@ export class ParticipantTableComponent {
     const cols = this.store.displayedColumns();
     const frozen = this.frozenLefts();
     return cols
-      .map((c) => {
-        if (c in frozen) return `${this.colWidth(c)}px`;
-        if (c === 'name') return 'minmax(240px, 1.4fr)';
-        if (c === 'atccount') return '110px';
-        return 'minmax(150px, 1fr)';
-      })
+      .map((c, i) => (i === cols.length - 1 && !(c in frozen) ? `minmax(${this.colWidth(c)}px, 1fr)` : `${this.colWidth(c)}px`))
       .join(' ');
   });
 
   readonly minWidth = computed(() => this.store.displayedColumns().reduce((w, c) => w + this.colWidth(c), 0));
 
+  // sort value computed once per row, not on every comparison; blanks go last in both directions
   readonly rows = computed<Participant[]>(() => {
-    const data = [...this.store.filtered()];
-    const key = this.sortKey();
+    const data = this.store.filtered();
+    const def = COLUMN_DEF_MAP[this.sortKey()];
     const dir = this.sortDir();
-    if (!dir) return data;
-    const def = COLUMN_DEF_MAP[key];
-    data.sort((a, b) => {
-      const av = this.sortValue(a, key, def);
-      const bv = this.sortValue(b, key, def);
-      if (av < bv) return dir === 'asc' ? -1 : 1;
-      if (av > bv) return dir === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return data;
+    if (!dir || !def) return data;
+    const sign = dir === 'asc' ? 1 : -1;
+    return data
+      .map((p) => ({ p, v: this.sortValue(p, def) }))
+      .sort((a, b) => {
+        if (a.v == null || b.v == null) return a.v == null ? (b.v == null ? 0 : 1) : -1;
+        const c = typeof a.v === 'number' && typeof b.v === 'number' ? a.v - b.v : LABEL_ORDER.compare(String(a.v), String(b.v));
+        return c * sign;
+      })
+      .map((x) => x.p);
   });
+
+  // ---- pagination ----
+  readonly pageSizes = [25, 50, 100, 200];
+  readonly pageSize = signal(50);
+  readonly pageIndex = signal(0);
+  private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+
+  readonly pageCount = computed(() => Math.max(1, Math.ceil(this.rows().length / this.pageSize())));
+  readonly pageRows = computed(() => {
+    const start = this.pageIndex() * this.pageSize();
+    return this.rows().slice(start, start + this.pageSize());
+  });
+  readonly rangeStart = computed(() => (this.rows().length ? this.pageIndex() * this.pageSize() + 1 : 0));
+  readonly rangeEnd = computed(() => Math.min(this.rows().length, (this.pageIndex() + 1) * this.pageSize()));
+
+  constructor() {
+    // back to page 1 whenever the filtered / sorted rows change
+    effect(() => {
+      this.rows();
+      untracked(() => this.goTo(0));
+    });
+  }
+
+  goTo(index: number): void {
+    this.pageIndex.set(Math.min(Math.max(0, index), this.pageCount() - 1));
+    const el = this.scroller()?.nativeElement;
+    if (el) el.scrollTop = 0;
+  }
+
+  setPageSize(value: string): void {
+    this.pageSize.set(Number(value) || 50);
+    this.goTo(0);
+  }
 
   toggleSort(key: string): void {
     if (this.sortKey() !== key) {
@@ -4756,12 +6248,63 @@ export class ParticipantTableComponent {
     this.sortDir.set(cur === 'asc' ? 'desc' : cur === 'desc' ? null : 'asc');
   }
 
-  private sortValue(p: Participant, key: string, def: ColumnDef): string | number {
-    const raw = (p as unknown as Record<string, unknown>)[key];
-    if (def?.type === 'number' || def?.type === 'money') return (raw as number) ?? -1;
-    if (def?.type === 'date') return raw ? new Date(raw as string).getTime() : 0;
-    if (Array.isArray(raw)) return raw.length;
-    return this.cellText(p, def).toLowerCase();
+  // What a column sorts by (null = blank): numbers / money / dates by value, remarks by count, lists by
+  // the first item shown (products in their shown order, most held first), everything else by its label.
+  private sortValue(p: Participant, def: ColumnDef): string | number | null {
+    const raw = (p as unknown as Record<string, unknown>)[def.key];
+    switch (def.type) {
+      case 'number':
+      case 'money':
+        return raw == null ? null : Number(raw);
+      case 'date': {
+        // a stored date that doesn't parse is a blank, so it sorts last instead of breaking the order
+        const t = raw ? new Date(raw as string).getTime() : NaN;
+        return Number.isNaN(t) ? null : t;
+      }
+      case 'remarks':
+        return p.remarks.length || null;
+      case 'array':
+      case 'tags':
+        return (def.resolve === 'product' ? this.productLines(p, def)[0]?.name : this.arrayValues(p, def)[0]) ?? null;
+      case 'status':
+        return this.statusValue(p, def.key) === 'none' ? null : this.statusLabel(p, def.key);
+      default: {
+        const text = this.cellText(p, def);
+        return text === '—' || text === '' ? null : text;
+      }
+    }
+  }
+
+  // Header tooltip naming what the sorted column is ordered by, in the current direction.
+  sortBasis(def: ColumnDef, dir: 'asc' | 'desc'): string {
+    const asc = dir === 'asc';
+    const az = asc ? 'A–Z' : 'Z–A';
+    const item: Record<string, string> = { product: 'product (most held first)', tag: 'tag', tier: 'tier', playlist: 'playlist' };
+    let basis: string;
+    switch (def.type) {
+      case 'number':
+      case 'money':
+        basis = `by value, ${asc ? 'lowest' : 'highest'} first`;
+        break;
+      case 'date':
+        basis = `by date, ${asc ? 'oldest' : 'newest'} first`;
+        break;
+      case 'remarks':
+        basis = `by number of remarks, ${asc ? 'fewest' : 'most'} first`;
+        break;
+      case 'array':
+      case 'tags':
+        basis = `by the first ${item[def.resolve ?? ''] ?? 'item'} shown, ${az}`;
+        break;
+      default:
+        basis = az;
+    }
+    return `Sorted ${basis}; blanks last`;
+  }
+
+  // Subscription start / end cells holding the last (not the current) subscription's date
+  isLastSubscriptionDate(p: Participant, def: ColumnDef): boolean {
+    return p.isLastSubscription && LAST_SUBSCRIPTION_KEYS.has(def.key) && !!(p as unknown as Record<string, unknown>)[def.key];
   }
 
   private resolve(resolve: ColumnDef['resolve'], id: string): string {
@@ -5159,7 +6702,7 @@ export class BulkActionBarComponent {
       <span class="lbl">Columns</span>
     </button>
 
-    <mat-menu #menu="matMenu" class="col-menu">
+    <mat-menu #menu="matMenu" class="col-menu" (closed)="query.set('')">
       <div class="head" (click)="$event.stopPropagation()">
         <span>Visible columns</span>
         <button class="reset" (click)="store.resetColumns()">Reset</button>
@@ -5185,13 +6728,21 @@ export class BulkActionBarComponent {
           </div>
         }
       </div>
-      @if (available().length) {
+      @if (store.availableColumns().length) {
         <div class="head sub" (click)="$event.stopPropagation()">Add column</div>
+        <!-- keys stay in the input (the menu's typeahead would move focus), except Escape, which closes the
+             menu; clicks never reach the menu panel, so it stays open while several columns are added -->
+        <div class="col-search" (click)="$event.stopPropagation()" (keydown)="$event.key !== 'Escape' && $event.stopPropagation()">
+          <span class="material-symbols-rounded">search</span>
+          <input data-testid="pi-col-search" type="text" placeholder="Search columns…" [value]="query()" (input)="query.set($any($event.target).value)" />
+        </div>
         <div class="add-list" (click)="$event.stopPropagation()">
           @for (def of available(); track def.key) {
             <button class="add" (click)="store.addColumn(def.key)">
               <span class="material-symbols-rounded">add</span>{{ def.label }}
             </button>
+          } @empty {
+            <div class="none">No columns match “{{ query() }}”.</div>
           }
         </div>
       }
@@ -5316,11 +6867,52 @@ export class BulkActionBarComponent {
     .add .material-symbols-rounded {
       font-size: 16px;
     }
+    .col-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      margin: 2px 16px 6px;
+      padding: 0 9px;
+      background: var(--pi-surface-3);
+      border-radius: var(--pi-radius-sm);
+    }
+    .col-search .material-symbols-rounded {
+      font-size: 17px;
+      color: var(--pi-text-3);
+    }
+    .col-search input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      background: none;
+      outline: none;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .none {
+      padding: 8px;
+      font-size: 12.5px;
+      color: var(--pi-text-3);
+    }
+    @media (max-width: 1200px) {
+      .tbtn {
+        padding: 0 10px;
+      }
+      .tbtn .lbl {
+        display: none;
+      }
+    }
   `,
 })
 export class ColumnConfigComponent {
   readonly store = inject(ParticipantStore);
-  readonly available = computed(() => this.store.availableColumns());
+  readonly query = signal('');
+  readonly available = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const all = this.store.availableColumns();
+    return q ? all.filter((c) => c.label.toLowerCase().includes(q)) : all;
+  });
 
   label(key: string): string {
     return COLUMN_DEF_MAP[key]?.label ?? key;
@@ -5336,6 +6928,7 @@ export class ColumnConfigComponent {
   imports: [DecimalPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <div class="wrap">
     <div class="panel">
       @for (cat of categories; track cat.key) {
         <div class="cat">
@@ -5358,15 +6951,40 @@ export class ColumnConfigComponent {
         </div>
       }
     </div>
+    <button data-testid="pi-insights-minimize" class="min" title="Minimise insights" (click)="minimize.emit()">
+      <span class="material-symbols-rounded">expand_less</span>
+    </button>
+    </div>
   `,
   styles: `
+    .wrap {
+      display: flex;
+      background: var(--pi-surface-2);
+      border-bottom: 1px solid var(--pi-border);
+    }
     .panel {
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       gap: 22px;
       padding: 14px 18px;
       overflow-x: auto;
-      background: var(--pi-surface-2);
-      border-bottom: 1px solid var(--pi-border);
+    }
+    .min {
+      flex-shrink: 0;
+      align-self: flex-start;
+      margin: 10px 10px 0 0;
+      border: none;
+      background: none;
+      color: var(--pi-text-3);
+      cursor: pointer;
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 6px;
+    }
+    .min:hover {
+      background: var(--pi-surface-3);
+      color: var(--pi-text);
     }
     .cat {
       display: flex;
@@ -5444,6 +7062,7 @@ export class ColumnConfigComponent {
 })
 export class SignalsPanelComponent {
   readonly store = inject(ParticipantStore);
+  readonly minimize = output<void>();
   // categories with no cards (e.g. Financial) are hidden
   readonly categories = SIGNAL_CATEGORIES.filter((c) => SIGNALS.some((s) => s.category === c.key));
 
@@ -5452,224 +7071,6 @@ export class SignalsPanelComponent {
   }
   count(id: string): number {
     return this.store.signalCounts()[id] ?? 0;
-  }
-}
-
-// ================================================================================================
-// Communications analytics panel
-// ================================================================================================
-
-@Component({
-  selector: 'app-comms-analytics-panel',
-  imports: [DecimalPipe],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="comms" (click)="$event.stopPropagation()">
-      <div class="head">
-        <span class="material-symbols-rounded">campaign</span>
-        <span>Communications analytics</span>
-      </div>
-
-      @if (!store.commsAnalytics()) {
-        <div class="loading">Loading analytics…</div>
-      } @else {
-        @for (ch of channels; track ch.key) {
-          <div class="channel">
-            <div class="ch-head">
-              <span class="ch-ic material-symbols-rounded">{{ ch.icon }}</span>
-              <span class="ch-name">{{ ch.label }}</span>
-              <span class="ch-total">{{ stats(ch.key).total | number }}</span>
-            </div>
-            <div class="stats">
-              <span class="stat sent"><b>{{ stats(ch.key).sent | number }}</b> sent</span>
-              <span class="stat queued"><b>{{ stats(ch.key).queued | number }}</b> queued</span>
-              <span class="stat failed"><b>{{ stats(ch.key).failed | number }}</b> failed</span>
-            </div>
-            @if (stats(ch.key).recent.length) {
-              <div class="recent">
-                @for (c of stats(ch.key).recent; track $index) {
-                  <div class="row">
-                    <span class="r-name" [title]="c.name">{{ c.name }}</span>
-                    <span class="r-meta">
-                      <span class="r-recip">{{ c.recipients | number }}</span>
-                      <span class="r-status tone-{{ tone(c.status) }}">{{ c.status }}</span>
-                      <span class="r-date">{{ fmtDate(c.date) }}</span>
-                    </span>
-                  </div>
-                }
-              </div>
-            } @else {
-              <div class="empty">No recent campaigns</div>
-            }
-          </div>
-        }
-      }
-    </div>
-  `,
-  styles: `
-    .comms {
-      width: 380px;
-      max-height: 70vh;
-      overflow-y: auto;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
-    }
-    .head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--pi-text);
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid var(--pi-border);
-      position: sticky;
-      top: 0;
-      background: var(--pi-surface);
-    }
-    .head .material-symbols-rounded {
-      font-size: 19px;
-      color: var(--pi-accent);
-    }
-    .loading,
-    .empty {
-      padding: 14px 16px;
-      font-size: 12.5px;
-      color: var(--pi-text-3);
-    }
-    .channel {
-      padding: 12px 16px;
-      border-bottom: 1px solid #eef1f4;
-    }
-    .ch-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .ch-ic {
-      font-size: 18px;
-      color: var(--pi-text-2);
-    }
-    .ch-name {
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--pi-text);
-    }
-    .ch-total {
-      margin-left: auto;
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--pi-text);
-      font-variant-numeric: tabular-nums;
-    }
-    .stats {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 10px;
-    }
-    .stat {
-      font-size: 12px;
-      color: var(--pi-text-2);
-    }
-    .stat b {
-      font-size: 13px;
-      font-variant-numeric: tabular-nums;
-    }
-    .stat.sent b {
-      color: var(--pi-status-active);
-    }
-    .stat.queued b {
-      color: var(--pi-status-late);
-    }
-    .stat.failed b {
-      color: var(--pi-status-banned);
-    }
-    .recent {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 0;
-    }
-    .r-name {
-      flex: 1;
-      font-size: 12.5px;
-      color: var(--pi-text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .r-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .r-recip {
-      font-size: 11.5px;
-      color: var(--pi-text-3);
-      font-variant-numeric: tabular-nums;
-    }
-    .r-status {
-      font-size: 10.5px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 999px;
-      text-transform: capitalize;
-    }
-    .r-date {
-      font-size: 11px;
-      color: var(--pi-text-3);
-      width: 52px;
-      text-align: right;
-    }
-    .tone-active {
-      color: var(--pi-status-active);
-      background: var(--pi-status-active-bg);
-    }
-    .tone-late {
-      color: var(--pi-status-late);
-      background: var(--pi-status-late-bg);
-    }
-    .tone-banned {
-      color: var(--pi-status-banned);
-      background: var(--pi-status-banned-bg);
-    }
-    .tone-none {
-      color: var(--pi-status-none);
-      background: var(--pi-status-none-bg);
-    }
-  `,
-})
-export class CommsAnalyticsPanelComponent {
-  readonly store = inject(ParticipantStore);
-
-  readonly channels: { key: CommsChannel; label: string; icon: string }[] = [
-    { key: 'email', label: 'Email', icon: 'mail' },
-    { key: 'whatsapp', label: 'WhatsApp', icon: 'chat' },
-    { key: 'notification', label: 'Notifications', icon: 'notifications' },
-  ];
-
-  stats(key: CommsChannel): CommsChannelStats {
-    const a = this.store.commsAnalytics();
-    return a ? a[key] : emptyChannelStats();
-  }
-
-  tone(status: string): string {
-    const s = status.toLowerCase();
-    if (['sent', 'created', 'validated', 'delivered', 'completed', 'success', 'approved'].includes(s)) return 'active';
-    if (s === 'queued' || s === 'scheduled' || s === 'pending') return 'late';
-    if (s === 'failed' || s === 'rejected' || s === 'error') return 'banned';
-    return 'none';
-  }
-
-  fmtDate(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   }
 }
 
@@ -5719,7 +7120,6 @@ function exportValue(p: Participant, def: ColumnDef, names: Record<string, Recor
     BulkActionBarComponent,
     ColumnConfigComponent,
     SignalsPanelComponent,
-    CommsAnalyticsPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './participant-intelligence.component.html',
@@ -5762,12 +7162,9 @@ export class ParticipantIntelligenceComponent implements OnInit {
     this.store.setSearch(v);
   }
 
-  toggleRail(): void {
-    this.railOpen.update((v) => !v);
-  }
-
-  toggleInsights(): void {
-    this.insightsOpen.update((v) => !v);
+  // Notification record screen in a new tab
+  openNotificationRecord(): void {
+    window.open('/notificationrecord', '_blank');
   }
 
   refresh(): void {
@@ -5780,11 +7177,11 @@ export class ParticipantIntelligenceComponent implements OnInit {
       .open(PromptDialogComponent, {
         ...this.dlg('440px'),
         data: {
-          title: 'Save as audience',
+          title: 'Save filter',
           subtitle: `${this.store.filteredCount()} participants match the current filter.`,
-          label: 'Audience name',
+          label: 'Filter name',
           placeholder: 'e.g. Active gold-tier renewals',
-          confirmText: 'Save audience',
+          confirmText: 'Save filter',
           icon: 'bookmark_add',
           validate: (v: string) => (this.store.nameTaken('filter', v) ? `A saved filter named “${v}” already exists.` : null),
         } as PromptData,
@@ -5793,13 +7190,14 @@ export class ParticipantIntelligenceComponent implements OnInit {
       .subscribe((name?: string) => {
         if (name) {
           this.store.saveCurrentAsAudience(name);
-          this.snack.open(`Saved audience "${name}"`, 'Dismiss', { duration: 3000 });
+          this.snack.open(`Saved filter "${name}"`, 'Dismiss', { duration: 3000 });
         }
       });
   }
 
-  openManageAudiences(): void {
-    this.dialog.open(ManageAudiencesDialogComponent, this.dlg('720px'));
+  // The rail's Saved filters block opens it on Saved filters; the audience dropdown on its own tab.
+  openManageAudiences(tab: AudienceKind = 'filter'): void {
+    this.dialog.open(ManageAudiencesDialogComponent, { ...this.dlg('720px'), data: { tab } as ManageAudiencesData });
   }
 
   // ---- bulk actions ----
@@ -6094,7 +7492,6 @@ export class ParticipantIntelligenceComponent implements OnInit {
         try {
           if (result.status === 'queued' || result.status === 'send') {
             await setDoc(doc(collection(this.firestore, 'email archive'), result.docid), result, { merge: true });
-            this.store.bumpQueued('email');
             this.snack.open(result.status === 'queued' ? `Email queued for ${n} participants` : `Email sent to ${n} participants`, 'Dismiss', { duration: 3000 });
           } else if (result.status === 'validated') {
             const url = `https://us-central1-${environment.firebase?.projectId}.cloudfunctions.net/sendBatchEmail`;
@@ -6128,7 +7525,6 @@ export class ParticipantIntelligenceComponent implements OnInit {
         if (!r) return;
         const n = this.store.selectedCount();
         if (r === 'queued') {
-          this.store.bumpQueued('whatsapp');
           this.snack.open(`WhatsApp queued for ${n} participants`, 'Dismiss', { duration: 3000 });
         } else if (r === 'failed' || r?.status === 'failed') {
           this.snack.open('Sending WhatsApp failed', 'Dismiss', { duration: 4000 });

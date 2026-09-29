@@ -2,16 +2,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="logo material-symbols-rounded">hub</span>
-      <div class="titles">
-        <h1>Participant Intelligence</h1>
-        <span class="sub">
-          @if (store.loading()) {
-            Loading participants…
-          } @else {
-            {{ store.filteredCount() | number }} of {{ store.totalCount() | number }} participants
-          }
-        </span>
-      </div>
+      <h1 class="title" title="Participant Intelligence">Participant Intelligence</h1>
     </div>
 
     <div class="search">
@@ -25,23 +16,7 @@
     </div>
 
     <div class="tools">
-      <app-audience-switcher (manage)="openManageAudiences()" />
-
-      <button class="tbtn" [class.active]="insightsOpen()" (click)="toggleInsights()" matTooltip="Toggle insights">
-        <span class="material-symbols-rounded">insights</span>
-        <span class="lbl">Insights</span>
-        @if (store.attentionCount()) {
-          <span class="pill warn">{{ store.attentionCount() | number }}</span>
-        }
-      </button>
-
-      <button class="tbtn" [class.active]="railOpen()" (click)="toggleRail()" matTooltip="Toggle filters">
-        <span class="material-symbols-rounded">filter_alt</span>
-        <span class="lbl">Filters</span>
-        @if (store.activeFilterCount()) {
-          <span class="pill">{{ store.activeFilterCount() }}</span>
-        }
-      </button>
+      <app-audience-switcher (manage)="openManageAudiences($event)" />
 
       <app-column-config />
 
@@ -57,11 +32,8 @@
 
       <span class="sep"></span>
 
-      <button class="iconbtn" matTooltip="Communications analytics" [matMenuTriggerFor]="commsMenu">
+      <button data-testid="pi-comms" class="iconbtn" matTooltip="Notification records (new tab)" (click)="openNotificationRecord()">
         <span class="material-symbols-rounded">campaign</span>
-        @if (store.queuedTotal()) {
-          <span class="badge">{{ store.queuedTotal() }}</span>
-        }
       </button>
       <button class="iconbtn" matTooltip="Refresh" (click)="refresh()">
         <span class="material-symbols-rounded">refresh</span>
@@ -72,14 +44,47 @@
   <div class="body">
     @if (railOpen()) {
       <aside class="rail">
-        <app-filter-rail (save)="saveAudience()" />
+        <app-filter-rail (save)="saveAudience()" (manage)="openManageAudiences()" (close)="railOpen.set(false)" />
       </aside>
+    } @else {
+      <!-- closed filter panel: a slim strip to reopen it -->
+      <button data-testid="pi-filter-open" class="rail-reopen" (click)="railOpen.set(true)" matTooltip="Open filters" matTooltipPosition="right">
+        <span class="material-symbols-rounded">left_panel_open</span>
+        <span class="rail-reopen-label">Filters</span>
+        @if (store.activeFilterCount()) {
+          <span class="pill">{{ store.activeFilterCount() }}</span>
+        }
+      </button>
     }
     <main class="main">
-      @if (insightsOpen() && !store.loading()) {
-        <app-signals-panel />
+      @if (!store.loading()) {
+        @if (insightsOpen()) {
+          <app-signals-panel (minimize)="insightsOpen.set(false)" />
+        } @else {
+          <button data-testid="pi-insights-expand" class="insights-bar" (click)="insightsOpen.set(true)">
+            <span class="material-symbols-rounded">insights</span>
+            <span>Insights</span>
+            @if (store.attentionCount()) {
+              <span class="pill warn">{{ store.attentionCount() | number }} need attention</span>
+            }
+            <span class="material-symbols-rounded chev">expand_more</span>
+          </button>
+        }
       }
-      <app-active-filter-chips />
+      <app-active-filter-chips (save)="saveAudience()" />
+      <div class="table-meta">
+        @if (store.loading()) {
+          <span class="count">Loading participants…</span>
+        } @else {
+          <span data-testid="pi-count" class="count">{{ store.filteredCount() | number }} of {{ store.totalCount() | number }} participants</span>
+          @if (store.activeSignal(); as sig) {
+            <span class="insight" [title]="sig.chipLabel ?? sig.label">· Insight: {{ sig.chipLabel ?? sig.label }}</span>
+            <button data-testid="pi-insight-clear" class="insight-x" matTooltip="Clear insight" aria-label="Clear insight" (click)="store.clearSignal()">
+              <span class="material-symbols-rounded">close</span>
+            </button>
+          }
+        }
+      </div>
       <div class="table-wrap">
         <app-participant-table />
       </div>
@@ -88,10 +93,6 @@
 
   <app-bulk-action-bar (action)="handleBulk($event)" />
 </div>
-
-<mat-menu #commsMenu="matMenu" xPosition="before" class="pi-comms-menu">
-  <app-comms-analytics-panel />
-</mat-menu>
 
 <mat-menu #exportMenu="matMenu" xPosition="before">
   <button data-testid="pi-export-table" mat-menu-item (click)="exportExcel(false)">
