@@ -720,7 +720,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     const metadata = this.participantMetadata[pid] ?? null;
     if (metadata) {
       const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
-      const status = metadata['status'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
       const consumedproducts = {};
 
       for (const product of metadata['consumedproducts'] ?? []) {
@@ -945,6 +945,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
       case 'eligible': return r.isEligible;
       case 'upgrade': return r.isUpgrade;
       case 'addon': return r.isAddon;
+      case 'continuity': return r.isContinuity;
       case 'noteligible': return r.notEligible;
       case 'noProduct': return r.isNoProduct;
       case 'inQueue': return r.isInQueueReq;

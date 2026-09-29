@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Firestore, getDocs, collection, query, where, DocumentReference } from '@angular/fire/firestore';
+import { Firestore, getDocs, collection, query, where, DocumentReference, orderBy } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -50,6 +50,19 @@ export class BigLadderComponent implements OnInit {
   cohortMap = {};
   eiflixVideoMap = {};
 
+  bigMarathon = [];
+  selectedMarathon : string | null = null;
+
+  filteredCohorts = [];
+  cohortSearch = '';
+  educationalCohort = true;
+  studioCohort = true;
+
+  selectedCohorts = [];
+  selectedCohortCategory = ['studio' , 'educational'];
+
+  loadAllCohort = false;
+
   // sorting
   sortHeader: { header: sortHeader; type: 'asce' | 'desc' } | null = null;
 
@@ -83,11 +96,22 @@ export class BigLadderComponent implements OnInit {
       },
     );
 
+    getDocs(query(collection(this.firestore, 'big marathon') , orderBy('enddate' , 'desc'))).then((bigMarathonSnap) => {
+        this.selectedMarathon = !bigMarathonSnap.empty ? bigMarathonSnap.docs[0]?.id : null;
+        for (const docref of bigMarathonSnap.docs) {
+          const marathon = docref.data();
+          this.bigMarathon.push(marathon);
+        }
+      },
+    );
+
     getDocs(query(collection(this.firestore, 'big cohorts'))).then((bigCohortSnap) => {
+      console.log(this.selectedMarathon)
         for (const docref of bigCohortSnap.docs) {
           const cohort = docref.data();
           this.cohortMap[docref.id] = cohort;
         }
+        this.filterCohortList();
       },
     );
 
@@ -305,16 +329,80 @@ export class BigLadderComponent implements OnInit {
   // function to filter tabel data
   filterTable() {
     const data = [...this.dashboardData];
+    const cohortParticipants = [];
+
+    for (const cohortId of this.selectedCohorts) {
+      const cohort = this.cohortMap[cohortId] ?? null;
+      if (cohort) {
+        for (const pid of cohort['participantidlist'] ?? []) {
+          cohortParticipants.push(pid);
+        }
+      }
+    }
+
     const filterData = data.filter((participant) => {
+      const profileId = participant['profileid'];
       const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
       if (search.length > 0) {
         const participantName: string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
         if (!participantName.includes(search)) return false;
       }
+
+      if (this.selectedCohorts.length > 0 && !cohortParticipants.includes(profileId)) {
+        return false;
+      }
+
       return true;
     });
     this.filteredDashbordData = filterData;
     this.sortTableHeader();
+  }
+
+  // function to filter cohorts
+  filterCohortList(){
+    const cohorts = Object.values(this.cohortMap);
+    const cohortSearch = this.cohortSearch?.trim().toLocaleLowerCase();
+    
+    const filteredCohorts =  cohorts.filter((cohort)=>{
+      const cohortName = cohort['name']?.trim()?.toLocaleLowerCase() ?? '';
+      const cohortCategory = cohort['cohortCategory'] ?? '';
+      const marathon = cohort['marathonref']?.id ?? null;
+      // const participantsNames = (cohort['participantidlist'] ?? []).map((pid) => this.participantMetadataMap[pid]?.name?.trim()?.toLocaleLowerCase() ?? '');
+      
+      if (this.selectedCohortCategory.length > 0 && !this.selectedCohortCategory.includes(cohortCategory)) {
+        return false;
+      }
+
+      if (this.selectedMarathon && this.selectedMarathon !== marathon) {
+        return false;
+      }
+
+      if (cohortSearch.length > 0 && !cohortName?.includes(cohortSearch)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    this.filteredCohorts = filteredCohorts;
+  }
+
+  onCohortCategoryChange(category : string){
+    if (this.selectedCohortCategory.includes(category)) {
+      this.selectedCohortCategory = this.selectedCohortCategory.filter((cat)=>cat !== category)
+    } else {
+      this.selectedCohortCategory.push(category);
+    }
+    this.filterCohortList();
+  }
+
+  handleCohortClick(cohortId){
+    if (this.selectedCohorts.includes(cohortId)) {
+      this.selectedCohorts = this.selectedCohorts.filter((cId)=> cId !== cohortId);
+    } else {
+      this.selectedCohorts.push(cohortId);
+    }
+    this.filterTable();
   }
 
   // applyFilter(participant : any){
@@ -388,6 +476,18 @@ export class BigLadderComponent implements OnInit {
     if (typeof value?.toDate === 'function') return value.toDate();
     const date = new Date(value);
     return isNaN(date.getTime()) ? null : date;
+  }
+
+  getFilteredCohorts(){
+    if (this.filteredCohorts.length > 16 && !this.loadAllCohort) {
+      return this.filteredCohorts.slice(0 , 16);
+    }
+    return this.filteredCohorts
+  }
+
+  toggleCohortShowMore(){
+    console.log(this.loadAllCohort)
+    this.loadAllCohort = !this.loadAllCohort;
   }
   
   // ===================== Tabel Sorting ======================
