@@ -32,7 +32,7 @@ interface Step {
 /**
  * ENROLL refusal diagnostics for one profile against THIS workshop.
  *
- * A faithful port of the EiFlix Flutter web gates (read-only source of truth..:
+ * A faithful port of the EiFlix Flutter web gates (read-only source of truth:
  * `workshop/lib/workshop_v2/utils/workshop_enroll_eligibility.dart`,
  * `workshop_enroll_policy.dart` and `_onEnroll` in
  * `screens/workshop/workshop_detail_screen.dart`), so an admin can answer
