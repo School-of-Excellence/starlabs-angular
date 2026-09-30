@@ -2595,7 +2595,13 @@ export class ParticipantsAnalyticsComponent {
   // Function to add products to participant Journey 
   bulkAddProducts() {
     this.dialog.open(BulkAddProductsComponent, {
-      data: this.selection.selected
+      panelClass: 'bap-overlay',
+      maxHeight: '92vh',
+      width: '640px',
+      data: {
+        participants: this.selection.selected,
+        loggedInProfileId: this.loggedInProfileId
+      }
     })
   }
 
