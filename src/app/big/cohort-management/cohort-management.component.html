@@ -912,6 +912,9 @@
         <button data-testid="cman-export-selected-cohorts-79" class="sb-btn primary" (click)="exportSelectedCohorts()" title="Export selected cohorts">
           <mat-icon>download</mat-icon> <span class="sb-lbl">Export ({{selectedCohortIds.size}})</span>
         </button>
+        <button data-testid="cman-duplicate-selected-cohorts-83" class="sb-btn primary" (click)="duplicateSelectedCohorts()" title="Duplicate selected cohorts into a marathon">
+          <mat-icon>content_copy</mat-icon> <span class="sb-lbl">Duplicate</span>
+        </button>
         <button data-testid="cman-make-selected-cohorts-inactive-80" class="sb-btn danger" (click)="makeSelectedCohortsInactive()" title="Mark selected cohorts inactive">
           <mat-icon>visibility_off</mat-icon> <span class="sb-lbl">Make Inactive</span>
         </button>
@@ -971,4 +974,32 @@
   <mat-dialog-actions align="end" class="dialog-actions">
     <button data-testid="cman-chat-model-close-82" mat-raised-button color="primary" (click)="chatModelClose(chatConfigModelData)">Apply</button>
   </mat-dialog-actions>
+</ng-template>
+
+<!-- Duplicate cohorts: pick the target marathon, then each selected cohort opens in the create cohort dialog -->
+<ng-template #duplicateConfig>
+
+  <h2 class="dialog-title">
+    Duplicate {{selectedCohortIds.size}} cohort(s)
+    <span class="dialog-subtitle">
+      Choose the marathon to copy into. Each cohort opens in the create cohort form to review — everything is carried over except the event.
+    </span>
+  </h2>
+
+  <div class="dialog-content">
+    <mat-form-field appearance="outline" class="dup-marathon-field">
+      <mat-label>Target marathon</mat-label>
+      <mat-select data-testid="cman-duplicate-target-marathon-84" [(ngModel)]="duplicateTargetMarathon">
+        <mat-option *ngFor="let option of marathonList" [value]="option.docid">
+          {{option.title || option.name}}{{option.docid === selectedMarathon ? ' (current)' : ''}}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="dialog-actions dup-actions">
+    <button data-testid="cman-duplicate-cancel-85" mat-button (click)="duplicateModelRef?.close()">Cancel</button>
+    <button data-testid="cman-duplicate-continue-86" mat-raised-button color="primary" [disabled]="!duplicateTargetMarathon"
+      (click)="duplicateModelRef?.close(duplicateTargetMarathon)">Continue</button>
+  </div>
 </ng-template>
