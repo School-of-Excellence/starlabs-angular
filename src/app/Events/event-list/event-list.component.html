@@ -5,6 +5,9 @@
       <button mat-raised-button class="menuitem fadein" data-testid="evl-create-event" (click)="openEventEditor()">
         Create New Event
       </button>
+      <button mat-raised-button class="menuitem fadein" data-testid="evl-create-event" (click)="openCTAConfig()">
+        Configure CTA
+      </button>
     </div>
     <table class="tablebox mat-elevation-z2" mat-table matSort [dataSource]="eventDataSource">
       <ng-container matColumnDef="id">
