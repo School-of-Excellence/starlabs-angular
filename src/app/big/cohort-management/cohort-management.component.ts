@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, inject, Input, TemplateRef, ViewChild } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
-import { Subject, Subscription, takeUntil } from 'rxjs';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Subject, Subscription, firstValueFrom, takeUntil } from 'rxjs';
 import { AuthguardService } from '../../authguard.service';
 import { Router } from '@angular/router';
 import { collection, collectionSnapshots, doc, Firestore, getDocs, orderBy, query, where, updateDoc, arrayRemove, arrayUnion, setDoc, deleteDoc, collectionData  , WriteBatch , getDoc} from '@angular/fire/firestore';
@@ -49,6 +49,11 @@ export class CohortManagementComponent {
 
   @ViewChild('cohortsearch') cohortSearch !: ElementRef<HTMLInputElement>;
   @ViewChild('chatConfig') chatConfig !: TemplateRef<ElementRef>;
+  @ViewChild('duplicateConfig') duplicateConfig !: TemplateRef<ElementRef>;
+  // ==== Duplicate cohorts ====
+  duplicateModelRef : MatDialogRef<any> | null = null;
+  duplicateTargetMarathon: string | null = null
+  private destroyed = false
   // ==== Design B additions ====
   selectMode = false
   selectedCohortIds = new Set<string>()
@@ -348,6 +353,7 @@ export class CohortManagementComponent {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.subscription.next();
     this.subscription.complete();
   }
@@ -3136,6 +3142,64 @@ export class CohortManagementComponent {
     const subset = full.filter((c: any) => this.selectedCohortIds.has(c.docid))
     this.filteredCohortsList = subset
     try { (this as any).exportCohortsData?.() } finally { this.filteredCohortsList = full }
+  }
+
+  // function to duplicate selected cohorts: pick a target marathon (same or another),
+  // then walk each selected cohort through the create cohort dialog in 'duplicate' mode
+  async duplicateSelectedCohorts(): Promise<void> {
+    if (this.selectedCohortIds.size === 0) return
+    const sources = this.cohortsList.filter((c: any) => this.selectedCohortIds.has(c.docid))
+    if (sources.length === 0) return
+
+    this.duplicateTargetMarathon = this.selectedMarathon
+    this.duplicateModelRef = this.dialog.open(this.duplicateConfig, { width: '440px', maxWidth: '95vw', autoFocus: false })
+    const targetMarathonId: string | undefined = await firstValueFrom(this.duplicateModelRef.afterClosed())
+    this.duplicateModelRef = null
+    if (!targetMarathonId || !this.mapMarathon[targetMarathonId]) return
+
+    // Closing one dialog skips that cohort; the rest still open (stops if the screen is left mid-way).
+    let created = 0
+    for (let i = 0; i < sources.length; i++) {
+      if (this.destroyed) return
+      const dialogRef = this.openDuplicateCohortDialog(sources[i], targetMarathonId, i + 1, sources.length)
+      const result = await firstValueFrom(dialogRef.afterClosed())
+      if (result) created++
+    }
+
+    if (created > 0) {
+      this.loadCohorts()
+      const marathon = this.mapMarathon[targetMarathonId]
+      this.authguard.openSnackBar(`${created} cohort(s) duplicated into ${marathon['title'] || marathon['name']}`, 'ok', 3000)
+    }
+    this.selectedCohortIds.clear()
+    this.selectbarExpanded = false
+    this.selectMode = false
+  }
+
+  // function to open the create cohort dialog pre-filled from a source cohort, marathon patched to the target
+  private openDuplicateCohortDialog(source: any, targetMarathonId: string, index: number, total: number) {
+    return this.dialog.open(ManageCohertsComponent, {
+      width: '560px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      panelClass: 'cohort-dialog-container',
+      data: {
+        type: 'duplicate',
+        doc: source,
+        duplicateIndex: index,
+        duplicateTotal: total,
+        selectedMarathon: this.mapMarathon[targetMarathonId],
+        selectedParticipants: [],
+        totalParticipants: this.participantlist || [],
+        // events of the TARGET marathon, so an event-type copy can pick one there
+        eventCollectionList: this.acceleratorEventList.filter(e => e['bigmarathonref']?.id === targetMarathonId),
+        mapEventCollection: this.mapAcceleratorEvent,
+        participantTagsList: this.participantTagsList,
+        loggedInProfile: this.loggedInProfile,
+        queueList : this.searchableQueueList,
+      },
+      disableClose: false
+    });
   }
   
 
