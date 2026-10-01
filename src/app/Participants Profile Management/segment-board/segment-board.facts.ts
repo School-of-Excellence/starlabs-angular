@@ -88,6 +88,8 @@ export function toParticipant(id: string, d: Doc, journeyNames: Map<string, stri
       // ✅ CONFIRMED (operator, 2026-09-25) — Onboarding: currentjourneyonboarded true → Onboarded;
       // false or missing → Yet to onboard (the builder's "Yet to onboard" covers every YTO value)
       onboardingStatus: onboarded === true ? 'ONBOARDED' : 'YTO_NEW',
+      // Participant mode: participantmode (a mode name); matched to the `modes` catalogue on the board (canonModes)
+      participantMode: d['participantmode'] ?? null,
       // ✅ CONFIRMED (operator, 2026-09-25) — Customer status: customerstatus; 'none' or missing → No status
       customerStatus: customerStatusOf(d['customerstatus']),
       // ✅ CONFIRMED (operator, 2026-09-25) — Finance status: financialstatus (incl. fully paid); missing → No status

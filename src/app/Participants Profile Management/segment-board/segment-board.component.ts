@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, Inject, OnDestroy, PLATFORM_ID, ViewChild, ViewEncapsulation, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Firestore, collection, deleteField, doc, getDocs, serverTimestamp, writeBatch } from '@angular/fire/firestore';
+import { Firestore, collection, deleteField, doc, getDocs, orderBy, query, serverTimestamp, writeBatch } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
 import { SegmentBoardStore, mountSegmentBoard } from './segment-board.engine';
 import { toParticipant } from './segment-board.facts';
@@ -89,9 +89,13 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       return ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }) as unknown[][]).map(r => r.map(c => String(c ?? ''))) : [];
     },
     loadCatalog: async () => {
-      const [journeys, products] = await Promise.all([this.journeys(), getDocs(collection(this.firestore, 'products'))]);
+      const [journeys, products, modes] = await Promise.all([
+        this.journeys(), getDocs(collection(this.firestore, 'products')),
+        getDocs(query(collection(this.firestore, 'modes'), orderBy('sequence', 'asc'))),
+      ]);
       return {
         journeys,
+        modes: modes.docs.map(m => ({ id: m.id, name: String(m.data()['mode'] ?? m.id).trim() })).filter(m => m.name),
         products: products.docs.map(p => ({ id: p.id, name: String(p.data()['product'] ?? p.id) })),
         countDefaults: { upCount: [], cpmCount: [] },   // products are picked on each condition
       };

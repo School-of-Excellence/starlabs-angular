@@ -248,3 +248,27 @@ Verified: with global styles loaded, card title and all footer buttons compute t
 - Verified (harness, real .xlsx via the xlsx package): 92 in View all; file with 6 emails (2 repeats, 1 upper-case) → 2 / 90 / 2,
   "2 repeated values ignored"; only-imported rows marked exists-elsewhere vs not found; both exports correct; name mode with
   messy spacing → 2 / 90 / 1. ng build ok.
+
+---
+
+## 2026-10-02 · Participant mode condition
+
+- New condition **Participant mode** (multi-select, "is any of"): source `participant metadata.participantmode` (a mode **name**,
+  not an id). Options = `modes` collection `mode` field in `sequence` order (same query other screens use), plus **No mode**
+  (empty/missing, ~17% of participants per the validated spec).
+- Stored as names: `{ "field": "participantMode", "op": "in", "value": ["Integration Mode", "NO_MODE"] }` — names because that is
+  what participant data holds; no id join exists.
+- Matching normalises case, spacing and a missing " Mode" suffix to the catalogue name (`canonModes()` on load), so
+  "integration" counts as "Integration Mode". A value not in the catalogue is kept and added as its own option rather than dropped.
+- Filter bar "Product + Mode" now uses the same real list (was the design's hard-coded 15 names that didn't match the data).
+  Export CSV gains a **Participant mode** column.
+- Verified (rebuilt harness — scratchpad had been cleared — fake `modes` + messy values): Exploration 37 · Integration 38 (incl.
+  lower-case "integration") · No mode 49 · unknown "Weird Mode" 38 as its own option · Journey Planning 38 = 200; segment
+  Integration + No mode → list of 87. tsc 0, esbuild ok, ng build ok.
+- Revert: remove the `participantMode` FIELDS entry, `VAL.participantMode`, `canonModes()` + its call, the `modes` query in
+  `loadCatalog`, and `participantMode` in `segment-board.facts.ts`.
+- **Participant mode → single select** (operator, same day): the condition row is one dropdown ("Choose a mode…", the `modes`
+  catalogue in sequence order, No mode). Stored `{ "field": "participantMode", "op": "eq", "value": "Integration Mode" }`;
+  an empty pick blocks save ("Pick a participant mode."). A rule saved earlier with several modes (`op: in`) still evaluates
+  as saved, but reopens showing only its first mode, and saving it then keeps just that one. The filter bar keeps multi-select.
+  Verified: Integration Mode → list 38; tsc 0; ng build ok.

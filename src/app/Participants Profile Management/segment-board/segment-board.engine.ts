@@ -15,7 +15,7 @@ export interface SegmentBoardStore {
   saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
   // journeys from `journey`, products from `products` (ids + names); countDefaults = products counted as uP! / CPM events
   readTable(file: File): Promise<string[][]>;               // rows x cells of an uploaded CSV / Excel file
-  loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
+  loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
 }
 export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
 const cleanups: Array<() => void> = [];
@@ -29,6 +29,7 @@ const VAL = {
   journeyGroup:{UP:'uP!',CPM:'CPM',FTM_LYL:'FTM / LYL',BIG:'B!G',DI:'D&I DFU',ARENA:'Installation Arena'},
   onboardingStatus:{ONBOARDED:'Onboarded',YTO_NEW:'Yet to onboard',YTO_UPGRADE:'Yet to Onboard (Upgrade)',YTO_DOWNGRADE:'Yet to Onboard (Downgrade)',YTO_ADDON:'Yet to Onboard (Addon)'},
   customerStatus:{ACTIVE:'Active',NON_ACTIVE:'Non active',DISCONTINUED:'Discontinued',LATE:'Late',BANNED:'Banned',NO_STATUS:'No status'},
+  participantMode:{NO_MODE:'No mode'},   // filled from the `modes` collection in setCatalog()
   financeStatus:{REGULAR:'Regular',FULLY_PAID:'Fully paid',DEFAULTED:'Defaulted',LOCKED:'Locked',DISCONTINUED:'Discontinued',LATE:'Late',BANNED:'Banned',NO_STATUS:'No status'}
 };
 // catalogue from Firestore, filled by setCatalog() in load(): products (`products`) and journeys (`journey`)
@@ -58,6 +59,7 @@ const FIELDS = [
   {key:'journeyId',label:'Journey',type:'enum'},   // segment-level Journey setting (journey doc ids)
   {key:'onboardingStatus',label:'Onboarding status',type:'enum'},
   {key:'customerStatus',label:'Customer status',type:'enum'},
+  {key:'participantMode',label:'Participant mode',type:'enum'},   // participant metadata.participantmode, names from `modes`
   {key:'financeStatus',label:'Finance status',type:'enum'},
   {key:'upCount',label:'uP! events attended',type:'number'},
   {key:'cpmCount',label:'CPM events attended',type:'number'},
@@ -236,6 +238,19 @@ function setCatalog(cat){
   PRODUCTS=cat.products.slice().sort(byName); PROD=Object.fromEntries(PRODUCTS.map(p=>[p.id,p.name]));
   JOURNEYS=cat.journeys.slice().sort(byName); VAL.journeyId=Object.fromEntries(JOURNEYS.map(j=>[j.id,j.name]));
   COUNT_DEFAULT={upCount:cat.countDefaults.upCount.filter(id=>PROD[id]),cpmCount:cat.countDefaults.cpmCount.filter(id=>PROD[id])};
+  VAL.participantMode=Object.fromEntries([...(cat.modes||[]).map(m=>[m.name,m.name]),['NO_MODE','No mode']]);   // `modes` sequence order
+}
+// participant metadata.participantmode → the `modes` name it means (ignoring case, spaces and a missing " Mode");
+// empty → NO_MODE; a value not in the catalogue is kept and added as its own option so it can still be picked
+function canonModes(){
+  const key=v=>String(v).trim().toLowerCase().replace(/\s+/g,' ').replace(/ mode$/,'');
+  const byKey=new Map(Object.keys(VAL.participantMode).filter(k=>k!=='NO_MODE').map(n=>[key(n),n]));
+  for(const p of P){
+    const raw=p.f.participantMode; if(raw==null||!String(raw).trim()){ p.f.participantMode='NO_MODE'; continue; }
+    const hit=byKey.get(key(raw)); if(hit){ p.f.participantMode=hit; continue; }
+    const name=String(raw).trim(); p.f.participantMode=name;
+    if(!VAL.participantMode[name]){ const {NO_MODE,...rest}=VAL.participantMode; VAL.participantMode={...rest,[name]:name,NO_MODE}; }
+  }
 }
 async function load(){
   S.loading=true; S.loadError=null; render();
@@ -244,6 +259,7 @@ async function load(){
     setCatalog(cat);
     // A–Z by name (then profile id): every list on the board walks P, so they all come out in this order
     P=parts.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base',numeric:true})||x.pid.localeCompare(y.pid)); PI=new Map(P.map(p=>[p.pid,p]));
+    canonModes();
     LISTS.clear(); for(const l of lists) LISTS.set(l.segmentid,{ids:new Set(l.profilelist||[]),lastupdated:l.lastupdated||null});
     ARCHIVED_IDS.clear();
     const live=[];
@@ -274,7 +290,7 @@ const emptyFilters=()=>({journey:[],customer:[],finance:[],mode:[],product:'',
   events:[],eventsMode:'attended', queues:[],queueStage:'', workshops:[],workshopState:'any',
   ongoing:[], ageMin:'', ageMax:'', bigLevel:[]});
 const OPTS={journey:()=>VAL.journeyId, customer:()=>VAL.customerStatus, finance:()=>VAL.financeStatus,
-  mode:()=>asMap(MODES), events:()=>EVENT_NAME, queues:()=>asMap(QUEUES), workshops:()=>asMap(WORKSHOPS),
+  mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>asMap(QUEUES), workshops:()=>asMap(WORKSHOPS),
   ongoing:()=>PROD, bigLevel:()=>asMap(BIG_LEVELS)};
 const S={stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
 function filtersOn(){const F=S.filters;
@@ -286,7 +302,7 @@ function matchFilter(p){
   if(F.journey.length&&!F.journey.includes(f.journeyId)) return false;
   if(F.customer.length&&!F.customer.includes(f.customerStatus)) return false;
   if(F.finance.length&&!F.finance.includes(f.financeStatus)) return false;
-  if(F.mode.length&&!F.mode.includes(p.mode)) return false;
+  if(F.mode.length&&!F.mode.includes(p.f.participantMode)) return false;
   if(F.product&&!(p.ongoingProducts.includes(F.product)||(f.consumedProducts[F.product]||0)>0||(f.unconsumedProducts[F.product]||0)>0)) return false;
   if(F.ongoing.length&&!p.ongoingProducts.some(id=>F.ongoing.includes(id))) return false;
   if(F.events.length){
@@ -482,7 +498,7 @@ function filterBar(t){
     fdrop('finance',`Finance status: ${sel(F.finance,'All')}`,F.finance.length,checkList('finance',VAL.financeStatus)),
     fdrop('product',`Product + Mode${F.product?': '+PROD[F.product]:''}${F.mode.length?' · '+sel(F.mode,''):''}`,F.product||F.mode.length,
       `<label class="f" for="fProd">Product</label><select id="fProd" data-fk="product"><option value="">Any product</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===F.product?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
-       <label class="f">Participant mode</label>${checkList('mode',asMap(MODES))}
+       <label class="f">Participant mode</label>${checkList('mode',VAL.participantMode)}
        <p class="subtle small" style="margin:8px 0 0">Combines a product with the participant's current mode, like the participants product screen.</p>`),
     fdrop('ongoing',`Ongoing product: ${sel(F.ongoing,'Any')}`,F.ongoing.length,
       checkList('ongoing',PROD)+`<p class="subtle small" style="margin:8px 0 0">Products that are ongoing or initiated right now.</p>`),
@@ -597,8 +613,8 @@ function exportList(){
   const extra=seg&&seg.mode==='auto'?['Saved list',(p)=>L?.ids.has(p.pid)?'In list':'Not saved yet']
     :d.kind==='dups'?['In segments',(p,m)=>m.segs.map(id=>segName(set,id)).join('; ')]
     :d.kind==='unseg'?['Why',(p,m)=>REASONS[m.reason]||'']:null;
-  const head=['Profile ID','Name','Journey','Customer status','Finance status','Onboarding','uP! events','CPM events','Age',...(extra?[extra[0]]:[])];
-  const lines=rows.map(([p,m])=>[p.pid,p.name,p.journey,VAL.customerStatus[p.f.customerStatus]||'',VAL.financeStatus[p.f.financeStatus]||'',
+  const head=['Profile ID','Name','Journey','Participant mode','Customer status','Finance status','Onboarding','uP! events','CPM events','Age',...(extra?[extra[0]]:[])];
+  const lines=rows.map(([p,m])=>[p.pid,p.name,p.journey,VAL.participantMode[p.f.participantMode]||'',VAL.customerStatus[p.f.customerStatus]||'',VAL.financeStatus[p.f.financeStatus]||'',
     VAL.onboardingStatus[p.f.onboardingStatus]||'',cnt(p,'upCount'),cnt(p,'cpmCount'),p.f.age??'',...(extra?[extra[1](p,m)]:[])]);
   downloadCsv(title,head,lines);
   toast(`Exported ${plural(rows.length,'participant')}.`);
@@ -922,6 +938,7 @@ function doMove(){
 let B=null;
 const defaultRow=field=>{const f=FIELD[field];
   if(field==='onboardingStatus') return {field,op:'in',value:['ONBOARDED']};
+  if(field==='participantMode') return {field,op:'eq',value:''};   // single mode, picked in the row
   if(f.type==='number') return COUNT_DEFAULT[field]?{field,op:'gte',value:1,products:[...COUNT_DEFAULT[field]]}:{field,op:'gte',value:1};
   if(f.type==='products') return {field,op:'counts',value:{mode:'all',items:[{product:PRODUCTS[0]?.id||'',op:'gte',n:1}]}};
   if(f.type==='list') return {field,op:'notEmpty',value:null};
@@ -953,6 +970,7 @@ function countsHtml(r){
     <button type="button" class="btn ghost" data-b="addi">+ Add product</button>`;
 }
 const toRows=list=>list.map(n=>{const f=FIELD[n.field];
+  if(n.field==='participantMode') return {field:n.field,op:'eq',value:Array.isArray(n.value)?(n.value[0]??''):(n.value??'')};
   if(COUNT_DEFAULT[n.field]) return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value,products:[...(n.products||COUNT_DEFAULT[n.field])]};if(n.op==='eq'&&f&&f.type==='enum')return {field:n.field,op:'in',value:[n.value]};return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value};});
 function openSegDlg(mode,segId){
   const set=curSet();
@@ -968,6 +986,8 @@ function rowHtml(r,i){
   const avail=FIELDS.filter(x=>!SCOPE_FIELDS.includes(x.key)&&(x.key===r.field||!used.has(x.key)));
   const field=`<select data-k="field" aria-label="Field">${avail.map(x=>`<option value="${x.key}" ${x.key===r.field?'selected':''}>${x.label}</option>`).join('')}</select>`;
   const rm=`<button type="button" class="icon-btn" data-b="rm" aria-label="Remove condition">×</button>`;
+  // participant mode: a single mode from the `modes` catalogue (or No mode)
+  if(r.field==='participantMode') return `<div class="cond" data-i="${i}">${field}<select data-k="pm" aria-label="Participant mode"><option value="" ${r.value?'':'selected'} disabled>Choose a mode…</option>${Object.entries(VAL.participantMode).map(([v,l])=>`<option value="${esc(v)}" ${v===r.value?'selected':''}>${esc(l)}</option>`).join('')}</select>${rm}</div>`;
   // onboarding: one choice, Onboarded or Yet to onboard (they can't both be true)
   if(r.field==='onboardingStatus'){const k=obKind(r.value);
     // an older rule on specific YTO statuses (e.g. only New) stays as it is, shown read-only
@@ -1067,6 +1087,7 @@ function validRule(){
   if(!B.rows.length&&!B.scope.ids.length) return `Pick a ${SCOPE[B.scope.type].label.toLowerCase()} or add at least one condition.`;
   for(const r of B.rows){const f=FIELD[r.field];
     if(r.op==='counts'&&(!r.value.items.length||!r.value.items.every(i=>Number.isFinite(i.n)))) return `Enter a count for every product in “${f.label}”.`;
+    if(r.field==='participantMode'&&!r.value) return 'Pick a participant mode.';
     if((r.op==='in'||r.op==='hasAny'||r.op==='equals')&&!r.value.length) return `Pick at least one value for “${f.label}”.`;
     if(COUNT_DEFAULT[r.field]&&!(r.products||[]).length) return `Pick at least one product for “${f.label}”.`;
     if(f.type==='number'&&(r.op==='between'?!r.value.every(Number.isFinite):!Number.isFinite(r.value))) return `Enter a number for “${f.label}”.`;}
@@ -1584,6 +1605,7 @@ listen(root,'change',e=>{
       updatePreview();}
     else if(k==='pv'){const ps=new Set(r.products||[]);t.checked?ps.add(t.value):ps.delete(t.value);
       r.products=PRODUCTS.map(p=>p.id).filter(id=>ps.has(id));syncPms(row,r);updatePreview();}
+    else if(k==='pm'){r.value=t.value;updatePreview();}
     else if(k==='ob'){r.value=t.value==='ONBOARDED'?['ONBOARDED']:[...YTO];updatePreview();}
     else if(k==='cmode'){r.value={...r.value,mode:t.value};updatePreview();}
     else if(k==='cprod'||k==='ccop'){const ci=+t.closest('[data-ci]').dataset.ci;
