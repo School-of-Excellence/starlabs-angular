@@ -185,9 +185,14 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   challengeStatistics: any[] = [];
   objectKeys = Object.keys;
   dataSource = new MatTableDataSource<any>([]);
+  // Total, Status and Assignment are parked, not dropped: their cell definitions are still in
+  // the template (commented out beside their column ids) because they are wanted again later.
+  // To bring one back, uncomment it here AND uncomment its <ng-container matColumnDef> block —
+  // mat-table throws if a displayed id has no cell definition.
   displayedColumns: string[] = [
-    'participantId', 'type', 'currentChallenge', 'progress', 'completed',
-    'total', 'status', 'action', 'assignment'
+    'participantId', 'email', 'type', 'currentChallenge', 'progress', 'completed',
+    'action'
+    // 'total', 'status', 'assignment'
   ];
 
   selectedJourneyFilters: string[] = [];
@@ -511,6 +516,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.dataSource.filterPredicate = (data: any, filter: string) => {
       const searchStr = filter.toLowerCase();
       const participantName = (this.mapProfile[data.profileid]?.['name'] || '').toLowerCase();
+      // Email is a table column, so it is searchable too — people look up a row by address.
+      const participantEmail = (this.mapProfile[data.profileid]?.['email'] || '').toLowerCase();
 
       let currentChallengeName = '';
       if (this.workshopData?.challenges[data.currentChallengeIndex]) {
@@ -527,6 +534,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       const statusStr = status.toLowerCase();
 
       return participantName.includes(searchStr) ||
+        participantEmail.includes(searchStr) ||
         currentChallengeName.includes(searchStr) ||
         statusStr.includes(searchStr) ||
         data.profileid.toLowerCase().includes(searchStr) ||
@@ -1188,7 +1196,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.workshopEndDateFormatted = this.formatDate(this.workshopData.detailpage?.workshopEndDate);
     if (this.workshopData.categorybased === true) {
       if (!this.displayedColumns.includes('type')) {
-        const idx = this.displayedColumns.indexOf('participantId');
+        // Email belongs immediately after the name, so Type goes in after Email rather than
+        // after Participant. Falls back to Participant if Email is ever taken out.
+        const anchor = this.displayedColumns.indexOf('email') > -1 ? 'email' : 'participantId';
+        const idx = this.displayedColumns.indexOf(anchor);
         this.displayedColumns.splice(idx + 1, 0, 'type');
       }
     } else {
