@@ -513,17 +513,26 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   private setupFilterPredicate() {
+    // Every searchable term goes through this: a missing or non-string field must become an empty
+    // haystack, never an exception. See the note on the sub-challenge name below for why a throw in
+    // here is worse than it looks.
+    const str = (v: any): string => (v === null || v === undefined) ? '' : String(v).toLowerCase();
+
     this.dataSource.filterPredicate = (data: any, filter: string) => {
       const searchStr = filter.toLowerCase();
-      const participantName = (this.mapProfile[data.profileid]?.['name'] || '').toLowerCase();
+      const participantName = str(this.mapProfile[data.profileid]?.['name']);
       // Email is a table column, so it is searchable too — people look up a row by address.
-      const participantEmail = (this.mapProfile[data.profileid]?.['email'] || '').toLowerCase();
+      const participantEmail = str(this.mapProfile[data.profileid]?.['email']);
 
       let currentChallengeName = '';
       if (this.workshopData?.challenges[data.currentChallengeIndex]) {
         const challenge = this.workshopData.challenges[data.currentChallengeIndex];
         if (challenge.type === 'challenge' && challenge.challenges?.[data.currentSubChallengeIndex]) {
-          currentChallengeName = challenge.challenges[data.currentSubChallengeIndex].name.toLowerCase();
+          // A sub-challenge is not guaranteed to carry `name` — some are stored with `heading`
+          // instead. Dereferencing it bare threw inside the predicate, and a throw here does not
+          // just lose one field: MatTableDataSource aborts the whole filter pass, so the table
+          // silently stops responding to the search box. Hence str() on every term below.
+          currentChallengeName = str(challenge.challenges[data.currentSubChallengeIndex].name);
         } else if (challenge.type === 'zoomcall') {
           currentChallengeName = `${challenge.heading}: ${challenge.subheading}`.toLowerCase();
         }
@@ -537,10 +546,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
         participantEmail.includes(searchStr) ||
         currentChallengeName.includes(searchStr) ||
         statusStr.includes(searchStr) ||
-        data.profileid.toLowerCase().includes(searchStr) ||
-        data.completedChallenges.toString().includes(searchStr) ||
-        data.totalChallenges.toString().includes(searchStr) ||
-        data.progressPercentage.toString().includes(searchStr);
+        str(data.profileid).includes(searchStr) ||
+        str(data.completedChallenges).includes(searchStr) ||
+        str(data.totalChallenges).includes(searchStr) ||
+        str(data.progressPercentage).includes(searchStr);
     };
   }
 

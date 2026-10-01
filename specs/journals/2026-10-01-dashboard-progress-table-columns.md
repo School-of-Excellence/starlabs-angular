@@ -115,3 +115,73 @@ branches in the `development...HEAD` diff.
   no address). The table now shows one; the export does not. Not asked for, so not changed.
 - `visibleColumns` still filters `'assignment'` out for ungranted users. Harmless (the id is no
   longer displayed) and left in place so uncommenting the column restores the gating for free.
+
+---
+
+# Addendum — CI run 2026-10-01: WS-43 failed, and it was an APP bug
+
+`99 passed · 1 failed`. WS-41, WS-42 and WS-44 were green; WS-43 failed with
+
+```
+CONSOLE.ERROR: ERROR TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+Expected: 0   Received: 1
+```
+
+## The bug
+
+`setupFilterPredicate()` dereferenced the sub-challenge's name bare:
+
+```ts
+currentChallengeName = challenge.challenges[data.currentSubChallengeIndex].name.toLowerCase();
+```
+
+The seeded sub-challenges carry **`heading`, not `name`** (`seed-workshops.js` →
+`workshopChallenges()`), so `.name` is `undefined` and the call throws.
+
+This line is **pre-existing** — it was not part of the Email change. What was new is that WS-43 is
+**the first test that has ever typed into that search box**, so a latent crash finally had a witness.
+It is a genuine production defect: on any workshop where the current sub-challenge lacks `name`, an
+admin typing in the search box kills the filter.
+
+A throw inside `filterPredicate` is worse than losing one search term. `MatTableDataSource` aborts
+the entire filter pass, `filteredData` is never reassigned, and **every row stays**. The table does
+not error visibly — it just stops responding to the box.
+
+## Why the spec's own ordering hid half of it
+
+WS-43 searched the email FIRST and asserted the row was still there (`toHaveCount(baseline)`). A
+thrown predicate leaves every row in place — which is *exactly* what "the email matched" looks like.
+That assertion passed for the wrong reason. Only the negative control, which expected the row to go
+away, could tell the difference.
+
+**The rule this leaves behind: in any filter/search case, the negative control runs FIRST.** Proving
+the filter can *remove* a row is what gives the positive assertion afterwards any meaning. A test
+that only ever asserts "the thing is still visible" cannot distinguish a working filter from a dead
+one.
+
+## The fix
+
+A local `str()` normaliser in `setupFilterPredicate()`, applied to every searchable term:
+
+```ts
+const str = (v: any): string => (v === null || v === undefined) ? '' : String(v).toLowerCase();
+```
+
+Hardened the whole predicate, not just the one line that threw: `profileid`, `completedChallenges`,
+`totalChallenges` and `progressPercentage` were all dereferenced bare too and are the same defect
+waiting on different data. A missing field must become an empty haystack, never an exception.
+
+Verified by replaying the fixed predicate against the exact seeded shapes (sub-challenge with
+`heading` and no `name`, plus a row with every field absent): negative control returns `false`
+instead of throwing, email and name terms return `true`.
+
+## What this says about the first-push checklist
+
+The checklist caught the two traps I went looking for (`fill()` not firing `keyup`; name == email
+making the search assertion vacuous). It did not catch this one, because I was auditing **my
+selectors and my preconditions** — not the app code path my test was about to exercise for the
+first time.
+
+Added to the checklist: **when a case drives a control no spec has driven before, read that handler's
+code end to end first.** A brand-new interaction is the most likely place to find an unguarded
+dereference, and the seed's shape is rarely the shape the app was written against.
