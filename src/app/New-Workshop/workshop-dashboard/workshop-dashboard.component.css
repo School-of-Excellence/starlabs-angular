@@ -1494,11 +1494,44 @@
   gap: 8px;
 }
 
+/* "New" used to be an image (assets/new.png). A text pill reads at any zoom, scales with the
+   row, needs no network round-trip and stays legible next to a long name. */
 .new-badge {
-  width: 40px;
-  height: auto;
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #ede7ff;
+  border: 1px solid #b39ddb;
+  color: #5e35b1;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
   vertical-align: middle;
-  margin-left: 4px;
+}
+
+/* Email column.
+   mat-table sizes columns by content, so a long address either stretches the row or — when the
+   other columns win the fight — gets squeezed into a one-character-wide vertical strip. Breaking
+   mid-word is what causes that, so the address stays on ONE line and ellipsises instead; the cell
+   carries a title attribute with the full value. The floor on the column keeps the header legible
+   even when every address in view is short. */
+.progress-table .mat-column-email {
+  min-width: 13em;
+}
+
+.participant-email {
+  display: block;
+  max-width: 24em;
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .filter-header {
   display: flex;
