@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray } from '@angular/forms';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -21,6 +22,7 @@ import {
   serverTimestamp,
   where
 } from '@angular/fire/firestore';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 import { firstValueFrom } from 'rxjs';
 
 interface ConfigOption {
@@ -28,6 +30,12 @@ interface ConfigOption {
   label: string;                                // shown in the library / rows
   type: 'comingsoon' | 'ads' | 'masterclass' | 'homeseries' | 'ad';
   id?: string;                                  // eiflixhomeseries / eiflixhomewidgets doc id
+}
+
+/** One choosable audience: a `journey` or a `tier` document, shown by its own name field. */
+interface AudienceOption {
+  id: string;     // the document id — this is what is stored
+  name: string;   // journey.journey / tier.tier — shown in the dropdown only
 }
 
 interface RowGroup {
@@ -40,9 +48,12 @@ interface RowGroup {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
+    NgxMatSelectSearchModule,
     MatButtonModule,
     MatIconModule,
     MatSlideToggleModule,
@@ -102,6 +113,53 @@ export class EiflixHomeConfigComponent implements OnInit {
     return this.form.get('items') as FormArray;
   }
 
+  // ── Audience (Journey OR Tier) ────────────────────────────────────────
+  // A row can be narrowed to a set of journeys or a set of tiers, never both:
+  // `audiencetype` says which one was chosen, and only that list is written.
+  journeyOptions: AudienceOption[] = [];
+  tierOptions: AudienceOption[] = [];
+  /** One search box is enough: only one select panel is ever open at a time. */
+  audienceSearch = '';
+
+  private toAudienceOptions(rows: any[], nameField: string): AudienceOption[] {
+    return (rows || [])
+      .map(r => ({ id: r.id, name: (r[nameField] ?? '').toString().trim() }))
+      .filter(o => o.id && o.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private filterAudience(list: AudienceOption[]): AudienceOption[] {
+    const q = this.audienceSearch.trim().toLowerCase();
+    return q ? list.filter(o => o.name.toLowerCase().includes(q)) : list;
+  }
+  filteredJourneys(): AudienceOption[] { return this.filterAudience(this.journeyOptions); }
+  filteredTiers(): AudienceOption[] { return this.filterAudience(this.tierOptions); }
+
+  audienceTypeOf(i: number): string { return this.items.at(i)?.get('audiencetype')?.value || ''; }
+
+  /**
+   * Journey and Tier are exclusive. Picking one clears the other's selection, and
+   * clicking the chosen one again clears the choice entirely — the row is then shown
+   * to everyone, which is what a row with no audience has always meant.
+   */
+  setAudienceType(i: number, type: 'journey' | 'tier'): void {
+    const item = this.items.at(i);
+    if (!item) return;
+    const next = item.get('audiencetype')?.value === type ? '' : type;
+    item.get('audiencetype')?.setValue(next);
+    if (next !== 'journey') item.get('journey')?.setValue([]);
+    if (next !== 'tier') item.get('tier')?.setValue([]);
+    this.audienceSearch = '';
+    this.dirty = true;
+  }
+
+  /** Count shown under the select, so a collapsed panel still says how many are picked. */
+  audienceCount(i: number): number {
+    const type = this.audienceTypeOf(i);
+    if (!type) return 0;
+    return (this.items.at(i)?.get(type)?.value || []).length;
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       // Options: static widgets + every eiflixhomeseries title + every ad
@@ -111,10 +169,17 @@ export class EiflixHomeConfigComponent implements OnInit {
         collection(this.firestore, 'eiflixhomewidgets'),
         where('widgettype', '==', 'ads')
       );
-      const [series, ads] = await Promise.all([
+      // Audience options. Only the NAME is shown; the document id is what gets stored.
+      const journeyRef = collection(this.firestore, 'journey');
+      const tierRef = collection(this.firestore, 'tier');
+      const [series, ads, journeys, tiers] = await Promise.all([
         firstValueFrom(collectionData(seriesRef, { idField: 'id' })) as Promise<any[]>,
-        firstValueFrom(collectionData(adsRef, { idField: 'id' })) as Promise<any[]>
+        firstValueFrom(collectionData(adsRef, { idField: 'id' })) as Promise<any[]>,
+        firstValueFrom(collectionData(journeyRef, { idField: 'id' })) as Promise<any[]>,
+        firstValueFrom(collectionData(tierRef, { idField: 'id' })) as Promise<any[]>
       ]);
+      this.journeyOptions = this.toAudienceOptions(journeys, 'journey');
+      this.tierOptions = this.toAudienceOptions(tiers, 'tier');
       this.seriesOptions = series
         .map(s => ({
           key: 'series:' + s.id,
@@ -174,7 +239,9 @@ export class EiflixHomeConfigComponent implements OnInit {
             this.adOptions.push(opt);
             this.optionByKey[key] = opt;
           }
-          this.items.push(this.makeItem(key, ad?.title, ad?.subtitle, ad?.showto));
+          this.items.push(this.makeItem(
+            key, ad?.title, ad?.subtitle, ad?.showto, false, [],
+            ad?.audiencetype, ad?.journey, ad?.tier));
         });
         return;
       }
@@ -198,15 +265,19 @@ export class EiflixHomeConfigComponent implements OnInit {
         this.optionByKey[key] = opt;
       }
 
-      this.items.push(this.makeItem(key, entry?.title, entry?.subtitle, entry?.showto, entry?.enabletag, entry?.tags));
+      this.items.push(this.makeItem(
+        key, entry?.title, entry?.subtitle, entry?.showto, entry?.enabletag, entry?.tags,
+        entry?.audiencetype, entry?.journey, entry?.tier));
     });
     this.rebuildGroups();
   }
 
   private makeItem(
     key: string, title = '', subtitle = '', showto = 'both',
-    enabletag = false, tags: any = []
+    enabletag = false, tags: any = [], audiencetype = '', journey: any = [], tier: any = []
   ): FormGroup {
+    const ids = (v: any) => (Array.isArray(v) ? v : []).map((x: any) => (x ?? '').toString()).filter(Boolean);
+    const type = audiencetype === 'journey' || audiencetype === 'tier' ? audiencetype : '';
     // tags is an array of strings, max 3 (index 0..2). Home Series items only.
     const tagList = (Array.isArray(tags) ? tags : []).slice(0, 3).map((t: any) => (t ?? '').toString());
     return this.fb.group({
@@ -215,7 +286,12 @@ export class EiflixHomeConfigComponent implements OnInit {
       subtitle: [subtitle || ''],
       showto: [showto || 'both'],
       enabletag: [!!enabletag],
-      tags: this.fb.array(tagList.map(t => this.fb.control(t)))
+      tags: this.fb.array(tagList.map(t => this.fb.control(t))),
+      // Only the chosen list is kept: a document written before this existed
+      // hydrates with no type and two empty lists.
+      audiencetype: [type],
+      journey: [type === 'journey' ? ids(journey) : []],
+      tier: [type === 'tier' ? ids(tier) : []]
     });
   }
 
@@ -423,6 +499,18 @@ export class EiflixHomeConfigComponent implements OnInit {
       adsBuffer = [];
     };
 
+    // Journey and Tier are exclusive: the unchosen list is written EMPTY rather than
+    // left out, so a consumer can read entry.journey / entry.tier without a guard.
+    const audience = (v: any) => {
+      const type = v.audiencetype === 'journey' || v.audiencetype === 'tier' ? v.audiencetype : '';
+      const ids = (x: any) => (Array.isArray(x) ? x : []).map((k: any) => (k ?? '').toString()).filter(Boolean);
+      return {
+        audiencetype: type,
+        journey: type === 'journey' ? ids(v.journey) : [],
+        tier: type === 'tier' ? ids(v.tier) : []
+      };
+    };
+
     this.items.controls.forEach(c => {
       const v = c.value;
       const opt = this.optionByKey[v.key];
@@ -434,7 +522,8 @@ export class EiflixHomeConfigComponent implements OnInit {
           adref: doc(this.firestore, 'eiflixhomewidgets', opt.id),
           title: (v.title || '').trim(),
           subtitle: (v.subtitle || '').trim(),
-          showto: (v.showto || 'both').toLowerCase()
+          showto: (v.showto || 'both').toLowerCase(),
+          ...audience(v)
         });
         if (adsBuffer.length === 2) flushAds();
         return;
@@ -446,7 +535,8 @@ export class EiflixHomeConfigComponent implements OnInit {
         label: opt?.label || v.key,
         title: (v.title || '').trim(),
         subtitle: (v.subtitle || '').trim(),
-        showto: (v.showto || 'both').toLowerCase()
+        showto: (v.showto || 'both').toLowerCase(),
+        ...audience(v)
       };
       if (opt?.type === 'homeseries' && opt.id) {
         base.value = opt.id;

@@ -847,7 +847,7 @@
         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 10px 4px;">
           <mat-form-field appearance="outline" style="flex: 1 1 220px; min-width: 180px; max-width: 50%;">
             <mat-label>Search</mat-label>
-            <input matInput (keyup)="applyFilter($event)" placeholder="Search participants">
+            <input matInput (keyup)="applyFilter($event)" placeholder="Search by name or email">
           </mat-form-field>
 
           <ng-container *ngIf="workshopData?.categorybased === true">
@@ -895,14 +895,17 @@
                     <!-- {{ mapProfile[participant.profileid]['name'] }} -->
                     <div class="participant-details">
                       <span class="participant-name">{{ mapProfile[participant.profileid]?.['name'] }}</span>
-                      <img
-                        *ngIf="mapProfile[participant.profileid]?.workshoponly"
-                        src="assets/new.png"
-                        alt="New"
-                        class="new-badge"
-                      />
+                      <span class="new-badge" *ngIf="mapProfile[participant.profileid]?.workshoponly">New</span>
                   </div>
                   </div>
+                </td>
+              </ng-container>
+              <!-- Email sits next to the name so a row can be identified without opening the profile. -->
+              <ng-container matColumnDef="email">
+                <th mat-header-cell *matHeaderCellDef>Email</th>
+                <td mat-cell *matCellDef="let participant">
+                  <span class="participant-email"
+                        [title]="mapProfile[participant.profileid]?.['email'] || ''">{{ mapProfile[participant.profileid]?.['email'] || '—' }}</span>
                 </td>
               </ng-container>
               <ng-container matColumnDef="type">
@@ -951,33 +954,42 @@
                   <span class="completed-count">{{ workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).completedChallenges : participant.completedChallenges }}</span>
                 </td>
               </ng-container>
+              <!-- Total — parked, not deleted. Hidden from the table for now; wanted again later,
+                   so the cell definition stays here next to its column id in displayedColumns. -->
+              <!--
               <ng-container matColumnDef="total">
                 <th mat-header-cell *matHeaderCellDef>Total</th>
                 <td mat-cell *matCellDef="let participant">
                   <span class="total-count">{{ workshopData?.categorybased === true ? calculateAccessBasedProgress(participant).totalChallenges : participant.totalChallenges }}</span>
                 </td>
               </ng-container>
+              -->
+              <!-- Status — parked, not deleted. Same reason as Total above. -->
+              <!--
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
                 <td mat-cell *matCellDef="let participant">
                   <ng-container *ngIf="workshopData?.categorybased === true; else defaultStatus">
                     <div class="custom-status-chip"
-                        [class]="calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'status-completed' : 
+                        [class]="calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'status-completed' :
                                   calculateAccessBasedProgress(participant).progressPercentage > 0 ? 'status-active' : 'status-inactive'">
-                      <span>{{ calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'Completed' : 
+                      <span>{{ calculateAccessBasedProgress(participant).progressPercentage === 100 ? 'Completed' :
                               calculateAccessBasedProgress(participant).progressPercentage > 0 ? 'Active' : 'Not Started' }}</span>
                     </div>
                   </ng-container>
                   <ng-template #defaultStatus>
                     <div class="custom-status-chip"
-                        [class]="participant.progressPercentage === 100 ? 'status-completed' : 
+                        [class]="participant.progressPercentage === 100 ? 'status-completed' :
                                   participant.progressPercentage > 0 ? 'status-active' : 'status-inactive'">
-                      <span>{{ participant.progressPercentage === 100 ? 'Completed' : 
+                      <span>{{ participant.progressPercentage === 100 ? 'Completed' :
                               participant.progressPercentage > 0 ? 'Active' : 'Not Started' }}</span>
                     </div>
                   </ng-template>
                 </td>
               </ng-container>
+              -->
+              <!-- NOTE: the #defaultStatus ng-template above is parked with its column. If Status is
+                   brought back, uncomment the whole block — the template and its reference move together. -->
               <!-- <ng-container matColumnDef="progress">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Progress</th>
                 <td mat-cell *matCellDef="let participant">
@@ -1033,10 +1045,14 @@
                 </td>
               </ng-container>
 
+              <!-- Assignment — parked, not deleted. Same reason as Total and Status above.
+                   reviewAssignment()/canReviewAssignment() stay on the component so this
+                   can be uncommented on its own. -->
+              <!--
               <ng-container matColumnDef="assignment">
                 <th mat-header-cell *matHeaderCellDef>Assignment</th>
                 <td mat-cell *matCellDef="let participant">
-                  <button data-testid="wd-review-assignment-38" mat-stroked-button 
+                  <button data-testid="wd-review-assignment-38" mat-stroked-button
                           (click)="reviewAssignment(participant)"
                           [disabled]="!canReviewAssignment(participant)"
                           [matTooltip]="canReviewAssignment(participant) ? 'Review assignment' : 'No assignment to review'">
@@ -1044,6 +1060,7 @@
                   </button>
                 </td>
               </ng-container>
+              -->
 
               <tr mat-header-row *matHeaderRowDef="visibleColumns"></tr>
               <tr data-testid="wd-on-participant-click-39" mat-row 
@@ -1089,8 +1106,7 @@
             <div class="pd-hero-main">
               <div class="pd-hero-name">
                 {{ mapProfile[selectedParticipantData.profileid]?.['name'] }}
-                <img *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly"
-                     src="assets/new.png" alt="New" class="new-badge" />
+                <span class="new-badge" *ngIf="mapProfile[selectedParticipantData.profileid]?.workshoponly">New</span>
               </div>
               <div class="pd-hero-meta">
                 <span class="participant-type-chip" *ngIf="workshopData?.categorybased === true"
@@ -2118,12 +2134,7 @@
               <mat-icon class="participant-avatar">person</mat-icon>
               <div class="participant-details">
                 <span class="participant-name">{{ participant.name }}</span>
-                <img
-                  *ngIf="mapProfile[participant.profileid]?.workshoponly"
-                  src="assets/new.png"
-                  alt="New"
-                  class="new-badge"
-                />
+                <span class="new-badge" *ngIf="mapProfile[participant.profileid]?.workshoponly">New</span>
                 <ng-container *ngIf="workshopData?.categorybased === true">
                   <span style="font-size: 11px; margin-top: 3px; display: block;"
                         [style.opacity]="0.7">

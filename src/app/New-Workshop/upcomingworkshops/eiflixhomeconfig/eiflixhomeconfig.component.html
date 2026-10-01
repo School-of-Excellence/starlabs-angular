@@ -168,6 +168,55 @@
                         (click)="setShowTo(idx, s.value)">{{ s.label }}</button>
                     </div>
                   </div>
+
+                  <!-- Narrow this row to a set of journeys OR a set of tiers, never both.
+                       Choosing one clears the other; clicking the chosen one again clears
+                       the choice, which means the row is shown to everyone. -->
+                  <div class="field-col">
+                    <span class="mini-label">Audience</span>
+                    <div class="seg-group" role="radiogroup" aria-label="Audience">
+                      <button data-testid="eif2-audience-journey" type="button" class="seg"
+                        [class.seg-on]="audienceTypeOf(idx) === 'journey'"
+                        [attr.aria-pressed]="audienceTypeOf(idx) === 'journey'"
+                        (click)="setAudienceType(idx, 'journey')">Journey</button>
+                      <button data-testid="eif2-audience-tier" type="button" class="seg"
+                        [class.seg-on]="audienceTypeOf(idx) === 'tier'"
+                        [attr.aria-pressed]="audienceTypeOf(idx) === 'tier'"
+                        (click)="setAudienceType(idx, 'tier')">Tier</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="audience-row" *ngIf="audienceTypeOf(idx) as audienceType">
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="audience-select"
+                    *ngIf="audienceType === 'journey'">
+                    <mat-label>Journeys</mat-label>
+                    <mat-select data-testid="eif2-journey-select" formControlName="journey" multiple
+                      (openedChange)="audienceSearch = ''">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="audienceSearch" [ngModelOptions]="{ standalone: true }"
+                          [placeholderLabel]="'Search journeys'" [noEntriesFoundLabel]="'No matching journey'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let j of filteredJourneys()" [value]="j.id">{{ j.name }}</mat-option>
+                    </mat-select>
+                    <mat-hint>{{ audienceCount(idx) }} selected</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="audience-select"
+                    *ngIf="audienceType === 'tier'">
+                    <mat-label>Tiers</mat-label>
+                    <mat-select data-testid="eif2-tier-select" formControlName="tier" multiple
+                      (openedChange)="audienceSearch = ''">
+                      <mat-option>
+                        <ngx-mat-select-search [(ngModel)]="audienceSearch" [ngModelOptions]="{ standalone: true }"
+                          [placeholderLabel]="'Search tiers'" [noEntriesFoundLabel]="'No matching tier'"
+                          ngDefaultControl></ngx-mat-select-search>
+                      </mat-option>
+                      <mat-option *ngFor="let t of filteredTiers()" [value]="t.id">{{ t.name }}</mat-option>
+                    </mat-select>
+                    <mat-hint>{{ audienceCount(idx) }} selected</mat-hint>
+                  </mat-form-field>
                 </div>
 
                 <!-- Home Series only: tag visibility + up to 3 tags. -->
