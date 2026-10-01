@@ -35,7 +35,10 @@
           @case ('util') { <app-sas-utilisation /> }
           @case ('book') {
             <div class="sas-phead"><div><h1 data-testid="sas-book-title">Book Session</h1><p>Book a participant into an open slot.</p></div></div>
-            <section class="sas-card" data-testid="sas-book"><app-book-appointment /></section>
+            <app-sas-filter-bar scope="all" [profileId]="profileId" (filterChange)="bookFilter = $event" />
+            <section class="sas-card sas-book-card" data-testid="sas-book">
+              <app-book-appointment [filterProductId]="bookFilter.productId" [filterTypeIds]="bookFilter.typeIds" />
+            </section>
           }
           @case ('settings') { <app-sas-settings /> }
         }

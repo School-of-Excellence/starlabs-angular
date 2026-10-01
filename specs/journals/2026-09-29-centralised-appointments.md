@@ -124,3 +124,7 @@ redundant. Removed `fixed` from the Angular write, model and labels; the CF chan
 committed or deployed). Static and auto docs now look the same in the data.
 Deploy of the (unchanged) computeSlot to starlabs-test was blocked by the repo's predeploy guard: the emulator
 needs Java 21, this machine has 17. Nothing was deployed.
+
+## Next: testing report round 1 (2026-10-01)
+See `specs/journals/2026-10-01-specialist-studio-testing-round1.md` (Day view, type columns, window details,
+product/type/booked filters, bulk delete, Join timing, time format).

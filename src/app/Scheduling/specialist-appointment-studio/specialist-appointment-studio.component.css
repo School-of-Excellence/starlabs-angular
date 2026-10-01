@@ -172,7 +172,7 @@
 .sas-rc-g { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; text-align:center; }
 .sas-rc-g span { font-size:11px; font-weight:800; color:var(--bt-ink-45); padding:4px 0; }
 .sas-rc-d { border:0; background:none; height:36px; border-radius:10px; font-size:13px; font-weight:600; color:var(--bt-ink); }
-.sas-rc-d:hover:not(:disabled) { background:var(--bt-fill); }
+.sas-rc-d:hover:not(:disabled):not(.is-in):not(.is-edge) { background:var(--bt-fill); }
 .sas-rc-d:disabled { color:var(--bt-ink-25); cursor:default; }
 .sas-rc-d.is-in { background:var(--bt-primary-tint); color:var(--bt-primary-deep); border-radius:0; }
 .sas-rc-d.is-edge { background:var(--bt-primary-deep); color:#fff; border-radius:10px; }
@@ -229,3 +229,18 @@
 .sas-viewas .sas-sel { width:100%; text-transform:none; letter-spacing:0; font-size:13.5px; color:var(--bt-ink); }
 @media (max-width:900px) { .sas-viewas { flex-direction:row; align-items:center; padding:0 8px 0 0; margin:0; border:0; flex-shrink:0; } .sas-viewas .sas-sel { width:auto; } }
 .sas-slot small.sas-slot-who { color:var(--bt-primary-deep); font-weight:800; padding-right:22px; }
+/* testing round 1 (2026-10-01): filter bar, Day view, window details, bulk delete, Join gating */
+.sas-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.sas-fsel { min-width:200px; max-width:300px; }
+.sas-wk-h.is-btn { border:0; background:none; padding:0; text-align:left; cursor:pointer; }
+.sas-wk-h.is-btn:hover b { color:var(--bt-primary-deep); }
+.sas-slot.is-click { cursor:pointer; }
+.sas-dcols { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; }
+.sas-dcol .sas-slot.is-sess { margin-left:0; width:100%; }
+.sas-djoin { display:block; margin:-2px 0 2px 4px; }
+.sas-dadd { width:100%; margin-top:8px; }
+.sas-link:disabled { opacity:.45; cursor:not-allowed; }
+.sas-chk { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--bt-ink-70); cursor:pointer; }
+.sas-chk-col { width:36px; }
+.sas-chk input, .sas-chk-col input { width:16px; height:16px; accent-color:var(--bt-primary-deep); cursor:pointer; }
+.sas-book-card { margin-top:10px; }

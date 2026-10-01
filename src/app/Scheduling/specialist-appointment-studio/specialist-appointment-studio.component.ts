@@ -8,7 +8,8 @@ import { SasTeamComponent } from './sas-team/sas-team.component';
 import { SasMentorsComponent } from './sas-mentors/sas-mentors.component';
 import { SasUtilisationComponent } from './sas-utilisation/sas-utilisation.component';
 import { SasSettingsComponent } from './sas-settings/sas-settings.component';
-import { ViewRole, VIEW_LABEL, ownsProduct } from './sas-logic';
+import { ViewRole, VIEW_LABEL, ownsProduct, SasFilter, NO_FILTER } from './sas-logic';
+import { SasFilterBarComponent } from './sas-filter-bar/sas-filter-bar.component';
 import { SasLoaderComponent } from './sas-loader/sas-loader.component';
 
 export type SasTab = 'home' | 'team' | 'overview' | 'mentors' | 'util' | 'book' | 'settings';
@@ -24,7 +25,7 @@ export const NAV: Record<Exclude<ViewRole, null>, NavItem[]> = {
     { tab: 'mentors', label: 'Mentors', icon: 'supervisor_account' },
     { tab: 'util', label: 'Utilisation', icon: 'insights' },
     { tab: 'book', label: 'Book Session', icon: 'event_available' },
-    { tab: 'settings', label: 'Settings', icon: 'tune' },
+    { tab: 'settings', label: 'Delivery Type Details', icon: 'tune' },
   ],
 };
 
@@ -34,7 +35,7 @@ export const NAV: Record<Exclude<ViewRole, null>, NavItem[]> = {
   selector: 'app-specialist-appointment-studio',
   imports: [
     MatIconModule, FormsModule, SasLoaderComponent, BookAppointmentComponent, SasHomeComponent, SasTeamComponent,
-    SasMentorsComponent, SasUtilisationComponent, SasSettingsComponent,
+    SasMentorsComponent, SasUtilisationComponent, SasSettingsComponent, SasFilterBarComponent,
   ],
   templateUrl: './specialist-appointment-studio.component.html',
   styleUrl: './specialist-appointment-studio.component.css',
@@ -49,8 +50,12 @@ export class SpecialistAppointmentStudioComponent implements OnInit {
   noProduct = false;          // Mentor view, but no product owner assigned
   nav: NavItem[] = [];
   tab: SasTab = 'home';
+  /* Book Session: product + type filter handed to book-appointment. */
+  bookFilter: SasFilter = NO_FILTER;
 
   constructor(private svc: SpecialistAppointmentService) {}
+
+  get profileId() { return this.svc.profileId; }
 
   async ngOnInit() {
     try {

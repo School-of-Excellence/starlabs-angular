@@ -13,7 +13,7 @@ interface TypeRow { id: string; name: string; duration: number; group: boolean; 
   imports: [FormsModule, SasLoaderComponent],
   template: `
     <div class="sas-phead"><div>
-      <h1 data-testid="sst-title">Settings</h1>
+      <h1 data-testid="sst-title">Delivery Type Details</h1>
       <p>Delivery types and their length. Start times are cut from these lengths. This page is view only.</p>
     </div></div>
     <section class="sas-card">

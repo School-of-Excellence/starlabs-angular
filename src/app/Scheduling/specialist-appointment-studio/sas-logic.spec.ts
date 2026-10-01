@@ -2,6 +2,7 @@ import {
   resolveViewRole, unionMinutes, bookedMinutes, hoursSummary, previewSlots, apptStatus,
   windowState, periodOf, shiftPeriod, overlapsAny, AvailWindow, Appt, NO_SHOW_REASON,
   openMinutes, availStatus, windowLabel, windowStatus, availableViews,
+  fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot,
 } from './sas-logic';
 
 const T = (h: number, m = 0) => new Date(2026, 8, 28, h, m);
@@ -192,6 +193,72 @@ describe('sas-logic', () => {
       expect(p.from.getDay()).toBe(1);
       expect(periodOf('month', new Date(2026, 8, 30)).from.getDate()).toBe(1);
       expect(shiftPeriod(p, 1).from.getDate()).toBe(new Date(2026, 9, 5).getDate());
+    });
+  });
+
+  describe('round 1 (2026-10-01)', () => {
+    const sl = (typeId: string, h: number, m: number, len: number, booked = false): Slot =>
+      ({ typeId, start: T(h, m), end: new Date(T(h, m).getTime() + len * 60000), booked, available: !booked });
+
+    it('fmtHours reads as minutes and hours, never decimals or days', () => {
+      expect(fmtHours(0)).toBe('0 min');
+      expect(fmtHours(50)).toBe('50 min');
+      expect(fmtHours(60)).toBe('1h');
+      expect(fmtHours(70)).toBe('1h 10m');
+      expect(fmtHours(1590)).toBe('26h 30m');
+    });
+
+    it('a Day period is one day and moves a day at a time', () => {
+      const d = periodOf('day', new Date(2026, 8, 30, 15));
+      expect(d.from.getTime()).toBe(new Date(2026, 8, 30).getTime());
+      expect(d.to.getTime()).toBe(new Date(2026, 9, 1).getTime());
+      expect(shiftPeriod(d, 1).from.getTime()).toBe(new Date(2026, 9, 1).getTime());
+      expect(shiftPeriod(d, -1).from.getTime()).toBe(new Date(2026, 8, 29).getTime());
+    });
+
+    it('scopeWindow keeps only the picked types and trims the time to their slots', () => {
+      const w = win({ slots: [sl('a', 9, 0, 60), sl('a', 9, 30, 60), sl('b', 11, 0, 30)] });
+      const a = scopeWindow(w, ['a'])!;
+      expect(a.typeIds).toEqual(['a']);
+      expect(a.slots.length).toBe(2);
+      expect(a.start.getTime()).toBe(T(9).getTime());
+      expect(a.end.getTime()).toBe(T(10, 30).getTime());
+      expect(scopeWindow(w, ['zzz'])).toBeNull();
+      expect(scopeWindow(w, null)).toBe(w);
+    });
+
+    it('apptMatches checks type, and product when the session has one', () => {
+      const f = { productId: 'P1', typeIds: ['a'], booked: 'all' as const };
+      expect(apptMatches(appt({ typeId: 'a', productId: 'P1' }), f)).toBeTrue();
+      expect(apptMatches(appt({ typeId: 'a', productId: 'P2' }), f)).toBeFalse();
+      expect(apptMatches(appt({ typeId: 'b', productId: 'P1' }), f)).toBeFalse();
+      expect(apptMatches(appt({ typeId: 'a', productId: null }), f)).toBeTrue();
+    });
+
+    it('windowMatchesBooked: booked = holds a booking, not booked = still bookable', () => {
+      const w = win({ slots: [sl('a', 9, 0, 60, true), sl('a', 10, 0, 60)] });
+      expect(windowMatchesBooked(w, 'booked', T(8))).toBeTrue();
+      expect(windowMatchesBooked(w, 'open', T(8))).toBeTrue();
+      expect(windowMatchesBooked(w, 'open', T(10, 30))).toBeFalse();
+    });
+
+    it('dayColumns lists open and booked slots per type, hiding blocked ones', () => {
+      const blocked: Slot = { ...sl('a', 9, 30, 60), available: false };
+      const w = win({ slots: [sl('a', 9, 0, 60, true), blocked, sl('a', 10, 0, 60), sl('b', 9, 0, 30)] });
+      const cols = dayColumns([w], [appt({ id: 's1', start: T(9), end: T(10), typeId: 'a' })], T(8));
+      const a = cols.find(c => c.typeId === 'a')!;
+      expect(a.entries.map(e => e.start.getHours() + ':' + e.start.getMinutes())).toEqual(['9:0', '10:0']);
+      expect(a.entries[0].appt?.id).toBe('s1');
+      expect(cols.find(c => c.typeId === 'b')!.entries.length).toBe(1);
+      expect(dayColumns([w], [], T(8), 'booked').map(c => c.typeId)).toEqual(['a']);
+    });
+
+    it('joinOpen: from 5 minutes before the start until the end', () => {
+      const a = appt({ start: T(10), end: T(11) });
+      expect(joinOpen(a, T(9, 54))).toBeFalse();
+      expect(joinOpen(a, T(9, 55))).toBeTrue();
+      expect(joinOpen(a, T(10, 59))).toBeTrue();
+      expect(joinOpen(a, T(11))).toBeFalse();
     });
   });
 

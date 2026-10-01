@@ -17,8 +17,9 @@
 </div>
 
 <div class="sas-stack">
-  <div style="display:flex;justify-content:flex-end">
-    <app-sas-period-bar [period]="period" (periodChange)="onPeriod($event)" />
+  <div class="sas-toolbar">
+    <app-sas-filter-bar [scope]="filterScope" [profileId]="svc.profileId" [showBooked]="true" (filterChange)="onFilter($event)" />
+    <app-sas-period-bar [period]="period" [allowDay]="true" (periodChange)="onPeriod($event)" />
   </div>
 
   @if (loading) {
@@ -53,20 +54,51 @@
     </div>
     @if (loading) {
       <app-sas-loader msg="Loading calendar…" />
+    } @else if (period.mode === 'day') {
+      <!-- Day: one column per delivery type, listing open and booked slots (operator, 2026-10-01) -->
+      @if (!dayCols.length) {
+        <div class="sas-empty" data-testid="sah-day-empty"><b>No availability on this day</b>{{ isFutureDay(period.from) ? 'Add availability to open slots for booking.' : '' }}</div>
+      } @else {
+        <div class="sas-dcols" data-testid="sah-day-view">
+          @for (c of dayCols; track c.typeId) {
+            <div class="sas-wk-col sas-dcol" data-testid="sah-day-col">
+              <div class="sas-wk-h">{{ typeDuration(c.typeId) }}<b>{{ typeLabel(c.typeId) }}</b></div>
+              @for (e of c.entries; track $index) {
+                <button class="sas-slot" [class]="entryClass(e)" data-testid="sah-day-slot" (click)="entryClick(e)">
+                  @if (allMode) { <small class="sas-slot-who">{{ svc.name(e.profileId) }}</small> }
+                  <b>{{ t(e.start) }} – {{ t(e.end) }}</b>
+                  <small>{{ entryStatus(e) }}{{ e.appt ? ' · ' + svc.name(e.appt.participantId) : '' }}</small>
+                </button>
+                @if (entryRow(e); as row) {
+                  @if (status(row) === 'Booked' || status(row) === 'In session') {
+                    <span class="sas-djoin" [matTooltip]="joinTip(row)">
+                      <button class="sas-link" data-testid="sah-day-join" [disabled]="!canJoin(row)" (click)="join(row)"><mat-icon>videocam</mat-icon>Join</button>
+                    </span>
+                  }
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+      @if (isFutureDay(period.from)) {
+        <button class="sas-add-slot sas-dadd" data-testid="sah-day-add-availability" (click)="addAvailability(period.from)">+ Add availability on this day</button>
+      }
     } @else if (showCalendar && period.mode === 'week') {
       <div class="sas-wk-wrap"><div class="sas-wk">
         @for (d of days; track d.date.getTime(); let i = $index) {
           <div class="sas-wk-col" [class.is-today]="isToday(d.date)">
-            <div class="sas-wk-h">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></div>
+            <button class="sas-wk-h is-btn" data-testid="sah-day-open" (click)="gotoDay(d.date)" [attr.aria-label]="'Open ' + (d.date | date: 'fullDate')">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></button>
             @if (!d.windows.length && !d.loose.length) { <div class="sas-wk-none">No availability</div> }
             @for (x of d.windows; track x.w.id) {
-              <div class="sas-slot" [class]="'sas-slot s-' + x.state" data-testid="sah-window">
+              <div class="sas-slot is-click" [class]="'sas-slot is-click s-' + x.state" data-testid="sah-window" role="button" tabindex="0"
+                [matTooltip]="typeNames(x.w)" (click)="openWindow(x.w)" (keydown.enter)="openWindow(x.w)">
                 @if (allMode) { <small class="sas-slot-who" data-testid="sah-window-who">{{ svc.name(x.w.profileId) }}</small> }
                 <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
                 <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}</small>
                 <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
                 @if (x.w.start > now) {
-                  <button class="sas-icon-btn sas-del" data-testid="sah-window-delete" (click)="deleteWindow(x.w, $event)" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
+                  <button class="sas-icon-btn sas-del" data-testid="sah-window-delete" (click)="deleteWindow(x.w, $event)" (keydown.enter)="$event.stopPropagation()" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
                 }
               </div>
               @for (r of x.sessions; track r.appt.id) {
@@ -91,14 +123,46 @@
       <div class="sas-mg">
         @for (n of DAYS; track n) { <div class="sas-mh">{{ n }}</div> }
         @for (c of month; track c.date.getTime()) {
-          <button class="sas-mc" [class.is-out]="c.out" [class.is-today]="isToday(c.date)" data-testid="sah-month-day" (click)="gotoWeek(c.date)" [attr.aria-label]="'Open the week of ' + (c.date | date: 'd MMM')">
+          <button class="sas-mc" [class.is-out]="c.out" [class.is-today]="isToday(c.date)" data-testid="sah-month-day" (click)="gotoDay(c.date)" [attr.aria-label]="'Open ' + (c.date | date: 'fullDate')">
             <span class="n">{{ c.date.getDate() }}</span>
             @for (l of c.lines; track $index) { <span class="ln" [style.--dc]="l.color"><i></i><span>{{ l.label }}</span></span> }
             @if (c.more) { <span class="ln">+{{ c.more }}</span> }
           </button>
         }
       </div>
-      <p class="sas-fine">Select a day to open its week.</p>
+      <p class="sas-fine">Select a day to open it.</p>
+    }
+  </section>
+
+  <section class="sas-card" data-testid="sah-avail">
+    <div class="sas-ch">
+      <h2>Availability</h2>
+      <div class="sas-ca">
+        <label class="sas-chk"><input type="checkbox" data-testid="sah-avail-all" [checked]="allSelected" [disabled]="!selectable.length || deleting" (change)="toggleAll()">Select all</label>
+        <button class="sas-btn is-danger" data-testid="sah-avail-delete" [disabled]="!selected.size || deleting" (click)="deleteSelected()">
+          <mat-icon>delete_outline</mat-icon>{{ deleting ? 'Deleting…' : 'Delete selected (' + selected.size + ')' }}
+        </button>
+      </div>
+      <div class="sas-chs">Availability in this {{ period.mode }}. Only future windows with nothing booked can be selected.</div>
+    </div>
+    @if (loading) { <app-sas-loader msg="Loading availability…" /> }
+    @else if (!availList.length) { <div class="sas-empty" data-testid="sah-avail-empty"><b>No availability in this {{ period.mode }}</b></div> }
+    @else {
+      <div class="sas-tw"><table class="sas-tbl">
+        <thead><tr><th class="sas-chk-col"><span style="font-size:0">Select</span></th><th>Date &amp; time</th>@if (showSpecialistCol) {<th>Specialist</th>}<th>Delivery types</th><th>Status</th></tr></thead>
+        <tbody>
+          @for (w of availList; track w.id) {
+            <tr data-testid="sah-avail-row">
+              <td class="sas-chk-col"><input type="checkbox" data-testid="sah-avail-check" [checked]="selected.has(w.id)" [disabled]="!canDelete(w) || deleting"
+                (change)="toggle(w)" [attr.aria-label]="'Select ' + (w.start | date: 'd MMM H:mm')"></td>
+              <td><b class="nw">{{ w.start | date: 'EEE, d MMM y' }}</b><small>{{ t(w.start) }} – {{ t(w.end) }}</small></td>
+              @if (showSpecialistCol) { <td>{{ svc.name(w.profileId) }}</td> }
+              <td>{{ typeNames(w) }}</td>
+              <td><span class="sas-pill">{{ windowLabelOf(w) }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
     }
   </section>
 
@@ -117,7 +181,7 @@
               <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
               @if (showSpecialistCol) { <td>{{ hostNames(r) }}</td> }
               <td><span class="sas-pill" [class]="'sas-pill ' + pillClass(r)">{{ status(r) }}</span></td>
-              <td><button class="sas-link" data-testid="sah-join" (click)="join(r)"><mat-icon>videocam</mat-icon>Join</button></td>
+              <td><span [matTooltip]="joinTip(r)"><button class="sas-link" data-testid="sah-join" [disabled]="!canJoin(r)" (click)="join(r)"><mat-icon>videocam</mat-icon>Join</button></span></td>
               <td class="r">
                 <button class="sas-icon-btn" data-testid="sah-upcoming-menu" [matMenuTriggerFor]="upMenu" aria-label="Actions"><mat-icon>more_horiz</mat-icon></button>
                 <mat-menu #upMenu="matMenu">

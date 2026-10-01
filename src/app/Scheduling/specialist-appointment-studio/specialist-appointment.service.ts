@@ -13,6 +13,9 @@ export interface Team { productIds: string[]; memberIds: string[]; }
 export interface RoleEis { id: string; name: string; kind: 'required' | 'additional'; eisIds: string[]; }
 export interface TypeBreakdown { id: string; name: string; duration: number; roles: RoleEis[]; }
 export interface ProductBreakdown { id: string; name: string; atcmodel: string; types: TypeBreakdown[]; }
+export interface FilterProduct { id: string; name: string; typeIds: string[]; }
+export interface FilterType { id: string; name: string; duration: number; }
+export interface FilterOptions { products: FilterProduct[]; types: FilterType[]; }
 
 const toDate = (v: any): Date | null => (v == null ? null : typeof v.toDate === 'function' ? v.toDate() : new Date(v));
 const chunk = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
@@ -257,6 +260,29 @@ export class SpecialistAppointmentService {
         };
       }),
     })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /* ---------- Product + appointment-type filter ----------
+     all (A&H): every product and every appointment type.
+     mentor: the products they own; types = the ones they can give (typesFor).
+     cw: products that hold a type they can give; types = the ones they can give.
+     A product's typeIds are its delivery-sequence types, cut to the type options. */
+  async filterOptions(scope: 'all' | 'mentor' | 'cw', profileId: string): Promise<FilterOptions> {
+    await this.init();
+    const toProducts = (list: ProductBreakdown[], keep: (id: string) => boolean) =>
+      list.map(p => ({ id: p.id, name: p.name, typeIds: p.types.map(t => t.id).filter(keep) }));
+    if (scope === 'all') {
+      const types = Object.keys(this.mapAppointmentData).map(id => ({
+        id, name: this.mapAppointmentData[id]?.['appointmenttype'] ?? id, duration: this.mapAppointmentData[id]?.['duration'] ?? 0,
+      })).sort((a, b) => a.name.localeCompare(b.name));
+      return { products: toProducts(await this.productsFor(await this.atcModels()), () => true), types };
+    }
+    const types = (await this.typesFor(profileId)).map(({ id, name, duration }) => ({ id, name, duration }));
+    const own = new Set(types.map(t => t.id));
+    if (scope === 'mentor') {
+      return { products: toProducts(await this.productsFor(this.roles['productowner'] ?? []), id => own.has(id)), types };
+    }
+    return { products: toProducts(await this.productsFor(await this.atcModels()), id => own.has(id)).filter(p => p.typeIds.length), types };
   }
 
   /* ---------- Add availability ---------- */

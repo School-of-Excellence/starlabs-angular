@@ -1,43 +1,37 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-09-29 (centralised appointment system)_
+_Last updated: 2026-10-01 (specialist studio testing round 1)_
 · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-09-29-centralised-appointments.md`.
+`specs/journals/2026-10-01-specialist-studio-testing-round1.md`.
 
 ## Current state
-- Branch `feature-test`: the new `/specialistappointmentstudio` screen is committed and **pushed** to
-  `origin/feature-test`. It builds clean (production), and 58/58 of its specs pass.
-- `starlabs-cloud-function`: no changes. The `computeSlot` change was discarded; static slots don't need it.
-- Nothing is deployed.
+- Branch `feature-test`: `/specialistappointmentstudio` is pushed up to `5f480f98`. Other sessions' commits
+  on top of it (participant-intelligence, participants-analytics, bigcohorts) have their own journals.
+- Round-1 testing fixes are **uncommitted** in the working tree. The dev build is clean and 78/78 studio specs pass.
+- `starlabs-cloud-function`: unchanged. Nothing is deployed.
 
-## Last session changes (2026-09-29)
-- **Centralised appointments**: one route whose view depends on the user's role (Mentor > A&H > CW),
-  built from the prototype `starlabs-appointments-v2.html`. The operator dictated every section in plan mode.
-  - **CW**: Home. It shows stats (window hours · booked slot time · delivered · unutilised ·
-    delivered ÷ available), a week/month calendar, upcoming sessions (Join copies the Zoom URL) and past
-    sessions (filters: Completed / Cancelled / Status updation pending → the calendar's detail and
-    mark-status dialogs).
-  - **Mentor**: Home plus My Team. The team comes from productowner → products → delivery sequence →
-    appointment types → roles → EIS.
-  - **A&H**: Overview (everyone, with a specialist filter), Mentors, Utilisation, Book Session
-    (the existing `BookAppointmentComponent`, embedded) and Settings (view only).
-  - **Add availability**: Auto (`computeSlot` intervals, with a preview) or Static (`fixed: true`, one
-    slot per type). Uses a single-month range calendar, and keeps the existing gate and overlap rules.
-  - **Why window hours:** `computeSlot` slots overlap per type, so adding them up overcounted.
-  - `AppointmentDetailComponent` gained an optional `disableCancel` flag, so only A&H can cancel from this screen.
-- Later the same day: View as dropdown, the all-specialists calendar, per-day static slots, past-session paging,
-  Join opening AppointmentZoomView, No-show shown as Cancelled, and a fix for stale loads. Details are in the journal.
-- **Failures and root causes:** the first test run failed 3 add-availability specs. The cause was that
-  `ngOnInit` re-ran `loadProfile()` after the test had loaded it, which cleared the types. The test order
-  was fixed; this was not a component bug.
+## Last session changes (2026-10-01)
+- Went through the testing report one item at a time; the decisions are in
+  `specs/plans/2026-10-01-specialist-studio-testing-round1.md`.
+- Built:
+  - **Time format:** `50 min`, `1h 10m`.
+  - **Range calendar:** the selected date shows immediately (a hover-specificity bug).
+  - **Calendar windows:** hovering shows the types; clicking opens an Availability details dialog.
+  - **Views:** Day · Week · Month on Home and Overview, Today opens Day mode, and Day has one column of
+    slots per type.
+  - **Filters:** product and type on Home and Book Session (a product ticks its types); Booked / Not
+    booked on Home only (the stats ignore it).
+  - **Bulk delete:** a select-all list of unbooked windows.
+  - **Join:** opens 5 minutes before the start and closes at the end.
+  - **Rename:** Settings → Delivery Type Details.
+- Parked: responsive layout, Edit availability (no edit; delete and re-add), pre-assigning specialists,
+  and the participant tracker.
+- Failure and its root cause: the Home specs hung. An in-zone `setInterval` (the Join clock) stopped
+  `whenStable` from settling. Fixed by running the clock outside the zone.
 
 ## Pending
-- A `dashboard` access entry for `specialistappointmentstudio`. Without it the guard shows "Contact Admin".
-- Uncommitted on `feature-test`: removal of the `fixed` flag (static slots work with the unchanged `computeSlot`).
-- CF deploys from this machine are blocked: the repo's predeploy guard runs the emulator, which needs Java 21 (installed: 17).
-- A live check on starlabs-test as a CW, a Mentor and an A&H user. The preview pane needs a login.
-- **e2e coverage is missing**: the screen was pushed before a starlabs-e2e-tests suite existed (operator's call).
-  Add the suite, seed and spec next. The hook prefixes are in the journal.
-- Flag: Book Session treats `ahmember`/`developer`/`tester`-only users as participants. This comes from
-  book-appointment's own role check.
-- Carried: create `static meta data/Workshop Admin` in production by hand (workshop Dashboard Access).
+- Commit and push of round 1: waiting for the operator.
+- Live check as CW, Mentor and A&H on starlabs-test (the preview needs a login).
+- e2e suite for the studio (prefixes: sas, sah, saa, sap, sal, stt, stm, smn, sut, sst, saf, saw).
+- `dashboard` access entries for `specialistappointmentstudio` and `appointment-status-update`.
+- Cloud Function deploys are blocked on Java 21 (installed: 17).

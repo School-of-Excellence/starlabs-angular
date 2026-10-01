@@ -1,6 +1,6 @@
 import { CommonModule, DatePipe, Location } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnChanges, OnInit } from '@angular/core';
 import { arrayUnion, collection, doc, Firestore, getDoc, getDocs, limit, query, serverTimestamp, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -38,7 +38,31 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
   templateUrl: './book-appointment.component.html',
   styleUrl: './book-appointment.component.css'
 })
-export class BookAppointmentComponent implements OnInit{
+export class BookAppointmentComponent implements OnInit, OnChanges{
+
+  /* Optional filter, set only by the Specialist Appointment Studio's Book Session tab: narrows the
+     participant's products and appointment types. null = no filter, so /bookappointment is unchanged. */
+  @Input() filterProductId: string | null = null
+  @Input() filterTypeIds: string[] | null = null
+
+  shownProducts(products: any[]) {
+    return (products ?? []).filter(p => !this.filterProductId || p.productid == this.filterProductId)
+  }
+
+  shownAppointments(product: any) {
+    return (product.appointment ?? []).filter(a => !this.filterTypeIds || this.filterTypeIds.includes(a.id))
+  }
+
+  /* A picked appointment the new filter hides is dropped, with its date and slots. */
+  ngOnChanges() {
+    const a: any = this.selectedAppointment
+    if (a && ((this.filterProductId && a.productid != this.filterProductId) || (this.filterTypeIds && !this.filterTypeIds.includes(a.id)))) {
+      this.selectedAppointment = null
+      this.selectedDate = null
+      this.selectedSlot = null
+      this.userAvailableSlots = []
+    }
+  }
 
   mindate
   loggedinPID

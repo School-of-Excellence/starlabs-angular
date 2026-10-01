@@ -35,4 +35,28 @@ describe('SasPeriodBarComponent', () => {
     click('sap-today');
     expect(emitted[0].from.getTime()).toBe(periodOf('week', new Date()).from.getTime());
   });
+
+  it('offers Day only when allowed', () => {
+    expect(fixture.nativeElement.querySelector('[data-testid="sap-day"]')).toBeNull();
+    component.allowDay = true;
+    fixture.detectChanges();
+    click('sap-day');
+    expect(emitted[0].mode).toBe('day');
+    expect(emitted[0].from.getDate()).toBe(28);
+  });
+
+  it('Today opens today\'s Day view on the calendar screens', () => {
+    component.allowDay = true;
+    click('sap-today');
+    expect(emitted[0].mode).toBe('day');
+    expect(emitted[0].from.getTime()).toBe(periodOf('day', new Date()).from.getTime());
+  });
+
+  it('moves a day at a time in Day mode', () => {
+    component.period = periodOf('day', new Date(2026, 8, 30));
+    fixture.detectChanges();
+    click('sap-next');
+    expect(emitted[0].from.getDate()).toBe(1);
+    expect(emitted[0].from.getMonth()).toBe(9);
+  });
 });

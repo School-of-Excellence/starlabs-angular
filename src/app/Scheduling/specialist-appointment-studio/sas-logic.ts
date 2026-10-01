@@ -157,9 +157,11 @@ export function hoursSummary(windows: AvailWindow[], appts: Appt[]): Hours {
   };
 }
 
+/* 50 → "50 min", 60 → "1h", 70 → "1h 10m", 1590 → "26h 30m". Never days (operator, 2026-10-01). */
 export function fmtHours(min: number): string {
-  const v = Math.round(min / 6) / 10;
-  return v + (v === 1 ? ' hr' : ' hrs');
+  const m = Math.round(min), h = Math.floor(m / 60), r = m % 60;
+  if (!h) return r + ' min';
+  return r ? `${h}h ${r}m` : `${h}h`;
 }
 
 /* ---------- Slot preview: mirrors computeSlot (starlabs-cloud-function appointment.js) ----------
@@ -183,7 +185,8 @@ export function previewSlots(start: Date, end: Date, types: TypeDur[]): Record<s
 }
 
 /* ---------- Period ---------- */
-export type PeriodMode = 'week' | 'month';
+/* 'day' is offered on the calendar screens only (Home, Overview); see SasPeriodBarComponent.allowDay. */
+export type PeriodMode = 'day' | 'week' | 'month';
 export interface Period { mode: PeriodMode; from: Date; to: Date; }
 
 export function mondayOf(d: Date): Date {
@@ -194,6 +197,10 @@ export function mondayOf(d: Date): Date {
 
 /* from is inclusive, to is exclusive. */
 export function periodOf(mode: PeriodMode, anchor: Date): Period {
+  if (mode === 'day') {
+    const from = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+    return { mode, from, to: new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1) };
+  }
   if (mode === 'week') {
     const from = mondayOf(anchor);
     const to = new Date(from); to.setDate(to.getDate() + 7);
@@ -206,7 +213,9 @@ export function periodOf(mode: PeriodMode, anchor: Date): Period {
 
 export function shiftPeriod(p: Period, dir: 1 | -1): Period {
   const a = new Date(p.from);
-  if (p.mode === 'week') a.setDate(a.getDate() + 7 * dir); else a.setMonth(a.getMonth() + dir);
+  if (p.mode === 'day') a.setDate(a.getDate() + dir);
+  else if (p.mode === 'week') a.setDate(a.getDate() + 7 * dir);
+  else a.setMonth(a.getMonth() + dir);
   return periodOf(p.mode, a);
 }
 
@@ -225,3 +234,70 @@ export function daysBetween(a: Date, b: Date): Date[] {
 /* True when [s,e) overlaps any interval (same rule as add-appointment-availability's validateAvailabilityExists). */
 export const overlapsAny = (s: Date, e: Date, list: Interval[]) =>
   list.some(i => (s >= i.start && s < i.end) || (e > i.start && e <= i.end) || (i.start >= s && i.start < e));
+
+/* ---------- Filters (Home: product + appointment types + booked / not booked) ---------- */
+export type BookedFilter = 'all' | 'booked' | 'open';
+export interface SasFilter { productId: string | null; typeIds: string[] | null; booked: BookedFilter; }
+export const NO_FILTER: SasFilter = { productId: null, typeIds: null, booked: 'all' };
+
+/* A window cut down to the picked types: only their slots, and the window's time trimmed to the span of
+   those slots, so hours count only the matching slots (operator, 2026-10-01). null = nothing matches.
+   A window whose slots are not generated yet keeps its own time. */
+export function scopeWindow(w: AvailWindow, typeIds: string[] | null): AvailWindow | null {
+  if (!typeIds) return w;
+  const ids = w.typeIds.filter(t => typeIds.includes(t));
+  if (!ids.length) return null;
+  const slots = w.slots.filter(s => ids.includes(s.typeId));
+  if (!slots.length) return { ...w, typeIds: ids, slots };
+  const start = new Date(Math.min(...slots.map(s => s.start.getTime())));
+  const end = new Date(Math.max(...slots.map(s => s.end.getTime())));
+  return { ...w, typeIds: ids, slots, start, end };
+}
+
+/* A session matches when its type is picked and, with a product picked, it belongs to that product. */
+export function apptMatches(a: Appt, f: SasFilter): boolean {
+  if (f.typeIds && !(a.typeId && f.typeIds.includes(a.typeId))) return false;
+  if (f.productId && a.productId && a.productId !== f.productId) return false;
+  return true;
+}
+
+/* Booked / Not booked for a window: booked = holds a booked slot; not booked = still has a bookable slot. */
+export function windowMatchesBooked(w: AvailWindow, b: BookedFilter, now: Date): boolean {
+  if (b === 'booked') return w.slots.some(s => s.booked);
+  if (b === 'open') return w.slots.some(s => bookable(s, now));
+  return true;
+}
+
+/* ---------- Day view: one column per delivery type, listing slots ----------
+   Shown: bookable slots (free, future) and booked slots. A booked slot carries its session when one
+   matches (same specialist, same start, same type); sessions outside any slot are added to their
+   type's column too. Cancelled sessions are left out (they free the slot again). Blocked (overlap) and past unbooked slots are hidden (operator, 2026-10-01). */
+export interface DayEntry { start: Date; end: Date; profileId: string; typeId: string; w: AvailWindow | null; appt: Appt | null; booked: boolean; }
+export interface DayColumn { typeId: string; entries: DayEntry[]; }
+
+export function dayColumns(wins: AvailWindow[], sessions: Appt[], now: Date, booked: BookedFilter = 'all'): DayColumn[] {
+  const cols = new Map<string, DayEntry[]>();
+  const add = (e: DayEntry) => cols.set(e.typeId, [...(cols.get(e.typeId) ?? []), e]);
+  const used = new Set<string>(), live = sessions.filter(a => !a.cancelled);
+  for (const w of wins) for (const s of w.slots) {
+    if (!s.booked && !bookable(s, now)) continue;
+    const appt = s.booked ? live.find(a => !used.has(a.id) && a.typeId === s.typeId && a.hostIds.includes(w.profileId)
+      && a.start.getTime() === s.start.getTime()) ?? null : null;
+    if (appt) used.add(appt.id);
+    add({ start: s.start, end: s.end, profileId: w.profileId, typeId: s.typeId, w, appt, booked: s.booked });
+  }
+  for (const a of live) if (!used.has(a.id) && a.typeId) {
+    add({ start: a.start, end: a.end, profileId: a.hostIds[0] ?? '', typeId: a.typeId, w: null, appt: a, booked: true });
+  }
+  const keep = (e: DayEntry) => booked === 'all' || (booked === 'booked') === e.booked;
+  return [...cols.entries()]
+    .map(([typeId, entries]) => ({ typeId, entries: entries.filter(keep).sort((a, b) => a.start.getTime() - b.start.getTime()) }))
+    .filter(c => c.entries.length);
+}
+
+/* ---------- Join ---------- */
+export const JOIN_LEAD_MIN = 5;
+/* Join opens 5 minutes before the start and closes at the end (operator, 2026-10-01). */
+export function joinOpen(a: Appt, now: Date): boolean {
+  return now.getTime() >= a.start.getTime() - JOIN_LEAD_MIN * 60000 && now < a.end;
+}

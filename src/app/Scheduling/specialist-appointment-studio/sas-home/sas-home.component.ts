@@ -1,11 +1,12 @@
-import { Component, Input, OnInit, ViewContainerRef } from '@angular/core';
+import { Component, Input, NgZone, OnDestroy, OnInit, ViewContainerRef } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { Firestore, doc, deleteDoc, QueryDocumentSnapshot } from '@angular/fire/firestore';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Firestore, doc, deleteDoc, writeBatch, QueryDocumentSnapshot } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
 import { take } from 'rxjs';
 import { AuthguardService } from '../../../authguard.service';
@@ -14,9 +15,13 @@ import { SpecialistAppointmentService, ApptRow, Specialist } from '../specialist
 import { SasPeriodBarComponent } from '../sas-period-bar/sas-period-bar.component';
 import { SasLoaderComponent } from '../sas-loader/sas-loader.component';
 import { SasAddAvailabilityComponent } from '../sas-add-availability/sas-add-availability.component';
+import { SasFilterBarComponent } from '../sas-filter-bar/sas-filter-bar.component';
+import { SasWindowDetailComponent, WindowDetailResult } from '../sas-window-detail/sas-window-detail.component';
 import {
   AvailWindow, Hours, Period, apptStatus, ApptStatus, hoursSummary, fmtHours, periodOf, sameDay,
   windowState, WindowState, mondayOf, openMinutes, windowStatus, NO_SHOW_REASON,
+  SasFilter, NO_FILTER, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, DayColumn, DayEntry,
+  joinOpen, JOIN_LEAD_MIN,
 } from '../sas-logic';
 
 type PastFilter = 'pending' | 'completed' | 'cancelled';
@@ -39,10 +44,13 @@ const STATE_DOT: Record<WindowState, string> = { open: 'var(--bt-success)', full
    (mode 'all' = every specialist, with a specialist filter). Hook prefix: sah */
 @Component({
   selector: 'app-sas-home',
-  imports: [DatePipe, DecimalPipe, FormsModule, MatIconModule, MatMenuModule, MatSnackBarModule, SasLoaderComponent, SasPeriodBarComponent],
+  imports: [
+    DatePipe, DecimalPipe, FormsModule, MatIconModule, MatMenuModule, MatSnackBarModule, MatTooltipModule,
+    SasLoaderComponent, SasPeriodBarComponent, SasFilterBarComponent,
+  ],
   templateUrl: './sas-home.component.html',
 })
-export class SasHomeComponent implements OnInit {
+export class SasHomeComponent implements OnInit, OnDestroy {
   @Input() mode: 'self' | 'all' = 'self';
 
   readonly DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -60,6 +68,18 @@ export class SasHomeComponent implements OnInit {
   openMin = 0;
   days: Day[] = [];
   month: MonthCell[] = [];
+  /* Day view: one column per delivery type (operator, 2026-10-01). */
+  dayCols: DayColumn[] = [];
+  /* Product · types · booked filter. Product and types apply everywhere; booked only to the calendar. */
+  filter: SasFilter = NO_FILTER;
+  /* Bulk delete: the period's windows (filtered by product and types), future + unbooked selectable. */
+  availList: AvailWindow[] = [];
+  selected = new Set<string>();
+  deleting = false;
+  /* Join opens 5 min before start; this clock re-checks every 30 s without a reload. */
+  clock = new Date();
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+  private raw: { wins: AvailWindow[]; appts: ApptRow[]; up: ApptRow[] } = { wins: [], appts: [], up: [] };
   upcoming: ApptRow[] = [];
   /* Past sessions load lazily: PAST_PAGE matching rows at a time, newest first, via Load more. */
   past: ApptRow[] = [];
@@ -73,10 +93,12 @@ export class SasHomeComponent implements OnInit {
   constructor(
     public svc: SpecialistAppointmentService, private guard: AuthguardService, private firestore: Firestore,
     private dialog: MatDialog, private snack: MatSnackBar, private datepipe: DatePipe, private vcr: ViewContainerRef,
-    private router: Router,
+    private router: Router, private zone: NgZone,
   ) {}
 
   async ngOnInit() {
+    // Outside the zone so the app (and tests) still settle; back inside only to tick the clock.
+    this.zone.runOutsideAngular(() => this.clockTimer = setInterval(() => this.zone.run(() => this.clock = new Date()), 30000));
     await this.svc.init();
     const h = new Date().getHours();
     const first = (this.svc.name(this.svc.profileId) || '').split(' ')[0];
@@ -123,12 +145,8 @@ export class SasHomeComponent implements OnInit {
         this.svc.appointments(ids, upFrom, upTo, ids ? 0 : 300),
       ]);
       if (run !== this.loadRun) return;
-      const inP = <T extends { start: Date }>(x: T) => x.start >= p.from && x.start < p.to;
-      const pWins = wins.filter(inP), pAppts = appts.map(r => r.appt).filter(inP);
-      this.hours = hoursSummary(pWins, pAppts);
-      this.openMin = pWins.reduce((a, w) => a + openMinutes(w, this.now), 0);
-      this.upcoming = up.filter(r => !r.appt.cancelled && !r.appt.attended && r.appt.end > this.now);
-      if (this.showCalendar) this.buildCalendar(wins, appts, p);
+      this.raw = { wins, appts, up };
+      this.apply();
     } catch (e) {
       if (run !== this.loadRun) return;
       console.error('Specialist appointment studio: load failed', e);
@@ -136,6 +154,39 @@ export class SasHomeComponent implements OnInit {
     }
     this.loading = false;
   }
+
+  ngOnDestroy() { if (this.clockTimer) clearInterval(this.clockTimer); }
+
+  /* Everything below the period bar from the fetched data and the filter; no Firestore reads, so a
+     filter change is instant. Windows are cut to the picked types (scopeWindow) before any hours. */
+  private apply() {
+    const f = this.filter, p = this.period;
+    const inP = <T extends { start: Date }>(x: T) => x.start >= p.from && x.start < p.to;
+    const wins = this.raw.wins.map(w => scopeWindow(w, f.typeIds)).filter((w): w is AvailWindow => !!w);
+    const appts = this.raw.appts.filter(r => apptMatches(r.appt, f));
+    const pWins = wins.filter(inP), pAppts = appts.map(r => r.appt).filter(inP);
+    this.hours = hoursSummary(pWins, pAppts);
+    this.openMin = pWins.reduce((a, w) => a + openMinutes(w, this.now), 0);
+    this.upcoming = this.raw.up.filter(r => !r.appt.cancelled && !r.appt.attended && r.appt.end > this.now && apptMatches(r.appt, f));
+    // Booked / Not booked narrows the calendar only; Not booked hides the sessions.
+    this.buildCalendar(wins.filter(w => windowMatchesBooked(w, f.booked, this.now)), f.booked === 'open' ? [] : appts, p);
+    this.dayCols = p.mode === 'day'
+      ? dayColumns(pWins, pAppts, this.now, f.booked).sort((a, b) => this.typeLabel(a.typeId).localeCompare(this.typeLabel(b.typeId)))
+      : [];
+    const ids = new Set(pWins.map(w => w.id));
+    this.availList = this.raw.wins.filter(w => ids.has(w.id))
+      .sort((a, b) => a.start.getTime() - b.start.getTime() || this.svc.name(a.profileId).localeCompare(this.svc.name(b.profileId)));
+    this.selected = new Set([...this.selected].filter(id => this.availList.some(w => w.id === id && this.canDelete(w))));
+  }
+
+  onFilter(f: SasFilter) {
+    const scopeChanged = f.productId !== this.filter.productId || String(f.typeIds) !== String(this.filter.typeIds);
+    this.filter = f;
+    this.apply();
+    if (scopeChanged) this.loadPast(true);
+  }
+
+  get filterScope(): 'all' | 'mentor' | 'cw' { return this.mode === 'all' ? 'all' : this.svc.viewRole === 'mentor' ? 'mentor' : 'cw'; }
 
   private buildCalendar(wins: AvailWindow[], live: ApptRow[], period: Period) {
     const dayOf = (d: Date) => {
@@ -153,7 +204,10 @@ export class SasHomeComponent implements OnInit {
       const loose = live.filter(r => sameDay(r.appt.start, d) && !used.has(r.appt.id));
       return { date: d, windows, loose };
     };
-    if (period.mode === 'week') {
+    if (period.mode === 'day') {
+      this.days = [dayOf(period.from)];
+      this.month = [];
+    } else if (period.mode === 'week') {
       this.days = Array.from({ length: 7 }, (_, i) => dayOf(new Date(period.from.getFullYear(), period.from.getMonth(), period.from.getDate() + i)));
       this.month = [];
     } else {
@@ -196,6 +250,7 @@ export class SasHomeComponent implements OnInit {
 
   /* Completed · Cancelled · Status updation pending (ended, not marked). */
   private pastMatches(r: ApptRow): boolean {
+    if (!apptMatches(r.appt, this.filter)) return false;
     const s = this.status(r), f = this.pastFilter;
     return f === 'pending' ? s === 'Pending' : f === 'completed' ? s === 'Completed' : s === 'Cancelled';
   }
@@ -231,7 +286,32 @@ export class SasHomeComponent implements OnInit {
 
   onPeriod(p: Period) { this.period = p; this.load(); }
   onSpecialist() { this.load(); }
-  gotoWeek(d: Date) { this.period = periodOf('week', d); this.load(); }
+  /* A date picked in Month view or a day header in Week view opens that day (operator, 2026-10-01). */
+  gotoDay(d: Date) { this.period = periodOf('day', d); this.load(); }
+
+  typeLabel(id: string) { return this.svc.mapAppointment[id] ?? id; }
+  typeDuration(id: string) { return fmtHours(this.svc.mapAppointmentData[id]?.['duration'] ?? 0); }
+  /* Hover text on a calendar window: its delivery types. */
+  typeNames(w: AvailWindow) { return w.typeIds.map(t => this.typeLabel(t)).join(', '); }
+
+  /* ---------- Day view ---------- */
+  entryRow(e: DayEntry): ApptRow | null { return e.appt ? this.raw.appts.find(r => r.appt.id === e.appt!.id) ?? null : null; }
+  entryStatus(e: DayEntry): string {
+    if (!e.booked) return 'Open';
+    if (!e.appt) return 'Booked';
+    const s = apptStatus(e.appt, this.now);
+    return s === 'Pending' ? 'Completion pending' : s;
+  }
+  entryClass(e: DayEntry) {
+    if (!e.booked) return 'sas-slot s-open';
+    const row = this.entryRow(e);
+    return row ? 'sas-slot is-sess ' + this.chipClass(row) : 'sas-slot s-full';
+  }
+  entryClick(e: DayEntry) {
+    const row = this.entryRow(e);
+    if (row) this.openDetail(row);
+    else if (e.w) this.openWindow(e.w);
+  }
 
   /* ---------- actions ---------- */
   addAvailability(date?: Date) {
@@ -243,9 +323,69 @@ export class SasHomeComponent implements OnInit {
     }).afterClosed().subscribe(saved => { if (saved) this.load(); });
   }
 
+  /* Availability details for a calendar window. The dialog gets the unfiltered window, so it lists
+     every type the window offers, and every session booked in it. */
+  openWindow(w: AvailWindow) {
+    const full = this.raw.wins.find(x => x.id === w.id) ?? w;
+    const sessions = this.raw.appts.filter(r => r.appt.hostIds.includes(full.profileId)
+      && r.appt.start >= full.start && r.appt.start < full.end).sort((a, b) => a.appt.start.getTime() - b.appt.start.getTime());
+    this.dialog.open(SasWindowDetailComponent, {
+      data: { w: full, sessions }, panelClass: 'sas-dialog-panel', autoFocus: false, maxWidth: '96vw', viewContainerRef: this.vcr,
+    }).afterClosed().subscribe((res: WindowDetailResult) => {
+      if (res && 'delete' in res) this.deleteWindow(full);
+      else if (res && 'open' in res) this.openDetail(res.open);
+    });
+  }
+
+  /* ---------- Bulk delete (operator, 2026-10-01): future windows with nothing booked ---------- */
+  canDelete(w: AvailWindow) { return w.start > this.now && !w.slots.some(s => s.booked); }
+  get selectable() { return this.availList.filter(w => this.canDelete(w)); }
+  get allSelected() { return this.selectable.length > 0 && this.selectable.every(w => this.selected.has(w.id)); }
+  toggleAll() { this.selected = this.allSelected ? new Set() : new Set(this.selectable.map(w => w.id)); }
+  toggle(w: AvailWindow) {
+    const s = new Set(this.selected);
+    if (s.has(w.id)) s.delete(w.id); else s.add(w.id);
+    this.selected = s;
+  }
+  windowLabelOf(w: AvailWindow) {
+    const sessions = this.raw.appts.filter(r => r.appt.hostIds.includes(w.profileId) && r.appt.start >= w.start && r.appt.start < w.end);
+    return windowStatus(w, sessions.map(r => r.appt), this.now);
+  }
+
+  async deleteSelected() {
+    // Re-check against the latest data: a slot may have been booked since the list was built.
+    const ids = this.availList.filter(w => this.selected.has(w.id) && this.canDelete(w)).map(w => w.id);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} availability window${ids.length === 1 ? '' : 's'}?`)) return;
+    this.deleting = true;
+    try {
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(this.firestore);
+        ids.slice(i, i + 400).forEach(id => batch.delete(doc(this.firestore, 'availability/' + id)));
+        await batch.commit();
+      }
+      this.selected = new Set();
+      this.snack.open(`${ids.length} availability window${ids.length === 1 ? '' : 's'} deleted.`, undefined, { duration: 3000 });
+      await this.load();
+    } catch (e) {
+      console.error('Specialist appointment studio: bulk delete failed', e);
+      this.snack.open('Could not delete. Try again.', 'OK', { duration: 5000 });
+    }
+    this.deleting = false;
+  }
+
+  /* ---------- Join: 5 minutes before the start until the end ---------- */
+  canJoin(r: ApptRow) { return joinOpen(r.appt, this.clock); }
+  joinTip(r: ApptRow): string {
+    if (this.canJoin(r)) return '';
+    if (r.appt.end <= this.clock) return 'This session has ended';
+    const opens = new Date(r.appt.start.getTime() - JOIN_LEAD_MIN * 60000);
+    return `Opens at ${this.t(opens)}${sameDay(opens, this.clock) ? '' : ' on ' + this.datepipe.transform(opens, 'd MMM')}`;
+  }
+
   /* Same rule as appointment-availability onrowdelete: only while nothing is booked in it. */
-  async deleteWindow(w: AvailWindow, ev: Event) {
-    ev.stopPropagation();
+  async deleteWindow(w: AvailWindow, ev?: Event) {
+    ev?.stopPropagation();
     if (w.slots.some(s => s.booked)) { alert('Booking were already made. Please ask client to cancel it'); return; }
     if (!confirm('Delete this day Slot?')) return;
     try {
@@ -274,6 +414,7 @@ export class SasHomeComponent implements OnInit {
      /openappointmentzoom/:id) in a new tab. That viewer reads appointments/{id}.zoomdata and only
      starts when it is there, so say so here instead of opening an empty tab. */
   join(r: ApptRow) {
+    if (!this.canJoin(r)) return;
     if (!r.raw?.['zoomdata']) {
       this.snack.open('This session has no Zoom meeting yet.', 'OK', { duration: 4000 });
       return;
