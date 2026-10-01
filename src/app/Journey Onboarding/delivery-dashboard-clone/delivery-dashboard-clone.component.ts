@@ -4228,6 +4228,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
                 { key: 'financialdata', label: 'PAYMENT STATUS', width: '10%' },
                 { key: 'lastpaymentdate', label: 'LASTPAYMENT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'bottleneck', label: 'BOTTLENECK', width: '10%' },
             ],
             dataKey: 'awaitingInitiation'
@@ -4241,6 +4243,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'profileid', label: 'MOBILE', width: '15%', type: 'mapped', mapData: this.mapMetaData, mapValue: 'phonenumber' },
                 { key: 'initiatedtime', label: 'INITIATED DATE', width: '15%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'generalnotes', label: 'NOTES', width: '10%' },
                 { key: 'addnotes', label: '+', width: '5%', substringStart: 0, substringEnd: 50 }
             ],
@@ -4259,6 +4263,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'waitingperiod', label: 'DAYS STUCK', width: '10%', type: 'number' },
                 { key: 'recentappointmentdate', label: 'LAST APPOINTMENT DATE', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'actualstuckdays', label: 'DAYS', width: '10%', type: 'number' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'lastaction', label: 'LAST ACTION', width: '10%', type: 'text' },
                 { key: 'assignedto', label: 'ASSIGNED TO', width: '13%', type: 'text' },
                 { key: 'generalnotes', label: 'RESOLUTION', width: '10%' },
@@ -4276,6 +4282,8 @@ export class DeliveryDashboardCloneComponent {
                 { key: 'waitingperiod', label: 'DAYS WAITING', width: '10%', type: 'number' },
                 { key: 'financialdata', label: 'PAYMENT STATUS', width: '10%' },
                 { key: 'lastpaymentdate', label: 'LASTPAYMENT', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionstart', label: 'SUBSCRIPTION START', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
+                { key: 'subscriptionend', label: 'SUBSCRIPTION END', width: '10%', type: 'date', format: 'MMM dd, yyyy' },
                 { key: 'bottleneck', label: 'BOTTLENECK', width: '10%' },
                 { key: 'action', label: 'ACTION REQUIRED', width: '20%' }
             ],
@@ -6934,6 +6942,8 @@ export class DeliveryDashboardCloneComponent {
 
     private readonly IDLE_DAYS = 7;
     private readonly STUCK_DAYS = 15;
+    private stuckCasesCache: any[] = [];
+    private stuckKey = '';
 
     private daysSinceTs(ts: any): number {
         return daysSince(ts);
@@ -6993,6 +7003,8 @@ export class DeliveryDashboardCloneComponent {
                     financialdata,
                     lastpaymentdate: lastPayment,
                     bottleneck: 'Awaiting for Initiation',
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null,  
                 });
                 continue;
             }
@@ -7005,13 +7017,15 @@ export class DeliveryDashboardCloneComponent {
                     initiatedtime: initiated,
                     waitingperiod: daysSinceInitiated,
                     generalnotes: [],
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null,  
                 });
             }
 
             // Development's cohort split (readyForInitiation vs awaiting) supersedes the engine's
             // classifyCohorts, so the stuck predicate is inlined here to match. escalationLevel() and
             // stuckIssueType() below still delegate — those two rules are unchanged on both sides.
-            if ((status === 'initiated' || status === 'ongoing') && daysSinceActivity >= this.STUCK_DAYS) {
+            if (status === 'initiated' || status === 'ongoing') { 
                 const days = daysSinceActivity;
                 const escalation = escalationLevel(days);
                 stuck.push({
@@ -7030,6 +7044,8 @@ export class DeliveryDashboardCloneComponent {
                     participantproductid: item?.docid || null,
                     recentappointmentdate: null,
                     actualstuckdays: null,
+                    subscriptionstart: item?.subscriptionstart || null,   
+                    subscriptionend: item?.subscriptionend || null, 
                 });
             }
         }
@@ -7052,6 +7068,8 @@ export class DeliveryDashboardCloneComponent {
                 lastpaymentdate: meta['lastpaymentdate'] || null,
                 bottleneck: 'Ready for Initiation',
                 participantproductid: item.docid || null,
+                subscriptionstart: item?.subscriptionstart || null,   
+                subscriptionend: item?.subscriptionend || null, 
             };
         });
 
@@ -7061,9 +7079,16 @@ export class DeliveryDashboardCloneComponent {
         this.originalData['readyForInitiation'].count = readyToStart.length;
         this.originalData['currentJourneyInitiated'].data = idle;
         this.originalData['currentJourneyInitiated'].count = idle.length;
-        this.originalData['stuckCases'].data = stuck;
-        this.originalData['stuckCases'].count = stuck.length;
-        this.getRecentAppointmentDetails(stuck);
+        const participantChangeKey = stuck.map(item => item.participantproductid).sort().join(',');
+        const stuckUnchanged = participantChangeKey === this.stuckKey;
+
+        if (stuckUnchanged) {
+            this.originalData['stuckCases'].data = this.stuckCasesCache;
+            this.originalData['stuckCases'].count = this.stuckCasesCache.length;
+        } else {
+            this.stuckKey = participantChangeKey;
+            this.getRecentAppointmentDetails(stuck);
+        }
 
         this.currentPage = 1;
         this.calculatePagination();
@@ -7073,7 +7098,12 @@ export class DeliveryDashboardCloneComponent {
         const requestId = ++this.uniqueTicketId;
 
         const participantProductIds = Array.from(new Set(stuckItems.map(item => item.participantproductid).filter(Boolean)));
-        if (participantProductIds.length === 0) return;
+        if (participantProductIds.length === 0) {
+            this.stuckCasesCache = [];
+            this.originalData['stuckCases'].data = [];
+            this.originalData['stuckCases'].count = 0;
+            return;
+        }
 
         const recentAppointmentMap = new Map<string, any>();
         const chunkSize = 30;
@@ -7112,6 +7142,10 @@ export class DeliveryDashboardCloneComponent {
             item.recentappointmentdate = recentAppointment['endtime'];
             item.actualstuckdays = daysSince(recentAppointment['endtime']);
         }
+
+        this.stuckCasesCache = stuckItems.filter(item => item.actualstuckdays >= this.STUCK_DAYS);
+        this.originalData['stuckCases'].data = this.stuckCasesCache;
+        this.originalData['stuckCases'].count = this.stuckCasesCache.length;
 
         this.calculatePagination();
         this.cdr.detectChanges();
