@@ -13,17 +13,21 @@ import { getDoc } from 'firebase/firestore';
   styleUrl: './event-cta-config.component.css',
 })
 export class EventCtaConfigComponent {
-  ctaconfig!: FormGroup;
-  docRef !: DocumentReference;
+  appCalenderConfig!: FormGroup;
+  eventCtaDocRef !: DocumentReference;
+  eventAppCalenderDocref !: DocumentReference;
 
   constructor(
     private formbuilder: FormBuilder,
     private firestore: Firestore,
     private dialogRef : MatDialogRef<any>
   ) {
-    this.docRef = doc(collection(this.firestore, 'static meta data') , 'eventcta');
+    // doc references
+    this.eventCtaDocRef = doc(collection(this.firestore, 'classify') , 'eventcta');
+    this.eventAppCalenderDocref = doc(collection(this.firestore, 'classify') , 'eventstatusmessage');
     
-    this.ctaconfig = this.formbuilder.group({
+    // calender form
+    this.appCalenderConfig = this.formbuilder.group({
       confirmparticipation : this.formbuilder.group({
         button : ['', {validators: [Validators.required], updateOn:"change"}],
         description : ['', {validators: [Validators.required], updateOn:"change"}],
@@ -43,36 +47,72 @@ export class EventCtaConfigComponent {
       nocta : this.formbuilder.group({
         button : ['', {validators: [Validators.required], updateOn:"change"}],
         description : ['', {validators: [Validators.required], updateOn:"change"}],
-      })
+      }),
+      confirmationmessage : ['', {validators: [Validators.required], updateOn:"change"}],
+      requested :  ['', {validators: [Validators.required], updateOn:"change"}],
     });
 
     this.fetchData();
   }
 
+  // function to patch data
   async fetchData(){
-    const ctaconfig = (await getDoc(this.docRef));
-    if (ctaconfig.exists) {
-      this.ctaconfig?.patchValue({...ctaconfig.data()});
+    const fallbackConfig = {button : '' , description : ''}
+    const [ctaconfigSnap , eventStatusMsgSnap] = await Promise.all([ getDoc(this.eventCtaDocRef) ,  getDoc(this.eventAppCalenderDocref)]);
+    const ctaconfig = ctaconfigSnap.data() ?? {};
+    const eventStatusMsg = eventStatusMsgSnap.data() ?? {};
+    
+    const appCalenderConfig = {
+      confirmparticipation : ctaconfig['confirmparticipation'] ?? fallbackConfig,
+      addon : ctaconfig['addon'] ?? fallbackConfig,
+      upgrade : ctaconfig['upgrade'] ?? fallbackConfig,
+      continuity : ctaconfig['continuity'] ?? fallbackConfig,
+      nocta : ctaconfig['nocta'] ?? fallbackConfig,
+      confirmationmessage : eventStatusMsg['confirmationmessage']?.message ?? '',
+      requested : eventStatusMsg['requested']?.message ?? ''
     }
+
+    this.appCalenderConfig.patchValue(appCalenderConfig)
   }
 
+  // function to handel submit
   async onSubmit() {
     try {
-      if (this.ctaconfig.valid) {
-        const ctaconfig = { ...this.ctaconfig.value };
-        await setDoc(this.docRef, ctaconfig);
-        alert('Successfully updated event configuations')
-      } else {
+      if (this.appCalenderConfig.invalid) {
         alert('Fill all Values');
+        return
       }
+
+      const value = this.appCalenderConfig.value;
+      const fallbackConfig = {button : '' , description : ''};
+
+      const ctaconfig = {
+        confirmparticipation: value['confirmparticipation'] || fallbackConfig,
+        addon: value['addon'] || fallbackConfig,
+        upgrade: value['upgrade'] || fallbackConfig,
+        continuity: value['continuity'] || fallbackConfig,
+        nocta: value['nocta'] || fallbackConfig,
+      };
+
+      const appCalenderConfig = {
+        confirmationmessage : {
+          message : value['confirmationmessage'] || ""
+        },
+        requested : {
+          message : value['requested'] || ''
+        }
+      }
+
+      await Promise.all([setDoc(this.eventCtaDocRef, ctaconfig) , setDoc(this.eventAppCalenderDocref, appCalenderConfig)]);
+      alert('Successfully updated event configuations');
+      this.closeDialog();
     } catch (error) {
       console.log(error);
       alert('Error Updating CTA Config');
-    } finally{
-      this.closeDialog();
     }
   }
 
+  // function to close dialog
   closeDialog(){
     this.dialogRef.close();
   }

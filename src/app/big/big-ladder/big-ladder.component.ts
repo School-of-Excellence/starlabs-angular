@@ -4,6 +4,7 @@ import { AuthguardService } from '../../authguard.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatIconModule } from '@angular/material/icon';
 
 interface CohortActivities {
   completed: Array<any>,
@@ -18,15 +19,18 @@ type sidePanelTab = 'level' | 'studio' | 'activity' | 'content' | 'attended';
 
 @Component({
   selector: 'app-big-ladder',
-  imports: [CommonModule, FormsModule, MatPaginatorModule],
+  imports: [CommonModule, FormsModule, MatPaginatorModule , MatIconModule],
   templateUrl: './big-ladder.component.html',
   styleUrl: './big-ladder.component.css',
 })
 export class BigLadderComponent implements OnInit {
+  private COHORT_GROUP_KEY = 'cohortsgroup'
+  
   isLoading = true;
 
   // participant search in tabel
   participantSearch = '';
+  selectedCustomerStatus : 'all' | 'active' | 'non active' = 'all';
 
   participantMetadataMap = {};
   eventsAttended: { [key: string]: Set<string> } = {};
@@ -39,6 +43,8 @@ export class BigLadderComponent implements OnInit {
   // Tabel data
   dashboardData = [];
   filteredDashbordData = [];
+  activeParticipants = 0;
+  nonactiveParticipants = 0;
 
   // overall data map
   bigJourney: string[] = [];
@@ -51,15 +57,30 @@ export class BigLadderComponent implements OnInit {
   eiflixVideoMap = {};
 
   bigMarathon = [];
+  eventsList = [];
   selectedMarathon : string | null = null;
+  selectedEvent : string | null = null;
 
   filteredCohorts = [];
   cohortSearch = '';
   educationalCohort = true;
   studioCohort = true;
 
+  groupFormMode : 'add' | 'edit' | null = null;
+  cohortGroupName = null;
+  cohortGroupSelectedForSave = null;
+
+  savedCohortGroups = {};
+  cohortsInGroups = [];
+  selectedCohortGroup = null;
+
+  expandedCohortGroup = null;
+
   selectedCohorts = [];
   selectedCohortCategory = ['studio' , 'educational'];
+
+  activeParticipantInCohort = 0;
+  nonactiveParticipantInCohort = 0;
 
   loadAllCohort = false;
 
@@ -105,16 +126,6 @@ export class BigLadderComponent implements OnInit {
       },
     );
 
-    getDocs(query(collection(this.firestore, 'big cohorts'))).then((bigCohortSnap) => {
-      console.log(this.selectedMarathon)
-        for (const docref of bigCohortSnap.docs) {
-          const cohort = docref.data();
-          this.cohortMap[docref.id] = cohort;
-        }
-        this.filterCohortList();
-      },
-    );
-
     getDocs(query(collection(this.firestore, 'episodes'))).then((episodeSnap) => {
         for (const docref of episodeSnap.docs) {
           const episodes = docref.data();
@@ -122,10 +133,36 @@ export class BigLadderComponent implements OnInit {
         }
       },
     );
+
+    this.savedCohortGroups = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}');
+    this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
   }
 
   async ngOnInit() {
     this.fetchDashbordData();
+
+    getDocs(query(collection(this.firestore, 'big cohorts') , where('status' , '==' , 'active'))).then((bigCohortSnap) => {
+        for (const docref of bigCohortSnap.docs) {
+          const cohort = docref.data();
+          const participantList = [];
+
+          for (const pid of cohort['participantidlist'] ?? []) {
+            const metadata = this.participantMetadataMap[pid] ?? null;
+            const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;;
+            if (this.bigJourney.includes(journey)){
+              participantList.push(pid);
+            };
+          }
+
+          if (participantList.length > 0) {
+            cohort['participantidlist'] = participantList;
+            this.cohortMap[docref.id] = cohort;
+          }
+
+        }
+        this.filterCohortList();
+      },
+    );
   }
 
   // function to fetch  data for tabel
@@ -165,11 +202,14 @@ export class BigLadderComponent implements OnInit {
     const bigEvents = [];
     eventCollectionSnap.docs.forEach((docref) => {
       const event = docref.data();
+      event['docid'] = docref.id;
       this.eventMap[docref.id] = event;
+      this.eventsList.push(event);
       if (['B!G'].includes(event['atcmodel'])) {
         bigEvents.push(docref.id);
       }
     });
+  
 
     eventParticipantSnap.docs.forEach((docref) => {
       const eventRequest = docref.data();
@@ -280,6 +320,7 @@ export class BigLadderComponent implements OnInit {
     this.bigParticipantLevel = bigParticipantLevel;
 
     this.processDashboardData();
+    this.filterEvents();
 
     this.isLoading = false;
 
@@ -293,10 +334,15 @@ export class BigLadderComponent implements OnInit {
   processDashboardData() {
     const allProfile = Object.values(this.participantMetadataMap);
     const dashboardData = [];
+    let activeParticipants = 0;
+    let nonactiveParticipants = 0;
 
     for (const metadata of allProfile) {
-      if (!this.bigJourney.includes(metadata['activejourney'])) continue;
+      const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
+      if (!this.bigJourney.includes(journey)) continue;
+
       const profileId = metadata['profileid'];
+      const customerStatus = metadata['customerstatus'] ?? null;
       const eventsAttendedCount = this.eventsAttended[profileId]?.size ?? 0;
       const bigActivity = this.cohortActivities[profileId] ?? null;
       const overAllActivity = Object.values(bigActivity ?? {}).reduce((t, c) => t + c?.length,0,);
@@ -308,6 +354,7 @@ export class BigLadderComponent implements OnInit {
       const participantMetrics = {
         profileid: metadata['profileid'],
         name: metadata['name'] ?? null,
+        customerstatus : customerStatus,
         extendedlifeimpact: metadata['extendedlifeimpact'] ?? 0,
         eventAttended: eventsAttendedCount,
         bigActivity: {
@@ -319,10 +366,19 @@ export class BigLadderComponent implements OnInit {
         bigParticipantLevel: bigParticipantLevel,
       };
 
+      if (customerStatus === 'active') {
+        activeParticipants++;
+      } else if (customerStatus === 'non active') {
+        nonactiveParticipants++;
+      }
+
       dashboardData.push(participantMetrics);
     }
     this.dashboardData = [...dashboardData];
     this.filteredDashbordData = [...dashboardData];
+    this.activeParticipants = activeParticipants;
+    this.nonactiveParticipants = nonactiveParticipants;
+
     this.sortTableHeader();
   }
 
@@ -330,8 +386,10 @@ export class BigLadderComponent implements OnInit {
   filterTable() {
     const data = [...this.dashboardData];
     const cohortParticipants = [];
+    const selectedCohortGroup = this.savedCohortGroups[this.selectedCohortGroup] ?? [];
+    const cohorts = [...this.selectedCohorts , ...selectedCohortGroup];
 
-    for (const cohortId of this.selectedCohorts) {
+    for (const cohortId of cohorts) {
       const cohort = this.cohortMap[cohortId] ?? null;
       if (cohort) {
         for (const pid of cohort['participantidlist'] ?? []) {
@@ -343,17 +401,23 @@ export class BigLadderComponent implements OnInit {
     const filterData = data.filter((participant) => {
       const profileId = participant['profileid'];
       const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
+      const customerStatus = participant['customerstatus'] ?? null;
       if (search.length > 0) {
         const participantName: string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
         if (!participantName.includes(search)) return false;
       }
 
-      if (this.selectedCohorts.length > 0 && !cohortParticipants.includes(profileId)) {
+      if ((this.selectedCohorts.length > 0 || this.selectedCohortGroup) && cohortParticipants.includes(profileId)) {
+        return false;
+      }
+
+      if (this.selectedCustomerStatus !== 'all' && this.selectedCustomerStatus !== customerStatus) {
         return false;
       }
 
       return true;
     });
+
     this.filteredDashbordData = filterData;
     this.sortTableHeader();
   }
@@ -362,29 +426,66 @@ export class BigLadderComponent implements OnInit {
   filterCohortList(){
     const cohorts = Object.values(this.cohortMap);
     const cohortSearch = this.cohortSearch?.trim().toLocaleLowerCase();
-    
+    const activeParticipants = new Set();
+    const nonactiveParticipants = new Set();
+
     const filteredCohorts =  cohorts.filter((cohort)=>{
+      const cohortId = cohort['docid'] ?? null;
       const cohortName = cohort['name']?.trim()?.toLocaleLowerCase() ?? '';
       const cohortCategory = cohort['cohortCategory'] ?? '';
       const marathon = cohort['marathonref']?.id ?? null;
-      // const participantsNames = (cohort['participantidlist'] ?? []).map((pid) => this.participantMetadataMap[pid]?.name?.trim()?.toLocaleLowerCase() ?? '');
+      const eventId = cohort['eventref']?.id ?? null;
+      const participantsList = cohort['participantidlist'] ?? [];
       
       if (this.selectedCohortCategory.length > 0 && !this.selectedCohortCategory.includes(cohortCategory)) {
         return false;
       }
 
-      if (this.selectedMarathon && this.selectedMarathon !== marathon) {
+      
+      if (cohortCategory !== 'educational') {
+        if (this.selectedEvent && this.selectedEvent !== eventId) {
+          return false;
+        }
+        if (this.selectedMarathon && this.selectedMarathon !== marathon) {
         return false;
+      } 
       }
 
       if (cohortSearch.length > 0 && !cohortName?.includes(cohortSearch)) {
         return false;
       }
 
+      for (const pid of participantsList) {
+        const metadata = this.participantMetadataMap[pid] ?? null;
+        const customerstatus = metadata['customerstatus'] ?? null;
+        if (customerstatus == 'active') {
+          activeParticipants.add(pid);
+        } else if(customerstatus === 'non active'){
+          nonactiveParticipants.add(pid);
+        }
+      }
+      
+      if (this.cohortsInGroups.includes(cohortId)) {
+        return false;
+      }
+
       return true;
+    }).sort((a , b)=>{
+      const dateA = this.toDate(a['createddate']);
+      const dateB = this.toDate(b['createddate']);
+      return dateB.getTime() - dateA.getTime();
     });
 
+    this.activeParticipantInCohort = activeParticipants.size;
+    this.nonactiveParticipantInCohort = nonactiveParticipants.size;
     this.filteredCohorts = filteredCohorts;
+  }
+
+  selectAllCohorts(){
+    for (const cohort of this.filteredCohorts) {
+      this.selectedCohorts.push(cohort['docid']);
+    }
+    this.filterTable();
   }
 
   onCohortCategoryChange(category : string){
@@ -402,22 +503,133 @@ export class BigLadderComponent implements OnInit {
     } else {
       this.selectedCohorts.push(cohortId);
     }
+
+    if (this.groupFormMode == 'add') {
+      if (this.cohortGroupSelectedForSave.length < 2) {
+        this.cancelGroup();
+      }
+      this.onToggleCohortFromGroup(cohortId);
+    }
+    
     this.filterTable();
   }
 
-  // applyFilter(participant : any){
-  //   const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
-  //   console.log(search)
-  //   if (search.length > 0) {
-  //     const participantName : string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
-  //     console.log(!participantName.includes(search))
-  //     if (!participantName.includes(search)) {
-  //       return false;
-  //     }
-  //   }
+  filterEvents(){
+    let filteredEvents = [...Object.values(this.eventMap)];
+    if (this.selectedMarathon) {
+      filteredEvents = filteredEvents.filter((event)=>{
+        const marathon = event['bigmarathonref']?.id ?? null;
+        if (this.selectedMarathon === marathon) {
+          return true;
+        }
+        return false;
+    });
+    this.eventsList = filteredEvents;
+    }
+  }
+  
+  onMarathonChange(){
+    this.selectedEvent = null;
+    this.filterEvents();
+    this.filterCohortList();
+  }
 
-  //   return true
-  // }
+  onCustomerStatusSelect(type : 'all' | 'active' | 'non active'){
+    this.selectedCustomerStatus = type;
+    this.filterTable();
+  }
+
+  onGroup(mode : 'add' | 'edit' = 'add' ){
+    this.groupFormMode = mode;
+    this.cohortGroupName = '';
+    this.cohortGroupSelectedForSave = [...this.selectedCohorts];
+  }
+
+  onCohortGroupSelect(groupTitle){
+    if (this.selectedCohortGroup === groupTitle) {
+      this.selectedCohortGroup = null;
+    } else {
+      this.selectedCohortGroup = groupTitle;
+    }
+    this.filterTable();
+  }
+
+  toggleCohortGroup(groupTitle){
+    if (this.selectedCohortGroup == groupTitle) {
+      return
+    }
+    if (this.expandedCohortGroup === groupTitle) {
+      this.expandedCohortGroup = null;
+      this.cancelGroup();
+    } else {
+      const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
+      const group = groupedCohorts[groupTitle] ?? [];
+      
+      this.groupFormMode = 'edit';
+      this.cohortGroupName = groupTitle;
+      this.cohortGroupSelectedForSave = group;
+      this.expandedCohortGroup = groupTitle;
+      
+    }
+  }
+
+  onToggleCohortFromGroup(cohortId){
+    if (this.cohortGroupSelectedForSave?.includes(cohortId)) {
+      this.cohortGroupSelectedForSave = this.cohortGroupSelectedForSave.filter((cId) => cId !== cohortId);
+    } else {
+      this.cohortGroupSelectedForSave?.push(cohortId)
+    }
+  }
+
+  groupCohortList(){
+    const title = this.cohortGroupName;
+    const selectedCohort = this.cohortGroupSelectedForSave;
+    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
+    if ([null , undefined , ''].includes(title) || selectedCohort.length === 0) {
+      alert('Fill all the fields');
+      return
+    }
+
+    if (this.expandedCohortGroup !== title && Object.hasOwn(groupedCohorts , title)) {
+      alert('this group title is already exist');
+      return
+    }
+    if (this.expandedCohortGroup) {
+      delete groupedCohorts[this.expandedCohortGroup]
+    }
+    groupedCohorts[title] = selectedCohort;
+    localStorage.setItem(this.COHORT_GROUP_KEY , JSON.stringify(groupedCohorts));
+    this.savedCohortGroups = groupedCohorts;
+    this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
+    this.selectedCohorts = [];
+    this.selectedCohortGroup = title;
+    this.filterTable();
+    this.filterCohortList();
+    this.cancelGroup();
+  }
+
+  cancelGroup(){
+    this.groupFormMode = null;
+    this.cohortGroupName = null;
+    this.cohortGroupSelectedForSave = null;
+    this.expandedCohortGroup = null;
+  }
+
+  unGroup(groupTitle){
+    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
+    if (Object.hasOwn(groupedCohorts , groupTitle)) {
+      const prombt = confirm('Are sure to delete the group');
+      if (!prombt) return
+      delete groupedCohorts[groupTitle]
+      localStorage.setItem(this.COHORT_GROUP_KEY , JSON.stringify(groupedCohorts));
+      this.savedCohortGroups = groupedCohorts;
+      this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
+      this.selectedCohorts = [];
+      this.cancelGroup();
+      this.filterTable();
+      this.filterCohortList();
+    }
+  }
 
   // function to open side panel
   openSidePanel(profileId: string, panelView: sidePanelTab = 'level') {
@@ -440,7 +652,6 @@ export class BigLadderComponent implements OnInit {
 
       this.sidePanelParticipant = participantMetrics;
       this.sidePanelCurrentTab = panelView;
-      console.log(this.sidePanelParticipant);
     }
   }
 
@@ -486,8 +697,22 @@ export class BigLadderComponent implements OnInit {
   }
 
   toggleCohortShowMore(){
-    console.log(this.loadAllCohort)
     this.loadAllCohort = !this.loadAllCohort;
+  }
+
+  getParticipantInCohortGroup(groupTitle : string){
+    const group = this.savedCohortGroups[groupTitle] ?? null;
+    const participantSet = new Set();
+    if (group) {
+      for (const cohortId of group) {
+        const cohortParticipants = this.cohortMap[cohortId]?.['participantidlist'] ?? [];
+        for (const pid of cohortParticipants) {
+          participantSet.add(pid);
+        }
+      }
+      return Array.from(participantSet.values());
+    }
+    return []
   }
   
   // ===================== Tabel Sorting ======================

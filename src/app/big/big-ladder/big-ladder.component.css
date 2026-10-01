@@ -1202,6 +1202,50 @@
   color: #9798A3;
 }
 
+/* participant tabel filters */
+.bl-participant-filter{
+  display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+}
+
+.bl-p-status{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:4px; border-radius:999px;
+  background:#FFFFFF;
+  box-shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05);
+}
+
+.bl-p-btn{
+  appearance:none; -webkit-appearance:none;
+  display:inline-flex; align-items:center; gap:7px;
+  padding:6px 14px; border:0; border-radius:999px;
+  background:transparent; cursor:pointer;
+  font:inherit; font-size:13px; font-weight:500; color:rgba(60,60,67,.62);
+  white-space:nowrap;
+  transition:background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.bl-p-btn b{
+  font-size:13px; font-weight:700; color:#1C1C1E;
+  font-variant-numeric:tabular-nums;
+  transition:color .15s ease;
+}
+.bl-p-btn:hover{background:rgba(120,120,128,.12); color:#1C1C1E}
+.bl-p-btn:focus-visible{outline:2px solid #007AFF; outline-offset:2px}
+
+/* status dots */
+.bl-p-dot{width:8px; height:8px; border-radius:50%; flex:none; background:#8E8E93}
+.bl-p-all .bl-p-dot{background:#007AFF}
+.bl-p-active .bl-p-dot{background:#34C759}
+.bl-p-inactive .bl-p-dot{background:#8E8E93}
+
+/* selected button */
+.bl-p-btn.bl-p-on,
+.bl-p-btn.bl-p-on:hover{
+  background:#007AFF; color:#FFFFFF;
+  box-shadow:0 2px 8px rgba(0,122,255,.3);
+}
+.bl-p-btn.bl-p-on b{color:#FFFFFF}
+.bl-p-btn.bl-p-on .bl-p-dot{background:#FFFFFF}
+
 /* side bar */
 /* ================= SIDEBAR WRAPPER ================= */
 .bl-sidebar {
@@ -1892,9 +1936,19 @@
 
 /* cohort filter */
 
+.bl-select-wrap{
+    display: flex;
+    gap: 10px;
+}
+
 .bl-select{
   display:inline-flex; align-items:center; gap:8px;
 }
+
+.bl-select.event-select select {
+    max-width: 200px;
+}
+
 .bl-select label{
   font-size:13.5px; font-weight:500; color:#1C1C1E;
 }
@@ -1944,9 +1998,30 @@
   box-shadow:inset 0 0 0 1.5px #007AFF, 0 1px 2px rgba(0,0,0,.04);
 }
 
+.bl-stats{
+  display:inline-flex; align-items:center; flex-wrap:wrap; gap:10px;
+}
+.bl-stats .bl-stat{
+  margin:0;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 14px; border-radius:999px;
+  background:#FFFFFF;
+  font-size:13px; font-weight:500; color:rgba(60,60,67,.62);
+  box-shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05);
+}
+.bl-stat b{
+  font-size:14px; font-weight:700; color:#1C1C1E;
+  font-variant-numeric:tabular-nums;
+}
+.bl-stat-dot{
+  width:8px; height:8px; border-radius:50%; flex:none;
+}
+.is-active-stat .bl-stat-dot{background:#34C759}
+.is-inactive-stat .bl-stat-dot{background:#8E8E93}
+
 /* hide the browser's built-in clear button on type="search" (optional) */
 .bl-search-cohort input::-webkit-search-cancel-button{display:none}
-.bl-filters{ margin:0 auto 14px}
+.bl-filters{ margin:0 auto 14px; display: flex; flex-direction: column; gap: 10px;}
 .bl-toggles{display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-bottom:10px; padding:0 2px}
 .bl-toggle{
   display:inline-flex; align-items:center; gap:8px; cursor:pointer;
@@ -1979,6 +2054,7 @@
   grid-template-columns:repeat(auto-fill, minmax(178px, 1fr));
   gap:10px;
 }
+
 .bl-cohort{
   display:flex; flex-direction:column; gap:7px;
   padding:13px 14px 14px;
@@ -1991,6 +2067,27 @@
 .bl-cohort:hover{transform:translateY(-1px); box-shadow:0 2px 4px rgba(0,0,0,.06), 0 10px 24px rgba(0,0,0,.08)}
 .bl-cohort:active{transform:translateY(0)}
 .bl-coh-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px}
+.bl-cohort-actions{
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+.bl-cohort-actions > button{
+  width:18px; height:18px; padding:0;
+  display:grid; 
+  justify-content: space-between;
+  border:none; border-radius:50%;
+  background-color:transparent;
+  color:rgba(60,60,67,.45);
+  line-height:1;
+  cursor:pointer;
+  transition:opacity .15s, background-color .15s, color .15s;
+}
+
+.bl-cohort-actions > button > mat-icon{
+  font-size:18px;
+}
+
 .bl-coh-name{font-size:15px; font-weight:600; letter-spacing:-.2px; color:#1C1C1E}
 .bl-coh-kind{
   font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
@@ -2081,3 +2178,140 @@
 }
 .bl-more:hover{background:#0A6FE0}
 .bl-more:active{transform:scale(.97)}
+
+/* ==========================================================================
+   9. SELECTION BAR
+   ========================================================================== */
+.bl-selbar{
+  display:flex; align-items:center; gap:8px;
+  padding:9px 12px; background:#FFFFFF; border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.05), 0 6px 18px rgba(0,0,0,.08);
+  margin-bottom: 5px;
+}
+.bl-selcount{font-size:13.5px; color:rgba(60,60,67,.62)}
+.bl-selcount b{font-size:15px; font-weight:700; color:#1C1C1E; font-variant-numeric:tabular-nums}
+.bl-selfield{position:relative; flex:1; max-width:320px}
+.bl-selname{
+  width:100%; height:32px; padding:0 11px;
+  border:0; border-radius:9px; background:rgba(120,120,128,.12);
+  font:400 14px/1 inherit; color:#1C1C1E;
+}
+.bl-selname::placeholder{color:rgba(60,60,67,.36)}
+.bl-selsug{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:40;
+  width:100%; padding:6px; border-radius:12px; background:#FFFFFF;
+  box-shadow:0 1px 2px rgba(0,0,0,.06), 0 14px 34px rgba(0,0,0,.18);
+}
+.bl-selsug button{
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:7px 9px; border:0; border-radius:8px; cursor:pointer;
+  background:none; color:#1C1C1E; font:400 13px/1.25 inherit; text-align:left;
+}
+.bl-selsug button:hover,.bl-selsug button.is-hover{background:#F2F2F7}
+.sug-n{
+  margin-left:auto; padding:1px 7px; border-radius:999px;
+  background:rgba(120,120,128,.14); color:rgba(60,60,67,.62);
+  font-size:11px; font-weight:600; font-variant-numeric:tabular-nums;
+}
+.bl-selgo,.bl-selout,.bl-selclear{
+  height:32px; padding:0 14px; border:0; border-radius:9px; cursor:pointer;
+  font:600 13.5px/1 inherit;
+}
+.bl-selgo{background:#007AFF; color:#FFFFFF}
+.bl-selout{background:rgba(255,59,48,.12); color:#C22A21}
+.bl-selclear{background:rgba(120,120,128,.12); color:rgba(60,60,67,.62)}
+
+/* ==========================================================================
+   7. GROUP CARD - grey, tagged, never mistaken for a cohort
+   ========================================================================== */
+
+/* ===== NORMAL (closed) STATE ===== */
+.cohgroup{
+  position:relative;
+  display:flex; flex-direction:column;
+  min-height:92px; padding:13px 14px 14px;
+  background:#EAEAEF; border-radius:14px;
+  box-shadow:inset 0 0 0 1px rgba(60,60,67,.10);
+}
+.cohgroup::after{
+  content:""; position:absolute; left:10px; right:10px; bottom:-4px; height:4px;
+  border-radius:0 0 12px 12px; background:rgba(60,60,67,.14);
+}
+.grp-head{display:flex; align-items:flex-start; gap:9px; cursor:pointer; border-radius:10px}
+.grp-dot{width:9px; height:9px; border-radius:50%; flex:none; margin-top:5px}
+.grp-text{display:flex; flex-direction:column; gap:2px; flex:1; min-width:0}
+.grp-tag{
+  align-self:flex-start; margin-bottom:3px;
+  padding:2px 7px; border-radius:5px;
+  background:rgba(60,60,67,.12); color:rgba(60,60,67,.62);
+  font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+}
+.cohgroup.is-mine .grp-tag{background:rgba(0,122,255,.14); color:#0063CC}
+.grp-name{
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  font-size:15px; font-weight:600; letter-spacing:-.2px;
+}
+.grp-meta{font-size:12.5px; color:rgba(60,60,67,.62)}
+.grp-meta b{font-size:15px; font-weight:700; color:#1C1C1E; font-variant-numeric:tabular-nums}
+.grp-chev{
+  width:24px; height:24px; flex:none; padding:0; border:0; border-radius:50%;
+  display:grid; place-items:center; cursor:pointer;
+  background:rgba(255,255,255,.7); color:rgba(60,60,67,.5); font-size:11px;
+  transition:transform .2s;
+}
+.grp-chev:hover,.grp-chev.is-hover{background:#FFFFFF; color:#1C1C1E}
+
+.grp-actions{display:flex; flex-wrap:wrap; gap:5px; margin-top:10px}
+.grp-actions button{
+  padding:4px 9px; border-radius:999px; border:0; cursor:pointer;
+  background:rgba(255,255,255,.7); color:rgba(60,60,67,.62);
+  font-family:inherit; font-size:11.5px; font-weight:600; line-height:1.5;
+}
+.grp-actions button:hover{background:#FFFFFF; color:#1C1C1E}
+.grp-actions .grp-ungroup:hover{background:rgba(255,59,48,.12); color:#C22A21}
+
+.grp-rename-btn{display:none}   /* Rename only appears when open */
+.grp-body{display:none}         /* members only appear when open */
+
+.grp-rename{
+  width:100%; height:26px; padding:0 8px; margin:-2px 0 2px;
+  border:0; border-radius:7px; background:rgba(255,255,255,.9);
+  font-family:inherit; font-size:15px; font-weight:600; line-height:1; letter-spacing:-.2px; color:#1C1C1E;
+  /* outline:2px solid #007AFF; */
+  margin-block: 5px;
+}
+
+/* ===== SELECTION STATES ===== */
+.cohgroup:hover{box-shadow:inset 0 0 0 1px rgba(60,60,67,.2)}
+.cohgroup.is-on{box-shadow:0 0 0 2px #007AFF, 0 6px 18px rgba(0,0,0,.05)}
+.cohgroup.is-active{box-shadow:0 0 0 2px #007AFF, 0 6px 18px rgba(0,122,255,.2); background:#E6F1FF}
+
+/* ===== OPEN STATE (everything scoped under .is-open) ===== */
+.cohgroup.is-open{
+  grid-column:1 / -1;
+  background:rgba(233, 233, 233, 0.547);
+  box-shadow:inset 0 0 0 1px rgba(52,199,89,.28);
+}
+.cohgroup.is-open::after{display:none}
+.cohgroup.is-open .grp-chev{transform:rotate(180deg)}
+.cohgroup.is-open .grp-rename-btn{display:inline-block}
+.cohgroup.is-open .grp-body{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(178px, 1fr)); gap:10px;
+  margin-top:12px; padding-top:12px; border-top:1px solid rgba(52,199,89,.22);
+}
+.cohgroup.is-open .bl-coh-kind{display:none}
+.cohgroup.is-open.is-active{
+  background:#E6F1FF;
+  box-shadow:0 0 0 2px #007AFF, 0 6px 18px rgba(0,122,255,.2);
+}bl-cohorts
+
+/* ===== DROP-OUT ZONE ===== */
+.bl-dropout{
+  padding:14px; border-radius:12px;
+  border:1.5px dashed rgba(60,60,67,.28);
+  text-align:center; color:rgba(60,60,67,.62); font-size:13px; font-weight:500;
+}
+.bl-dropout.is-dropping{
+  border-color:#FF3B30; border-style:solid;
+  background:rgba(255,59,48,.08); color:#C22A21;
+}

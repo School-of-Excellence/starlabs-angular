@@ -1,11 +1,9 @@
 <div class="cta-wrapper">
     <div class="cta-header">
         <h2 class="cta-title">Call To Action Config</h2>
-        <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()">
-            Close
-        </button>
+        <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()"> Close </button>
     </div>
-    <form [formGroup]="ctaconfig" class="cta-form">
+    <form [formGroup]="appCalenderConfig" class="cta-form">
 
         <div class="cta-grid">
             <div formGroupName="confirmparticipation" class="cta-card">
@@ -74,13 +72,27 @@
             </div>
         </div>
 
-        <div class="cta-actions">
-            <div class="cta-submit" (click)="onSubmit()">
-                Submit
+        <div class="cta-grid" style="margin-top: 10px;">
+            <div class="cta-card">
+                <h4 class="cta-card-title">Requested Message config</h4>
+                <mat-form-field appearance="outline" class="inputfields">
+                    <mat-label>Requested Message</mat-label>
+                    <input matInput formControlName="requested">
+                </mat-form-field>
             </div>
-            <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()">
-                Close
-            </button>
+
+            <div class="cta-card">
+                <h4 class="cta-card-title">Confirmation Message config</h4>
+                <mat-form-field appearance="outline" class="inputfields">
+                    <mat-label>Confirmation Message</mat-label>
+                    <input matInput formControlName="confirmationmessage">
+                </mat-form-field>
+            </div>
+        </div>
+
+        <div class="cta-actions">
+            <div class="cta-submit" (click)="onSubmit()"> Submit </div>
+            <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()"> Close </button>
         </div>
     </form>
 </div>
