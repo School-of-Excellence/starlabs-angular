@@ -187,3 +187,40 @@ Checks after these: tsc 0 errors, dev build OK, unit spec 104 / 104.
 
 ## Flags (not built)
 Backend customer-status job (Watson R2–R4 mismatches) · Onboarding status + active-by-age insights · Load approved requests for all events at start (Confirmed counts for every event option).
+
+---
+
+# Round 5 — 2026-10-01 (9 operator points; plan `specs/plans/2026-10-01-participant-intelligence-round5.md`)
+
+All changes are in `participant-intelligence.component.ts` and its unit spec. Nothing outside the PI folder changed.
+
+## Why
+- **R5-1 pinned header hidden on scroll.** `.thead` (sticky top) and `.td.frozen` (sticky left) were both `z-index: 2`. Body cells come later in the DOM, so with equal z they painted over the header's frozen cells. Unpinned cells aren't positioned, so only pinned columns showed it. `.thead` is now `z-index: 5`.
+- **R5-2 no dates on event / queue options.** The queue "date" was `queue generation.created`, which nobody recognises, so it read as random. Without the date, duplicate names would be indistinguishable. Same-name events / queues are therefore **one option** (`nameGroups`: trimmed, case-insensitive). The option value is the name's first (newest) id, and the engine expands any id to its whole name group (`FilterContext.eventGroups / queueGroups`), so older saved filters holding any same-name id still match. `normalizeSaved` maps saved ids to the option id so the checkbox shows ticked and "· modified" doesn't fire falsely. Counts are a union per name, so each person counts once. Confirmed loads all ids in the group.
+- **R5-3 tag delete = hard delete.** B!G cohort, queue manager and journey coach read `participant tags` without checking `isActive`, so a soft delete would still show the tag there. Holders are found with a Firestore `array-contains` query, not the loaded rows, because `loadParticipants` orders by `name` and drops docs without one. Delete re-checks the holders: if any remain (unloaded docs), it refuses and shows the count, and "Remove from all" appears. Unknown tag ids in saved filters are dropped on load (only when the tag list loaded, so a load failure never strips tags). Anyone can delete (operator).
+- **R5-4** Removed the Integrity card `defaulted-but-active` (defaulted / banned only). The round-4 Finance card `active-customer-finance-inactive` already covers all 5 statuses; keeping both double-counted.
+- **R5-5** `customer-no-finance-status` (Finance): active / non active AND finance `none`. Blank / unknown stored values normalise to `none`.
+- **R5-6** `onboarding-not-updated` (Integrity): active / non active AND `currentjourneyonboarded` missing. `false` (= yet to onboard) is a real value and is not flagged. This is the field the segment board uses (operator-confirmed 2026-09-25). New `Participant.onboarded` comes from the already-loaded doc (no new read).
+- **R5-7** `age-not-updated` (Integrity): active / non active AND age null (DOB missing / unreadable).
+- **R5-8** `dfu-and-queue-product` (Integrity, any status): ≥ 1 active DFU product AND ≥ 1 active queue product. Queue product = `arena events` where `type == 'queue'`, `delete != true` and end day ≥ today (start any). One extra read at page load (`where type == 'queue'`); dates are filtered client-side so no composite index is needed. The operator confirmed DFU products are never queue products.
+- **R5-9** HOP mismatch now compares with `p.journey` (the Journey column: active → activejourney, non active → lastcompletedjourney, discontinued → lastsubscribedjourney). Previously non active / discontinued rows with a matching journey were flagged because their activejourney is blank. Rows with no journey (none / late / banned) are skipped. The **Checklist** "Higher-order purchase" (HOP ≠ active AND ≠ last completed, analytics-style) is unchanged.
+
+## CHANGE LOG & REVERT GUIDE (round 5)
+| # | Where (component.ts) | Revert |
+|---|---|---|
+| 1 | table styles `.thead` `z-index: 5` | set back to 2 |
+| 2 | `nameGroups` / `canonicalId` (replace `datedLabel`); `FilterContext.eventGroups/queueGroups`; `hasValue` events / queues; `deriveChips` names; rail `referenceOptions`; store `eventGroups`, `queueGroups`, `expandEvents`, `countMembers(byId, groups)`, `attendedCounts`, confirmed effect, `audienceCounts`, `normalizeSaved` (loadAudience, audienceModified, resolveAudienceIds) | restore `datedLabel` + the 4 old call sites; drop the groups from the context / counts |
+| 3 | data service `tagHolderDocIds`, `removeTagEverywhere`, `deleteTag` (+ `deleteDoc` import); store `tagCounts`, `removeTagFromAll`, `deleteTag`; tag dialog count badge, `.tagdanger` block, `confirming` / `busy` / `unseen` / `held` / `openEdit` / `removeFromAll` / `deleteTag` | remove those; the edit button goes back to `editing.set(...)` |
+| 4 | SIGNALS | re-add `defaulted-but-active` |
+| 5–8 | SIGNALS + `isActiveOrNonActive`; `Participant.onboarded` + mapping; `SignalContext.queueProductIds`; `ReferenceData.queueProductIds` + `queueProductIds()` loader + the `arena events` query in `loadReference` | delete the 4 signal defs and their supporting fields |
+| 9 | `higher-order-mismatch` predicate | `!!p.higherorderpurchase && p.higherorderpurchase !== p.activejourney` |
+
+New hooks: `pi-tag-count`, `pi-tag-remove-all`, `pi-tag-delete`, `pi-tag-confirm`, `pi-tag-cancel` (no e2e yet; the operator will say when).
+
+## Verification
+- Unit spec: **116 / 116** (12 new R5 tests: name groups and expansion, chips without dates, HOP vs journey, the removed card, no-finance, onboarding mapping + card, age, queue-product loader dates / deleted, DFU + queue).
+- `tsc` 0 errors (app + unit configs); development build OK.
+- **Not viewed logged-in** (the app is auth-gated). The tag delete flow and the merged options need a manual check on starlabs-test.
+
+## Flags (updated)
+Onboarding and age insights are now built (R5-6 / R5-7) and come off the flag list. Still flagged: the backend customer-status job (Watson R2–R4) · loading approved requests for all events at start.

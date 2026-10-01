@@ -16,7 +16,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Firestore, QuerySnapshot, arrayRemove, arrayUnion, collection, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
+import { Firestore, QuerySnapshot, arrayRemove, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from '@angular/fire/storage';
 import { Observable, firstValueFrom, forkJoin, from } from 'rxjs';
 import { saveAs } from 'file-saver';
@@ -111,6 +111,8 @@ export interface Participant {
   purchasedate: string | null;
   dateofbirth: string | null;
   age: number | null;
+  // currentjourneyonboarded: true / false as stored, null when never set
+  onboarded: boolean | null;
   // journey for the participant's status: active → current, non active → last completed,
   // discontinued → last subscribed (cancelled); null otherwise
   journey: string | null;
@@ -150,7 +152,7 @@ export interface ProductRef extends NamedRef {
   type: string | null; // products.type, e.g. 'DFU'
 }
 
-// An event (start_date) or queue (created date); names repeat, so the date tells them apart.
+// An event (start_date) or queue (created date). Names repeat; the date only orders same-name ones.
 export interface DatedRef extends NamedRef {
   date: string | null;
 }
@@ -171,6 +173,7 @@ export interface ReferenceData {
   events: DatedRef[]; // name A–Z, then newest first
   queues: DatedRef[]; // name A–Z, then newest first
   journeySegments: JourneySegment[]; // board display order
+  queueProductIds: string[]; // products on a queue that is ongoing or upcoming
 }
 
 // Count conditions (uP! / CPM / ATC counts and product-count rules); both numbers are inclusive.
@@ -457,6 +460,8 @@ export interface FilterContext {
   completedByQueue?: Record<string, Set<string>>; // queueId -> profile ids whose active, approved token is at 'Completed'
   liveByQueue?: Record<string, Set<string>>; // queueId -> profile ids whose active, approved token is at any other stage
   segmentMembers?: Record<string, Set<string>>; // journey segment id -> profile ids in its saved list
+  eventGroups?: Record<string, string[]>; // event id -> every event id with the same name (nameGroups)
+  queueGroups?: Record<string, string[]>; // queue id -> every queue id with the same name
 }
 
 // Does participant p have value v in a checkbox group?
@@ -468,12 +473,17 @@ function hasValue(p: Participant, f: FilterModel, g: CheckGroup, v: string, ctx:
       return p.customersupport.status === v;
     case 'upStatus':
       return v === (p.upcount > 0 ? 'returning' : 'new');
-    case 'events':
-      return f.eventStatus === 'confirmed'
-        ? !!ctx.confirmedByEvent?.[v]?.has(p.profileid)
-        : mapValues(p.productevent).includes(v);
-    case 'queues':
-      return !!(f.queueStatus === 'live' ? ctx.liveByQueue : ctx.completedByQueue)?.[v]?.has(p.profileid);
+    // a ticked event / queue stands for every event / queue with its name
+    case 'events': {
+      const ids = ctx.eventGroups?.[v] ?? [v];
+      if (f.eventStatus === 'confirmed') return ids.some((id) => !!ctx.confirmedByEvent?.[id]?.has(p.profileid));
+      const attended = mapValues(p.productevent);
+      return ids.some((id) => attended.includes(id));
+    }
+    case 'queues': {
+      const members = f.queueStatus === 'live' ? ctx.liveByQueue : ctx.completedByQueue;
+      return (ctx.queueGroups?.[v] ?? [v]).some((id) => !!members?.[id]?.has(p.profileid));
+    }
     case 'journeysegments':
       return !!ctx.segmentMembers?.[v]?.has(p.profileid);
     default: {
@@ -670,11 +680,22 @@ function describeCondition(c: CountCondition): string {
 const formatDay = (day: string): string =>
   new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-// Event / queue names repeat, so the rail options and the chips both add the date: "Name · 12 Mar 2026".
-function datedLabel(ref: DatedRef): string {
-  const day = dayKey(ref.date);
-  return day ? `${ref.name} · ${formatDay(day)}` : ref.name;
+// Events / queues that share a name are one filter option. Maps every id to all the ids with its
+// name (trimmed, case-insensitive), in list order; the first (newest) id is the option's value.
+export function nameGroups(items: NamedRef[]): Record<string, string[]> {
+  const byName = new Map<string, string[]>();
+  for (const { id, name } of items) {
+    const key = String(name).trim().toLowerCase();
+    const ids = byName.get(key);
+    ids ? ids.push(id) : byName.set(key, [id]);
+  }
+  const out: Record<string, string[]> = {};
+  for (const ids of byName.values()) for (const id of ids) out[id] = ids;
+  return out;
 }
+
+// The option value an id is ticked under: the first id with its name (the id itself when unknown).
+export const canonicalId = (groups: Record<string, string[]>, id: string): string => groups[id]?.[0] ?? id;
 
 // A From–To day range in words; a missing side is open.
 function describeRange(from: string | null, to: string | null): string {
@@ -690,12 +711,8 @@ export function deriveChips(f: FilterModel, ref: ReferenceData): FilterChip[] {
   const productName = (id: string) => ref.products.find((p) => p.id === id)?.name ?? id;
   const tierName = (id: string) => ref.tiers.find((t) => t.id === id)?.name ?? id;
   const tagName = (id: string) => ref.tags.find((t) => t.id === id)?.name ?? id;
-  const dated = (list: DatedRef[], id: string) => {
-    const d = list.find((x) => x.id === id);
-    return d ? datedLabel(d) : id;
-  };
-  const eventName = (id: string) => dated(ref.events, id);
-  const queueName = (id: string) => dated(ref.queues, id);
+  const eventName = (id: string) => ref.events.find((e) => e.id === id)?.name ?? id;
+  const queueName = (id: string) => ref.queues.find((q) => q.id === id)?.name ?? id;
   const segmentName = (id: string) => ref.journeySegments.find((s) => s.id === id)?.name ?? id;
 
   const addEach = (group: CheckGroup, values: string[], prefix: string, fmt: (v: string) => string = (v) => v) => {
@@ -851,6 +868,7 @@ export interface SignalContext {
   productIds: Set<string>;
   journeyIds: Set<string>;
   dfuProductIds: Set<string>;
+  queueProductIds: Set<string>; // products on a queue that is ongoing or upcoming (arena events, type 'queue')
 }
 
 export interface SignalDef {
@@ -880,6 +898,8 @@ const subscriptionExpired = (p: Participant): boolean => {
   const today = dayKey(new Date());
   return !!end && !!today && end < today;
 };
+
+const isActiveOrNonActive = (p: Participant): boolean => p.customerstatus === 'active' || p.customerstatus === 'non active';
 
 // Watson finance statuses that mean the finance side is no longer live.
 const NON_ACTIVE_FINANCE: FinancialStatus[] = ['defaulted', 'locked', 'banned', 'late', 'discontinued'];
@@ -913,14 +933,6 @@ export const SIGNALS: SignalDef[] = [
     category: 'integrity',
     severity: 'critical',
     predicate: (p) => p.customerstatus === 'active' && subscriptionExpired(p),
-  },
-  {
-    id: 'defaulted-but-active',
-    label: 'Defaulted / banned finance, still active',
-    description: 'Financial standing is defaulted or banned but the customer is still active.',
-    category: 'integrity',
-    severity: 'critical',
-    predicate: (p) => (p.financialstatus === 'defaulted' || p.financialstatus === 'banned') && p.customerstatus === 'active',
   },
   {
     id: 'status-none-engaged',
@@ -958,6 +970,31 @@ export const SIGNALS: SignalDef[] = [
     category: 'integrity',
     severity: 'warn',
     predicate: (p, ref) => p.activeproduct.filter((id) => ref.dfuProductIds.has(id)).length >= 2,
+  },
+  {
+    id: 'dfu-and-queue-product',
+    label: 'DFU and queue product ongoing together',
+    description: 'Has an active DFU product and an active product on an ongoing or upcoming queue.',
+    category: 'integrity',
+    severity: 'warn',
+    predicate: (p, ref) =>
+      p.activeproduct.some((id) => ref.dfuProductIds.has(id)) && p.activeproduct.some((id) => ref.queueProductIds.has(id)),
+  },
+  {
+    id: 'onboarding-not-updated',
+    label: 'Onboarding status not updated',
+    description: 'Active or non active customer whose onboarding status (currentjourneyonboarded) was never set.',
+    category: 'integrity',
+    severity: 'warn',
+    predicate: (p) => isActiveOrNonActive(p) && p.onboarded == null,
+  },
+  {
+    id: 'age-not-updated',
+    label: 'Age not updated',
+    description: 'Active or non active customer with no readable date of birth.',
+    category: 'integrity',
+    severity: 'warn',
+    predicate: (p) => isActiveOrNonActive(p) && p.age == null,
   },
 
   // --- retention: churn risk / revive ---
@@ -1008,10 +1045,11 @@ export const SIGNALS: SignalDef[] = [
   {
     id: 'higher-order-mismatch',
     label: 'Higher-order purchase ≠ current journey',
-    description: 'Has a higher-order purchase that differs from the active journey (any status). No higher-order purchase is never a mismatch.',
+    description:
+      'Has a higher-order purchase that differs from the Journey column (active → active, non active → last completed, discontinued → last subscribed). Rows with no higher-order purchase or no journey are skipped.',
     category: 'retention',
     severity: 'warn',
-    predicate: (p) => !!p.higherorderpurchase && p.higherorderpurchase !== p.activejourney,
+    predicate: (p) => !!p.higherorderpurchase && !!p.journey && p.higherorderpurchase !== p.journey,
   },
 
   // --- finance status: a breakdown per Watson status, plus one flag ---
@@ -1035,6 +1073,14 @@ export const SIGNALS: SignalDef[] = [
     category: 'finance',
     severity: 'critical',
     predicate: (p) => p.customerstatus === 'active' && NON_ACTIVE_FINANCE.includes(p.financialstatus),
+  },
+  {
+    id: 'customer-no-finance-status',
+    label: 'Active / non active customer, no finance status',
+    description: 'Customer status active or non active while the finance status is none, blank or not a known value.',
+    category: 'finance',
+    severity: 'warn',
+    predicate: (p) => isActiveOrNonActive(p) && p.financialstatus === 'none',
   },
 
   // --- opportunity: upsell / relationship ---
@@ -1222,7 +1268,7 @@ export class ParticipantDataService {
   }
   private async loadReference(): Promise<ReferenceData> {
     const col = (name: string) => getDocs(collection(this.firestore, name)).catch(() => null);
-    const [journeys, products, modes, tiers, tags, events, queues, segmentConfigs, segmentLists] = await Promise.all([
+    const [journeys, products, modes, tiers, tags, events, queues, segmentConfigs, segmentLists, queueProducts] = await Promise.all([
       col('journey'),
       col('products'),
       col('modes'),
@@ -1232,6 +1278,7 @@ export class ParticipantDataService {
       col('queue generation'),
       col('segmentboardconfig'),
       col('segmentboardlist'),
+      getDocs(query(collection(this.firestore, 'arena events'), where('type', '==', 'queue'))).catch(() => null),
     ]);
     const named = (snap: any, field: string): NamedRef[] =>
       snap ? snap.docs.map((d: any) => ({ id: d.id, name: d.data()[field] ?? d.id })) : [];
@@ -1256,7 +1303,23 @@ export class ParticipantDataService {
       events: dated(events, 'name', 'start_date'),
       queues: dated(queues, 'queuename', 'created'),
       journeySegments: this.journeySegments(segmentConfigs, segmentLists),
+      queueProductIds: this.queueProductIds(queueProducts),
     };
+  }
+
+  // Products on a queue that is ongoing or upcoming: arena events of type 'queue', not deleted, whose
+  // end day is today or later (the start can be past or future). Dates are checked here, so the query
+  // needs no composite index.
+  private queueProductIds(snap: QuerySnapshot | null): string[] {
+    const today = dayKey(new Date()) ?? '';
+    const ids = new Set<string>();
+    for (const d of snap?.docs ?? []) {
+      const data = d.data() as Dict;
+      const end = toDay(data['enddate']);
+      const id = data['productref']?.id;
+      if (data['delete'] !== true && id && end && end >= today) ids.add(id);
+    }
+    return [...ids];
   }
 
   // Live segment board segments in board order (as the segment board), each with its saved member list.
@@ -1333,6 +1396,7 @@ export class ParticipantDataService {
       purchasedate: tsToIso(d['purchasedate']),
       dateofbirth: dob,
       age: ageFrom(dob),
+      onboarded: typeof d['currentjourneyonboarded'] === 'boolean' ? d['currentjourneyonboarded'] : null,
       journey: journey ?? null,
       upcount: consumed.filter((id) => UP_LIVE_PRODUCT_IDS.includes(id)).length,
       cpmcount: consumed.filter((id) => CPM_PRODUCT_IDS.includes(id)).length,
@@ -1714,6 +1778,28 @@ export class ParticipantDataService {
     });
   }
 
+  // Every participant metadata doc holding the tag — read from Firestore, so docs the screen didn't
+  // load (e.g. no name) count too.
+  async tagHolderDocIds(tagId: string): Promise<string[]> {
+    const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), where('profiletags', 'array-contains', tagId)));
+    return snap.docs.map((d) => d.id);
+  }
+
+  // Takes the tag off everyone who has it; returns their doc ids.
+  async removeTagEverywhere(tagId: string): Promise<string[]> {
+    const holders = await this.tagHolderDocIds(tagId);
+    for (const group of this.chunk(holders, 400)) {
+      const batch = writeBatch(this.firestore);
+      for (const id of group) batch.update(doc(this.firestore, 'participant metadata', id), { profiletags: arrayRemove(tagId) });
+      await batch.commit();
+    }
+    return holders;
+  }
+
+  async deleteTag(tagId: string): Promise<void> {
+    await deleteDoc(doc(this.firestore, 'participant tags', tagId));
+  }
+
   // as analytics' tag-participants updateTagsFor
   async persistTagFor(tagId: string, tagsfor: string[]): Promise<void> {
     await updateDoc(doc(this.firestore, 'participant tags', tagId), { tagsfor });
@@ -1799,6 +1885,7 @@ const EMPTY_REF: ReferenceData = {
   events: [],
   queues: [],
   journeySegments: [],
+  queueProductIds: [],
 };
 
 const AUDIENCE_KIND_LABEL: Record<AudienceKind, string> = { filter: 'Saved filter', list: 'List', segment: 'Segment' };
@@ -1847,8 +1934,8 @@ export class ParticipantStore {
   constructor() {
     effect(() => {
       const f = this.filter();
-      const events = [...f.events, ...(f.exclude.events ?? [])];
-      if (f.eventStatus !== 'confirmed' || !events.length) return;
+      if (f.eventStatus !== 'confirmed' || !(f.events.length || f.exclude.events?.length)) return;
+      const events = this.expandEvents([...f.events, ...(f.exclude.events ?? [])]);
       untracked(() => this.loadConfirmed(events));
     });
     effect(() => {
@@ -1869,11 +1956,21 @@ export class ParticipantStore {
   });
   private readonly segmentSets = computed(() => toSets(Object.fromEntries(this.reference().journeySegments.map((s) => [s.id, s.profileIds]))));
 
+  // same-name events / queues are one filter option
+  readonly eventGroups = computed(() => nameGroups(this.reference().events));
+  readonly queueGroups = computed(() => nameGroups(this.reference().queues));
+  private expandEvents(ids: string[]): string[] {
+    const groups = this.eventGroups();
+    return [...new Set(ids.flatMap((id) => groups[id] ?? [id]))];
+  }
+
   private readonly filterContext = computed<FilterContext>(() => ({
     confirmedByEvent: this.confirmedSets(),
     completedByQueue: this.queueSets().completed,
     liveByQueue: this.queueSets().live,
     segmentMembers: this.segmentSets(),
+    eventGroups: this.eventGroups(),
+    queueGroups: this.queueGroups(),
   }));
 
   private readonly signalContext = computed<SignalContext>(() => {
@@ -1882,6 +1979,7 @@ export class ParticipantStore {
       productIds: new Set(ref.products.map((p) => p.id)),
       journeyIds: new Set(ref.journeys.map((j) => j.id)),
       dfuProductIds: new Set(ref.products.filter((p) => p.type === 'DFU').map((p) => p.id)),
+      queueProductIds: new Set(ref.queueProductIds),
     };
   });
 
@@ -1915,13 +2013,16 @@ export class ParticipantStore {
   // --- event / queue option counts (whole base) ---
   private readonly baseIds = computed(() => new Set(this.all().map((p) => p.profileid)));
   private readonly attendedCounts = computed<Record<string, number>>(() => {
+    const groups = this.eventGroups();
     const counts: Record<string, number> = {};
-    for (const p of this.all()) for (const id of new Set(mapValues(p.productevent))) counts[id] = (counts[id] ?? 0) + 1;
+    for (const p of this.all()) {
+      for (const id of new Set(mapValues(p.productevent).map((e) => canonicalId(groups, e)))) counts[id] = (counts[id] ?? 0) + 1;
+    }
     return counts;
   });
-  private readonly confirmedCounts = computed(() => this.countMembers(this.confirmedSets()));
-  private readonly completedQueueCounts = computed(() => this.countMembers(this.queueSets().completed));
-  private readonly liveQueueCounts = computed(() => this.countMembers(this.queueSets().live));
+  private readonly confirmedCounts = computed(() => this.countMembers(this.confirmedSets(), this.eventGroups()));
+  private readonly completedQueueCounts = computed(() => this.countMembers(this.queueSets().completed, this.queueGroups()));
+  private readonly liveQueueCounts = computed(() => this.countMembers(this.queueSets().live, this.queueGroups()));
 
   // Participants per event / queue option under the section's current switch (Attended / Confirmed,
   // Completed / Live). Confirmed counts exist only for events whose approved requests have been loaded.
@@ -1932,16 +2033,16 @@ export class ParticipantStore {
     this.filter().queueStatus === 'live' ? this.liveQueueCounts() : this.completedQueueCounts()
   );
 
-  // Only ids in the loaded base count, so an option's count is what ticking it alone shows.
-  private countMembers(byId: Record<string, Set<string>>): Record<string, number> {
+  // Per option (same-name ids together, each person once). Only ids in the loaded base count, so an
+  // option's count is what ticking it alone shows.
+  private countMembers(byId: Record<string, Set<string>>, groups: Record<string, string[]>): Record<string, number> {
     const base = this.baseIds();
-    const counts: Record<string, number> = {};
-    for (const [id, members] of Object.entries(byId)) {
-      let n = 0;
-      for (const pid of members) if (base.has(pid)) n++;
-      counts[id] = n;
+    const members: Record<string, Set<string>> = {};
+    for (const [id, pids] of Object.entries(byId)) {
+      const option = (members[canonicalId(groups, id)] ??= new Set());
+      for (const pid of pids) if (base.has(pid)) option.add(pid);
     }
-    return counts;
+    return Object.fromEntries(Object.entries(members).map(([id, pids]) => [id, pids.size]));
   }
 
   readonly activeSignal = computed<SignalDef | null>(() => {
@@ -1956,7 +2057,7 @@ export class ParticipantStore {
     const counts: Record<string, number | null> = {};
     for (const a of this.audiences()) {
       const f = a.kind === 'filter' ? a.filter : undefined;
-      const pending = f?.eventStatus === 'confirmed' && [...f.events, ...(f.exclude.events ?? [])].some((id) => !(id in loaded));
+      const pending = f?.eventStatus === 'confirmed' && this.expandEvents([...f.events, ...(f.exclude.events ?? [])]).some((id) => !(id in loaded));
       counts[a.id] = pending ? null : this.resolveAudienceIds(a).size;
     }
     return counts;
@@ -1976,7 +2077,7 @@ export class ParticipantStore {
   // saved filter: the current filter no longer matches what was saved
   readonly audienceModified = computed(() => {
     const aud = this.activeAudience();
-    return aud?.kind === 'filter' && !!aud.filter && filterSignature(aud.filter) !== filterSignature(this.filter());
+    return aud?.kind === 'filter' && !!aud.filter && filterSignature(this.normalizeSaved(aud.filter)) !== filterSignature(this.filter());
   });
   readonly audienceLabel = computed<AudienceLabel | null>(() => {
     const aud = this.activeAudience();
@@ -2204,13 +2305,31 @@ export class ParticipantStore {
     if (!aud) return;
     this.activeAudienceId.set(id);
     if (aud.kind === 'filter' && aud.filter) {
-      this.filter.set(structuredClone(aud.filter));
+      this.filter.set(this.normalizeSaved(aud.filter));
       this.membership.set(null);
     } else {
       this.filter.set(emptyFilter());
       this.membership.set(this.resolveAudienceIds(aud));
     }
     this.clearSelection();
+  }
+
+  // A saved filter as the rail shows it: events / queues under their name's option (older saves hold
+  // any same-name id) and tags that no longer exist dropped. Skipped while the tag list is empty
+  // (not loaded or failed), so a load error never strips tags.
+  private normalizeSaved(saved: FilterModel): FilterModel {
+    const f = structuredClone(saved);
+    const ref = this.reference();
+    const canon = (ids: string[] | undefined, groups: Record<string, string[]>) => [...new Set((ids ?? []).map((id) => canonicalId(groups, id)))];
+    f.events = canon(f.events, this.eventGroups());
+    f.queues = canon(f.queues, this.queueGroups());
+    f.exclude = { ...f.exclude, events: canon(f.exclude.events, this.eventGroups()), queues: canon(f.exclude.queues, this.queueGroups()) };
+    if (ref.tags.length) {
+      const known = new Set(ref.tags.map((t) => t.id));
+      f.profiletags = f.profiletags.filter((id) => known.has(id));
+      f.exclude = { ...f.exclude, profiletags: (f.exclude.profiletags ?? []).filter((id) => known.has(id)) };
+    }
+    return f;
   }
 
   // Names are unique within their own kind (case-insensitive, trimmed).
@@ -2293,7 +2412,7 @@ export class ParticipantStore {
 
   private resolveAudienceIds(aud: Audience): Set<string> {
     if (aud.kind === 'filter' && aud.filter) {
-      return new Set(applyFilters(this.all(), aud.filter, this.filterContext()).map((p) => p.profileid));
+      return new Set(applyFilters(this.all(), this.normalizeSaved(aud.filter), this.filterContext()).map((p) => p.profileid));
     }
     if (aud.kind === 'list') {
       return new Set(aud.profileIds ?? []);
@@ -2374,6 +2493,34 @@ export class ParticipantStore {
     this.reference.update((r) => ({ ...r, tags: [...r.tags, tag] }));
     this.data.persistNewTag(tag).catch((e) => console.error('persistNewTag failed', e));
     return tag;
+  }
+
+  // participants holding each tag, over the loaded base
+  readonly tagCounts = computed<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    for (const p of this.all()) for (const id of new Set(p.profiletags)) counts[id] = (counts[id] ?? 0) + 1;
+    return counts;
+  });
+
+  // Removes the tag from every participant who has it (Firestore query, not only the loaded rows).
+  async removeTagFromAll(tagId: string): Promise<number> {
+    const removed = await this.data.removeTagEverywhere(tagId);
+    this.all.update((list) => list.map((p) => (p.profiletags.includes(tagId) ? { ...p, profiletags: p.profiletags.filter((t) => t !== tagId) } : p)));
+    return removed.length;
+  }
+
+  // Deletes the tag doc only once no participant holds it; otherwise returns how many still do.
+  async deleteTag(tagId: string): Promise<number> {
+    const holders = await this.data.tagHolderDocIds(tagId);
+    if (holders.length) return holders.length;
+    await this.data.deleteTag(tagId);
+    this.reference.update((r) => ({ ...r, tags: r.tags.filter((t) => t.id !== tagId) }));
+    this.filter.update((f) => ({
+      ...f,
+      profiletags: f.profiletags.filter((id) => id !== tagId),
+      exclude: { ...f.exclude, profiletags: (f.exclude.profiletags ?? []).filter((id) => id !== tagId) },
+    }));
+    return 0;
   }
 
   setTagFor(tagId: string, tagsfor: string[]): void {
@@ -2533,6 +2680,7 @@ const TAG_FOR_OPTIONS = ['live event', 'queue event', 'video ask', 'journey coac
               <button class="tagpick" [attr.aria-pressed]="picked().has(t.id)" (click)="toggle(t.id)">
                 <span class="material-symbols-rounded box">{{ picked().has(t.id) ? 'check_box' : 'check_box_outline_blank' }}</span>
                 <span class="tname">{{ t.name }}</span>
+                <span data-testid="pi-tag-count" class="tcount" [matTooltip]="held(t.id) + ' participant' + (held(t.id) === 1 ? '' : 's') + ' have this tag'">{{ held(t.id) }}</span>
               </button>
               <span class="forbadges">
                 @for (f of t.tagsfor; track f) {
@@ -2546,8 +2694,8 @@ const TAG_FOR_OPTIONS = ['live event', 'queue event', 'video ask', 'journey coac
                 class="edit"
                 [class.on]="editing() === t.id"
                 [attr.aria-expanded]="editing() === t.id"
-                matTooltip="Edit what this tag is for"
-                (click)="editing.set(editing() === t.id ? null : t.id)"
+                matTooltip="Edit or delete this tag"
+                (click)="openEdit(t.id)"
               >
                 <span class="material-symbols-rounded">edit</span>
               </button>
@@ -2567,6 +2715,32 @@ const TAG_FOR_OPTIONS = ['live event', 'queue event', 'video ask', 'journey coac
                   >
                     {{ o }}
                   </button>
+                }
+              </div>
+              <!-- delete: only once nobody holds the tag; removing it from everyone comes first -->
+              <div class="tagdanger">
+                @if (busy()) {
+                  <span class="dz-text">Working…</span>
+                } @else if (confirming() === 'clear') {
+                  <span class="dz-text">Remove “{{ t.name }}” from all {{ held(t.id) }} participant{{ held(t.id) === 1 ? '' : 's' }}?</span>
+                  <button data-testid="pi-tag-cancel" class="btn btn-ghost sm" (click)="confirming.set(null)">Cancel</button>
+                  <button data-testid="pi-tag-confirm" class="btn btn-danger sm" (click)="removeFromAll(t)">Yes, remove</button>
+                } @else if (confirming() === 'delete') {
+                  <span class="dz-text">Delete “{{ t.name }}” permanently?</span>
+                  <button data-testid="pi-tag-cancel" class="btn btn-ghost sm" (click)="confirming.set(null)">Cancel</button>
+                  <button data-testid="pi-tag-confirm" class="btn btn-danger sm" (click)="deleteTag(t)">Yes, delete</button>
+                } @else {
+                  <span class="dz-text">On {{ held(t.id) }} participant{{ held(t.id) === 1 ? '' : 's' }}</span>
+                  @if (held(t.id) > 0) {
+                    <button data-testid="pi-tag-remove-all" class="btn btn-ghost sm" (click)="confirming.set('clear')">
+                      <span class="material-symbols-rounded">label_off</span> Remove from all {{ held(t.id) }}
+                    </button>
+                  }
+                  <span [matTooltip]="held(t.id) > 0 ? 'Remove it from all participants first' : ''">
+                    <button data-testid="pi-tag-delete" class="btn btn-danger sm" [disabled]="held(t.id) > 0" (click)="confirming.set('delete')">
+                      <span class="material-symbols-rounded">delete</span> Delete tag
+                    </button>
+                  </span>
                 }
               </div>
             }
@@ -2705,6 +2879,32 @@ const TAG_FOR_OPTIONS = ['live event', 'queue event', 'video ask', 'journey coac
       gap: 6px;
       padding: 6px 8px 10px 36px;
     }
+    .tcount {
+      flex-shrink: 0;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--pi-text-3);
+    }
+    .tagdanger {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px 10px 36px;
+    }
+    .dz-text {
+      flex: 1;
+      min-width: 140px;
+      font-size: 12.5px;
+      color: var(--pi-text-2);
+    }
+    .btn.sm {
+      padding: 5px 10px;
+      font-size: 12.5px;
+    }
+    .btn.sm .material-symbols-rounded {
+      font-size: 16px;
+    }
     .for-row {
       display: flex;
       flex-wrap: wrap;
@@ -2797,6 +2997,61 @@ export class TagManagerDialogComponent {
       next.has(option) ? next.delete(option) : next.add(option);
       return next;
     });
+  }
+
+  // which step of the delete flow is showing for the open tag
+  readonly confirming = signal<'clear' | 'delete' | null>(null);
+  readonly busy = signal(false);
+  // holders Firestore found that the loaded rows don't show (a delete refused because of them)
+  private readonly unseen = signal<Record<string, number>>({});
+
+  held(tagId: string): number {
+    return (this.store.tagCounts()[tagId] ?? 0) || (this.unseen()[tagId] ?? 0);
+  }
+
+  openEdit(tagId: string): void {
+    this.editing.set(this.editing() === tagId ? null : tagId);
+    this.confirming.set(null);
+  }
+
+  async removeFromAll(tag: Tag): Promise<void> {
+    this.busy.set(true);
+    try {
+      const n = await this.store.removeTagFromAll(tag.id);
+      this.unseen.update((u) => ({ ...u, [tag.id]: 0 }));
+      this.snack.open(`Removed “${tag.name}” from ${n} participant${n === 1 ? '' : 's'}`, 'Dismiss', { duration: 3000 });
+    } catch (e) {
+      console.error('removeTagFromAll failed', e);
+      this.snack.open('Could not remove the tag. Try again.', 'Dismiss', { duration: 4000 });
+    } finally {
+      this.busy.set(false);
+      this.confirming.set(null);
+    }
+  }
+
+  async deleteTag(tag: Tag): Promise<void> {
+    this.busy.set(true);
+    try {
+      const left = await this.store.deleteTag(tag.id);
+      if (left) {
+        this.unseen.update((u) => ({ ...u, [tag.id]: left }));
+        this.snack.open(`“${tag.name}” is still on ${left} participant${left === 1 ? '' : 's'}. Remove it from all first.`, 'Dismiss', { duration: 4000 });
+      } else {
+        this.picked.update((s) => {
+          const next = new Set(s);
+          next.delete(tag.id);
+          return next;
+        });
+        this.editing.set(null);
+        this.snack.open(`Deleted tag “${tag.name}”`, 'Dismiss', { duration: 3000 });
+      }
+    } catch (e) {
+      console.error('deleteTag failed', e);
+      this.snack.open('Could not delete the tag. Try again.', 'Dismiss', { duration: 4000 });
+    } finally {
+      this.busy.set(false);
+      this.confirming.set(null);
+    }
   }
 
   toggleTagFor(tag: Tag, option: string): void {
@@ -4710,14 +4965,15 @@ export class FilterRailComponent {
 
   private opt = (arr: { id: string; name: string }[]): FilterOption[] => arr.map((a) => ({ value: a.id, label: a.name }));
 
-  // Event / queue names repeat, so the date tells them apart ("Name · 12 Mar 2026"); journey segments
-  // say when their saved list was last updated. Built per reference load, not on every filter change.
+  // One event / queue option per name (its value is the name's first id); journey segments say when
+  // their saved list was last updated. Built per reference load, not on every filter change.
   private readonly referenceOptions = computed(() => {
     const ref = this.store.reference();
-    const dated = (items: DatedRef[]): FilterOption[] => items.map((d) => ({ value: d.id, label: datedLabel(d) }));
+    const byName = (items: DatedRef[], groups: Record<string, string[]>): FilterOption[] =>
+      items.filter((d) => canonicalId(groups, d.id) === d.id).map((d) => ({ value: d.id, label: d.name }));
     return {
-      events: dated(ref.events),
-      queues: dated(ref.queues),
+      events: byName(ref.events, this.store.eventGroups()),
+      queues: byName(ref.queues, this.store.queueGroups()),
       segments: ref.journeySegments.map((s): FilterOption => {
         const day = toDay(s.lastupdated);
         return { value: s.id, label: s.name, hint: day ? `updated ${formatDay(day)}` : 'not updated yet' };
@@ -5737,7 +5993,8 @@ const LAST_SUBSCRIPTION_KEYS = new Set(['subscriptionstart', 'subscriptionend'])
       background: var(--pi-surface-2);
       position: sticky;
       top: 0;
-      z-index: 2;
+      /* above the frozen body cells (z-index 2), which come later in the DOM and would paint over it */
+      z-index: 5;
     }
 
     .th {

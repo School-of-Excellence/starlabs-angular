@@ -1,5 +1,6 @@
 // participant-intelligence.unit.spec.ts — unit tests for the Participant Intelligence filter engine,
-// insights and Watson rules (round 4 plan: specs/plans/2026-09-29-participant-intelligence-round4.md).
+// insights and Watson rules (round 4 plan: specs/plans/2026-09-29-participant-intelligence-round4.md;
+// round 5: specs/plans/2026-10-01-participant-intelligence-round5.md, tests tagged R5-n).
 //
 // WHY UNIT: the filter engine, chips, count conditions, subscription relations and insight predicates
 // are pure functions over already-loaded participants. They decide which rows an operator bulk-tags,
@@ -28,6 +29,8 @@ import {
   SubscriptionRelation,
   WATSON_RULES,
   ageRangeError,
+  canonicalId,
+  nameGroups,
   applyFilters,
   conditionActive,
   conditionError,
@@ -77,6 +80,7 @@ function mk(over: Partial<Participant> = {}): Participant {
     purchasedate: null,
     dateofbirth: null,
     age: null,
+    onboarded: true,
     journey: null,
     upcount: 0,
     cpmcount: 0,
@@ -129,12 +133,14 @@ const REF: ReferenceData = {
   events: [{ id: 'e1', name: 'B!G Accelerator', date: at(2026, 3, 12) }],
   queues: [{ id: 'q1', name: 'Morning Queue', date: at(2026, 3, 12) }],
   journeySegments: [{ id: 's1', name: 'Ready to renew', profileIds: ['a'], lastupdated: null }],
+  queueProductIds: [],
 };
 
 const SIGNAL_CTX: SignalContext = {
   productIds: new Set(['p1', 'dfu1', 'dfu2']),
   journeyIds: new Set(['j1', 'j2']),
   dfuProductIds: new Set(['dfu1', 'dfu2']),
+  queueProductIds: new Set(['qp1', 'qp2']),
 };
 
 const signal = (id: string) => {
@@ -147,6 +153,7 @@ const signal = (id: string) => {
 const mapper = Object.create(ParticipantDataService.prototype) as {
   mapParticipant(id: string, d: Dict): Participant;
   mapSavedFilter(d: Dict): FilterModel;
+  queueProductIds(snap: unknown): string[];
 };
 
 describe('Participant Intelligence', () => {
@@ -227,9 +234,9 @@ describe('Participant Intelligence', () => {
       expect(ids(applyFilters(people, withFilter({ queues: ['q1'] }), {}))).toEqual([]);
     });
 
-    it('chips the queue with the switch and its date', () => {
-      expect(labels(withFilter({ queues: ['q1'], queueStatus: 'completed' }))).toEqual(['Completed queue: Morning Queue · 12 Mar 2026']);
-      expect(labels(withFilter({ queues: ['q1'], queueStatus: 'live' }))).toEqual(['Live in queue: Morning Queue · 12 Mar 2026']);
+    it('R5-2 chips the queue with the switch and its name only (no date)', () => {
+      expect(labels(withFilter({ queues: ['q1'], queueStatus: 'completed' }))).toEqual(['Completed queue: Morning Queue']);
+      expect(labels(withFilter({ queues: ['q1'], queueStatus: 'live' }))).toEqual(['Live in queue: Morning Queue']);
     });
 
     it('Attended reads productevent (single id or list); Confirmed reads approved requests', () => {
@@ -241,7 +248,52 @@ describe('Participant Intelligence', () => {
       const evCtx: FilterContext = { confirmedByEvent: { e1: new Set(['c']) } };
       expect(ids(applyFilters(evPeople, withFilter({ events: ['e1'], eventStatus: 'attended' }), evCtx))).toEqual(['a', 'b']);
       expect(ids(applyFilters(evPeople, withFilter({ events: ['e1'], eventStatus: 'confirmed' }), evCtx))).toEqual(['c']);
-      expect(labels(withFilter({ events: ['e1'], eventStatus: 'confirmed' }))).toEqual(['Confirmed for: B!G Accelerator · 12 Mar 2026']);
+      expect(labels(withFilter({ events: ['e1'], eventStatus: 'confirmed' }))).toEqual(['Confirmed for: B!G Accelerator']);
+    });
+  });
+
+  // =============================================================================================
+  // R5-2 — same-name events / queues are one option
+  // =============================================================================================
+  describe('R5-2 same-name events and queues', () => {
+    // list order = name A–Z, then newest first, so e3 (newest B!G) is the option's value
+    const events = [
+      { id: 'e3', name: 'B!G Accelerator', date: at(2026, 6, 1) },
+      { id: 'e1', name: 'B!G Accelerator ', date: at(2026, 3, 12) },
+      { id: 'e2', name: 'CPM Live', date: at(2026, 4, 1) },
+    ];
+    const groups = nameGroups(events);
+
+    it('groups ids by trimmed, case-insensitive name; the first id is the option', () => {
+      expect(groups['e1']).toEqual(['e3', 'e1']);
+      expect(groups['e3']).toEqual(['e3', 'e1']);
+      expect(groups['e2']).toEqual(['e2']);
+      expect(canonicalId(groups, 'e1')).toBe('e3');
+      expect(canonicalId(groups, 'unknown')).toBe('unknown');
+    });
+
+    it('a ticked event matches every event with its name (attended and confirmed)', () => {
+      const people = [
+        mk({ profileid: 'a', productevent: { x: ['e1'] } }),
+        mk({ profileid: 'b', productevent: { x: ['e3'] } }),
+        mk({ profileid: 'c', productevent: { x: ['e2'] } }),
+      ];
+      const ctx: FilterContext = { eventGroups: groups, confirmedByEvent: { e1: new Set(['c']), e3: new Set(['a']) } };
+      expect(ids(applyFilters(people, withFilter({ events: ['e3'], eventStatus: 'attended' }), ctx))).toEqual(['a', 'b']);
+      // an older saved filter holding the other id matches the same people
+      expect(ids(applyFilters(people, withFilter({ events: ['e1'], eventStatus: 'attended' }), ctx))).toEqual(['a', 'b']);
+      expect(ids(applyFilters(people, withFilter({ events: ['e3'], eventStatus: 'confirmed' }), ctx))).toEqual(['a', 'c']);
+      expect(ids(applyFilters(people, withFilter({ exclude: { events: ['e3'] }, eventStatus: 'attended' }), ctx))).toEqual(['c']);
+    });
+
+    it('a ticked queue matches every queue with its name', () => {
+      const queues = [
+        { id: 'q2', name: 'Morning Queue', date: null },
+        { id: 'q1', name: 'Morning Queue', date: null },
+      ];
+      const people = [mk({ profileid: 'a' }), mk({ profileid: 'b' }), mk({ profileid: 'c' })];
+      const ctx: FilterContext = { queueGroups: nameGroups(queues), completedByQueue: { q1: new Set(['a']), q2: new Set(['b']) } };
+      expect(ids(applyFilters(people, withFilter({ queues: ['q2'], queueStatus: 'completed' }), ctx))).toEqual(['a', 'b']);
     });
   });
 
@@ -650,17 +702,26 @@ describe('Participant Intelligence', () => {
     describe('a) higher-order-mismatch', () => {
       const s = signal('higher-order-mismatch');
 
-      it('flags a higher-order purchase that differs from the active journey, for every status', () => {
-        for (const customerstatus of ['active', 'non active', 'discontinued', 'late', 'banned', 'none'] as const) {
-          expect(s.predicate(mk({ customerstatus, higherorderpurchase: 'j2', activejourney: 'j1' }), SIGNAL_CTX)).withContext(customerstatus).toBeTrue();
-        }
-        expect(s.predicate(mk({ higherorderpurchase: 'j2', activejourney: null }), SIGNAL_CTX)).toBeTrue();
+      // R5-9: compares with the Journey column (status-based), not the active journey
+      it('R5-9 flags a higher-order purchase that differs from the status-based journey', () => {
+        expect(s.predicate(mk({ customerstatus: 'active', higherorderpurchase: 'j2', journey: 'j1' }), SIGNAL_CTX)).toBeTrue();
+        expect(s.predicate(mk({ customerstatus: 'non active', higherorderpurchase: 'j2', journey: 'j1' }), SIGNAL_CTX)).toBeTrue();
       });
 
-      it('never flags a matching or an empty higher-order purchase', () => {
-        expect(s.predicate(mk({ higherorderpurchase: 'j1', activejourney: 'j1' }), SIGNAL_CTX)).toBeFalse();
-        expect(s.predicate(mk({ higherorderpurchase: null, activejourney: 'j1' }), SIGNAL_CTX)).toBeFalse();
-        expect(s.predicate(mk({ higherorderpurchase: '', activejourney: 'j1' }), SIGNAL_CTX)).toBeFalse();
+      it('R5-9 does not flag a non active / discontinued participant whose journey matches (active journey blank)', () => {
+        for (const customerstatus of ['non active', 'discontinued'] as const) {
+          expect(s.predicate(mk({ customerstatus, higherorderpurchase: 'j1', journey: 'j1', activejourney: null }), SIGNAL_CTX))
+            .withContext(customerstatus)
+            .toBeFalse();
+        }
+      });
+
+      it('R5-9 skips rows with no journey and rows with no higher-order purchase', () => {
+        for (const customerstatus of ['none', 'late', 'banned'] as const) {
+          expect(s.predicate(mk({ customerstatus, higherorderpurchase: 'j2', journey: null }), SIGNAL_CTX)).withContext(customerstatus).toBeFalse();
+        }
+        expect(s.predicate(mk({ higherorderpurchase: null, journey: 'j1' }), SIGNAL_CTX)).toBeFalse();
+        expect(s.predicate(mk({ higherorderpurchase: '', journey: 'j1' }), SIGNAL_CTX)).toBeFalse();
       });
     });
 
@@ -755,6 +816,83 @@ describe('Participant Intelligence', () => {
         expect(s.predicate(mk({ customerstatus: 'active', financialstatus: status }), SIGNAL_CTX)).withContext(status).toBe(flagged);
       }
       expect(s.predicate(mk({ customerstatus: 'non active', financialstatus: 'defaulted' }), SIGNAL_CTX)).toBeFalse();
+    });
+
+    it('R5-4 the old integrity card (defaulted / banned only) is gone', () => {
+      expect(SIGNALS.some((x) => x.id === 'defaulted-but-active')).toBeFalse();
+    });
+
+    it('R5-5 flags an active or non active customer with no finance status', () => {
+      const s = signal('customer-no-finance-status');
+      expect(s.category).toBe('finance');
+      expect(s.predicate(mk({ customerstatus: 'active', financialstatus: 'none' }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'non active', financialstatus: 'none' }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'discontinued', financialstatus: 'none' }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ customerstatus: 'active', financialstatus: 'regular' }), SIGNAL_CTX)).toBeFalse();
+    });
+
+    it('R5-5 a blank or unknown stored finance status maps to none', () => {
+      expect(mapper.mapParticipant('a', { financialstatus: '' }).financialstatus).toBe('none');
+      expect(mapper.mapParticipant('a', { financialstatus: 'Regulr' }).financialstatus).toBe('none');
+      expect(mapper.mapParticipant('a', {}).financialstatus).toBe('none');
+    });
+  });
+
+  // =============================================================================================
+  // R5-6 / R5-7 / R5-8 — new integrity cards
+  // =============================================================================================
+  describe('R5 integrity cards', () => {
+    it('R5-6 onboarding not updated: active / non active with currentjourneyonboarded never set', () => {
+      const s = signal('onboarding-not-updated');
+      expect(s.category).toBe('integrity');
+      expect(s.predicate(mk({ customerstatus: 'active', onboarded: null }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'non active', onboarded: null }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'active', onboarded: false }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ customerstatus: 'active', onboarded: true }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ customerstatus: 'discontinued', onboarded: null }), SIGNAL_CTX)).toBeFalse();
+    });
+
+    it('R5-6 maps currentjourneyonboarded: booleans kept, anything else is not set', () => {
+      expect(mapper.mapParticipant('a', { currentjourneyonboarded: true }).onboarded).toBeTrue();
+      expect(mapper.mapParticipant('a', { currentjourneyonboarded: false }).onboarded).toBeFalse();
+      expect(mapper.mapParticipant('a', {}).onboarded).toBeNull();
+      expect(mapper.mapParticipant('a', { currentjourneyonboarded: '' }).onboarded).toBeNull();
+    });
+
+    it('R5-7 age not updated: active / non active with no age', () => {
+      const s = signal('age-not-updated');
+      expect(s.category).toBe('integrity');
+      expect(s.predicate(mk({ customerstatus: 'active', age: null }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'non active', age: null }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'active', age: 30 }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ customerstatus: 'late', age: null }), SIGNAL_CTX)).toBeFalse();
+    });
+
+    it('R5-8 queue products: arena events of type queue, not deleted, ending today or later', () => {
+      const ts = (iso: string) => ({ toDate: () => new Date(iso) });
+      const row = (data: Dict) => ({ data: () => data });
+      const snap = {
+        docs: [
+          row({ productref: { id: 'past' }, startdate: ts(dayOffset(-30)), enddate: ts(dayOffset(-1)) }),
+          row({ productref: { id: 'today' }, startdate: ts(dayOffset(-30)), enddate: ts(dayOffset(0, 0, 1)) }),
+          row({ productref: { id: 'future' }, startdate: ts(dayOffset(10)), enddate: ts(dayOffset(20)) }),
+          row({ productref: { id: 'deleted' }, enddate: ts(dayOffset(20)), delete: true }),
+          row({ productref: { id: 'noend' } }),
+          row({ enddate: ts(dayOffset(20)) }),
+        ],
+      };
+      expect(mapper.queueProductIds(snap).sort()).toEqual(['future', 'today']);
+      expect(mapper.queueProductIds(null)).toEqual([]);
+    });
+
+    it('R5-8 DFU and queue product ongoing together, any status', () => {
+      const s = signal('dfu-and-queue-product');
+      expect(s.category).toBe('integrity');
+      expect(s.predicate(mk({ activeproduct: ['dfu1', 'qp1'] }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ customerstatus: 'none', activeproduct: ['qp2', 'p1', 'dfu2'] }), SIGNAL_CTX)).toBeTrue();
+      expect(s.predicate(mk({ activeproduct: ['dfu1', 'dfu2'] }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ activeproduct: ['qp1', 'qp2'] }), SIGNAL_CTX)).toBeFalse();
+      expect(s.predicate(mk({ activeproduct: [] }), SIGNAL_CTX)).toBeFalse();
     });
   });
 
