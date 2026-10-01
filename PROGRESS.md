@@ -1,51 +1,69 @@
-# PROGRESS — StarLabs (atctranscription)
-
-_Last updated: 2026-09-23 (workshop Dashboard Access)_
-· **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-09-23-workshop-dashboard-access.md`.
+# PROGRESS
 
 ## Current state
-- Branch `nanda-development` @ `29c4e88b` + one uncommitted build fix. Builds clean.
-  **Not pushed** — the operator pushes `starlabs-angular` manually.
-- `starlabs-e2e-tests` `main` @ `9772ace` — **pushed**. 125 workshop-suite tests; the CI
-  readiness gate reports **MATCHED** for this diff (1193 selectors resolve).
-- Workshop screens now deny by default. Nothing in production is gated yet because
-  `static meta data/Workshop Admin` does not exist — see Pending.
 
-## Last session changes (2026-09-23)
-- **Dashboard Access** — per-person permissions for the workshop screens.
-  - New `src/app/New-Workshop/workshop-access/` — `workshop-access.model.ts` (pure rules,
-    11 action keys) and `workshop-access.service.ts` (reads/writes + session and IndexedDB
-    caches).
-  - New **Dashboard Access** section in workshop config › Settings (after Communication).
-    Writes `workshopsettings/{workshop id}.dashboardaccess` (profileid → actions) and the
-    three shared lists in `static meta data/Workshop Admin`. People are picked from
-    `participant metadata` only. The section saves itself, separately from Settings.
-  - Gated: the dashboard header (Communication / Q&A / Diagnose / Clear / Enroll), the side
-    panel's send and export actions, the progress-table export, row click, Move next and
-    Review, the evergreen extend flow, and the three archive sections; the workshops list's
-    New/Edit/Duplicate and three switches; the New Users button and `/newusersprofile`; both
-    workshop editor URLs.
-  - **Deny by default, no bypass** — two operator corrections. The first cut used
-    "empty list = unrestricted"; the second added four founding profileids as a recovery
-    path. Both were rejected: access now comes only from the two documents. Two hard-coded
-    allow-lists were deleted in the process, including the private one inside
-    `moveParticipantToNext()` that popped `alert('No Access')`.
-  - **Why the picker was slow:** `participant metadata` has no cached reader (unlike
-    `profile_data`, which `getProfileMap` caches), so it re-read the whole collection each
-    time. Now cached as a compact list in the same IndexedDB store and warmed in the
-    background. Picker rows also wrap instead of ellipsising a name.
-- **e2e:** `workshops/seed-workshops.js` §6c seeds both access documents (without them
-  every workshop spec would be blocked), plus a `limited` actor — same roles and route
-  grants as `admin`, on no shared list, two actions on `W_DASH`.
-  `workshops/workshop-dashboard-access.spec.ts` WDA-00…WDA-15.
+- **starlabs-angular** — Angular 19 admin app. Live on `nanda-development`; the operator commits and
+  pushes this repo manually. Workshop Dashboard (`/workshop_dashboard/:id`) carries the per-workshop
+  Dashboard Access grants (`workshopsettings` + `static meta data/Workshop Admin`), the EiFlix home
+  config screen carries the Journey/Tier audience picker and the Home Series series-level fields.
+- **starlabs-e2e-tests** — the Playwright hub, `main`. 132 tests across 20 files in the `workshops`
+  suite config. CI is the only place the suites can run: they need the Firebase emulator, which
+  needs Java, which is not installed on this machine.
+- **workshop (Flutter)** — enrolment duplicate-write bug fixed (synchronous latch + atomic batch +
+  post-commit reconcile, Firestore auto-ids). 369/369 unit tests pass, `dart analyze lib` clean.
+  Changes are still **uncommitted** in that repo.
+
+## Last session changes (2026-10-01)
+
+**Participant Progress Details table** — `workshop-dashboard.component.{ts,html,css}`:
+
+- **Total / Status / Assignment parked**, not deleted, at the operator's request ("in future we will
+  use this"). Each cell definition stays in the template inside `<!-- -->`, and the ids stay as a
+  commented line in `displayedColumns`. The two must be uncommented *together* — mat-table throws
+  `Could not find column with id` otherwise; that is written into the code comments.
+- **New Email column** immediately after Participant. The runtime `type`-column splice was re-
+  anchored to Email (it used to insert at `participantId + 1`, which would have pushed Email out of
+  the position that was asked for).
+- **Search now matches email** as well as name; placeholder reads "Search by name or email".
+- **The "New" marker is a text pill**, not `assets/new.png` — converted in all three places it
+  appears on the screen (table cell, Participant Data hero, side-panel list).
+
+**Two failures caught before pushing, not after:**
+
+- *Email column shredding.* The first CSS used `overflow-wrap: break-word`. A harness screenshot
+  showed it collapsing into a one-character-wide vertical strip — the same failure the operator
+  rejected once already on the Dashboard Access picker. mat-table sizes columns by content, so a
+  *breakable* long value collapses a column; the fix is `nowrap` + ellipsis + a `title`, with a
+  `13em` floor on `.mat-column-email`.
+- *The `fill()` trap.* The search input is bound to `(keyup)`, and Playwright's `fill()` dispatches
+  only `input` — the spec would have set the box and never run the filter, failing in CI in a way
+  that looks like an app bug. The case types with `pressSequentially()`.
+
+**e2e coverage added** (`workshops/workshop-dashboard.spec.ts`): WS-41 Email column position +
+rendered address, WS-42 the three parked columns are absent while the kept ones survive (with a
+cell-count check that catches a `displayedColumns`/`matColumnDef` mismatch), WS-43 search matches on
+email (with the name first stamped distinct, because the CF normally makes name == email), WS-44 the
+tag is a text element with a painted background and no `new.png`. Helpers in `workshops/support/wshop.ts`.
+
+`wd-review-assignment-38` went with the Assignment column, so two hub references were parked:
+`new-workshop-controls.spec.ts`'s registration line, and WDA-02's Review check — the latter would
+still pass but vacuously, since the button is now absent for everyone.
+
+Verified: `ng build` clean (exit 0, only pre-existing warnings) · `playwright test --list` parses all
+20 files · readiness gate re-run, `wd-review-assignment-38` absent from the missing-selector list
+(the 35 that remain are `bap-*`/`cman-*`/`mcoh-*` from other branches).
 
 ## Pending
-- **Production bootstrap, by hand, once.** Create `static meta data/Workshop Admin` with
-  `workshopeditaccess`, `workshopdashboardadmin` and `workshopnewusersaccess` arrays
-  containing at least the operator's profileid. Until then nobody can open either workshop
-  editor — there is no in-app way in, deliberately.
-- Operator to commit + push `starlabs-angular` (`nanda-development`).
-- The workshops suite has not been run against this branch yet.
-- Carried: `workshopprogressmessagev2` still runs Charan's 2026-09-22 15:48 build (old code,
-  same latent `watitoken` bug) if anything calls it.
+
+- **starlabs-angular is uncommitted** — three source files, this file and the journal. The operator
+  pushes this repo manually.
+- **Production bootstrap for Dashboard Access** — `static meta data/Workshop Admin` needs
+  `workshopdashboardadmin` / `workshopeditaccess` / `workshopnewusersaccess` to contain at least the
+  operator's profileid, or the deployed build locks everyone out of the editor that sets those lists.
+- **The dashboard CSV export has no Email column** while the table now shows one. Not asked for.
+- **Duplicate `participant workshop` docs in production** — 11 pairs across 5 workshops remain
+  uncleaned; `script/dup-participant-workshop.js delete --confirm` is the operator's to run.
+- **The Angular dashboard still reads progress keyed by profileid** rather than through
+  `participantworkshopref` — the root cause of the Susha Roy mis-read. Offered, not accepted.
+- **Flutter integration test has never been executed** (no Java/chromedriver here) and the Flutter
+  changes are uncommitted.
