@@ -242,6 +242,7 @@ export class JourneycoachDashboardComponent {
   subscriptions: any = {};
   mapCoachAppointments: any = {};
   mapOnboardingAppointments: any = {};
+  private saleProductRefs: Record<string, any> = {};
   private loadingStates = {
     journeyData: false,
     salesLeads: false,
@@ -1806,7 +1807,7 @@ export class JourneycoachDashboardComponent {
     let enddate = Timestamp.fromDate(currentMonthEnd).toDate();
 
     const queryValue = or(and(where("purchasedate", ">=", startdate), where("purchasedate", "<=", enddate)), and(where("date", ">=", startdate), where("date", "<=", enddate)))
-    this.subscriptions['salesleads'] = collectionData(query(collection(this.firestore, "salesleads"), queryValue)).subscribe(async (salesleads) => {
+    this.subscriptions['salesleads'] = collectionData(query(collection(this.firestore, "salesleads"), queryValue), { idField: '_sid' }).subscribe(async (salesleads) => {
       if (salesleads.length != 0) {
 
         let grossData = [];
@@ -2536,6 +2537,11 @@ export class JourneycoachDashboardComponent {
 
     try {
       this.subscriptions['journeyproduct1'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "==", null))).subscribe(async (notassured) => {
+        notassured.forEach((d: any) => {
+          const sid = d['salesleadsref']?.id;
+          if (sid && d['productref']) this.saleProductRefs[sid] = d['productref'];
+        });
+        this.cdr.markForCheck();
         if (notassured.length != 0) {
           let tempArray1 = [];
           let addonsToCheck: { index: number; salesLeadId: string; data: any }[] = [];
@@ -2597,6 +2603,11 @@ export class JourneycoachDashboardComponent {
       });
 
       this.subscriptions['journeyproduct2'] = collectionData(query(collection(this.firestore, "participantjourneyproduct"), where("paymentplan", "!=", null))).subscribe((onboarded) => {
+        onboarded.forEach((d: any) => {
+          const sid = d['salesleadsref']?.id;
+          if (sid && d['productref']) this.saleProductRefs[sid] = d['productref'];
+        });
+        this.cdr.markForCheck();
         if (onboarded.length != 0) {
           // last 30days
           let last30days = new Date();
@@ -3897,7 +3908,7 @@ export class JourneycoachDashboardComponent {
   formatCellValue(row: any, column: ColumnConfig): string {
     const value = row[column.key];
 
-    if (column.key === 'journeyref' && [null, undefined, ''].includes(value)) {
+    if (['journeyref', 'journey'].includes(column.key) && [null, undefined, ''].includes(value)) {
       return this.getProductName(row);
     }
 
