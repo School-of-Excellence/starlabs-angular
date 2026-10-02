@@ -32,3 +32,24 @@ event-list, event-participation-confirmations (events) and workshop-dashboard (w
 - Configure CTA: `git checkout f87040e7 -- src/app/Events/event-list/event-list.component.* && git rm -r src/app/Events/event-list/event-cta-config`
 - queued email: `git checkout f87040e7 -- "src/app/Participants Profile Management/participants-analytics/email-input" "src/app/Participants Profile Management/participants-analytics/participants-analytics.component.ts"`
 - confirmations buckets: `git checkout f87040e7 -- src/app/Events/event-participation-confirmations`
+
+---
+## Second pull (same day): surya 7835cb21 — eligibility buckets wired
+Merged --no-ff. The confirmations overview gains **Upgrade / Addon / Continuity** columns and Not eligible is now
+the bucket count; the product-funnel breakdown replaces **No product** with Upgrade / Addon / Continuity / Not
+Eligible. Both components now declare + load `participantMetadata` themselves, so the stopgap declarations
+from the first merge were REMOVED (they became duplicate identifiers, TS2300).
+
+Bucket rule (`participantBucket`): active → consumption/cohort fail = not eligible, journey mismatch = upgrade,
+not owner = addon, else eligible; non active → (arena allows non active AND owner) = eligible, journey match =
+continuity, else upgrade; anything else / no metadata = not eligible. Only REQUESTED, non-queue-active people count.
+
+Flagged, not changed:
+- Each component reads the WHOLE `participant metadata` collection in its constructor (two full scans when the
+  funnel opens) — heavy on production-size data.
+- Race: buckets are computed when the overview loads, not when metadata arrives; if metadata is slower (likely
+  on prod), every requester classifies as "not eligible" until the page is reloaded/paged.
+- Rows served from `epc_snapshot` / `event_stats` never set upgrade/addon/continuity → those cells show "…".
+- Leftover `console.log`s (bucket per requester, cardMap).
+
+e2e: hub EPC-ELIG-01 (one requester per bucket + an approved one excluded).

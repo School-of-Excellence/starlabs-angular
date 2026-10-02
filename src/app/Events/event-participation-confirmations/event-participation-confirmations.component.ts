@@ -30,6 +30,9 @@ interface OverviewRow {
   requested: number | null;
   approved: number | null;
   eligible: number | null;
+  upgrade: number | null;
+  addon: number | null;
+  continuity: number | null;
   notEligible: number | null;
   frozen: boolean;
   eligibleLoaded: boolean;
@@ -64,8 +67,6 @@ const PAST_WINDOW_MS = 180 * 86400000;
 export class EventParticipationConfirmationsComponent {
 
   mapProduct: Record<string, string> = {};
-  // read by participantBucket() (surya 573e1f59, not wired yet) — declared so the build compiles
-  participantMetadata: Record<string, any> = {};
   overviewRows: OverviewRow[] = [];
   openTabs: OpenTab[] = [];
   selectedIndex = 0;
@@ -78,8 +79,19 @@ export class EventParticipationConfirmationsComponent {
   pageSize = 5;
   private tabsRestored = false;
 
+  participantMetadata = {};
+
   constructor(public firestore: Firestore, public guard: AuthguardService) {
     this.loadOverview();
+
+    getDocs(collection(this.firestore , 'participant metadata')).then((participantMetadataSnap)=>{
+      participantMetadataSnap.docs.forEach((docref)=>{
+        const data = docref.data();
+        const profileId = data['profileid'] ?? null;
+        this.participantMetadata[profileId] = data;
+      })
+    });
+    
   }
 
   async loadOverview() {
@@ -146,7 +158,7 @@ export class EventParticipationConfirmationsComponent {
             endValue: end, startValue: start,
             isToday: !!start && start <= todayEnd && end >= todayStart,
             potential: null, requested: null, approved: null,
-            eligible: null, notEligible: null, frozen: false, eligibleLoaded: false, error: false
+            eligible: null, upgrade: null , addon: null , continuity: null, notEligible: null, frozen: false, eligibleLoaded: false, error: false
           };
           const snap = a['epc_snapshot'];
           if (snap) {
@@ -306,6 +318,27 @@ export class EventParticipationConfirmationsComponent {
       await Promise.all(chunk.map(async r => {
         try {
           const arena = r.arena;
+           const eligibility = arena['eligibility'] ?? {};
+           const productConsumption = eligibility['productconsumption'] ?? [];
+           const customerStatus = eligibility['customerstatus'] ?? [];
+           const eligibilityJourney = eligibility['journeyid'] ?? [];
+
+           const dataQueries : any = [
+              getDocs(query(collection(this.firestore, 'event participation request'),
+                where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved']))),
+              this.getOwners(arena['productref']),
+              this.getActive(arena['eventref'])
+          ]
+           
+          if (eligibility?.cohortid?.length > 0) {
+            const cohortQuery = query(
+              collection(this.firestore, 'big cohorts'),
+              where('docid', 'in', eligibility?.cohortid),
+            );
+            dataQueries.push(getDocs(cohortQuery));
+          }
+
+
           // Prefer the precomputed rollup doc (1 read). Any failure here — the doc
           // doesn't exist yet, OR security rules don't allow event_stats yet — must
           // fall through to the live scan-and-join below, so the screen never breaks.
@@ -323,14 +356,23 @@ export class EventParticipationConfirmationsComponent {
               return;
             }
           } catch { /* no event_stats yet / not readable — use the live fallback */ }
-          const [eprSnap, owners, active] = await Promise.all([
-            getDocs(query(collection(this.firestore, 'event participation request'),
-              where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved']))),
-            this.getOwners(arena['productref']),
-            this.getActive(arena['eventref'])
-          ]);
+          const [eprSnap, owners, active , cohorts] = await Promise.all(dataQueries);
+          const cohortParticipants = [];
+
+          if (cohorts) {
+            cohorts?.docs.forEach((docref) => {
+              const participant = docref.data()['participantidlist'] ?? [];
+              for (const pid of participant) {
+                if (!cohortParticipants.includes(pid)) {
+                  cohortParticipants.push(pid);
+                }
+              }
+            });
+          }
+
           const requestedIds = new Set<string>();
           const approvedIds = new Set<string>();
+
           eprSnap.docs.forEach(d => {
             const x = d.data();
             const pid = x['profileid'];
@@ -340,12 +382,36 @@ export class EventParticipationConfirmationsComponent {
           });
           approvedIds.forEach(p => requestedIds.delete(p));
           let eligible = 0;
-          requestedIds.forEach(p => { if (owners.has(p) && !active.has(p)) eligible++; });
+          let upgrade = 0;
+          let addon = 0;
+          let continuity = 0;
+          let notEligible = 0;
+
+          // requestedIds.forEach(p => { if (owners.has(p) && !active.has(p)) eligible++; });
+          requestedIds.forEach(p => { 
+              const participantEligibleBucket = this.participantBucket(p , owners.has(p) , customerStatus , productConsumption , eligibilityJourney , cohortParticipants);
+              console.log(participantEligibleBucket)
+              if (participantEligibleBucket === 'eligibile' && !active.has(p)) {
+                eligible++
+              } else if(participantEligibleBucket === 'upgrade' && !active.has(p)){
+                upgrade++
+              } else if(participantEligibleBucket === 'addon' && !active.has(p)){
+                addon++
+              } else if(participantEligibleBucket === 'continuity' && !active.has(p)){
+                continuity++
+              } else if(participantEligibleBucket === 'not eligibile' && !active.has(p)){
+                notEligible++
+              }
+           });
+
           r.potential = owners.size;
           r.requested = requestedIds.size;
           r.approved = approvedIds.size;
           r.eligible = eligible;
-          r.notEligible = requestedIds.size - eligible;
+          r.upgrade = upgrade;
+          r.addon = addon;
+          r.continuity = continuity;
+          r.notEligible = notEligible;
           r.error = false;
           r.eligibleLoaded = true;
         } catch (e) {
