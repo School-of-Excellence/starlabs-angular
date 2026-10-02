@@ -366,3 +366,226 @@
   width: 18px;
   height: 18px;
 }
+/* === Arena Section Wrapper === */
+.arena-section {
+  border: 1px dashed #aaa;
+  border-radius: 16px;
+  padding: 20px;
+  background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+}
+ 
+/* === Section Header === */
+.arena-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e0e0e0;
+}
+ 
+.section-icon {
+  color: rgb(0, 101, 135);
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+}
+ 
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: rgb(0, 101, 135);
+  flex: 1;
+}
+ 
+.add-event-btn {
+  color: white !important;
+  background-color: rgb(0, 101, 135);
+  border: none !important;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+ 
+.add-event-btn:hover {
+  box-shadow: 0 4px 12px rgba(0, 101, 135, 0.3);
+}
+ 
+/* === Event Card === */
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+ 
+.event-card {
+  border: 1px solid #e0e0e0;
+  border-left: 4px solid rgb(0, 101, 135);
+  border-radius: 10px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+ 
+/* === Card Header === */
+.event-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(0, 101, 135, 0.06);
+  border-bottom: 1px solid #e8e8e8;
+}
+ 
+.event-index {
+  font-weight: 700;
+  font-size: 14px;
+  color: rgb(0, 101, 135);
+  flex: 1;
+  letter-spacing: 0.3px;
+}
+ 
+.delete-toggle {
+  font-size: 13px;
+}
+ 
+.remove-btn {
+  color: #e53935;
+}
+ 
+/* === Card Body === */
+.event-card-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+ 
+/* === Field Row === */
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+ 
+.inputfields {
+  width: 260px;
+}
+ 
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  padding-top: 14px;
+}
+ 
+/* === Subsection Label === */
+.subsection-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(0, 101, 135);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+ 
+.subsection-label mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+ 
+/* === Eligibility Section === */
+.eligibility-section {
+  background: #f7fbfc;
+  border: 1px solid #d0eaf3;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+ 
+/* === Customer Status === */
+.customer-status-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+ 
+.status-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  min-width: 110px;
+}
+ 
+/* === Consumed Products === */
+.consumed-products-section {
+  border-top: 1px dashed #c8e6f0;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+ 
+.product-consumption-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+}
+ 
+.consumption-field {
+  width: 200px;
+}
+ 
+.consumption-field--short {
+  width: 120px;
+}
+ 
+.delete-consumption-btn {
+  margin-top: 10px;
+  color: #e53935;
+}
+ 
+.add-consumption-btn {
+  align-self: flex-start;
+  font-size: 13px;
+  color: rgb(0, 101, 135) !important;
+  border-color: rgb(0, 101, 135) !important;
+}
+ 
+/* === Delivery Preview === */
+.delivery-preview {
+  padding: 0 20px 16px;
+}
+ 
+.delivery-preview-body {
+  padding-top: 14px;
+}
+ 
+.delivery-sequence-list {
+  padding-left: 18px;
+  margin: 8px 0 0;
+  color: #444;
+  font-size: 14px;
+  line-height: 1.8;
+}
+ 
+.no-data-text {
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+  margin: 6px 0 0;
+}
