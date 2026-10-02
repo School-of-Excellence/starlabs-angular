@@ -751,7 +751,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
       }
 
        if (status == 'non active') {
-        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        // if (!consumptionMatch || !cohortMatch) return 'not eligibile';
         if (customerStatus.includes('non active') && isOwner) return 'eligibile';
         if (journeyMatch) return 'continuity';
         return 'upgrade';

@@ -93,93 +93,6 @@
             </div>
           </div>
         </div>
-        <!-- <div class="cohgroup" *ngFor="let group of savedCohortGroups | keyvalue"
-          [class.is-active]="selectedCohortGroup === group?.key" [class.is-open]="true"
-          (click)="onCohortGroupSelect(group.key)">
-        
-          <div class="grp-head">
-            <span class="grp-dot" style="background:#5856D6"></span>
-            <span class="grp-text">
-              <span class="grp-tag">Group</span>
-        
-              <ng-container *ngIf="false; else nameTpl">
-                <input #inp class="grp-rename" [value]="group.key" (click)="$event.stopPropagation()"
-                  (keydown.enter)="commitRename(group.key, inp.value)" (keydown.escape)="renamingGroup = null"
-                  (blur)="commitRename(group.key, inp.value)" />
-              </ng-container>
-              <ng-template #nameTpl>
-                <span class="grp-name">{{ group.key }}</span>
-              </ng-template>
-        
-              <span class="grp-meta">
-                <b>{{ getParticipantInCohortGroup(group.key)?.length }}</b> participants &middot;
-                {{ group?.value?.length }} cohorts
-              </span>
-            </span>
-            <button class="grp-chev" type="button" (click)="toggleGroup(group.key, $event)">&#9662;</button>
-          </div>
-        
-          <div class="grp-actions">
-            <button type="button" class="grp-rename-btn" (click)="startRename(group.key, $event)">Rename</button>
-            <button type="button" class="grp-ungroup" (click)="unGroup(group.key); $event.stopPropagation()">Ungroup</button>
-          </div>
-        
-          <div class="grp-body">
-            <div class="bl-cohort" *ngFor="let cohort of group.value">
-              <span class="bl-coh-name">{{ 'no name' }}</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>{{ 0 }}</b> participants</span>
-              </span>
-            </div>
-          </div>
-        </div> -->
-        <!-- <div class="cohgroup is-open">
-          <div class="grp-head">
-            <span class="grp-dot" style="background:#34C759"></span>
-            <span class="grp-text">
-              <span class="grp-tag">Group</span>
-              <span class="grp-name">Diagnostics and assignment</span>
-              <span class="grp-meta"><b>410</b> participants &middot; 11 cohorts</span>
-            </span>
-            <button class="grp-chev" type="button">&#9662;</button>
-          </div>
-          <div class="grp-actions">
-            <button type="button">Rename</button>
-            <button type="button" class="grp-ungroup">Ungroup</button>
-          </div>
-          <div class="grp-body">
-            <div class="bl-cohort ">
-              <span class="bl-coh-name">Mentors for Prodigies</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>14</b> participants</span>
-              </span>
-            </div>
-            <div class="bl-cohort ">
-              <span class="bl-coh-name">DOERS/MENTORS for CW</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>47</b> participants</span>
-              </span>
-            </div>
-            <div class="bl-cohort ">
-              <span class="bl-coh-name">CW Mentors</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>45</b> participants</span>
-              </span>
-            </div>
-            <div class="bl-cohort ">
-              <span class="bl-coh-name">CWM</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>12</b> participants</span>
-              </span>
-            </div>
-            <div class="bl-cohort ">
-              <span class="bl-coh-name">Mentoring Preparation (2)</span>
-              <span class="bl-coh-foot">
-                <span class="bl-coh-people"><b>27</b> participants</span>
-              </span>
-            </div>
-          </div>
-        </div> -->
         <div class="bl-cohort is-active" *ngFor="let cohort of getFilteredCohorts()" [class.is-active]="selectedCohorts.includes(cohort['docid'])" (click)="handleCohortClick(cohort['docid'])">
           <span class="bl-coh-top">
             <span class="bl-coh-name">{{cohort['name'] ?? ''}}</span>
@@ -216,6 +129,17 @@
           </button>
         </div>
       </div>
+      <!-- <div class="filter-chips" *ngIf="getParticipantFilterChips().length > 0">
+        <div class="chip" *ngFor="let f of []">
+          <span class="chip-label">{{ f.label }}:</span>
+          <span class="chip-value">{{ f.value }}</span>
+          <button type="button" class="chip-remove" (click)="removeFilter(f)"
+            [attr.aria-label]="'Remove ' + f.label + ' filter'">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <button type="button" class="clear-all">Clear all</button>
+      </div> -->
       <div class="bl-scroll">
         <div class="bl-grid">
           <!-- column headings double as the sort buttons -->

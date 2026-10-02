@@ -2315,3 +2315,93 @@
   border-color:#FF3B30; border-style:solid;
   background:rgba(255,59,48,.08); color:#C22A21;
 }
+
+/* filter chips */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 4px 0 12px;
+  background: #e8f0fe;
+  border: 1px solid #c6dafc;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1;
+  color: #1a3d8f;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.chip:hover {
+  background: #dbe7fd;
+  border-color: #aecbfa;
+}
+
+.chip-label {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.chip-value {
+  font-weight: 600;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.chip-remove:hover {
+  background: rgba(26, 61, 143, 0.15);
+}
+
+.chip-remove:focus-visible {
+  outline: 2px solid #1a3d8f;
+  outline-offset: 1px;
+}
+
+.chip-remove mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.clear-all {
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5f6368;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.clear-all:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
