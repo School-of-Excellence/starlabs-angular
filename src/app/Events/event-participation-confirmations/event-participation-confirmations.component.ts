@@ -64,6 +64,8 @@ const PAST_WINDOW_MS = 180 * 86400000;
 export class EventParticipationConfirmationsComponent {
 
   mapProduct: Record<string, string> = {};
+  // read by participantBucket() (surya 573e1f59, not wired yet) — declared so the build compiles
+  participantMetadata: Record<string, any> = {};
   overviewRows: OverviewRow[] = [];
   openTabs: OpenTab[] = [];
   selectedIndex = 0;
@@ -182,7 +184,121 @@ export class EventParticipationConfirmationsComponent {
     this.loadOverview();
   }
 
-  private async computePageEligibility() {
+  // private async computePageEligibility() {
+  //   const pending = this.pagedRows.filter(r => !r.eligibleLoaded);
+  //   const CHUNK = 4;
+  //   for (let i = 0; i < pending.length; i += CHUNK) {
+  //     const chunk = pending.slice(i, i + CHUNK);
+  //     await Promise.all(chunk.map(async r => {
+  //       try {
+  //         const arena = r.arena;
+  //          const eligibility = arena['eligibility'] ?? {};
+  //          const productConsumption = eligibility['productconsumption'] ?? [];
+  //          const customerStatus = eligibility['customerstatus'] ?? [];
+  //          const eligibilityJourney = eligibility['journeyid'] ?? [];
+
+  //          const dataQueries : any = [
+  //             getDocs(query(collection(this.firestore, 'event participation request'),
+  //               where('arenaeventid', '==', arena['docid']), where('status', 'in', ['requested', 'approved']))),
+  //             this.getOwners(arena['productref']),
+  //             this.getActive(arena['eventref'])
+  //         ]
+           
+  //         if (eligibility?.cohortid?.length > 0) {
+  //           const cohortQuery = query(
+  //             collection(this.firestore, 'big cohorts'),
+  //             where('docid', 'in', eligibility?.cohortid),
+  //           );
+  //           dataQueries.push(getDocs(cohortQuery));
+  //         }
+
+
+  //         // Prefer the precomputed rollup doc (1 read). Any failure here — the doc
+  //         // doesn't exist yet, OR security rules don't allow event_stats yet — must
+  //         // fall through to the live scan-and-join below, so the screen never breaks.
+  //         try {
+  //           const statsSnap = await getDoc(doc(this.firestore, 'event_stats', arena['docid']));
+  //           if (statsSnap.exists()) {
+  //             const s: any = statsSnap.data();
+  //             r.potential = s['potential'] ?? null;
+  //             r.requested = s['requested'] ?? null;
+  //             r.approved = s['approved'] ?? null;
+  //             r.eligible = s['eligible'] ?? null;
+  //             r.notEligible = (s['noProduct'] ?? 0) + (s['inQueue'] ?? 0);
+  //             r.error = false;
+  //             r.eligibleLoaded = true;
+  //             return;
+  //           }
+  //         } catch { /* no event_stats yet / not readable — use the live fallback */ }
+  //         const [eprSnap, owners, active , cohorts] = await Promise.all(dataQueries);
+  //         const cohortParticipants = [];
+
+  //         if (cohorts) {
+  //           cohorts?.docs.forEach((docref) => {
+  //             const participant = docref.data()['participantidlist'] ?? [];
+  //             for (const pid of participant) {
+  //               if (!cohortParticipants.includes(pid)) {
+  //                 cohortParticipants.push(pid);
+  //               }
+  //             }
+  //           });
+  //         }
+
+  //         const requestedIds = new Set<string>();
+  //         const approvedIds = new Set<string>();
+
+  //         eprSnap.docs.forEach(d => {
+  //           const x = d.data();
+  //           const pid = x['profileid'];
+  //           if (!pid) return;
+  //           if (x['status'] == 'approved') approvedIds.add(pid);
+  //           else if (x['status'] == 'requested') requestedIds.add(pid);
+  //         });
+  //         approvedIds.forEach(p => requestedIds.delete(p));
+  //         let eligible = 0;
+  //         let upgrade = 0;
+  //         let addon = 0;
+  //         let continuity = 0;
+  //         let notEligible = 0;
+
+  //         // requestedIds.forEach(p => { if (owners.has(p) && !active.has(p)) eligible++; });
+  //         requestedIds.forEach(p => { 
+  //             const participantEligibleBucket = this.participantBucket(p , owners.has(p) , customerStatus , productConsumption , eligibilityJourney , cohortParticipants);
+  //             console.log(participantEligibleBucket)
+  //             if (participantEligibleBucket === 'eligibile' && !active.has(p)) {
+  //               eligible++
+  //             } else if(participantEligibleBucket === 'upgrade' && !active.has(p)){
+  //               upgrade++
+  //             } else if(participantEligibleBucket === 'addon' && !active.has(p)){
+  //               addon++
+  //             } else if(participantEligibleBucket === 'continuity' && !active.has(p)){
+  //               continuity++
+  //             } else if(participantEligibleBucket === 'not eligibile' && !active.has(p)){
+  //               notEligible++
+  //             }
+  //          });
+
+  //         r.potential = owners.size;
+  //         r.requested = requestedIds.size;
+  //         r.approved = approvedIds.size;
+  //         r.eligible = eligible;
+  //         r.upgrade = upgrade;
+  //         r.addon = addon;
+  //         r.continuity = continuity;
+  //         r.notEligible = notEligible;
+  //         r.error = false;
+  //         r.eligibleLoaded = true;
+  //       } catch (e) {
+  //         console.log('overview eligibility load failed', e);
+  //         r.error = true;
+  //         r.eligibleLoaded = true;
+  //       }
+  //     }));
+  //   }
+  // }
+
+  // surya
+   private async computePageEligibility() {
     const pending = this.pagedRows.filter(r => !r.eligibleLoaded);
     const CHUNK = 4;
     for (let i = 0; i < pending.length; i += CHUNK) {
@@ -239,6 +355,49 @@ export class EventParticipationConfirmationsComponent {
         }
       }));
     }
+  }
+
+  participantBucket(pid : string , isOwner : boolean, customerStatus : Array<string>, productConsumption : Array<any> , eligibilityJourney : Array<string> , cohortParticipants : Array<string>){
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (metadata) {
+      const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
+      const consumedproducts = {};
+
+      for (const product of metadata['consumedproducts'] ?? []) {
+        consumedproducts[product] = consumedproducts[product] ?? 0;
+        consumedproducts[product] = consumedproducts[product] + 1;
+      }
+
+      const journeyMatch = eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
+      const cohortMatch = cohortParticipants.length === 0 || cohortParticipants.includes(pid);
+      const consumptionMatch = productConsumption.every((product) => {
+        const productId = product?.productid;
+        if (product['operator'] === '==') {
+          return (consumedproducts[productId] ?? 0) === product?.count;
+        } else if (product['operator'] === '>=') {
+          return (consumedproducts[productId] ?? 0) >= product?.count;
+        } else if (product['operator'] === '<=') {
+          return (consumedproducts[productId] ?? 0) <= product?.count;
+        } else {
+          return false;
+        }
+      });
+
+      if (status == 'active') {
+        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (!journeyMatch) return 'upgrade';
+        if (!isOwner) return 'addon';
+        return 'eligibile';
+      }
+
+       if (status == 'non active') {
+        if (customerStatus.includes('non active') && isOwner) return 'eligibile';
+        if (journeyMatch) return 'continuity';
+        return 'upgrade';
+      }
+    }
+    return 'not eligibile'
   }
 
   private ownersCache = new Map<string, Set<string>>();

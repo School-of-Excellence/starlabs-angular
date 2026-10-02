@@ -1,0 +1,182 @@
+/* Fills the dialog and acts as the query container */
+.cta-wrapper {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px;
+    container-type: inline-size;
+    container-name: cta;
+}
+
+/* Header: title on the left, close button on the right */
+.cta-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 0 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Overrides the earlier margin so the title aligns with the button */
+.cta-header .cta-title {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.cta-close {
+    flex-shrink: 0;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #4b5563;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cta-close:hover {
+    color: #1f2937;
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.cta-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.35);
+}
+
+.cta-close:active {
+    background: #e5e7eb;
+}
+
+
+.cta-form {
+    width: 100%;
+}
+
+.cta-title {
+    margin: 0 0 20px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+/* 2 cards per row */
+.cta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.cta-grid > .cta-card {
+    min-width: 0;
+}
+
+/* Last card takes the full width */
+.area-nocta {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+}
+
+.area-nocta .cta-card-title {
+    grid-column: 1 / -1;
+}
+
+/* Card */
+.cta-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: start;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.2s ease;
+}
+
+.cta-card:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.cta-card-title {
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: #4f46e5;
+    border-bottom: 2px solid #eef2ff;
+}
+
+.inputfields {
+    width: 100%;
+}
+
+/* Submit */
+.cta-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+    gap: 10px;
+}
+
+.cta-submit {
+    padding: 12px 32px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    background: #4f46e5;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.cta-submit:hover {
+    background: #4338ca;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.cta-submit:active {
+    background: #3730a3;
+    transform: scale(0.98);
+}
+
+/* Narrow dialog: keep title and button on one line, tighten sizes */
+@container cta (max-width: 560px) {
+    .cta-header .cta-title {
+        font-size: 18px;
+    }
+
+    .cta-close {
+        padding: 6px 12px;
+    }
+}
+
+/* Narrow dialog: single column (based on dialog width, not the window) */
+@container cta (max-width: 560px) {
+    .cta-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .area-nocta {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cta-actions {
+        justify-content: stretch;
+    }
+
+    .cta-submit {
+        width: 100%;
+        text-align: center;
+    }
+}

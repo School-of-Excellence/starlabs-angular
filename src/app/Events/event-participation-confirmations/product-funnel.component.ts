@@ -100,6 +100,8 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
   @Input() arena: any;
   @Input() eventName = '';
   @Input() eventEnd = 0;
+  // read by participantBucket() (surya 573e1f59, not wired yet) — declared so the build compiles
+  participantMetadata: Record<string, any> = {};
 
   @ViewChild('confirmTpl') confirmTpl!: TemplateRef<any>;
   @ViewChild('progressTpl') progressTpl!: TemplateRef<any>;
@@ -656,6 +658,50 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     } finally {
       this.loading = false;
     }
+  }
+
+  participantBucket(pid : string , isOwner : boolean, customerStatus : Array<string>, productConsumption : Array<any> , eligibilityJourney : Array<string> , cohortParticipants : Array<string>){
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (metadata) {
+      const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
+      const consumedproducts = {};
+
+      for (const product of metadata['consumedproducts'] ?? []) {
+        consumedproducts[product] = consumedproducts[product] ?? 0;
+        consumedproducts[product] = consumedproducts[product] + 1;
+      }
+
+      const journeyMatch = eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
+      const cohortMatch = cohortParticipants.length === 0 || cohortParticipants.includes(pid);
+      const consumptionMatch = productConsumption.every((product) => {
+        const productId = product?.productid;
+        if (product['operator'] === '==') {
+          return (consumedproducts[productId] ?? 0) === product?.count;
+        } else if (product['operator'] === '>=') {
+          return (consumedproducts[productId] ?? 0) >= product?.count;
+        } else if (product['operator'] === '<=') {
+          return (consumedproducts[productId] ?? 0) <= product?.count;
+        } else {
+          return false;
+        }
+      });
+
+      if (status == 'active') {
+        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (!journeyMatch) return 'upgrade';
+        if (!isOwner) return 'addon';
+        return 'eligibile';
+      }
+
+       if (status == 'non active') {
+        // if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (customerStatus.includes('non active') && isOwner) return 'eligibile';
+        if (journeyMatch) return 'continuity';
+        return 'upgrade';
+      }
+    }
+    return 'not eligibile'
   }
 
   retry() { this.loadData(); }
