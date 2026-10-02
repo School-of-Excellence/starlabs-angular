@@ -27,9 +27,9 @@
           <div class="sx-bd-about">{{ p.about }}</div>
           <ng-container *ngFor="let r of p.rows">
             <button data-testid="pf-breakdown-row" type="button"
-              class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key].cls }}"
+              class="sx-bd-row d{{ r.depth }} {{ cardMap[r.key]?.cls }}"
               [class.on]="segment===r.key" [attr.aria-pressed]="segment===r.key"
-              [matTooltip]="cardMap[r.key].tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
+              [matTooltip]="cardMap[r.key]?.tip || ''" matTooltipClass="sx-tip" (click)="setSegment(r.key)">
               <span class="sx-bd-top">
                 <span class="sx-bd-dot"></span>
                 <span class="sx-bd-lab">{{ cardMap[r.key].label }}</span>
