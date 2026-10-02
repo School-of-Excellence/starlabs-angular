@@ -17,6 +17,11 @@ big-ladder: identical to charan-release already.
 | `evl-configure-cta` on the Configure CTA button | it reused `data-testid="evl-create-event"` → duplicate hook |
 | 15 `ecta-*` hooks on event-cta-config | dialog had none; readiness gate |
 
+## Behaviour change to know
+**Eligible Journey is required** on every arena product (`eligibility.journeyid` Validators.required): an
+event can't be created/updated until each arena product names ≥1 journey. Hub EVT-02 (create event) broke on
+exactly this and was refit to pick one.
+
 ## e2e
 Hub `events/event-eligibility-cta.spec.ts` UED-ELIG-01, ECTA-01..03 (+ seed 9d/9e). hook-diff aligned for
 event-list, event-participation-confirmations (events) and workshop-dashboard (workshops).
