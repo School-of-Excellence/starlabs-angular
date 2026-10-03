@@ -1,7 +1,7 @@
 <div class="cta-wrapper">
     <div class="cta-header">
         <h2 class="cta-title">Call To Action Config</h2>
-        <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()"> Close </button>
+        <button type="button" class="cta-close" data-testid="ecta-close" aria-label="Close" (click)="closeDialog()"> Close </button>
     </div>
     <form [formGroup]="appCalenderConfig" class="cta-form">
 
@@ -10,12 +10,12 @@
                 <h4 class="cta-card-title">Confirm config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Button</mat-label>
-                    <input matInput formControlName="button">
+                    <input matInput data-testid="ecta-confirm-button" formControlName="button">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description"></textarea>
+                    <textarea matInput data-testid="ecta-confirm-description" formControlName="description"></textarea>
                 </mat-form-field>
             </div>
 
@@ -23,12 +23,12 @@
                 <h4 class="cta-card-title">Addon config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Button</mat-label>
-                    <input matInput formControlName="button">
+                    <input matInput data-testid="ecta-addon-button" formControlName="button">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description"></textarea>
+                    <textarea matInput data-testid="ecta-addon-description" formControlName="description"></textarea>
                 </mat-form-field>
             </div>
 
@@ -36,12 +36,12 @@
                 <h4 class="cta-card-title">Upgrade config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Button</mat-label>
-                    <input matInput formControlName="button">
+                    <input matInput data-testid="ecta-upgrade-button" formControlName="button">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description"></textarea>
+                    <textarea matInput data-testid="ecta-upgrade-description" formControlName="description"></textarea>
                 </mat-form-field>
             </div>
 
@@ -49,12 +49,12 @@
                 <h4 class="cta-card-title">Continuity</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Button</mat-label>
-                    <input matInput formControlName="button">
+                    <input matInput data-testid="ecta-continuity-button" formControlName="button">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description"></textarea>
+                    <textarea matInput data-testid="ecta-continuity-description" formControlName="description"></textarea>
                 </mat-form-field>
             </div>
 
@@ -62,12 +62,12 @@
                 <h4 class="cta-card-title">No CTA config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Button</mat-label>
-                    <input matInput formControlName="button">
+                    <input matInput data-testid="ecta-nocta-button" formControlName="button">
                 </mat-form-field>
 
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description"></textarea>
+                    <textarea matInput data-testid="ecta-nocta-description" formControlName="description"></textarea>
                 </mat-form-field>
             </div>
         </div>
@@ -77,7 +77,7 @@
                 <h4 class="cta-card-title">Requested Message config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Requested Message</mat-label>
-                    <input matInput formControlName="requested">
+                    <input matInput data-testid="ecta-requested" formControlName="requested">
                 </mat-form-field>
             </div>
 
@@ -85,14 +85,14 @@
                 <h4 class="cta-card-title">Confirmation Message config</h4>
                 <mat-form-field appearance="outline" class="inputfields">
                     <mat-label>Confirmation Message</mat-label>
-                    <input matInput formControlName="confirmationmessage">
+                    <input matInput data-testid="ecta-confirmationmessage" formControlName="confirmationmessage">
                 </mat-form-field>
             </div>
         </div>
 
         <div class="cta-actions">
-            <div class="cta-submit" (click)="onSubmit()"> Submit </div>
-            <button type="button" class="cta-close" aria-label="Close" (click)="closeDialog()"> Close </button>
+            <div class="cta-submit" data-testid="ecta-submit" (click)="onSubmit()"> Submit </div>
+            <button type="button" class="cta-close" data-testid="ecta-cancel" aria-label="Close" (click)="closeDialog()"> Close </button>
         </div>
     </form>
 </div>
