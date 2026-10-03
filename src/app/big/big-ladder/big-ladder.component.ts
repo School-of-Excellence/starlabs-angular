@@ -165,7 +165,7 @@ export class BigLadderComponent implements OnInit {
         // filter participants in cohort based on their journey ( only big participants )
         for (const pid of cohort['participantidlist'] ?? []) {
           const metadata = this.participantMetadataMap[pid] ?? null;
-          const journey = metadata?.['activejourney'] || metadata?.['lastcompletedjourney'] || null;
+          const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
           if (this.bigJourney.includes(journey)) {
             participantList.push(pid);
             if (!['educational'].includes(category)) continue;
@@ -626,7 +626,7 @@ export class BigLadderComponent implements OnInit {
         // process active and non active participants in cohorts
         for (const pid of participantsList) {
           const metadata = this.participantMetadataMap[pid] ?? null;
-          const customerstatus = metadata?.['customerstatus'] ?? null;
+          const customerstatus = metadata['customerstatus'] ?? null;
           if (customerstatus == 'active') activeParticipants.add(pid);
           else if (customerstatus === 'non active')
             nonactiveParticipants.add(pid);
@@ -640,8 +640,7 @@ export class BigLadderComponent implements OnInit {
       .sort((a, b) => {
         const dateA = this.toDate(a['createddate']);
         const dateB = this.toDate(b['createddate']);
-        // cohorts without a createddate sort last instead of throwing
-        return (dateB?.getTime() ?? 0) - (dateA?.getTime() ?? 0);
+        return dateB.getTime() - dateA.getTime();
       });
 
     this.activeParticipantInCohort = activeParticipants.size;
