@@ -24,6 +24,15 @@
                 <option *ngFor="let marathon of bigMarathon" [value]="marathon['docid']">{{marathon['title'] ?? ''}} </option>
               </select>
             </div>
+            <!-- <div class="sel">
+              <input [(ngModel)]="marathonSearch" placeholder="Search cohort…" (focus)="openParticipantSearch = true; $any($event.target).select()"
+                (blur)="openParticipantSearch = false" />
+            
+              <ul *ngIf="openParticipantSearch">
+                <li *ngFor="let c of filterMarathon" (mousedown)="pickMarathon(c)">{{ c.title }}</li>
+                <li *ngIf="!filterMarathon.length" class="empty">No match</li>
+              </ul>
+            </div> -->
             <div class="bl-select event-select">
               Select Event
               <select [(ngModel)]="selectedEvent" (change)="filterCohortList()">
@@ -45,6 +54,7 @@
         </div>
         <button class="bl-selgo" type="button" *ngIf="selectedCohorts.length > 1 && groupFormMode === null" (click)="onGroup()">Group</button>
         <button class="bl-selgo" type="button" (click)="selectAllCohorts()">Select All cohorts</button>
+        <button class="bl-selout" type="button" (click)="deSelectAllCohorts()" >DeSelect All cohorts</button>
       </div>
       <!-- group form -->
       <div class="bl-selbar" *ngIf="selectedCohorts.length > 1 && groupFormMode === 'add'">
@@ -71,7 +81,7 @@
               <span class="grp-meta"><b>{{getParticipantInCohortGroup(group.key)?.length}}</b> participants &middot; {{group?.value?.length}} cohorts</span>
             </span>
             <button class="bl-selgo" type="button" *ngIf="expandedCohortGroup == group?.key" (click)="groupCohortList();$event.stopPropagation()">Save</button>
-            <button class="grp-chev" type="button" (click)="toggleCohortGroup(group?.key);$event.stopPropagation()">&#9662;</button>
+            <button class="grp-chev" type="button" *ngIf="selectedCohortGroup !== group.key" (click)="toggleCohortGroup(group?.key);$event.stopPropagation()">&#9662;</button>
           </div>
           <div class="grp-actions">
             <button type="button" class="grp-ungroup" (click)="unGroup(group.key);$event.stopPropagation()">Ungroup</button>
@@ -128,18 +138,24 @@
             Non Active <b>{{nonactiveParticipants}}</b>
           </button>
         </div>
+        <button type="button" class="non-cohort" [class.is-active]="showNonCohortParticipants" [attr.aria-pressed]="showNonCohortParticipants" (click)="onNonCohortParticipantClick()">
+          <span class="bl-stat-dot"></span>
+          Non Educational Cohort Participants
+          <b>{{ dashboardData.length - participantsInCohort.size }}</b>
+        </button>
       </div>
-      <!-- <div class="filter-chips" *ngIf="getParticipantFilterChips().length > 0">
-        <div class="chip" *ngFor="let f of []">
-          <span class="chip-label">{{ f.label }}:</span>
-          <span class="chip-value">{{ f.value }}</span>
-          <button type="button" class="chip-remove" (click)="removeFilter(f)"
-            [attr.aria-label]="'Remove ' + f.label + ' filter'">
+      <div class="filter-chips" *ngIf="getParticipantFilterChips().length > 0">
+        <div class="chip" *ngFor="let chip of getParticipantFilterChips()">
+          <span class="chip-type">{{ chip.type }}:</span>
+          <span class="chip-label">{{ chip.label }}</span>
+          <!-- <span class="chip-value">{{ f.value }}</span> -->
+          <button type="button" class="chip-remove" (click)="removeFilter(chip)"
+            [attr.aria-label]="'Remove ' + chip.label + ' filter'">
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <button type="button" class="clear-all">Clear all</button>
-      </div> -->
+        <button type="button" class="clear-all" (click)="clearAllParticipantFilters()">Clear all</button>
+      </div>
       <div class="bl-scroll">
         <div class="bl-grid">
           <!-- column headings double as the sort buttons -->

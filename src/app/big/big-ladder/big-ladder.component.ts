@@ -16,23 +16,26 @@ interface CohortActivities {
 type sortHeader = 'extendedlifeimpact' | 'eventAttended' | 'bigActivity' | 'eiflixConsumption' | 'queueActivityLog';
 type sidePanelTab = 'level' | 'studio' | 'activity' | 'content' | 'attended';
 type customerStatus = 'all' | 'active' | 'non active';
+type cohortTab = | 'initiated' | 'completed' | 'missed' | 'review' | 'rework';
 
 @Component({
   selector: 'app-big-ladder',
-  imports: [CommonModule, FormsModule, MatPaginatorModule , MatIconModule],
+  imports: [CommonModule, FormsModule, MatPaginatorModule, MatIconModule],
   templateUrl: './big-ladder.component.html',
   styleUrl: './big-ladder.component.css',
 })
 export class BigLadderComponent implements OnInit {
-  private COHORT_GROUP_KEY = 'cohortsgroup'
-  
+  private COHORT_GROUP_KEY = 'cohortsgroup';
+
   isLoading = true;
 
   // participant tabel filters
   participantSearch = '';
-  selectedCustomerStatus : customerStatus = 'all';
+  openParticipantSearch = false;
+  showNonCohortParticipants = false;
+  selectedCustomerStatus: customerStatus = 'all';
   selectedCohorts = [];
-  selectedCohortCategory = ['studio' , 'educational'];
+  selectedCohortCategory = ['studio', 'educational'];
 
   // participant table data points maps
   participantMetadataMap = {};
@@ -48,6 +51,7 @@ export class BigLadderComponent implements OnInit {
   filteredDashbordData = [];
   activeParticipants = 0;
   nonactiveParticipants = 0;
+  participantsInCohort = new Set()
 
   // overall data map
   bigJourney: string[] = [];
@@ -62,15 +66,16 @@ export class BigLadderComponent implements OnInit {
   // cohort filters
   bigMarathon = [];
   eventsList = [];
-  selectedMarathon : string | null = null;
-  selectedEvent : string | null = null;
+  selectedMarathon: string | null = null;
+  marathonSearch: string = '';
+  selectedEvent: string | null = null;
   filteredCohorts = [];
   cohortSearch = '';
   educationalCohort = true;
   studioCohort = true;
 
   // cohort grouping
-  groupFormMode : 'add' | 'edit' | null = null;
+  groupFormMode: 'add' | 'edit' | null = null;
   cohortGroupName = null;
   cohortGroupSelectedForSave = null;
 
@@ -97,12 +102,12 @@ export class BigLadderComponent implements OnInit {
   // side panel
   sidePanelParticipant = null;
   sidePanelCurrentTab: sidePanelTab = 'level';
-  cohortActivityTab: | 'initiated' | 'completed' | 'missed' | 'review' | 'rework' = 'initiated';
+  cohortActivityTab: cohortTab = 'initiated';
 
-  constructor( private firestore: Firestore,) {
-    
+  constructor(private firestore: Firestore) {
     // fetch big levels
-    getDocs(query(collection(this.firestore, 'biglevel'))).then((bigLevelSnap) => {
+    getDocs(query(collection(this.firestore, 'biglevel'))).then(
+      (bigLevelSnap) => {
         for (const docref of bigLevelSnap.docs) {
           const level = docref.data();
           this.bigLevelMap[docref.id] = level;
@@ -111,7 +116,8 @@ export class BigLadderComponent implements OnInit {
     );
 
     // fetch big activities
-    getDocs(query(collection(this.firestore, 'bigactivity'))).then((bigActivitySnap) => {
+    getDocs(query(collection(this.firestore, 'bigactivity'))).then(
+      (bigActivitySnap) => {
         for (const docref of bigActivitySnap.docs) {
           const activity = docref.data();
           this.bigActivityMap[docref.id] = activity;
@@ -120,26 +126,25 @@ export class BigLadderComponent implements OnInit {
     );
 
     // fetch big marthons
-    getDocs(query(collection(this.firestore, 'big marathon') , orderBy('enddate' , 'desc'))).then((bigMarathonSnap) => {
-        this.selectedMarathon = !bigMarathonSnap.empty ? bigMarathonSnap.docs[0]?.id : null;
-        for (const docref of bigMarathonSnap.docs) {
-          const marathon = docref.data();
-          this.bigMarathon.push(marathon);
-        }
-      },
-    );
+    getDocs(query(collection(this.firestore, 'big marathon'), orderBy('enddate', 'desc'),),).then((bigMarathonSnap) => {
+      this.selectedMarathon = !bigMarathonSnap.empty ? bigMarathonSnap.docs[0]?.id : null;
+      for (const docref of bigMarathonSnap.docs) {
+        const marathon = docref.data();
+        this.bigMarathon.push(marathon);
+      }
+    });
 
     // fetch videos / episodes in eiflix
     getDocs(query(collection(this.firestore, 'episodes'))).then((episodeSnap) => {
-        for (const docref of episodeSnap.docs) {
-          const episodes = docref.data();
-          this.eiflixVideoMap[docref.id] = episodes;
-        }
-      },
+      for (const docref of episodeSnap.docs) {
+        const episodes = docref.data();
+        this.eiflixVideoMap[docref.id] = episodes;
+      }
+    },
     );
 
     // patch cohort groups from localstorage
-    this.savedCohortGroups = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}');
+    this.savedCohortGroups = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}',);
     this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
   }
 
@@ -147,29 +152,31 @@ export class BigLadderComponent implements OnInit {
     this.fetchDashbordData();
 
     // fetch active cohorts
-    getDocs(query(collection(this.firestore, 'big cohorts') , where('status' , '==' , 'active'))).then((bigCohortSnap) => {
-        for (const docref of bigCohortSnap.docs) {
-          const cohort = docref.data();
-          const participantList = [];
+    getDocs(query(collection(this.firestore, 'big cohorts'), where('status', '==', 'active'),)).then((bigCohortSnap) => {
+      const participantsInCohort = new Set();
+      for (const docref of bigCohortSnap.docs) {
+        const cohort = docref.data();
+        const participantList = [];
 
-          // filter participants in cohort based on their journey ( only big participants )
-          for (const pid of cohort['participantidlist'] ?? []) {
-            const metadata = this.participantMetadataMap[pid] ?? null;
-            const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;;
-            if (this.bigJourney.includes(journey)){
-              participantList.push(pid);
-            };
+        const category = cohort['cohortCategory'] ?? null;
+
+        // filter participants in cohort based on their journey ( only big participants )
+        for (const pid of cohort['participantidlist'] ?? []) {
+          const metadata = this.participantMetadataMap[pid] ?? null;
+          const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
+          if (this.bigJourney.includes(journey)) {
+            participantList.push(pid);
+            if (!['educational'].includes(category)) continue;
+            participantsInCohort.add(pid);
           }
-
-          if (participantList.length > 0) {
-            cohort['participantidlist'] = participantList;
-            this.cohortMap[docref.id] = cohort;
-          }
-
         }
-        this.filterCohortList();
-      },
-    );
+
+        cohort['participantidlist'] = participantList;
+        this.cohortMap[docref.id] = cohort;
+      }
+      this.participantsInCohort = participantsInCohort;
+      this.filterCohortList();
+    });
   }
 
   // ================================== Participant Table =========================
@@ -198,12 +205,12 @@ export class BigLadderComponent implements OnInit {
       participantMetadataSnap,
     ] = await Promise.all([
       getDocs(query(collection(this.firestore, 'event collection'))),
-      getDocs(query(collection(this.firestore, 'event participation request'),where('status', '==', 'attended'),),),
-      getDocs(query(collection(this.firestore, 'big assignment'),where('status', 'in', ['initiated', 'ongoing', 'completed']),),),
+      getDocs(query(collection(this.firestore, 'event participation request'), where('status', '==', 'attended'),),),
+      getDocs(query(collection(this.firestore, 'big assignment'), where('status', 'in', ['initiated', 'ongoing', 'completed']),),),
       getDocs(query(collection(this.firestore, 'big participants assignments')),),
       getDocs(query(collection(this.firestore, 'queue activity log'))),
       getDocs(query(collection(this.firestore, 'big aggregate level'))),
-      getDocs(query(collection(this.firestore, 'content analytics'),where('status', '==', 'complete'),where('type', 'in', ['eiflix', 'eiflixcontent', 'eiflixhomecontent']),),),
+      getDocs(query(collection(this.firestore, 'content analytics'), where('status', '==', 'complete'), where('type', 'in', ['eiflix', 'eiflixcontent', 'eiflixhomecontent']),),),
       getDocs(query(collection(this.firestore, 'journey'))),
       getDocs(query(collection(this.firestore, 'participant metadata'))),
     ]);
@@ -219,7 +226,6 @@ export class BigLadderComponent implements OnInit {
         bigEvents.push(docref.id);
       }
     });
-  
 
     // code to process participants attendednce
     eventParticipantSnap.docs.forEach((docref) => {
@@ -227,11 +233,7 @@ export class BigLadderComponent implements OnInit {
       const profileId = eventRequest['profileid'] ?? null;
       const eventref = eventRequest['eventref'] as DocumentReference;
 
-      if (
-        eventref.parent.path === 'event collection' &&
-        ![null, undefined, ''].includes(profileId) &&
-        bigEvents.includes(eventref.id)
-      ) {
+      if (eventref.parent.path === 'event collection' &&![null, undefined, ''].includes(profileId) &&bigEvents.includes(eventref.id)) {
         eventsAttended[profileId] = eventsAttended[profileId] ?? new Set();
         eventsAttended[profileId]?.add(eventref.id);
       }
@@ -244,12 +246,11 @@ export class BigLadderComponent implements OnInit {
       bigAssignmentMap[docref.id] = assignment;
     });
 
-     // code to process cohort activity ( participant wise )
+    // code to process cohort activity ( participant wise )
     cohortActivitySnap.docs.forEach((docref) => {
       const activity = docref.data();
       const profileId = activity['profileid'] ?? null;
-      const assignment =
-        bigAssignmentMap[activity['assignmentref']?.id ?? ''] ?? null;
+      const assignment = bigAssignmentMap[activity['assignmentref']?.id ?? ''] ?? null;
       const activityStatus = activity['status'];
 
       if (profileId && assignment) {
@@ -304,8 +305,7 @@ export class BigLadderComponent implements OnInit {
       const profileId = log['profileid'] ?? null;
       const videoId = log['videoid'] ?? null;
       if (profileId && videoId) {
-        eiflixConsumptionMap[profileId] =
-          eiflixConsumptionMap[profileId] ?? new Set();
+        eiflixConsumptionMap[profileId] = eiflixConsumptionMap[profileId] ?? new Set();
         eiflixConsumptionMap[profileId].add(videoId);
       }
     });
@@ -342,10 +342,10 @@ export class BigLadderComponent implements OnInit {
 
     this.isLoading = false;
 
-    const end = new Date();
+    // const end = new Date();
 
-    const timegap = end.getTime() - now.getTime();
-    alert(`the time gap : ${timegap / 1000}`);
+    // const timegap = end.getTime() - now.getTime();
+    // alert(`the time gap : ${timegap / 1000}`);
   }
 
   // function to process data for tabel
@@ -356,7 +356,8 @@ export class BigLadderComponent implements OnInit {
     let nonactiveParticipants = 0;
 
     for (const metadata of allProfile) {
-      const journey = metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
+      const journey =
+        metadata['activejourney'] || metadata['lastcompletedjourney'] || null;
       if (!this.bigJourney.includes(journey)) continue;
 
       const profileId = metadata['profileid'];
@@ -372,7 +373,7 @@ export class BigLadderComponent implements OnInit {
       const participantMetrics = {
         profileid: metadata['profileid'],
         name: metadata['name'] ?? null,
-        customerstatus : customerStatus,
+        customerstatus: customerStatus,
         extendedlifeimpact: metadata['extendedlifeimpact'] ?? 0,
         eventAttended: eventsAttendedCount,
         bigActivity: {
@@ -405,7 +406,8 @@ export class BigLadderComponent implements OnInit {
     const data = [...this.dashboardData];
     const cohortParticipants = [];
     const selectedCohortGroup = this.savedCohortGroups[this.selectedCohortGroup] ?? [];
-    const cohorts = [...this.selectedCohorts , ...selectedCohortGroup];
+    const cohorts = [...this.selectedCohorts, ...selectedCohortGroup];
+    const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
 
     for (const cohortId of cohorts) {
       const cohort = this.cohortMap[cohortId] ?? null;
@@ -418,20 +420,28 @@ export class BigLadderComponent implements OnInit {
 
     const filterData = data.filter((participant) => {
       const profileId = participant['profileid'];
-      const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
       const customerStatus = participant['customerstatus'] ?? null;
-      
+
       // search
       if (search.length > 0) {
-        const participantName: string = participant?.name?.toLocaleLowerCase()?.trim() ?? '';
+        const participantName: string =
+          participant?.name?.toLocaleLowerCase()?.trim() ?? '';
         if (!participantName.includes(search)) return false;
       }
 
       // cohort filter
-      if ((this.selectedCohorts.length > 0 || this.selectedCohortGroup) && !cohortParticipants.includes(profileId)) return false;
+      if (
+        (this.selectedCohorts.length > 0 || this.selectedCohortGroup) &&
+        !cohortParticipants.includes(profileId)
+      )
+        return false;
 
       // customer status
       if (this.selectedCustomerStatus !== 'all' && this.selectedCustomerStatus !== customerStatus) return false;
+
+      if (this.showNonCohortParticipants && this.participantsInCohort.has(profileId)) {
+        return false;
+      }
 
       return true;
     });
@@ -440,37 +450,111 @@ export class BigLadderComponent implements OnInit {
     this.sortTableHeader();
   }
 
-    // function to handel customer status change
-  onCustomerStatusSelect(type : customerStatus){
+  // function to handel customer status change
+  onCustomerStatusSelect(type: customerStatus) {
     this.selectedCustomerStatus = type;
     this.filterTable();
   }
 
-  // getParticipantFilterChips(){
-  //   return []
-  // }
+  // function to show filter chips above table
+  getParticipantFilterChips() {
+    const chips = [];
+    const search = this.participantSearch?.toLocaleLowerCase()?.trim() ?? '';
+    if (search.length > 0) {
+      chips.push({
+        type: 'search',
+        label: search,
+      });
+    }
+
+    if (this.selectedCohorts.length > 0) {
+      for (const cohortId of this.selectedCohorts) {
+        const cohort = this.cohortMap[cohortId] ?? null;
+        if (cohort) {
+          chips.push({
+            type: 'cohort',
+            label: cohort['name'],
+            cohortId: cohortId,
+          });
+        }
+      }
+    }
+
+    if (this.selectedCohortGroup) {
+      chips.push({
+        type: 'group',
+        label: this.selectedCohortGroup,
+      });
+    }
+
+    if (this.showNonCohortParticipants) {
+      chips.push({
+        type: 'non-cohort',
+        label: 'Non Cohort Participants ',
+      });
+    }
+
+    return chips;
+  }
+
+  // function to remove filter via chips
+  removeFilter(chip: any) {
+    const type = chip.type;
+    if ([null, undefined, ''].includes(type)) return;
+
+    if (type === 'search') {
+      this.participantSearch = '';
+    } else if (type === 'cohort') {
+      this.selectedCohorts = this.selectedCohorts.filter(
+        (cId) => cId !== chip?.cohortId,
+      );
+    } else if (type === 'group') {
+      this.selectedCohortGroup = null;
+    } else if (type === 'non-cohort') {
+      this.showNonCohortParticipants = false;
+    }
+    this.filterTable();
+  }
+
+  // function to clear all table filters
+  clearAllParticipantFilters() {
+    this.participantSearch = '';
+    this.selectedCohortGroup = null;
+    this.selectedCohorts = [];
+    this.selectedCustomerStatus = 'all';
+    this.filterTable();
+  }
+
+  // function to handel no chort participants list
+  onNonCohortParticipantClick() {
+    this.showNonCohortParticipants = !this.showNonCohortParticipants;
+    this.filterTable();
+  }
 
   // ========================== Cohort Filter ======================
 
   // function to group cohorts
-  groupCohortList(){
+  groupCohortList() {
     const title = this.cohortGroupName;
     const selectedCohort = this.cohortGroupSelectedForSave;
-    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
-    if ([null , undefined , ''].includes(title) || selectedCohort.length === 0) {
+    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}',) as Object;
+    if ([null, undefined, ''].includes(title) || selectedCohort.length === 0) {
       alert('Fill all the fields');
-      return
+      return;
     }
 
-    if (this.expandedCohortGroup !== title && Object.hasOwn(groupedCohorts , title)) {
+    if (
+      this.expandedCohortGroup !== title &&
+      Object.hasOwn(groupedCohorts, title)
+    ) {
       alert('this group title is already exist');
-      return
+      return;
     }
     if (this.expandedCohortGroup) {
-      delete groupedCohorts[this.expandedCohortGroup]
+      delete groupedCohorts[this.expandedCohortGroup];
     }
     groupedCohorts[title] = selectedCohort;
-    localStorage.setItem(this.COHORT_GROUP_KEY , JSON.stringify(groupedCohorts));
+    localStorage.setItem(this.COHORT_GROUP_KEY, JSON.stringify(groupedCohorts));
     this.savedCohortGroups = groupedCohorts;
     this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
     this.selectedCohorts = [];
@@ -481,7 +565,7 @@ export class BigLadderComponent implements OnInit {
   }
 
   // function to cancel group select
-  cancelGroup(){
+  cancelGroup() {
     this.groupFormMode = null;
     this.cohortGroupName = null;
     this.cohortGroupSelectedForSave = null;
@@ -489,13 +573,13 @@ export class BigLadderComponent implements OnInit {
   }
 
   // function to ungroup
-  unGroup(groupTitle){
-    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
-    if (Object.hasOwn(groupedCohorts , groupTitle)) {
+  unGroup(groupTitle) {
+    const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}',) as Object;
+    if (Object.hasOwn(groupedCohorts, groupTitle)) {
       const prombt = confirm('Are sure to delete the group');
-      if (!prombt) return
-      delete groupedCohorts[groupTitle]
-      localStorage.setItem(this.COHORT_GROUP_KEY , JSON.stringify(groupedCohorts));
+      if (!prombt) return;
+      delete groupedCohorts[groupTitle];
+      localStorage.setItem(this.COHORT_GROUP_KEY,JSON.stringify(groupedCohorts),);
       this.savedCohortGroups = groupedCohorts;
       this.cohortsInGroups = Object.values(this.savedCohortGroups).flat(1);
       this.selectedCohorts = [];
@@ -504,6 +588,192 @@ export class BigLadderComponent implements OnInit {
       this.filterCohortList();
     }
   }
+
+  // function to filter cohorts
+  filterCohortList() {
+    const cohorts = Object.values(this.cohortMap);
+    const cohortSearch = this.cohortSearch?.trim().toLocaleLowerCase();
+    const activeParticipants = new Set();
+    const nonactiveParticipants = new Set();
+
+    const filteredCohorts = cohorts.filter((cohort) => {
+        const cohortId = cohort['docid'] ?? null;
+        const cohortName = cohort['name']?.trim()?.toLocaleLowerCase() ?? '';
+        const cohortCategory = cohort['cohortCategory'] ?? '';
+        const marathon = cohort['marathonref']?.id ?? null;
+        const eventId = cohort['eventref']?.id ?? null;
+        const participantsList = cohort['participantidlist'] ?? [];
+
+        // cohort category select
+        if (this.selectedCohortCategory.length > 0 &&!this.selectedCohortCategory.includes(cohortCategory))
+          return false;
+
+        if (cohortCategory !== 'educational') {
+          // event
+          if (this.selectedEvent && this.selectedEvent !== eventId)
+            return false;
+          // marathon
+          if (this.selectedMarathon && this.selectedMarathon !== marathon)
+            return false;
+        }
+
+        // search
+        if (cohortSearch.length > 0 && !cohortName?.includes(cohortSearch))
+          return false;
+
+        // process active and non active participants in cohorts
+        for (const pid of participantsList) {
+          const metadata = this.participantMetadataMap[pid] ?? null;
+          const customerstatus = metadata['customerstatus'] ?? null;
+          if (customerstatus == 'active') activeParticipants.add(pid);
+          else if (customerstatus === 'non active')
+            nonactiveParticipants.add(pid);
+        }
+
+        // does in cohort group
+        if (this.cohortsInGroups.includes(cohortId)) return false;
+
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = this.toDate(a['createddate']);
+        const dateB = this.toDate(b['createddate']);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+    this.activeParticipantInCohort = activeParticipants.size;
+    this.nonactiveParticipantInCohort = nonactiveParticipants.size;
+    this.filteredCohorts = filteredCohorts;
+  }
+
+  // function to select all cohorts
+  selectAllCohorts() {
+    for (const cohort of this.filteredCohorts) {
+      this.selectedCohorts.push(cohort['docid']);
+    }
+    this.filterTable();
+  }
+
+  // function to deselect all cohorts
+  deSelectAllCohorts() {
+    this.selectedCohorts = [];
+    this.filterTable();
+  }
+
+  // function to handel catgeory change for cohort filter
+  onCohortCategoryChange(category: string) {
+    if (this.selectedCohortCategory.includes(category)) {
+      this.selectedCohortCategory = this.selectedCohortCategory.filter((cat) => cat !== category,);
+    } else {
+      this.selectedCohortCategory.push(category);
+    }
+    this.filterCohortList();
+  }
+
+  // function to handle cohort click
+  handleCohortClick(cohortId) {
+    if (this.selectedCohorts.includes(cohortId)) {
+      this.selectedCohorts = this.selectedCohorts.filter((cId) => cId !== cohortId,);
+    } else {
+      this.selectedCohorts.push(cohortId);
+    }
+
+    if (this.groupFormMode == 'add') {
+      if (this.cohortGroupSelectedForSave.length < 2) {
+        this.cancelGroup();
+      }
+      this.onToggleCohortFromGroup(cohortId);
+    }
+
+    this.filterTable();
+  }
+
+  // function to filter events has per current marathon select
+  filterEvents() {
+    let filteredEvents = [...Object.values(this.eventMap)];
+    if (this.selectedMarathon) {
+      filteredEvents = filteredEvents.filter((event) => {
+        const marathon = event['bigmarathonref']?.id ?? null;
+        if (this.selectedMarathon === marathon) {
+          return true;
+        }
+        return false;
+      });
+      this.eventsList = filteredEvents;
+    }
+  }
+
+  // function to handle marathon change
+  onMarathonChange() {
+    this.selectedEvent = null;
+    this.filterEvents();
+    this.filterCohortList();
+  }
+
+  pickMarathon(c) {
+    this.selectedMarathon = c['docid'];
+    this.marathonSearch = c?.title;
+    this.onMarathonChange();
+  }
+
+  get filterMarathon() {
+    return this.bigMarathon.filter((marathon) => {
+      const search = this.marathonSearch?.trim()?.toLocaleLowerCase();
+      const title = marathon['title']?.title?.trim().toLocaleLowerCase();
+      if (search && title) {
+        return title.includes(search);
+      }
+      return true;
+    });
+  }
+
+  // function to handel grouping
+  onGroup(mode: 'add' | 'edit' = 'add') {
+    this.cancelGroup();
+    this.groupFormMode = mode;
+    this.cohortGroupName = '';
+    this.cohortGroupSelectedForSave = [...this.selectedCohorts];
+  }
+
+  // function to handle cohort group select
+  onCohortGroupSelect(groupTitle) {
+    if (this.selectedCohortGroup === groupTitle) {
+      this.selectedCohortGroup = null;
+    } else {
+      this.selectedCohortGroup = groupTitle;
+    }
+    this.filterTable();
+  }
+
+  // function to toggle expand in cohort filter
+  toggleCohortGroup(groupTitle) {
+    if (this.selectedCohortGroup == groupTitle) {
+      return;
+    }
+    if (this.expandedCohortGroup === groupTitle) {
+      this.expandedCohortGroup = null;
+      this.cancelGroup();
+    } else {
+      const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}',) as Object;
+      const group = groupedCohorts[groupTitle] ?? [];
+
+      this.groupFormMode = 'edit';
+      this.cohortGroupName = groupTitle;
+      this.cohortGroupSelectedForSave = group;
+      this.expandedCohortGroup = groupTitle;
+    }
+  }
+
+  // function to add and remove cohort from group
+  onToggleCohortFromGroup(cohortId) {
+    if (this.cohortGroupSelectedForSave?.includes(cohortId)) {
+      this.cohortGroupSelectedForSave = this.cohortGroupSelectedForSave.filter((cId) => cId !== cohortId,);
+    } else {
+      this.cohortGroupSelectedForSave?.push(cohortId);
+    }
+  }
+
+  // ====================== Side Panel =====================================
 
   // function to open side panel
   openSidePanel(profileId: string, panelView: sidePanelTab = 'level') {
@@ -536,169 +806,6 @@ export class BigLadderComponent implements OnInit {
     this.cohortActivityTab = 'initiated';
   }
 
-  // function to filter cohorts
-  filterCohortList(){
-    const cohorts = Object.values(this.cohortMap);
-    const cohortSearch = this.cohortSearch?.trim().toLocaleLowerCase();
-    const activeParticipants = new Set();
-    const nonactiveParticipants = new Set();
-
-    const filteredCohorts =  cohorts.filter((cohort)=>{
-      const cohortId = cohort['docid'] ?? null;
-      const cohortName = cohort['name']?.trim()?.toLocaleLowerCase() ?? '';
-      const cohortCategory = cohort['cohortCategory'] ?? '';
-      const marathon = cohort['marathonref']?.id ?? null;
-      const eventId = cohort['eventref']?.id ?? null;
-      const participantsList = cohort['participantidlist'] ?? [];
-      
-      // cohort category select
-      if (this.selectedCohortCategory.length > 0 && !this.selectedCohortCategory.includes(cohortCategory)) return false;
-
-      if (cohortCategory !== 'educational') {
-        // event
-        if (this.selectedEvent && this.selectedEvent !== eventId) return false;
-        // marathon
-        if (this.selectedMarathon && this.selectedMarathon !== marathon) return false;
-      }
-
-      // search
-      if (cohortSearch.length > 0 && !cohortName?.includes(cohortSearch)) return false;
-
-      // process active and non active participants in cohorts
-      for (const pid of participantsList) {
-        const metadata = this.participantMetadataMap[pid] ?? null;
-        const customerstatus = metadata['customerstatus'] ?? null;
-        if (customerstatus == 'active') activeParticipants.add(pid);
-        else if(customerstatus === 'non active') nonactiveParticipants.add(pid);
-        
-      }
-      
-      // does in cohort group
-      if (this.cohortsInGroups.includes(cohortId)) return false;
-
-      return true;
-    }).sort((a , b)=>{
-      const dateA = this.toDate(a['createddate']);
-      const dateB = this.toDate(b['createddate']);
-      return dateB.getTime() - dateA.getTime();
-    });
-
-    this.activeParticipantInCohort = activeParticipants.size;
-    this.nonactiveParticipantInCohort = nonactiveParticipants.size;
-    this.filteredCohorts = filteredCohorts;
-  }
-
-  // function to select all cohorts
-  selectAllCohorts(){
-    for (const cohort of this.filteredCohorts) {
-      this.selectedCohorts.push(cohort['docid']);
-    }
-    this.filterTable();
-  }
-
-  // function to deselect all cohorts
-  deSelectAllCohorts(){
-    this.selectedCohorts = [];
-    this.filterTable();
-  }
-
-  // function to handel catgeory change for cohort filter
-  onCohortCategoryChange(category : string){
-    if (this.selectedCohortCategory.includes(category)) {
-      this.selectedCohortCategory = this.selectedCohortCategory.filter((cat)=>cat !== category)
-    } else {
-      this.selectedCohortCategory.push(category);
-    }
-    this.filterCohortList();
-  }
-
-  // function to handle cohort click
-  handleCohortClick(cohortId){
-    if (this.selectedCohorts.includes(cohortId)) {
-      this.selectedCohorts = this.selectedCohorts.filter((cId)=> cId !== cohortId);
-    } else {
-      this.selectedCohorts.push(cohortId);
-    }
-
-    if (this.groupFormMode == 'add') {
-      if (this.cohortGroupSelectedForSave.length < 2) {
-        this.cancelGroup();
-      }
-      this.onToggleCohortFromGroup(cohortId);
-    }
-    
-    this.filterTable();
-  }
-
-  // function to filter events has per current marathon select
-  filterEvents(){
-    let filteredEvents = [...Object.values(this.eventMap)];
-    if (this.selectedMarathon) {
-      filteredEvents = filteredEvents.filter((event)=>{
-        const marathon = event['bigmarathonref']?.id ?? null;
-        if (this.selectedMarathon === marathon) {
-          return true;
-        }
-        return false;
-    });
-    this.eventsList = filteredEvents;
-    }
-  }
-  
-  // function to handle marathon change
-  onMarathonChange(){
-    this.selectedEvent = null;
-    this.filterEvents();
-    this.filterCohortList();
-  }
-
-  // function to handel grouping 
-  onGroup(mode : 'add' | 'edit' = 'add' ){
-    this.cancelGroup();
-    this.groupFormMode = mode;
-    this.cohortGroupName = '';
-    this.cohortGroupSelectedForSave = [...this.selectedCohorts];
-  }
-
-  // function to handle cohort group select
-  onCohortGroupSelect(groupTitle){
-    if (this.selectedCohortGroup === groupTitle) {
-      this.selectedCohortGroup = null;
-    } else {
-      this.selectedCohortGroup = groupTitle;
-    }
-    this.filterTable();
-  }
-
-  // function to toggle expand in cohort filter
-  toggleCohortGroup(groupTitle){
-    if (this.selectedCohortGroup == groupTitle) {
-      return
-    }
-    if (this.expandedCohortGroup === groupTitle) {
-      this.expandedCohortGroup = null;
-      this.cancelGroup();
-    } else {
-      const groupedCohorts = JSON.parse(localStorage.getItem(this.COHORT_GROUP_KEY) ?? '{}') as Object;
-      const group = groupedCohorts[groupTitle] ?? [];
-      
-      this.groupFormMode = 'edit';
-      this.cohortGroupName = groupTitle;
-      this.cohortGroupSelectedForSave = group;
-      this.expandedCohortGroup = groupTitle;
-      
-    }
-  }
-
-  // function to add and remove cohort from group
-  onToggleCohortFromGroup(cohortId){
-    if (this.cohortGroupSelectedForSave?.includes(cohortId)) {
-      this.cohortGroupSelectedForSave = this.cohortGroupSelectedForSave.filter((cId) => cId !== cohortId);
-    } else {
-      this.cohortGroupSelectedForSave?.push(cohortId)
-    }
-  }
-  
   // ===================== Tabel Sorting ======================
 
   // function to sort set header for sorting
@@ -717,7 +824,7 @@ export class BigLadderComponent implements OnInit {
     } else {
       this.sortHeader = { header: header, type: 'asce' };
     }
-    this.sortTableHeader()
+    this.sortTableHeader();
   }
 
   // function to sort tabel based on header click
@@ -769,7 +876,10 @@ export class BigLadderComponent implements OnInit {
 
   // function to get participant journey
   getParticipantJourney(participant: any): string {
-    const journey = participant['activejourney'] ?? participant['lastcompletedjourney'] ?? null;
+    const journey =
+      participant['activejourney'] ??
+      participant['lastcompletedjourney'] ??
+      null;
     if (journey) return this.journeyMap[journey]?.journey ?? '';
     return '';
   }
@@ -793,31 +903,32 @@ export class BigLadderComponent implements OnInit {
   }
 
   // function to get filtered cohorts for pagination
-  getFilteredCohorts(){
+  getFilteredCohorts() {
     if (this.filteredCohorts.length > 16 && !this.loadAllCohort) {
-      return this.filteredCohorts.slice(0 , 16);
+      return this.filteredCohorts.slice(0, 16);
     }
-    return this.filteredCohorts
+    return this.filteredCohorts;
   }
 
   // function to toggle cohort pagination
-  toggleCohortShowMore(){
+  toggleCohortShowMore() {
     this.loadAllCohort = !this.loadAllCohort;
   }
 
   // function to get participants in cohorts
-  getParticipantInCohortGroup(groupTitle : string){
+  getParticipantInCohortGroup(groupTitle: string) {
     const group = this.savedCohortGroups[groupTitle] ?? null;
     const participantSet = new Set();
     if (group) {
       for (const cohortId of group) {
-        const cohortParticipants = this.cohortMap[cohortId]?.['participantidlist'] ?? [];
+        const cohortParticipants =
+          this.cohortMap[cohortId]?.['participantidlist'] ?? [];
         for (const pid of cohortParticipants) {
           participantSet.add(pid);
         }
       }
       return Array.from(participantSet.values());
     }
-    return []
+    return [];
   }
 }
