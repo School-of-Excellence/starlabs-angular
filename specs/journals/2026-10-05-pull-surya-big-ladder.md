@@ -14,6 +14,7 @@ development no longer have (undone in the Oct 1 squash/merges); operator to conf
 | 56 literal `bld-*` hooks on big-ladder.component.html | screen shipped with 0 hooks; readiness gate |
 | `await this.fetchDashbordData()` in ngOnInit before the active-cohort read | the cohort read (1 query) beat the 9-query dashboard load, saw an empty participantMetadataMap and threw on `metadata['activejourney']` → empty cohort panel |
 | `metadata?.['activejourney']` / `?.['lastcompletedjourney']` | a cohort member with no metadata doc crashed the same line |
+| cohort sort `(dateB?.getTime() ?? 0) - (dateA?.getTime() ?? 0)` + `metadata?.['customerstatus']` in filterCohortList | a cohort with no `createddate` threw `getTime` of null (found by BLD-01's console guard — big-seed cohorts carry none, older real ones may not either); same null-metadata crash as above |
 
 ## Notes
 - Read-only screen. Reads 14 collections incl. `big assignment` (plain B!G assignments — not ATC-fenced), full

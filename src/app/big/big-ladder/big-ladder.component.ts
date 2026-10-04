@@ -626,7 +626,7 @@ export class BigLadderComponent implements OnInit {
         // process active and non active participants in cohorts
         for (const pid of participantsList) {
           const metadata = this.participantMetadataMap[pid] ?? null;
-          const customerstatus = metadata['customerstatus'] ?? null;
+          const customerstatus = metadata?.['customerstatus'] ?? null;
           if (customerstatus == 'active') activeParticipants.add(pid);
           else if (customerstatus === 'non active')
             nonactiveParticipants.add(pid);
@@ -640,7 +640,8 @@ export class BigLadderComponent implements OnInit {
       .sort((a, b) => {
         const dateA = this.toDate(a['createddate']);
         const dateB = this.toDate(b['createddate']);
-        return dateB.getTime() - dateA.getTime();
+        // cohorts without a createddate sort last instead of throwing
+        return (dateB?.getTime() ?? 0) - (dateA?.getTime() ?? 0);
       });
 
     this.activeParticipantInCohort = activeParticipants.size;
