@@ -79,9 +79,50 @@
         <mat-option [value]="'processing'">Processing</mat-option>
         <mat-option [value]="'partial_success'">Partial Success</mat-option>
         <mat-option [value]="'failed'">Failed</mat-option>
+        <mat-option [value]="'verify_failed'">Verify failed</mat-option>
       </mat-select>
     </mat-form-field>
   </form>
+
+  <!-- ===== verify all ===== -->
+  <section class="verify-all">
+    <div class="verify-all__bar">
+      <div>
+        <b>Verify backups</b>
+        <span class="zoom-toggle__hint">— check every listed recording against Dropbox; missing files are backed up automatically</span>
+      </div>
+      @if (verifyAllState?.running) {
+      <button data-testid="zrd-verifyall-stop" class="reload-btn" (click)="stopVerifyAll()" [disabled]="verifyAllState?.stop">
+        {{ verifyAllState?.stop ? 'Stopping…' : 'Stop' }}
+      </button>
+      } @else {
+      <button data-testid="zrd-verifyall" class="migrate-btn" (click)="verifyAll()" [disabled]="verifyAllTargets.length === 0">
+        Verify all ({{ verifyAllTargets.length }})
+      </button>
+      }
+    </div>
+    @if (verifyAllState; as st) {
+    <div class="verify-all__body">
+      <div class="row-progress">
+        <div class="progress-bar">
+          <div class="progress-fill progress-success" [style.width.%]="st.total ? (st.done / st.total) * 100 : 0"></div>
+        </div>
+        <span class="mono progress-text">{{ st.done }}/{{ st.total }}</span>
+      </div>
+      <div class="verify-all__counts">
+        <span class="verify-ok">✓ {{ st.verified }} verified</span>
+        <span class="verify-run">⟳ {{ st.repairing }} backing up missing files</span>
+        @if (st.failed) { <span class="verify-bad">⚠ {{ st.failed }} failed</span> }
+        @if (st.skipped) { <span class="action-muted">{{ st.skipped }} skipped</span> }
+        @if (st.errors) { <span class="verify-bad">{{ st.errors }} error(s)</span> }
+        @if (!st.running) { <span class="action-muted">{{ st.stop ? 'Stopped' : 'Done' }}</span> }
+      </div>
+      @for (p of st.problems; track $index) {
+      <div class="file-error">⚠ {{ p.topic }} — {{ p.text }}</div>
+      }
+    </div>
+    }
+  </section>
 
   <!-- ===== migrate-from-Zoom panel ===== -->
   <section class="zoom-panel">
@@ -211,6 +252,14 @@
           <div class="cell-sub" *ngIf="el.successCount !== undefined">
             {{ el.successCount }}/{{ el.totalFiles }} files
           </div>
+          @if (isDocStale(el)) {
+          <div class="cell-sub cell-warn" title="No heartbeat for 5+ minutes — this run died">⚠ stalled</div>
+          }
+          @if (el.zoomTrashedAt) {
+          <div class="cell-sub">🗑 In Zoom trash</div>
+          } @else if (el.verification?.ok && el.status === 'completed') {
+          <div class="cell-sub cell-ok">✓ verified</div>
+          }
         </td>
       </ng-container>
 
@@ -286,6 +335,16 @@
           <a data-testid="zrd-link" class="dropbox-link-sm" [href]="dbUrl" target="_blank" rel="noopener"
              title="Open this recording's folder in Dropbox">📁 Dropbox ↗</a>
           }
+          @if (!el.zoomTrashedAt) {
+          <button data-testid="zrd-trash-row" class="trash-btn trash-btn--sm" (click)="trashRecord(el)"
+                  [disabled]="rowTrash[el.id]?.busy || !canTrash(el)"
+                  [title]="trashBlockedReason(el) || 'Move this recording to Zoom trash (restorable for 30 days)'">
+            {{ rowTrash[el.id]?.busy ? 'Moving…' : '🗑 Move to Zoom trash' }}
+          </button>
+          }
+          @if (rowTrash[el.id]?.msg; as m) {
+          <div class="cell-sub" [class.cell-ok]="m.kind === 'ok'" [class.cell-bad]="m.kind === 'bad'">{{ m.text }}</div>
+          }
         </td>
       </ng-container>
 
@@ -334,6 +393,49 @@
           </a>
         </p>
         }
+        <div class="modal-actions">
+          <button data-testid="zrd-verify" class="view-btn" (click)="verifyRecord(activeRecord)"
+                  [disabled]="!!actionBusy || activeRecord?.status === 'processing'">
+            {{ actionBusy === 'verify' ? 'Verifying…' : 'Verify backup' }}
+          </button>
+          @if (activeRecord?.zoomTrashedAt) {
+          <span class="action-muted">🗑 Moved to Zoom trash
+            {{ toDate(activeRecord.zoomTrashedAt) | date : "MMM d, y, h:mm a" }} by {{ activeRecord.zoomTrashedBy }}</span>
+          } @else {
+          <button data-testid="zrd-trash" class="trash-btn" (click)="trashRecord(activeRecord)"
+                  [disabled]="!!actionBusy || !canTrash(activeRecord)"
+                  [title]="trashBlockedReason(activeRecord) || 'Move this recording to Zoom trash (restorable for 30 days)'">
+            {{ actionBusy === 'trash' ? 'Moving…' : 'Move to Zoom trash' }}
+          </button>
+          }
+        </div>
+        @if (!activeRecord?.zoomTrashedAt && trashBlockedReason(activeRecord); as why) {
+        <p class="modal-meta action-muted">{{ why }}</p>
+        }
+        @if (activeRecord?.verification; as v) {
+        @if (isRepairing(activeRecord)) {
+        <p class="modal-meta">
+          <span class="verify-run">⟳ Backing up missing files…</span>
+          <span>checked {{ v.checkedAt | date : "MMM d, y, h:mm a" }}</span>
+        </p>
+        @for (m of v.zoomMissing; track m.zoomFileId) {
+        <div class="action-msg-run">⟳ {{ m.fileType }} ({{ formatBytes(m.fileSize) }}) — backing up from Zoom</div>
+        }
+        } @else {
+        <p class="modal-meta">
+          <span [class]="v.ok ? 'verify-ok' : 'verify-bad'">
+            {{ v.ok ? '✓ Verified' : '⚠ Verification failed' }}
+          </span>
+          <span>{{ v.checkedAt | date : "MMM d, y, h:mm a" }}</span>
+        </p>
+        @for (m of v.zoomMissing; track m.zoomFileId) {
+        <div class="file-error">⚠ {{ m.fileType }} ({{ formatBytes(m.fileSize) }}) is in Zoom but not backed up</div>
+        }
+        }
+        }
+        @if (actionMessage) {
+        <div [class]="actionMessage.kind === 'ok' ? 'action-msg-ok' : 'file-error'">{{ actionMessage.text }}</div>
+        }
       </div>
       <button data-testid="zrd-closefilemodel-2" class="close-x" (click)="closeFileModel()">✕</button>
     </div>
@@ -361,6 +463,15 @@
         </div>
         @if (f.status === 'failed' && f.error) {
         <div class="file-error">⚠ {{ f.error }}</div>
+        }
+        @if (verificationFor(f); as v) {
+        @if (isRepairing(activeRecord) && !v.ok) {
+        <div class="file-bytes verify-run">⟳ Re-uploading — {{ v.reason }}</div>
+        } @else if (v.ok) {
+        <div class="file-bytes verify-ok">✓ In Dropbox, size matches</div>
+        } @else {
+        <div class="file-error">⚠ {{ v.reason }}</div>
+        }
         }
       </div>
       }
