@@ -11,7 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ZoomMigrationService, ZoomRecording } from './zoom-migration.service';
+import { ZoomMigrationService, ZoomRecording, VerificationResult } from './zoom-migration.service';
 
 @Component({
   selector: 'app-zoom-recording-dashboard',
@@ -239,6 +239,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     } catch (e: any) {
       this.queuedUuids.delete(rec.uuid)
       this.zoomError = e?.error?.error || e?.message || `Failed to start migration for ${rec.topic}`
+      this.recomputeVisible()
     }
   }
 
@@ -254,13 +255,17 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
       const q = query(this.collRef, where('meetinguid', 'in', chunk))
       const unsub = onSnapshot(q, (snap) => {
         const present = new Set<string>()
+        const best = new Map<string, any>()
         snap.docs.forEach((d) => {
           const data = d.data() as any
           if (!data?.meetinguid) return
           present.add(data.meetinguid)
-          this.migrationByUuid.set(data.meetinguid, { id: d.id, ...data })
+          const doc = { id: d.id, ...data }
+          const cur = best.get(data.meetinguid)
+          if (!cur || this.docRank(doc) > this.docRank(cur)) best.set(data.meetinguid, doc)
           this.queuedUuids.delete(data.meetinguid) // a real doc now exists
         })
+        best.forEach((doc, uuid) => this.migrationByUuid.set(uuid, doc))
         // Reconcile deletions: if a doc for one of this chunk's uuids no longer
         // exists (e.g. a retry deleted the stale doc), drop the stale entry so
         // the row reverts to its real state instead of showing the old status.
@@ -276,6 +281,16 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   private stopZoomMatching() {
     this.zoomUnsubs.forEach((u) => u())
     this.zoomUnsubs = []
+  }
+
+  // A meeting can have several backup docs (older duplicate runs). Show the
+  // one that matters: a live run, then a completed one, then the newest.
+  private docRank(doc: any): number {
+    const started = this.toDate(doc?.processingStartedAt) || this.toDate(doc?.timestamp)
+    const recency = started ? started.getTime() / 1e13 : 0 // < 1, only breaks ties
+    if (doc?.status === 'processing' && !this.isDocStale(doc)) return 3 + recency
+    if (doc?.status === 'completed') return 2 + recency
+    return 1 + recency
   }
 
   // ---- per-recording migration view (matched by meetinguid) ----
@@ -298,16 +313,22 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     return this.isQueued(rec.uuid) ? 'processing' : 'none'
   }
 
-  // A doc stuck at 'processing' for longer than the server's max run window
-  // (6h) is abandoned — the migration died and left the doc frozen. We treat it
-  // as retryable rather than "in flight".
+  // A running migration refreshes `heartbeatAt` every 10s. No heartbeat for
+  // 5 min means the run died and left the doc frozen at 'processing' — treat it
+  // as retryable rather than "in flight". Docs from before heartbeats existed
+  // fall back to the old 6h window.
+  private readonly STALE_HEARTBEAT_MS = 5 * 60 * 1000
   private readonly STALE_PROCESSING_MS = 6 * 60 * 60 * 1000
-  isStaleProcessing(rec: ZoomRecording): boolean {
-    const doc = this.migrationByUuid.get(rec.uuid)
+  isDocStale(doc: any): boolean {
     if (!doc || doc.status !== 'processing') return false
+    const hb = this.toDate(doc.heartbeatAt)
+    if (hb) return Date.now() - hb.getTime() > this.STALE_HEARTBEAT_MS
     const started = this.toDate(doc.processingStartedAt) || this.toDate(doc.timestamp)
     if (!started) return true
     return Date.now() - started.getTime() > this.STALE_PROCESSING_MS
+  }
+  isStaleProcessing(rec: ZoomRecording): boolean {
+    return this.isDocStale(this.migrationByUuid.get(rec.uuid))
   }
 
   // True while a matched doc is genuinely being processed right now (so we show
@@ -379,10 +400,158 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
     this.openRecordId = recordId
     const record = this.recordsBackup.data.find((r) => r.id === recordId)
     this.activeRecord = record ?? null
-    this.files = this.normalizeFiles(record?.files)
+    this.files = this.filesWithKeys(record?.files)
+  }
+
+  // Like normalizeFiles, but keeps each file's map key (f0, f1, …), which is
+  // how verification results are keyed.
+  private filesWithKeys(files: any): Array<any> {
+    if (!files) return []
+    if (Array.isArray(files)) return files.map((f, i) => ({ ...f, _key: 'f' + i }))
+    if (typeof files === 'object') return Object.entries(files).map(([k, f]: [string, any]) => ({ ...f, _key: k }))
+    return []
+  }
+
+  // ---- Verify / Move to Zoom trash (one recording at a time) ----
+  public actionBusy: 'verify' | 'trash' | null = null
+  public actionMessage: { kind: 'ok' | 'bad'; text: string } | null = null
+
+  verificationFor(file: any): any | null {
+    return this.activeRecord?.verification?.files?.[file?._key] ?? null
+  }
+
+  isVerified(record: any): boolean {
+    return record?.status === 'completed' && record?.verification?.ok === true
+  }
+
+  // Why the trash button is unavailable ('' = available).
+  trashBlockedReason(record: any): string {
+    if (!record) return ''
+    if (record.zoomTrashedAt) return ''
+    if (this.isRepairing(record) || record.status === 'processing') return 'Backing up — available once it finishes and verifies.'
+    if (record.status !== 'completed') return 'Only a completed backup can be moved to Zoom trash.'
+    if (!this.isVerified(record)) return 'Verify the backup first — every file must be confirmed in Dropbox.'
+    if (this.existsInZoom(record) === 'no') return 'This recording is no longer in Zoom.'
+    if (this.existsInZoom(record) === 'unknown') return 'Checking whether the recording is in Zoom…'
+    return ''
+  }
+
+  canTrash(record: any): boolean {
+    return !!record && !record.zoomTrashedAt && this.trashBlockedReason(record) === '' && this.existsInZoom(record) === 'yes'
+  }
+
+  async verifyRecord(record: any) {
+    if (!record?.id || this.actionBusy) return
+    this.actionBusy = 'verify'
+    this.actionMessage = null
+    try {
+      const res = await this.migrationApi.verify(record.id)
+      if (res.verification.ok) {
+        this.actionMessage = { kind: 'ok', text: 'All files are in Dropbox with the exact size Zoom reports.' }
+      } else if (res.status === 'repairing') {
+        // The server is already backing up the missing/broken files and will
+        // re-verify by itself — the live snapshot updates this modal.
+        this.actionMessage = { kind: 'ok', text: `Backing up the missing file(s) now — ${this.describeProblems(res.verification, false)}. This updates by itself and shows ✓ Verified when done.` }
+      } else {
+        this.actionMessage = { kind: 'bad', text: this.describeProblems(res.verification) }
+      }
+    } catch (e: any) {
+      this.actionMessage = { kind: 'bad', text: e?.error?.error || e?.message || 'Verification failed' }
+    } finally {
+      this.actionBusy = null
+    }
+  }
+
+  // Per-row state for the table's trash button (the modal uses actionBusy /
+  // actionMessage). Keyed by backup doc id.
+  public rowTrash: { [docId: string]: { busy: boolean; msg?: { kind: 'ok' | 'bad'; text: string } } } = {}
+
+  // Used by both the table row button and the file modal button.
+  async trashRecord(record: any) {
+    if (!record?.id || this.rowTrash[record.id]?.busy || !this.canTrash(record)) return
+    const inModal = this.activeRecord?.id === record.id
+    if (inModal && this.actionBusy) return
+    const when = this.toDate(record.startTime)
+    const ok = window.confirm(
+      `Move this recording to Zoom trash?\n\n${record.meetingTopic}\n${when ? when.toLocaleString() : ''}\n\n` +
+      `It will be re-verified against Dropbox first. Zoom keeps trashed recordings for 30 days.`)
+    if (!ok) return
+    this.rowTrash[record.id] = { busy: true }
+    if (inModal) { this.actionBusy = 'trash'; this.actionMessage = null }
+    let msg: { kind: 'ok' | 'bad'; text: string }
+    try {
+      await this.migrationApi.trash(record.id)
+      msg = { kind: 'ok', text: 'Moved to Zoom trash. It can be restored from Zoom for 30 days.' }
+      this.loadZoomPresence()
+    } catch (e: any) {
+      const v: VerificationResult | undefined = e?.error?.verification
+      msg = { kind: 'bad', text: (e?.error?.error || e?.message || 'Could not move to trash') + (v && !v.ok ? ' — ' + this.describeProblems(v) : '') }
+    }
+    this.rowTrash[record.id] = { busy: false, msg }
+    if (inModal) { this.actionBusy = null; this.actionMessage = msg }
+  }
+
+  private describeProblems(v: VerificationResult, withCount = true): string {
+    const bad = Object.values(v.files || {}).filter((f) => !f.ok).map((f) => `${f.fileType || f.fileName}: ${f.reason}`)
+    const missing = (v.zoomMissing || []).map((m) => `${m.fileType}: in Zoom but not backed up`)
+    const all = [...bad, ...missing]
+    if (!all.length) return 'Verification failed'
+    return withCount ? `${all.length} problem(s): ${all.join('; ')}` : all.join('; ')
+  }
+
+  // ---- Verify all (every record in the current filtered table) ----
+  private readonly VERIFY_BATCH_SIZE = 25
+  public verifyAllState: {
+    running: boolean; stop: boolean; total: number; done: number
+    verified: number; repairing: number; failed: number; skipped: number; errors: number
+    problems: Array<{ topic: string; text: string }>
+  } | null = null
+
+  // Records Verify all would check: everything listed except runs in progress
+  // and recordings already moved to Zoom trash.
+  get verifyAllTargets(): any[] {
+    return (this.recordsBackup.filteredData || []).filter((r) => r?.id && r.status !== 'processing' && !r.zoomTrashedAt)
+  }
+
+  async verifyAll() {
+    const targets = this.verifyAllTargets
+    if (!targets.length || this.verifyAllState?.running) return
+    this.verifyAllState = {
+      running: true, stop: false, total: targets.length, done: 0,
+      verified: 0, repairing: 0, failed: 0, skipped: 0, errors: 0, problems: [],
+    }
+    const st = this.verifyAllState
+    for (let i = 0; i < targets.length && !st.stop; i += this.VERIFY_BATCH_SIZE) {
+      const chunk = targets.slice(i, i + this.VERIFY_BATCH_SIZE)
+      try {
+        const res = await this.migrationApi.verifyBatch(chunk.map((r) => r.id))
+        for (const r of res.results) {
+          if (r.result === 'verified') st.verified++
+          else if (r.result === 'repairing') st.repairing++
+          else if (r.result === 'skipped') st.skipped++
+          else if (r.result === 'failed') { st.failed++; st.problems.push({ topic: r.topic, text: r.problems.join('; ') }) }
+          else { st.errors++; st.problems.push({ topic: r.topic || r.docId, text: r.problems.join('; ') }) }
+        }
+      } catch (e: any) {
+        st.errors += chunk.length
+        st.problems.push({ topic: `${chunk.length} record(s)`, text: e?.error?.error || e?.message || 'Request failed' })
+      }
+      st.done = Math.min(st.total, i + chunk.length)
+    }
+    st.running = false
+  }
+
+  stopVerifyAll() {
+    if (this.verifyAllState) this.verifyAllState.stop = true
+  }
+
+  // Verify found gaps and the server is backing them up right now.
+  isRepairing(record: any): boolean {
+    return record?.verification?.repairing === true && !['failed', 'partial_success'].includes(record?.status)
   }
 
   closeFileModel() {
+    this.actionMessage = null
     this.files = null
     this.activeRecord = null
     this.openRecordId = null

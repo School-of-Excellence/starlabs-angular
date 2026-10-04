@@ -291,7 +291,7 @@
             <th>Paid</th>
             <th *ngIf="showAfterApprovalChecks">Venue Fee</th>
             <th *ngIf="showApprovalChecks">Queue stage</th>
-            <th>{{ (segment==='noProduct' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
+            <th>{{ (segment==='noProduct' || segment==='addon' || segment==='inQueue') ? 'Reason' : (selectionMode==='attend' ? 'Attendance' : 'Status') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -361,9 +361,9 @@
             </td>
             <td>
               <!-- Reason (no product / in queue) -->
-              <ng-container *ngIf="segment==='noProduct' || segment==='inQueue'">
+              <ng-container *ngIf="segment==='noProduct' || segment==='inQueue' || segment === 'addon'">
                 <span class="sx-reason" [class.sx-reason-mut]="segment==='inQueue'">{{ row.reason }}</span>
-                <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="segment==='noProduct' && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
+                <button data-testid="pf-row-assign-product" mat-button class="sx-assign" *ngIf="(segment==='noProduct' ||  segment === 'addon') && !row.isOwner" (click)="assignProduct(row)">Assign product</button>
               </ng-container>
               <!-- Attendance (approved/attended/no-show) -->
               <ng-container *ngIf="selectionMode==='attend'">
@@ -393,7 +393,7 @@
                 <span class="sx-mut" *ngIf="!row.revokedBy && !row.revokedDate">· product cancelled</span>
               </span>
               <!-- Status (other segments) -->
-              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='inQueue' && segment!=='unattended' && segment!=='revoked' && selectionMode!=='attend'">
+              <span class="sx-mut" *ngIf="segment!=='noProduct' && segment!=='addon' && segment!=='inQueue' && segment!=='unattended' && segment!=='revoked' && selectionMode!=='attend'">
                 <ng-container *ngIf="segment==='overallRequested'; else stdStatus">{{ row.isUnattended ? 'unattended' : (row.isRevoked ? 'revoked' : (row.isApproved ? (row.attended ? 'attended' : 'approved') : 'requested')) }}</ng-container>
                 <ng-template #stdStatus>{{ segment==='eligible' ? 'ready' : (row.isNotRequested ? 'owns product' : (row.isRequested ? 'requested' : '')) }}</ng-template>
               </span>

@@ -10,14 +10,14 @@ import { of, throwError } from 'rxjs';
 import { ZoomMigrationService, ZoomRecording } from './zoom-migration.service';
 
 interface GetCall { url: string; opts: any; }
-interface PostCall { url: string; body: any; }
+interface PostCall { url: string; body: any; opts?: any; }
 
 const makeService = (getResult: any = { recordings: [] }, postResult: any = {}) => {
   const gets: GetCall[] = [];
   const posts: PostCall[] = [];
   const http: any = {
     get: (url: string, opts: any) => { gets.push({ url, opts }); return of(getResult); },
-    post: (url: string, body: any) => { posts.push({ url, body }); return of(postResult); },
+    post: (url: string, body: any, opts?: any) => { posts.push({ url, body, opts }); return of(postResult); },
   };
   return { svc: new ZoomMigrationService(http), gets, posts, http };
 };
@@ -126,6 +126,44 @@ describe('ZoomMigrationService', () => {
       svc.listRecordings('a', 'b');
       const configured = svc.folderOpenUrl('/x') !== '';
       expect(gets[0].url.startsWith('/api/')).toBe(!configured);
+    });
+  });
+  // =============================================================================================
+  // CNU-04 — verify / trash act on ONE backup doc by id
+  // =============================================================================================
+  describe('CNU-04 verify and trash', () => {
+    it('verify posts only the doc id to the verify endpoint', async () => {
+      const { svc, posts } = makeService({}, { success: true, status: 'completed', verification: { ok: true } });
+      await svc.verify('doc-1');
+      expect(posts[0].url).toContain('/api/zoom/verify');
+      expect(posts[0].body).toEqual({ docId: 'doc-1' });
+    });
+
+    it('trash posts only the doc id to the trash endpoint', async () => {
+      // One recording at a time: the body must never carry a list.
+      const { svc, posts } = makeService({}, { success: true });
+      await svc.trash('doc-2');
+      expect(posts[0].url).toContain('/api/zoom/trash');
+      expect(posts[0].body).toEqual({ docId: 'doc-2' });
+    });
+
+    it('sends no Authorization header when nobody is signed in (server then refuses)', async () => {
+      const { svc, posts } = makeService({}, { success: true });
+      await svc.trash('doc-3');
+      expect(posts[0].opts.headers.Authorization).toBeUndefined();
+    });
+
+    it('verifyBatch posts the list of doc ids to the batch endpoint', async () => {
+      const { svc, posts } = makeService({}, { success: true, results: [] });
+      await svc.verifyBatch(['a', 'b']);
+      expect(posts[0].url).toContain('/api/zoom/verify-batch');
+      expect(posts[0].body).toEqual({ docIds: ['a', 'b'] });
+    });
+
+    it('rejects when the server refuses to trash', async () => {
+      // A refused trash (e.g. verification failed) must surface as an error, never as success.
+      const http: any = { get: () => of({}), post: () => throwError(() => ({ status: 409, error: { error: 'Verification failed' } })) };
+      await expectAsync(new ZoomMigrationService(http).trash('doc-4')).toBeRejected();
     });
   });
 });
