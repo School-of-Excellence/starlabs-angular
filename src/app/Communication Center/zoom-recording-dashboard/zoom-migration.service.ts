@@ -33,7 +33,7 @@ export interface VerificationResult {
 export interface VerifyBatchResult {
   docId: string;
   topic: string;
-  result: 'verified' | 'repairing' | 'failed' | 'skipped' | 'error';
+  result: 'verified' | 'repairing' | 'failed' | 'skipped' | 'duplicate_removed' | 'error';
   problems: string[];
 }
 
@@ -81,6 +81,13 @@ export class ZoomMigrationService {
   async verifyBatch(docIds: string[]): Promise<{ success: boolean; results: VerifyBatchResult[] }> {
     return firstValueFrom(
       this.http.post<any>(`${this.base}/api/zoom/verify-batch`, { docIds }, { headers: await this.authHeaders() })
+    );
+  }
+
+  // Restart the backup of one record (stalled / failed / partial row).
+  async retry(docId: string): Promise<{ success: boolean; status?: string; keptDocId?: string; dispatch?: string }> {
+    return firstValueFrom(
+      this.http.post<any>(`${this.base}/api/zoom/retry`, { docId }, { headers: await this.authHeaders() })
     );
   }
 

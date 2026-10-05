@@ -160,6 +160,13 @@ describe('ZoomMigrationService', () => {
       expect(posts[0].body).toEqual({ docIds: ['a', 'b'] });
     });
 
+    it('retry posts only the doc id to the retry endpoint', async () => {
+      const { svc, posts } = makeService({}, { success: true });
+      await svc.retry('doc-9');
+      expect(posts[0].url).toContain('/api/zoom/retry');
+      expect(posts[0].body).toEqual({ docId: 'doc-9' });
+    });
+
     it('rejects when the server refuses to trash', async () => {
       // A refused trash (e.g. verification failed) must surface as an error, never as success.
       const http: any = { get: () => of({}), post: () => throwError(() => ({ status: 409, error: { error: 'Verification failed' } })) };
