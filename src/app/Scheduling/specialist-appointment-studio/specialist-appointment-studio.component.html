@@ -10,39 +10,1004 @@
         </label>
       }
       @for (n of nav; track n.tab) {
-        <button class="sas-nav-item" data-testid="sas-nav-item" [class.is-on]="tab === n.tab" [attr.aria-current]="tab === n.tab ? 'page' : null" (click)="go(n.tab)">
+        <button class="sas-nav-item" data-testid="sas-nav-item" [class.is-on]="tab === n.tab" [attr.aria-current]="tab === n.tab ? 'page' : null"
+          [attr.title]="n.label" [attr.aria-label]="n.label" (click)="go(n.tab)">
           <mat-icon>{{ n.icon }}</mat-icon><span>{{ n.label }}</span>
         </button>
       }
     </nav>
   }
   <main class="sas-main"><div class="sas-wrap">
+    @if (views.length > 1) {
+      <!-- icon-rail widths: View as sits above the page instead of in the nav -->
+      <label class="sas-viewas-compact">
+        <span>View as</span>
+        <select class="sas-sel" data-testid="sas-view-as-compact" [ngModel]="viewRole" (ngModelChange)="setView($event)">
+          @for (v of views; track v) { <option [ngValue]="v">{{ VIEW_LABEL[v] }}</option> }
+        </select>
+      </label>
+    }
     @if (loading) {
-      <app-sas-loader msg="Loading appointments…" />
+      <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading appointments…' }" />
     } @else if (!viewRole) {
       <section class="sas-card"><div class="sas-empty" data-testid="sas-no-role"><b>No appointment role</b>This screen is for CW specialists, mentors and the A&amp;H team.</div></section>
     } @else if (noProduct) {
       <div class="sas-phead"><div><h1 data-testid="sas-mentor-title">Mentor</h1></div></div>
       <section class="sas-card"><div class="sas-empty" data-testid="sas-no-product"><b>No product owner is assigned to you</b>Ask an admin to tick your product under Product Owner in the Profile list.</div></section>
     } @else {
-      <!-- keyed on the view, so switching View as re-creates the tabs with the new view's data -->
-      @for (v of [viewRole]; track v) {
-        @switch (tab) {
-          @case ('home') { <app-sas-home mode="self" /> }
-          @case ('team') { <app-sas-team /> }
-          @case ('overview') { <app-sas-home mode="all" /> }
-          @case ('mentors') { <app-sas-mentors /> }
-          @case ('util') { <app-sas-utilisation /> }
-          @case ('book') {
-            <div class="sas-phead"><div><h1 data-testid="sas-book-title">Book Session</h1><p>Book a participant into an open slot.</p></div></div>
-            <app-sas-filter-bar scope="all" [profileId]="profileId" (filterChange)="bookFilter = $event" />
-            <section class="sas-card sas-book-card" data-testid="sas-book">
-              <app-book-appointment [filterProductId]="bookFilter.productId" [filterTypeIds]="bookFilter.typeIds" />
-            </section>
-          }
-          @case ('settings') { <app-sas-settings /> }
-        }
-      }
+      @if (home; as h) { <ng-container *ngTemplateOutlet="homeTpl; context: { $implicit: h }" /> }
+      @if (team; as tm) { <ng-container *ngTemplateOutlet="teamTpl; context: { $implicit: tm }" /> }
+      @if (mentors; as mn) { <ng-container *ngTemplateOutlet="mentorsTpl; context: { $implicit: mn }" /> }
+      @if (util; as u) { <ng-container *ngTemplateOutlet="utilTpl; context: { $implicit: u }" /> }
+      @if (book; as b) { <ng-container *ngTemplateOutlet="bookTpl; context: { $implicit: b }" /> }
+      @if (settings; as st) { <ng-container *ngTemplateOutlet="settingsTpl; context: { $implicit: st }" /> }
     }
   </div></main>
 </div>
+
+<!-- ==================================================================================
+     Home (CW / Mentor) and Overview (A&H)
+     ================================================================================== -->
+<ng-template #homeTpl let-h>
+  <div class="sas-phead">
+    <div>
+      <h1 data-testid="sas-home-title">{{ h.mode === 'all' ? 'Overview' : h.greeting }}</h1>
+      <p>{{ h.subtitle }}</p>
+    </div>
+    <div class="sas-acts">
+      @if (h.picker) { <ng-container *ngTemplateOutlet="personTpl; context: { $implicit: h.picker }" /> }
+      <button class="sas-btn" data-testid="sas-home-add-availability" (click)="h.addAvailability()"><mat-icon>add</mat-icon>Add availability</button>
+    </div>
+  </div>
+
+  <div class="sas-stack">
+    <div class="sas-toolbar">
+      <ng-container *ngTemplateOutlet="filterBarTpl; context: { $implicit: h.filterBar }" />
+      <ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: h.bar }" />
+    </div>
+
+    @if (h.loading) {
+      <section class="sas-card"><ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading hours…' }" /></section>
+    } @else if (h.hours) {
+      @let hours = h.hours;
+      <div class="sas-stats" data-testid="sas-home-stats">
+        <div class="sas-stat" data-testid="sas-home-stat-available">
+          <div class="sas-sk"><mat-icon>schedule</mat-icon>Available</div><b>{{ fmtHours(hours.availMin) }}</b><small>Availability given</small>
+        </div>
+        <div class="sas-stat" data-testid="sas-home-stat-booked">
+          <div class="sas-sk"><mat-icon>event_available</mat-icon>Booked</div><b>{{ fmtHours(hours.bookedMin) }}</b><small>{{ fmtHours(h.openMin) }} still open to book</small>
+        </div>
+        <div class="sas-stat is-up" data-testid="sas-home-stat-delivered">
+          <div class="sas-sk"><mat-icon>check_circle</mat-icon>Delivered</div><b>{{ fmtHours(hours.deliveredMin) }}</b><small>{{ hours.completed }} completed session{{ hours.completed === 1 ? '' : 's' }}</small>
+        </div>
+        <div class="sas-stat is-warn" data-testid="sas-home-stat-unutilised">
+          <div class="sas-sk"><mat-icon>error_outline</mat-icon>Unutilised</div><b>{{ fmtHours(hours.unutilisedMin) }}</b><small>{{ fmtHours(hours.cancelledMin) }} cancelled</small>
+        </div>
+        <div class="sas-stat is-accent" data-testid="sas-home-stat-utilisation">
+          <div class="sas-sk"><mat-icon>track_changes</mat-icon>Utilisation</div><b>{{ hours.pct | number: '1.0-0' }}%</b><small>Delivered ÷ available</small>
+        </div>
+      </div>
+    }
+
+    <section class="sas-card" data-testid="sas-home-calendar">
+      <div class="sas-ch">
+        <h2>{{ h.mode === 'all' ? 'Calendar' : 'My calendar' }}</h2>
+        @if (h.period.mode === 'day' || h.slotMode) {
+          <div class="sas-ca">
+            <div class="sas-seg" role="group" aria-label="Slot order">
+              <button data-testid="sas-home-group-type" [class.is-on]="h.groupBy === 'type'" [attr.aria-pressed]="h.groupBy === 'type'" (click)="h.setGroup('type')">Group by type</button>
+              <button data-testid="sas-home-group-time" [class.is-on]="h.groupBy === 'time'" [attr.aria-pressed]="h.groupBy === 'time'" (click)="h.setGroup('time')">Sort by time</button>
+            </div>
+          </div>
+        }
+        <div class="sas-chs">
+          @if (h.allMode) { Every specialist's availability and sessions · {{ fmtHours(h.openMin) }} still open to book in this {{ h.period.mode }}. Pick a specialist above to see only theirs. }
+          @else { {{ fmtHours(h.openMin) }} still open to book in this {{ h.period.mode }}. Start times come from each delivery type's length. }
+        </div>
+      </div>
+      @if (h.loading) {
+        <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading calendar…' }" />
+      } @else if (h.period.mode === 'day') {
+        <!-- Day: one column per delivery type, listing open and booked slots (operator, 2026-10-01) -->
+        @if (!h.dayCols.length) {
+          <div class="sas-empty" data-testid="sas-home-day-empty"><b>No availability on this day</b>{{ h.isFutureDay(h.period.from) ? 'Add availability to open slots for booking.' : '' }}</div>
+        } @else {
+          <div class="sas-dcols" data-testid="sas-home-day-view">
+            @for (c of h.dayCols; track c.typeId) {
+              <div class="sas-wk-col sas-dcol" data-testid="sas-home-day-col">
+                @if (c.typeId) { <div class="sas-wk-h">{{ typeDuration(c.typeId) }}<b>{{ typeLabel(c.typeId) }}</b></div> }
+                @else { <div class="sas-wk-h">In time order<b>All delivery types</b></div> }
+                @for (e of c.entries; track $index) { <ng-container *ngTemplateOutlet="slotEntryTpl; context: { $implicit: e, h: h }" /> }
+              </div>
+            }
+          </div>
+        }
+        @if (h.isFutureDay(h.period.from)) {
+          <button class="sas-add-slot sas-dadd" data-testid="sas-home-day-add-availability" (click)="h.addAvailability(h.period.from)">+ Add availability on this day</button>
+        }
+      } @else if (h.period.mode === 'week' && h.slotMode) {
+        <!-- Filtered Week: slots, not windows, so booked / not booked never show the same item (operator, 2026-10-05) -->
+        <div class="sas-wk-wrap"><div class="sas-wk" data-testid="sas-home-slot-week">
+          @for (d of h.slotDays; track d.date.getTime(); let i = $index) {
+            <div class="sas-wk-col" [class.is-today]="h.isToday(d.date)">
+              <button class="sas-wk-h is-btn" data-testid="sas-home-day-open" (click)="h.gotoDay(d.date)" [attr.aria-label]="'Open ' + (d.date | date: 'fullDate')">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></button>
+              @if (!d.cols.length) { <div class="sas-wk-none">No matching slots</div> }
+              @for (c of d.cols; track c.typeId) {
+                @if (c.typeId) { <div class="sas-slot-grp" data-testid="sas-home-slot-group">{{ typeLabel(c.typeId) }}</div> }
+                @for (e of c.entries; track $index) { <ng-container *ngTemplateOutlet="slotEntryTpl; context: { $implicit: e, h: h }" /> }
+              }
+            </div>
+          }
+        </div></div>
+      } @else if (h.period.mode === 'week') {
+        <div class="sas-wk-wrap"><div class="sas-wk">
+          @for (d of h.days; track d.date.getTime(); let i = $index) {
+            <div class="sas-wk-col" [class.is-today]="h.isToday(d.date)">
+              <button class="sas-wk-h is-btn" data-testid="sas-home-day-open" (click)="h.gotoDay(d.date)" [attr.aria-label]="'Open ' + (d.date | date: 'fullDate')">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></button>
+              @if (!d.windows.length && !d.loose.length) { <div class="sas-wk-none">No availability</div> }
+              @for (x of d.windows; track x.w.id) {
+                <div class="sas-slot is-click" [class]="'sas-slot is-click s-' + x.state" data-testid="sas-home-window" role="button" tabindex="0"
+                  [matTooltip]="typeNames(x.w)" (click)="h.openWindow(x.w)" (keydown.enter)="h.openWindow(x.w)">
+                  @if (h.allMode) { <small class="sas-slot-who" data-testid="sas-home-window-who">{{ svc.name(x.w.profileId) }}</small> }
+                  <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
+                  <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}</small>
+                  <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
+                  @if (x.w.start > h.now) {
+                    <button class="sas-icon-btn sas-del" data-testid="sas-home-window-delete" (click)="h.deleteWindow(x.w, $event)" (keydown.enter)="$event.stopPropagation()" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
+                  }
+                </div>
+                @for (r of x.sessions; track r.appt.id) {
+                  <button class="sas-slot is-sess" [class]="'sas-slot is-sess ' + h.chipClass(r)" data-testid="sas-home-session" (click)="h.openDetail(r)">
+                    <b>{{ t(r.appt.start) }} – {{ t(r.appt.end) }}</b><small>{{ h.status(r) }}</small><small>{{ svc.name(r.appt.participantId) }} · {{ typeName(r) }}</small>
+                  </button>
+                }
+              }
+              @for (r of d.loose; track r.appt.id) {
+                <button class="sas-slot is-sess" [class]="'sas-slot is-sess ' + h.chipClass(r)" data-testid="sas-home-session" (click)="h.openDetail(r)">
+                  @if (h.allMode) { <small class="sas-slot-who">{{ h.hostNames(r) }}</small> }
+                  <b>{{ t(r.appt.start) }} – {{ t(r.appt.end) }}</b><small>{{ h.status(r) }}</small><small>{{ svc.name(r.appt.participantId) }} · {{ typeName(r) }}</small>
+                </button>
+              }
+              @if (h.isFutureDay(d.date)) {
+                <button class="sas-add-slot" data-testid="sas-home-day-add" (click)="h.addAvailability(d.date)">+ Add</button>
+              }
+            </div>
+          }
+        </div></div>
+      } @else {
+        <div class="sas-mg">
+          @for (n of DAYS; track n) { <div class="sas-mh">{{ n }}</div> }
+          @for (c of h.month; track c.date.getTime()) {
+            <button class="sas-mc" [class.is-out]="c.out" [class.is-today]="h.isToday(c.date)" data-testid="sas-home-month-day" (click)="h.gotoDay(c.date)" [attr.aria-label]="'Open ' + (c.date | date: 'fullDate')">
+              <span class="n">{{ c.date.getDate() }}</span>
+              @for (l of c.lines; track $index) { <span class="ln" [style.--dc]="l.color"><i></i><span>{{ l.label }}</span></span> }
+              @if (c.more) { <span class="ln">+{{ c.more }}</span> }
+            </button>
+          }
+        </div>
+        <p class="sas-fine">Select a day to open it.</p>
+      }
+    </section>
+
+    <section class="sas-card" data-testid="sas-home-avail">
+      <div class="sas-ch">
+        <h2>Availability</h2>
+        <div class="sas-ca">
+          <label class="sas-chk"><input type="checkbox" data-testid="sas-home-avail-all" [checked]="h.allSelected" [disabled]="!h.selectable.length || h.deleting" (change)="h.toggleAll()">Select all</label>
+          <button class="sas-btn is-danger" data-testid="sas-home-avail-delete" [disabled]="!h.selected.size || h.deleting" (click)="h.deleteSelected()">
+            <mat-icon>delete_outline</mat-icon>{{ h.deleting ? 'Deleting…' : 'Delete selected (' + h.selected.size + ')' }}
+          </button>
+        </div>
+        <div class="sas-chs">Availability in this {{ h.period.mode }}. Only future windows with nothing booked can be selected.</div>
+      </div>
+      @if (h.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading availability…' }" /> }
+      @else if (!h.availList.length) { <div class="sas-empty" data-testid="sas-home-avail-empty"><b>No availability in this {{ h.period.mode }}</b></div> }
+      @else {
+        <div class="sas-tw"><table class="sas-tbl">
+          <thead><tr><th class="sas-chk-col"><span style="font-size:0">Select</span></th><th>Date &amp; time</th>@if (h.allMode) {<th>Specialist</th>}<th>Delivery types</th><th>Status</th></tr></thead>
+          <tbody>
+            @for (w of h.availList; track w.id) {
+              <tr data-testid="sas-home-avail-row">
+                <td class="sas-chk-col"><input type="checkbox" data-testid="sas-home-avail-check" [checked]="h.selected.has(w.id)" [disabled]="!h.canDelete(w) || h.deleting"
+                  (change)="h.toggle(w)" [attr.aria-label]="'Select ' + (w.start | date: 'd MMM H:mm')"></td>
+                <td><b class="nw">{{ w.start | date: 'EEE, d MMM y' }}</b><small>{{ t(w.start) }} – {{ t(w.end) }}</small></td>
+                @if (h.allMode) { <td>{{ svc.name(w.profileId) }}</td> }
+                <td>{{ typeNames(w) }}</td>
+                <td><span class="sas-pill">{{ h.windowLabelOf(w) }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table></div>
+      }
+    </section>
+
+    <section class="sas-card" data-testid="sas-home-upcoming">
+      <div class="sas-ch"><h2>Upcoming sessions</h2></div>
+      @if (h.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading upcoming sessions…' }" /> }
+      @else if (!h.upcoming.length) { <div class="sas-empty"><b>No upcoming sessions</b>They appear here once someone books one of the start times.</div> }
+      @else {
+        <div class="sas-tw"><table class="sas-tbl">
+          <thead><tr><th>Date &amp; time</th><th>Session</th><th>Participant</th>@if (h.allMode) {<th>Specialist</th>}<th>Status</th><th>Join</th><th class="r"><span class="sas-muted" style="font-size:0">Actions</span></th></tr></thead>
+          <tbody>
+            @for (r of h.upcoming; track r.appt.id) {
+              <tr data-testid="sas-home-upcoming-row">
+                <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
+                <td>{{ typeName(r) }}</td>
+                <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
+                @if (h.allMode) { <td>{{ h.hostNames(r) }}</td> }
+                <td><span class="sas-pill" [class]="'sas-pill ' + h.pillClass(r)">{{ h.status(r) }}</span></td>
+                <td><span [matTooltip]="joinTip(r)"><button class="sas-link" data-testid="sas-home-join" [disabled]="!canJoin(r)" (click)="join(r)"><mat-icon>videocam</mat-icon>Join</button></span></td>
+                <td class="r">
+                  <button class="sas-icon-btn" data-testid="sas-home-upcoming-menu" [matMenuTriggerFor]="upMenu" aria-label="Actions"><mat-icon>more_horiz</mat-icon></button>
+                  <mat-menu #upMenu="matMenu">
+                    <button mat-menu-item data-testid="sas-home-menu-details" (click)="h.openDetail(r)"><mat-icon>info</mat-icon>View details</button>
+                    <button mat-menu-item data-testid="sas-home-menu-copy" (click)="copyZoom(r)"><mat-icon>content_copy</mat-icon>Copy Zoom link</button>
+                  </mat-menu>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table></div>
+      }
+    </section>
+
+    <section class="sas-card" data-testid="sas-home-past">
+      <div class="sas-ch">
+        <h2>Past sessions</h2>
+        <div class="sas-ca">
+          <select class="sas-sel" data-testid="sas-home-past-filter" aria-label="Filter past sessions by status" [(ngModel)]="h.pastFilter" (ngModelChange)="h.loadPast(true)">
+            <option value="pending">Status updation pending</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="sas-chs">
+          @if (h.pastFilter === 'pending') { Sessions that have ended and still need a status. Open one to mark it completed or cancelled. }
+          @else { Newest first. Use Load more to go further back. }
+        </div>
+      </div>
+      @if (h.pastLoading && !h.past.length) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading past sessions…' }" /> }
+      @else if (!h.past.length) {
+        <div class="sas-empty" data-testid="sas-home-past-empty"><b>{{ h.pastFilter === 'pending' ? 'Nothing waiting for a status' : 'No sessions with this status' }}</b></div>
+      } @else {
+        <div class="sas-tw"><table class="sas-tbl">
+          <thead><tr><th>Date &amp; time</th><th>Session</th><th>Participant</th>@if (h.allMode) {<th>Specialist</th>}<th>Length</th><th>Status</th><th class="r"><span style="font-size:0">Actions</span></th></tr></thead>
+          <tbody>
+            @for (r of h.past; track r.appt.id) {
+              <tr class="is-click" data-testid="sas-home-past-row" (click)="h.openDetail(r)">
+                <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
+                <td>{{ typeName(r) }}</td>
+                <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
+                @if (h.allMode) { <td>{{ h.hostNames(r) }}</td> }
+                <td class="nw">{{ fmtHours((r.appt.end.getTime() - r.appt.start.getTime()) / 60000) }}</td>
+                <td><span class="sas-pill" [class]="'sas-pill ' + h.pillClass(r)">{{ h.status(r) === 'Pending' ? 'Status pending' : h.status(r) }}</span>
+                  @if (h.reasonShown(r)) { <small>{{ r.appt.cancelledReason }}</small> }</td>
+                <td class="r">
+                  @if (h.status(r) === 'Pending') {
+                    <button class="sas-btn is-secondary" data-testid="sas-home-update-status" (click)="h.openDetail(r); $event.stopPropagation()">Update status</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table></div>
+        <div class="sas-more">
+          <span class="sas-muted">Showing {{ h.past.length }}{{ h.pastDone ? ' · that is all' : '' }}</span>
+          @if (h.pastLoading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading more…', sm: true }" /> }
+          @else if (!h.pastDone) { <button class="sas-btn is-secondary" data-testid="sas-home-past-more" (click)="h.loadPast(false)">Load more</button> }
+        </div>
+      }
+    </section>
+  </div>
+</ng-template>
+
+<!-- One slot (Day view and filtered Week): open → availability details, booked → the appointment -->
+<ng-template #slotEntryTpl let-e let-h="h">
+  <button class="sas-slot" [class]="h.entryClass(e)" data-testid="sas-home-slot" (click)="h.entryClick(e)">
+    @if (h.allMode) { <small class="sas-slot-who">{{ svc.name(e.profileId) }}</small> }
+    <b>{{ t(e.start) }} – {{ t(e.end) }}</b>
+    @if (h.groupBy === 'time') { <small>{{ typeLabel(e.typeId) }}</small> }
+    <small>{{ h.entryStatus(e) }}{{ e.appt ? ' · ' + svc.name(e.appt.participantId) : '' }}</small>
+  </button>
+  @if (h.entryRow(e); as row) {
+    @if (h.status(row) === 'Booked' || h.status(row) === 'In session') {
+      <span class="sas-djoin" [matTooltip]="joinTip(row)">
+        <button class="sas-link" data-testid="sas-home-slot-join" [disabled]="!canJoin(row)" (click)="join(row)"><mat-icon>videocam</mat-icon>Join</button>
+      </span>
+    }
+  }
+</ng-template>
+
+<!-- ==================================================================================
+     Mentor · My Team
+     ================================================================================== -->
+<ng-template #teamTpl let-tm>
+  <div class="sas-phead">
+    <div>
+      <h1 data-testid="sas-team-title">My Team</h1>
+      <p>
+        @if (tm.owned.length) { Your products, the appointment types in them and the EIS who deliver each one. }
+        @else { You are not a product owner yet. }
+      </p>
+    </div>
+    @if (tm.owned.length) {
+      <div class="sas-acts">
+        <input class="sas-search" type="search" data-testid="sas-team-search" placeholder="Search names" aria-label="Search names" [(ngModel)]="tm.q">
+      </div>
+    }
+  </div>
+  @if (tm.initialising) {
+    <section class="sas-card"><ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading your products…' }" /></section>
+  } @else if (!tm.owned.length) {
+    <section class="sas-card"><div class="sas-empty" data-testid="sas-team-no-products"><b>No products</b>Ask an admin to tick your product under Product Owner in the Profile list.</div></section>
+  } @else {
+    <div class="sas-stack">
+      <section class="sas-card" data-testid="sas-team-products">
+        <div class="sas-ch">
+          <h2>Your products ({{ tm.products.length }})</h2>
+          <div class="sas-chs">Select a product to see its appointment types and who holds the EIS role for each.</div>
+        </div>
+        @if (tm.loadingProducts) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading your products…' }" /> }
+        @else if (!tm.products.length) { <div class="sas-empty"><b>No products found</b>No product has an ATC model matching {{ tm.owned.join(', ') }}.</div> }
+        @else {
+          <div class="sas-tw"><table class="sas-tbl">
+            <thead><tr><th>Product</th><th>ATC model</th><th class="num">Appointment types</th><th class="num">EIS</th><th></th></tr></thead>
+            <tbody>
+              @for (p of tm.products; track p.id) {
+                @if (!tm.term || tm.productMatches(p)) {
+                  <tr class="is-click" data-testid="sas-team-product-row" tabindex="0" [attr.aria-expanded]="tm.isOpen(p)" (click)="tm.toggle(p.id)" (keydown.enter)="tm.toggle(p.id)">
+                    <td><b>{{ p.name }}</b></td>
+                    <td>{{ p.atcmodel }}</td>
+                    <td class="num">{{ p.types.length }}</td>
+                    <td class="num">{{ tm.eisCount(p) }}</td>
+                    <td class="r"><mat-icon>{{ tm.isOpen(p) ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+                  </tr>
+                  @if (tm.isOpen(p)) {
+                    <tr><td colspan="5" class="sas-sub" data-testid="sas-team-product-detail">
+                      @if (!p.types.length) {
+                        <div class="sas-empty"><b>No appointment types</b>This product's delivery sequence has no appointment steps.</div>
+                      } @else {
+                        <table class="sas-tbl">
+                          <thead><tr><th>Appointment type</th><th class="num">Length</th><th>Role</th><th>EIS</th></tr></thead>
+                          <tbody>
+                            @for (ty of p.types; track ty.id) {
+                              @if (!tm.term || tm.typeMatches(ty)) {
+                                @if (!ty.roles.length) {
+                                  <tr data-testid="sas-team-type-row"><td><b>{{ ty.name }}</b></td><td class="num">{{ fmtHours(ty.duration) }}</td><td colspan="2" class="sas-muted">No role mapped</td></tr>
+                                }
+                                @for (r of ty.roles; track r.id + r.kind; let first = $first) {
+                                  @if (!tm.term || tm.eisNames(r.eisIds).length) {
+                                    <tr data-testid="sas-team-type-row">
+                                      <td>@if (first || tm.term) { <b>{{ ty.name }}</b> }</td>
+                                      <td class="num">@if (first || tm.term) { {{ fmtHours(ty.duration) }} }</td>
+                                      <td>{{ r.name }}@if (r.kind === 'additional') { <small>Additional</small> }</td>
+                                      <td data-testid="sas-team-type-eis">
+                                        @if (tm.eisNames(r.eisIds).length) { {{ tm.eisNames(r.eisIds).join(', ') }} }
+                                        @else { <span class="sas-muted">No EIS assigned</span> }
+                                      </td>
+                                    </tr>
+                                  }
+                                }
+                              }
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </td></tr>
+                  }
+                }
+              }
+            </tbody>
+          </table></div>
+          @if (tm.term && !tm.anyProductMatch()) { <div class="sas-empty"><b>No one named "{{ tm.q }}"</b>in these products.</div> }
+        }
+      </section>
+
+      <div class="sas-toolbar"><span></span><ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: tm.bar }" /></div>
+      @if (tm.sum; as sum) {
+        <div class="sas-stats" data-testid="sas-team-stats">
+          <div class="sas-stat is-accent"><div class="sas-sk"><mat-icon>track_changes</mat-icon>Team utilisation</div><b>{{ sum.hours.pct | number: '1.0-0' }}%</b><small>Delivered ÷ available</small></div>
+          <div class="sas-stat is-up"><div class="sas-sk"><mat-icon>check_circle</mat-icon>Delivered</div><b>{{ fmtHours(sum.hours.deliveredMin) }}</b><small>Completed sessions</small></div>
+          <div class="sas-stat"><div class="sas-sk"><mat-icon>group</mat-icon>Participants</div><b>{{ sum.participants }}</b><small>Across {{ sum.members }} EIS</small></div>
+        </div>
+      }
+      <section class="sas-card">
+        <div class="sas-ch"><h2>Your team</h2><div class="sas-chs">Select someone to see the availability they gave and what is booked in it.</div></div>
+        @if (tm.table; as tt) { <ng-container *ngTemplateOutlet="teamTableTpl; context: { $implicit: tt }" /> }
+        @else { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading your team…' }" /> }
+      </section>
+    </div>
+  }
+</ng-template>
+
+<!-- Team table (My Team and an opened Mentors row) -->
+<ng-template #teamTableTpl let-tt>
+  @if (tt.loading) {
+    <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading availability and sessions…' }" />
+  } @else if (!tt.rows.length) {
+    <div class="sas-empty" data-testid="sas-tt-empty"><b>No team members</b>No EIS is mapped to the appointment types in these products' delivery sequences.</div>
+  } @else {
+    <div class="sas-tw"><table class="sas-tbl" data-testid="sas-tt-table">
+      <thead><tr>
+        <th>EIS</th><th>Status</th><th class="num">Available</th><th class="num">Booked</th><th class="num">Delivered</th>
+        <th class="num">Utilisation</th><th class="num">Participants</th><th class="num">Completed</th><th></th>
+      </tr></thead>
+      <tbody>
+        @for (r of tt.shown; track r.id) {
+          <tr class="is-click" data-testid="sas-tt-row" tabindex="0" [attr.aria-expanded]="tt.open === r.id" (click)="tt.toggle(r.id)" (keydown.enter)="tt.toggle(r.id)">
+            <td><div class="sas-who"><span class="sas-av" aria-hidden="true">{{ tt.initials(r.name) }}</span><b>{{ r.name }}</b></div></td>
+            <td><span class="sas-pill" [class]="'sas-pill ' + tt.statusClass(r.status)">{{ r.status }}</span></td>
+            <td class="num">{{ fmtHours(r.hours.availMin) }}</td>
+            <td class="num">{{ fmtHours(r.hours.bookedMin) }}</td>
+            <td class="num">{{ fmtHours(r.hours.deliveredMin) }}</td>
+            <td class="num"><div class="sas-util" [attr.title]="fmtHours(r.hours.deliveredMin) + ' delivered of ' + fmtHours(r.hours.availMin) + ' available'"><span class="sas-bar"><i [style.width.%]="pct(r.hours.pct)"></i></span><b>{{ r.hours.pct | number: '1.0-0' }}%</b></div></td>
+            <td class="num">{{ r.participants.length }}</td>
+            <td class="num">{{ r.hours.completed }}</td>
+            <td class="r"><mat-icon>{{ tt.open === r.id ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+          </tr>
+          @if (tt.open === r.id) {
+            <tr><td colspan="9" class="sas-sub" data-testid="sas-tt-detail">
+              <div class="sas-sub-bar">
+                <b class="sas-sub-h">Availability given · {{ r.avail.length }} window{{ r.avail.length === 1 ? '' : 's' }} · {{ fmtHours(r.hours.availMin) }} · {{ fmtHours(r.hours.deliveredMin) }} delivered ({{ r.hours.pct | number: '1.0-0' }}%)</b>
+                @if (r.avail.length) {
+                  <select class="sas-sel" data-testid="sas-tt-status-filter" aria-label="Filter availability by status" [(ngModel)]="tt.availFilter" (click)="$event.stopPropagation()">
+                    <option value="">All statuses ({{ r.avail.length }})</option>
+                    @for (st of WINDOW_STATUSES; track st) {
+                      <option [value]="st" [disabled]="!tt.statusCount(r, st)">{{ st }} ({{ tt.statusCount(r, st) }})</option>
+                    }
+                  </select>
+                }
+              </div>
+              @if (!r.avail.length && !r.outside.length) {
+                <div class="sas-empty" data-testid="sas-tt-no-avail"><b>No availability in this period</b></div>
+              } @else {
+                <table class="sas-tbl" data-testid="sas-tt-avail">
+                  <thead><tr><th>Date &amp; time</th><th>Delivery types</th><th>Status</th><th>Booked: time · appointment type · participant</th></tr></thead>
+                  <tbody>
+                    @for (a of tt.filteredAvail(r); track a.w.id) {
+                      <tr data-testid="sas-tt-avail-row">
+                        <td><b class="nw">{{ a.w.start | date: 'EEE d MMM' }}</b><small>{{ a.w.start | date: 'shortTime' }} – {{ a.w.end | date: 'shortTime' }}</small></td>
+                        <td>{{ typeNames(a.w) }}</td>
+                        <td><span class="sas-pill" [class]="'sas-pill ' + WINDOW_PILL[a.status]" data-testid="sas-tt-avail-status">{{ a.status }}</span>
+                          <small>{{ fmtHours((a.w.end.getTime() - a.w.start.getTime()) / 60000) }} given{{ a.openMin > 0 ? ' · ' + fmtHours(a.openMin) + ' still open' : '' }}</small></td>
+                        <td>
+                          @if (!a.sessions.length) { <span class="sas-muted">Nothing booked</span> }
+                          @for (x of a.sessions; track x.appt.id) {
+                            <div class="sas-bk" data-testid="sas-tt-booking">
+                              <span class="nw">{{ x.appt.start | date: 'shortTime' }} – {{ x.appt.end | date: 'shortTime' }}</span>
+                              <b>{{ typeName(x) }}</b> · {{ svc.name(x.appt.participantId) }}
+                              <span class="sas-pill" [class]="'sas-pill ' + tt.apptPill(x)">{{ tt.apptLabel(x) }}</span>
+                            </div>
+                          }
+                        </td>
+                      </tr>
+                    }
+                    @if (tt.availFilter && !tt.filteredAvail(r).length) {
+                      <tr><td colspan="4"><div class="sas-empty"><b>No windows with this status</b></div></td></tr>
+                    }
+                    @if (r.outside.length && !tt.availFilter) {
+                      <tr data-testid="sas-tt-outside-row">
+                        <td><b>Outside availability</b><small>Booked without a window</small></td>
+                        <td></td><td></td>
+                        <td>
+                          @for (x of r.outside; track x.appt.id) {
+                            <div class="sas-bk" data-testid="sas-tt-booking">
+                              <span class="nw">{{ x.appt.start | date: 'd MMM, shortTime' }} – {{ x.appt.end | date: 'shortTime' }}</span>
+                              <b>{{ typeName(x) }}</b> · {{ svc.name(x.appt.participantId) }}
+                              <span class="sas-pill" [class]="'sas-pill ' + tt.apptPill(x)">{{ tt.apptLabel(x) }}</span>
+                            </div>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </td></tr>
+          }
+        }
+      </tbody>
+    </table></div>
+    @if (!tt.shown.length) { <div class="sas-empty" data-testid="sas-tt-no-match"><b>No one named "{{ tt.q }}"</b>in this team or their participants.</div> }
+  }
+</ng-template>
+
+<!-- ==================================================================================
+     A&H · Mentors
+     ================================================================================== -->
+<ng-template #mentorsTpl let-mn>
+  <div class="sas-phead"><div>
+    <h1 data-testid="sas-mentors-title">Mentors</h1>
+    <p>Each mentor with the products they own, their EIS team, and how the team performed.</p>
+  </div></div>
+  <div class="sas-stack">
+    <div class="sas-toolbar"><span></span><ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: mn.bar }" /></div>
+    <section class="sas-card">
+      <div class="sas-ch"><h2>All mentors</h2><div class="sas-chs">Team utilisation counts the mentor and their EIS. Select a mentor to see the team.</div></div>
+      @if (mn.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading mentors and their teams…' }" /> }
+      @else if (!mn.rows.length) { <div class="sas-empty"><b>No mentors</b>Nobody has the mentor role yet.</div> }
+      @else {
+        <div class="sas-tw"><table class="sas-tbl" data-testid="sas-mentors-table">
+          <thead><tr><th>Mentor</th><th>Products</th><th class="num">EIS</th><th class="num">Participants</th><th class="num">Team utilisation</th><th class="num">Delivered</th><th></th></tr></thead>
+          <tbody>
+            @for (r of mn.rows; track r.m.profileId) {
+              <tr class="is-click" data-testid="sas-mentors-row" tabindex="0" [attr.aria-expanded]="mn.open === r.m.profileId" (click)="mn.toggle(r)" (keydown.enter)="mn.toggle(r)">
+                <td><b>{{ r.m.name }}</b></td>
+                <td>{{ r.m.productowner.length ? r.m.productowner.join(', ') : '—' }}</td>
+                <td class="num">{{ r.team.memberIds.length }}</td>
+                <td class="num">{{ r.participants }}</td>
+                <td class="num"><div class="sas-util"><span class="sas-bar"><i [style.width.%]="pct(r.hours.pct)"></i></span><b>{{ r.hours.pct | number: '1.0-0' }}%</b></div></td>
+                <td class="num">{{ fmtHours(r.hours.deliveredMin) }}</td>
+                <td class="r"><mat-icon>{{ mn.open === r.m.profileId ? 'expand_less' : 'expand_more' }}</mat-icon></td>
+              </tr>
+              @if (mn.open === r.m.profileId && mn.table) {
+                <tr><td colspan="7" class="sas-sub" data-testid="sas-mentors-team">
+                  <ng-container *ngTemplateOutlet="teamTableTpl; context: { $implicit: mn.table }" />
+                </td></tr>
+              }
+            }
+          </tbody>
+          <tfoot><tr><td>{{ mn.rows.length }} mentors</td><td></td><td class="num">{{ mn.totalEis }}</td><td class="num"></td><td class="num">{{ mn.total.pct | number: '1.0-0' }}%</td><td class="num">{{ fmtHours(mn.total.deliveredMin) }}</td><td></td></tr></tfoot>
+        </table></div>
+      }
+    </section>
+  </div>
+</ng-template>
+
+<!-- ==================================================================================
+     A&H · Utilisation
+     ================================================================================== -->
+<ng-template #utilTpl let-u>
+  <div class="sas-phead"><div>
+    <h1 data-testid="sas-util-title">Utilisation</h1>
+    <p>How each specialist's available hours turned into delivered sessions.</p>
+  </div></div>
+  <div class="sas-stack">
+    <div class="sas-filters">
+      <ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: u.bar }" />
+      <select class="sas-sel" data-testid="sas-util-role" aria-label="Role" [(ngModel)]="u.role">
+        <option value="">Mentors and CWs</option><option value="mentor">Mentors</option><option value="cw">CW specialists</option>
+      </select>
+      <select class="sas-sel" data-testid="sas-util-product" aria-label="Product" [(ngModel)]="u.product" (ngModelChange)="u.onProduct()">
+        <option value="">All products</option>
+        @for (p of u.products; track p) { <option [value]="p">{{ p }}</option> }
+      </select>
+      <input class="sas-search" type="search" data-testid="sas-util-search" placeholder="Search specialist" aria-label="Search specialist" [(ngModel)]="u.q">
+    </div>
+    @if (!u.loading && !u.productLoading) {
+      <div class="sas-stats" data-testid="sas-util-stats">
+        <div class="sas-stat is-accent"><div class="sas-sk"><mat-icon>track_changes</mat-icon>Utilisation</div><b>{{ u.total.pct | number: '1.0-0' }}%</b><small>{{ fmtHours(u.total.deliveredMin) }} of {{ fmtHours(u.total.availMin) }}</small></div>
+        <div class="sas-stat"><div class="sas-sk"><mat-icon>event_available</mat-icon>Booked</div><b>{{ fmtHours(u.total.bookedMin) }}</b><small>Booked slot time</small></div>
+        <div class="sas-stat is-warn"><div class="sas-sk"><mat-icon>error_outline</mat-icon>Unutilised</div><b>{{ fmtHours(u.total.unutilisedMin) }}</b><small>{{ fmtHours(u.total.cancelledMin) }} cancelled</small></div>
+      </div>
+    }
+    <section class="sas-card">
+      <div class="sas-ch"><h2>By specialist</h2><div class="sas-chs">Utilisation is delivered hours ÷ available hours.</div></div>
+      @if (u.loading || u.productLoading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: u.productLoading ? 'Finding the team for this product…' : 'Loading utilisation…' }" /> }
+      @else if (!u.shown.length) { <div class="sas-empty"><b>No specialists match</b>Change the filters or the search.</div> }
+      @else {
+        <div class="sas-tw"><table class="sas-tbl" data-testid="sas-util-table">
+          <thead><tr><th>Specialist</th><th class="num">Available</th><th class="num">Booked</th><th class="num">Delivered</th><th class="num">Unutilised</th><th class="num">Cancelled</th><th class="num">Utilisation</th></tr></thead>
+          <tbody>
+            @for (r of u.shown; track r.s.profileId) {
+              <tr data-testid="sas-util-row">
+                <td><b>{{ r.s.name }}</b><small>{{ r.s.role === 'mentor' ? 'Mentor' : 'CW Specialist' }}</small></td>
+                <td class="num">{{ fmtHours(r.h.availMin) }}</td><td class="num">{{ fmtHours(r.h.bookedMin) }}</td>
+                <td class="num">{{ fmtHours(r.h.deliveredMin) }}</td><td class="num">{{ fmtHours(r.h.unutilisedMin) }}</td>
+                <td class="num">{{ fmtHours(r.h.cancelledMin) }}</td>
+                <td class="num"><div class="sas-util"><span class="sas-bar"><i [style.width.%]="pct(r.h.pct)"></i></span><b>{{ r.h.pct | number: '1.0-0' }}%</b></div></td>
+              </tr>
+            }
+          </tbody>
+          <tfoot><tr>
+            <td>{{ u.shown.length }} specialists</td><td class="num">{{ fmtHours(u.total.availMin) }}</td><td class="num">{{ fmtHours(u.total.bookedMin) }}</td>
+            <td class="num">{{ fmtHours(u.total.deliveredMin) }}</td><td class="num">{{ fmtHours(u.total.unutilisedMin) }}</td>
+            <td class="num">{{ fmtHours(u.total.cancelledMin) }}</td><td class="num">{{ u.total.pct | number: '1.0-0' }}%</td>
+          </tr></tfoot>
+        </table></div>
+      }
+    </section>
+  </div>
+</ng-template>
+
+<!-- ==================================================================================
+     A&H · Book Session: Calendar (default) or By participant
+     ================================================================================== -->
+<ng-template #bookTpl let-b>
+  <div class="sas-phead"><div><h1 data-testid="sas-book-title">Book Session</h1><p>Book a participant into an open slot.</p></div></div>
+  <div class="sas-toolbar">
+    <ng-container *ngTemplateOutlet="filterBarTpl; context: { $implicit: b.filterBar }" />
+    <div class="sas-seg" role="group" aria-label="How to book">
+      <button data-testid="sas-book-mode-calendar" [class.is-on]="b.mode === 'calendar'" [attr.aria-pressed]="b.mode === 'calendar'" (click)="b.mode = 'calendar'">Calendar</button>
+      <button data-testid="sas-book-mode-participant" [class.is-on]="b.mode === 'participant'" [attr.aria-pressed]="b.mode === 'participant'" (click)="b.mode = 'participant'">By participant</button>
+    </div>
+  </div>
+  @if (b.mode === 'calendar') {
+    <section class="sas-card sas-book-card" data-testid="sas-bookcal">
+      <div class="sas-ch">
+        <h2>Open slots</h2>
+        <div class="sas-ca">
+          <div class="sas-seg" role="group" aria-label="Slot order">
+            <button data-testid="sas-bookcal-group-type" [class.is-on]="b.groupBy === 'type'" [attr.aria-pressed]="b.groupBy === 'type'" (click)="b.setGroup('type')">Group by type</button>
+            <button data-testid="sas-bookcal-group-time" [class.is-on]="b.groupBy === 'time'" [attr.aria-pressed]="b.groupBy === 'time'" (click)="b.setGroup('time')">Sort by time</button>
+          </div>
+        </div>
+        <div class="sas-chs">Click a slot to book a participant into it.</div>
+      </div>
+      <div class="sas-toolbar sas-mb"><span></span><ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: b.bar }" /></div>
+      @if (!b.ready) {
+        <div class="sas-empty" data-testid="sas-bookcal-pick"><b>Pick a product and a delivery type</b>Open slots appear here once both are picked above.</div>
+      } @else if (b.loading) {
+        <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Finding open slots…' }" />
+      } @else {
+        @if (b.noRoles.length) { <p class="sas-fine" data-testid="sas-bookcal-no-roles">No roles are set up for {{ b.noRoles.join(', ') }}, so it has no slots.</p> }
+        <div class="sas-wk-wrap">
+          <div [class]="b.bar.period.mode === 'day' ? 'sas-dcols' : 'sas-wk'" data-testid="sas-bookcal-grid">
+            @for (d of b.days; track d.date.getTime()) {
+              @if (b.bar.period.mode === 'week') {
+                <div class="sas-wk-col" [class.is-today]="isToday(d.date)">
+                  <button class="sas-wk-h is-btn" data-testid="sas-bookcal-day-open" (click)="b.openDay(d.date)">{{ d.date | date: 'EEE' }}<b>{{ d.date | date: 'd MMM' }}</b></button>
+                  @if (!d.groups.length) { <div class="sas-wk-none">No open slots</div> }
+                  @for (g of d.groups; track g.typeId) {
+                    @if (g.typeId) { <div class="sas-slot-grp">{{ typeLabel(g.typeId) }}</div> }
+                    @for (x of g.slots; track $index) {
+                      <button class="sas-slot s-open" data-testid="sas-bookcal-slot" (click)="b.pick(x.typeId, x.slot)">
+                        <b>{{ t(x.slot.start) }} – {{ t(x.slot.end) }}</b>
+                        @if (!g.typeId) { <small>{{ typeLabel(x.typeId) }}</small> }
+                        <small>with {{ x.slot.specialist }}</small>
+                      </button>
+                    }
+                  }
+                </div>
+              } @else {
+                @if (!d.groups.length) { <div class="sas-empty" data-testid="sas-bookcal-day-empty"><b>No open slots on this day</b></div> }
+                @for (g of d.groups; track g.typeId) {
+                  <div class="sas-wk-col sas-dcol">
+                    @if (g.typeId) { <div class="sas-wk-h">{{ typeDuration(g.typeId) }}<b>{{ typeLabel(g.typeId) }}</b></div> }
+                    @else { <div class="sas-wk-h">In time order<b>All delivery types</b></div> }
+                    @for (x of g.slots; track $index) {
+                      <button class="sas-slot s-open" data-testid="sas-bookcal-slot" (click)="b.pick(x.typeId, x.slot)">
+                        <b>{{ t(x.slot.start) }} – {{ t(x.slot.end) }}</b>
+                        @if (!g.typeId) { <small>{{ typeLabel(x.typeId) }}</small> }
+                        <small>with {{ x.slot.specialist }}</small>
+                      </button>
+                    }
+                  </div>
+                }
+              }
+            }
+          </div>
+        </div>
+      }
+    </section>
+  } @else {
+    <section class="sas-card sas-book-card" data-testid="sas-book">
+      <app-book-appointment [filterProductId]="b.filter.productId" [filterTypeIds]="b.filter.typeIds" />
+    </section>
+  }
+</ng-template>
+
+<!-- ==================================================================================
+     A&H · Delivery Type Details
+     ================================================================================== -->
+<ng-template #settingsTpl let-st>
+  <div class="sas-phead"><div>
+    <h1 data-testid="sas-settings-title">Delivery Type Details</h1>
+    <p>Delivery types and their length. Start times are cut from these lengths. This page is view only.</p>
+  </div></div>
+  <section class="sas-card">
+    <div class="sas-ch">
+      <h2>Delivery types ({{ st.shown.length }})</h2>
+      <div class="sas-ca"><input class="sas-search" type="search" data-testid="sas-settings-search" placeholder="Search delivery type" aria-label="Search delivery type" [(ngModel)]="st.q"></div>
+    </div>
+    @if (st.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading delivery types…' }" /> } @else {
+      <div class="sas-tw"><table class="sas-tbl" data-testid="sas-settings-table">
+        <thead><tr><th>Delivery type</th><th class="num">Length</th><th>Group</th><th>Change work</th></tr></thead>
+        <tbody>
+          @for (r of st.shown; track r.id) {
+            <tr data-testid="sas-settings-row">
+              <td><b>{{ r.name }}</b></td>
+              <td class="num">{{ fmtHours(r.duration) }}</td>
+              <td>{{ r.group ? 'Yes' + (r.maxbooking ? ' · up to ' + r.maxbooking : '') : '—' }}</td>
+              <td>{{ r.changework ? 'Required' : '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
+    }
+  </section>
+</ng-template>
+
+<!-- ==================================================================================
+     Shared pieces
+     ================================================================================== -->
+<!-- Inline loader: the Material spinner plus a line of text -->
+<ng-template #loaderTpl let-msg="msg" let-sm="sm">
+  <div class="sas-loader" [class.is-sm]="sm" role="status" aria-live="polite" data-testid="sas-loader">
+    <mat-progress-spinner mode="indeterminate" color="primary" [diameter]="sm ? 20 : 36" [strokeWidth]="sm ? 2.5 : 3.5" />
+    @if (msg) { <span>{{ msg }}</span> }
+  </div>
+</ng-template>
+
+<!-- Day / Week / Month · previous / next · Today -->
+<ng-template #periodBarTpl let-pb>
+  <div class="sas-filters">
+    <div class="sas-pnav">
+      <button class="sas-icon-btn" data-testid="sas-period-prev" (click)="pb.shift(-1)" [attr.aria-label]="'Previous ' + pb.period.mode"><mat-icon>chevron_left</mat-icon></button>
+      <span data-testid="sas-period-label">{{ periodLabel(pb.period) }}</span>
+      <button class="sas-icon-btn" data-testid="sas-period-next" (click)="pb.shift(1)" [attr.aria-label]="'Next ' + pb.period.mode"><mat-icon>chevron_right</mat-icon></button>
+    </div>
+    <div class="sas-seg" role="group">
+      @if (pb.allowDay) {
+        <button data-testid="sas-period-day" [class.is-on]="pb.period.mode === 'day'" [attr.aria-pressed]="pb.period.mode === 'day'" (click)="pb.setMode('day')">Day</button>
+      }
+      <button data-testid="sas-period-week" [class.is-on]="pb.period.mode === 'week'" [attr.aria-pressed]="pb.period.mode === 'week'" (click)="pb.setMode('week')">Week</button>
+      @if (pb.allowMonth) {
+        <button data-testid="sas-period-month" [class.is-on]="pb.period.mode === 'month'" [attr.aria-pressed]="pb.period.mode === 'month'" (click)="pb.setMode('month')">Month</button>
+      }
+    </div>
+    <button class="sas-btn is-secondary" data-testid="sas-period-today" (click)="pb.today()">Today</button>
+  </div>
+</ng-template>
+
+<!-- Product · Delivery types · (Booked / Not booked) -->
+<ng-template #filterBarTpl let-fb>
+  <div class="sas-filters" data-testid="sas-filter-bar">
+    <select class="sas-sel sas-fsel" data-testid="sas-filter-product" aria-label="Product" [disabled]="fb.loading"
+      [(ngModel)]="fb.productId" (ngModelChange)="fb.onProduct()">
+      <option [ngValue]="null">{{ fb.loading ? 'Loading products…' : 'All products' }}</option>
+      @for (p of fb.products; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }
+    </select>
+    <mat-select class="sas-mselect sas-fsel" data-testid="sas-filter-types" multiple placeholder="All delivery types"
+      panelClass="sas-mselect-panel" aria-label="Delivery types" [disabled]="fb.loading"
+      [(ngModel)]="fb.typeIds" (selectionChange)="fb.emit()">
+      @for (ty of fb.shownTypes; track ty.id) {
+        <mat-option [value]="ty.id" data-testid="sas-filter-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option>
+      }
+    </mat-select>
+    @if (fb.showBooked) {
+      <div class="sas-seg" role="group" aria-label="Booked or not booked">
+        <button data-testid="sas-filter-booked-all" [class.is-on]="fb.booked === 'all'" [attr.aria-pressed]="fb.booked === 'all'" (click)="fb.setBooked('all')">All</button>
+        <button data-testid="sas-filter-booked-booked" [class.is-on]="fb.booked === 'booked'" [attr.aria-pressed]="fb.booked === 'booked'" (click)="fb.setBooked('booked')">Booked</button>
+        <button data-testid="sas-filter-booked-open" [class.is-on]="fb.booked === 'open'" [attr.aria-pressed]="fb.booked === 'open'" (click)="fb.setBooked('open')">Not booked</button>
+      </div>
+    }
+    @if (fb.active) {
+      <button class="sas-link" data-testid="sas-filter-clear" (click)="fb.clear()"><mat-icon>close</mat-icon>Clear</button>
+    }
+    @if (fb.productId && !fb.typeIds.length) {
+      <span class="sas-muted" data-testid="sas-filter-no-types">This product has no delivery types you can give.</span>
+    }
+  </div>
+</ng-template>
+
+<!-- Searchable person dropdown -->
+<ng-template #personTpl let-pp>
+  <mat-select class="sas-mselect sas-psel" data-testid="sas-person-select" panelClass="sas-mselect-panel" [placeholder]="pp.placeholder"
+    [attr.aria-label]="pp.label" [disabled]="pp.disabled" [ngModel]="pp.value" (ngModelChange)="pp.pick($event)">
+    <mat-option>
+      <ngx-mat-select-search data-testid="sas-person-search" [(ngModel)]="pp.q" [placeholderLabel]="'Search names'"
+        [noEntriesFoundLabel]="'No matching names'" ngDefaultControl />
+    </mat-option>
+    @if (pp.allLabel !== null) { <mat-option value="" data-testid="sas-person-all">{{ pp.allLabel }}</mat-option> }
+    @for (p of pp.shown; track p.id) {
+      <mat-option [value]="p.id" data-testid="sas-person-option">{{ p.name }}{{ p.sub ? ' · ' + p.sub : '' }}</mat-option>
+    }
+  </mat-select>
+</ng-template>
+
+<!-- ==================================================================================
+     Dialogs (opened as TemplateRefs; the .sas-dialog box is the wrapper)
+     ================================================================================== -->
+<ng-template #addTpl>
+  @if (add; as a) {
+    <div class="sas-dialog" data-testid="sas-add-root">
+      <h2 data-testid="sas-add-title">Add availability</h2>
+      <p class="sas-dsub">Give the dates and time you can take sessions. Participants and the A&amp;H team book from it.</p>
+
+      @if (a.picker) {
+        <span class="sas-lbl">Specialist</span>
+        <ng-container *ngTemplateOutlet="personTpl; context: { $implicit: a.picker }" />
+      }
+
+      @if (a.blocked) {
+        <div class="sas-err" data-testid="sas-add-blocked">The last appointment '{{ a.blocked }}' Status is not updated by the specialist. Please update to proceed.</div>
+      }
+
+      @if (!a.profileId) {
+        <div class="sas-empty" data-testid="sas-add-pick-first"><b>Choose a specialist</b>Their delivery types, dates and slots appear once you pick who the availability is for.</div>
+      } @else {
+        <span class="sas-lbl">How to add it</span>
+        <div class="sas-mode" role="group" aria-label="How to add availability">
+          <button type="button" data-testid="sas-add-mode-auto" [class.is-on]="a.mode === 'auto'" [attr.aria-pressed]="a.mode === 'auto'" (click)="a.mode = 'auto'">
+            <b>Auto configuration</b>
+            <small>Give a time range. Start times are created automatically every 30 minutes for each delivery type, each as long as that type's duration, and only where the whole session fits.</small>
+          </button>
+          <button type="button" data-testid="sas-add-mode-static" [class.is-on]="a.mode === 'static'" [attr.aria-pressed]="a.mode === 'static'" (click)="a.mode = 'static'">
+            <b>Static</b>
+            <small>Add your own slots for the day. Pick a delivery type and a start time for each; it ends after that type's duration. Only those slots are created.</small>
+          </button>
+        </div>
+
+        <span class="sas-lbl">Delivery types</span>
+        @if (a.loadingTypes) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading delivery types…', sm: true }" /> }
+        @else if (!a.types.length) { <p class="sas-fine">No delivery types are mapped to this specialist's EIS roles.</p> }
+        @else if (a.mode === 'static') {
+          <p class="sas-fine" style="margin-top:0">In Static, pick the delivery type on each slot below.</p>
+        } @else {
+          <div class="sas-chips">
+            <button type="button" class="sas-chip is-all" data-testid="sas-add-type-all" [class.is-on]="a.allPicked" [attr.aria-pressed]="a.allPicked" (click)="a.toggleAllTypes()">Select all</button>
+            @for (ty of a.types; track ty.path) {
+              <button type="button" class="sas-chip" data-testid="sas-add-type" [class.is-on]="a.picked.has(ty.path)" [attr.aria-pressed]="a.picked.has(ty.path)" (click)="a.toggleType(ty)">{{ ty.name }} · {{ fmtHours(ty.duration) }}</button>
+            }
+          </div>
+        }
+
+        <span class="sas-lbl">Dates</span>
+        <div class="sas-rc" data-testid="sas-add-calendar">
+          <div class="sas-rc-head">
+            <button type="button" class="sas-icon-btn" data-testid="sas-add-month-prev" (click)="a.shiftMonth(-1)" [disabled]="!a.canGoBack()" aria-label="Previous month"><mat-icon>chevron_left</mat-icon></button>
+            <span>{{ a.monthAnchor | date: 'MMMM y' }}</span>
+            <button type="button" class="sas-icon-btn" data-testid="sas-add-month-next" (click)="a.shiftMonth(1)" aria-label="Next month"><mat-icon>chevron_right</mat-icon></button>
+          </div>
+          <div class="sas-rc-g">
+            @for (n of a.DAYS; track n) { <span>{{ n }}</span> }
+            @for (d of a.monthCells(); track $index) {
+              @if (d) {
+                <button type="button" class="sas-rc-d" data-testid="sas-add-day" [class.is-in]="a.inRange(d)" [class.is-edge]="a.isEdge(d)" [class.is-today]="a.isToday(d)"
+                  [disabled]="d < a.today" (click)="a.pickDay(d)" [attr.aria-pressed]="a.inRange(d)" [attr.aria-label]="d | date: 'fullDate'">{{ d.getDate() }}</button>
+              } @else { <i></i> }
+            }
+          </div>
+        </div>
+        <p class="sas-fine" data-testid="sas-add-dates-summary">
+          @if (!a.from) { Pick the first day, then the last day. }
+          @else if (a.picking) { From {{ a.from | date: 'EEE d MMM' }}. Now pick the last day, or pick the same day again for one day. }
+          @else { {{ a.dates().length }} day{{ a.dates().length === 1 ? '' : 's' }}: {{ a.from | date: 'EEE d MMM' }}{{ a.dates().length > 1 ? ' – ' + (a.to | date: 'EEE d MMM') : '' }}. }
+        </p>
+
+        @if (a.mode === 'static') {
+          <span class="sas-lbl">Slots per day</span>
+          @if (!a.dates().length || a.picking) {
+            <p class="sas-fine" style="margin-top:0">Pick the dates above first. Each date gets its own slots.</p>
+          } @else {
+            @for (d of a.dates(); track d.getTime(); let di = $index) {
+              <div class="sas-day" data-testid="sas-add-day-block">
+                <div class="sas-day-h">
+                  <b data-testid="sas-add-day-title">{{ d | date: 'EEE, d MMM' }}</b>
+                  <span class="sas-muted">{{ a.rowsFor(d).length }} slot{{ a.rowsFor(d).length === 1 ? '' : 's' }}</span>
+                  @if (di === 0 && a.dates().length > 1) {
+                    <button type="button" class="sas-link" data-testid="sas-add-copy-all" (click)="a.copyToAll()"><mat-icon>content_copy</mat-icon>Copy these slots to all {{ a.dates().length }} days</button>
+                  }
+                </div>
+                @if (!a.rowsFor(d).length) { <p class="sas-fine" style="margin:0 0 8px">No slots on this day.</p> }
+                @for (r of a.rowsFor(d); track $index; let i = $index) {
+                  <div class="sas-srow" data-testid="sas-add-slot-row">
+                    <span class="sas-srow-n">{{ i + 1 }}</span>
+                    <div class="sas-srow-type">
+                      <span>Delivery type</span>
+                      @if (a.loadingTypes) {
+                        <span class="sas-srow-note">Loading types…</span>
+                      } @else if (!a.types.length) {
+                        <span class="sas-srow-note">No delivery types are mapped to this specialist's EIS roles</span>
+                      } @else {
+                        <mat-select class="sas-mselect" data-testid="sas-add-slot-type" placeholder="Choose a type" panelClass="sas-mselect-panel"
+                          [(ngModel)]="r.typePath" [attr.aria-label]="'Delivery type for slot ' + (i + 1)">
+                          @for (ty of a.types; track ty.path) {
+                            <mat-option [value]="ty.path" data-testid="sas-add-slot-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option>
+                          }
+                        </mat-select>
+                      }
+                    </div>
+                    <label>Starts<input class="sas-ctl" type="time" data-testid="sas-add-slot-start" [(ngModel)]="r.start"></label>
+                    <div class="sas-srow-end"><span>Ends</span><b data-testid="sas-add-slot-end">{{ a.rowEnd(r) }}</b></div>
+                    <button type="button" class="sas-icon-btn" data-testid="sas-add-slot-remove" (click)="a.removeRow(d, i)" [attr.aria-label]="'Remove slot ' + (i + 1)"><mat-icon>delete_outline</mat-icon></button>
+                  </div>
+                }
+                <button type="button" class="sas-btn is-secondary" data-testid="sas-add-slot-add" (click)="a.addRow(d)"><mat-icon>add</mat-icon>Add slot</button>
+              </div>
+            }
+            <p class="sas-fine">{{ a.slotCount() }} slot{{ a.slotCount() === 1 ? '' : 's' }} across {{ a.dates().length }} day{{ a.dates().length === 1 ? '' : 's' }}. Each slot ends after its delivery type's duration and is saved as its own availability.</p>
+          }
+        } @else {
+          <span class="sas-lbl">Time</span>
+          <div class="sas-range">
+            <label>From<input class="sas-ctl" type="time" data-testid="sas-add-start" [(ngModel)]="a.startTime"></label>
+            <label>To<input class="sas-ctl" type="time" data-testid="sas-add-end" [(ngModel)]="a.endTime"></label>
+          </div>
+        }
+
+        @if (a.mode === 'auto' && a.picked.size && a.windowMin() > 0) {
+          <span class="sas-lbl">Start times each day</span>
+          @for (p of a.preview(); track p.t.path) {
+            <div class="sas-prev" [class.is-bad]="!p.fits" data-testid="sas-add-preview">
+              <b>{{ p.t.name }} · {{ fmtHours(p.t.duration) }}{{ p.fits ? ' · ' + p.starts.length + ' start time' + (p.starts.length === 1 ? '' : 's') : '' }}</b>
+              @if (p.fits) {
+                <div class="sas-opts">@for (s of p.starts; track s.getTime()) { <span>{{ s | date: 'shortTime' }}</span> }</div>
+              } @else {
+                <span>Needs {{ fmtHours(p.t.duration) }} and this time is {{ fmtHours(a.windowMin()) }}. Widen the time or drop it.</span>
+              }
+            </div>
+          }
+          <p class="sas-fine">Once a start time is booked, the start times that overlap it close automatically.</p>
+        }
+      }
+
+      @if (a.error) { <div class="sas-err" role="alert" data-testid="sas-add-error">{{ a.error }}</div> }
+
+      <div class="sas-dfoot">
+        @if (a.saving) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Saving availability…', sm: true }" /> }
+        <button type="button" class="sas-btn is-secondary" data-testid="sas-add-cancel" (click)="a.close()" [disabled]="a.saving">Cancel</button>
+        <button type="button" class="sas-btn" data-testid="sas-add-save" (click)="a.save()" [disabled]="a.saving || !!a.blocked || !a.profileId">{{ a.saving ? 'Saving…' : 'Save availability' }}</button>
+      </div>
+    </div>
+  }
+</ng-template>
+
+<ng-template #windowTpl>
+  @if (win; as wd) {
+    <div class="sas-dialog" data-testid="sas-window-dialog">
+      <h2>Availability details</h2>
+      <p class="sas-dsub" data-testid="sas-window-when">
+        {{ wd.w.start | date: 'EEEE, d MMM y' }} · {{ wd.w.start | date: 'H:mm' }} – {{ wd.w.end | date: 'H:mm' }} · {{ svc.name(wd.w.profileId) }}
+      </p>
+      <span class="sas-pill" data-testid="sas-window-status">{{ wd.status }}</span>
+
+      <span class="sas-lbl">Delivery types</span>
+      <div class="sas-tw"><table class="sas-tbl" data-testid="sas-window-types">
+        <thead><tr><th>Type</th><th class="num">Length</th><th class="num">Slots given</th><th class="num">Booked</th><th class="num">Still open</th></tr></thead>
+        <tbody>
+          @for (ty of wd.types; track ty.id) {
+            <tr data-testid="sas-window-type-row">
+              <td><b>{{ ty.name }}</b></td><td class="num">{{ fmtHours(ty.duration) }}</td>
+              <td class="num">{{ ty.given }}</td><td class="num">{{ ty.booked }}</td><td class="num">{{ ty.open }}</td>
+            </tr>
+          }
+        </tbody>
+      </table></div>
+
+      <span class="sas-lbl">Bookings</span>
+      @if (!wd.sessions.length) { <p class="sas-muted" data-testid="sas-window-no-bookings">Nothing booked in this window.</p> }
+      @for (r of wd.sessions; track r.appt.id) {
+        <button class="sas-slot is-sess" data-testid="sas-window-booking" (click)="wd.ref?.close(r)">
+          <b>{{ r.appt.start | date: 'H:mm' }} – {{ r.appt.end | date: 'H:mm' }} · {{ typeName(r) }}</b>
+          <small>{{ svc.name(r.appt.participantId) }} · {{ wd.statusOf(r) }}</small>
+        </button>
+      }
+
+      <div class="sas-dfoot">
+        @if (wd.canDelete) {
+          <button class="sas-btn is-danger" data-testid="sas-window-delete" (click)="wd.ref?.close('delete')"><mat-icon>delete_outline</mat-icon>Delete</button>
+        }
+        <button class="sas-btn is-secondary" data-testid="sas-window-close" (click)="wd.ref?.close()">Close</button>
+      </div>
+    </div>
+  }
+</ng-template>
+
+<ng-template #bookSlotTpl>
+  @if (bookSlot; as bs) {
+    <div class="sas-dialog" data-testid="sas-bookslot-dialog">
+      <h2>Book {{ bs.typeName }}</h2>
+      <p class="sas-dsub" data-testid="sas-bookslot-when">
+        {{ bs.data.slot.start | date: 'EEEE, d MMM y' }} · {{ bs.data.slot.start | date: 'H:mm' }} – {{ bs.data.slot.end | date: 'H:mm' }}
+        · with {{ bs.data.slot.specialist }}
+      </p>
+      <span class="sas-lbl">Participant</span>
+      @if (bs.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Finding participants who can take this slot…', sm: true }" /> }
+      @else if (!bs.picker?.people?.length) {
+        <div class="sas-empty" data-testid="sas-bookslot-none"><b>No participant can take this slot</b>
+          Nobody has this product active with {{ bs.typeName }} ready{{ bs.excluded ? ', or their assigned specialists differ' : '' }}.</div>
+      } @else {
+        <ng-container *ngTemplateOutlet="personTpl; context: { $implicit: bs.picker }" />
+        <p class="sas-fine" data-testid="sas-bookslot-count">{{ bs.picker.people.length }} participant{{ bs.picker.people.length === 1 ? '' : 's' }} can take this slot.
+          @if (bs.excluded) { {{ bs.excluded }} more have it ready but are assigned to other specialists. }</p>
+      }
+      <div class="sas-dfoot">
+        @if (bs.saving) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Booking…', sm: true }" /> }
+        <button class="sas-btn is-secondary" data-testid="sas-bookslot-cancel" [disabled]="bs.saving" (click)="bs.ref?.close(false)">Cancel</button>
+        <button class="sas-btn" data-testid="sas-bookslot-book" [disabled]="bs.saving || !bs.participantId" (click)="bs.book()">Book</button>
+      </div>
+    </div>
+  }
+</ng-template>

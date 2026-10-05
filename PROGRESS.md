@@ -1,37 +1,30 @@
 # PROGRESS — StarLabs (atctranscription)
 
-_Last updated: 2026-10-01 (specialist studio testing round 1)_
+_Last updated: 2026-10-05 (specialist studio testing round 2)_
 · **New session? Read `specs/ORIENTATION.md` first**, then
-`specs/journals/2026-10-01-specialist-studio-testing-round1.md`.
+`specs/journals/2026-10-05-specialist-studio-testing-round2.md`.
 
 ## Current state
-- Branch `feature-test`: `/specialistappointmentstudio` is pushed up to `5f480f98`. Other sessions' commits
-  on top of it (participant-intelligence, participants-analytics, bigcohorts) have their own journals.
-- Round-1 testing fixes are **uncommitted** in the working tree. The dev build is clean and 78/78 studio specs pass.
-- `starlabs-cloud-function`: unchanged. Nothing is deployed.
+- Branch `feature-test`: round 2 is pushed. The studio is now **one component** (tab and dialog logic as plain
+  classes, shared bits and dialogs as `<ng-template>`s). Dev build clean; 90/90 studio + book-appointment specs.
+- Other sessions' work on this branch (segment-board, participant-intelligence) has its own journals.
+- `starlabs-cloud-function`: unchanged. Nothing deployed.
 
-## Last session changes (2026-10-01)
-- Went through the testing report one item at a time; the decisions are in
-  `specs/plans/2026-10-01-specialist-studio-testing-round1.md`.
-- Built:
-  - **Time format:** `50 min`, `1h 10m`.
-  - **Range calendar:** the selected date shows immediately (a hover-specificity bug).
-  - **Calendar windows:** hovering shows the types; clicking opens an Availability details dialog.
-  - **Views:** Day · Week · Month on Home and Overview, Today opens Day mode, and Day has one column of
-    slots per type.
-  - **Filters:** product and type on Home and Book Session (a product ticks its types); Booked / Not
-    booked on Home only (the stats ignore it).
-  - **Bulk delete:** a select-all list of unbooked windows.
-  - **Join:** opens 5 minutes before the start and closes at the end.
-  - **Rename:** Settings → Delivery Type Details.
-- Parked: responsive layout, Edit availability (no edit; delete and re-add), pre-assigning specialists,
-  and the participant tracker.
-- Failure and its root cause: the Home specs hung. An in-zone `setInterval` (the Join clock) stopped
-  `whenStable` from settling. Fixed by running the clock outside the zone.
+## Last session changes (2026-10-05)
+- Testing report round 2, all 8 points (plan: `specs/plans/2026-10-05-specialist-studio-testing-round2.md`):
+  - **Filters:** a product limits the type list ("Delivery types"). Any filter switches Week to slots, so
+    Booked and Not booked no longer overlap. Group by type / Sort by time.
+  - **Pickers and layout:** searchable specialist pickers; an icon-rail layout for tablet.
+  - **Collaborative sessions:** they now show for every host (the calendar was deduping them to one window).
+  - **Book Session:** has a Calendar mode. Open slots → pick a participant → Book, through the new shared
+    `AppointmentBookingService` that Book Appointment now also uses.
+  - **Add availability:** Select all delivery types.
+- Then, on the operator's request, merged the 15 components into one; all hooks now use the `sas-` prefix.
+- Failure, root cause: the team-table spec started failing on its own because its fake depended on today's
+  date. The fake is fixed. During the merge, an `@for` track expression read a template alias and threw.
 
 ## Pending
-- Commit and push of round 1: waiting for the operator.
-- Live check as CW, Mentor and A&H on starlabs-test (the preview needs a login).
-- e2e suite for the studio (prefixes: sas, sah, saa, sap, sal, stt, stm, smn, sut, sst, saf, saw).
+- Live check on starlabs-test (needs a login), including a real Book-calendar booking.
+- e2e suite for the studio (single `sas-` prefix).
 - `dashboard` access entries for `specialistappointmentstudio` and `appointment-status-update`.
 - Cloud Function deploys are blocked on Java 21 (installed: 17).

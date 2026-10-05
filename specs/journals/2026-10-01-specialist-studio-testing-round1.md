@@ -65,3 +65,6 @@ New `sap` hook: `sap-day`.
 | Book Session filter | shell template + `bookFilter`; `book-appointment` `filterProductId`/`filterTypeIds`, `shownProducts`/`shownAppointments`, `ngOnChanges` | drop the inputs; template back to `journey.products` / `product.appointment` |
 | Bulk delete | Home `sah-avail` section, `canDelete`/`toggleAll`/`deleteSelected` | delete the section and methods |
 | Join timing | `joinOpen` in logic; Home `clock`, `canJoin`, `joinTip`, guard in `join()` | remove the guard and the `[disabled]` |
+
+## Next: testing report round 2 (2026-10-05)
+See `specs/journals/2026-10-05-specialist-studio-testing-round2.md`.

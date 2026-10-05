@@ -51,7 +51,8 @@ export function unionMinutes(list: Interval[]): number {
 }
 
 /* An availability window as the screen uses it: the doc's own time plus its per-type slot arrays. */
-export interface Slot { typeId: string; start: Date; end: Date; booked: boolean; available: boolean; }
+/* index = position in the doc's per-type slot array (what booking writes back to). */
+export interface Slot { typeId: string; start: Date; end: Date; booked: boolean; available: boolean; index?: number; }
 export interface AvailWindow { id: string; profileId: string; start: Date; end: Date; typeIds: string[]; slots: Slot[]; }
 
 export const windowMinutes = (w: AvailWindow) => minutesBetween(w.start, w.end);
@@ -281,18 +282,30 @@ export function dayColumns(wins: AvailWindow[], sessions: Appt[], now: Date, boo
   const used = new Set<string>(), live = sessions.filter(a => !a.cancelled);
   for (const w of wins) for (const s of w.slots) {
     if (!s.booked && !bookable(s, now)) continue;
-    const appt = s.booked ? live.find(a => !used.has(a.id) && a.typeId === s.typeId && a.hostIds.includes(w.profileId)
+    // Once per host: a collaborative session fills each host's booked slot.
+    const appt = s.booked ? live.find(a => !used.has(a.id + '|' + w.profileId) && a.typeId === s.typeId && a.hostIds.includes(w.profileId)
       && a.start.getTime() === s.start.getTime()) ?? null : null;
-    if (appt) used.add(appt.id);
+    if (appt) used.add(appt.id + '|' + w.profileId);
     add({ start: s.start, end: s.end, profileId: w.profileId, typeId: s.typeId, w, appt, booked: s.booked });
   }
-  for (const a of live) if (!used.has(a.id) && a.typeId) {
+  const placed = new Set([...used].map(k => k.split('|')[0]));
+  for (const a of live) if (!placed.has(a.id) && a.typeId) {
     add({ start: a.start, end: a.end, profileId: a.hostIds[0] ?? '', typeId: a.typeId, w: null, appt: a, booked: true });
   }
   const keep = (e: DayEntry) => booked === 'all' || (booked === 'booked') === e.booked;
   return [...cols.entries()]
     .map(([typeId, entries]) => ({ typeId, entries: entries.filter(keep).sort((a, b) => a.start.getTime() - b.start.getTime()) }))
     .filter(c => c.entries.length);
+}
+
+/* Group by type: one column per type, ordered by label. Sort by time: a single column (typeId '')
+   holding every slot in time order (operator, 2026-10-05). */
+export type SlotGrouping = 'type' | 'time';
+export function groupColumns(cols: DayColumn[], by: SlotGrouping, label: (typeId: string) => string): DayColumn[] {
+  if (by === 'type') return [...cols].sort((a, b) => label(a.typeId).localeCompare(label(b.typeId)));
+  const entries = cols.flatMap(c => c.entries).sort((a, b) => a.start.getTime() - b.start.getTime()
+    || label(a.typeId).localeCompare(label(b.typeId)) || a.profileId.localeCompare(b.profileId));
+  return entries.length ? [{ typeId: '', entries }] : [];
 }
 
 /* ---------- Join ---------- */

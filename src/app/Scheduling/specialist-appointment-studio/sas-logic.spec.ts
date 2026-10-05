@@ -2,7 +2,7 @@ import {
   resolveViewRole, unionMinutes, bookedMinutes, hoursSummary, previewSlots, apptStatus,
   windowState, periodOf, shiftPeriod, overlapsAny, AvailWindow, Appt, NO_SHOW_REASON,
   openMinutes, availStatus, windowLabel, windowStatus, availableViews,
-  fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot,
+  fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot, groupColumns,
 } from './sas-logic';
 
 const T = (h: number, m = 0) => new Date(2026, 8, 28, h, m);
@@ -259,6 +259,31 @@ describe('sas-logic', () => {
       expect(joinOpen(a, T(9, 55))).toBeTrue();
       expect(joinOpen(a, T(10, 59))).toBeTrue();
       expect(joinOpen(a, T(11))).toBeFalse();
+    });
+  });
+
+  describe('round 2 (2026-10-05)', () => {
+    const sl = (typeId: string, h: number, booked = false): Slot =>
+      ({ typeId, start: T(h), end: T(h + 1), booked, available: !booked });
+
+    it('a collaborative session fills the booked slot of every host', () => {
+      const a = win({ id: 'wa', profileId: 'diag', typeIds: ['a'], slots: [sl('a', 9, true)] });
+      const b = win({ id: 'wb', profileId: 'impl', typeIds: ['a'], slots: [sl('a', 9, true)] });
+      const s = appt({ id: 'joint', start: T(9), end: T(10), typeId: 'a', hostIds: ['diag', 'impl'] });
+      const entries = dayColumns([a, b], [s], T(8))[0].entries;
+      expect(entries.length).toBe(2);
+      expect(entries.every(e => e.appt?.id === 'joint')).toBeTrue();
+    });
+
+    it('groupColumns: by type ordered by label, or one list in time order', () => {
+      const w = win({ slots: [sl('b', 9), sl('a', 10), sl('a', 8)] });
+      const cols = dayColumns([w], [], T(7));
+      const label = (id: string) => ({ a: 'Zeta', b: 'Alpha' } as any)[id];
+      expect(groupColumns(cols, 'type', label).map(c => c.typeId)).toEqual(['b', 'a']);
+      const time = groupColumns(cols, 'time', label);
+      expect(time.length).toBe(1);
+      expect(time[0].typeId).toBe('');
+      expect(time[0].entries.map(e => e.start.getHours())).toEqual([8, 9, 10]);
     });
   });
 

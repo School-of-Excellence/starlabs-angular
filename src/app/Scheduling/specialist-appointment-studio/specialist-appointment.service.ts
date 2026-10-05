@@ -23,6 +23,17 @@ const chunk = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length 
 /* Data access for the Specialist Appointment Studio. It reads the same collections the existing
    Scheduling screens use (availability, appointments, Roles-To-EIS, AppointmentType-To-Roles,
    productToDeliverySequence, users_roles) and never writes anything except availability. */
+/* Every specialist on a session: hosts plus anyone listed under hostRole (role path → profile refs).
+   Collaborative sessions (e.g. EI Diagnostics + EI Implementation) must reach every host (operator, 2026-10-05). */
+export function hostIdsOf(d: any): string[] {
+  const ids = (d?.['hosts'] ?? []).map((h: any) => h?.id).filter(Boolean);
+  Object.values(d?.['hostRole'] ?? {}).forEach((list: any) => (Array.isArray(list) ? list : []).forEach((h: any) => {
+    const id = typeof h === 'string' ? h.split('/').pop() : h?.id;
+    if (id && !ids.includes(id)) ids.push(id);
+  }));
+  return ids;
+}
+
 @Injectable()
 export class SpecialistAppointmentService {
   profileId = '';
@@ -72,8 +83,8 @@ export class SpecialistAppointmentService {
   /* ---------- Availability ---------- */
   private parseWindow(id: string, d: any): AvailWindow {
     const typeIds: string[] = (d['appointments'] ?? []).map((r: any) => r.id);
-    const slots = typeIds.flatMap(t => (d[t] ?? []).map((s: any) => ({
-      typeId: t, start: toDate(s.slotstart)!, end: toDate(s.slotend)!, booked: !!s.booked, available: !!s.available,
+    const slots = typeIds.flatMap(t => (d[t] ?? []).map((s: any, index: number) => ({
+      typeId: t, start: toDate(s.slotstart)!, end: toDate(s.slotend)!, booked: !!s.booked, available: !!s.available, index,
     })));
     return { id, profileId: d['profileref']?.id ?? '', start: toDate(d['starttime'])!, end: toDate(d['endtime'])!, typeIds, slots };
   }
@@ -102,7 +113,7 @@ export class SpecialistAppointmentService {
     return {
       id, start: toDate(d['starttime'])!, end: toDate(d['endtime'])!,
       attended: d['attended'] === true, cancelled: d['cancelled'] === true, cancelledReason: d['cancelledreason'] ?? null,
-      hostIds: (d['hosts'] ?? []).map((h: any) => h.id), participantId: d['bookedby']?.id ?? null,
+      hostIds: hostIdsOf(d), participantId: d['bookedby']?.id ?? null,
       typeId: d['appointment']?.id ?? null, productId: d['productid'] ?? null, zoomUrl: d['zoomdata']?.['join_url'] ?? null,
     };
   }
