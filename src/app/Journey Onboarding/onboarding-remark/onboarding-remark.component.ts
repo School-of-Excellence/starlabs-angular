@@ -18,6 +18,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const FIXED_JOURNEY_ID      = 'SOORkBYIzPKbrFEcXzeQ';
@@ -128,9 +129,9 @@ export class OnboardingRemarkComponent {
   participantEmailProfileMap: Record<string, string> = {};
 
   // ── Package / Product maps & bonus ───────────────────────────────────────
-  mapPackage: Record<string, string> = {};   
-  mapProduct: Record<string,Object> = {};  
-  mapJourney: Record<string,Object> = {};   
+  mapPackage: Record<string, string> = {};
+  mapProduct: Record<string,Object> = {};
+  mapJourney: Record<string,Object> = {};
   bonusProducts: string[] = [];
   bonusLoading: boolean = false;
   mailAttachments: Array<Object> = [];
@@ -146,6 +147,7 @@ export class OnboardingRemarkComponent {
     public dialogRef: MatDialogRef<any>,
     private dialog: MatDialog,
     private firestore: Firestore,
+    private storage: Storage,
     public guard: AuthguardService,
     private sanitizer: DomSanitizer,
     private elRef: ElementRef,
@@ -166,7 +168,7 @@ export class OnboardingRemarkComponent {
 
     docData(doc(this.firestore,'classify','postmarkserver')).subscribe((senders)=>{
       console.log('Sender Emails:',senders);
-      
+
       this.fromEmails = senders['senderemails'] || [
         'starlabs@excellenceinstallation.com',
         'support@intl.soexcellence.com'
@@ -328,7 +330,7 @@ export class OnboardingRemarkComponent {
     this.bonusProducts   = [];
     this.mailAttachments = [];
     this.buildPreview();
-    this.extractAttachments();  
+    this.extractAttachments();
     this.resolveBonusProducts();
   }
 
@@ -380,7 +382,7 @@ export class OnboardingRemarkComponent {
   //     this.mailattachments.push(journeyAttchements);
   //     this.bonusProducts = bonusNames;
   //     console.log('Attachments',this.mailattachments);
-      
+
   //   } catch (err) {
   //     console.error('resolveBonusProducts error:', err);
   //   } finally {
@@ -484,7 +486,7 @@ export class OnboardingRemarkComponent {
       this.bonusLoading = false;
       this.buildPreview();
     }
-  } 
+  }
 
   // ── Attachments ───────────────────────────────────────────────────────────
 
@@ -777,7 +779,7 @@ export class OnboardingRemarkComponent {
       },
     };
     console.log("EMail Archive",map);
-    
+
     await setDoc(archiveRef, map);
     console.log('Email Archive Created:', docid, '| emailMap:', emailMap);
   }
@@ -914,28 +916,37 @@ export class OnboardingRemarkComponent {
     this.mailAttachments = this.mailAttachments.filter((a: any) => a['_id'] !== id);
   }
 
-  onAddAttachment(event: Event) {
+  async onAddAttachment(event: Event) {
     const input = event.target as HTMLInputElement;
     if (!input.files?.length) return;
-    Array.from(input.files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const existing = this.mailAttachments as any[];
-        // Avoid duplicates by name
-        if (existing.find(a => a.name === file.name)) return;
+
+    for (const file of Array.from(input.files)) {
+      const existing = this.mailAttachments as any[];
+      // Avoid duplicates by name
+      if (existing.find(a => a.name === file.name)) continue;
+
+      const id = `manual_${file.name}_${Date.now()}`;
+      const storageRef = ref(this.storage, `email-attachments/${id}`);
+
+      try {
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+
         existing.push({
           name:     file.name,
           size:     file.size,
           type:     file.type,
-          url:      reader.result as string,   // data URL for preview
+          url:      downloadUrl,
           _source:  'manual',
-          _id:      `manual_${file.name}_${Date.now()}`,
+          _id:      id,
         });
         // Trigger CD — replace reference so Angular detects change
         this.mailAttachments = [...existing];
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('onAddAttachment upload error:', err);
+        alert(`Failed to upload "${file.name}". Please try again.`);
+      }
+    }
     // Reset input so same file can be re-added after removal
     input.value = '';
   }
@@ -1192,11 +1203,11 @@ export class OnboardingRemarkComponent {
 //         if (this.upgrade) value['opportunities'].push('Upgrade');
 //         if (this.referral) value['opportunities'].push('Referral');
 //         if (this.addon) value['opportunities'].push('Add-on');
-        
+
 //         this.salesleadsData['referral'] = this.participantjourneyproduct['referral'].toLowerCase() == 'Yes' ? true : false ;
 //         value['salesleadsData'] = JSON.parse(JSON.stringify(this.salesleadsData));
 //         value['journeytype'] = this.participantjourneyproduct['journeytype'] || null
-        
+
 //         this.dialogRef.close(value);
 //       }
 

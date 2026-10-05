@@ -3936,7 +3936,8 @@ export class JourneycoachDashboardComponent {
   }
 
   getProductName(row: any): string {
-    const refs = row['productref'];
+    const saleId = row['_sid'] ?? row['docid'] ?? row['id'];
+    const refs = row['productref'] ?? (saleId ? this.saleProductRefs[saleId] : null);
     const list = Array.isArray(refs) ? refs : (refs ? [refs] : []);
     const names = list.map((r: any) => this.mapproductname[r?.id]).filter((n: any) => !!n);
     return names.length ? names.join(', ') : '-';
