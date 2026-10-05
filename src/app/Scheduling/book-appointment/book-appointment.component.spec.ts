@@ -16,6 +16,7 @@ describe('BookAppointmentComponent', () => {
       getRoles: () => new Promise(() => {}),        // no profile picked in these tests
       getAppointmentMap: () => Promise.resolve({ map: {} }),
       getProductMap: () => Promise.resolve({}),
+      getAppointmentRolesMap: () => Promise.resolve({ map: {} }),
       getProfileMap: () => Promise.resolve({ list: [], map: {} }),
     };
     await TestBed.configureTestingModule({

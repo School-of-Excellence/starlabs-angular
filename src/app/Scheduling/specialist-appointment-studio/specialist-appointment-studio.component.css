@@ -268,3 +268,7 @@
   .sas-fsel, .sas-psel { min-width:180px; }
   .sas-srow-type { flex-basis:100%; }
 }
+/* why a delivery type has nothing to book (Book Session calendar) */
+.sas-note { display:flex; gap:8px; align-items:flex-start; margin:0 0 10px; padding:10px 13px; border-radius:var(--bt-r-sm);
+  background:var(--bt-warning-tint); color:var(--bt-ink); font-size:13px; line-height:1.45; }
+.sas-note mat-icon { width:18px; height:18px; font-size:18px; color:var(--bt-warning-deep, var(--bt-warning)); flex-shrink:0; }

@@ -103,3 +103,20 @@ The screen was 15 components. It is now **one**, `SpecialistAppointmentStudioCom
 - **Revert guide:** the rows above now point at the classes and templates of the same names inside
   `specialist-appointment-studio.component.{ts,html}`. To undo only the merge, restore the folder from
   `8955e7e0` (round 1) and reapply round 2 from this journal.
+
+## Why nothing can be booked: name the roles (operator, 2026-10-05)
+For a delivery type with several required roles (for example EI Diagnostics + EI Implementation), the
+booking screens only said "No EIS are available", "EIS Slots not available…" or "No open slots", and
+never named the role that was missing. `slotGapMessage` (in `appointment-booking.service.ts`) now
+builds one message everywhere a session is booked:
+- Book Appointment (`/bookappointment`) and Book Session → By participant: the same alerts, with new text.
+- Book Session → Calendar: a note above the slots for each picked type that has nothing to book.
+
+It names, in this order:
+1. the type has no roles set up;
+2. a role nobody is mapped to;
+3. the roles with no open slots in the date or week;
+4. for a collaborative type, roles that have slots but never at the same start with different people.
+
+Revert: restore the three `alert("…")` strings in `book-appointment.component.ts` and the old
+`noRoles` line in the Book calendar.

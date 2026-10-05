@@ -14,6 +14,29 @@ export interface TypeRoles { required: string[]; additional: string[]; eis: Reco
 export interface Bookable { participantId: string; target: BookTarget; mapped: Record<string, any> | null; }
 
 const minuteOf = (d: Date) => Math.floor(new Date(d).getTime() / 60000);
+const an = (w: string) => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
+const listOf = (xs: string[]) => xs.length < 2 ? (xs[0] ?? '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+
+/* Why a delivery type has nothing to book, naming the roles (operator, 2026-10-05). Used wherever a
+   session is booked: Book Appointment, and the studio's Book Session (both modes).
+   freeRoles = the roles that have at least one free slot in the range; when = "on 7 Oct", "this week", or ''. */
+export function slotGapMessage(typeName: string, roles: string[], rolePersons: Record<string, string[]>,
+    freeRoles: Set<string>, roleName: (rolePath: string) => string, when = ''): string {
+  if (!roles.length) return `${typeName} has no roles set up, so it can't be booked. Ask an admin to map roles to it.`;
+  const at = when ? ' ' + when : '';
+  const head = roles.length > 1
+    ? `${typeName} needs ${roles.length} specialists at the same time: ${listOf(roles.map(roleName))}.`
+    : `${typeName} needs ${an(roleName(roles[0]))} specialist.`;
+  const noPeople = roles.filter(r => !(rolePersons[r] ?? []).length);
+  if (noPeople.length) return `${head} No specialist is mapped to ${listOf(noPeople.map(roleName))}. Ask an admin to map one.`;
+  const noSlots = roles.filter(r => !freeRoles.has(r));
+  if (noSlots.length) {
+    const names = noSlots.map(roleName);
+    return `${head} ${listOf(names)} ${names.length === 1 ? 'has' : 'have'} no open slots${at}. Ask ${names.length === 1 ? an(names[0]) : 'those'} specialist${names.length === 1 ? '' : 's'} to add availability.`;
+  }
+  if (roles.length > 1) return `${head} Their open slots never start at the same time${at}, with a different person for each role. Ask them to add matching availability.`;
+  return `${head} There are no open slots${at}.`;
+}
 
 /* The booking engine, moved out of BookAppointmentComponent unchanged in behaviour so that the Book
    Appointment screen and the Specialist Appointment Studio's calendar booking write the same docs:

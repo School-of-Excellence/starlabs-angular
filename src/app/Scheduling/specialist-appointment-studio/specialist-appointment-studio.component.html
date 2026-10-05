@@ -640,7 +640,7 @@
       } @else if (b.loading) {
         <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Finding open slots…' }" />
       } @else {
-        @if (b.noRoles.length) { <p class="sas-fine" data-testid="sas-bookcal-no-roles">No roles are set up for {{ b.noRoles.join(', ') }}, so it has no slots.</p> }
+        @for (g of b.gaps; track $index) { <div class="sas-note" role="status" data-testid="sas-bookcal-gap"><mat-icon>info</mat-icon><span>{{ g }}</span></div> }
         <div class="sas-wk-wrap">
           <div [class]="b.bar.period.mode === 'day' ? 'sas-dcols' : 'sas-wk'" data-testid="sas-bookcal-grid">
             @for (d of b.days; track d.date.getTime()) {

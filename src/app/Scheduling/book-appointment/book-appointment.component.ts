@@ -5,7 +5,7 @@ import { collection, doc, Firestore, getDoc, getDocs, query, where } from '@angu
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthguardService } from '../../authguard.service';
-import { AppointmentBookingService, BookSlot, EisSlot } from './appointment-booking.service';
+import { AppointmentBookingService, BookSlot, EisSlot, slotGapMessage } from './appointment-booking.service';
 import { LoadingProgressComponent } from '../../loading-progress/loading-progress.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -83,6 +83,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
     }]
   }]
   mapAppointments = {}
+  mapRoles = {}
   mapProfile = {}
   mapProduct = {}
   mapJourney = {}
@@ -141,6 +142,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
 
   ngOnInit(): void {
     this.guard.getAppointmentMap().then(data => this.mapAppointments = data.map)
+    this.guard.getAppointmentRolesMap().then(data => this.mapRoles = data?.map ?? {})
     this.guard.getProductMap().then(data => this.mapProduct = data)
     this.guard.getProfileMap().then(data =>{
       this.profileList = data.list,
@@ -239,8 +241,9 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
     this.rolePersons = plan.rolePersons
 
     console.log(this.rolePersons)
-    if(Object.keys(this.rolePersons).length == 0){
-      alert("No EIS are available for the selected Appointment")
+    // No roles, or a required role nobody holds: say which (operator, 2026-10-05).
+    if(!this.appointmentRoles.length || this.appointmentRoles.some(r => !(this.rolePersons[r] ?? []).length)){
+      alert(this.gapMessage(new Set(this.appointmentRoles), ""))
     }
     this.matDialog.closeAll()
   }
@@ -308,7 +311,7 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
 
       var rolesWithSlots = this.appointmentRoles.filter(role => slotsOfEIS.some(e => e.appointmentrole == role))
       if(rolesWithSlots.length != this.appointmentRoles.length){
-        alert("EIS Slots not available for the selected date. Try again!")
+        alert(this.gapMessage(new Set(rolesWithSlots), "on " + this.datepipe.transform(this.selectedDate, "d MMM")))
       }
       else{
         this.mergeEISslots(slotsOfEIS)
@@ -322,8 +325,15 @@ export class BookAppointmentComponent implements OnInit, OnChanges{
     this.userAvailableSlots = this.booking.mergeSlots(slotsOfEIS, this.appointmentRoles, id => this.mapProfile[id])
     console.log(this.userAvailableSlots)
     if(this.userAvailableSlots.length == 0){
-      alert("No Slots available on the selected date")
+      alert(this.gapMessage(new Set(this.appointmentRoles), "on " + this.datepipe.transform(this.selectedDate, "d MMM")))
     }
+  }
+
+  /* Why nothing can be booked, naming the roles a delivery type needs and the one that is missing. */
+  gapMessage(freeRoles: Set<string>, when: string){
+    const typeName = this.mapAppointments[this.selectedAppointment?.id] ?? "This appointment"
+    return slotGapMessage(typeName, this.appointmentRoles, this.rolePersons, freeRoles,
+      role => this.mapRoles[role.split("/").pop()] ?? "another", when)
   }
 
   async confirmSlot(){

@@ -636,6 +636,25 @@ describe('BookTab · calendar', () => {
     const slots = b.days[0].groups.flatMap(g => g.slots);
     expect(slots.map(x => x.slot.start.getHours())).toEqual([9]);       // 10:00 — anu is booked
     expect(slots[0].slot.specialist).toBe('anu, ravi');
+    expect(b.gaps).toEqual([]);
+  });
+
+  it('says which role is missing when a collaborative type has nothing to book', async () => {
+    const real = new AppointmentBookingService({} as any);
+    const booking = {
+      typeRoles: () => Promise.resolve({ required: ['roles/diag', 'roles/impl'], additional: [], eis: { 'roles/diag': ['profile_data/anu'], 'roles/impl': ['profile_data/kim'] } }),
+      mergeSlots: real.mergeSlots.bind(real),
+    };
+    const { c } = await make(fakeSvc({ windows: () => Promise.resolve(wins), mapAppointment: { t: 'Joint review' },
+      mapRoles: { diag: 'EI Diagnostics', impl: 'EI Implementation' } }), { template: '', init: false, booking });
+    const b = new BookTab(c);
+    b.filter = { productId: 'P', typeIds: ['t'], booked: 'all' };
+    b.bar.period = { mode: 'day', from: day, to: new Date(day.getTime() + 86400000) };
+    await b.load();
+    expect(b.days[0].groups.length).toBe(0);
+    expect(b.gaps.length).toBe(1);
+    expect(b.gaps[0]).toContain('needs 2 specialists at the same time: EI Diagnostics and EI Implementation');
+    expect(b.gaps[0]).toContain('EI Implementation has no open slots');      // kim gave no availability
   });
 });
 

@@ -16,7 +16,7 @@ import { AuthguardService } from '../../authguard.service';
 import { AppointmentDetailComponent } from '../appointment-detail/appointment-detail.component';
 import { BookAppointmentComponent } from '../book-appointment/book-appointment.component';
 import {
-  AppointmentBookingService, Bookable, BookSlot, EisSlot, RolePlan, TypeRoles,
+  AppointmentBookingService, Bookable, BookSlot, EisSlot, RolePlan, TypeRoles, slotGapMessage,
 } from '../book-appointment/appointment-booking.service';
 import {
   SpecialistAppointmentService, ApptRow, Specialist, Team, TypeOption, ProductBreakdown, TypeBreakdown,
@@ -800,7 +800,8 @@ export class BookTab {
   groupBy: SlotGrouping = 'type';
   loading = false;
   days: { date: Date; groups: BookGroup[] }[] = [];
-  noRoles: string[] = [];
+  /* Per picked type with nothing to book in the period: why, naming the roles it needs (operator, 2026-10-05). */
+  gaps: string[] = [];
   private slots: { typeId: string; slot: BookSlot }[] = [];
   private bases = new Map<string, TypeRoles>();
   private bookables = new Map<string, Promise<Bookable[]>>();
@@ -816,7 +817,7 @@ export class BookTab {
   /* Free, future slots of every specialist who holds a required role, merged per type. */
   async load() {
     const run = ++this.run;
-    this.slots = []; this.days = []; this.noRoles = [];
+    this.slots = []; this.days = []; this.gaps = [];
     if (!this.ready) return;
     this.loading = true;
     try {
@@ -827,9 +828,9 @@ export class BookTab {
       ]);
       if (run !== this.run) return;
       const out: { typeId: string; slot: BookSlot }[] = [];
+      const when = p.mode === 'day' ? 'on ' + this.h.datepipe.transform(p.from, 'd MMM') : 'in the week of ' + this.h.datepipe.transform(p.from, 'd MMM');
       typeIds.forEach((t, i) => {
         const base = bases[i];
-        if (!base.required.length) { this.noRoles.push(this.h.typeLabel(t)); return; }
         const free: EisSlot[] = [];
         for (const role of base.required) for (const w of wins) {
           if (!w.typeIds.includes(t)) continue;
@@ -841,7 +842,12 @@ export class BookTab {
             }
           }
         }
-        this.h.booking.mergeSlots(free, base.required, id => this.h.svc.name(id)).forEach(slot => out.push({ typeId: t, slot }));
+        const merged = this.h.booking.mergeSlots(free, base.required, id => this.h.svc.name(id));
+        merged.forEach(slot => out.push({ typeId: t, slot }));
+        if (!merged.length) {
+          this.gaps.push(slotGapMessage(this.h.typeLabel(t), base.required, base.eis, new Set(free.map(f => f.appointmentrole)),
+            role => this.h.svc.mapRoles[role.split('/').pop()!] ?? 'another', when));
+        }
       });
       this.slots = out;
       this.build();
@@ -1232,7 +1238,7 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
 
   constructor(
     public svc: SpecialistAppointmentService, public booking: AppointmentBookingService, public firestore: Firestore,
-    public snack: MatSnackBar, private dialog: MatDialog, private datepipe: DatePipe, private guard: AuthguardService,
+    public snack: MatSnackBar, private dialog: MatDialog, public datepipe: DatePipe, private guard: AuthguardService,
     private router: Router, private zone: NgZone,
   ) {}
 
