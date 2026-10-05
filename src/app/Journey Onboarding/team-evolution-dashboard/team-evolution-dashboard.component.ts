@@ -106,6 +106,17 @@ interface OngoingParticipant {
   awaitingsignoff?: boolean;
 }
 
+interface OngoingParticipant {
+  profileid: string;
+  name: string;
+  email: string;
+  participantproducts?: any[];
+  notstartedparticipant?: boolean;
+  needsattention?: boolean;
+  completed?: boolean;
+  awaitingsignoff?: boolean;
+}
+
 @Component({
   selector: 'app-team-evolution-dashboard',
   standalone: true,
