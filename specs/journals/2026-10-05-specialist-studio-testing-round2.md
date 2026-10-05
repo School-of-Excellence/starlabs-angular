@@ -166,3 +166,16 @@ instead of `x.cards`; drop `jointNote` / `hostLine` from the template.
   - Also possible: two bookings at the same moment (`book` doesn't use a transaction); another app booking.
   - Operator: **don't change the cancel code now; fix it later.** Pending: the cancel fix, a transactional
     `book`, and flagging existing double bookings.
+
+## Checked: a pending EI Diagnostics + EI Implementation session (2026-10-05)
+There is no such session in the data, so the specs reproduce one: two hosts, ended, not marked, each host
+with their own window.
+- **Each host's Home:** Past sessions shows it as pending, the window reads "Completion pending", and the
+  card reads "Joint · with" the partner.
+- **A&H Overview:** both windows read pending; the session is drawn once and listed once.
+- **Once either host marks it:** pending for neither, because it is one shared doc.
+- **Known limit:** a second host stored **only** in `hostRole` (not `hosts`).
+  - The A&H Overview shows it pending for both.
+  - That host's own Home never fetches it, because a specialist's sessions are queried through `hosts`.
+  - Bookings from this app always write both hosts. The fix, if such data exists: backfill `hosts` from
+    `hostRole`, and make every other booking path write `hosts`.

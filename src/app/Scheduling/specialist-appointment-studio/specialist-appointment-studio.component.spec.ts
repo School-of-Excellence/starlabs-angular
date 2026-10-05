@@ -9,7 +9,7 @@ import {
   SpecialistAppointmentStudioComponent, NAV, HomeTab, TeamTable, AddDialog, WindowDialog, FilterBar, PersonPicker,
   PeriodBar, BookTab, BookSlotDialog, SettingsTab,
 } from './specialist-appointment-studio.component';
-import { SpecialistAppointmentService, ApptRow } from './specialist-appointment.service';
+import { SpecialistAppointmentService, ApptRow, hostIdsOf } from './specialist-appointment.service';
 import { Appt, AvailWindow, NO_SHOW_REASON, Period, availableViews, periodOf, resolveViewRole } from './sas-logic';
 
 /* Everything the screen reads, empty by default; each test overrides what it needs. */
@@ -376,6 +376,92 @@ describe('HomeTab · joint delivery types', () => {
     const d = h.days.find(x => x.date.getDate() === day.getDate())!;
     expect(d.windows.flatMap(x => x.cards).map(r => r.appt.id)).toEqual(['joint']);           // drawn once
     expect(d.windows.every(x => x.sessions.some(r => r.appt.id === 'joint'))).toBeTrue();     // counted for both
+  });
+});
+
+/* ================================================================ Collaborative pending: EI Diagnostics + EI Implementation */
+describe('Collaborative session pending — EI Diagnostics + EI Implementation', () => {
+  // Yesterday 10:00–11:00, booked for both specialists, ended, not marked.
+  const y = new Date(); y.setHours(0, 0, 0, 0); y.setDate(y.getDate() - 1);
+  const at = (hr: number) => new Date(y.getFullYear(), y.getMonth(), y.getDate(), hr);
+  const ref = (id: string) => ({ id, path: 'profile_data/' + id });
+  const raw = (over: any = {}) => ({
+    starttime: at(10), endtime: at(11), attended: false, cancelled: false, appointment: { id: 'impl' }, bookedby: { id: 'anna' },
+    hosts: [ref('diag'), ref('impl')], hostRole: { 'roles/diag': [ref('diag')], 'roles/impl': [ref('impl')] }, ...over,
+  });
+  // The same parse the service does: hosts plus everyone under hostRole.
+  const row = (d: any): ApptRow => ({ raw: d, appt: {
+    id: 'joint', start: d.starttime, end: d.endtime, attended: d.attended, cancelled: d.cancelled, cancelledReason: null,
+    hostIds: hostIdsOf(d), participantId: 'anna', typeId: 'impl', productId: null, zoomUrl: null } });
+  const win = (id: string, who: string): any => ({ id, profileId: who, start: at(9), end: at(12), typeIds: ['impl'],
+    slots: [{ typeId: 'impl', start: at(10), end: at(11), booked: true, available: false }] });
+
+  /* pastPage / appointments behave like the Firestore queries: a specialist's own sessions are found through
+     the `hosts` array only (array-contains); A&H (null) gets everything. */
+  function svcFor(viewer: { roles: any; id: string }, d: any) {
+    const r = row(d), inHosts = (id: string) => (d.hosts ?? []).some((h: any) => h.id === id);
+    return fakeSvc({
+      roles: viewer.roles, profileId: viewer.id,
+      name: (id: string) => ({ diag: 'Diag Specialist', impl: 'Impl Specialist', anna: 'Anna' } as any)[id] ?? id,
+      mapAppointment: { impl: 'EI Implementation' },
+      windows: (ids: string[] | null) => Promise.resolve([win('wd', 'diag'), win('wi', 'impl')].filter(w => !ids || ids.includes(w.profileId))),
+      appointments: (ids: string[] | null) => Promise.resolve(!ids || ids.some(inHosts) ? [r] : []),
+      pastPage: (host: string | null) => Promise.resolve({ rows: !host || inHosts(host) ? [r] : [], cursor: null, done: true }),
+    });
+  }
+  async function homeOf(viewer: { roles: any; id: string }, d: any) {
+    const { fixture, c } = await make(svcFor(viewer, d));
+    const h = c.home!;
+    h.bar.emit(periodOf('week', y));
+    await settle(fixture);
+    const day = h.days.find(x => x.date.getTime() === y.getTime())!;
+    return { h, day };
+  }
+  const diag = { roles: { eis: true }, id: 'diag' }, impl = { roles: { eis: true }, id: 'impl' }, ah = { roles: { scheduler: true }, id: 'admin' };
+
+  it('EI Diagnostics specialist: in Past sessions as pending, and their window reads Completion pending', async () => {
+    const { h, day } = await homeOf(diag, raw());
+    expect(h.past.map(r => r.appt.id)).toEqual(['joint']);
+    expect(h.status(h.past[0])).toBe('Pending');
+    expect(day.windows.map(x => x.label)).toEqual(['Completion pending']);
+    expect(h.hostLine(h.past[0], 'diag')).toBe('Joint · with Impl Specialist');
+  });
+
+  it('EI Implementation specialist: the same', async () => {
+    const { h, day } = await homeOf(impl, raw());
+    expect(h.past.map(r => r.appt.id)).toEqual(['joint']);
+    expect(day.windows.map(x => x.label)).toEqual(['Completion pending']);
+    expect(h.hostLine(h.past[0], 'impl')).toBe('Joint · with Diag Specialist');
+  });
+
+  it('A&H Overview: both windows read Completion pending, the session is drawn once, listed once', async () => {
+    const { h, day } = await homeOf(ah, raw());
+    expect(day.windows.map(x => [x.w.profileId, x.label])).toEqual([['diag', 'Completion pending'], ['impl', 'Completion pending']]);
+    expect(day.windows.flatMap(x => x.cards).length).toBe(1);
+    expect(h.past.length).toBe(1);
+  });
+
+  it('once either specialist marks it, it is pending for neither (one shared doc)', async () => {
+    for (const viewer of [diag, impl, ah]) {
+      const { h, day } = await homeOf(viewer, raw({ attended: true }));
+      expect(h.past.length).withContext(viewer.id).toBe(0);                    // the Pending filter is empty
+      expect(day.windows.every(x => x.label === 'Completed')).withContext(viewer.id).toBeTrue();
+      TestBed.resetTestingModule();
+    }
+  });
+
+  it('second specialist only under hostRole: A&H sees it pending for both; that specialist\'s own Home cannot find it', async () => {
+    const d = raw({ hosts: [ref('impl')] });                                  // diag is only in hostRole
+    const overview = await homeOf(ah, d);
+    expect(overview.day.windows.map(x => x.label)).toEqual(['Completion pending', 'Completion pending']);
+    TestBed.resetTestingModule();
+    // A specialist's sessions are queried by `hosts`, so diag's Home never receives it (known limit, journal).
+    const forDiag = await homeOf(diag, d);
+    expect(forDiag.h.past.length).toBe(0);
+    expect(forDiag.day.windows[0].label).not.toBe('Completion pending');
+    TestBed.resetTestingModule();
+    const forImpl = await homeOf(impl, d);
+    expect(forImpl.h.past.length).toBe(1);
   });
 });
 
