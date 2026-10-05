@@ -1430,6 +1430,11 @@ export class ParticipantsAnalyticsComponent {
             this.openSnackBar("Error Sending Email", "OK");
           });
         } else if (result['status'] == 'validated') {
+          result['status'] = 'send'
+          await setDoc(docRef, result, { merge: true }).catch(err => {
+            console.log(err);
+            this.openSnackBar("Error Sending Email", "OK");
+          });
           let url: string;
           if (environment.firebase.projectId == 'starlabs-test') {
             url = "https://us-central1-starlabs-test.cloudfunctions.net/sendBatchEmail";
@@ -1445,6 +1450,7 @@ export class ParticipantsAnalyticsComponent {
           }).subscribe({
             next: (response) => {
               console.log('response', response);
+              this.openSnackBar("Email Sent Successfully", "OK");
             },
             error: (err) => {
               console.log(err);
@@ -2595,7 +2601,13 @@ export class ParticipantsAnalyticsComponent {
   // Function to add products to participant Journey 
   bulkAddProducts() {
     this.dialog.open(BulkAddProductsComponent, {
-      data: this.selection.selected
+      panelClass: 'bap-overlay',
+      maxHeight: '92vh',
+      width: '640px',
+      data: {
+        participants: this.selection.selected,
+        loggedInProfileId: this.loggedInProfileId
+      }
     })
   }
 
