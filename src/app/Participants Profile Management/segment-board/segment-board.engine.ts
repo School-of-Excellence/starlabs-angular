@@ -938,7 +938,6 @@ function doMove(){
 let B=null;
 const defaultRow=field=>{const f=FIELD[field];
   if(field==='onboardingStatus') return {field,op:'in',value:['ONBOARDED']};
-  if(field==='participantMode') return {field,op:'eq',value:''};   // single mode, picked in the row
   if(f.type==='number') return COUNT_DEFAULT[field]?{field,op:'gte',value:1,products:[...COUNT_DEFAULT[field]]}:{field,op:'gte',value:1};
   if(f.type==='products') return {field,op:'counts',value:{mode:'all',items:[{product:PRODUCTS[0]?.id||'',op:'gte',n:1}]}};
   if(f.type==='list') return {field,op:'notEmpty',value:null};
@@ -970,7 +969,6 @@ function countsHtml(r){
     <button type="button" class="btn ghost" data-b="addi">+ Add product</button>`;
 }
 const toRows=list=>list.map(n=>{const f=FIELD[n.field];
-  if(n.field==='participantMode') return {field:n.field,op:'eq',value:Array.isArray(n.value)?(n.value[0]??''):(n.value??'')};
   if(COUNT_DEFAULT[n.field]) return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value,products:[...(n.products||COUNT_DEFAULT[n.field])]};if(n.op==='eq'&&f&&f.type==='enum')return {field:n.field,op:'in',value:[n.value]};return {field:n.field,op:n.op,value:Array.isArray(n.value)?[...n.value]:n.value};});
 function openSegDlg(mode,segId){
   const set=curSet();
@@ -986,8 +984,6 @@ function rowHtml(r,i){
   const avail=FIELDS.filter(x=>!SCOPE_FIELDS.includes(x.key)&&(x.key===r.field||!used.has(x.key)));
   const field=`<select data-k="field" aria-label="Field">${avail.map(x=>`<option value="${x.key}" ${x.key===r.field?'selected':''}>${x.label}</option>`).join('')}</select>`;
   const rm=`<button type="button" class="icon-btn" data-b="rm" aria-label="Remove condition">×</button>`;
-  // participant mode: a single mode from the `modes` catalogue (or No mode)
-  if(r.field==='participantMode') return `<div class="cond" data-i="${i}">${field}<select data-k="pm" aria-label="Participant mode"><option value="" ${r.value?'':'selected'} disabled>Choose a mode…</option>${Object.entries(VAL.participantMode).map(([v,l])=>`<option value="${esc(v)}" ${v===r.value?'selected':''}>${esc(l)}</option>`).join('')}</select>${rm}</div>`;
   // onboarding: one choice, Onboarded or Yet to onboard (they can't both be true)
   if(r.field==='onboardingStatus'){const k=obKind(r.value);
     // an older rule on specific YTO statuses (e.g. only New) stays as it is, shown read-only
@@ -1087,7 +1083,6 @@ function validRule(){
   if(!B.rows.length&&!B.scope.ids.length) return `Pick a ${SCOPE[B.scope.type].label.toLowerCase()} or add at least one condition.`;
   for(const r of B.rows){const f=FIELD[r.field];
     if(r.op==='counts'&&(!r.value.items.length||!r.value.items.every(i=>Number.isFinite(i.n)))) return `Enter a count for every product in “${f.label}”.`;
-    if(r.field==='participantMode'&&!r.value) return 'Pick a participant mode.';
     if((r.op==='in'||r.op==='hasAny'||r.op==='equals')&&!r.value.length) return `Pick at least one value for “${f.label}”.`;
     if(COUNT_DEFAULT[r.field]&&!(r.products||[]).length) return `Pick at least one product for “${f.label}”.`;
     if(f.type==='number'&&(r.op==='between'?!r.value.every(Number.isFinite):!Number.isFinite(r.value))) return `Enter a number for “${f.label}”.`;}
@@ -1605,7 +1600,6 @@ listen(root,'change',e=>{
       updatePreview();}
     else if(k==='pv'){const ps=new Set(r.products||[]);t.checked?ps.add(t.value):ps.delete(t.value);
       r.products=PRODUCTS.map(p=>p.id).filter(id=>ps.has(id));syncPms(row,r);updatePreview();}
-    else if(k==='pm'){r.value=t.value;updatePreview();}
     else if(k==='ob'){r.value=t.value==='ONBOARDED'?['ONBOARDED']:[...YTO];updatePreview();}
     else if(k==='cmode'){r.value={...r.value,mode:t.value};updatePreview();}
     else if(k==='cprod'||k==='ccop'){const ci=+t.closest('[data-ci]').dataset.ci;

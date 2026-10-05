@@ -272,3 +272,8 @@ Verified: with global styles loaded, card title and all footer buttons compute t
   an empty pick blocks save ("Pick a participant mode."). A rule saved earlier with several modes (`op: in`) still evaluates
   as saved, but reopens showing only its first mode, and saving it then keeps just that one. The filter bar keeps multi-select.
   Verified: Integration Mode → list 38; tsc 0; ng build ok.
+- **2026-10-05 · Participant mode back to multi-select** (operator): the single-select special cases were removed, so the row is
+  the standard multi-select ("is any of"), stored `{ "op": "in", "value": ["Integration Mode", "NO_MODE"] }`. Rules saved as
+  single select (`op: eq`, string value) still evaluate, reopen with that one mode ticked (the existing eq→in conversion for
+  enum rows) and save unchanged. Verified: Integration + No mode → 87; a planted `eq` "Exploration Mode" rule → 37, reopens ticked,
+  "No changes to save". tsc 0, ng build ok.
