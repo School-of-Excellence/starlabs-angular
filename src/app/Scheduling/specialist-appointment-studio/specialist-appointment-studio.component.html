@@ -191,6 +191,28 @@
         </div>
         <p class="sas-fine">Select a day to open it.</p>
       }
+      @if (!h.loading) {
+        <!-- What the colour strip on each block means (operator, 2026-10-05) -->
+        <div class="sas-legend" data-testid="sas-home-legend">
+          @if (h.period.mode === 'month') {
+            <span><i style="--lc:var(--bt-success)"></i>Availability</span>
+            <span><i style="--lc:var(--bt-primary)"></i>Booked</span>
+          } @else {
+            <b>Availability</b>
+            <span><i style="--lc:var(--bt-success)"></i>Open</span>
+            <span><i style="--lc:var(--bt-primary)"></i>Fully booked</span>
+            <span><i style="--lc:var(--bt-warning)"></i>Waiting for a partner</span>
+            <span><i style="--lc:var(--bt-ink-25)"></i>Ended / unused</span>
+            <b>Sessions</b>
+            <span><i style="--lc:var(--bt-primary)"></i>Booked</span>
+            <span><i style="--lc:var(--bt-primary-deep)"></i>In session</span>
+            <span><i style="--lc:var(--bt-success)"></i>Completed</span>
+            <span><i style="--lc:var(--bt-warning)"></i>Completion pending</span>
+            <span><i style="--lc:var(--bt-ink-25)"></i><s>Cancelled</s></span>
+          }
+          <span><mat-icon>group</mat-icon>Joint (needs two or more specialists)</span>
+        </div>
+      }
     </section>
 
     <section class="sas-card" data-testid="sas-home-avail">

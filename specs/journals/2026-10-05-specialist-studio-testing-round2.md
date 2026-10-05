@@ -152,3 +152,17 @@ instead of `x.cards`; drop `jointNote` / `hostLine` from the template.
     "👥 Joint: Kick-off · with Ravi" or "Joint: Kick-off · needs EI Implementation".
   - Each Month day shows "👥 Joint: 2 bookable · 1 booked".
   - Code: `HomeTab.windowJoint` and `dayJoint`. Revert: drop the `joint` field from the window and month cell.
+
+## Calendar legend, and a double booking found (2026-10-05)
+- **Legend under the calendar:**
+  - Week and Day: availability (Open, Fully booked, Waiting for a partner, Ended or unused), sessions (Booked,
+    In session, Completed, Completion pending, Cancelled) and the 👥 Joint icon.
+  - Month: green = availability, blue = booked.
+  - The operator removed the legend at the start, then asked for it back once the colours multiplied.
+- **Found:** a specialist double-booked in one window (EI Implementation and Scope Enhancement, both 9:00–11:00).
+  Booking closes every overlapping slot for all types, so this came in some other way.
+  - Confirmed hole in the code: `AuthguardService.cancelAppointment` reopens every unbooked slot that overlaps
+    the cancelled session, even when that slot also overlaps another session still booked.
+  - Also possible: two bookings at the same moment (`book` doesn't use a transaction); another app booking.
+  - Operator: **don't change the cancel code now; fix it later.** Pending: the cancel fix, a transactional
+    `book`, and flagging existing double bookings.

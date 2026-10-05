@@ -279,3 +279,10 @@
 .sas-dcol.is-joint { background:var(--bt-primary-tint); }
 .sas-mc .ln.is-joint { color:var(--bt-primary-deep); font-weight:700; }
 .sas-mc .ln.is-joint mat-icon { width:12px; height:12px; font-size:12px; flex-shrink:0; }
+/* calendar legend */
+.sas-legend { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--bt-line);
+  font-size:12px; color:var(--bt-ink-70); }
+.sas-legend b { font-size:11px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--bt-ink-45); }
+.sas-legend span { display:inline-flex; align-items:center; gap:5px; }
+.sas-legend i { width:4px; height:14px; border-radius:2px; background:var(--lc); }
+.sas-legend mat-icon { width:14px; height:14px; font-size:14px; color:var(--bt-primary-deep); }

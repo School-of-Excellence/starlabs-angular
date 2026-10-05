@@ -28,3 +28,5 @@ _Last updated: 2026-10-05 (specialist studio testing round 2)_
 - e2e suite for the studio (single `sas-` prefix).
 - `dashboard` access entries for `specialistappointmentstudio` and `appointment-status-update`.
 - Cloud Function deploys are blocked on Java 21 (installed: 17).
+- Double booking: `cancelAppointment` reopens slots that overlap another booked session (operator: fix later);
+  also consider a transaction in `AppointmentBookingService.book` and flagging existing double bookings.
