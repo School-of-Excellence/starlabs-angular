@@ -11,7 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ZoomMigrationService, ZoomRecording, VerificationResult } from './zoom-migration.service';
+import { ZoomMigrationService, ZoomRecording, VerificationResult, CostRates } from './zoom-migration.service';
 
 @Component({
   selector: 'app-zoom-recording-dashboard',
@@ -78,6 +78,8 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   ngOnInit(): void {
     this.recordsBackup.filterPredicate = this.filterPredicate
     this.subscribe()
+    this.loadCostRates()
+    this.costRatesTimer = setInterval(() => this.loadCostRates(), 3 * 60 * 60 * 1000)
   }
 
   ngAfterViewInit(): void {
@@ -87,6 +89,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
   ngOnDestroy(): void {
     this.stopSubscription()
     this.stopZoomMatching()
+    if (this.costRatesTimer) clearInterval(this.costRatesTimer)
   }
 
   private stopSubscription() {
@@ -372,11 +375,27 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
   // ---- migration cost estimate ----
   // Internet egress (Cloud Run → Dropbox) is the dominant per-GB migration cost.
-  // GCP us-central1 internet egress is $0.12/GB (first 1 TB/mo); compute is
-  // negligible once the service scales to zero, so we estimate from GB egressed.
-  readonly costPerGbUsd = 0.12
-  // USD → INR. Adjust as the rate moves (≈ ₹94.5 / $1 as of Jun 2026).
-  readonly usdToInr = 94.5
+  // The GB figure is live (Firestore snapshot); the egress price and the
+  // USD→INR rate come from the server (/api/cost-rates, live daily FX feed)
+  // and are refreshed every 3h. The constants are only the fallback when the
+  // server can't be reached.
+  public costPerGbUsd = 0.12
+  public usdToInr = 96.4
+  public costRates: CostRates | null = null
+  private costRatesTimer: any = null
+
+  private async loadCostRates() {
+    try {
+      const r = await this.migrationApi.costRates()
+      if (r?.usdToInr > 0) {
+        this.costRates = r
+        this.usdToInr = r.usdToInr
+        if (r.egressUsdPerGb > 0) this.costPerGbUsd = r.egressUsdPerGb
+      }
+    } catch {
+      // keep the last known / fallback values
+    }
+  }
 
   // ---- summary stats (computed from the currently filtered rows) ----
   get stats() {

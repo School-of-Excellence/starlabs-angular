@@ -37,6 +37,17 @@ export interface VerifyBatchResult {
   problems: string[];
 }
 
+// Live cost inputs from the server: USD→INR rate (daily feed, cached) and
+// the egress price per GB.
+export interface CostRates {
+  usdToInr: number;
+  rateDate: string;
+  rateSource: string;
+  egressUsdPerGb: number;
+  fetchedAt: string;
+  stale: boolean;
+}
+
 export interface MigrateResponse {
   success: boolean;
   dispatch: 'cloud-tasks' | 'inline';
@@ -82,6 +93,10 @@ export class ZoomMigrationService {
     return firstValueFrom(
       this.http.post<any>(`${this.base}/api/zoom/verify-batch`, { docIds }, { headers: await this.authHeaders() })
     );
+  }
+
+  async costRates(): Promise<CostRates> {
+    return firstValueFrom(this.http.get<CostRates>(`${this.base}/api/cost-rates`));
   }
 
   // Restart the backup of one record (stalled / failed / partial row).
