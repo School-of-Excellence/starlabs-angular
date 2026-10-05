@@ -272,3 +272,10 @@
 .sas-note { display:flex; gap:8px; align-items:flex-start; margin:0 0 10px; padding:10px 13px; border-radius:var(--bt-r-sm);
   background:var(--bt-warning-tint); color:var(--bt-ink); font-size:13px; line-height:1.45; }
 .sas-note mat-icon { width:18px; height:18px; font-size:18px; color:var(--bt-warning-deep, var(--bt-warning)); flex-shrink:0; }
+/* joint delivery types (several roles at once) */
+.sas-slot small.sas-joint { display:flex; align-items:center; gap:4px; white-space:normal; color:var(--bt-primary-deep); font-weight:700; }
+.sas-slot small.sas-joint mat-icon { width:13px; height:13px; font-size:13px; flex-shrink:0; }
+.sas-slot.s-wait { --sc:var(--bt-warning); background:var(--bt-ground); box-shadow:inset 3px 0 0 var(--sc), inset 0 0 0 1px var(--bt-line); }
+.sas-dcol.is-joint { background:var(--bt-primary-tint); }
+.sas-mc .ln.is-joint { color:var(--bt-primary-deep); font-weight:700; }
+.sas-mc .ln.is-joint mat-icon { width:12px; height:12px; font-size:12px; flex-shrink:0; }

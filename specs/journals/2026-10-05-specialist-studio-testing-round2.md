@@ -120,3 +120,35 @@ It names, in this order:
 
 Revert: restore the three `alert("…")` strings in `book-appointment.component.ts` and the old
 `noRoles` line in the Book calendar.
+
+## Joint delivery types grouped in the calendar (operator, 2026-10-05: all three, show once, partner names)
+A **joint** type has 2 or more roles in `AppointmentType-To-Roles.required_role`. It is bookable at a time only
+when each role has a different free person starting then, the same rule as booking (`mergeSlots`).
+- **Badge on every joint slot (Day view and filtered Week):**
+  - "Joint · with Ravi" when a partner is free at the same start;
+  - "Joint · needs EI Implementation free at 14:00", status "Waiting for a partner", when no partner is free.
+- **Booked joint session, one card:**
+  - On Home it reads "Joint · with Ravi".
+  - In the all-specialists Overview it reads "Joint · Anu + Ravi" and is drawn once, under the first host's
+    window. Every host's window still counts it, so "Completion pending" still shows for both.
+  - Upcoming and Past show the same "Joint · with …" line.
+- **Day view:** joint types get their own tinted column, placed last and headed "Joint · 1h Kick-off". In the
+  all-specialists view each joint start time is one entry listing everyone free then ("Anu + Ravi · bookable").
+
+How (`sas-logic.ts`):
+- `JointIndex` builds, per type and start minute, the free people per role. From that it answers `teams`,
+  `partners`, `missing` and `uncovered`.
+- `collapseJoint` merges the all-specialists entries.
+- `svc.jointTypes()` reads the two role collections once.
+
+Why Home now reads **partners' windows**: a specialist's own slots can't say whether the partner is free. In
+self mode, the windows of everyone who shares one of that specialist's joint types are fetched for the same
+range. They are used only by `JointIndex`, never drawn and never counted in hours.
+
+Revert: remove `JointIndex` / `collapseJoint` and the partner fetch in `HomeTab.load`; draw `x.sessions`
+instead of `x.cards`; drop `jointNote` / `hostLine` from the template.
+- **Week and Month too.** The default Week view (window blocks) showed nothing for open joint availability.
+  - Each window offering a joint type now carries a line, also shown in its tooltip:
+    "👥 Joint: Kick-off · with Ravi" or "Joint: Kick-off · needs EI Implementation".
+  - Each Month day shows "👥 Joint: 2 bookable · 1 booked".
+  - Code: `HomeTab.windowJoint` and `dayJoint`. Revert: drop the `joint` field from the window and month cell.

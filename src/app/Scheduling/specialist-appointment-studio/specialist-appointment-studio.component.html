@@ -114,8 +114,9 @@
         } @else {
           <div class="sas-dcols" data-testid="sas-home-day-view">
             @for (c of h.dayCols; track c.typeId) {
-              <div class="sas-wk-col sas-dcol" data-testid="sas-home-day-col">
-                @if (c.typeId) { <div class="sas-wk-h">{{ typeDuration(c.typeId) }}<b>{{ typeLabel(c.typeId) }}</b></div> }
+              <div class="sas-wk-col sas-dcol" [class.is-joint]="h.isJoint(c.typeId)" data-testid="sas-home-day-col">
+                @if (c.typeId && h.isJoint(c.typeId)) { <div class="sas-wk-h" data-testid="sas-home-joint-col">Joint · {{ typeDuration(c.typeId) }}<b>{{ typeLabel(c.typeId) }}</b></div> }
+                @else if (c.typeId) { <div class="sas-wk-h">{{ typeDuration(c.typeId) }}<b>{{ typeLabel(c.typeId) }}</b></div> }
                 @else { <div class="sas-wk-h">In time order<b>All delivery types</b></div> }
                 @for (e of c.entries; track $index) { <ng-container *ngTemplateOutlet="slotEntryTpl; context: { $implicit: e, h: h }" /> }
               </div>
@@ -133,7 +134,7 @@
               <button class="sas-wk-h is-btn" data-testid="sas-home-day-open" (click)="h.gotoDay(d.date)" [attr.aria-label]="'Open ' + (d.date | date: 'fullDate')">{{ DAYS[i] }}<b>{{ d.date | date: 'd MMM' }}</b></button>
               @if (!d.cols.length) { <div class="sas-wk-none">No matching slots</div> }
               @for (c of d.cols; track c.typeId) {
-                @if (c.typeId) { <div class="sas-slot-grp" data-testid="sas-home-slot-group">{{ typeLabel(c.typeId) }}</div> }
+                @if (c.typeId) { <div class="sas-slot-grp" data-testid="sas-home-slot-group">{{ h.isJoint(c.typeId) ? 'Joint · ' : '' }}{{ typeLabel(c.typeId) }}</div> }
                 @for (e of c.entries; track $index) { <ng-container *ngTemplateOutlet="slotEntryTpl; context: { $implicit: e, h: h }" /> }
               }
             </div>
@@ -147,18 +148,20 @@
               @if (!d.windows.length && !d.loose.length) { <div class="sas-wk-none">No availability</div> }
               @for (x of d.windows; track x.w.id) {
                 <div class="sas-slot is-click" [class]="'sas-slot is-click s-' + x.state" data-testid="sas-home-window" role="button" tabindex="0"
-                  [matTooltip]="typeNames(x.w)" (click)="h.openWindow(x.w)" (keydown.enter)="h.openWindow(x.w)">
+                  [matTooltip]="typeNames(x.w) + (x.joint ? ' — ' + x.joint : '')" (click)="h.openWindow(x.w)" (keydown.enter)="h.openWindow(x.w)">
                   @if (h.allMode) { <small class="sas-slot-who" data-testid="sas-home-window-who">{{ svc.name(x.w.profileId) }}</small> }
                   <b>{{ t(x.w.start) }} – {{ t(x.w.end) }}</b>
                   <small>{{ x.label }}{{ x.state === 'open' ? ' · ' + fmtHours(x.open) + ' open' : '' }}</small>
                   <small>{{ x.w.typeIds.length }} delivery type{{ x.w.typeIds.length === 1 ? '' : 's' }}</small>
+                  @if (x.joint) { <small class="sas-joint" data-testid="sas-home-window-joint"><mat-icon>group</mat-icon>{{ x.joint }}</small> }
                   @if (x.w.start > h.now) {
                     <button class="sas-icon-btn sas-del" data-testid="sas-home-window-delete" (click)="h.deleteWindow(x.w, $event)" (keydown.enter)="$event.stopPropagation()" aria-label="Delete availability"><mat-icon>delete_outline</mat-icon></button>
                   }
                 </div>
-                @for (r of x.sessions; track r.appt.id) {
+                @for (r of x.cards; track r.appt.id) {
                   <button class="sas-slot is-sess" [class]="'sas-slot is-sess ' + h.chipClass(r)" data-testid="sas-home-session" (click)="h.openDetail(r)">
                     <b>{{ t(r.appt.start) }} – {{ t(r.appt.end) }}</b><small>{{ h.status(r) }}</small><small>{{ svc.name(r.appt.participantId) }} · {{ typeName(r) }}</small>
+                    @if (h.hostLine(r, x.w.profileId); as hl) { <small class="sas-joint" data-testid="sas-home-joint"><mat-icon>group</mat-icon>{{ hl }}</small> }
                   </button>
                 }
               }
@@ -180,6 +183,7 @@
           @for (c of h.month; track c.date.getTime()) {
             <button class="sas-mc" [class.is-out]="c.out" [class.is-today]="h.isToday(c.date)" data-testid="sas-home-month-day" (click)="h.gotoDay(c.date)" [attr.aria-label]="'Open ' + (c.date | date: 'fullDate')">
               <span class="n">{{ c.date.getDate() }}</span>
+              @if (c.joint) { <span class="ln is-joint" data-testid="sas-home-month-joint"><mat-icon>group</mat-icon><span>{{ c.joint }}</span></span> }
               @for (l of c.lines; track $index) { <span class="ln" [style.--dc]="l.color"><i></i><span>{{ l.label }}</span></span> }
               @if (c.more) { <span class="ln">+{{ c.more }}</span> }
             </button>
@@ -232,7 +236,7 @@
             @for (r of h.upcoming; track r.appt.id) {
               <tr data-testid="sas-home-upcoming-row">
                 <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
-                <td>{{ typeName(r) }}</td>
+                <td>{{ typeName(r) }}@if (h.hostLine(r, svc.profileId); as hl) { <small>{{ hl }}</small> }</td>
                 <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
                 @if (h.allMode) { <td>{{ h.hostNames(r) }}</td> }
                 <td><span class="sas-pill" [class]="'sas-pill ' + h.pillClass(r)">{{ h.status(r) }}</span></td>
@@ -276,7 +280,7 @@
             @for (r of h.past; track r.appt.id) {
               <tr class="is-click" data-testid="sas-home-past-row" (click)="h.openDetail(r)">
                 <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
-                <td>{{ typeName(r) }}</td>
+                <td>{{ typeName(r) }}@if (h.hostLine(r, svc.profileId); as hl) { <small>{{ hl }}</small> }</td>
                 <td><b>{{ svc.name(r.appt.participantId) }}</b></td>
                 @if (h.allMode) { <td>{{ h.hostNames(r) }}</td> }
                 <td class="nw">{{ fmtHours((r.appt.end.getTime() - r.appt.start.getTime()) / 60000) }}</td>
@@ -304,10 +308,11 @@
 <!-- One slot (Day view and filtered Week): open → availability details, booked → the appointment -->
 <ng-template #slotEntryTpl let-e let-h="h">
   <button class="sas-slot" [class]="h.entryClass(e)" data-testid="sas-home-slot" (click)="h.entryClick(e)">
-    @if (h.allMode) { <small class="sas-slot-who">{{ svc.name(e.profileId) }}</small> }
+    @if (h.allMode && !e.members) { <small class="sas-slot-who">{{ svc.name(e.profileId) }}</small> }
     <b>{{ t(e.start) }} – {{ t(e.end) }}</b>
     @if (h.groupBy === 'time') { <small>{{ typeLabel(e.typeId) }}</small> }
     <small>{{ h.entryStatus(e) }}{{ e.appt ? ' · ' + svc.name(e.appt.participantId) : '' }}</small>
+    @if (h.jointNote(e); as jn) { <small class="sas-joint" data-testid="sas-home-joint"><mat-icon>group</mat-icon>{{ jn }}</small> }
   </button>
   @if (h.entryRow(e); as row) {
     @if (h.status(row) === 'Booked' || h.status(row) === 'In session') {

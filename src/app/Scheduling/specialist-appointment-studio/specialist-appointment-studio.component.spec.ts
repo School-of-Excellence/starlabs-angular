@@ -25,6 +25,8 @@ function fakeSvc(over: Record<string, any> = {}): any {
     pastPage: () => Promise.resolve({ rows: [], cursor: null, done: true }),
     productsFor: () => Promise.resolve([]), teamForAtcModels: () => Promise.resolve({ productIds: [], memberIds: [] }),
     typesFor: () => Promise.resolve([]), futureIntervals: () => Promise.resolve([]), unmarkedLastAppointment: () => Promise.resolve(null),
+    jointTypes: () => Promise.resolve(new Map()), mapRoles: {},
+    roleName(this: any, r: string) { return this.mapRoles[r.split('/').pop()] ?? 'another'; },
     ...over,
   };
 }
@@ -305,6 +307,75 @@ describe('HomeTab · filters, Day view and bulk delete', () => {
     expect([...h.selected]).toEqual(['w2']);
     h.toggleAll();
     expect(h.selected.size).toBe(0);
+  });
+});
+
+/* ================================================================ Home: joint delivery types */
+describe('HomeTab · joint delivery types', () => {
+  const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() + 2);
+  const at = (hr: number) => new Date(day.getFullYear(), day.getMonth(), day.getDate(), hr);
+  const sl = (hr: number, booked = false) => ({ typeId: 'j', start: at(hr), end: at(hr + 1), booked, available: !booked });
+  const wins: any[] = [
+    { id: 'wa', profileId: 'anu', start: at(9), end: at(12), typeIds: ['j'], slots: [sl(9), sl(10), sl(11, true)] },
+    { id: 'wr', profileId: 'ravi', start: at(9), end: at(12), typeIds: ['j'], slots: [sl(9), sl(11, true)] },
+  ];
+  const joint: ApptRow = { raw: {}, appt: { id: 'joint', start: at(11), end: at(12), attended: false, cancelled: false, cancelledReason: null,
+    hostIds: ['anu', 'ravi'], participantId: 'p', typeId: 'j', productId: null, zoomUrl: null } };
+  const svcFor = (roles: any, profileId: string) => fakeSvc({
+    roles, profileId, mapAppointment: { j: 'Kick-off' }, mapAppointmentData: { j: { duration: 60 } },
+    mapRoles: { diag: 'EI Diagnostics', impl: 'EI Implementation' },
+    name: (id: string) => ({ anu: 'Anu', ravi: 'Ravi', p: 'Anna' } as any)[id] ?? id,
+    jointTypes: () => Promise.resolve(new Map([['j', { roles: ['r/diag', 'r/impl'], eis: { 'r/diag': ['anu'], 'r/impl': ['ravi'] } }]])),
+    // self mode asks for its own windows, then for its partners'
+    windows: (ids: string[] | null) => Promise.resolve(ids ? wins.filter(w => ids.includes(w.profileId)) : wins),
+    appointments: () => Promise.resolve([joint]),
+  });
+
+  it('a specialist sees who a joint slot is with, or which role it is waiting for', async () => {
+    const { fixture, c } = await make(svcFor({ eis: true }, 'anu'));
+    const h = c.home!;
+    h.gotoDay(day);
+    await settle(fixture);
+    const col = h.dayCols.find(x => x.typeId === 'j')!;
+    const at9 = col.entries.find(e => e.start.getHours() === 9)!, at10 = col.entries.find(e => e.start.getHours() === 10)!;
+    const booked = col.entries.find(e => e.booked)!;
+    expect(h.jointNote(at9)).toBe('Joint · with Ravi');
+    expect(h.entryStatus(at9)).toBe('Open');
+    expect(h.jointNote(at10)).toContain('needs EI Implementation free at');
+    expect(h.entryStatus(at10)).toBe('Waiting for a partner');
+    expect(h.jointNote(booked)).toBe('Joint · with Ravi');
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-joint-col"]')).toBeTruthy();
+  });
+
+  it('Week windows and Month days say which joint types they offer', async () => {
+    const { fixture, c } = await make(svcFor({ eis: true }, 'anu'));
+    const h = c.home!;
+    h.bar.emit(periodOf('week', day));
+    await settle(fixture);
+    const d = h.days.find(x => x.date.getDate() === day.getDate())!;
+    expect(d.windows[0].joint).toBe('Joint: Kick-off · with Ravi');
+    expect(fixture.nativeElement.querySelector('[data-testid="sas-home-window-joint"]')?.textContent).toContain('Joint: Kick-off · with Ravi');
+    h.bar.emit(periodOf('month', day));
+    await settle(fixture);
+    const cell = h.month.find(x => x.date.getTime() === day.getTime())!;
+    expect(cell.joint).toBe('Joint: 1 bookable · 1 booked');     // 9:00 pairs with Ravi; 11:00 is the booked joint session
+  });
+
+  it('the all-specialists view shows each joint time and each joint session once', async () => {
+    const { fixture, c } = await make(svcFor({ scheduler: true }, 'admin'));
+    const h = c.home!;
+    h.gotoDay(day);
+    await settle(fixture);
+    const col = h.dayCols.find(x => x.typeId === 'j')!;
+    expect(col.entries.filter(e => e.start.getHours() === 9).length).toBe(1);
+    expect(h.jointNote(col.entries.find(e => e.start.getHours() === 9)!)).toBe('Joint · Anu + Ravi · bookable');
+    expect(col.entries.filter(e => e.booked).length).toBe(1);
+    expect(h.jointNote(col.entries.find(e => e.booked)!)).toBe('Joint · Anu + Ravi');
+    h.bar.emit(periodOf('week', day));
+    await settle(fixture);
+    const d = h.days.find(x => x.date.getDate() === day.getDate())!;
+    expect(d.windows.flatMap(x => x.cards).map(r => r.appt.id)).toEqual(['joint']);           // drawn once
+    expect(d.windows.every(x => x.sessions.some(r => r.appt.id === 'joint'))).toBeTrue();     // counted for both
   });
 });
 

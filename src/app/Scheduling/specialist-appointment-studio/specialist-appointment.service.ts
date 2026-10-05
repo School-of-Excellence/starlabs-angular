@@ -4,7 +4,7 @@ import {
   QueryDocumentSnapshot,
 } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
-import { AvailWindow, Appt, CW_KEYS, MENTOR_KEYS, ViewRole, resolveViewRole, availableViews, Interval } from './sas-logic';
+import { AvailWindow, Appt, JointType, CW_KEYS, MENTOR_KEYS, ViewRole, resolveViewRole, availableViews, Interval } from './sas-logic';
 
 export interface ApptRow { appt: Appt; raw: any; }
 export interface Specialist { profileId: string; name: string; role: 'mentor' | 'cw'; productowner: string[]; }
@@ -272,6 +272,31 @@ export class SpecialistAppointmentService {
       }),
     })).sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  /* ---------- Joint delivery types ----------
+     Types whose AppointmentType-To-Roles.required_role has 2+ roles, with the people on each role
+     (Roles-To-EIS). Read once per screen. */
+  private jointP: Promise<Map<string, JointType>> | null = null;
+  jointTypes(): Promise<Map<string, JointType>> {
+    return this.jointP ??= (async () => {
+      const [atr, r2e] = await Promise.all([
+        getDocs(collection(this.firestore, 'AppointmentType-To-Roles')), getDocs(collection(this.firestore, 'Roles-To-EIS')),
+      ]);
+      const eisByRole = new Map<string, string[]>();
+      r2e.docs.forEach(x => {
+        const r = x.data()['assigned_role_ref']?.path;
+        if (r) eisByRole.set(r, [...(eisByRole.get(r) ?? []), ...(x.data()['assigned_eis'] ?? []).map((e: any) => e.id)]);
+      });
+      const out = new Map<string, JointType>();
+      atr.docs.forEach(x => {
+        const t = x.data()['assigned_appttype_ref']?.id, roles: string[] = (x.data()['required_role'] ?? []).map((r: any) => r.path);
+        if (t && roles.length > 1) out.set(t, { roles, eis: Object.fromEntries(roles.map(r => [r, [...new Set(eisByRole.get(r) ?? [])]])) });
+      });
+      return out;
+    })();
+  }
+
+  roleName(rolePath: string) { return this.mapRoles[rolePath.split('/').pop() ?? ''] ?? 'another'; }
 
   /* ---------- Product + appointment-type filter ----------
      all (A&H): every product and every appointment type.

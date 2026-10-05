@@ -273,7 +273,8 @@ export function windowMatchesBooked(w: AvailWindow, b: BookedFilter, now: Date):
    Shown: bookable slots (free, future) and booked slots. A booked slot carries its session when one
    matches (same specialist, same start, same type); sessions outside any slot are added to their
    type's column too. Cancelled sessions are left out (they free the slot again). Blocked (overlap) and past unbooked slots are hidden (operator, 2026-10-01). */
-export interface DayEntry { start: Date; end: Date; profileId: string; typeId: string; w: AvailWindow | null; appt: Appt | null; booked: boolean; }
+/* members: in the all-specialists view a joint type's slot at one time is shown once for everyone free then. */
+export interface DayEntry { start: Date; end: Date; profileId: string; typeId: string; w: AvailWindow | null; appt: Appt | null; booked: boolean; members?: string[]; }
 export interface DayColumn { typeId: string; entries: DayEntry[]; }
 
 export function dayColumns(wins: AvailWindow[], sessions: Appt[], now: Date, booked: BookedFilter = 'all'): DayColumn[] {
@@ -313,4 +314,88 @@ export const JOIN_LEAD_MIN = 5;
 /* Join opens 5 minutes before the start and closes at the end (operator, 2026-10-01). */
 export function joinOpen(a: Appt, now: Date): boolean {
   return now.getTime() >= a.start.getTime() - JOIN_LEAD_MIN * 60000 && now < a.end;
+}
+
+/* ---------- Joint delivery types (operator, 2026-10-05) ----------
+   A type that needs more than one specialist role at the same time (AppointmentType-To-Roles.required_role
+   has 2+ roles, e.g. EI Diagnostics + EI Implementation). It is bookable at a time only when every role has a
+   different free person starting then — the same rule as book-appointment's merge. */
+export interface JointType { roles: string[]; eis: Record<string, string[]>; }    // role path → profile ids
+
+const minuteKey = (d: Date) => Math.floor(d.getTime() / 60000);
+
+export class JointIndex {
+  /* typeId|minute → role → people with a free slot of that type starting then */
+  private free = new Map<string, Map<string, Set<string>>>();
+
+  constructor(private types: Map<string, JointType>, wins: AvailWindow[], now: Date) {
+    for (const w of wins) for (const s of w.slots) {
+      const jt = types.get(s.typeId);
+      if (!jt || !s.available || s.booked || s.start <= now) continue;
+      const key = s.typeId + '|' + minuteKey(s.start);
+      const byRole = this.free.get(key) ?? new Map<string, Set<string>>();
+      for (const role of jt.roles) if ((jt.eis[role] ?? []).includes(w.profileId)) {
+        byRole.set(role, (byRole.get(role) ?? new Set()).add(w.profileId));
+      }
+      this.free.set(key, byRole);
+    }
+  }
+
+  isJoint(typeId: string) { return this.types.has(typeId); }
+  roles(typeId: string) { return this.types.get(typeId)?.roles ?? []; }
+
+  /* Every team that could take the type at that start: one different free person per role. */
+  teams(typeId: string, start: Date): string[][] {
+    const jt = this.types.get(typeId), byRole = this.free.get(typeId + '|' + minuteKey(start));
+    if (!jt || !byRole) return [];
+    const out: string[][] = [];
+    const walk = (i: number, team: string[]) => {
+      if (i === jt.roles.length) { out.push(team); return; }
+      for (const p of byRole.get(jt.roles[i]) ?? []) if (!team.includes(p)) walk(i + 1, [...team, p]);
+    };
+    walk(0, []);
+    return out;
+  }
+
+  /* Who could take it with this person at that start (empty = not bookable yet). */
+  partners(typeId: string, start: Date, profileId: string): string[] {
+    const set = new Set<string>();
+    this.teams(typeId, start).filter(t => t.includes(profileId)).forEach(t => t.forEach(p => p !== profileId && set.add(p)));
+    return [...set];
+  }
+
+  /* The roles with nobody free at that start. */
+  uncovered(typeId: string, start: Date): string[] {
+    const byRole = this.free.get(typeId + '|' + minuteKey(start));
+    return this.roles(typeId).filter(r => !(byRole?.get(r)?.size));
+  }
+
+  /* The roles nobody else is free for at that start — what the slot is waiting for. */
+  missing(typeId: string, start: Date, profileId: string): string[] {
+    const jt = this.types.get(typeId), byRole = this.free.get(typeId + '|' + minuteKey(start));
+    if (!jt) return [];
+    const own = jt.roles.find(r => (jt.eis[r] ?? []).includes(profileId));
+    return jt.roles.filter(r => r !== own && ![...(byRole?.get(r) ?? [])].some(p => p !== profileId));
+  }
+}
+
+/* All-specialists view: a joint type's column shows each time once — open slots at the same start merged
+   into one entry listing everyone free then, a booked session once however many hosts it has.
+   Joint columns go last. */
+export function collapseJoint(cols: DayColumn[], idx: JointIndex): DayColumn[] {
+  const out = cols.map(c => {
+    if (!idx.isJoint(c.typeId) && c.typeId !== '') return c;
+    const seen = new Map<string, DayEntry>(), entries: DayEntry[] = [];
+    for (const e of c.entries) {
+      if (!idx.isJoint(e.typeId)) { entries.push(e); continue; }
+      const key = e.booked ? 'b|' + (e.appt?.id ?? e.profileId + e.start.getTime()) : 'o|' + e.typeId + '|' + e.start.getTime();
+      const hit = seen.get(key);
+      if (hit) { if (!hit.booked && !hit.members!.includes(e.profileId)) hit.members!.push(e.profileId); continue; }
+      const copy = { ...e, members: e.booked ? (e.appt?.hostIds ?? [e.profileId]) : [e.profileId] };
+      seen.set(key, copy);
+      entries.push(copy);
+    }
+    return { ...c, entries };
+  });
+  return [...out.filter(c => !idx.isJoint(c.typeId)), ...out.filter(c => idx.isJoint(c.typeId))];
 }

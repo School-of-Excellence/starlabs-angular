@@ -2,7 +2,7 @@ import {
   resolveViewRole, unionMinutes, bookedMinutes, hoursSummary, previewSlots, apptStatus,
   windowState, periodOf, shiftPeriod, overlapsAny, AvailWindow, Appt, NO_SHOW_REASON,
   openMinutes, availStatus, windowLabel, windowStatus, availableViews,
-  fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot, groupColumns,
+  fmtHours, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, joinOpen, Slot, groupColumns, JointIndex, collapseJoint,
 } from './sas-logic';
 
 const T = (h: number, m = 0) => new Date(2026, 8, 28, h, m);
@@ -284,6 +284,36 @@ describe('sas-logic', () => {
       expect(time.length).toBe(1);
       expect(time[0].typeId).toBe('');
       expect(time[0].entries.map(e => e.start.getHours())).toEqual([8, 9, 10]);
+    });
+  });
+
+  describe('joint delivery types', () => {
+    const sl = (h: number, booked = false): Slot => ({ typeId: 'j', start: T(h), end: T(h + 1), booked, available: !booked });
+    const types = new Map([['j', { roles: ['r/diag', 'r/impl'], eis: { 'r/diag': ['anu'], 'r/impl': ['ravi', 'kim'] } }]]);
+    const wins = [
+      win({ id: 'a', profileId: 'anu', typeIds: ['j'], slots: [sl(9), sl(10), sl(11)] }),
+      win({ id: 'r', profileId: 'ravi', typeIds: ['j'], slots: [sl(9), sl(11, true)] }),
+      win({ id: 'k', profileId: 'kim', typeIds: ['j'], slots: [sl(9)] }),
+    ];
+    const idx = new JointIndex(types, wins, T(8));
+
+    it('pairs a slot with every partner free at the same start', () => {
+      expect(idx.isJoint('j')).toBeTrue();
+      expect(idx.partners('j', T(9), 'anu').sort()).toEqual(['kim', 'ravi']);
+      expect(idx.teams('j', T(9)).length).toBe(2);
+    });
+    it('says which role a slot is waiting for', () => {
+      expect(idx.partners('j', T(10), 'anu')).toEqual([]);
+      expect(idx.missing('j', T(10), 'anu')).toEqual(['r/impl']);
+      expect(idx.uncovered('j', T(11))).toEqual(['r/impl']);      // ravi is booked at 11
+    });
+    it('collapseJoint shows each time once for everyone free, and puts joint columns last', () => {
+      const cols = dayColumns(wins, [], T(8));
+      const out = collapseJoint([{ typeId: 'x', entries: [] }, ...cols], idx);
+      expect(out.map(c => c.typeId)).toEqual(['x', 'j']);
+      const nine = out[1].entries.filter(e => e.start.getHours() === 9);
+      expect(nine.length).toBe(1);
+      expect(nine[0].members!.sort()).toEqual(['anu', 'kim', 'ravi']);
     });
   });
 

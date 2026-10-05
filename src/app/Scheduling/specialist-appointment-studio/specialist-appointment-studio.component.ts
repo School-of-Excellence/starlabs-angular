@@ -27,7 +27,7 @@ import {
   WindowState, WindowStatus, WINDOW_STATUSES, SasFilter, NO_FILTER, BookedFilter, DayColumn, DayEntry, SlotGrouping, Appt,
   apptStatus, availStatus, hoursSummary, fmtHours, periodOf, shiftPeriod, sameDay, mondayOf, openMinutes, windowState,
   windowStatus, scopeWindow, apptMatches, windowMatchesBooked, dayColumns, groupColumns, joinOpen, JOIN_LEAD_MIN,
-  NO_SHOW_REASON, daysBetween, overlapsAny, previewSlots,
+  NO_SHOW_REASON, daysBetween, overlapsAny, previewSlots, JointIndex, JointType, collapseJoint,
 } from './sas-logic';
 
 /* Specialist Appointment Studio: centralised appointments for CW specialists, mentor specialists and the
@@ -154,8 +154,11 @@ type PastFilter = 'pending' | 'completed' | 'cancelled';
 const PAST_PAGE = 10;          // rows added per Load more
 const PAST_FETCH = 25;         // appointments read per Firestore page
 const PAST_MAX_FETCHES = 8;    // per click, so a rare status can't read the whole history in one go
-interface CalDay { date: Date; windows: { w: AvailWindow; state: WindowState; label: string; sessions: ApptRow[]; open: number }[]; loose: ApptRow[]; }
-interface MonthCell { date: Date; out: boolean; lines: { label: string; color: string }[]; more: number; }
+/* sessions = every session in the window (its status counts them all); cards = the ones drawn under it — in the
+   all-specialists view a joint session is drawn once, under its first host's window (operator, 2026-10-05). */
+interface CalDay { date: Date; windows: { w: AvailWindow; state: WindowState; label: string; sessions: ApptRow[]; cards: ApptRow[]; open: number; joint: string | null }[]; loose: ApptRow[]; }
+/* joint: "2 bookable · 1 booked" for the day's joint delivery types, or null when it has none. */
+interface MonthCell { date: Date; out: boolean; lines: { label: string; color: string }[]; more: number; joint: string | null; }
 
 export class HomeTab {
   readonly bar: PeriodBar;
@@ -195,6 +198,10 @@ export class HomeTab {
   private pastRun = 0;
   private loadRun = 0;
   private raw: { wins: AvailWindow[]; appts: ApptRow[]; up: ApptRow[] } = { wins: [], appts: [], up: [] };
+  /* Joint delivery types: who could take a slot with whom. Partners' windows are read too, but never shown. */
+  joint = new JointIndex(new Map(), [], new Date());
+  private jointTypes = new Map<string, JointType>();
+  private partnerWins: AvailWindow[] = [];
 
   constructor(private h: SpecialistAppointmentStudioComponent, public mode: 'self' | 'all') {
     this.bar = new PeriodBar(periodOf('week', new Date()), () => this.load(), true);
@@ -245,13 +252,23 @@ export class HomeTab {
     const calTo = p.mode === 'month' ? new Date(calFrom.getTime() + 42 * 86400000) : p.to;
     try {
       this.loadPast(true);
-      const [wins, appts, up] = await Promise.all([
+      const [wins, appts, up, joint] = await Promise.all([
         this.svc.windows(ids, calFrom, calTo),
         this.svc.appointments(ids, calFrom, calTo),
         this.svc.appointments(ids, upFrom, upTo, ids ? 0 : 300),
+        this.svc.jointTypes(),
       ]);
+      // A specialist's joint types need their partners' free slots to say whether a slot is bookable.
+      let partnerWins: AvailWindow[] = [];
+      if (ids && joint.size) {
+        const mine = [...joint.values()].filter(j => Object.values(j.eis).some(l => l.some(p => ids.includes(p))));
+        const partners = [...new Set(mine.flatMap(j => Object.values(j.eis).flat()))].filter(p => !ids.includes(p));
+        if (partners.length) partnerWins = await this.svc.windows(partners, calFrom, calTo);
+      }
       if (run !== this.loadRun) return;
       this.raw = { wins, appts, up };
+      this.jointTypes = joint;
+      this.partnerWins = partnerWins;
       this.apply();
     } catch (e) {
       if (run !== this.loadRun) return;
@@ -265,6 +282,7 @@ export class HomeTab {
      filter change is instant. Windows are cut to the picked types (scopeWindow) before any hours. */
   private apply() {
     const f = this.filter, p = this.period;
+    this.joint = new JointIndex(this.jointTypes, [...this.raw.wins, ...this.partnerWins], this.now);
     const inP = <T extends { start: Date }>(x: T) => x.start >= p.from && x.start < p.to;
     const wins = this.raw.wins.map(w => scopeWindow(w, f.typeIds)).filter((w): w is AvailWindow => !!w);
     const appts = this.raw.appts.filter(r => apptMatches(r.appt, f));
@@ -299,7 +317,7 @@ export class HomeTab {
   /* One day's slots, grouped by type or in time order. */
   private slotCols(d: Date, wins: AvailWindow[], appts: Appt[]): DayColumn[] {
     const cols = dayColumns(wins.filter(w => sameDay(w.start, d)), appts.filter(a => sameDay(a.start, d)), this.now, this.filter.booked);
-    return groupColumns(cols, this.groupBy, id => this.h.typeLabel(id));
+    return collapseJoint(groupColumns(cols, this.groupBy, id => this.h.typeLabel(id)), this.joint);
   }
 
   setGroup(g: SlotGrouping) { if (g !== this.groupBy) { this.groupBy = g; this.apply(); } }
@@ -317,12 +335,14 @@ export class HomeTab {
         .sort((a, b) => a.start.getTime() - b.start.getTime() || this.svc.name(a.profileId).localeCompare(this.svc.name(b.profileId)));
       // A session belongs to a window of the same specialist that it starts inside, once per specialist:
       // a collaborative session shows under every host's window (operator, 2026-10-05).
-      const used = new Set<string>(), key = (r: ApptRow, who: string) => r.appt.id + '|' + who;
+      const used = new Set<string>(), key = (r: ApptRow, who: string) => r.appt.id + '|' + who, carded = new Set<string>();
       const windows = ws.map(w => {
         const sessions = live.filter(r => sameDay(r.appt.start, d) && r.appt.hostIds.includes(w.profileId)
             && r.appt.start >= w.start && r.appt.start < w.end && !used.has(key(r, w.profileId))).sort(byStart);
         sessions.forEach(r => used.add(key(r, w.profileId)));
-        return { w, state: windowState(w, this.now), label: windowStatus(w, sessions.map(r => r.appt), this.now) as string, sessions, open: openMinutes(w, this.now) };
+        const cards = this.allMode ? sessions.filter(r => !carded.has(r.appt.id)) : sessions;
+        cards.forEach(r => carded.add(r.appt.id));
+        return { w, state: windowState(w, this.now), label: windowStatus(w, sessions.map(r => r.appt), this.now) as string, sessions, cards, open: openMinutes(w, this.now), joint: this.windowJoint(w) };
       });
       const placed = new Set([...used].map(k => k.split('|')[0]));
       const loose = live.filter(r => sameDay(r.appt.start, d) && !placed.has(r.appt.id));
@@ -356,7 +376,7 @@ export class HomeTab {
             color: STATE_DOT[x.state],
           }));
         }
-        this.month.push({ date: d, out: d.getMonth() !== mo, lines: lines.slice(0, 3), more: Math.max(0, lines.length - 3) });
+        this.month.push({ date: d, out: d.getMonth() !== mo, lines: lines.slice(0, 3), more: Math.max(0, lines.length - 3), joint: this.dayJoint(day) });
       }
       this.days = [];
     }
@@ -410,16 +430,80 @@ export class HomeTab {
   /* ---------- Day view / filtered Week entries ---------- */
   entryRow(e: DayEntry): ApptRow | null { return e.appt ? this.raw.appts.find(r => r.appt.id === e.appt!.id) ?? null : null; }
   entryStatus(e: DayEntry): string {
-    if (!e.booked) return 'Open';
+    if (!e.booked) return this.waiting(e) ? 'Waiting for a partner' : 'Open';
     if (!e.appt) return 'Booked';
     const s = apptStatus(e.appt, this.now);
     return s === 'Pending' ? 'Completion pending' : s;
   }
   entryClass(e: DayEntry) {
-    if (!e.booked) return 'sas-slot s-open';
+    if (!e.booked) return this.waiting(e) ? 'sas-slot s-wait' : 'sas-slot s-open';
     const row = this.entryRow(e);
     return row ? 'sas-slot is-sess ' + this.chipClass(row) : 'sas-slot s-full';
   }
+  /* ---------- Joint delivery types (operator, 2026-10-05) ---------- */
+  isJoint(typeId: string) { return this.joint.isJoint(typeId); }
+  /* An open joint slot nobody can pair with yet. */
+  waiting(e: DayEntry) { return !e.booked && this.joint.isJoint(e.typeId) && !this.joint.teams(e.typeId, e.start).length; }
+  private names(ids: string[]) { return ids.map(id => this.svc.name(id)); }
+  /* The badge line: who it is with, or which role it is waiting for. */
+  jointNote(e: DayEntry): string | null {
+    const hosts = e.appt?.hostIds ?? [];
+    if (!this.joint.isJoint(e.typeId) && hosts.length < 2) return null;
+    if (e.booked) {
+      const all = hosts.length ? hosts : (e.members ?? [e.profileId]);
+      return this.allMode ? 'Joint · ' + this.names(all).join(' + ') : 'Joint · with ' + (this.names(all.filter(x => x !== e.profileId)).join(', ') || 'a partner');
+    }
+    const roles = (list: string[]) => list.map(r => this.svc.roleName(r)).join(' and ');
+    if (this.allMode) {
+      const who = this.names(e.members ?? [e.profileId]).join(' + ');
+      if (this.joint.teams(e.typeId, e.start).length) return `Joint · ${who} · bookable`;
+      const gap = this.joint.uncovered(e.typeId, e.start);
+      return `Joint · ${who} · needs ${gap.length ? roles(gap) : 'a different person for each role'}`;
+    }
+    const partners = this.joint.partners(e.typeId, e.start, e.profileId);
+    if (partners.length) return 'Joint · with ' + this.names(partners).join(' or ');
+    const gap = this.joint.missing(e.typeId, e.start, e.profileId);
+    return `Joint · needs ${gap.length ? roles(gap) : 'a partner'} free at ${this.h.t(e.start)}`;
+  }
+  /* Week window line and tooltip: each joint type it offers, with who its open slots pair with or the role
+     they wait for (operator, 2026-10-05). */
+  windowJoint(w: AvailWindow): string | null {
+    const parts = w.typeIds.filter(t => this.joint.isJoint(t)).map(t => {
+      const name = this.h.typeLabel(t);
+      const open = w.slots.filter(s => s.typeId === t && s.available && !s.booked && s.start > this.now);
+      if (!open.length) return name;
+      const partners = new Set<string>();
+      open.forEach(s => this.joint.partners(t, s.start, w.profileId).forEach(p => partners.add(p)));
+      if (partners.size) return `${name} · with ${this.names([...partners]).join(', ')}`;
+      const gap = this.joint.missing(t, open[0].start, w.profileId);
+      return `${name} · needs ${gap.length ? gap.map(r => this.svc.roleName(r)).join(' and ') : 'a partner'}`;
+    });
+    return parts.length ? 'Joint: ' + parts.join('; ') : null;
+  }
+
+  /* Month cell line: joint start times that can be booked that day, and joint sessions booked. */
+  private dayJoint(day: CalDay): string | null {
+    const offers = day.windows.filter(x => x.w.typeIds.some(t => this.joint.isJoint(t)));
+    const booked = new Set([...day.windows.flatMap(x => x.sessions), ...day.loose]
+      .filter(r => !r.appt.cancelled && r.appt.hostIds.length > 1).map(r => r.appt.id)).size;
+    if (!offers.length && !booked) return null;
+    const times = new Set<string>();
+    offers.forEach(x => x.w.slots.forEach(s => {
+      if (this.joint.isJoint(s.typeId) && s.available && !s.booked && s.start > this.now && this.joint.partners(s.typeId, s.start, x.w.profileId).length) {
+        times.add(s.typeId + '|' + s.start.getTime());
+      }
+    }));
+    const parts = [...(times.size || !booked ? [`${times.size} bookable`] : []), ...(booked ? [`${booked} booked`] : [])];
+    return 'Joint: ' + parts.join(' · ');
+  }
+
+  /* A booked joint session's other specialists (tables and week cards). */
+  hostLine(r: ApptRow, me?: string): string | null {
+    const hosts = r.appt.hostIds;
+    if (hosts.length < 2) return null;
+    return this.allMode || !me ? 'Joint · ' + this.names(hosts).join(' + ') : 'Joint · with ' + this.names(hosts.filter(x => x !== me)).join(', ');
+  }
+
   entryClick(e: DayEntry) {
     const row = this.entryRow(e);
     if (row) this.openDetail(row);
