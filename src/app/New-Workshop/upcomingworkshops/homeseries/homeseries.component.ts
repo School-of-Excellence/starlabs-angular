@@ -4,6 +4,7 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Va
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -44,6 +45,7 @@ interface EpisodeOption {
     MatProgressSpinnerModule,
     MatTooltipModule,
     DragDropModule,
+    MatSlideToggleModule,
     NgxMatSelectSearchModule
   ],
   templateUrl: './homeseries.component.html',
@@ -69,6 +71,15 @@ export class HomeseriesComponent implements OnInit {
   ) {
     this.form = this.fb.group({
       title: ['', Validators.required],
+      // Series-level presentation fields. All optional: an empty one is stored as an
+      // empty string, never null, so a consumer never has to test for a missing key.
+      // `subtitle` here belongs to the SERIES — the per-episode rows have their own.
+      pickoftheweek: [false],
+      heading: [''],
+      headleft: [''],
+      headright: [''],
+      subtitle: [''],
+      buttontext: [''],
       selectedEpisodes: [[] as string[]],
       homeseries: this.fb.array([])
     });
@@ -111,7 +122,16 @@ export class HomeseriesComponent implements OnInit {
         if (epId) ids.push(epId);
         this.homeseries.push(this.makeGroup(epId, item?.title, item?.footer, item?.headtag, item?.subtitle));
       });
-      this.form.patchValue({ title: s.title || '', selectedEpisodes: ids });
+      this.form.patchValue({
+        title: s.title || '',
+        pickoftheweek: s.pickoftheweek === true,
+        heading: s.heading || '',
+        headleft: s.headleft || '',
+        headright: s.headright || '',
+        subtitle: s.subtitle || '',
+        buttontext: s.buttontext || '',
+        selectedEpisodes: ids,
+      });
     }
   }
 
@@ -205,6 +225,12 @@ export class HomeseriesComponent implements OnInit {
 
     const payload: any = {
       title: (this.form.get('title')?.value || '').trim(),
+      pickoftheweek: this.form.get('pickoftheweek')?.value === true,
+      heading: (this.form.get('heading')?.value || '').trim(),
+      headleft: (this.form.get('headleft')?.value || '').trim(),
+      headright: (this.form.get('headright')?.value || '').trim(),
+      subtitle: (this.form.get('subtitle')?.value || '').trim(),
+      buttontext: (this.form.get('buttontext')?.value || '').trim(),
       homeseries
     };
 

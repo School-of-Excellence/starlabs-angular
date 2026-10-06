@@ -122,25 +122,25 @@
                   <tbody>
                     <tr data-testid="jted-ov-empty" *ngIf="!displayedEntries.length"><td colspan="2" class="empty">No participants match.</td></tr>
 
-                    <ng-container *ngFor="let entry of displayedEntries">
+                    <ng-container *ngFor="let participant of displayedEntries">
                     <tr data-testid="jted-ov-row">
                       <td>
                         <div class="who-cell">
-                          <div class="tok" [style.background]="tokColor(entry.key)">{{ entry.value.name.substring(0,2).toUpperCase() }}</div>
-                          <div class="name-strong">{{ entry.value.name }}<small>{{ entry.value.email }}</small></div>
+                          <div class="tok" [style.background]="tokColor(participant.profileid)">{{ participant.name.substring(0,2).toUpperCase() }}</div>
+                          <div class="name-strong">{{ participant.name }}<small>{{ participant.email }}</small></div>
                         </div>
                       </td>
                       <td>
-                        {{ (entry.value.participantproducts || []).length }}
-                        product{{ (entry.value.participantproducts || []).length > 1 ? 's' : '' }}
-                        <span data-testid="jted-ov-tag-notstarted" class="tag" style="margin-left:8px;background:var(--surface-3);color:var(--muted)" *ngIf="entry.value.notstartedparticipant">Not started</span>
-                        <span data-testid="jted-ov-tag-attention" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-attention) 15%, transparent);color:var(--c-attention)" *ngIf="entry.value.needsattention">Needs attention</span>
-                        <span data-testid="jted-ov-tag-completed" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-done) 15%, transparent);color:var(--c-done)" *ngIf="entry.value.completed">Completed</span>
-                        <span data-testid="jted-ov-tag-signoff" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-await) 15%, transparent);color:var(--c-await)" *ngIf="entry.value.awaitingsignoff">Awaiting sign-off</span>
+                        {{ (participant.participantproducts || []).length }}
+                        product{{ (participant.participantproducts || []).length > 1 ? 's' : '' }}
+                        <span data-testid="jted-ov-tag-notstarted" class="tag" style="margin-left:8px;background:var(--surface-3);color:var(--muted)" *ngIf="participant.notstartedparticipant">Not started</span>
+                        <span data-testid="jted-ov-tag-attention" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-attention) 15%, transparent);color:var(--c-attention)" *ngIf="participant.needsattention">Needs attention</span>
+                        <span data-testid="jted-ov-tag-completed" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-done) 15%, transparent);color:var(--c-done)" *ngIf="participant.completed">Completed</span>
+                        <span data-testid="jted-ov-tag-signoff" class="tag" style="margin-left:8px;background:color-mix(in srgb, var(--c-await) 15%, transparent);color:var(--c-await)" *ngIf="participant.awaitingsignoff">Awaiting sign-off</span>
                       </td>
                     </tr>
 
-                    <ng-container *ngFor="let product of entry.value.participantproducts">
+                    <ng-container *ngFor="let product of participant.participantproducts">
                       <tr data-testid="jted-ov-product" class="click" (click)="toggleOverviewProduct(product.participantproductid)">
                         <td colspan="2">
                           <div style="display:flex;align-items:center;justify-content:space-between;">
