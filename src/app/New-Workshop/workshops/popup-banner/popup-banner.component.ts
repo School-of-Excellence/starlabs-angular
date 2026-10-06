@@ -11,6 +11,9 @@ import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { NgxEditorModule, Editor, Toolbar } from 'ngx-editor';
 import { WC2_TOOLBAR_FULL, resetToParagraph, focusedEditor } from '../../workshop-configurationv2/wc2-editor';
+import {
+  PopupBanner, bannerLabel, bannersFromDoc, bannersToPayload, blankBanner, isLegacyOnly,
+} from './popup-banner.model';
 
 /** The three artwork slots, with the size each one is cut to. */
 interface Slot {
@@ -20,13 +23,23 @@ interface Slot {
 }
 
 /**
- * EiFlix popup banner editor — a single Firestore document,
- * `classify/eiflixpopupbanner`.
+ * EiFlix popup banner editor — the `popupbanner` field on `classify/eiflixpopupbanner`.
  *
- * One banner exists for the whole app, so this edits that one document rather
- * than a collection: `setDoc(..., { merge: true })` creates it on the first save
- * and updates it afterwards. Nothing is required — every field may be left
- * empty, and `enable` is the switch that decides whether the banner shows.
+ * SEVERAL banners live in that one field, as an array of maps (2026-10-06). The dialog is a
+ * master-detail: the list picks a banner, and the form below edits whichever is selected. One set of
+ * six ngx-editor instances is reused across the selection rather than one set per banner — ProseMirror
+ * instances are expensive, and a list of ten banners would otherwise build sixty of them.
+ *
+ * The form is the working copy of the SELECTED banner only. Every path that changes the selection
+ * (select, add, remove) commits the form back into the array first, so an edit is never lost by
+ * clicking away from it.
+ *
+ * `setDoc(..., { merge: true })` writes only `popupbanner`. The legacy flat fields are deliberately
+ * left on the document: the app that renders the popup still reads them until it is updated, so
+ * clearing them here would take the live banner down.
+ *
+ * Nothing is required — every field may be left empty, and each banner's own `enable` decides
+ * whether it shows.
  *
  * The rich-text fields use the same ngx-editor setup and skin as the workshop
  * configuration editor (`wc2-shared.css`), so the two screens behave alike.
@@ -49,6 +62,14 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
   loadError = false;
   justSaved = false;
   private savedTimer: any = null;
+
+  /** Every banner on the document. The form edits whichever `selected` points at. */
+  banners: PopupBanner[] = [];
+  selected = 0;
+  /** Adding, removing or reordering is a change the form's own dirty flag cannot see. */
+  listDirty = false;
+  /** True while the document still holds only the pre-array banner — shown as a one-off notice. */
+  migratedFromLegacy = false;
 
   /** Rich text everywhere except `button1link`, which is a plain URL. */
   readonly richFields = [
@@ -124,25 +145,15 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
       const snap = await getDoc(doc(this.firestore, this.docPath.col, this.docPath.id));
       // A missing document is the normal first-run state, not an error.
       const d: any = snap.exists() ? snap.data() : {};
-      this.form.patchValue({
-        header: this.str(d['header']),
-        title: this.str(d['title']),
-        description: this.str(d['description']),
-        button1text: this.str(d['button1text']),
-        button2text: this.str(d['button2text']),
-        button1link: this.str(d['button1link']),
-        footer: this.str(d['footer']),
-        desktop: this.str(d['desktop']),
-        tablet: this.str(d['tablet']),
-        mobile: this.str(d['mobile']),
-        enable: d['enable'] === true,
-      }, { emitEvent: false });
-      // ngx-editor normalises the HTML it renders ('' becomes <p></p>), so push
-      // the saved markup into the model without re-rendering the view — the
-      // same guard the workshop configuration editor uses.
-      this.richFields.forEach(f =>
-        this.form.get(f.key)?.setValue(this.str(d[f.key]), { emitModelToViewChange: false, emitEvent: false }));
-      this.form.markAsPristine();
+      // bannersFromDoc adopts the pre-array flat banner when there is no array yet, so the one
+      // already live is never lost behind the new shape.
+      this.migratedFromLegacy = isLegacyOnly(d);
+      this.banners = bannersFromDoc(d);
+      // An empty document still needs something to type into.
+      if (this.banners.length === 0) this.banners = [blankBanner()];
+      this.selected = 0;
+      this.patchForm(this.banners[0]);
+      this.listDirty = false;
       this.loadError = false;
     } catch (e) {
       console.error('Popup banner load failed:', e);
@@ -153,6 +164,87 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
   }
 
   private str(v: any): string { return typeof v === 'string' ? v : ''; }
+
+  // ───────────────────────── the banner list ─────────────────────────
+
+  /** Put one banner into the form. */
+  private patchForm(b: PopupBanner): void {
+    this.form.patchValue(b, { emitEvent: false });
+    // ngx-editor normalises the HTML it renders ('' becomes <p></p>), so push the saved markup into
+    // the model without re-rendering the view — the same guard the workshop configuration editor
+    // uses. On a selection change this ALSO has to reach the view, or the editors would keep showing
+    // the previous banner's text: setContent() is what actually swaps what ProseMirror displays.
+    this.richFields.forEach(f => {
+      const html = this.str((b as any)[f.key]);
+      this.form.get(f.key)?.setValue(html, { emitModelToViewChange: false, emitEvent: false });
+      this.editors[f.key]?.setContent(html || '');
+    });
+    this.form.markAsPristine();
+  }
+
+  /** The form's current values as a banner map. */
+  private formBanner(): PopupBanner {
+    const v = this.form.value;
+    return {
+      header: v.header || '',
+      title: v.title || '',
+      description: v.description || '',
+      button1text: v.button1text || '',
+      button2text: v.button2text || '',
+      button1link: (v.button1link || '').trim(),
+      footer: v.footer || '',
+      desktop: v.desktop || '',
+      tablet: v.tablet || '',
+      mobile: v.mobile || '',
+      enable: v.enable === true,
+    };
+  }
+
+  /**
+   * Write the form back into the array it came from.
+   *
+   * Every path that changes which banner is on screen calls this FIRST — otherwise switching banners
+   * would quietly discard whatever was typed into the one being left.
+   */
+  private commitForm(): void {
+    if (this.selected >= 0 && this.selected < this.banners.length) {
+      this.banners[this.selected] = this.formBanner();
+    }
+  }
+
+  label(b: PopupBanner, i: number): string { return bannerLabel(b, i); }
+
+  trackBanner(index: number): number { return index; }
+
+  selectBanner(i: number): void {
+    if (i === this.selected || i < 0 || i >= this.banners.length) return;
+    this.commitForm();
+    if (this.form.dirty) this.listDirty = true;   // the edit now lives in the array, not the form
+    this.selected = i;
+    this.patchForm(this.banners[i]);
+  }
+
+  addBanner(): void {
+    this.commitForm();
+    if (this.form.dirty) this.listDirty = true;
+    this.banners.push(blankBanner());
+    this.selected = this.banners.length - 1;
+    this.patchForm(this.banners[this.selected]);
+    this.listDirty = true;
+  }
+
+  removeBanner(i: number): void {
+    if (i < 0 || i >= this.banners.length) return;
+    if (!confirm(`Remove "${bannerLabel(this.banners[i], i)}"? This cannot be undone once you save.`)) return;
+    this.commitForm();
+    this.banners.splice(i, 1);
+    // The list is never empty: an operator with no banners has nothing to type into.
+    if (this.banners.length === 0) this.banners = [blankBanner()];
+    this.selected = Math.min(this.selected > i ? this.selected - 1 : this.selected, this.banners.length - 1);
+    if (this.selected < 0) this.selected = 0;
+    this.patchForm(this.banners[this.selected]);
+    this.listDirty = true;
+  }
 
   // ───────────────────────────── artwork ─────────────────────────────
   onImageError(slot: Slot): void { this.broken[slot.key] = true; }
@@ -210,26 +302,15 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
   }
 
   // ───────────────────────────── save ─────────────────────────────
-  get dirty(): boolean { return !!this.form && this.form.dirty; }
+  /** Unsaved work is either an edit in the form OR a change to the list itself. */
+  get dirty(): boolean { return (!!this.form && this.form.dirty) || this.listDirty; }
   get anyUploading(): boolean { return Object.values(this.uploading).some(Boolean); }
 
-  /** The saveable shape of the form right now — compared before and after a
+  /** The saveable shape of EVERY banner right now — compared before and after a
    *  write to tell whether the operator edited anything meanwhile. */
   private snapshot(): any {
-    const v = this.form.value;
-    return {
-        header: v.header || '',
-        title: v.title || '',
-        description: v.description || '',
-        button1text: v.button1text || '',
-        button2text: v.button2text || '',
-        button1link: (v.button1link || '').trim(),
-        footer: v.footer || '',
-        desktop: v.desktop || '',
-        tablet: v.tablet || '',
-        mobile: v.mobile || '',
-      enable: v.enable === true,
-    };
+    this.commitForm();
+    return bannersToPayload(this.banners);
   }
 
   async save(): Promise<void> {
@@ -237,16 +318,24 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
     this.saving = true;
     try {
       const payload = this.snapshot();
-      // merge:true so the first save creates the document and a later save never
-      // drops a field some other screen may have added to it.
+      // merge:true so the first save creates the document, a later save never drops a field some
+      // other screen added, and — deliberately — the legacy flat fields stay put: the app that
+      // renders the popup still reads them until it is updated to read `popupbanner`.
       await setDoc(doc(this.firestore, this.docPath.col, this.docPath.id), payload, { merge: true });
       // An edit or an upload can land while the write is in flight. Clearing the
       // dirty flag unconditionally would mark those unsaved edits as saved.
-      if (JSON.stringify(this.snapshot()) === JSON.stringify(payload)) this.form.markAsPristine();
+      if (JSON.stringify(this.snapshot()) === JSON.stringify(payload)) {
+        this.form.markAsPristine();
+        this.listDirty = false;
+        // Once an array is on the document the legacy notice no longer applies.
+        this.migratedFromLegacy = false;
+      }
       this.justSaved = true;
       if (this.savedTimer) clearTimeout(this.savedTimer);
       this.savedTimer = setTimeout(() => { this.justSaved = false; }, 4000);
-      this.snackBar.open('Popup banner saved.', 'Close', { duration: 2500, panelClass: 'sx-snack' });
+      this.snackBar.open(
+        this.banners.length === 1 ? 'Popup banner saved.' : `${this.banners.length} popup banners saved.`,
+        'Close', { duration: 2500, panelClass: 'sx-snack' });
     } catch (e) {
       console.error('Popup banner save failed:', e);
       this.snackBar.open('Could not save the popup banner.', 'Close', { duration: 4000, panelClass: 'sx-snack' });
@@ -267,7 +356,7 @@ export class PopupBannerComponent implements OnInit, OnDestroy {
     if (this.anyUploading &&
         !confirm('An image is still uploading. Close anyway? The upload will finish but its URL will not be saved.')) return;
     if (this.dirty &&
-        !confirm('You have unsaved changes to the popup banner. Close without saving?')) return;
+        !confirm('You have unsaved changes to the popup banners. Close without saving?')) return;
     this.dialogRef.close();
   }
 }

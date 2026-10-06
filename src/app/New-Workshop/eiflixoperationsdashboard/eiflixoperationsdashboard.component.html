@@ -492,6 +492,14 @@
             }
           </mat-select>
         </mat-form-field>
+        <mat-form-field appearance="outline" class="eod-log-select eod-log-select-md" subscriptSizing="dynamic">
+          <mat-label>User type</mat-label>
+          <mat-select data-testid="eif-logs-usertype-filter" [(value)]="logUserTypeFilter" (selectionChange)="onLogFilterChange()">
+            <mat-option data-testid="eif-logs-usertype-all" value="all">All users</mat-option>
+            <mat-option data-testid="eif-logs-usertype-new" value="new">New users</mat-option>
+            <mat-option data-testid="eif-logs-usertype-existing" value="existing">Existing users</mat-option>
+          </mat-select>
+        </mat-form-field>
         @if (logFilterCount) {
           <button data-testid="eif-logs-clear" type="button" class="eod-log-clear" (click)="clearLogFilters()">
             <mat-icon aria-hidden="true">filter_alt_off</mat-icon>Clear {{ logFilterCount }}
