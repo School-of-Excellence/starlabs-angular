@@ -79,3 +79,27 @@
   .pb-slots { grid-template-columns: minmax(0, 1fr); }
   .pb-head, .pb-body, .pb-bar { padding-left: 16px; padding-right: 16px; }
 }
+
+/* ───────── banner list (2026-10-06: several banners per document) ───────── */
+.pb-list-card { margin-bottom: 14px; }
+.pb-legacy { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: #fff7e6; border: 1px solid #ffd591; color: #874d00; }
+
+.pb-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+/* A flex column with a max-height compresses its children below their own content height, which
+   paints one row over the next. Same fix as the workshop access picker. */
+.pb-list > * { flex-shrink: 0; }
+
+.pb-list-item { display: flex; align-items: center; gap: 4px; border: 1px solid var(--pb-hairline, #e3e3e8); border-radius: 10px; background: #fff; }
+.pb-list-item.sel { border-color: #7c4dff; box-shadow: 0 0 0 2px rgba(124, 77, 255, 0.12); }
+
+.pb-list-pick { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 0; border-radius: 10px; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.pb-list-pick:hover { background: rgba(124, 77, 255, 0.05); }
+
+/* The name takes the room and wraps; the state pill never shrinks or wraps. */
+.pb-list-name { flex: 1 1 auto; min-width: 6em; font-size: 13.5px; font-weight: 500; color: var(--pb-ink, #26262c); white-space: normal; overflow-wrap: break-word; }
+.pb-list-state { flex: 0 0 auto; padding: 1px 8px; border-radius: 10px; background: #ececeF; color: #6b6b76; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; white-space: nowrap; }
+.pb-list-state.on { background: #e4f8ec; color: #1b7f4b; }
+
+.pb-list-x { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-right: 4px; border: 0; border-radius: 8px; background: transparent; color: #b3452e; cursor: pointer; }
+.pb-list-x:hover { background: rgba(179, 69, 46, 0.08); }
+.pb-list-x mat-icon { font-size: 19px; width: 19px; height: 19px; }

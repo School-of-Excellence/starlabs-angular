@@ -1339,6 +1339,8 @@ section.eod-section:focus { outline: none; }
 .eod-log-search input::placeholder { color: var(--eod-ink-3); }
 .eod-log-select { width: 220px; }
 .eod-log-select-sm { width: 150px; }
+/* "Existing users" is the longest option on this row — 150px clips it. */
+.eod-log-select-md { width: 172px; }
 .eod-log-select .mat-mdc-text-field-wrapper { height: 38px; }
 .eod-log-clear { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px 0 6px; border: 0; border-radius: 9px; background: transparent; color: #b3452e; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .eod-log-clear mat-icon { font-size: 17px; width: 17px; height: 17px; }
@@ -1372,5 +1374,5 @@ section.eod-section:focus { outline: none; }
 .eod-log-pgbtn mat-icon { font-size: 18px; width: 18px; height: 18px; }
 .eod-log-pgbtn:hover:not([disabled]) { border-color: var(--eod-indigo); color: var(--eod-indigo); }
 .eod-log-pgbtn[disabled] { opacity: .4; cursor: not-allowed; }
-@media (max-width: 720px) { .eod-log-select, .eod-log-select-sm { width: 100%; } .eod-log-count { margin-left: 0; } }
+@media (max-width: 720px) { .eod-log-select, .eod-log-select-sm, .eod-log-select-md { width: 100%; } .eod-log-count { margin-left: 0; } }
 .eod-log-dot { margin: 0 6px; color: var(--eod-ink-3); }
