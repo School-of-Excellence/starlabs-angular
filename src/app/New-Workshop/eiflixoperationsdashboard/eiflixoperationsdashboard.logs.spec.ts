@@ -7,18 +7,20 @@ import { EiflixoperationsdashboardComponent } from './eiflixoperationsdashboard.
  */
 describe('EiflixoperationsdashboardComponent — EiFlix Mobile App Logs', () => {
   const at = (iso: string) => new Date(iso);
-  const row = (id: string, profileid: string, name: string, iso: string, os: string, v: string) =>
-    ({ id, profileid, name, date: at(iso), dateLabel: iso, device_os: os, current_version: v });
+  const row = (id: string, profileid: string, name: string, iso: string, os: string, v: string, isNewUser = false) =>
+    ({ id, profileid, name, date: at(iso), dateLabel: iso, device_os: os, current_version: v, isNewUser });
 
+  // p1 is still a new user (new_user_data, not moved to paid); p2 and p3 are existing.
   function make(rows = [
-    row('a', 'p1', 'Anita', '2026-09-21T09:00:00', 'android', '2.3.1'),
+    row('a', 'p1', 'Anita', '2026-09-21T09:00:00', 'android', '2.3.1', true),
     row('b', 'p2', 'Bala', '2026-09-21T11:30:00', 'ios', '2.3.0'),
-    row('c', 'p1', 'Anita', '2026-09-20T08:00:00', 'android', '2.2.9'),
+    row('c', 'p1', 'Anita', '2026-09-20T08:00:00', 'android', '2.2.9', true),
     row('d', 'p3', 'Chitra', '2026-09-15T20:00:00', 'ios', '2.3.1'),
   ]): any {
     const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
     c.logAll = rows; c.logShown = []; c.logPage = [];
     c.logSearch = ''; c.logNameSearch = ''; c.logNameFilter = 'all'; c.logOsFilter = 'all';
+    c.logUserTypeFilter = 'all';
     c.logNameOptions = [{ profileid: 'p1', name: 'Anita' }, { profileid: 'p2', name: 'Bala' }, { profileid: 'p3', name: 'Chitra' }];
     c.logSortKey = 'date'; c.logSortDir = 'desc'; c.logPageIndex = 0; c.logPageSize = 25;
     c.applyLogFilters();
@@ -67,10 +69,12 @@ describe('EiflixoperationsdashboardComponent — EiFlix Mobile App Logs', () => 
 
   it('counts active filters and clears them all', () => {
     const c = make();
-    c.logSearch = 'x'; c.logNameFilter = 'p1'; c.logOsFilter = 'ios'; c.onLogFilterChange();
-    expect(c.logFilterCount).toBe(3);
+    c.logSearch = 'x'; c.logNameFilter = 'p1'; c.logOsFilter = 'ios'; c.logUserTypeFilter = 'new'; c.onLogFilterChange();
+    expect(c.logFilterCount).toBe(4);
     c.clearLogFilters();
-    expect(c.logFilterCount).toBe(0); expect(ids(c).length).toBe(4);
+    expect(c.logFilterCount).toBe(0);
+    expect(c.logUserTypeFilter).toBe('all');
+    expect(ids(c).length).toBe(4);
   });
 
   it('counts unique people — over everything in range, and over what the filters leave', () => {
@@ -91,6 +95,48 @@ describe('EiflixoperationsdashboardComponent — EiFlix Mobile App Logs', () => 
     expect(c.logNameOptionsShown.length).toBe(3);
     c.clearLogFilters();
     expect(c.logNameSearch).toBe('');
+  });
+
+  it('filters to new users, to existing users, and the two halves are a complete split', () => {
+    const c = make();
+    c.logUserTypeFilter = 'new'; c.onLogFilterChange();
+    expect(ids(c)).toEqual(['a', 'c']);                 // p1's two logins
+
+    c.logUserTypeFilter = 'existing'; c.onLogFilterChange();
+    expect(ids(c)).toEqual(['b', 'd']);                 // p2 and p3
+
+    // No row belongs to neither half: a person who has been moved to paid is existing, not missing.
+    c.logUserTypeFilter = 'all'; c.onLogFilterChange();
+    expect(ids(c).length).toBe(4);
+  });
+
+  it('combines the user type with the other filters rather than replacing them', () => {
+    const c = make();
+    c.logUserTypeFilter = 'new'; c.logOsFilter = 'android'; c.onLogFilterChange();
+    expect(ids(c)).toEqual(['a', 'c']);                 // both of p1's rows are android
+    c.logOsFilter = 'ios'; c.onLogFilterChange();
+    expect(ids(c)).toEqual([]);                         // no new user logged in from ios
+    c.logUserTypeFilter = 'existing'; c.onLogFilterChange();
+    expect(ids(c)).toEqual(['b', 'd']);
+    c.logSearch = 'chitra'; c.onLogFilterChange();      // narrows further, does not reset the type
+    expect(ids(c)).toEqual(['d']);
+    expect(c.logUserTypeFilter).toBe('existing');
+  });
+
+  it('counts unique people within the chosen user type', () => {
+    const c = make();
+    c.logUserTypeFilter = 'new'; c.onLogFilterChange();
+    expect(c.logUniquePeopleShown).toBe(1);             // two rows, one person
+    expect(c.logUniquePeople).toBe(3);                  // the range total ignores filters
+  });
+
+  it('re-pages when the user type shrinks the list', () => {
+    const c = make(); c.setLogPageSize(2);
+    c.logNext();
+    expect(c.logPageIndex).toBe(1);
+    c.logUserTypeFilter = 'new'; c.onLogFilterChange(); // 2 rows → 1 page
+    expect(c.logPageIndex).toBe(0);
+    expect(c.logPage.map((r: any) => r.id)).toEqual(['a', 'c']);
   });
 
   it('labels the range', () => {
