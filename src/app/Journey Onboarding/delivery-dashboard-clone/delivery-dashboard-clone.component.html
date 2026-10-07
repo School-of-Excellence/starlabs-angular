@@ -232,6 +232,7 @@
       <button data-testid="ddc-btn-017" class="dd-tab" [class.is-active]="outerTabIndex === 2" (click)="outerTabIndex = 2">
         Participants <span class="dd-tab__count">{{ participantsTotalCount | number }}</span>
       </button>
+      <button data-testid="ddc-btn-130" class="dd-tab" [class.is-active]="outerTabIndex === 3" (click)="outerTabIndex = 3">Weekly Report</button>
     </div>
 
     <mat-tab-group class="dd-tab-group" animationDuration="200ms" dynamicHeight [(selectedIndex)]="outerTabIndex"
@@ -1827,6 +1828,65 @@
           </div>
 
 
+        </ng-template>
+       </mat-tab>
+
+      <mat-tab label="Weekly Report">
+        <ng-template matTabContent>
+          <div class="pm-section">
+            <div class="pm-header">
+              <h2 class="pm-title">Weekly Report</h2>
+              <mat-form-field appearance="outline" class="pm-filter-field">
+                <mat-label>Initiated Date Range</mat-label>
+                <mat-date-range-input [rangePicker]="initRangePicker" [formGroup]="weeklyInitiatedRange">
+                  <input matStartDate formControlName="start" placeholder="From">
+                  <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matSuffix [for]="initRangePicker"></mat-datepicker-toggle>
+                <mat-date-range-picker #initRangePicker></mat-date-range-picker>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="pm-filter-field">
+                <mat-label>Diagnostics Date Range</mat-label>
+                <mat-date-range-input [rangePicker]="diagRangePicker" [formGroup]="weeklyDiagnosticsRange">
+                  <input matStartDate formControlName="start" placeholder="From">
+                  <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
+                </mat-date-range-input>
+                <mat-datepicker-toggle matSuffix [for]="diagRangePicker"></mat-datepicker-toggle>
+                <mat-date-range-picker #diagRangePicker></mat-date-range-picker>
+              </mat-form-field>
+              <div class="pm-actions">
+                <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-label>Choose Stage</mat-label>
+                  <mat-select data-testid="ddc-msel-131" [(value)]="weeklyReportProductId"
+                    (selectionChange)="onWeeklyProductChange($event.value)">
+                    <mat-option *ngFor="let cardId of visibleCardIds" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button data-testid="ddc-btn-132" class="pm-btn-primary" (click)="exportWeeklyReport()"
+                  [disabled]="weeklyReportSource.data.length === 0">Export</button>
+              </div>
+            </div>
+
+            <div class="spec-util-loading" *ngIf="weeklyReportLoading">
+              <div class="specialist-loading-spinner"></div>
+            </div>
+
+            <div class="pm-table-container" *ngIf="weeklyReportProductId && !weeklyReportLoading">
+              <table mat-table [dataSource]="weeklyReportSource" class="pm-data-table">
+                <ng-container *ngFor="let col of weeklyReportColumns" [matColumnDef]="col.key">
+                  <th mat-header-cell *matHeaderCellDef>{{ col.label }}</th>
+                  <td mat-cell *matCellDef="let row">{{ row[col.key] || '-' }}</td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="weeklyReportColumnKeys"></tr>
+                <tr mat-row *matRowDef="let row; columns: weeklyReportColumnKeys"></tr>
+                <tr class="mat-row" *matNoDataRow>
+                  <td class="pm-no-data" [attr.colspan]="weeklyReportColumnKeys.length">No participants found</td>
+                </tr>
+              </table>
+            </div>
+          </div>
         </ng-template>
       </mat-tab>
     </mat-tab-group>

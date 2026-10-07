@@ -80,6 +80,9 @@ export class BookAppointmentComponent implements OnInit{
   rolePersons = {}
   filteredProfile = ""
   goback:boolean = false
+  // groupappointment variables
+  isGroupAppointment: boolean = false
+  maxBooking: number = 0
 
   constructor(
     private firestore: Firestore,
@@ -218,6 +221,9 @@ export class BookAppointmentComponent implements OnInit{
     this.appointmentRoles = []
     var additionalRoles = []
     this.rolePersons = {}
+    var apptTypeDoc = await getDoc(doc(this.firestore, "appointmenttype/"+this.selectedAppointment.id))
+    this.isGroupAppointment = apptTypeDoc.data()?.["groupappointment"] == true
+    this.maxBooking = apptTypeDoc.data()?.["maxbooking"] ?? 0
 
     console.log("id", this.selectedAppointment.id);
     
@@ -341,7 +347,8 @@ export class BookAppointmentComponent implements OnInit{
               if(localSlot != undefined && localSlot != null && localSlot.length != 0){
                 for (let a = 0; a < localSlot.length; a++){
                   var data = localSlot[a]
-                  if(data.booked == false && data.available == true){
+                  var isSlotOpen = (data.booked == false || this.isGroupAppointment) && data.available == true
+                  if(isSlotOpen){
                     slotsOfEIS.push({
                       slotstart: data.slotstart.toDate(),
                       slotend: data.slotend.toDate(),
@@ -479,6 +486,7 @@ export class BookAppointmentComponent implements OnInit{
   async confirmSlot(){
     var batch = writeBatch(this.firestore)
     var selectedSlot = this.userAvailableSlots[this.selectedSlot]
+    var mapBookingCount = {}
     console.log(selectedSlot)
     if(!selectedSlot){
       alert("Select a Slot to Book!")
@@ -509,8 +517,16 @@ export class BookAppointmentComponent implements OnInit{
           mapSelectedSlot[available.id] = availableData
           if(availableData[this.selectedAppointment.id] != null){
             hosts.push(availableData['profileref']['path'])
-            availablility.push(availableData[this.selectedAppointment.id][slotDoc.index].booked == false && availableData[this.selectedAppointment.id][slotDoc.index].available == true)
+            var slotToCheck = availableData[this.selectedAppointment.id][slotDoc.index]
+            var isSlotOpen = (slotToCheck.booked == false || this.isGroupAppointment) && slotToCheck.available == true
+            availablility.push(isSlotOpen)
           }
+        })
+      }
+      if(this.isGroupAppointment){
+        mapBookingCount = await this.guard.getActiveBookings({
+          appointment: doc(this.firestore, "appointmenttype/"+this.selectedAppointment.id),
+          slotdata: selectedSlot.docdata
         })
       }
       console.log(availablility)
@@ -556,7 +572,12 @@ export class BookAppointmentComponent implements OnInit{
                     if(!slotelement.booked){
                       slotelement.available = false
                     }
-                    if(chosenelement.id == selectedAppointment && slotDoc.index == k && this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short") && this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")){
+                    var isBookedSlot = chosenelement.id == selectedAppointment && slotDoc.index == k && this.datepipe.transform(slotStart, "short") == this.datepipe.transform(selectedSlot.start, "short") && this.datepipe.transform(slotEnd, "short") == this.datepipe.transform(selectedSlot.end, "short")
+                    if(isBookedSlot && this.isGroupAppointment){
+                      slotelement.booked = true
+                      slotelement.available = mapBookingCount[slotDoc.id] + 1 < this.maxBooking
+                    }
+                    else if(isBookedSlot){
                       slotelement.booked = true
                     }
                   }
@@ -635,7 +656,7 @@ export class BookAppointmentComponent implements OnInit{
       const product = this.selectedAppointment.participantdelivery.products[i];
       for (let j = 0; j < product.delivery.length; j++) {
         const delivery = product.delivery[j];
-        if(delivery.sequenceref.path == this.selectedAppointment.deliverypath){
+        if(delivery?.sequenceref?.path == this.selectedAppointment.deliverypath){
           productstatus = product.status ?? "ongoing"
           delivery.status = "ongoing"
           console.log(product)
