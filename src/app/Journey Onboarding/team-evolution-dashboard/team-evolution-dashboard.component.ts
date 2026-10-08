@@ -463,7 +463,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         allParticipantsProduct.push({ participantproductid: docSnap.id, ...docSnap.data() });
       }
     }
-    console.log("allParticipantsProduct:",allParticipantsProduct[0].statusdate?.initiated?.toMillis())
     allParticipantsProduct.sort((a, b) => (a.statusdate?.initiated?.toMillis() ?? Infinity) - (b.statusdate?.initiated?.toMillis() ?? Infinity));
 
     const byProfile = new Map(this.ongoingparticipants.map(p => [p.profileid, p]));
@@ -485,7 +484,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     for (const p of this.ongoingparticipants) {
       if (!seen.has(p.profileid)) { sortedParticipants.push(p); }
     }
-    console.log("orderedParticipants:",sortedParticipants)
     this.ongoingparticipants = sortedParticipants;
   }
 

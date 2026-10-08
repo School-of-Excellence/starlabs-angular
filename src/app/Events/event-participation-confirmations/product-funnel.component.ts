@@ -32,7 +32,7 @@ import { AhNotificationComponent } from '../../Participants Profile Management/p
 import { EmailInputComponent } from '../../Participants Profile Management/participants-analytics/email-input/email-input.component';
 import { Subscription } from 'rxjs';
 
-type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
+type SegmentKey = 'potential' | 'requested' | 'notRequested' | 'eligible' | 'upgrade'  | 'addon' | 'continuity' | 'noteligible'|'noProduct' | 'inQueue' | 'approved' | 'attended' | 'noShow' | 'unattended' | 'revoked' | 'overallRequested';
 
 interface ImportPreviewRow { name: string; email: string; }
 interface Split { key: string; label: string; count: number; }
@@ -50,6 +50,10 @@ interface PRow {
   isRequested: boolean;
   isApproved: boolean;
   isEligible: boolean;
+  isUpgrade : boolean;
+  isAddon : boolean;
+  isContinuity : boolean;
+  notEligible : boolean;
   isNoProduct: boolean;
   isInQueueReq: boolean;
   isNotRequested: boolean;
@@ -120,6 +124,10 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     { key: 'requested', label: 'Requested', cls: '', desc: 'said yes' },
     { key: 'notRequested', label: 'Not requested', cls: '', desc: 'owners, no request', tip: 'Hold the product but have not requested' },
     { key: 'eligible', label: 'Eligible', cls: 'elig', desc: 'ready to approve' },
+    { key: 'upgrade', label: 'Upgrade', cls: 'ne', desc: 'Upgrade needed' },
+    { key: 'addon', label: 'Addon', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
+    { key: 'continuity', label: 'Continuity', cls: 'ne', desc: 'Non active participant', tip: '' },
+    { key: 'noteligible', label: 'Not Eligible', cls: 'ne', desc: 'not eligible for the event' },
     { key: 'noProduct', label: 'No product', cls: 'ne', desc: 'requested, needs product', tip: 'Requested but does not hold the product — assign it to revive them' },
     { key: 'inQueue', label: 'In queue', cls: 'inq', desc: 'already in a queue', tip: 'Requested but already in an active queue — already being served, no action needed' },
     { key: 'approved', label: 'Approved', cls: 'app', desc: 'initiated' },
@@ -138,7 +146,11 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
         { key: 'potential', depth: 0 },
         { key: 'requested', depth: 1 },
         { key: 'eligible', depth: 2 },
-        { key: 'noProduct', depth: 2 },
+        { key: 'upgrade', depth: 2 },
+        { key: 'addon', depth: 2 },
+        { key: 'continuity', depth: 2 },
+        { key: 'noteligible', depth: 2 },
+        // { key: 'noProduct', depth: 2 },
         { key: 'inQueue', depth: 2 },
         { key: 'notRequested', depth: 1 }
       ]
@@ -244,7 +256,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
   selection = new SelectionModel<PRow>(true, []);
 
   counts: Record<SegmentKey, number> = {
-    potential: 0, requested: 0, notRequested: 0, eligible: 0, noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, revoked: 0, overallRequested: 0
+    potential: 0, requested: 0, notRequested: 0, eligible: 0, upgrade : 0 , addon : 0 , continuity : 0 , noteligible : 0 , noProduct: 0, inQueue: 0, approved: 0, attended: 0, noShow: 0, unattended: 0, revoked: 0, overallRequested: 0
   };
 
   // Everyone who ever raised their hand for this event — including the terminal outcomes
@@ -448,7 +460,9 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
   // progress dialog state
   progress = { msg: '', value: 0, total: 0, eta: '' };
   mapEligibility = {};
-  eticketEligibilitySubscription : Subscription | null = null
+  eticketEligibilitySubscription : Subscription | null = null;
+
+  participantMetadata = {};
 
   constructor(
     public firestore: Firestore,
@@ -457,7 +471,18 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     public snackbar: MatSnackBar,
     public storage: Storage,
     public http: HttpClient
-  ) {}
+  ) {
+    getDocs(collection(this.firestore , 'participant metadata')).then((participantMetadataSnap)=>{
+      for (const docref of participantMetadataSnap.docs) {
+        const participant = docref.data();
+        const profileId = participant['profileid'] ?? null;
+        if (profileId) {
+          this.participantMetadata[profileId] = participant;
+        }
+      }
+    }).catch((error)=>console.log(error));
+    console.log(this.cardMap)
+  }
 
   async ngOnInit() {
     const profile = await this.guard.getProfileMap();
@@ -488,17 +513,41 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     this.queueStageByPid = new Map<string, string>();
     this.queueStagesLoaded = false;
     const arena = this.arena;
+    const eligibility = arena['eligibility'] ?? {};
+    const productConsumption = eligibility['productconsumption'] ?? [];
+    const customerStatus = eligibility['customerstatus'] ?? [];
+    const eligibilityJourney = eligibility['journeyid'] ?? []
+    
     this.loadJourneyGroups();   // per-event journey grouping from localStorage (keyed by arenaevent id)
     try {
-      const [ownSnap, eprSnap, scanSnap] = await Promise.all([
-        getDocs(query(collection(this.firestore, 'participantsproduct'),
-          where('productref', '==', arena['productref']), where('status', '==', null))),
-        getDocs(query(collection(this.firestore, 'event participation request'),
-          where('arenaeventid', '==', arena['docid']),
-          where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']))),
-        getDocs(query(collection(this.firestore, 'arena e-ticket log'),
-          where('eventref', '==', arena['eventref'])))
-      ]);
+      const dataQueries = [
+          getDocs(query(collection(this.firestore, 'participantsproduct'),
+            where('productref', '==', arena['productref']), where('status', '==', null))),
+          getDocs(query(collection(this.firestore, 'event participation request'),
+            where('arenaeventid', '==', arena['docid']),
+            where('status', 'in', ['requested', 'approved', 'attended', 'unattended', 'revoked']))),
+          getDocs(query(collection(this.firestore, 'arena e-ticket log'),
+            where('eventref', '==', arena['eventref'])))
+        ];
+
+      if (eligibility?.cohortid?.length > 0) {
+        const cohortQuery = query(collection(this.firestore , 'big cohorts') , where('docid' , 'in' , eligibility?.cohortid));
+        dataQueries.push(getDocs(cohortQuery))
+      }
+      const [ownSnap, eprSnap, scanSnap , cohorts ] = await Promise.all(dataQueries);
+
+      const cohortParticipants = [];
+
+      if (cohorts) {
+        cohorts?.docs.forEach((docref)=>{
+          const participant = docref.data()['participantidlist'] ?? [];
+          for (const pid of participant) {
+            if (!cohortParticipants.includes(pid)) {
+              cohortParticipants.push(pid);
+            }
+          }
+        })
+      }
 
       const owners = new Map<string, string>();
       ownSnap.docs.forEach(d => {
@@ -577,6 +626,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
         // whatever live membership their source data still gives them AND retains their terminal flag.
         const isOwner = owners.has(pid);
         const isScanned = scanned.has(pid);
+        const participantEligibleBucket = this.participantBucket(pid , isOwner , customerStatus , productConsumption , eligibilityJourney , cohortParticipants);
         // Approval and attendance are both EPR-only (operator directive): a row is approved when its
         // `event participation request` doc has status 'approved' or 'attended', and attended only when
         // that status is 'attended'. An e-ticket scan confers neither — it survives as `scanned` for the
@@ -586,7 +636,11 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
         const isRequested = requestedData.has(pid);
         const bucket = useBuckets ? bucketByPid.get(pid) : undefined;
         const inQueue = bucket ? (bucket === 'inQueue') : active.has(pid);
-        const isEligible = bucket ? (bucket === 'eligible') : (isRequested && isOwner && !inQueue);
+        const isEligible = isRequested && participantEligibleBucket === 'eligibile' && !inQueue;
+        const isUpgrade = isRequested && participantEligibleBucket === 'upgrade' && !inQueue;
+        const isAddon = isRequested &&  participantEligibleBucket === 'addon' && !inQueue;
+        const isContinuity = isRequested && participantEligibleBucket === 'continuity' && !inQueue;
+        const notEligible = isRequested && participantEligibleBucket === 'not eligibile' && !inQueue;
         const isNoProduct = bucket ? (bucket === 'noProduct') : (isRequested && !isOwner);
         const isInQueueReq = bucket ? (bucket === 'inQueue') : (isRequested && isOwner && inQueue);
         const isNotRequested = isOwner && !isRequested && !inCohort;
@@ -600,7 +654,7 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
           approvedRequestId: approvedReq.get(pid) ?? null,
           requestData: requestedData.get(pid) ?? null,
           isOwner, isRequested, isApproved: inCohort,
-          isEligible, isNoProduct, isInQueueReq, isNotRequested, isUnattended, isRevoked, inQueue,
+          isEligible, isNoProduct, isInQueueReq, isNotRequested, isUnattended, isRevoked, inQueue, isUpgrade ,isAddon,isContinuity , notEligible,
           attended: isAttended,
           scanned: isScanned,
           attendanceState: attendanceStateByPid.get(pid) ?? '',
@@ -629,6 +683,10 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
         // directly would mis-classify them. `isNotRequested` already excludes requested/cohort membership.
         notRequested: rows.filter(r => r.isNotRequested).length,
         eligible: rows.filter(r => r.isEligible).length,
+        upgrade: rows.filter(r => r.isUpgrade).length,
+        addon: rows.filter(r => r.isAddon).length,
+        continuity: rows.filter(r => r.isContinuity).length,
+        noteligible: rows.filter(r => r.notEligible).length,
         noProduct: rows.filter(r => r.isNoProduct).length,
         inQueue: rows.filter(r => r.isInQueueReq).length,
         approved: cohort.size,
@@ -656,6 +714,50 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     } finally {
       this.loading = false;
     }
+  }
+
+  participantBucket(pid : string , isOwner : boolean, customerStatus : Array<string>, productConsumption : Array<any> , eligibilityJourney : Array<string> , cohortParticipants : Array<string>){
+    const metadata = this.participantMetadata[pid] ?? null;
+    if (metadata) {
+      const journey = metadata['activejourney'] ?? metadata['lastcompletedjourney'] ?? null;
+      const status = metadata['customerstatus'] ?? null;
+      const consumedproducts = {};
+
+      for (const product of metadata['consumedproducts'] ?? []) {
+        consumedproducts[product] = consumedproducts[product] ?? 0;
+        consumedproducts[product] = consumedproducts[product] + 1;
+      }
+
+      const journeyMatch = eligibilityJourney.length === 0 || eligibilityJourney.includes(journey);
+      const cohortMatch = cohortParticipants.length === 0 || cohortParticipants.includes(pid);
+      const consumptionMatch = productConsumption.every((product) => {
+        const productId = product?.productid;
+        if (product['operator'] === '==') {
+          return (consumedproducts[productId] ?? 0) === product?.count;
+        } else if (product['operator'] === '>=') {
+          return (consumedproducts[productId] ?? 0) >= product?.count;
+        } else if (product['operator'] === '<=') {
+          return (consumedproducts[productId] ?? 0) <= product?.count;
+        } else {
+          return false;
+        }
+      });
+
+      if (status == 'active') {
+        if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (!journeyMatch) return 'upgrade';
+        if (!isOwner) return 'addon';
+        return 'eligibile';
+      }
+
+       if (status == 'non active') {
+        // if (!consumptionMatch || !cohortMatch) return 'not eligibile';
+        if (customerStatus.includes('non active') && isOwner) return 'eligibile';
+        if (journeyMatch) return 'continuity';
+        return 'upgrade';
+      }
+    }
+    return 'not eligibile'
   }
 
   retry() { this.loadData(); }
@@ -691,13 +793,13 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
     await Promise.all(chunks.map(async chunk => {
       try {
-        const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), where('profileid', 'in', chunk)));
-        const metaById: Record<string, any> = {};
-        snap.docs.forEach(d => { const x = d.data(); if (x['profileid']) metaById[x['profileid']] = x; });
+        // const snap = await getDocs(query(collection(this.firestore, 'participant metadata'), where('profileid', 'in', chunk)));
+        // const metaById: Record<string, any> = {};
+        // snap.docs.forEach(d => { const x = d.data(); if (x['profileid']) metaById[x['profileid']] = x; });
         chunk.forEach(pid => {
           const row = byId.get(pid);
           if (!row) return;
-          const m = metaById[pid] ?? {};
+          const m = this.participantMetadata[pid] ?? {};
           // Current journey depends on customer status: active → activejourney,
           // non active → lastcompletedjourney, otherwise → lastsubscribedjourney.
           const cs = (m['customerstatus'] ?? '').toString().trim().toLowerCase();
@@ -841,6 +943,10 @@ export class ProductFunnelComponent implements OnInit , OnDestroy{
       case 'requested': return r.isRequested;
       case 'notRequested': return r.isNotRequested;
       case 'eligible': return r.isEligible;
+      case 'upgrade': return r.isUpgrade;
+      case 'addon': return r.isAddon;
+      case 'continuity': return r.isContinuity;
+      case 'noteligible': return r.notEligible;
       case 'noProduct': return r.isNoProduct;
       case 'inQueue': return r.isInQueueReq;
       case 'approved': return r.isApproved;

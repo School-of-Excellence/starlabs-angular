@@ -1,0 +1,510 @@
+<div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-container">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">{{ 'Loading Dashboard..' }}</div>
+    <div class="loading-progress">
+    </div>
+  </div>
+</div>
+
+<div class="bl-app">
+  <div class="bl-app-wrap">
+    <header> <h2>B!G Leaderboard</h2> </header>
+    <div class="bl-filters">
+      <div class="bl-toggles">
+        <div class="bl-search-cohort">
+          <input data-testid="bld-cohort-search" type="text" placeholder="Search Cohort..." [(ngModel)]="cohortSearch" (input)="filterCohortList()" />
+        </div>
+        <label class="bl-toggle" for="bl-show-edu"><input data-testid="bld-cat-educational" type="checkbox" [checked]="selectedCohortCategory.includes('educational')" (change)="onCohortCategoryChange('educational')" /> Educational cohorts</label>
+        <label class="bl-toggle" for="bl-show-stu"><input data-testid="bld-cat-studio" type="checkbox" [checked]="selectedCohortCategory.includes('studio')" (change)="onCohortCategoryChange('studio')" />Studio cohorts</label>
+        <div class="bl-dd">
+          <div class="bl-select-wrap">
+            <div class="bl-select">
+              <select data-testid="bld-marathon-select" [(ngModel)]="selectedMarathon" (change)="onMarathonChange()">
+                <option *ngFor="let marathon of bigMarathon" [value]="marathon['docid']">{{marathon['title'] ?? ''}} </option>
+              </select>
+            </div>
+            <!-- <div class="sel">
+              <input data-testid="bld-marathon-search" [(ngModel)]="marathonSearch" placeholder="Search cohort…" (focus)="openParticipantSearch = true; $any($event.target).select()"
+                (blur)="openParticipantSearch = false" />
+            
+              <ul *ngIf="openParticipantSearch">
+                <li data-testid="bld-marathon-option" *ngFor="let c of filterMarathon" (mousedown)="pickMarathon(c)">{{ c.title }}</li>
+                <li *ngIf="!filterMarathon.length" class="empty">No match</li>
+              </ul>
+            </div> -->
+            <div class="bl-select event-select">
+              Select Event
+              <select data-testid="bld-event-select" [(ngModel)]="selectedEvent" (change)="filterCohortList()">
+                <option [ngValue]="null">None</option>
+                <option *ngFor="let event of eventsList" [ngValue]="event['docid']">{{event['name'] ?? ''}}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="bl-stats">
+          <p class="bl-stat is-active-stat">
+            <span class="bl-stat-dot"></span>
+            Active <b>{{activeParticipantInCohort}}</b>
+          </p>
+          <p class="bl-stat is-inactive-stat">
+            <span class="bl-stat-dot"></span>
+            Non Active <b>{{nonactiveParticipantInCohort}}</b>
+          </p>
+        </div>
+        <button data-testid="bld-group" class="bl-selgo" type="button" *ngIf="selectedCohorts.length > 1 && groupFormMode === null" (click)="onGroup()">Group</button>
+        <button data-testid="bld-select-all" class="bl-selgo" type="button" (click)="selectAllCohorts()">Select All cohorts</button>
+        <button data-testid="bld-deselect-all" class="bl-selout" type="button" (click)="deSelectAllCohorts()" >DeSelect All cohorts</button>
+      </div>
+      <!-- group form -->
+      <div class="bl-selbar" *ngIf="selectedCohorts.length > 1 && groupFormMode === 'add'">
+        <span class="bl-selcount"><b>{{selectedCohorts.length}}</b> selected</span>
+        <span class="bl-selfield">
+          <input data-testid="bld-group-name" class="bl-selname" type="text" [(ngModel)]="cohortGroupName">
+        </span>
+        <button data-testid="bld-group-save" class="bl-selgo" type="button" (click)="groupCohortList()">Group them</button>
+        <button data-testid="bld-group-clear" class="bl-selclear" type="button" (click)="cancelGroup()">Clear</button>
+      </div>
+      <div class="bl-cohorts">
+        <div data-testid="bld-cohort-group" class="cohgroup" [class.is-active]="selectedCohortGroup === group?.key" [class.is-open]="expandedCohortGroup == group?.key" *ngFor="let group of this.savedCohortGroups | keyvalue" (click)="!expandedCohortGroup && onCohortGroupSelect(group.key)">
+          <div class="grp-head">
+            <span class="grp-dot" style="background:#5856D6"></span>
+            <span class="grp-text">
+              <span class="grp-tag">Group</span>
+              <ng-container *ngIf="expandedCohortGroup == group?.key; else nameTpl">
+                <input data-testid="bld-group-rename" #inp class="grp-rename" [(ngModel)]="cohortGroupName" (click)="$event.stopPropagation()"/>
+              </ng-container>
+              <ng-template #nameTpl>
+                <span class="grp-name">{{ group.key }}</span>
+              </ng-template>
+              <span class="grp-meta"><b>{{getParticipantInCohortGroup(group.key)?.length}}</b> participants &middot; {{group?.value?.length}} cohorts</span>
+            </span>
+            <button data-testid="bld-group-edit-save" class="bl-selgo" type="button" *ngIf="expandedCohortGroup == group?.key" (click)="groupCohortList();$event.stopPropagation()">Save</button>
+            <button data-testid="bld-group-expand" class="grp-chev" type="button" *ngIf="selectedCohortGroup !== group.key" (click)="toggleCohortGroup(group?.key);$event.stopPropagation()">&#9662;</button>
+          </div>
+          <div class="grp-actions">
+            <button data-testid="bld-group-ungroup" type="button" class="grp-ungroup" (click)="unGroup(group.key);$event.stopPropagation()">Ungroup</button>
+            <div class="bl-select">
+              <select data-testid="bld-group-add-cohort" (change)="onToggleCohortFromGroup($event.target.value);$event.stopPropagation();" *ngIf="expandedCohortGroup == group?.key">
+                  <option *ngFor="let cohort of filteredCohorts" [value]="cohort['docid']">{{cohort['name'] ?? ''}} </option>
+              </select>
+            </div>
+          </div>
+          <div class="grp-body">
+            <div class="bl-cohort" *ngFor="let cohort of cohortGroupSelectedForSave">
+              <div class="bl-cohort-actions">
+                <span class="bl-coh-name">{{ cohortMap[cohort]?.name }}</span>
+                <button data-testid="bld-group-remove-cohort" (click)="onToggleCohortFromGroup(cohort)"><mat-icon>cancel</mat-icon></button>
+              </div>
+              <span class="bl-coh-foot">
+                <span class="bl-coh-people"><b>{{ cohortMap[cohort]?.participantidlist?.length }}</b> participants</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div data-testid="bld-cohort" class="bl-cohort is-active" *ngFor="let cohort of getFilteredCohorts()" [class.is-active]="selectedCohorts.includes(cohort['docid'])" (click)="handleCohortClick(cohort['docid'])">
+          <span class="bl-coh-top">
+            <span class="bl-coh-name">{{cohort['name'] ?? ''}}</span>
+            <span class="bl-coh-kind">{{cohort['cohortCategory']}}</span>
+          </span>
+          <span class="bl-coh-people"><b>{{cohort['participantidlist']?.length ?? 0}}</b> participants</span>
+        </div>
+        <div data-testid="bld-cohort-more" class="bl-more" *ngIf="filteredCohorts.length > 16" (click)="toggleCohortShowMore()">
+          <span>{{loadAllCohort ? 'Show Less' : 'Show More'}}</span>
+        </div>
+      </div>
+    </div>
+    <div class="bl-card">
+      <div class="bl-participant-filter">
+        <div class="topbar-search">
+          <input data-testid="bld-participant-search" type="text" placeholder="Search Participant..." [(ngModel)]="participantSearch" (input)="filterTable()" />
+        </div>
+    
+        <div class="bl-p-status">
+          <button data-testid="bld-status-all" type="button" class="bl-p-btn bl-p-all" [class.bl-p-on]="selectedCustomerStatus === 'all'"
+            (click)="onCustomerStatusSelect('all')">
+            <span class="bl-p-dot"></span>
+            All <b>{{activeParticipants + nonactiveParticipants}}</b>
+          </button>
+          <button data-testid="bld-status-active" type="button" class="bl-p-btn bl-p-active" [class.bl-p-on]="selectedCustomerStatus === 'active'"
+            (click)="onCustomerStatusSelect('active')">
+            <span class="bl-p-dot"></span>
+            Active <b>{{activeParticipants}}</b>
+          </button>
+          <button data-testid="bld-status-nonactive" type="button" class="bl-p-btn bl-p-inactive" [class.bl-p-on]="selectedCustomerStatus === 'non active'"
+            (click)="onCustomerStatusSelect('non active')">
+            <span class="bl-p-dot"></span>
+            Non Active <b>{{nonactiveParticipants}}</b>
+          </button>
+        </div>
+        <button data-testid="bld-non-cohort" type="button" class="non-cohort" [class.is-active]="showNonCohortParticipants" [attr.aria-pressed]="showNonCohortParticipants" (click)="onNonCohortParticipantClick()">
+          <span class="bl-stat-dot"></span>
+          Non Educational Cohort Participants
+          <b>{{ dashboardData.length - participantsInCohort.size }}</b>
+        </button>
+      </div>
+      <div class="filter-chips" *ngIf="getParticipantFilterChips().length > 0">
+        <div class="chip" *ngFor="let chip of getParticipantFilterChips()">
+          <span class="chip-type">{{ chip.type }}:</span>
+          <span class="chip-label">{{ chip.label }}</span>
+          <!-- <span class="chip-value">{{ f.value }}</span> -->
+          <button data-testid="bld-chip-remove" type="button" class="chip-remove" (click)="removeFilter(chip)"
+            [attr.aria-label]="'Remove ' + chip.label + ' filter'">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <button data-testid="bld-clear-all" type="button" class="clear-all" (click)="clearAllParticipantFilters()">Clear all</button>
+      </div>
+      <div class="bl-scroll">
+        <div class="bl-grid">
+          <!-- column headings double as the sort buttons -->
+          <div class="bl-head">
+            <div class="bl-cell bl-left bl-h-rank">Rank</div>
+            <div class="bl-cell bl-left bl-h-n">
+              <label for="bl-sort-n">Participant<span class="bl-caret">&#9660;</span></label>
+            </div>
+            <div class="bl-cell bl-h-level bl-left">
+              <label for="bl-sort-level">Current level<span class="bl-caret">&#9660;</span></label>
+            </div>
+            <div class="bl-cell bl-h-impact">
+              <label data-testid="bld-sort-impact" for="bl-sort-impact" (click)="onTableHeaderClick('extendedlifeimpact')" [class.active-header]="sortHeader?.header === 'extendedlifeimpact'">
+                Extended impact (yrs)
+                <span class="bl-caret" [class.bl-caret-desc]="sortHeader?.header === 'extendedlifeimpact' && sortHeader?.type == 'desc'">&#9660;</span>
+              </label>
+            </div>
+            <div class="bl-cell bl-h-att">
+              <label data-testid="bld-sort-attended" for="bl-sort-att" (click)="onTableHeaderClick('eventAttended')" [class.active-header]="sortHeader?.header === 'eventAttended'">
+                Attendance
+                <span class="bl-caret" [class.bl-caret-desc]="sortHeader?.header === 'eventAttended' && sortHeader?.type === 'desc'">&#9660;</span>
+              </label>
+            </div>
+            <div class="bl-cell bl-h-studio">
+              <label data-testid="bld-sort-studio" for="bl-sort-studio" (click)="onTableHeaderClick('queueActivityLog')" [class.active-header]="sortHeader?.header === 'queueActivityLog'">
+                Studio log
+                <span class="bl-caret" [class.bl-caret-desc]="sortHeader?.header === 'queueActivityLog' && sortHeader?.type === 'desc'">&#9660;</span>
+              </label>
+            </div>
+            <div class="bl-cell bl-h-cohortlog">
+              <label data-testid="bld-sort-activity" for="bl-sort-cohortlog" (click)="onTableHeaderClick('bigActivity')" [class.active-header]="sortHeader?.header === 'bigActivity'">
+                Cohort Activity log
+                <span class="bl-caret" [class.bl-caret-desc]="sortHeader?.header === 'bigActivity' && sortHeader?.type === 'desc'">&#9660;</span>
+              </label>
+            </div>
+            <div class="bl-cell bl-h-eilifiz">
+              <label data-testid="bld-sort-eiflix" for="bl-sort-eilifiz" (click)="onTableHeaderClick('eiflixConsumption')" [class.active-header]="sortHeader?.header === 'eiflixConsumption'">
+                Eiflix consumption
+                <span class="bl-caret" [class.bl-caret-desc]="sortHeader?.header === 'eiflixConsumption' && sortHeader?.type === 'desc'">&#9660;</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- totals where a total means something, averages where it does not -->
+          <div class="bl-summary">
+            <div class="bl-cell bl-left"></div>
+            <div class="bl-cell bl-left bl-sumlabel">{{filteredDashbordData.length}} participants</div>
+          </div>
+          <div class="bl-rows" *ngFor="let participant of paginatedData; let i = index;">
+            <div class="bl-row bl-r0">
+              <div class="bl-cell bl-left"><span class="bl-rank">{{i + 1}}</span></div>
+              <div class="bl-cell bl-left">
+                <span class="bl-avatar" style="background:linear-gradient(135deg,hsl(226 62% 52%),hsl(264 64% 42%))">{{getInital(participant.name)}}</span>
+                <span data-testid="bld-row-name" class="bl-person" (click)="openSidePanel(participant?.profileid)"><span class="bl-name">{{participant.name}}</span></span>
+              </div>
+              <div data-testid="bld-row-level" class="bl-cell bl-cell-click bl-left" (click)="openSidePanel(participant?.profileid)">
+                <div>
+                  <div *ngFor="let level of participant.bigParticipantLevel"> {{bigLevelMap[level['level'] ?? '']?.level ?? ''}} ( {{ level['atcmodel'] }} ) </div>
+                  <div *ngIf="participant.bigParticipantLevel?.length === 0"> Field Preparation </div>
+                </div>
+              </div>
+              <div class="bl-cell">{{participant.extendedlifeimpact}}</div>
+              <div data-testid="bld-row-attended" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'attended')"> {{participant.eventAttended}}</div>
+              <div data-testid="bld-row-studio" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'studio')"> {{participant.queueActivityLog}}</div>
+              <div data-testid="bld-row-activity" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'activity')"> {{participant.bigActivity.completed}} / {{participant.bigActivity.overAll}}</div>
+              <div data-testid="bld-row-eiflix" class="bl-cell bl-cell-click" (click)="openSidePanel(participant?.profileid , 'content')"> {{participant.eiflixConsumption}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <mat-paginator data-testid="bld-paginator" [length]="filteredDashbordData.length" [pageSize]="pageSize" [pageSizeOptions]="[5, 10, 15 , 25, 100]" [pageIndex]="pageIndex" (page)="onPageChange($event)" [showFirstLastButtons]="true"> </mat-paginator>
+    </div>
+
+    <div class="bl-sidebar" *ngIf="sidePanelParticipant">
+      <div class="bl-drawer-head">
+        <span class="bl-avatar bl-avatar-lg" style="background:linear-gradient(135deg,hsl(316 62% 52%),hsl(354 64% 42%))">{{ getInital(sidePanelParticipant.name) }}</span>
+        <span class="bl-who">
+          <span class="bl-who-name">{{ sidePanelParticipant.name }}</span>
+          <span class="bl-who-meta">{{ sidePanelParticipant.customerstatus }} &middot; Journey {{ getParticipantJourney(sidePanelParticipant) }}</span>
+        </span>
+        <div data-testid="bld-side-close" class="bl-close" title="Close" (click)="closeSidePanel()">&times;</div>
+      </div>
+
+      <div class="bl-tabs">
+        <label data-testid="bld-side-tab-level" class="bl-tab bl-tab-level" title="Current level" [class.active-sidetab]="sidePanelCurrentTab === 'level'" (click)="sidePanelCurrentTab = 'level'">
+          <span class="bl-tab-l">Level</span>
+        </label>
+        <label data-testid="bld-side-tab-attended" class="bl-tab bl-tab-att" title="Attendance" [class.active-sidetab]="sidePanelCurrentTab === 'attended'" (click)="sidePanelCurrentTab = 'attended'">
+          <span class="bl-tab-l">Attendance</span>
+        </label>
+        <label data-testid="bld-side-tab-studio" class="bl-tab bl-tab-studio" title="Studio log" [class.active-sidetab]="sidePanelCurrentTab === 'studio'" (click)="sidePanelCurrentTab = 'studio'">
+          <span class="bl-tab-l">Studio</span>
+        </label>
+        <label data-testid="bld-side-tab-activity" class="bl-tab bl-tab-cal" title="Cohort activity log" [class.active-sidetab]="sidePanelCurrentTab === 'activity'" (click)="sidePanelCurrentTab = 'activity'">
+          <span class="bl-tab-l">Activity</span>
+        </label>
+        <label data-testid="bld-side-tab-eiflix" class="bl-tab bl-tab-eiflix" title="Eiflix consumption" [class.active-sidetab]="sidePanelCurrentTab === 'content'" (click)="sidePanelCurrentTab = 'content'">
+          <span class="bl-tab-l">Eiflix</span>
+        </label>
+      </div>
+
+      <!-- ══════════ PANELS ══════════ -->
+      <div class="bl-panels">
+
+        <!-- ── LEVEL ── -->
+        <div class="bl-panel bl-p-level" *ngIf="sidePanelCurrentTab === 'level'">
+
+          <div *ngIf="(sidePanelParticipant.bigParticipantLevel ?? []).length == 0">
+            <div class="bl-panel-head">Current level</div>
+            <div class="bl-panel-stat"><span class="bl-panel-n">Field Preparation</span></div>
+          </div>
+
+          <div class="bl-level-overview" *ngIf="(sidePanelParticipant.bigParticipantLevel ?? []).length > 0">
+            <div class="bl-section-label">Overview</div>
+            <div class="bl-overview-grid">
+              <div class="bl-stat-card">
+                <div class="bl-stat-n">{{ (sidePanelParticipant.bigParticipantLevel ?? []).length }}</div>
+                <div class="bl-stat-l">ATC models</div>
+              </div>
+              <!-- <div class="bl-stat-card">
+                <div class="bl-stat-n">--</div>
+                <div class="bl-stat-l">Total activities</div>
+              </div>
+              <div class="bl-stat-card">
+                <div class="bl-stat-n">--</div>
+                <div class="bl-stat-l">Fast tracks</div>
+              </div> -->
+            </div>
+          </div>
+
+          <div class="bl-divider" *ngIf="(sidePanelParticipant.bigParticipantLevel ?? []).length > 0"></div>
+
+          <div class="bl-section-label" *ngIf="(sidePanelParticipant.bigParticipantLevel ?? []).length > 0">Levels by ATC model</div>
+          <div class="bl-level-cards">
+
+            <!-- native <details>/<summary> now handles expand/collapse — no click handler or state needed -->
+            <details class="bl-atc-card" *ngFor="let level of sidePanelParticipant.bigParticipantLevel ?? []">
+
+              <summary class="bl-atc-head">
+                <div>
+                  <div class="bl-atc-tag">{{ level['atcmodel'] }}</div>
+                  <div class="bl-atc-title">{{ bigLevelMap[level['level'] ?? '']?.level ?? ''}}</div>
+                </div>
+                <div class="bl-atc-chevron">▾</div>
+              </summary>
+
+              <div class="bl-atc-body">
+
+                <div class="bl-group">
+                  <div class="bl-group-title">Warm up</div>
+                  <div class="bl-act" *ngFor="let warmup of level['warmup'] ?? []">
+                    <span class="bl-act-name">{{ bigActivityMap[warmup['activity'].id]?.activity }}</span>
+                    <span class="bl-act-chip"><b>{{ warmup['completed'] ?? 0 }}</b> done</span>
+                  </div>
+                </div>
+
+                <div class="bl-group">
+                  <div class="bl-group-title">Regular</div>
+                  <div class="bl-act" *ngFor="let regular of level['regular'] ?? []">
+                    <span class="bl-act-name">{{ bigActivityMap[regular['activity']?.id ?? '']?.activity }}</span>
+                    <span class="bl-act-chip"><b>{{ regular['completed'] ?? 0 }} / {{ regular['metric'] }}</b></span>
+                  </div>
+                </div>
+
+                <div class="bl-group">
+                  <div class="bl-group-title">Special activity</div>
+                  <div class="bl-act" *ngFor="let specialActivity of level['specialactivity'] ?? []">
+                    <span class="bl-act-name">{{ bigActivityMap[specialActivity['activity']?.id ?? '']?.activity ?? '' }}</span>
+                    <span class="bl-act-chip"><b>{{ specialActivity['completed'] ?? 0 }}</b> done</span>
+                  </div>
+                </div>
+
+                <div class="bl-group">
+                  <div class="bl-group-title">Booster activity</div>
+                  <div class="bl-act" *ngFor="let boosterActivity of level['boosteractivity'] ?? []">
+                    <span class="bl-act-name">{{ bigActivityMap[boosterActivity['activity']?.id ?? '']?.activity ?? '' }}</span>
+                    <span class="bl-act-chip"><b>{{ boosterActivity['completed'] ?? 0 }}</b> done</span>
+                  </div>
+                </div>
+
+                <div class="bl-group">
+                  <div class="bl-group-title">Fast track</div>
+                  <div class="bl-fasttrack-box" *ngFor="let fasttrack of level['fasttrack'] ?? []">
+                    <div class="bl-ft-target">Target — {{ bigLevelMap[fasttrack['level']?.id ?? '']?.level }}</div>
+                    <div class="bl-ft-row">
+                      <span>Validation</span>
+                      <span class="bl-act-chip"><b>{{ fasttrack['validation'][0]['completed'] ?? 0 }} / {{ fasttrack['validation'][0]['metric'] ?? 0 }}</b></span>
+                    </div>
+                    <div class="bl-ft-row">
+                      <span>Stabilisation</span>
+                      <span class="bl-act-chip"><b>{{ fasttrack['stabilization'][0]['completed'] ?? 0 }} / {{ fasttrack['stabilization'][0]['metric'] ?? 0 }}</b></span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- ── ATTENDED ── -->
+        <div class="bl-panel bl-p-att" *ngIf="sidePanelCurrentTab === 'attended'">
+          <div class="bl-overview-grid">
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ (sidePanelParticipant?.eventAttended ?? []).length }}</div>
+              <div class="bl-stat-l">Events attended</div>
+            </div>
+          </div>
+
+          <div class="bl-divider"></div>
+
+          <!-- TODO: search input + filtering -->
+          <!-- <div class="bl-search-box">
+        <span class="bl-search-icon">⌕</span>
+        <input data-testid="bld-side-search-events" type="text" placeholder="Search events…" />
+      </div> -->
+
+          <div class="bl-section-label">Event history</div>
+          <div class="bl-list">
+            <div class="bl-list-item" *ngFor="let eventId of sidePanelParticipant?.eventAttended ?? []">
+              <div class="bl-item-title">{{ eventMap[eventId]?.name }}</div>
+              <div class="bl-item-sub">{{ toDate(eventMap[eventId]?.start_date) | date:'medium' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── STUDIO ── -->
+        <div class="bl-panel bl-p-studio" *ngIf="sidePanelCurrentTab === 'studio'">
+          <div class="bl-overview-grid">
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.queueActivityLog?.length }}</div>
+              <div class="bl-stat-l">Entries logged</div>
+            </div>
+          </div>
+
+          <div class="bl-divider"></div>
+
+          <!-- TODO: search input + filtering -->
+          <!-- <div class="bl-search-box">
+        <span class="bl-search-icon">⌕</span>
+        <input data-testid="bld-side-search-activity-atc" type="text" placeholder="Search by activity or ATC mode…" />
+      </div> -->
+
+          <div class="bl-section-label">Log entries</div>
+          <!-- wrapped so this list scrolls on its own, independent of the rest of the panel -->
+          <div class="bl-studio-list">
+            <div class="studio-card" *ngFor="let studiolog of sidePanelParticipant?.queueActivityLog ?? []">
+              <div class="studio-avatar-row">
+                <div class="studio-avatar">{{ getInital(participantMetadataMap[studiolog?.participantid]?.name) }}</div>
+                <div class="studio-name">{{ participantMetadataMap[studiolog?.participantid]?.name }}</div>
+              </div>
+              <div class="studio-divider"></div>
+              <div class="studio-metrics-top">
+                <div class="studio-metric">
+                  <div class="studio-metric-label">Activity</div>
+                  <div class="studio-metric-value">{{ bigActivityMap[studiolog['activity']]?.activity }}</div>
+                </div>
+                <div class="studio-metric">
+                  <div class="studio-metric-label">ATC mode</div>
+                  <div class="studio-metric-value">{{ studiolog['atcmodel'] }}</div>
+                </div>
+              </div>
+              <div class="studio-date-row">{{ toDate(studiolog?.activitydate) | date:'medium' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── ACTIVITY ── -->
+        <div class="bl-panel bl-p-cal" *ngIf="sidePanelCurrentTab === 'activity'">
+          <div class="bl-overview-grid">
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.bigActivity?.initiated?.length }}</div>
+              <div class="bl-stat-l">Initiated</div>
+            </div>
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.bigActivity?.completed?.length }}</div>
+              <div class="bl-stat-l">Completed</div>
+            </div>
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.bigActivity?.missed?.length }}</div>
+              <div class="bl-stat-l">Missed</div>
+            </div>
+          </div>
+
+          <div class="bl-divider"></div>
+
+          <!-- TODO: search input + filtering -->
+          <!-- <div class="bl-search-box">
+        <span class="bl-search-icon">⌕</span>
+        <input data-testid="bld-side-search-activities" type="text" placeholder="Search activities…" />
+      </div> -->
+
+          <div class="bl-section-label">Queue</div>
+          <div class="bl-queue">
+            <button data-testid="bld-side-pill-initiated" class="bl-pill" (click)="cohortActivityTab='initiated'">Initiated <b>{{
+                sidePanelParticipant?.bigActivity?.initiated?.length }}</b></button>
+            <button data-testid="bld-side-pill-review" class="bl-pill" (click)="cohortActivityTab='review'">Review <b>{{
+                sidePanelParticipant?.bigActivity?.review?.length }}</b></button>
+            <button data-testid="bld-side-pill-rework" class="bl-pill" (click)="cohortActivityTab='rework'">Rework <b>{{
+                sidePanelParticipant?.bigActivity?.rework?.length }}</b></button>
+            <button data-testid="bld-side-pill-missed" class="bl-pill" (click)="cohortActivityTab='missed'">Missed <b>{{
+                sidePanelParticipant?.bigActivity?.missed?.length }}</b></button>
+            <button data-testid="bld-side-pill-completed" class="bl-pill" (click)="cohortActivityTab='completed'">Completed <b>{{
+                sidePanelParticipant?.bigActivity?.completed?.length }}</b></button>
+          </div>
+
+          <div class="bl-section-label">Activities</div>
+          <!-- wrapped so this list scrolls on its own, independent of the rest of the panel -->
+          <div class="bl-actcard-list">
+            <div class="bl-actcard" *ngFor="let activity of sidePanelParticipant?.bigActivity[cohortActivityTab] ?? []">
+              <div class="bl-actcard-top">
+                <span class="bl-badge bl-badge-type">{{ bigAssignmentMap[activity['assignmentref']?.id ?? '']?.assignmenttype }}</span>
+                <span class="bl-badge bl-badge-review">{{ activity['status'] ?? '' }}</span>
+              </div>
+              <div class="bl-actcard-title">{{ bigAssignmentMap[activity['assignmentref']?.id ?? '']?.title ?? '' }}
+              </div>
+              <div class="bl-actcard-dates">
+                <span><i>Start</i>{{ toDate(bigAssignmentMap[activity['assignmentref']?.id ?? '']?.startdate) | date:'medium' }}</span>
+                <span><i>End</i>{{ toDate(bigAssignmentMap[activity['assignmentref']?.id ?? '']?.enddate) | date:'medium' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── EIFLIX ── -->
+        <div class="bl-panel bl-p-eiflix" *ngIf="sidePanelCurrentTab === 'content'">
+          <div class="bl-overview-grid">
+            <div class="bl-stat-card">
+              <div class="bl-stat-n">{{ sidePanelParticipant?.eiflixConsumption?.length }}</div>
+              <div class="bl-stat-l">Units consumed</div>
+            </div>
+          </div>
+
+          <div class="bl-divider"></div>
+
+          <!-- TODO: search input + filtering -->
+          <!-- <div class="bl-search-box">
+        <span class="bl-search-icon">⌕</span>
+        <input data-testid="bld-side-search-content" type="text" placeholder="Search content…" />
+      </div> -->
+
+          <div class="bl-section-label">Recently watched</div>
+          <div class="bl-list">
+            <div class="bl-list-item" *ngFor="let video of sidePanelParticipant?.eiflixConsumption ?? []">
+              <div class="bl-item-title">{{ eiflixVideoMap[video]?.title }}</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

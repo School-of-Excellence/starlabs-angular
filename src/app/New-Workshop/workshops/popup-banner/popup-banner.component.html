@@ -10,8 +10,8 @@
   <div class="pb-head">
     <div class="pb-head-text">
       <div class="eyebrow">EiFlix</div>
-      <h2 class="pb-title">Popup banner</h2>
-      <p class="pb-sub">One banner for the whole app. Nothing here is required — fill in what you need.</p>
+      <h2 class="pb-title">Popup banners</h2>
+      <p class="pb-sub">Add as many as you need. Nothing here is required — fill in what you want to use.</p>
     </div>
     <span class="pb-state" *ngIf="!loading && !loadError" [class.on]="form?.get('enable')?.value">
       {{ form?.get('enable')?.value ? 'Live' : 'Off' }}
@@ -31,7 +31,39 @@
     <p class="ph-text">The saved banner could not be read, so saving is disabled to avoid overwriting it with empty values. Close this and try again.</p>
   </div>
 
-  <!-- ───────── form ───────── -->
+  <!-- ───────── the banners ───────── -->
+  <section class="card pb-list-card" *ngIf="!loading && !loadError">
+    <div class="sec-head static">
+      <h2 class="sec-title">Banners</h2>
+      <span class="grow"></span>
+      <button data-testid="pb-add-banner-9" type="button" class="btn btn-sm" (click)="addBanner()">
+        <mat-icon>add</mat-icon>Add banner
+      </button>
+    </div>
+    <div class="sec-body">
+      <p class="help pb-legacy" *ngIf="migratedFromLegacy">
+        The banner already in use has been brought in as the first one below. It stays exactly as it
+        is until you save.
+      </p>
+      <div class="pb-list">
+        <div class="pb-list-item" *ngFor="let b of banners; let i = index; trackBy: trackBanner"
+             [class.sel]="i === selected">
+          <button data-testid="pb-select-banner-10" type="button" class="pb-list-pick"
+                  (click)="selectBanner(i)" [attr.aria-current]="i === selected">
+            <span class="pb-list-name">{{ label(b, i) }}</span>
+            <span class="pb-list-state" [class.on]="b.enable">{{ b.enable ? 'Live' : 'Off' }}</span>
+          </button>
+          <button data-testid="pb-remove-banner-11" type="button" class="pb-list-x"
+                  (click)="removeBanner(i)" [attr.aria-label]="'Remove ' + label(b, i)">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+      <div class="help">Pick one to edit it below. Each banner has its own switch.</div>
+    </div>
+  </section>
+
+  <!-- ───────── form — edits the selected banner ───────── -->
   <form [formGroup]="form" *ngIf="!loading && !loadError" class="pb-body">
 
     <!-- enable -->
@@ -40,7 +72,7 @@
         <div class="pb-toggle-row">
           <div class="pb-toggle-text">
             <div class="pb-toggle-title">Show this popup</div>
-            <div class="help">Turn this off to hide the popup from the app without clearing anything you have written here.</div>
+            <div class="help">Turn this off to hide this banner from the app without clearing anything you have written here. Each banner has its own switch.</div>
           </div>
           <button data-testid="pb-toggle-enable-3" type="button" class="toggle" [class.on]="form.get('enable')?.value"
                   (click)="toggleEnable()" [attr.aria-pressed]="form.get('enable')?.value"
@@ -52,7 +84,7 @@
     <!-- copy -->
     <section class="card">
       <div class="sec-head static">
-        <h2 class="sec-title">Content</h2>
+        <h2 class="sec-title">Content — {{ label(banners[selected], selected) }}</h2>
         <span class="grow"></span>
         <span class="sec-hint">Rich text, except the button link</span>
       </div>
@@ -69,7 +101,7 @@
         <div class="field">
           <div class="label"><span>Button 1 link</span><span class="counter">Plain text</span></div>
           <div class="input">
-            <input class="txt" type="text" formControlName="button1link"
+            <input data-testid="pb-button1link-12" class="txt" type="text" formControlName="button1link"
                    placeholder="https://…" autocomplete="off" spellcheck="false">
           </div>
           <div class="help">Where the first button goes. Button 2 has no link by design.</div>
@@ -136,7 +168,7 @@
     <button data-testid="pb-close-7" type="button" class="btn" (click)="close()">Close</button>
     <button data-testid="pb-save-8" type="button" class="btn btn-primary" (click)="save()" [disabled]="saving || anyUploading">
       <span class="spin" *ngIf="saving"></span>
-      <span>{{ saving ? 'Saving' : 'Save banner' }}</span>
+      <span>{{ saving ? 'Saving' : (banners.length === 1 ? 'Save banner' : 'Save all banners') }}</span>
     </button>
   </div>
 </div>
