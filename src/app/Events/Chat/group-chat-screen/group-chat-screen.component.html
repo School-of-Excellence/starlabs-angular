@@ -18,6 +18,13 @@
         </div>
       </div>
 
+      <!-- Groups split by membership: mine (can post) vs others (view-only). Only A&H members and
+           platform admins see groups they are not in, so only they get the split. -->
+      <div class="wc-subtabs" *ngIf="tab === 'groups' && showGroupSubtabs">
+        <button data-testid="gcs-subtabs-groups" *ngFor="let t of GROUP_TABS; trackBy: trackByIndex"
+                [class.on]="groupsSub === t.k" (click)="setGroupsSub(t.k)">{{ t.label }}</button>
+      </div>
+
       <!-- Archived splits into deleted groups / deleted channels -->
       <div class="wc-subtabs" *ngIf="tab === 'archived'">
         <button data-testid="gcs-subtabs-archived" *ngFor="let t of ARCHIVED_TABS; trackBy: trackByIndex"
@@ -46,9 +53,9 @@
       <div class="wc-list">
         <!-- No query: the plain chat list -->
         <ng-container *ngIf="!search">
-          <div class="wc-empty" *ngIf="loading">Loading…</div>
-          <div class="wc-empty" *ngIf="!loading && filtered.length === 0">
-            {{ tab === 'groups' ? 'No groups yet — create one'
+          <div class="wc-empty" *ngIf="loading || currentGroupsLoading">Loading…</div>
+          <div class="wc-empty" *ngIf="!loading && !currentGroupsLoading && filtered.length === 0">
+            {{ tab === 'groups' ? (groupsSub === 'others' ? 'No other groups' : 'No groups yet — create one')
              : tab === 'channels' ? 'No channels yet — create one'
              : archivedSub === 'channels' ? 'No deleted channels' : 'Nothing archived yet' }}
           </div>
@@ -80,7 +87,9 @@
                 <span class="wc-draft-tag">Draft:</span> {{ draftPreview(c.id) }}
               </span>
               <ng-template #lastMsg>
-                <span class="wc-row-preview">{{ c.lastMessage || '—' }}</span>
+                <span class="wc-row-preview">
+                  <mat-icon class="wc-row-announce" *ngIf="c.lastIsAnnouncement" aria-label="Announcement">campaign</mat-icon>{{ c.lastMessage || '—' }}
+                </span>
               </ng-template>
               <span class="wc-row-unread" *ngIf="c.unread > 0">{{ c.unread }}</span>
               <button data-testid="gcs-list-pin" class="wc-row-pin" [class.on]="c.pinned" (click)="togglePinChat(c, $event)"
@@ -90,6 +99,12 @@
             </div>
           </div>
         </div>
+
+        <!-- Other groups and archived groups load a page at a time, only once their list is opened. -->
+        <button data-testid="gcs-list-loadmore-groups" class="wc-loadmore" *ngIf="!search && showGroupPaging"
+                (click)="loadMoreGroups()" [disabled]="currentGroupsLoading">
+          {{ currentGroupsLoading ? 'Loading…' : 'Load more groups' }}
+        </button>
 
         <!-- Channels are paged, not streamed — the old screen loaded them 10 at a time. -->
         <button data-testid="gcs-list-loadmore" class="wc-loadmore" *ngIf="!search && showChannelPaging"
@@ -160,6 +175,7 @@
             </div>
           </div>
           <span class="wc-archived-pill" *ngIf="tab === 'archived'">ARCHIVED</span>
+          <span class="wc-archived-pill" *ngIf="tab === 'groups' && viewOnly">VIEW ONLY</span>
           <button data-testid="gcs-thread-msgsearch-toggle" class="wc-icon-btn" [class.on]="showMsgSearch" matTooltip="Search messages"
                   (click)="showMsgSearch ? closeMsgSearch() : (showMsgSearch = true)">
             <mat-icon>search</mat-icon>
@@ -373,24 +389,33 @@
                     <ng-container *ngIf="!photoOf(m.senderName)">{{ initials(m.senderName) }}</ng-container>
                   </span>
                   <span class="wc-ann-sender">{{ senderLabel(m) }}</span>
-                  <div class="wc-reactions" *ngIf="features.react">
+                  <div class="wc-reactions" *ngIf="reactionEntries(m).length">
                     <button data-testid="gcs-ann-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
-                            [class.mine]="r.mine" [title]="r.users.join(', ')" (click)="toggleReaction(m.id, r.emoji)">
-                      <span>{{ r.emoji }}</span>{{ r.users.length }}
+                            [class.mine]="r.mine" [class.static]="!features.react" [title]="r.users.join(', ')"
+                            (click)="toggleReaction(m.id, r.emoji)">
+                      <span>{{ r.emoji }}</span><ng-container *ngIf="r.users.length > 1">{{ r.users.length }}</ng-container>
                     </button>
                   </div>
                 </div>
+                <div class="wc-picker ann" *ngIf="pickerId === m.id">
+                  <button data-testid="gcs-ann-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
+                </div>
                 <div class="wc-ann-actions" *ngIf="!selectMode">
-                  <button data-testid="gcs-ann-react" *ngIf="features.react" matTooltip="React" (click)="toggleReaction(m.id, '👍')">
+                  <button data-testid="gcs-ann-react" *ngIf="features.react" [class.on]="pickerId === m.id" matTooltip="React"
+                          (click)="pickerId = pickerId === m.id ? null : m.id">
                     <mat-icon>add_reaction</mat-icon>
                   </button>
                   <button data-testid="gcs-ann-info" *ngIf="m.from === 'team' && features.info" matTooltip="Message info" (click)="openMessageInfo(m)">
                     <mat-icon>info</mat-icon>
                   </button>
-                  <button data-testid="gcs-ann-pin" [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
+                  <button data-testid="gcs-ann-edit" *ngIf="!viewOnly && !features.readOnly && m.from === 'team'" matTooltip="Edit"
+                          (click)="handleMenuAction('edit', m)">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button data-testid="gcs-ann-pin" *ngIf="!viewOnly && !features.readOnly" [class.on]="m.pinned" [matTooltip]="m.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(m)">
                     <mat-icon>push_pin</mat-icon>
                   </button>
-                  <button data-testid="gcs-ann-delete" class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
+                  <button data-testid="gcs-ann-delete" *ngIf="!viewOnly && !features.readOnly" class="danger" matTooltip="Delete" (click)="confirmDelete = { msgs: [m] }">
                     <mat-icon>delete_outline</mat-icon>
                   </button>
                 </div>
@@ -430,14 +455,14 @@
                     </div>
 
                     <!-- Card and its stamp share a row; the stamp sits beside the card. -->
-                    <div class="wc-bubble-line"
-                         (mouseenter)="hoverId = m.id" (mouseleave)="hoverId = null; pickerId = null">
+                    <div class="wc-bubble-line" #bubbleLine
+                         (mouseenter)="onBubbleEnter(m.id, bubbleLine)" (mouseleave)="hoverId = null; pickerId = null">
                     <div class="wc-bubble"
                          [class.mine]="alignRight(m)"
                          [class.mention]="mentionsMe(m) && !isLight(m)">
 
                       <!-- Anchored to the card, so it always hugs the message it belongs to -->
-                      <div class="wc-hover" *ngIf="hoverId === m.id && !selectMode">
+                      <div class="wc-hover" *ngIf="hoverId === m.id && !selectMode" [class.from-left]="hoverFlip">
                         <button data-testid="gcs-msg-action" *ngFor="let o of actionsFor(m); trackBy: trackByIndex"
                                 [class.danger]="o.danger" [matTooltip]="o.label"
                                 (click)="handleMenuAction(o.k, m)">
@@ -445,7 +470,7 @@
                         </button>
                       </div>
 
-                      <div class="wc-picker" *ngIf="pickerId === m.id">
+                      <div class="wc-picker" *ngIf="pickerId === m.id" [class.from-left]="hoverFlip">
                         <button data-testid="gcs-msg-picker-emoji" *ngFor="let e of QUICK_EMOJIS; trackBy: trackByIndex" (click)="toggleReaction(m.id, e)">{{ e }}</button>
                       </div>
 
@@ -512,10 +537,11 @@
                     </div>
                   </div>
 
-                  <div class="wc-reactions" *ngIf="features.react">
+                  <div class="wc-reactions" *ngIf="reactionEntries(m).length">
                     <button data-testid="gcs-msg-reaction" *ngFor="let r of reactionEntries(m); trackBy: trackByIndex" class="wc-chip"
-                            [class.mine]="r.mine" [title]="r.users.join(', ')" (click)="toggleReaction(m.id, r.emoji)">
-                      <span>{{ r.emoji }}</span>{{ r.users.length }}
+                            [class.mine]="r.mine" [class.static]="!features.react" [title]="r.users.join(', ')"
+                            (click)="toggleReaction(m.id, r.emoji)">
+                      <span>{{ r.emoji }}</span><ng-container *ngIf="r.users.length > 1">{{ r.users.length }}</ng-container>
                     </button>
                   </div>
 
@@ -543,7 +569,7 @@
         </div>
         <div class="wc-noaccess" *ngIf="!features.readOnly && !isChannel(a) && !canMessage">
           <mat-icon>lock</mat-icon>
-          <span>Contact the group admin or developer for access to message.</span>
+          <span>You are not a member of this group, so you can only read it. An A&amp;H member in the group can add you to reply.</span>
         </div>
 
         <!-- Composer card: notices, pickers and the input row all live inside one panel. -->
@@ -589,14 +615,16 @@
           <button data-testid="gcs-composer-mention" class="wide" matTooltip="Tag a specific person" (click)="startPersonMention()">
             <mat-icon>alternate_email</mat-icon> person
           </button>
-          <!-- Announcement composing is parked for now; existing announcement messages still render.
-          <button class="wide" [class.announce]="announceMode" (click)="announceMode = !announceMode"
-                  matTooltip="Send as an announcement — shown centred to everyone">
-            <mat-icon>campaign</mat-icon> announcement
-          </button>
-          -->
           <button data-testid="gcs-composer-link" class="wide" [class.on]="linkForm" matTooltip="Add a link button" (click)="linkForm = { label: '', url: '' }">
             <mat-icon>link</mat-icon> link
+          </button>
+          <!-- A&H team only, as in the Flutter app. Saved as `announcement: true` on the message. -->
+          <button data-testid="gcs-composer-announce" class="wide" *ngIf="canAnnounce" [class.announce]="announceMode"
+                  [class.muted]="!announceMode && notAnAnnouncement"
+                  [matTooltip]="announceMode ? 'Sending as an announcement — click to send a normal message'
+                                : (notAnAnnouncement || 'Send as an announcement — shown centred to everyone')"
+                  (click)="toggleAnnounce()">
+            <mat-icon>campaign</mat-icon> announcement
           </button>
           <span class="wc-toolbar-hint">*bold* · _italic_ · • bullet · 1. number</span>
         </div>
@@ -838,35 +866,49 @@
 
         <!-- Members -->
         <ng-container *ngIf="tab === 'groups'">
-          <div class="wc-block" *ngIf="!isLive(a)">
+          <!-- A&H members, listed apart from participants. Live groups sort `members` by the ahmember
+               role; demo rows keep their static team. -->
+          <div class="wc-block">
             <div class="wc-block-title">
-              <mat-icon>group</mat-icon> <span class="grow">Team · {{ teamMembers.length + 1 }}</span>
-              <button data-testid="gcs-info-team-add" class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <mat-icon>verified_user</mat-icon>
+              <span class="grow" *ngIf="isLive(a)">A&amp;H members · {{ memberSearch ? filteredTeam.length + ' of ' + teamMembers.length : teamMembers.length }}</span>
+              <span class="grow" *ngIf="!isLive(a)">Team · {{ teamMembers.length + 1 }}</span>
+              <!-- Live groups add anyone from the one Add button under Participants. -->
+              <button data-testid="gcs-info-team-add" class="wc-add-btn" *ngIf="!isLive(a) && canManageGroup" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
-            <div class="wc-search plain membersearch">
+            <div class="wc-note" *ngIf="isLive(a) && teamMembers.length === 0">
+              No A&amp;H member in this group, so nobody can add or remove people.
+            </div>
+            <!-- One search box filters both lists; it sits here only when Participants has none to show. -->
+            <div class="wc-search plain membersearch" *ngIf="!isLive(a) || (teamMembers.length && !participantMembers.length)">
               <mat-icon>search</mat-icon>
               <input data-testid="gcs-info-team-search" [(ngModel)]="memberSearch" placeholder="Search to find or remove…"/>
               <button data-testid="gcs-info-team-search-clear" class="wc-search-clear" *ngIf="memberSearch" (click)="memberSearch = ''" matTooltip="Clear">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
-            <div class="wc-member">
+            <div class="wc-note" *ngIf="memberSearch && teamMembers.length && filteredTeam.length === 0">
+              No A&amp;H member matches “{{ memberSearch }}”
+            </div>
+            <div class="wc-member" *ngIf="!isLive(a)">
               <div class="wc-avatar team">AH</div>
               <span class="wc-member-name">{{ TEAM_NAME }}</span>
               <span class="wc-team-pill">ADMIN</span>
             </div>
+            <div class="wc-memberlist" [class.capped]="hasMediaBlock">
             <div class="wc-member" *ngFor="let mem of filteredTeam; trackBy: trackByIndex">
               <div data-testid="gcs-info-team-member" class="wc-member-main" (click)="openPerson(mem.name)">
-                <div class="wc-avatar" [style.background]="avatarBg(mem.name)">
+                <div data-testid="gcs-info-team-avatar" class="wc-avatar clickable" [style.background]="avatarBg(mem.name)"
+                     (click)="openAvatar(mem.name, $event)">
                   <img *ngIf="photoOf(mem.name) as url" [src]="url" [alt]="mem.name"/>
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
                 </div>
                 <span class="wc-member-name">{{ mem.name }}</span>
-                <span class="wc-role" *ngIf="directory[mem.name]?.role">{{ directory[mem.name].role }}</span>
               </div>
-              <button data-testid="gcs-info-team-remove" class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-team-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
+            </div>
             </div>
           </div>
 
@@ -874,8 +916,7 @@
             <div class="wc-block-title">
               <mat-icon>account_circle</mat-icon>
               <span class="grow">Participants · {{ memberSearch ? filteredParticipants.length + ' of ' + participantMembers.length : participantMembers.length }}</span>
-              <span class="wc-badge purple" *ngIf="groupAdminCount">{{ groupAdminCount }} admin{{ groupAdminCount === 1 ? '' : 's' }}</span>
-              <button data-testid="gcs-info-participants-add" class="wc-add-btn" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
+              <button data-testid="gcs-info-participants-add" class="wc-add-btn" *ngIf="canManageGroup" (click)="openAddMembers()"><mat-icon>add</mat-icon> Add</button>
             </div>
             <div class="wc-note" *ngIf="participantMembers.length === 0">No participants yet</div>
 
@@ -900,16 +941,10 @@
                   <ng-container *ngIf="!photoOf(mem.name)">{{ initials(mem.name) }}</ng-container>
                 </div>
                 <span class="wc-member-name">{{ mem.name }}</span>
-                <span class="wc-admin-pill" *ngIf="isGroupAdmin(mem)">ADMIN</span>
                 <span class="wc-journey" *ngIf="journeyMeta(mem.journey) as jm"
                       [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
               </div>
-              <button data-testid="gcs-info-participant-admin" class="wc-admin-btn" *ngIf="canManageAdmins" [class.on]="isGroupAdmin(mem)"
-                      [matTooltip]="isGroupAdmin(mem) ? 'Remove as group admin' : 'Make group admin'"
-                      (click)="toggleGroupAdmin(mem, $event)">
-                <mat-icon>shield</mat-icon>
-              </button>
-              <button data-testid="gcs-info-participant-remove" class="wc-remove-btn" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
+              <button data-testid="gcs-info-participant-remove" class="wc-remove-btn" *ngIf="canManageGroup" [matTooltip]="'Remove ' + mem.name" (click)="removeMember(mem.name)">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -1038,10 +1073,10 @@
       </div>
 
       <div class="wc-slide-foot">
-        <button data-testid="gcs-info-restore" class="wc-outline-btn" *ngIf="a.archived" (click)="restoreGroup()">
+        <button data-testid="gcs-info-restore" class="wc-outline-btn" *ngIf="a.archived && (isChannel(a) || canManageGroup)" (click)="restoreGroup()">
           <mat-icon>restore</mat-icon> Restore {{ isChannel(a) ? 'channel' : 'group' }}
         </button>
-        <button data-testid="gcs-info-delete-group" class="wc-danger-btn full" *ngIf="!a.archived" (click)="confirmDelete = { group: true }">
+        <button data-testid="gcs-info-delete-group" class="wc-danger-btn full" *ngIf="!a.archived && (isChannel(a) || canManageGroup)" (click)="confirmDelete = { group: true }">
           <mat-icon>delete_outline</mat-icon> Delete {{ isChannel(a) ? 'channel' : 'group' }}
         </button>
       </div>
@@ -1329,7 +1364,7 @@
 
         <div class="wc-field" *ngIf="isGroupCreate">
           <label>Members *
-            <span class="wc-count">{{ cSelected.length }} selected<ng-container *ngIf="cAdminIds.length">, {{ cAdminIds.length }} admin</ng-container></span>
+            <span class="wc-count">{{ cSelected.length }} selected</span>
           </label>
           <!-- Search + import sit together: both are ways of getting people INTO the selection. -->
           <div class="wc-pickbar">
@@ -1388,14 +1423,8 @@
                 <span class="wc-pickname">{{ p.name }}</span>
                 <span class="wc-picksub" *ngIf="emailOf(p.id)">{{ emailOf(p.id) }}</span>
               </span>
-              <span class="wc-admin-pill" *ngIf="isCreateAdmin(p.id)">ADMIN</span>
               <span class="wc-journey" *ngIf="journeyMeta(p.journey) as jm"
                     [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
-              <button data-testid="gcs-create-person-admin" class="wc-admin-btn" [class.on]="isCreateAdmin(p.id)"
-                      [matTooltip]="isCreateAdmin(p.id) ? 'Remove admin' : 'Mark as group admin'"
-                      (click)="toggleCreateAdmin(p, $event)">
-                <mat-icon>shield</mat-icon>
-              </button>
             </div>
           </div>
         </div>
@@ -1561,7 +1590,6 @@
           <span class="wc-pickname">{{ p.name }}</span>
           <span class="wc-journey" *ngIf="journeyMeta(p.journey) as jm"
                 [style.background]="jm.bg" [style.color]="jm.color">{{ jm.label }}</span>
-          <span class="wc-role" *ngIf="!journeyMeta(p.journey) && p.role">{{ p.role }}</span>
         </div>
       </div>
       <div class="wc-dialog-foot">

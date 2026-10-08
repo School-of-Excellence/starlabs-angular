@@ -10,7 +10,7 @@ import {
   query, where, orderBy, getDoc, setDoc, updateDoc, serverTimestamp, arrayRemove, arrayUnion, deleteField,
   startAt, endAt, startAfter, limit,
 } from '@angular/fire/firestore';
-import { writeBatch } from 'firebase/firestore';
+import { writeBatch, FieldPath } from 'firebase/firestore';
 import { Storage } from '@angular/fire/storage';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Subject, Subscription, takeUntil } from 'rxjs';
@@ -74,7 +74,12 @@ export interface ChatMessage {
     thumbUrl?: string;
     isMedia?: boolean;
   };
+  /**
+   * Live messages: `reactions` exactly as stored — { emoji: [uid, …] }, shared with the Flutter app.
+   * Demo rows: { emoji: [display name, …] }. `_reactionsByUid` says which one this is.
+   */
   reactions?: { [emoji: string]: string[] };
+  _reactionsByUid?: boolean;
   mentions?: string[];
   readBy?: Receipt[];
   deliveredTo?: Receipt[];
@@ -145,10 +150,12 @@ export interface ChatItem {
   archived?: boolean;
   /** `pinned` on the supportchat doc — chat-screen's existing chat-pin flag. */
   pinned?: boolean;
-  /** `group_admin` — uids (same identifier as `members`) allowed to administer the group. */
-  adminUids?: string[];
   _coll?: string;
   _kind?: 'group' | 'channel';
+  /** The newest message is an announcement — the chat list shows a megaphone before the preview. */
+  lastIsAnnouncement?: boolean;
+  /** Which group stream delivered this row — each stream only replaces its own rows. */
+  _bucket?: GroupBucket;
   /** True for a group backed by Firestore (`supportchat`), false for the static demo rows. */
   _live?: boolean;
   /** Firestore doc ref for a live group. */
@@ -189,6 +196,8 @@ export interface ParticipantEvent {
 export interface EventRef { id: string; title: string; }
 
 type TabKey = 'groups' | 'channels' | 'archived';
+/** The three group lists, each backed by its own Firestore listener that starts on first open. */
+type GroupBucket = 'mine' | 'others' | 'archived';
 
 interface Features {
   sender: boolean; reply: boolean; react: boolean;
@@ -222,12 +231,24 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   readonly TEAM_NAME = 'A&H Team';
   /** Display name for "me" — the signed-in profile on live groups, the demo team otherwise. */
   get selfName(): string { return this.currentProfile?.['name'] || this.TEAM_NAME; }
-  readonly QUICK_EMOJIS = ['👍', '❤️', '😂', '🙏', '🎉', '👏'];
+  /** The Flutter app's reaction set, in its order (msgThread.dart `_emoji`). */
+  readonly QUICK_EMOJIS = ['👍', '🙌', '❤️', '🔥', '🙏'];
   readonly AVATAR_EMOJIS = ['💬', '🎪', '🧠', '✨', '⚡', '📣', '🌟', '🔥', '🎯', '🤝'];
   readonly TABS: { k: TabKey; label: string }[] = [
     { k: 'groups', label: 'Groups' },
     { k: 'channels', label: 'Channels' },
     { k: 'archived', label: 'Archived' },
+  ];
+
+  /**
+   * Groups split by membership. "My groups" are the ones whose `members` holds my uid — I can post
+   * there. "Other groups" are visible only to A&H members (and platform admins) and are view-only:
+   * to reply, an A&H member who IS in that group has to add you.
+   */
+  groupsSub: 'mine' | 'others' = 'mine';
+  readonly GROUP_TABS: { k: 'mine' | 'others'; label: string }[] = [
+    { k: 'mine', label: 'My groups' },
+    { k: 'others', label: 'Other groups' },
   ];
 
   /** Archived is split in two: deleted groups and deleted channels. */
@@ -325,8 +346,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   readonly cDesc = '';
   cEventId = '';
   cSaving = false;
-  /** Everyone in one list — no team/participants split in the create dialog. */
-  cAdminIds: string[] = [];
   cImageFile: File | null = null;
   cImagePreview: string | null = null;
   cSearch = '';
@@ -513,6 +532,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   currentProfileDocId = '';
   chatAdmin = false;
   adminRole = false;
+  /** `ahmember` on the roles doc — every A&H member is an admin of the groups they are in. */
+  ahMember = false;
   /** `developer` on the roles doc — the escape hatch that can appoint the first admin. */
   developerRole = false;
   /** True once `profile_data` resolved and the group subscriptions are attached. */
@@ -607,6 +628,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       this.chatAdmin = roles?.['chatxadmin'] ?? false;
       this.adminRole = roles?.['admin'] ?? false;
       this.developerRole = roles?.['developer'] ?? false;
+      this.ahMember = roles?.['ahmember'] ?? false;
 
       const userRef = doc(this.firestore, 'user_data', this.guard.uid);
       const profileSnap = await getDocs(query(collection(this.firestore, 'profile_data'), where('user_ref', '==', userRef)));
@@ -671,6 +693,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
           if (!uid || !data['name']) return;
           const profileId = data['profileid'] || data['profile_id'] || d.id;
           data['_profileId'] = profileId;
+          data['_docId'] = d.id;
           this.profileByDocId[d.id] = { name: data['name'], photoUrl: data['profile'] || null, uid };
           this.profilesByUid[uid] = data;
           this.profileIdToName[profileId] = data['name'];
@@ -702,9 +725,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     const team: Person[] = [];
     const participants: Person[] = [];
     this.livePeople.forEach(p => {
-      const profile = this.profilesByUid[p.id];
-      const role = profile ? this.rolesByProfileId[profile['_profileId']] : null;
-      const isTeam = !!(role?.['admin'] || role?.['chatxadmin']);
+      const role = this.roleOfUid(p.id);
+      const isTeam = !!(role?.['ahmember'] || role?.['admin'] || role?.['chatxadmin']);
       const person: Person = { ...p, source: isTeam ? 'team' : 'participant', role: role?.['name'] || undefined };
       this.directory[person.name] = person;
       (isTeam ? team : participants).push(person);
@@ -715,6 +737,19 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   private nameOfUid(uid: string): string { return this.profilesByUid[uid]?.['name'] || 'Unknown User'; }
 
+  /**
+   * users_roles doc for a uid. `profile_ref` points at the profile_data DOC id, so that is tried first;
+   * the `profileid` field is the fallback for profiles where the two happen to match.
+   */
+  private roleOfUid(uid: string): any {
+    const p = this.profilesByUid[uid];
+    if (!p) return null;
+    return this.rolesByProfileId[p['_docId']] || this.rolesByProfileId[p['_profileId']] || null;
+  }
+
+  /** True when this uid belongs to an A&H member — the only kind of group admin there is. */
+  isAhMemberUid(uid?: string): boolean { return !!uid && !!this.roleOfUid(uid)?.['ahmember']; }
+
   /** Same query shape as chat-screen: admins see every group, everyone else only their own. */
   /** The paging control only belongs under a channel list that actually has another page. */
   get showChannelPaging(): boolean {
@@ -723,32 +758,127 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return false;
   }
 
-  /** Same query shape as chat-screen: admins see every group, everyone else only their own. */
+  /* ── Group streams, one per list, started only when that list is opened ──
+     Loading used to open two listeners up front — every active group and every archived group. For
+     an A&H member that is every group in the system on first paint. Now:
+       mine      members array-contains me              started at load (default tab, unread badge)
+       others    every active group, minus mine         started on first "Other groups" click, paged
+       archived  isdelete == true (mine, or all for     started on first Archived › Groups click;
+                 A&H/admins)                            paged when it is "all"
+     Firestore has no "not array-contains", so Other groups is the all-groups query with mine dropped
+     client-side. The paged queries reuse the (type, isdelete, last_modification desc) index the
+     channel list already needs. */
+
+  private groupSubs: { [b in GroupBucket]?: Subscription } = {};
+  private readonly GROUP_PAGE = 30;
+  private groupLimit: { others: number; archived: number } = { others: 30, archived: 30 };
+  hasMoreGroups: { others: boolean; archived: boolean } = { others: false, archived: false };
+  /** True until a lazily started stream delivers its first snapshot. */
+  groupsLoading: { [b in GroupBucket]: boolean } = { mine: false, others: false, archived: false };
+
   private loadGroups(): void {
-    const baseFilter = (this.chatAdmin || this.adminRole)
-      ? []
-      : [where('members', 'array-contains', this.currentUid)];
-
-    const groupQuery = (isdelete: boolean) => query(
-      this.supportchat, ...baseFilter, where('type', '==', 'group'), where('isdelete', '==', isdelete));
-
-    this.loading = true;
-    collectionSnapshots(groupQuery(false)).pipe(takeUntil(this.destroy$)).subscribe({
-      next: docs => { this.mergeGroups(docs, false); this.loading = false; },
-      error: e => { console.error('active groups', e); this.loading = false; },
-    });
-    collectionSnapshots(groupQuery(true)).pipe(takeUntil(this.destroy$)).subscribe({
-      next: docs => this.mergeGroups(docs, true),
-      error: e => console.error('archived groups', e),
-    });
+    this.ensureGroupStream('mine');
   }
 
-  /** Replace the demo groups with live ones, keeping any messages already streamed in. */
-  private mergeGroups(docs: any[], archived: boolean): void {
-    const mapped = docs.map(d => this.mapGroupDoc(d, archived));
-    // Keep the other bucket (active vs archived) as it is; demo groups drop out once live data lands.
-    const kept = this.groups.filter(g => g._live && !!g.archived !== archived);
-    this.groups = [...kept, ...mapped].sort((a, b) => (b.lastAt || '').localeCompare(a.lastAt || ''));
+  /** Start a bucket's listener the first time its list is shown; later visits reuse it. */
+  private ensureGroupStream(b: GroupBucket): void {
+    if (!this.currentUid || this.groupSubs[b]) return;
+    if (b === 'others' && !this.seesAllGroups) return;
+    this.startGroupStream(b);
+  }
+
+  private isPagedBucket(b: GroupBucket): b is 'others' | 'archived' {
+    return b === 'others' || (b === 'archived' && this.seesAllGroups);
+  }
+
+  private startGroupStream(b: GroupBucket): void {
+    this.groupSubs[b]?.unsubscribe();
+    const archived = b === 'archived';
+    const ownOnly = b === 'mine' || (archived && !this.seesAllGroups);
+    const paged = this.isPagedBucket(b);
+    const parts: any[] = [
+      ...(ownOnly ? [where('members', 'array-contains', this.currentUid)] : []),
+      where('type', '==', 'group'),
+      where('isdelete', '==', archived),
+    ];
+    if (paged) parts.push(orderBy('last_modification', 'desc'), limit(this.groupLimit[b]));
+
+    this.groupsLoading[b] = true;
+    if (b === 'mine') this.loading = true;
+    this.groupSubs[b] = collectionSnapshots(query(this.supportchat, ...parts))
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: docs => {
+          if (paged) this.hasMoreGroups[b] = docs.length >= this.groupLimit[b];
+          const keep = b === 'others'
+            ? docs.filter(d => !((d.data() as any)['members'] || []).includes(this.currentUid))
+            : docs;
+          this.mergeGroups(keep, b);
+          this.groupsLoading[b] = false;
+          if (b === 'mine') this.loading = false;
+        },
+        error: e => {
+          console.error(`${b} groups`, e);
+          this.groupsLoading[b] = false;
+          if (b === 'mine') this.loading = false;
+        },
+      });
+  }
+
+  /** The group bucket behind the list on screen, or null when a channel list is showing. */
+  get currentGroupBucket(): GroupBucket | null {
+    if (this.tab === 'groups') return this.groupsSub === 'mine' ? 'mine' : 'others';
+    if (this.tab === 'archived' && this.archivedSub === 'groups') return 'archived';
+    return null;
+  }
+
+  get showGroupPaging(): boolean {
+    const b = this.currentGroupBucket;
+    return !!b && this.isPagedBucket(b) && this.hasMoreGroups[b];
+  }
+
+  get currentGroupsLoading(): boolean {
+    const b = this.currentGroupBucket;
+    return !!b && this.groupsLoading[b];
+  }
+
+  /** Widen the listener by one page; the snapshot that follows replaces this bucket's rows. */
+  loadMoreGroups(): void {
+    const b = this.currentGroupBucket;
+    if (!b || !this.isPagedBucket(b)) return;
+    this.groupLimit[b] += this.GROUP_PAGE;
+    this.startGroupStream(b);
+  }
+
+  /** Replace one bucket's rows, keeping the others and any messages already streamed in. */
+  private mergeGroups(docs: any[], b: GroupBucket): void {
+    const mapped = docs.map(d => ({ ...this.mapGroupDoc(d, b === 'archived'), _bucket: b }));
+    // Demo groups drop out once live data lands; other buckets stay as they are.
+    const kept = this.groups.filter(g => g._live && g._bucket !== b);
+    // Mine and others can overlap for one snapshot while a membership change propagates — keep one row.
+    const byId = new Map<string, ChatItem>();
+    [...kept, ...mapped].forEach(g => {
+      const prev = byId.get(g.id);
+      if (!prev || g._bucket === 'mine') byId.set(g.id, g);
+    });
+    this.groups = [...byId.values()].sort((a, b2) => (b2.lastAt || '').localeCompare(a.lastAt || ''));
+    // Being added to (or removed from) the open group moves it between My / Other groups. Follow it,
+    // so the thread does not vanish from under the reader mid-read.
+    const open = this.groups.find(g => g.id === this.activeIds.groups && !g.archived);
+    if (open && this.isLive(open)) this.groupsSub = this.isMine(open) ? 'mine' : 'others';
+  }
+
+  /**
+   * Same test as the Flutter app: sending an announcement stamps `last_announcement_at` with the same
+   * time as `last_modification`, and any later message moves `last_modification` on. Compared within a
+   * millisecond, because a backend rewrite of last_modification rounds to the millisecond.
+   */
+  private latestIsAnnouncement(data: any): boolean {
+    const ms = (v: any): number | null =>
+      v?.toMillis ? v.toMillis() : v instanceof Date ? v.getTime() : null;
+    const at = ms(data['last_announcement_at']);
+    const last = ms(data['last_modification']);
+    return at !== null && last !== null && Math.abs(at - last) < 1;
   }
 
   private mapGroupDoc(d: any, archived: boolean): ChatItem {
@@ -771,9 +901,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       messages: existing?.messages || [],
       lastMessage: data['last_message'] || '',
       lastAt: this.tsToIso(data['last_modification']),
+      lastIsAnnouncement: this.latestIsAnnouncement(data),
       unread: pending.includes(this.currentUid) ? 1 : 0,
       pinned: !!data['pinned'],
-      adminUids: data['group_admin'] || [],
       deletedLog: existing?.deletedLog || [],
       archived,
       _live: true,
@@ -866,7 +996,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       lastAt: this.tsToIso(data['last_modification']),
       unread: 0,
       pinned: !!data['pinned'],
-      adminUids: [],
       deletedLog: [],
       archived,
       _live: true,
@@ -1089,6 +1218,10 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       id: data['messageid'] || d.id,
       from: uid === this.currentUid ? 'team' : 'member',
       senderName: this.nameOfUid(uid),
+      reactions: this.mapReactions(data['reactions']),
+      _reactionsByUid: true,
+      // `announcement: true` — written by the Flutter app's "Send as announcement" and by this screen.
+      kind: data['announcement'] === true ? 'announcement' : undefined,
       text: this.expandMentions(data['message'] || '', data['mentions'] || []),
       at: this.tsToIso(data['time']),
       pinned: !!data['pinned'],
@@ -1105,6 +1238,17 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       _senderUid: uid,
       _readerUids: readers,
     };
+  }
+
+  /** `reactions` as stored: { emoji: [uid, …] }. Empty lists (everyone un-reacted) are dropped. */
+  private mapReactions(raw: any): { [emoji: string]: string[] } {
+    const out: { [emoji: string]: string[] } = {};
+    if (!raw || typeof raw !== 'object') return out;
+    Object.entries(raw).forEach(([emoji, uids]) => {
+      const list = Array.isArray(uids) ? uids.filter(u => typeof u === 'string') : [];
+      if (list.length) out[emoji] = list;
+    });
+    return out;
   }
 
   /**
@@ -1286,7 +1430,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private async writeMessage(group: ChatItem, body: string, files: any[], replyTarget?: ChatMessage | null,
-                             buttons: Cta[] = []): Promise<void> {
+                             buttons: Cta[] = [], announcement = false): Promise<void> {
     const messageId = doc(collection(this.firestore, 'temp')).id;
     const { message, mentions } = this.collapseMentions(body, group);
     const pending = this.otherMembers(group);
@@ -1305,6 +1449,8 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       pending,
       mentions,
     };
+    // Exactly the Flutter app's flag: present and true on an announcement, absent otherwise.
+    if (announcement) payload.announcement = true;
     if (replyTarget) {
       // Exactly the Flutter app's reply_to shape — no extra keys.
       payload.reply_to = {
@@ -1320,6 +1466,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       last_sender_uid: this.currentUid,
       last_modification: serverTimestamp(),
       last_pending: pending,
+      // Same field and same value as last_modification (one update, one server time), so the chat
+      // list on both apps shows the megaphone until the next message moves last_modification on.
+      ...(announcement ? { last_announcement_at: serverTimestamp() } : {}),
     });
   }
 
@@ -1531,7 +1680,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   get lists(): { [k in TabKey]: ChatItem[] } {
     return {
-      groups: this.groups.filter(g => !g.archived),
+      groups: this.groups.filter(g => !g.archived && (this.groupsSub === 'mine') === this.isMine(g)),
       channels: this.channels.filter(c => !c.archived),
       archived: (this.archivedSub === 'channels'
         ? this.channels.filter(c => c.archived)
@@ -1645,59 +1794,79 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     }, attempt === 0 ? 60 : 150);
   }
 
-  /* ── Group admins (`group_admin`) ────────────────────────────────────
-     Stored as UIDs, exactly like `members` (profile_data.user_ref.id = the user_data doc id).
-     profileid is a different identifier, used only for mentions and roles. */
+  /* ── Group access ─────────────────────────────────────────────────────
+     There is no per-group admin list any more — `group_admin` on old docs is ignored. Two facts decide
+     everything:
+       · `members` (uids)            → you can read AND post. Not in it → view-only.
+       · users_roles.ahmember = true → you are an admin. A&H members see every group, and in a group
+                                       they belong to they add/remove members, rename, re-picture,
+                                       archive and restore. */
 
-  /**
-   * Membership of `group_admin` is the only thing that makes someone an admin — the creator is not
-   * implicitly one. (They are seeded into `group_admin` at creation, so they appear through the array
-   * like everyone else, and can be demoted.)
-   */
+  /** Who gets every group (My + Other) rather than only their own. */
+  get seesAllGroups(): boolean { return this.ahMember || this.chatAdmin || this.adminRole; }
+
+  /** The Groups tab only splits for people who can see groups they are not in. */
+  get showGroupSubtabs(): boolean { return this.liveMode && this.seesAllGroups; }
+
+  /** My uid is in the group's `members`. Demo rows always count as mine. */
+  isMine(g?: ChatItem | null): boolean {
+    if (!g) return false;
+    if (!this.isLive(g)) return true;
+    return (g._memberUids || []).includes(this.currentUid);
+  }
+
+  /** An open group I can read but not take part in. */
+  get viewOnly(): boolean {
+    const a = this.active;
+    return !!a && !this.isChannel(a) && !this.isMine(a);
+  }
+
+  /** A member is an admin when they are an A&H member; demo rows fall back to the team directory. */
   isGroupAdmin(mem: Member): boolean {
-    const a = this.active;
-    if (!a || !mem.id) return false;
-    return (a.adminUids || []).includes(mem.id);
+    if (!mem.id) return false;
+    return this.isLive(this.active) ? this.isAhMemberUid(mem.id) : this.isTeamMember(mem.name);
   }
 
-  /** True when the signed-in user is an admin of the open group. */
-  get isSelfGroupAdmin(): boolean {
-    const a = this.active;
-    return !!a && (a.adminUids || []).includes(this.currentUid);
+  /** Managing a group takes both: being an A&H member, and being in that group's `members`. */
+  canManageGroupOf(g?: ChatItem | null): boolean {
+    if (!g || this.isChannel(g)) return false;
+    if (!this.isLive(g)) return true;               // demo rows stay fully editable
+    return this.ahMember && this.isMine(g);
   }
 
-  /**
-   * Only a group admin assigns other admins — with the `developer` role as the escape hatch, since a
-   * group whose `group_admin` is still empty would otherwise have nobody able to appoint the first one.
-   */
-  get canManageAdmins(): boolean {
-    const a = this.active;
-    if (!a) return false;
-    // Channel membership and admins are owned by the broadcast flow, not edited from this panel.
-    if (this.isChannel(a)) return false;
-    if (!this.isLive(a)) return true;               // demo rows stay fully editable
-    return this.isSelfGroupAdmin || this.developerRole;
-  }
+  get canManageGroup(): boolean { return this.canManageGroupOf(this.active); }
 
   /**
-   * Posting requires BOTH: being in `members`, and being in `group_admin`. The `developer` role does
-   * not grant it — a developer can appoint admins (see canManageAdmins) but cannot post unless they
-   * are a member and an admin themselves. Platform chatxadmin/admin see every group via loadGroups(),
-   * which is exactly why membership is checked here rather than assumed.
-   * There is NO exemption for a group with an empty `group_admin`. That allowance existed so groups
-   * created before the field would not freeze, but it meant any member could post in one — which is
-   * the opposite of the rule. Such a group is now read-only until someone is made an admin; a
-   * `developer` can always do that (see canManageAdmins), so no group is stuck.
+   * Announcing is for the A&H team, as in the Flutter app (`chatxadmin` or `ahmember`), and only where
+   * they can post at all.
    */
+  get canAnnounce(): boolean {
+    const a = this.active;
+    if (!a || !this.canMessage) return false;
+    if (!this.isLive(a)) return true;
+    return this.ahMember || this.chatAdmin;
+  }
+
+  /** Why the draft can't go as an announcement, or null when it can: an announcement is words only. */
+  get notAnAnnouncement(): string | null {
+    if (this.editing) return 'Not while editing a message';
+    if (this.pendingFiles.length) return `Text only: remove the attachment${this.pendingFiles.length === 1 ? '' : 's'}`;
+    if (this.replyTo) return 'Not as a reply';
+    return null;
+  }
+
+  toggleAnnounce(): void {
+    if (!this.announceMode && this.notAnAnnouncement) { this.notify(this.notAnAnnouncement); return; }
+    this.announceMode = !this.announceMode;
+  }
+
+  /** Posting needs membership, nothing else. Not a member → the thread is view-only. */
   get canMessage(): boolean {
     const a = this.active;
     if (!a) return false;
     // A channel is one-way — the composer is replaced by the broadcast bar, not gated by access.
     if (this.isChannel(a)) return false;
-    if (!this.isLive(a)) return true;
-    const isMember = (a._memberUids || []).includes(this.currentUid);
-    if (!isMember) return false;
-    return this.isSelfGroupAdmin;
+    return this.isMine(a);
   }
 
   /**
@@ -1737,39 +1906,15 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   /** One gate for the info panel, whichever kind of chat is open. */
   get canEditChat(): boolean {
-    return this.isChannel(this.active) ? this.canManageChannel : this.canManageAdmins;
+    return this.isChannel(this.active) ? this.canManageChannel : this.canManageGroup;
   }
 
-  toggleGroupAdmin(mem: Member, event?: Event): void {
-    event?.stopPropagation();
-    const a = this.active;
-    if (!a || !mem.id || !this.canManageAdmins) return;
-
-    const isAdmin = this.isGroupAdmin(mem);
-    // Never leave a group with no admin at all — nobody could appoint one again.
-    if (isAdmin && (a.adminUids || []).length <= 1) {
-      this.notify('A group needs at least one admin');
-      return;
-    }
-    if (this.isLive(a)) {
-      updateDoc(a._ref, { group_admin: isAdmin ? arrayRemove(mem.id) : arrayUnion(mem.id) })
-        .then(() => this.notify(isAdmin ? `${mem.name} is no longer an admin` : `${mem.name} is now an admin`))
-        .catch(e => { console.error('group admin', e); this.notify('Error updating admins'); });
-      return;
-    }
-    const src = this.sourceOf(a);
-    const list = src.adminUids || [];
-    src.adminUids = isAdmin ? list.filter(id => id !== mem.id) : [...list, mem.id];
-  }
-
-  /** Only a group admin — someone listed in `group_admin` — posts on behalf of the team. */
+  /** A&H members post on behalf of the team. */
   isAdminSender(name?: string, uid?: string): boolean {
     const a = this.active;
     if (!name || name === this.TEAM_NAME || !a) return false;
-    const admins = a.adminUids || [];
-    if (!admins.length) return false;
     const id = uid || (a.members || []).find(m => m.name === name)?.id;
-    return !!id && admins.includes(id);
+    return this.isAhMemberUid(id);
   }
 
   /**
@@ -1788,13 +1933,23 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return this.labelFor(name, uid);
   }
 
-  get groupAdminCount(): number {
-    return (this.active?.members || []).filter(m => this.isGroupAdmin(m)).length;
+  setGroupsSub(k: 'mine' | 'others'): void {
+    if (this.groupsSub === k) return;
+    this.stashDraft();                 // the open chat's draft, before its id is cleared
+    this.editing = null;
+    this.blankComposer();
+    this.groupsSub = k;
+    this.ensureGroupStream(k);
+    this.activeIds = { ...this.activeIds, groups: null };
+    this.showInfo = false; this.infoMsg = null; this.person = null;
+    this.replyTo = null; this.exitSelect();
+    this.search = ''; this.messageHits = [];
   }
 
   setArchivedSub(k: 'groups' | 'channels'): void {
     if (this.archivedSub === k) return;
     this.archivedSub = k;
+    if (k === 'groups') this.ensureGroupStream('archived');
     this.activeIds = { ...this.activeIds, archived: null };
     this.showInfo = false; this.infoMsg = null; this.person = null;
   }
@@ -1812,7 +1967,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.sourceOf(item).pinned = next;
   }
 
-  unread(k: TabKey): number { return this.lists[k].reduce((a, c) => a + (c.unread || 0), 0); }
+  unread(k: TabKey): number {
+    // The Groups badge counts both sub-tabs; only "My groups" can ever be unread anyway.
+    const items = k === 'groups' ? this.groups.filter(g => !g.archived) : this.lists[k];
+    return items.reduce((a, c) => a + (c.unread || 0), 0);
+  }
 
   get totalUnread(): number { return this.unread('groups') + this.unread('channels'); }
 
@@ -1822,7 +1981,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   get features(): Features {
     return {
-      groups:   { sender: true,  reply: true,  react: true,  oneWay: false, info: true,  attach: true,  readOnly: false },
+      // A group I am not a member of is view-only: no reply, reaction or attachment.
+      groups:   { sender: true,  reply: !this.viewOnly, react: !this.viewOnly, oneWay: false, info: true,
+                  attach: !this.viewOnly, readOnly: false },
       // A broadcast has no reactions, replies or per-message read receipts to render — its
       // delivery panel (sent / read / pending) replaces all of that.
       channels: { sender: false, reply: false, react: false, oneWay: true,  info: true,  attach: false, readOnly: false },
@@ -1849,7 +2010,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.editing = null;                             // an edit belongs to the chat being left
     this.activeIds = { ...this.activeIds, [this.tab]: c.id };
     this.restoreDraft(c.id);
-    this.replyTo = null; this.showInfo = false; this.infoMsg = null;
+    this.replyTo = null; this.showInfo = false; this.infoMsg = null; this.announceMode = false;
     this.person = null; this.attachError = ''; this.pinnedOpen = false;
     this.clearPendingFiles();
     this.messagesError = '';
@@ -1891,6 +2052,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.blankComposer();
     this.tab = t;
     this.archivedSub = 'groups';
+    if (t === 'archived') this.ensureGroupStream('archived');
     this.search = ''; this.catFilter = 'all';
     this.replyTo = null; this.showInfo = false; this.infoMsg = null;
     this.person = null; this.attachError = ''; this.selectMode = false; this.selectedIds = [];
@@ -2312,14 +2474,21 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     return this.adminsFirst(list, m => this.isGroupAdmin(m));
   }
 
-  /** Live groups have no team/participant split in `supportchat` — everyone is a participant. */
+  /**
+   * The info panel lists A&H members apart from everyone else. `supportchat` has no split of its own,
+   * so a live group's members are sorted by the `ahmember` role; demo rows use the team directory.
+   */
   get teamMembers(): Member[] {
-    if (this.isLive(this.active)) return [];
-    return (this.active?.members || []).filter(m => this.isTeamMember(m.name));
+    const all = this.active?.members || [];
+    return this.isLive(this.active)
+      ? all.filter(m => this.isAhMemberUid(m.id))
+      : all.filter(m => this.isTeamMember(m.name));
   }
   get participantMembers(): Member[] {
-    if (this.isLive(this.active)) return this.active?.members || [];
-    return (this.active?.members || []).filter(m => !this.isTeamMember(m.name));
+    const all = this.active?.members || [];
+    return this.isLive(this.active)
+      ? all.filter(m => !this.isAhMemberUid(m.id))
+      : all.filter(m => !this.isTeamMember(m.name));
   }
 
   get deletedLogReversed(): DeletedEntry[] { return [...(this.active?.deletedLog || [])].reverse(); }
@@ -2341,7 +2510,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   reactionEntries(m: ChatMessage): { emoji: string; users: string[]; mine: boolean }[] {
     return Object.entries(m.reactions || {})
       .filter(([, v]) => (v || []).length)
-      .map(([emoji, users]) => ({ emoji, users, mine: users.includes(this.TEAM_NAME) }));
+      .map(([emoji, ids]) => m._reactionsByUid
+        ? {
+            emoji,
+            users: ids.map(u => u === this.currentUid ? 'You' : this.nameOfUid(u)),
+            mine: ids.includes(this.currentUid),
+          }
+        : { emoji, users: ids, mine: ids.includes(this.TEAM_NAME) });
   }
 
   bubbleWho(m: ChatMessage): string {
@@ -2368,21 +2543,44 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         { k: 'delivered', label: 'Delivery',  icon: 'fact_check',   show: true,     danger: false },
       ].filter(o => o.show);
     }
+    // A view-only reader (not in `members`) can copy and raise a ticket — nothing that changes the chat.
+    const can = !this.viewOnly;
     return [
-      { k: 'copy',   label: 'Copy',                     icon: 'content_copy',   show: !!m.text,                  danger: false },
-      { k: 'react',  label: 'React',                    icon: 'add_reaction',   show: f.react,                   danger: false },
-      { k: 'reply',  label: 'Reply',                    icon: 'reply',          show: f.reply,                   danger: false },
-      { k: 'edit',   label: 'Edit',                     icon: 'edit',           show: isTeam && !m.attachment,   danger: false },
-      { k: 'pin',    label: m.pinned ? 'Unpin' : 'Pin', icon: 'push_pin',       show: true,                      danger: false },
-      { k: 'ticket', label: 'Raise ticket',             icon: 'support',        show: !isTeam || f.oneWay,       danger: false },
-      { k: 'info',   label: 'Message info',             icon: 'info',           show: f.info && isTeam,          danger: false },
-      { k: 'delete', label: 'Delete',                   icon: 'delete_outline', show: true,                      danger: true  },
+      { k: 'copy',   label: 'Copy',                     icon: 'content_copy',   show: !!m.text,                       danger: false },
+      { k: 'react',  label: 'React',                    icon: 'add_reaction',   show: f.react,                        danger: false },
+      { k: 'reply',  label: 'Reply',                    icon: 'reply',          show: f.reply,                        danger: false },
+      { k: 'edit',   label: 'Edit',                     icon: 'edit',           show: can && isTeam && !m.attachment, danger: false },
+      { k: 'pin',    label: m.pinned ? 'Unpin' : 'Pin', icon: 'push_pin',       show: can,                            danger: false },
+      { k: 'ticket', label: 'Raise ticket',             icon: 'support',        show: !isTeam || f.oneWay,            danger: false },
+      { k: 'info',   label: 'Message info',             icon: 'info',           show: f.info && isTeam,               danger: false },
+      { k: 'delete', label: 'Delete',                   icon: 'delete_outline', show: can,                            danger: true  },
     ].filter(o => o.show);
+  }
+
+  /**
+   * The hover strip opens from the card's top-right corner and grows left. On a short incoming message
+   * ("Hiiiii") that ran it past the thread pane's left edge, where it was clipped. After it renders, if
+   * it starts left of the pane it is flipped to open from the card's left corner instead. Measured
+   * rather than guessed, because the strip's width depends on which actions the message offers.
+   */
+  hoverFlip = false;
+
+  onBubbleEnter(id: string, line: HTMLElement): void {
+    this.hoverId = id;
+    this.hoverFlip = false;
+    requestAnimationFrame(() => {
+      if (this.hoverId !== id) return;
+      const strip = line.querySelector('.wc-hover') as HTMLElement | null;
+      const pane = this.messagePane?.nativeElement;
+      if (!strip || !pane) return;
+      this.hoverFlip = strip.getBoundingClientRect().left < pane.getBoundingClientRect().left + 4;
+    });
   }
 
   onBubbleDblClick(m: ChatMessage): void {
     // Broadcasts are an archive — there is nothing here that bulk-deletes one.
     if (m._broadcast) return;
+    if (this.viewOnly) return;          // multi-select only leads to bulk delete
     if (this.selectMode) return;
     this.selectMode = true;
     this.selectedIds = [m.id];
@@ -2441,6 +2639,9 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     // The Send BUTTON is [disabled] while files upload, but Enter reaches this directly — without
     // this guard, holding Enter during an upload queues the same message several times.
     if (this.uploadingFiles) return;
+    // Announcement mode was switched on, then a file or a reply was added — refuse rather than quietly
+    // send a normal message the author meant as an announcement.
+    if (this.announceMode && this.notAnAnnouncement) { this.notify(this.notAnAnnouncement); return; }
 
     if (this.pendingFiles.length) {
       this.sendPendingFiles(active, text);
@@ -2450,14 +2651,14 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.clearDraft();
 
     if (this.isLive(active)) {
-      // Announcement framing still has no field behind it; the reply does — see reply_to above.
+      const announcement = this.announceMode && this.canAnnounce;
       this.announceMode = false;
       const replyTarget = this.replyTo;
       const buttons = this.pendingButtons;
       this.replyTo = null;
       this.pendingButtons = [];
       this.justSent = true;
-      this.writeMessage(active, text, [], replyTarget, buttons)
+      this.writeMessage(active, text, [], replyTarget, buttons, announcement)
         .catch(e => { console.error('send', e); this.notify('Error sending message'); });
       return;
     }
@@ -3260,9 +3461,24 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     src.messages = src.messages.map(x => x.id === m.id ? { ...x, pinned: !x.pinned } : x);
   }
 
+  /**
+   * Same write as the Flutter app's `_react`: one field per emoji (`reactions.<emoji>`), and only my uid
+   * is added or removed with arrayUnion/arrayRemove — so two people reacting at once never overwrite
+   * each other. FieldPath, not a dotted string, because the key is an emoji.
+   */
   toggleReaction(msgId: string, emoji: string): void {
     const active = this.active;
-    if (!active) return;
+    this.pickerId = null;
+    if (!active || !this.features.react) return;     // view-only and archived threads show, never write
+    if (this.isLive(active)) {
+      const m = this.sourceOf(active).messages.find(x => x.id === msgId);
+      if (!m?._ref) return;
+      const reacted = (m.reactions?.[emoji] || []).includes(this.currentUid);
+      updateDoc(m._ref, new FieldPath('reactions', emoji),
+                reacted ? arrayRemove(this.currentUid) : arrayUnion(this.currentUid))
+        .catch(e => { console.error('react', e); this.notify('Couldn’t react. Try again.'); });
+      return;
+    }
     const src = this.sourceOf(active);
     src.messages = src.messages.map(m => {
       if (m.id !== msgId) return m;
@@ -3286,6 +3502,11 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (this.isLive(active)) {
       const batch = writeBatch(this.firestore);
       msgs.forEach(m => batch.delete(doc(this.supportchat, active.id, 'messages', m.id)));
+      // last_modification stays, so a deleted latest announcement would keep its megaphone in the list.
+      const latest = active.messages[active.messages.length - 1];
+      if (latest && ids.includes(latest.id) && latest.kind === 'announcement') {
+        batch.update(active._ref, { last_announcement_at: deleteField() });
+      }
       batch.commit()
         .then(() => this.notify(`${msgs.length} message${msgs.length === 1 ? '' : 's'} deleted`))
         .catch(e => { console.error('delete messages', e); this.notify('Error deleting messages'); });
@@ -3324,19 +3545,23 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   removeMember(name: string): void {
     const active = this.active;
     if (!active) return;
+    if (!this.canManageGroup) { this.notify('Only an A&H member in this group can remove people'); return; }
     if (this.isLive(active)) {
       const uid = (active.members || []).find(m => m.name === name)?.id;
       if (!uid) return;
-      // Strip the admin grant too — otherwise the uid lingers in group_admin and canManageAdmins
-      // would still hand an ex-member permission over the group.
-      updateDoc(active._ref, { members: arrayRemove(uid), group_admin: arrayRemove(uid) })
+      // Only an A&H member inside the group can add people, so removing the last one would leave the
+      // group with nobody able to add anyone ever again.
+      const ahLeft = (active._memberUids || []).filter(u => u !== uid && this.isAhMemberUid(u));
+      if (this.isAhMemberUid(uid) && !ahLeft.length) {
+        this.notify('A group needs at least one A&H member');
+        return;
+      }
+      updateDoc(active._ref, { members: arrayRemove(uid) })
         .catch(e => { console.error('remove member', e); this.notify('Error removing member'); });
       return;
     }
     const src = this.sourceOf(active);
-    const goneUid = (src.members || []).find(m => m.name === name)?.id;
     src.members = (src.members || []).filter(m => m.name !== name);
-    if (goneUid) src.adminUids = (src.adminUids || []).filter(id => id !== goneUid);
   }
 
   /**
@@ -3347,6 +3572,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   restoreGroup(): void {
     const active = this.active;
     if (!active) return;
+    if (!this.isChannel(active) && !this.canManageGroupOf(active)) return;
     if (this.isLive(active)) {
       const isChan = this.isChannel(active);
       updateDoc(active._ref, { isdelete: false })
@@ -3366,6 +3592,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   deleteGroup(): void {
     const active = this.active;
     if (!active) return;
+    if (!this.isChannel(active) && !this.canManageGroupOf(active)) return;
     if (this.isLive(active)) {
       // chat-screen never hard-deletes a chat — it sets isdelete, which lands it in Archived.
       const isChan = this.isChannel(active);
@@ -3396,7 +3623,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     this.createOpen = true;
     this.cName = ''; this.cEventId = '';
     this.cSearch = ''; this.cSelected = [];
-    this.cAdminIds = []; this.cImageFile = null; this.cImagePreview = null;
+    this.cImageFile = null; this.cImagePreview = null;
     this.importReport = null;
   }
 
@@ -3408,16 +3635,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
       seen.add(p.id);
       return true;
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  isCreateAdmin(id: string): boolean { return this.cAdminIds.includes(id); }
-
-  toggleCreateAdmin(p: Person, event: Event): void {
-    event.stopPropagation();
-    if (!this.isPicked(p.id)) this.togglePerson(p);      // marking an admin implies membership
-    this.cAdminIds = this.isCreateAdmin(p.id)
-      ? this.cAdminIds.filter(id => id !== p.id)
-      : [...this.cAdminIds, p.id];
   }
 
   onGroupImagePicked(event: Event): void {
@@ -3464,7 +3681,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
     if (allPicked) {
       const ids = new Set(shown.map(p => p.id));
       this.cSelected = this.cSelected.filter(s => !ids.has(s.id));
-      this.cAdminIds = this.cAdminIds.filter(id => !ids.has(id));
     } else {
       shown.filter(p => !this.isPicked(p.id)).forEach(p => this.togglePerson(p));
     }
@@ -3589,7 +3805,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
   togglePerson(p: Person): void {
     if (this.isPicked(p.id)) {
       this.cSelected = this.cSelected.filter(s => s.id !== p.id);
-      this.cAdminIds = this.cAdminIds.filter(id => id !== p.id);
     } else {
       this.cSelected = [...this.cSelected, { id: p.id, name: p.name, journey: p.journey || null }];
     }
@@ -3806,7 +4021,6 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         const uploaded = await uploadBytes(imgRef, f);
         groupProfile = await getDownloadURL(uploaded.ref);
       }
-      const admins = [this.currentUid, ...this.cAdminIds.filter(id => id !== this.currentUid)];
       await setDoc(doc(this.firestore, 'supportchat', docId), {
         isdelete: false,
         type: 'group',
@@ -3815,13 +4029,13 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
         last_message: '',
         last_pending: [],
         group_profile: groupProfile,
-        group_admin: admins,
         last_modification: serverTimestamp(),
         created_on: serverTimestamp(),
         creator_uid: this.currentUid,
         id: docId,
       }, { merge: true });
       this.createOpen = false;
+      this.groupsSub = 'mine';                     // the creator is always a member
       this.activeIds = { ...this.activeIds, groups: docId };
       this.notify('Group created');
     } catch (e) {
@@ -3886,7 +4100,7 @@ export class GroupChatScreenComponent implements OnInit, AfterViewInit, OnDestro
 
   saveAddMembers(): void {
     const active = this.active;
-    if (!active || !this.aPicked.length) return;
+    if (!active || !this.aPicked.length || !this.canManageGroup) return;
     const n = this.aPicked.length;
     if (this.isLive(active)) {
       updateDoc(active._ref, { members: arrayUnion(...this.aPicked.map(p => p.id)) })

@@ -524,7 +524,7 @@
 
 /* Announcement */
 .wc-ann-wrap { display: flex; justify-content: center; padding: 4px 0; }
-.wc-ann { width: 100%; max-width: 520px; background: var(--amber-tint2); border: 1.5px solid var(--amber-line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 2px 10px rgba(217,119,6,0.10); }
+.wc-ann { position: relative; width: 100%; max-width: 520px; background: var(--amber-tint2); border: 1.5px solid var(--amber-line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 2px 10px rgba(217,119,6,0.10); }
 .wc-ann-head { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
 .wc-ann-head mat-icon { color: var(--amber-text); font-size: 12px; width: 12px; height: 12px; }
 .wc-ann-label { font-size: 10px; font-weight: 800; color: var(--amber-text); text-transform: uppercase; letter-spacing: 0.6px; flex: 1; }
@@ -711,20 +711,19 @@
 .wc-bubble:has(.wc-ctas) { min-width: 210px; }
 
 /* Hover actions · menu · picker */
-/* The action strip sits beside the message — vertically centred on its right edge, never over it. */
+/* The action strip sits just above the card, intruding only ~5px into the bubble's top padding.
+   Anchored to the card's top-RIGHT corner and growing left: anchored left, a wide pill on a short
+   outgoing message ("ok") pushed past the pane and produced a horizontal scrollbar.
+   `.from-left` is the exception, set by onBubbleEnter() only when the strip would start left of the
+   pane — a short INCOMING message ("Hiiiii"), where the right anchor clipped the buttons. */
 .wc-hover {
-  /* Fully clear of the text: the pill sits above the card, intruding only ~5px into the bubble's
-     own top padding. Anchored right, not left — a wide pill on a short outgoing bubble used to
-     push past the pane and produce a horizontal scrollbar. */
   position: absolute; bottom: calc(100% - 2px); top: auto; right: 6px; left: auto; margin: 0;
   display: flex; gap: 1px; background: var(--raised);
   border: 1px solid var(--line3); border-radius: 999px; padding: 3px;
   box-shadow: 0 8px 30px -8px rgba(0,0,0,.35); z-index: 5; white-space: nowrap;
   animation: wc-pop .18s cubic-bezier(.34,1.4,.64,1);
 }
-/* Outgoing cards keep it on their right corner too: anchored left, a wide pill next to a short
-   message ("ok") overflowed the pane and produced a horizontal scrollbar on hover. */
-.wc-msg.right .wc-hover { right: 6px; left: auto; }
+.wc-msg .wc-hover.from-left { left: 6px; right: auto; }
 @keyframes wc-pop { from { opacity: 0; transform: translateY(4px) scale(.94); } to { opacity: 1; transform: none; } }
 .wc-hover button { width: 26px; height: 26px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: var(--ink); transition: transform .12s; }
 .wc-hover button:active { transform: scale(.9); }
@@ -753,7 +752,11 @@
   position: absolute; top: -46px; right: 0; left: auto; display: flex; gap: 2px; background: var(--field); border: 1px solid var(--border);
   border-radius: 99px; padding: 4px 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); z-index: 6;
 }
+/* Flips with the action strip, or the picker clips on a short incoming message the same way. */
+.wc-msg .wc-picker.from-left { left: 0; right: auto; }
 .wc-picker button { border: none; background: transparent; font-size: 16px; padding: 0 3px; }
+/* On an announcement the picker opens centred, just above the card's action buttons. */
+.wc-picker.ann { top: auto; bottom: 40px; left: 50%; right: auto; transform: translateX(-50%); }
 
 .wc-reactions { display: flex; gap: 4px; margin: 2px 3px 0; flex-wrap: wrap; }
 .wc-chip {
@@ -761,6 +764,8 @@
   background: var(--panel); border: 1px solid var(--line); color: var(--ink);
 }
 .wc-chip.mine { background: var(--blue-tint); border-color: var(--blue-line); color: var(--blue-text); }
+/* Shown to view-only / archived readers, who can see reactions but not add them. */
+.wc-chip.static { cursor: default; pointer-events: none; }
 .wc-chip span { font-size: 12px; }
 
 /* Card + stamp on one line — the stamp always sits to the RIGHT of the card.
@@ -813,6 +818,9 @@
 .wc-toolbar button:hover { border-color: var(--blue-text); color: var(--blue-text); }
 .wc-toolbar button.on { background: var(--blue-tint); color: var(--blue); }
 .wc-toolbar button.announce { border-color: var(--amber-text); background: var(--amber-tint); color: var(--amber-text); }
+/* Offered but not usable for this draft (a file or a reply is attached) — the tooltip says why. */
+.wc-toolbar button.muted { opacity: .45; }
+.wc-row-announce { font-size: 14px; width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; color: var(--amber-text); }
 .wc-toolbar mat-icon { font-size: 13px; width: 13px; height: 13px; }
 .wc-toolbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 .wc-toolbar-hint { font-size: 12px; color: var(--ink4); margin-left: auto; }
