@@ -70,6 +70,9 @@ import {
   shouldSetAsCurrent,
   shouldSetZoomCallAsCurrent,
   toMillis,
+  filterParticipantsByName,
+  daysRemaining,
+  daysRemainingLabel,
 } from './workshop-dashboard.engine';
 
 // ---------------------------------------------------------------------------------------------
@@ -1009,6 +1012,136 @@ describe('workshop-dashboard.engine', () => {
       // screen or in the export distinguishes "never enrolled properly" from "enrolment date is
       // garbage" — and the try/catch means it is never logged either.
       expect(formatDate({ toDate: () => { throw new Error('bad doc'); } })).toBe('');
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // Side-panel name search.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('filterParticipantsByName', () => {
+    const people = [
+      { name: 'Anita Rao' }, { name: 'Bala Krishnan' }, { name: 'anita sharma' }, { name: 'Chitra' },
+    ];
+    const nameOf = (p: any) => p.name;
+
+    it('matches anywhere in the name, ignoring case', () => {
+      expect(filterParticipantsByName(people, 'anita', nameOf).map(nameOf))
+        .toEqual(['Anita Rao', 'anita sharma']);
+      expect(filterParticipantsByName(people, 'KRISHNAN', nameOf).map(nameOf)).toEqual(['Bala Krishnan']);
+      // 'Chitra' is NOT a match — it contains "itr", not "ita". A mid-name substring hit:
+      expect(filterParticipantsByName(people, 'ita', nameOf).map(nameOf))
+        .toEqual(['Anita Rao', 'anita sharma']);
+      expect(filterParticipantsByName(people, 'hit', nameOf).map(nameOf)).toEqual(['Chitra']);
+    });
+
+    it('returns EVERYTHING for an empty or whitespace-only term', () => {
+      // A cleared box must show the whole list again, and a stray space must not empty the panel.
+      expect(filterParticipantsByName(people, '', nameOf).length).toBe(4);
+      expect(filterParticipantsByName(people, '   ', nameOf).length).toBe(4);
+      expect(filterParticipantsByName(people, null, nameOf).length).toBe(4);
+      expect(filterParticipantsByName(people, undefined, nameOf).length).toBe(4);
+    });
+
+    it('trims the term, so a trailing space still finds the person', () => {
+      expect(filterParticipantsByName(people, '  bala  ', nameOf).map(nameOf)).toEqual(['Bala Krishnan']);
+    });
+
+    it('returns nothing when nobody matches', () => {
+      expect(filterParticipantsByName(people, 'zzz', nameOf)).toEqual([]);
+    });
+
+    it('keeps the order it was given', () => {
+      expect(filterParticipantsByName(people, 'a', nameOf).map(nameOf))
+        .toEqual(['Anita Rao', 'Bala Krishnan', 'anita sharma', 'Chitra']);
+    });
+
+    it('treats a missing or non-string name as no match rather than throwing', () => {
+      // The panel's entries come from several builders; one that omits `name` must not crash the
+      // search for everybody else.
+      const ragged = [{ name: 'Anita' }, {}, { name: null }, { name: 42 }] as any[];
+      expect(() => filterParticipantsByName(ragged, 'a', (p: any) => p.name)).not.toThrow();
+      expect(filterParticipantsByName(ragged, 'a', (p: any) => p.name).length).toBe(1);
+    });
+
+    it('survives an empty or absent list', () => {
+      expect(filterParticipantsByName([], 'a', nameOf)).toEqual([]);
+      expect(filterParticipantsByName(null, 'a', nameOf)).toEqual([]);
+      expect(filterParticipantsByName(undefined, null, nameOf)).toEqual([]);
+    });
+
+    it('returns a copy, so the caller cannot mutate the source list', () => {
+      const out = filterParticipantsByName(people, '', nameOf);
+      out.push({ name: 'Injected' });
+      expect(people.length).toBe(4);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // Evergreen "days remaining" — shown per profile in the Extended Participants dialog.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('daysRemaining', () => {
+    // A fixed "now" so these never drift. Mid-afternoon, deliberately not midnight.
+    const now = new Date(2026, 9, 8, 15, 30, 0).getTime();
+    // extenduntill is stored at 23:59 on the chosen day.
+    const until = (y: number, m: number, d: number, h = 23, min = 59) => new Date(y, m, d, h, min).getTime();
+
+    it('counts today as the LAST day, not zero days gone', () => {
+      expect(daysRemaining(until(2026, 9, 8), now)).toBe(0);
+    });
+
+    it('counts whole calendar days ahead', () => {
+      expect(daysRemaining(until(2026, 9, 9), now)).toBe(1);
+      expect(daysRemaining(until(2026, 9, 20), now)).toBe(12);
+    });
+
+    it('ignores the time of day on both sides — only the calendar day counts', () => {
+      // The whole reason this is day-based: an hours-based count would call 23:59 tomorrow "1"
+      // but 00:01 tomorrow "0", when both are the same number of days away.
+      expect(daysRemaining(until(2026, 9, 9, 0, 1), now)).toBe(1);
+      expect(daysRemaining(until(2026, 9, 9, 23, 59), now)).toBe(1);
+      const earlyNow = new Date(2026, 9, 8, 0, 5, 0).getTime();
+      const lateNow = new Date(2026, 9, 8, 23, 50, 0).getTime();
+      expect(daysRemaining(until(2026, 9, 9), earlyNow)).toBe(1);
+      expect(daysRemaining(until(2026, 9, 9), lateNow)).toBe(1);
+    });
+
+    it('goes negative once the access has lapsed', () => {
+      expect(daysRemaining(until(2026, 9, 7), now)).toBe(-1);
+      expect(daysRemaining(until(2026, 8, 28), now)).toBe(-10);
+    });
+
+    it('crosses a month and a year boundary correctly', () => {
+      expect(daysRemaining(until(2026, 10, 1), now)).toBe(24);   // 8 Oct → 1 Nov
+      expect(daysRemaining(until(2027, 0, 1), now)).toBe(85);    // 8 Oct 2026 → 1 Jan 2027
+    });
+
+    it('returns null when there is nothing to count to', () => {
+      expect(daysRemaining(null, now)).toBeNull();
+      expect(daysRemaining(undefined, now)).toBeNull();
+      expect(daysRemaining(NaN, now)).toBeNull();
+      expect(daysRemaining(Infinity, now)).toBeNull();
+      expect(daysRemaining('2026-10-09' as any, now)).toBeNull();
+    });
+  });
+
+  describe('daysRemainingLabel', () => {
+    it('reads as a person would say it', () => {
+      expect(daysRemainingLabel(12)).toBe('12 days left');
+      expect(daysRemainingLabel(2)).toBe('2 days left');
+      expect(daysRemainingLabel(1)).toBe('1 day left');   // singular
+      expect(daysRemainingLabel(0)).toBe('Last day');
+    });
+
+    it('says Expired rather than a negative number of days', () => {
+      expect(daysRemainingLabel(-1)).toBe('Expired');
+      expect(daysRemainingLabel(-99)).toBe('Expired');
+    });
+
+    it('says nothing at all when there is no date', () => {
+      // '' and not 'Expired': a participant with no extension has not expired, there is just
+      // nothing to show. The template hides the pill on an empty string.
+      expect(daysRemainingLabel(null)).toBe('');
+      expect(daysRemainingLabel(undefined)).toBe('');
     });
   });
 });
