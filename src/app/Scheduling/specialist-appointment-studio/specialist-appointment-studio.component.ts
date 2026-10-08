@@ -112,6 +112,8 @@ export class FilterBar {
   productId: string | null = null;
   typeIds: string[] = [];
   booked: BookedFilter = 'all';
+  qp = '';           // search text in the product dropdown
+  qt = '';           // search text in the delivery-type dropdown
   readonly ready: Promise<void>;
 
   constructor(svc: SpecialistAppointmentService, scope: 'all' | 'mentor' | 'cw', profileId: string,
@@ -129,6 +131,11 @@ export class FilterBar {
     return p.typeIds.map(id => this.types.find(t => t.id === id)).filter((t): t is FilterType => !!t);
   }
   get active() { return !!this.productId || this.typeIds.length > 0 || this.booked !== 'all'; }
+
+  hit(q: string, label: string) { return !q.trim() || label.toLowerCase().includes(q.trim().toLowerCase()); }
+  /* undefined = the search row was clicked, not an option. */
+  pickProduct(v: string | null | undefined) { if (v === undefined) return; this.productId = v; this.onProduct(); }
+  pickTypes(v: (string | undefined)[]) { this.typeIds = (v ?? []).filter((x): x is string => !!x); this.emit(); }
 
   onProduct() {
     const p = this.products.find(x => x.id === this.productId);
@@ -148,6 +155,93 @@ export class FilterBar {
 }
 
 /* ======================================================================================
+   Participant lookup (operator, 2026-10-07): search a participant of the product picked in the filter and
+   see each appointment step of that product — booked or not — plus every booking in the selected period.
+   On Home, Overview and Book Session.
+   ====================================================================================== */
+export type StepState = 'Completed' | 'In session' | 'Booked' | 'Pending' | 'Not booked';
+export interface StepRow { typeId: string; stepStatus: string | null; state: StepState; appt: ApptRow | null; }
+const STEP_PILL: Record<StepState, string> = { Completed: 'is-success', 'In session': 'is-solid', Booked: '', Pending: 'is-warning', 'Not booked': 'is-neutral' };
+
+export class ParticipantLookup {
+  productId: string | null = null;
+  picker: PersonPicker | null = null;
+  loadingList = false;
+  participantId: string | null = null;
+  loading = false;
+  steps: StepRow[] = [];
+  history: ApptRow[] = [];
+  private all: ApptRow[] = [];
+  private listRun = 0;
+  private run = 0;
+
+  constructor(private h: SpecialistAppointmentStudioComponent, private period: () => Period, public canBook: boolean) {}
+
+  async setProduct(productId: string | null) {
+    if (productId === this.productId) return;
+    const run = ++this.listRun;
+    this.productId = productId; this.picker = null; this.clear();
+    if (!productId) return;
+    this.loadingList = true;
+    try {
+      const list = await this.h.svc.participantsOf(productId);
+      if (run !== this.listRun) return;
+      this.picker = new PersonPicker(list.map(p => ({ id: p.id, name: this.h.svc.name(p.id), sub: p.status ?? 'not started' })), null,
+        v => this.pick(v), 'Search participant', 'Participant');
+    } catch (e) {
+      console.error('Specialist appointment studio: participants failed', e);
+      this.h.snack.open('Could not load participants. Try again.', 'OK', { duration: 5000 });
+    }
+    if (run === this.listRun) this.loadingList = false;
+  }
+
+  private clear() { this.participantId = null; this.steps = []; this.history = []; this.all = []; ++this.run; }
+
+  async pick(pid: string | null) {
+    this.clear();
+    const run = this.run, productId = this.productId;
+    this.participantId = pid;
+    if (!pid || !productId) return;
+    this.loading = true;
+    try {
+      const [steps, bookings] = await Promise.all([this.h.svc.participantSteps(pid, productId), this.h.svc.participantBookings(pid)]);
+      if (run !== this.run) return;
+      // A quarter of appointments carry no productid: those count when their type is one of the product's steps.
+      const types = new Set(steps.map(s => s.typeId));
+      this.all = bookings.filter(r => r.appt.productId === productId || (!r.appt.productId && !!r.appt.typeId && types.has(r.appt.typeId)));
+      const now = new Date();
+      this.steps = steps.map(s => {
+        const latest = this.all.find(r => r.appt.typeId === s.typeId && !r.appt.cancelled) ?? null;   // newest first
+        const st = latest ? apptStatus(latest.appt, now) : null;
+        const state: StepState = !st ? 'Not booked' : st === 'Completed' || st === 'In session' || st === 'Pending' ? st : 'Booked';
+        return { typeId: s.typeId, stepStatus: s.status, state, appt: latest };
+      });
+      this.applyPeriod();
+    } catch (e) {
+      console.error('Specialist appointment studio: participant failed', e);
+      this.h.snack.open('Could not load this participant. Try again.', 'OK', { duration: 5000 });
+    }
+    if (run === this.run) this.loading = false;
+  }
+
+  /* Every booking of the product in the selected Day / Week / Month, cancelled ones too. */
+  applyPeriod() {
+    const p = this.period();
+    this.history = this.all.filter(r => r.appt.start >= p.from && r.appt.start < p.to).sort(byStart);
+  }
+
+  reload() { const pid = this.participantId; if (pid) this.pick(pid); }
+  pill(s: StepRow) { return STEP_PILL[s.state]; }
+  note(s: StepRow): string {
+    if (s.state !== 'Not booked') return '';
+    return s.stepStatus === 'ready' ? 'Ready to book' : s.stepStatus === 'completed' ? 'Step completed' : 'Not ready yet (earlier steps first)';
+  }
+  canBookStep(s: StepRow) { return this.canBook && s.state === 'Not booked' && s.stepStatus === 'ready'; }
+  historyStatus(r: ApptRow) { const st = apptStatus(r.appt, new Date()); return st === 'Pending' ? 'Completion pending' : st; }
+  historyPill(r: ApptRow) { return APPT_PILL[apptStatus(r.appt, new Date())]; }
+}
+
+/* ======================================================================================
    Home (CW / Mentor: mode 'self') and Overview (A&H: mode 'all')
    ====================================================================================== */
 type PastFilter = 'pending' | 'completed' | 'cancelled';
@@ -163,6 +257,7 @@ interface MonthCell { date: Date; out: boolean; lines: { label: string; color: s
 export class HomeTab {
   readonly bar: PeriodBar;
   readonly filterBar: FilterBar;
+  readonly lookup: ParticipantLookup;
   picker: PersonPicker | null = null;
   specialists: Specialist[] = [];
   specialistId = '';          // mode 'all': '' = everyone
@@ -207,6 +302,7 @@ export class HomeTab {
     this.bar = new PeriodBar(periodOf('week', new Date()), () => this.load(), true);
     const scope = mode === 'all' ? 'all' : h.svc.viewRole === 'mentor' ? 'mentor' : 'cw';
     this.filterBar = new FilterBar(h.svc, scope, h.svc.profileId, true, f => this.onFilter(f));
+    this.lookup = new ParticipantLookup(h, () => this.bar.period, h.svc.viewRole === 'ah');
   }
 
   get period() { return this.bar.period; }
@@ -283,6 +379,7 @@ export class HomeTab {
   private apply() {
     const f = this.filter, p = this.period;
     this.joint = new JointIndex(this.jointTypes, [...this.raw.wins, ...this.partnerWins], this.now);
+    this.lookup.applyPeriod();
     const inP = <T extends { start: Date }>(x: T) => x.start >= p.from && x.start < p.to;
     const wins = this.raw.wins.map(w => scopeWindow(w, f.typeIds)).filter((w): w is AvailWindow => !!w);
     const appts = this.raw.appts.filter(r => apptMatches(r.appt, f));
@@ -325,6 +422,7 @@ export class HomeTab {
   onFilter(f: SasFilter) {
     const scopeChanged = f.productId !== this.filter.productId || String(f.typeIds) !== String(this.filter.typeIds);
     this.filter = f;
+    this.lookup.setProduct(f.productId);
     this.apply();
     if (scopeChanged) this.loadPast(true);
   }
@@ -422,6 +520,7 @@ export class HomeTab {
     if (run === this.pastRun) this.pastLoading = false;
   }
 
+  setPast(v: PastFilter | undefined) { if (!v) return; this.pastFilter = v; this.loadPast(true); }
   reasonShown(r: ApptRow) { return r.appt.cancelled && r.appt.cancelledReason && r.appt.cancelledReason !== NO_SHOW_REASON; }
 
   /* A date picked in Month view or a day header in Week view opens that day (operator, 2026-10-01). */
@@ -662,6 +761,7 @@ export class TeamTable {
   }
 
   toggle(id: string) { this.open = this.open === id ? null : id; this.availFilter = ''; }
+  setAvailFilter(v: WindowStatus | '' | undefined) { if (v !== undefined) this.availFilter = v; }
   initials(n: string) { return n.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase(); }
   statusClass(s: AvailStatus) { return s === 'In session' ? 'is-solid' : s === 'Available' ? 'is-success' : 'is-neutral'; }
   /* The open row's windows, narrowed by the status filter. */
@@ -815,6 +915,9 @@ export class UtilTab {
     this.loading = false;
   }
 
+  setRole(v: '' | 'mentor' | 'cw' | undefined) { if (v !== undefined) this.role = v; }
+  setProduct(v: string | undefined) { if (v === undefined) return; this.product = v; this.onProduct(); }
+
   async onProduct() {
     if (!this.product) { this.productTeam = null; return; }
     this.productLoading = true;
@@ -879,6 +982,7 @@ interface BookGroup { typeId: string; slots: { typeId: string; slot: BookSlot }[
 export class BookTab {
   readonly filterBar: FilterBar;
   readonly bar: PeriodBar;
+  readonly lookup: ParticipantLookup;
   filter: SasFilter = NO_FILTER;
   mode: 'calendar' | 'participant' = 'calendar';
   groupBy: SlotGrouping = 'type';
@@ -892,8 +996,9 @@ export class BookTab {
   private run = 0;
 
   constructor(private h: SpecialistAppointmentStudioComponent) {
-    this.filterBar = new FilterBar(h.svc, 'all', h.svc.profileId, false, f => { this.filter = f; this.load(); });
-    this.bar = new PeriodBar(periodOf('week', new Date()), () => this.load(), true, false);
+    this.filterBar = new FilterBar(h.svc, 'all', h.svc.profileId, false, f => { this.filter = f; this.lookup.setProduct(f.productId); this.load(); });
+    this.bar = new PeriodBar(periodOf('week', new Date()), () => { this.lookup.applyPeriod(); this.load(); }, true, false);
+    this.lookup = new ParticipantLookup(h, () => this.bar.period, true);
   }
 
   get ready() { return !!this.filter.productId && !!this.filter.typeIds?.length; }
@@ -1078,6 +1183,7 @@ export class AddDialog {
     if (!this.dayRows.has(k)) this.dayRows.set(k, [{ typePath: null, start: '' }]);
     return this.dayRows.get(k)!;
   }
+  setSlotType(r: StaticRow, v: string | null | undefined) { if (v !== undefined) r.typePath = v; }
   typeOf(r: StaticRow) { return this.types.find(t => t.path === r.typePath) ?? null; }
   rowEndMin(r: StaticRow): number | null { const t = this.typeOf(r); return t && r.start ? this.mins(r.start) + t.duration : null; }
   rowEnd(r: StaticRow): string {
@@ -1292,6 +1398,13 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
   readonly WINDOW_STATUSES = WINDOW_STATUSES;
   readonly WINDOW_PILL = WINDOW_PILL;
   readonly fmtHours = fmtHours;
+  readonly PAST_OPTIONS = [
+    { value: 'pending', label: 'Status updation pending' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' },
+  ];
+  readonly ROLE_OPTIONS = [{ value: '', label: 'Mentors and CWs' }, { value: 'mentor', label: 'Mentors' }, { value: 'cw', label: 'CW specialists' }];
+  /* Search text per dropdown (every dropdown is searchable, operator 2026-10-07). */
+  q: Record<string, string> = {};
+  hit(key: string, label: string) { const t = (this.q[key] ?? '').trim().toLowerCase(); return !t || label.toLowerCase().includes(t); }
 
   loading = true;
   viewRole: ViewRole = null;
@@ -1365,6 +1478,17 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
       else if (tab === 'book') this.book = new BookTab(this);
     }
     if (typeof window !== 'undefined') window.scrollTo(0, 0);
+  }
+
+  /* Lookup → Book: open Book Session's calendar on that product and delivery type. */
+  async bookStep(productId: string, typeId: string) {
+    if (this.tab !== 'book') this.go('book');
+    const b = this.book!;
+    b.mode = 'calendar';
+    await b.filterBar.ready;
+    b.filterBar.productId = productId;
+    b.filterBar.typeIds = [typeId];
+    b.filterBar.emit();
   }
 
   /* ---------- dialogs ---------- */
@@ -1450,5 +1574,6 @@ export class SpecialistAppointmentStudioComponent implements OnInit, OnDestroy {
   /* Hover text on a calendar window, and the delivery-type column: its delivery types. */
   typeNames(w: AvailWindow) { return w.typeIds.map(id => this.typeLabel(id)).join(', '); }
   isToday(d: Date) { return sameDay(d, new Date()); }
+  hostNamesOf(r: ApptRow) { return r.appt.hostIds.map(id => this.svc.name(id)).join(' + ') || '—'; }
   pct(n: number) { return n > 100 ? 100 : n; }
 }

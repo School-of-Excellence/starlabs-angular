@@ -23,8 +23,8 @@
       <label class="sas-viewas-compact">
         <span>View as</span>
         <select class="sas-sel" data-testid="sas-view-as-compact" [ngModel]="viewRole" (ngModelChange)="setView($event)">
-          @for (v of views; track v) { <option [ngValue]="v">{{ VIEW_LABEL[v] }}</option> }
-        </select>
+            @for (v of views; track v) { <option [ngValue]="v">{{ VIEW_LABEL[v] }}</option> }
+          </select>
       </label>
     }
     @if (loading) {
@@ -65,6 +65,7 @@
       <ng-container *ngTemplateOutlet="filterBarTpl; context: { $implicit: h.filterBar }" />
       <ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: h.bar }" />
     </div>
+    <ng-container *ngTemplateOutlet="lookupTpl; context: { $implicit: h.lookup, mode: h.period.mode }" />
 
     @if (h.loading) {
       <section class="sas-card"><ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading hours…' }" /></section>
@@ -281,11 +282,11 @@
       <div class="sas-ch">
         <h2>Past sessions</h2>
         <div class="sas-ca">
-          <select class="sas-sel" data-testid="sas-home-past-filter" aria-label="Filter past sessions by status" [(ngModel)]="h.pastFilter" (ngModelChange)="h.loadPast(true)">
-            <option value="pending">Status updation pending</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+          <mat-select class="sas-mselect sas-fsel" data-testid="sas-home-past-filter" panelClass="sas-mselect-panel" aria-label="Filter past sessions by status"
+            [ngModel]="h.pastFilter" (ngModelChange)="h.setPast($event)">
+            <mat-option><ngx-mat-select-search [(ngModel)]="q['past']" placeholderLabel="Search" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
+            @for (o of PAST_OPTIONS; track o.value) { @if (hit('past', o.label)) { <mat-option [value]="o.value">{{ o.label }}</mat-option> } }
+          </mat-select>
         </div>
         <div class="sas-chs">
           @if (h.pastFilter === 'pending') { Sessions that have ended and still need a status. Open one to mark it completed or cancelled. }
@@ -477,12 +478,14 @@
               <div class="sas-sub-bar">
                 <b class="sas-sub-h">Availability given · {{ r.avail.length }} window{{ r.avail.length === 1 ? '' : 's' }} · {{ fmtHours(r.hours.availMin) }} · {{ fmtHours(r.hours.deliveredMin) }} delivered ({{ r.hours.pct | number: '1.0-0' }}%)</b>
                 @if (r.avail.length) {
-                  <select class="sas-sel" data-testid="sas-tt-status-filter" aria-label="Filter availability by status" [(ngModel)]="tt.availFilter" (click)="$event.stopPropagation()">
-                    <option value="">All statuses ({{ r.avail.length }})</option>
+                  <mat-select class="sas-mselect sas-fsel" data-testid="sas-tt-status-filter" panelClass="sas-mselect-panel" aria-label="Filter availability by status"
+                    [ngModel]="tt.availFilter" (ngModelChange)="tt.setAvailFilter($event)" (click)="$event.stopPropagation()">
+                    <mat-option><ngx-mat-select-search [(ngModel)]="q['ttst']" placeholderLabel="Search" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
+                    <mat-option value="">All statuses ({{ r.avail.length }})</mat-option>
                     @for (st of WINDOW_STATUSES; track st) {
-                      <option [value]="st" [disabled]="!tt.statusCount(r, st)">{{ st }} ({{ tt.statusCount(r, st) }})</option>
+                      @if (hit('ttst', st)) { <mat-option [value]="st" [disabled]="!tt.statusCount(r, st)">{{ st }} ({{ tt.statusCount(r, st) }})</mat-option> }
                     }
-                  </select>
+                  </mat-select>
                 }
               </div>
               @if (!r.avail.length && !r.outside.length) {
@@ -592,13 +595,16 @@
   <div class="sas-stack">
     <div class="sas-filters">
       <ng-container *ngTemplateOutlet="periodBarTpl; context: { $implicit: u.bar }" />
-      <select class="sas-sel" data-testid="sas-util-role" aria-label="Role" [(ngModel)]="u.role">
-        <option value="">Mentors and CWs</option><option value="mentor">Mentors</option><option value="cw">CW specialists</option>
-      </select>
-      <select class="sas-sel" data-testid="sas-util-product" aria-label="Product" [(ngModel)]="u.product" (ngModelChange)="u.onProduct()">
-        <option value="">All products</option>
-        @for (p of u.products; track p) { <option [value]="p">{{ p }}</option> }
-      </select>
+      <mat-select class="sas-mselect sas-fsel" data-testid="sas-util-role" panelClass="sas-mselect-panel" aria-label="Role" [ngModel]="u.role" (ngModelChange)="u.setRole($event)">
+        <mat-option><ngx-mat-select-search [(ngModel)]="q['urole']" placeholderLabel="Search" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
+        @for (o of ROLE_OPTIONS; track o.value) { @if (hit('urole', o.label)) { <mat-option [value]="o.value">{{ o.label }}</mat-option> } }
+      </mat-select>
+      <mat-select class="sas-mselect sas-fsel" data-testid="sas-util-product" panelClass="sas-mselect-panel" aria-label="Product" placeholder="All products"
+        [ngModel]="u.product" (ngModelChange)="u.setProduct($event)">
+        <mat-option><ngx-mat-select-search [(ngModel)]="q['uprod']" placeholderLabel="Search" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
+        <mat-option value="">All products</mat-option>
+        @for (p of u.products; track p) { @if (hit('uprod', p)) { <mat-option [value]="p">{{ p }}</mat-option> } }
+      </mat-select>
       <input class="sas-search" type="search" data-testid="sas-util-search" placeholder="Search specialist" aria-label="Search specialist" [(ngModel)]="u.q">
     </div>
     @if (!u.loading && !u.productLoading) {
@@ -649,6 +655,7 @@
       <button data-testid="sas-book-mode-participant" [class.is-on]="b.mode === 'participant'" [attr.aria-pressed]="b.mode === 'participant'" (click)="b.mode = 'participant'">By participant</button>
     </div>
   </div>
+  <div class="sas-book-card"><ng-container *ngTemplateOutlet="lookupTpl; context: { $implicit: b.lookup, mode: b.bar.period.mode }" /></div>
   @if (b.mode === 'calendar') {
     <section class="sas-card sas-book-card" data-testid="sas-bookcal">
       <div class="sas-ch">
@@ -745,6 +752,69 @@
   </section>
 </ng-template>
 
+<!-- Participant lookup: steps of the picked product, booked or not, and the period's bookings -->
+<ng-template #lookupTpl let-lk let-mode="mode">
+  <section class="sas-card" data-testid="sas-lookup">
+    <div class="sas-ch">
+      <h2>Participant</h2>
+      <div class="sas-ca">
+        @if (!lk.productId) { <span class="sas-muted" data-testid="sas-lookup-pick-product">Pick a product above to search its participants.</span> }
+        @else if (lk.loadingList) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading participants…', sm: true }" /> }
+        @else if (lk.picker) { <ng-container *ngTemplateOutlet="personTpl; context: { $implicit: lk.picker }" /> }
+      </div>
+      <div class="sas-chs">See whether a participant's sessions for this product are booked.</div>
+    </div>
+    @if (lk.participantId) {
+      @if (lk.loading) { <ng-container *ngTemplateOutlet="loaderTpl; context: { msg: 'Loading this participant…' }" /> }
+      @else if (!lk.steps.length) {
+        <div class="sas-empty" data-testid="sas-lookup-no-steps"><b>No appointment steps</b>This participant's delivery sequence has no appointments for this product.</div>
+      } @else {
+        <div class="sas-tw"><table class="sas-tbl" data-testid="sas-lookup-steps">
+          <thead><tr><th>Delivery activity</th><th>Status</th><th>Appointment</th><th class="r"><span style="font-size:0">Actions</span></th></tr></thead>
+          <tbody>
+            @for (st of lk.steps; track $index) {
+              <tr data-testid="sas-lookup-step">
+                <td><b>{{ typeLabel(st.typeId) }}</b><small>{{ typeDuration(st.typeId) }}</small></td>
+                <td><span class="sas-pill" [class]="'sas-pill ' + lk.pill(st)">{{ st.state === 'Pending' ? 'Completion pending' : st.state }}</span></td>
+                <td>
+                  @if (st.appt; as r) {
+                    <b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b>
+                    <small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }} · {{ hostNamesOf(r) }}</small>
+                  } @else { <span class="sas-muted">{{ lk.note(st) }}</span> }
+                </td>
+                <td class="r">
+                  @if (st.appt; as r) {
+                    <button class="sas-btn is-secondary" data-testid="sas-lookup-view" (click)="openAppointment(r, lk.reload.bind(lk))">{{ st.state === 'Pending' ? 'Update status' : 'View' }}</button>
+                  } @else if (lk.canBookStep(st)) {
+                    <button class="sas-btn" data-testid="sas-lookup-book" (click)="bookStep(lk.productId, st.typeId)">Book</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table></div>
+        <span class="sas-lbl">Bookings in this {{ mode }}</span>
+        @if (!lk.history.length) { <p class="sas-muted" data-testid="sas-lookup-no-history">No bookings for this product in this {{ mode }}.</p> }
+        @else {
+          <div class="sas-tw"><table class="sas-tbl" data-testid="sas-lookup-history">
+            <thead><tr><th>Date &amp; time</th><th>Session</th><th>Specialist</th><th>Status</th></tr></thead>
+            <tbody>
+              @for (r of lk.history; track r.appt.id) {
+                <tr class="is-click" data-testid="sas-lookup-history-row" (click)="openAppointment(r, lk.reload.bind(lk))">
+                  <td><b class="nw">{{ r.appt.start | date: 'EEE, d MMM y' }}</b><small>{{ r.appt.start | date: 'shortTime' }} – {{ r.appt.end | date: 'shortTime' }}</small></td>
+                  <td>{{ typeName(r) }}</td>
+                  <td>{{ hostNamesOf(r) }}</td>
+                  <td><span class="sas-pill" [class]="'sas-pill ' + lk.historyPill(r)">{{ lk.historyStatus(r) }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+        }
+      }
+    }
+  </section>
+</ng-template>
+
 <!-- ==================================================================================
      Shared pieces
      ================================================================================== -->
@@ -780,16 +850,20 @@
 <!-- Product · Delivery types · (Booked / Not booked) -->
 <ng-template #filterBarTpl let-fb>
   <div class="sas-filters" data-testid="sas-filter-bar">
-    <select class="sas-sel sas-fsel" data-testid="sas-filter-product" aria-label="Product" [disabled]="fb.loading"
-      [(ngModel)]="fb.productId" (ngModelChange)="fb.onProduct()">
-      <option [ngValue]="null">{{ fb.loading ? 'Loading products…' : 'All products' }}</option>
-      @for (p of fb.products; track p.id) { <option [ngValue]="p.id">{{ p.name }}</option> }
-    </select>
+    <mat-select class="sas-mselect sas-fsel" data-testid="sas-filter-product" panelClass="sas-mselect-panel" aria-label="Product" [disabled]="fb.loading"
+      [placeholder]="fb.loading ? 'Loading products…' : 'All products'" [ngModel]="fb.productId" (ngModelChange)="fb.pickProduct($event)">
+      <mat-option><ngx-mat-select-search [(ngModel)]="fb.qp" placeholderLabel="Search products" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
+      <mat-option [value]="null">All products</mat-option>
+      @for (p of fb.products; track p.id) { @if (fb.hit(fb.qp, p.name)) { <mat-option [value]="p.id">{{ p.name }}</mat-option> } }
+    </mat-select>
     <mat-select class="sas-mselect sas-fsel" data-testid="sas-filter-types" multiple placeholder="All delivery types"
       panelClass="sas-mselect-panel" aria-label="Delivery types" [disabled]="fb.loading"
-      [(ngModel)]="fb.typeIds" (selectionChange)="fb.emit()">
+      [ngModel]="fb.typeIds" (ngModelChange)="fb.pickTypes($event)">
+      <mat-option><ngx-mat-select-search [(ngModel)]="fb.qt" placeholderLabel="Search delivery types" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
       @for (ty of fb.shownTypes; track ty.id) {
-        <mat-option [value]="ty.id" data-testid="sas-filter-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option>
+        @if (fb.hit(fb.qt, ty.name) || fb.typeIds.includes(ty.id)) {
+          <mat-option [value]="ty.id" data-testid="sas-filter-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option>
+        }
       }
     </mat-select>
     @if (fb.showBooked) {
@@ -919,9 +993,10 @@
                         <span class="sas-srow-note">No delivery types are mapped to this specialist's EIS roles</span>
                       } @else {
                         <mat-select class="sas-mselect" data-testid="sas-add-slot-type" placeholder="Choose a type" panelClass="sas-mselect-panel"
-                          [(ngModel)]="r.typePath" [attr.aria-label]="'Delivery type for slot ' + (i + 1)">
+                          [ngModel]="r.typePath" (ngModelChange)="a.setSlotType(r, $event)" [attr.aria-label]="'Delivery type for slot ' + (i + 1)">
+                          <mat-option><ngx-mat-select-search [(ngModel)]="q['slottype']" placeholderLabel="Search" noEntriesFoundLabel="No matches" ngDefaultControl /></mat-option>
                           @for (ty of a.types; track ty.path) {
-                            <mat-option [value]="ty.path" data-testid="sas-add-slot-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option>
+                            @if (hit('slottype', ty.name)) { <mat-option [value]="ty.path" data-testid="sas-add-slot-type-option">{{ ty.name }} · {{ fmtHours(ty.duration) }}</mat-option> }
                           }
                         </mat-select>
                       }

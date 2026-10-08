@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import {
-  Firestore, collection, doc, getDocs, query, where, orderBy, limit, startAfter, QueryConstraint, DocumentReference,
+  Firestore, collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, QueryConstraint, DocumentReference,
   QueryDocumentSnapshot,
 } from '@angular/fire/firestore';
 import { AuthguardService } from '../../authguard.service';
@@ -17,6 +17,8 @@ export interface FilterProduct { id: string; name: string; typeIds: string[]; }
 export interface FilterType { id: string; name: string; duration: number; }
 export interface FilterOptions { products: FilterProduct[]; types: FilterType[]; }
 
+/* participantsproduct.status values the participant lookup lists. */
+export const PARTICIPANT_PRODUCT_LIVE: (string | null)[] = [null, 'initiated', 'ongoing'];
 const toDate = (v: any): Date | null => (v == null ? null : typeof v.toDate === 'function' ? v.toDate() : new Date(v));
 const chunk = <T>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
 
@@ -271,6 +273,40 @@ export class SpecialistAppointmentService {
         };
       }),
     })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /* ---------- Participant lookup (operator, 2026-10-07) ----------
+     Search a product's participants and see, per appointment step of that product, whether it is booked. */
+
+  /* Everyone holding the product (participantsproduct.productref) whose product is not started (null),
+     initiated or ongoing — cancelled, shifted and completed ones are left out (operator, 2026-10-08). */
+  async participantsOf(productId: string): Promise<{ id: string; status: string | null }[]> {
+    const s = await getDocs(query(collection(this.firestore, 'participantsproduct'), where('productref', '==', doc(this.firestore, 'products/' + productId))));
+    const byId = new Map<string, string | null>();
+    s.docs.forEach(x => {
+      const pid = x.data()['profileid'], status = x.data()['status'] ?? null;
+      if (pid && !byId.has(pid) && PARTICIPANT_PRODUCT_LIVE.includes(status)) byId.set(pid, status);
+    });
+    return [...byId.entries()].map(([id, status]) => ({ id, status })).sort((a, b) => this.name(a.id).localeCompare(this.name(b.id)));
+  }
+
+  /* The product's appointment steps in the participant's delivery sequence, in order, with each step's
+     status (ready / ongoing / completed / null = not ready) and its delivery type (from the deliverable). */
+  async participantSteps(profileId: string, productId: string): Promise<{ typeId: string; status: string | null }[]> {
+    const seq = await getDoc(doc(this.firestore, 'participantdeliverysequence/' + profileId));
+    if (!seq.exists()) return [];
+    const product = (seq.data()['products'] ?? []).find((p: any) => p.productref?.id === productId);
+    const steps = (product?.delivery ?? []).filter((d: any) => d.type === 'appointment' && d.sequenceref?.path);
+    const delivs = await Promise.all(steps.map((d: any) => getDoc(doc(this.firestore, d.sequenceref.path))));
+    return steps.map((d: any, i: number) => ({ typeId: delivs[i].data()?.['deliveryref']?.id ?? '', status: d.status ?? null }))
+      .filter((x: { typeId: string }) => x.typeId);
+  }
+
+  /* Every appointment the participant booked (bookedby), newest first. */
+  async participantBookings(profileId: string): Promise<ApptRow[]> {
+    const s = await getDocs(query(collection(this.firestore, 'appointments'), where('bookedby', '==', doc(this.firestore, 'profile_data/' + profileId))));
+    return s.docs.map(x => ({ appt: this.parseAppt(x.id, x.data()), raw: x.data() }))
+      .sort((a, b) => b.appt.start.getTime() - a.appt.start.getTime());
   }
 
   /* ---------- Joint delivery types ----------

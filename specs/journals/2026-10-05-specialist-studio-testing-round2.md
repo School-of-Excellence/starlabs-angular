@@ -179,3 +179,31 @@ with their own window.
   - That host's own Home never fetches it, because a specialist's sessions are queried through `hosts`.
   - Bookings from this app always write both hosts. The fix, if such data exists: backfill `hosts` from
     `hostRole`, and make every other booking path write `hosts`.
+
+## Participant lookup + searchable dropdowns (operator, 2026-10-07)
+**Participant lookup.** A "Participant" card under the filter bar on Home, Overview and Book Session.
+- **Search:** only after a product is picked. It lists everyone holding that product
+  (`participantsproduct.productref`) whose product status is not started (null), `initiated` or `ongoing`.
+  Cancelled, shifted and completed ones are left out (operator, 2026-10-08). CW and Mentor are limited to
+  their own products by the filter.
+- **Steps:** each appointment step of the product, in delivery-sequence order
+  (`participantdeliverysequence` → the deliverable's `deliveryref`), with:
+  - the latest non-cancelled booking for that type (`appointments.bookedby`), read as Completed, In session,
+    Booked or Completion pending;
+  - otherwise Not booked: "Ready to book" (step `ready`) or "Not ready yet".
+- **Appointments without a `productid`** (about a quarter of them) count when their type is one of the
+  product's steps.
+- **History:** every booking of the product in the selected Day / Week / Month, cancelled ones included.
+- **Actions:** View / Update status opens the appointment dialog. Book is A&H only: it opens Book Session's
+  calendar on that product and type.
+- Code: `ParticipantLookup` class, `#lookupTpl`, `svc.participantsOf` / `participantSteps` /
+  `participantBookings`. The queries are single equality filters, so they need no new indexes.
+
+**Every dropdown is searchable.** The remaining native selects and mat-selects now carry an
+ngx-mat-select-search row: Past sessions filter, team table status filter, Utilisation role
+and product, filter-bar product and delivery types, and the Static slot type. Clicking the search row emits
+`undefined`, so every change handler ignores `undefined`. View as stays a plain select (operator: no search
+there; it has at most 3 options).
+
+Revert: remove `#lookupTpl`, its two outlets and `ParticipantLookup`; restore the native `<select>`s
+(git history, `0399049b`).

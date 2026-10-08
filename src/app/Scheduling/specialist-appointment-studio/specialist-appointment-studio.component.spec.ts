@@ -7,7 +7,7 @@ import { AuthguardService } from '../../authguard.service';
 import { AppointmentBookingService, Bookable, TypeRoles } from '../book-appointment/appointment-booking.service';
 import {
   SpecialistAppointmentStudioComponent, NAV, HomeTab, TeamTable, AddDialog, WindowDialog, FilterBar, PersonPicker,
-  PeriodBar, BookTab, BookSlotDialog, SettingsTab,
+  PeriodBar, BookTab, BookSlotDialog, SettingsTab, ParticipantLookup,
 } from './specialist-appointment-studio.component';
 import { SpecialistAppointmentService, ApptRow, hostIdsOf } from './specialist-appointment.service';
 import { Appt, AvailWindow, NO_SHOW_REASON, Period, availableViews, periodOf, resolveViewRole } from './sas-logic';
@@ -26,6 +26,7 @@ function fakeSvc(over: Record<string, any> = {}): any {
     productsFor: () => Promise.resolve([]), teamForAtcModels: () => Promise.resolve({ productIds: [], memberIds: [] }),
     typesFor: () => Promise.resolve([]), futureIntervals: () => Promise.resolve([]), unmarkedLastAppointment: () => Promise.resolve(null),
     jointTypes: () => Promise.resolve(new Map()), mapRoles: {},
+    participantsOf: () => Promise.resolve([]), participantSteps: () => Promise.resolve([]), participantBookings: () => Promise.resolve([]),
     roleName(this: any, r: string) { return this.mapRoles[r.split('/').pop()] ?? 'another'; },
     ...over,
   };
@@ -462,6 +463,95 @@ describe('Collaborative session pending — EI Diagnostics + EI Implementation',
     TestBed.resetTestingModule();
     const forImpl = await homeOf(impl, d);
     expect(forImpl.h.past.length).toBe(1);
+  });
+});
+
+/* ================================================================ Participant lookup */
+describe('ParticipantLookup', () => {
+  const now = new Date();
+  const day = (d: number, hr: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, hr);
+  const row = (id: string, typeId: string, d: number, over: Partial<Appt> = {}): ApptRow => ({ raw: {}, appt: {
+    id, start: day(d, 10), end: day(d, 11), attended: false, cancelled: false, cancelledReason: null,
+    hostIds: ['priya'], participantId: 'anna', typeId, productId: 'P1', zoomUrl: null, ...over } });
+  const bookings = [                                   // newest first, as the service returns them
+    row('next', 'review', 3),                          // booked, upcoming
+    row('old-review', 'review', -10, { cancelled: true }),
+    row('unmarked', 'final', -1),                      // ended, not marked
+    row('done', 'kickoff', -5, { attended: true }),
+    row('other-product', 'kickoff', -2, { productId: 'P2' }),
+    row('no-product', 'adjust', -20, { productId: null, cancelled: true }),
+  ];
+
+  async function lookupFor(canBook = true, period: Period = periodOf('month', now)) {
+    const svc = fakeSvc({
+      name: (id: string) => ({ anna: 'Anna Kumar', priya: 'Priya' } as any)[id] ?? id,
+      participantsOf: () => Promise.resolve([{ id: 'anna', status: 'ongoing' }]),
+      participantSteps: () => Promise.resolve([
+        { typeId: 'kickoff', status: 'completed' }, { typeId: 'review', status: 'ongoing' }, { typeId: 'final', status: 'ongoing' },
+        { typeId: 'adjust', status: 'ready' }, { typeId: 'closing', status: null },
+      ]),
+      participantBookings: () => Promise.resolve(bookings),
+    });
+    const { c } = await make(svc, { template: '', init: false });
+    const lk = new ParticipantLookup(c, () => period, canBook);
+    await lk.setProduct('P1');
+    return lk;
+  }
+
+  it('lists the product\'s participants in a searchable picker', async () => {
+    const lk = await lookupFor();
+    expect(lk.picker!.people).toEqual([{ id: 'anna', name: 'Anna Kumar', sub: 'ongoing' }]);
+  });
+
+  it('shows each appointment step: completed, booked, pending, not booked (ready or not)', async () => {
+    const lk = await lookupFor();
+    await lk.pick('anna');
+    expect(lk.steps.map(s => [s.typeId, s.state, s.appt?.appt.id ?? null])).toEqual([
+      ['kickoff', 'Completed', 'done'],        // the other product's kick-off is ignored
+      ['review', 'Booked', 'next'],            // the cancelled one does not count
+      ['final', 'Pending', 'unmarked'],
+      ['adjust', 'Not booked', null],          // its only booking was cancelled
+      ['closing', 'Not booked', null],
+    ]);
+    expect(lk.note(lk.steps[3])).toBe('Ready to book');
+    expect(lk.note(lk.steps[4])).toContain('Not ready yet');
+    expect(lk.canBookStep(lk.steps[3])).toBeTrue();
+    expect(lk.canBookStep(lk.steps[4])).toBeFalse();
+  });
+
+  it('history lists every booking of the product in the selected period, cancelled too', async () => {
+    const lk = await lookupFor(true, { mode: 'day', from: day(-10, 0), to: day(-9, 0) });
+    await lk.pick('anna');
+    expect(lk.history.map(r => r.appt.id)).toEqual(['old-review']);
+    expect(lk.historyStatus(lk.history[0])).toBe('Cancelled');
+  });
+
+  it('only A&H can book from it', async () => {
+    const lk = await lookupFor(false);
+    await lk.pick('anna');
+    expect(lk.canBookStep(lk.steps[3])).toBeFalse();
+  });
+
+  it('asks for a product first, and clears when the product is cleared', async () => {
+    const lk = await lookupFor();
+    await lk.pick('anna');
+    await lk.setProduct(null);
+    expect(lk.picker).toBeNull();
+    expect(lk.participantId).toBeNull();
+    expect(lk.steps).toEqual([]);
+  });
+});
+
+describe('Searchable dropdowns', () => {
+  it('every dropdown filters its options by the typed text', async () => {
+    const { c } = await make(fakeSvc(), { template: '', init: false });
+    c.q['past'] = 'comp';
+    expect(c.PAST_OPTIONS.filter(o => c.hit('past', o.label)).map(o => o.value)).toEqual(['completed']);
+    const fb = new FilterBar(fakeSvc(), 'all', 'me', false, () => {});
+    expect(fb.hit('lead', 'Leadership')).toBeTrue();
+    expect(fb.hit('lead', 'Wellbeing')).toBeFalse();
+    fb.pickProduct(undefined);                         // the search row, not an option
+    expect(fb.productId).toBeNull();
   });
 });
 
