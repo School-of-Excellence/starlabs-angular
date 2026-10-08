@@ -7224,68 +7224,83 @@ export class DeliveryDashboardCloneComponent {
         this.weeklyReportLoading = true;
 
         const productIds = new Set(this.getCardProductIds(cardId));
+        const activeStatuses = ['initiated', 'ongoing'];
         const items = this.allMatchedProductsRaw.filter(item =>
-            productIds.has(item?.productref?.id) && this.isActiveWeeklyItem(item)
+            productIds.has(item?.productref?.id) && activeStatuses.includes(item?.status?.toLowerCase().trim())
         );
-        const appointmentsByProduct = await this.fetchAppointmentsByParticipantProduct(items);
 
-        this.weeklyReportRows = items.map(item =>
-            this.buildWeeklyReportRow(item, appointmentsByProduct.get(item.docid) || [])
-        );
+        const docIds = items.map(item => item.docid).filter(Boolean);
+        const chunks: string[][] = [];
+        for (let i = 0; i < docIds.length; i += 30) chunks.push(docIds.slice(i, i + 30));
+
+        const snaps = await Promise.all(chunks.map(chunk =>
+            runInInjectionContext(this.injector, () =>
+                getDocs(query(collection(this.firestore, 'appointments'), 
+                where('participantproductid', 'in', chunk)))
+            )
+        ));
+
+        const appointmentsByProduct = new Map<string, any[]>();
+        for (const snap of snaps) {
+            for (const appointmentDoc of snap.docs) {
+                const appointment: any = appointmentDoc.data();
+                if (appointment.cancelled) continue;
+                const list = appointmentsByProduct.get(appointment.participantproductid) || [];
+                list.push(appointment);
+                appointmentsByProduct.set(appointment.participantproductid, list);
+            }
+        }
+
+        const hostName = (appointment: any) => {
+            const hostId = (appointment?.hosts?.[0]?.path || '').split('/').pop();
+            return this.mapMetaData[hostId]?.['name'] || '';
+        };
+
+        this.weeklyReportRows = items.map(item => {
+            const appointments = (appointmentsByProduct.get(item.docid) || [])
+                .sort((a, b) => (b.starttime?.seconds || 0) - (a.starttime?.seconds || 0));
+            const findByType = (keyword: string) =>
+                appointments.find(app => this.resolveAppointmentType(app)?.toLowerCase().includes(keyword));
+            const diagnostics = findByType('diagnostics');
+            const implementation = findByType('implementation');
+
+            return {
+                name: this.mapMetaData[item.profileid]?.['name'] || item.profileid,
+                diagnosticsSpecialist: hostName(diagnostics),
+                implementationSpecialist: hostName(implementation),
+                initiationDate: this.formatDate(item.statusdate?.initiated),
+                diagnosticsDate: this.formatDateTime(diagnostics?.starttime),
+                currentStatus: this.resolveAppointmentType(appointments[0]) || item.status,
+                initiatedOn: this.getDateFromFieldPublic(item.statusdate?.initiated),
+                diagnosticsOn: this.tsToDate(diagnostics?.starttime),
+            };
+        });
+
         this.applyWeeklyFilters();
         this.weeklyReportLoading = false;
     }
 
-    private async fetchAppointmentsByParticipantProduct(items: any[]): Promise<Map<string, any[]>> {
-        const appointmentMap = new Map<string, any[]>();
-        const docIds = items.map(item => item.docid).filter(Boolean);
+    applyWeeklyFilters(): void {
+        const init = this.weeklyInitiatedRange.value;
+        const diag = this.weeklyDiagnosticsRange.value;
 
-        for (let i = 0; i < docIds.length; i += 30) {
-            const chunk = docIds.slice(i, i + 30);
-            const snap = await runInInjectionContext(this.injector, () =>
-                getDocs(query(
-                    collection(this.firestore, 'appointments'),
-                    where('participantproductid', 'in', chunk)
-                ))
-            );
-
-            for (const appointmentDoc of snap.docs) {
-                const appointment: any = appointmentDoc.data();
-                if (appointment.cancelled) continue;
-                const list = appointmentMap.get(appointment.participantproductid) || [];
-                list.push(appointment);
-                appointmentMap.set(appointment.participantproductid, list);
-            }
-        }
-        return appointmentMap;
-    }
-
-    private findAppointmentByType(appointments: any[], keyword: string): any {
-        return appointments.find(app => this.resolveAppointmentType(app)?.toLowerCase().includes(keyword));
-    }
-
-    private getAppointmentHostName(appointment: any): string {
-        const hostRef = appointment?.hosts?.[0];
-        const hostId = (hostRef?.path || '').split('/').pop();
-        return this.mapMetaData[hostId]?.['name'] || '';
-    }
-
-    private buildWeeklyReportRow(item: any, appointments: any[]) {
-        const sorted = [...appointments].sort((a, b) => (b.starttime?.seconds || 0) - (a.starttime?.seconds || 0));
-        const diagnostics = this.findAppointmentByType(sorted, 'diagnostics');
-        const implementation = this.findAppointmentByType(sorted, 'implementation');
-        const latestStage = this.resolveAppointmentType(sorted[0]);
-
-        return {
-            name: this.mapMetaData[item.profileid]?.['name'] || item.profileid,
-            diagnosticsSpecialist: this.getAppointmentHostName(diagnostics),
-            implementationSpecialist: this.getAppointmentHostName(implementation),
-            initiationDate: this.formatDate(item.statusdate?.initiated),
-            diagnosticsDate: this.formatDateTime(diagnostics?.starttime),
-            currentStatus: latestStage || item.status,
-            initiatedOn: this.getDateFromFieldPublic(item.statusdate?.initiated),
-            diagnosticsOn: this.tsToDate(diagnostics?.starttime),
+        const inRange = (date: Date | null, start?: Date | null, end?: Date | null) => {
+            if (!start && !end) return true;
+            if (!date) return false;
+            const from = start ? new Date(start).setHours(0, 0, 0, 0) : -Infinity;
+            const to = end ? new Date(end).setHours(23, 59, 59, 999) : Infinity;
+            return date.getTime() >= from && date.getTime() <= to;
         };
+
+        this.weeklyReportSource.data = this.weeklyReportRows
+            .filter(row => inRange(row.initiatedOn, init.start, init.end) && inRange(row.diagnosticsOn, diag.start, diag.end))
+            .map((row, index) => ({ ...row, sno: index + 1 }));
+    }
+
+    clearWeeklyFilters(): void {
+        this.weeklyInitiatedRange.reset();
+        this.weeklyDiagnosticsRange.reset();
+        this.applyWeeklyFilters();
     }
 
     exportWeeklyReport(): void {
@@ -7312,46 +7327,5 @@ export class DeliveryDashboardCloneComponent {
         this.formOverlay.mapWorkshop = this.mapWorkshop;
         this.formOverlay.mapWorkshopNew = this.mapWorkshopNew;
         this.formOverlay.viewFormOverlay(row);
-    }
-
-    // helper functions
-    private isActiveWeeklyItem(item: any): boolean {
-        const status = (item?.status || '').toString().toLowerCase().trim();
-        return status === 'initiated' || status === 'ongoing';
-    }
-
-    applyWeeklyFilters(): void {
-        const filtered = this.weeklyReportRows.filter(row => this.passesWeeklyFilters(row));
-        this.weeklyReportSource.data = filtered.map((row, index) => ({ ...row, sno: index + 1 }));
-    }
-
-    clearWeeklyFilters(): void {
-        this.weeklyInitiatedRange.reset();
-        this.weeklyDiagnosticsRange.reset();
-        this.applyWeeklyFilters();
-    }
-
-    private passesWeeklyFilters(row: any): boolean {
-        const init = this.weeklyInitiatedRange.value;
-        const diag = this.weeklyDiagnosticsRange.value;
-        const initiatedOk = this.isWithinBounds(row.initiatedOn, init.start ?? null, init.end ?? null);
-        const diagnosticsOk = this.isWithinBounds(row.diagnosticsOn, diag.start ?? null, diag.end ?? null);
-        return initiatedOk && diagnosticsOk;
-    }
-
-    private isWithinBounds(date: Date | null, from: Date | null, to: Date | null): boolean {
-        if (!from && !to) return true;
-        if (!date) return false;
-        const afterStart = !from || date >= this.startOfDay(from);
-        const beforeEnd = !to || date <= this.endOfDay(to);
-        return afterStart && beforeEnd;
-    }
-
-    private startOfDay(date: Date): Date {
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-    }
-
-    private endOfDay(date: Date): Date {
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
     }
 }

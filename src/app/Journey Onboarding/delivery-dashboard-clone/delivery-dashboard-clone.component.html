@@ -1836,33 +1836,37 @@
           <div class="pm-section">
             <div class="pm-header">
               <h2 class="pm-title">Weekly Report</h2>
-              <mat-form-field appearance="outline" class="pm-filter-field">
-                <mat-label>Initiated Date Range</mat-label>
-                <mat-date-range-input [rangePicker]="initRangePicker" [formGroup]="weeklyInitiatedRange">
-                  <input matStartDate formControlName="start" placeholder="From">
-                  <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
-                </mat-date-range-input>
-                <mat-datepicker-toggle matSuffix [for]="initRangePicker"></mat-datepicker-toggle>
-                <mat-date-range-picker #initRangePicker></mat-date-range-picker>
-              </mat-form-field>
 
               <mat-form-field appearance="outline" class="pm-filter-field">
-                <mat-label>Diagnostics Date Range</mat-label>
-                <mat-date-range-input [rangePicker]="diagRangePicker" [formGroup]="weeklyDiagnosticsRange">
-                  <input matStartDate formControlName="start" placeholder="From">
-                  <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
-                </mat-date-range-input>
-                <mat-datepicker-toggle matSuffix [for]="diagRangePicker"></mat-datepicker-toggle>
-                <mat-date-range-picker #diagRangePicker></mat-date-range-picker>
+                <mat-label>Choose a product</mat-label>
+                <mat-select data-testid="ddc-msel-131" [(value)]="weeklyReportProductId"
+                  (selectionChange)="onWeeklyProductChange($event.value)">
+                  <mat-option *ngFor="let cardId of visibleCardIds" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
+                </mat-select>
               </mat-form-field>
+
               <div class="pm-actions">
                 <mat-form-field appearance="outline" class="pm-filter-field">
-                  <mat-label>Choose Stage</mat-label>
-                  <mat-select data-testid="ddc-msel-131" [(value)]="weeklyReportProductId"
-                    (selectionChange)="onWeeklyProductChange($event.value)">
-                    <mat-option *ngFor="let cardId of visibleCardIds" [value]="cardId">{{ getCardName(cardId) }}</mat-option>
-                  </mat-select>
+                  <mat-label>Initiated Date Range</mat-label>
+                  <mat-date-range-input [rangePicker]="initRangePicker" [formGroup]="weeklyInitiatedRange">
+                    <input matStartDate formControlName="start" placeholder="From" (dateChange)="applyWeeklyFilters()">
+                    <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matSuffix [for]="initRangePicker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #initRangePicker></mat-date-range-picker>
                 </mat-form-field>
+
+                <mat-form-field appearance="outline" class="pm-filter-field">
+                  <mat-label>Diagnostics Date Range</mat-label>
+                  <mat-date-range-input [rangePicker]="diagRangePicker" [formGroup]="weeklyDiagnosticsRange">
+                    <input matStartDate formControlName="start" placeholder="From" (dateChange)="applyWeeklyFilters()">
+                    <input matEndDate formControlName="end" placeholder="To" (dateChange)="applyWeeklyFilters()">
+                  </mat-date-range-input>
+                  <mat-datepicker-toggle matSuffix [for]="diagRangePicker"></mat-datepicker-toggle>
+                  <mat-date-range-picker #diagRangePicker></mat-date-range-picker>
+                </mat-form-field>
+
+                <button data-testid="ddc-btn-133" class="pm-btn-primary" (click)="clearWeeklyFilters()">Clear Date Filter</button>
                 <button data-testid="ddc-btn-132" class="pm-btn-primary" (click)="exportWeeklyReport()"
                   [disabled]="weeklyReportSource.data.length === 0">Export</button>
               </div>
