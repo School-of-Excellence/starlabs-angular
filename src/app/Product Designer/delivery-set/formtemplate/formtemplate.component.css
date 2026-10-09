@@ -49,9 +49,11 @@
 .form-description {
   font-size: 16px;
   color: #555;
-  max-width: 700px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   line-height: 1.5;
+  white-space: pre-line;
+  text-align: left;
 }
 
 /* Form content styles */
