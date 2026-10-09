@@ -250,7 +250,7 @@
 
   <!-- ===== table ===== -->
   <div class="table-card">
-    <table mat-table [dataSource]="recordsBackup">
+    <table mat-table [dataSource]="recordsBackup" matSort>
       <ng-container matColumnDef="meetingTopic">
         <th mat-header-cell *matHeaderCellDef>Meeting</th>
         <td mat-cell *matCellDef="let el">
@@ -285,7 +285,8 @@
       </ng-container>
 
       <ng-container matColumnDef="zoom">
-        <th mat-header-cell *matHeaderCellDef>In Zoom</th>
+        <th mat-header-cell *matHeaderCellDef mat-sort-header start="asc"
+            title="Sort: In Zoom first → Not in Zoom first → date order">In Zoom</th>
         <td mat-cell *matCellDef="let el">
           @switch (existsInZoom(el)) {
             @case ('yes') {
