@@ -75,9 +75,26 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       batch.update(doc(this.firestore, CONFIG_COLLECTION, id), { archived: true, archivedAt: serverTimestamp(), archivedBy: this.userId() });
       await batch.commit();
     },
+    unarchiveSegment: async (id, place) => {
+      // back on the board: at the end of the board, and at the end of the sequence if automated
+      const batch = writeBatch(this.firestore);
+      batch.update(doc(this.firestore, CONFIG_COLLECTION, id), {
+        ...place, archived: deleteField(), archivedAt: deleteField(), archivedBy: deleteField(),
+        updatedAt: serverTimestamp(), updatedBy: this.userId(),
+      });
+      await batch.commit();
+    },
+    deleteSegment: async id => {
+      // only reachable from the Archived view; removes the config and its saved list together
+      const batch = writeBatch(this.firestore);
+      batch.delete(doc(this.firestore, CONFIG_COLLECTION, id));
+      batch.delete(doc(this.firestore, LIST_COLLECTION, id));
+      await batch.commit();
+    },
     loadParticipants: async () => {
-      // journey names label each participant's journey id in the tables (see segment-board.facts.ts)
-      const [people, journeys] = await Promise.all([getDocs(collection(this.firestore, PARTICIPANTS_COLLECTION)), this.journeys()]);
+      // journey names label each participant's journey id in the tables (see segment-board.facts.ts).
+      // orderBy('name') on purpose: like Participants Analytics, docs with no `name` field are left out, so the counts match.
+      const [people, journeys] = await Promise.all([getDocs(query(collection(this.firestore, PARTICIPANTS_COLLECTION), orderBy('name'))), this.journeys()]);
       const journeyNames = new Map(journeys.map(j => [j.id, j.name]));
       return people.docs.map(d => toParticipant(d.id, d.data(), journeyNames));
     },

@@ -277,3 +277,33 @@ Verified: with global styles loaded, card title and all footer buttons compute t
   single select (`op: eq`, string value) still evaluate, reopen with that one mode ticked (the existing eq→in conversion for
   enum rows) and save unchanged. Verified: Integration + No mode → 87; a planted `eq` "Exploration Mode" rule → 37, reopens ticked,
   "No changes to save". tsc 0, ng build ok.
+
+---
+
+## 2026-10-12 · Testing feedback round 1 (plan: `specs/plans/2026-10-12-segment-board-feedback.md`)
+
+| # | Change | Why |
+|---|---|---|
+| 1 | Saving a new / edited active automated segment rebuilds and stores its list at once | Testers expected the list to follow the conditions without Refresh |
+| 2 | Participants loaded with `orderBy('name')` | Participants Analytics does the same; Firestore drops docs with no `name` field, which was the 29-profile gap. Operator chose to hide them |
+| 3 | Profile ID no longer shown (cards, View all, duplicates, Add picker, compare, history); email shown under names instead; IDs kept in CSV exports | Operator: IDs are noise on screen but the join key in files |
+| 4 | **Manual segments win:** anyone in an active manual segment is left out of every automated list and View all ("N more match but are in a manual segment"). A person is in one manual segment at most. **Move to manual segment…** in every list side panel's selection bar. Add / Move / Remove / Archive / turning a manual segment on or off rebuild the automated lists that changed (`syncAutoLists`, stores only changed lists) | Operator: manual placement must not be overridden by conditions |
+| 5 | Board search filters as you type (name or email, 150 ms debounce): cards without a match hide, cards show only matching rows; no dropdown | Like B!G Cohort |
+| 6 | **Archived (N)** toolbar view; **Unarchive** puts it at the end of the board (and the sequence, if automated) and rebuilds its list | — |
+| 7 | **Delete** only in the Archived view: deletes the `segmentboardconfig` and `segmentboardlist` docs (confirm) | Archive first = a safety step |
+| 8 | Events, Queue, Workshop, B!G Level filters removed | They ran on the design's made-up data |
+| 9 | **uP! events** / **CPM events** filters: pick products, then at least / at most / exactly / between | Same product choice as the conditions |
+
+**Verified** (harness rebuilt with a one-step builder `scratchpad/build_harness.sh` — the scratchpad keeps getting cleared;
+fake store incl. 3 nameless docs): 200 participants (3 dropped) · list built on create 38 → after edit 87 · move 2 to VIP →
+Integration 85, View all note "2 more … left out" · move one on to VIP Two → out of VIP · remove → Integration 86 · no ids on
+screen, export starts with Profile ID · search "person 6" → only Integration (61, 62, 66…) and VIP (Person 6) cards ·
+archive → Archived (1) → unarchive → back on board → archive → delete removes both docs · filters list without the four ·
+uP! at least 2 → 100, between 1–2 → 100. tsc 0, esbuild ok, ng build ok.
+
+**Revert (per change):** 1 — drop the `refreshLists`/`syncAutoLists` lines at the end of `saveSeg`. 2 — `loadParticipants` back to
+`getDocs(collection(...))`. 3 — restore the pid spans (`prow`, `tableHtml`, compare, history, Add picker). 4 — remove
+`_pinned` (refresh/assign), `autoList`/`syncAutoLists`/`placeInManual`, the Move dialog and the bulk-bar buttons; `doAdd` back to
+`saveManualList`. 5 — the `#q` input handler back to the dropdown, drop `qMatch`/`S.q` from `filtersOn`/`refreshFilter`.
+6/7 — remove `archivedHtml`/`unarchiveSeg`/`deleteSeg`, the toolbar button, `unarchiveSegment`/`deleteSegment` in the component.
+8 — put the four `fdrop`s back in `filterBar`. 9 — remove `countDrop` and the `up*`/`cpm*` filter fields.

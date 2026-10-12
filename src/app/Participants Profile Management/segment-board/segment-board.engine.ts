@@ -10,6 +10,8 @@ export interface SegmentBoardStore {
   saveSegment(doc: any, opts: { isNew: boolean; sequenceUpdates: { id: string; sequence: number }[] }): Promise<void>;
   saveDisplayOrder(ids: string[]): Promise<void>;          // displayIndex = position on the board
   archiveSegment(id: string): Promise<void>;
+  unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }): Promise<void>;
+  deleteSegment(id: string): Promise<void>;                // removes the segmentboardconfig and segmentboardlist docs
   loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
   loadLists(): Promise<{ segmentid: string; profilelist: string[]; lastupdated: Date | null }[]>;   // segmentboardlist
   saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
@@ -203,11 +205,15 @@ function refresh(set){
   // checked in sequence order; inactive segments place no one
   set._auto=set.segments.filter(s=>s.mode==='auto'&&s.status!=='inactive').sort((a,b)=>a.sequence-b.sequence);
   set._members=[...set._auto,...set.segments.filter(s=>s.mode==='manual'&&s.status!=='inactive')];   // every segment with a list
+  set._pinned=new Set();   // everyone in an active manual segment
+  for(const s of set._members) if(s.mode==='manual') for(const id of LISTS.get(s.id)?.ids||[]) set._pinned.add(id);
   set._by=new Map(set.segments.map(s=>[s.id,s]));
 }
 function assign(set,p,m){
   // every active automated segment whose refreshed list holds this participant, in sequence order
   m.segs=set._members.filter(s=>LISTS.get(s.id)?.ids.has(p.pid)).map(s=>s.id);
+  // someone placed in a manual segment is only in that segment, whatever the automated conditions say
+  if(set._pinned?.has(p.pid)) m.segs=m.segs.filter(id=>set._by.get(id)?.mode==='manual');
   m.matched=m.segs; m.pinned=false; m.warning=null;
   m.segmentId=m.segs[0]||null;
   m.reason=m.segmentId?null:!set._members.some(s=>LISTS.has(s.id))?'LIST_NOT_REFRESHED'
@@ -224,6 +230,7 @@ function defaultOrder(segs){ return segs.slice().sort((a,b)=>rank(a)-rank(b)).ma
 const master={id:'master',type:'master',name:'Master Segments',segments:[],displayOrder:[],defaultDisplayOrder:[]};
 const SETS=[master];
 const ARCHIVED_IDS=new Set();   // archived docs keep their id reserved
+let ARCHIVED=[];                // archived segments, for the Archived view
 computeSet(master);
 const AUDIT=[];                 // change history for this session only (not stored yet)
 
@@ -263,7 +270,8 @@ async function load(){
     LISTS.clear(); for(const l of lists) LISTS.set(l.segmentid,{ids:new Set(l.profilelist||[]),lastupdated:l.lastupdated||null});
     ARCHIVED_IDS.clear();
     const live=[];
-    for(const d of docs){ if(d.archived) ARCHIVED_IDS.add(d.id); else live.push(fromDoc(d)); }
+    ARCHIVED=[];
+    for(const d of docs){ if(d.archived){ ARCHIVED_IDS.add(d.id); ARCHIVED.push(fromDoc(d)); } else live.push(fromDoc(d)); }
     master.segments=live;
     master.defaultDisplayOrder=defaultOrder(live);
     master.displayOrder=live.slice().sort((a,b)=>(a.displayIndex??1e9)-(b.displayIndex??1e9)||master.defaultDisplayOrder.indexOf(a.id)-master.defaultDisplayOrder.indexOf(b.id)).map(x=>x.id);
@@ -288,13 +296,24 @@ const MODES=['Big','Installation Event','Event','Integration','Priority','Prepar
 const WORKSHOP_STATES=[['any','Any'],['enrollednotstarted','Enrolled, not started'],['inprogress','In progress'],['completed','Completed'],['attended','Attended a live session'],['missed','Missed the last live session'],['none','Never enrolled']];
 const emptyFilters=()=>({journey:[],customer:[],finance:[],mode:[],product:'',
   events:[],eventsMode:'attended', queues:[],queueStage:'', workshops:[],workshopState:'any',
-  ongoing:[], ageMin:'', ageMax:'', bigLevel:[]});
+  ongoing:[], ageMin:'', ageMax:'', bigLevel:[],
+  // uP! / CPM attended: count of the picked products in consumedproducts, compared like the conditions
+  upProducts:[], upOp:'gte', upN:'', upN2:'', cpmProducts:[], cpmOp:'gte', cpmN:'', cpmN2:''});
+const COUNT_OPS=[['gte','at least'],['lte','at most'],['eq','exactly'],['between','between']];
+const countOn=(F,k)=>F[k+'Products'].length>0&&F[k+'N']!==''&&(F[k+'Op']!=='between'||F[k+'N2']!=='');
+function countOk(F,k,f){
+  const c=sumConsumed(f,F[k+'Products']), n=+F[k+'N'], n2=+F[k+'N2'];
+  return F[k+'Op']==='gte'?c>=n:F[k+'Op']==='lte'?c<=n:F[k+'Op']==='eq'?c===n:c>=Math.min(n,n2)&&c<=Math.max(n,n2);
+}
 const OPTS={journey:()=>VAL.journeyId, customer:()=>VAL.customerStatus, finance:()=>VAL.financeStatus,
   mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>asMap(QUEUES), workshops:()=>asMap(WORKSHOPS),
-  ongoing:()=>PROD, bigLevel:()=>asMap(BIG_LEVELS)};
-const S={stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
-function filtersOn(){const F=S.filters;
-  return !!(F.journey.length||F.customer.length||F.finance.length||F.mode.length||F.product||F.events.length
+  ongoing:()=>PROD, bigLevel:()=>asMap(BIG_LEVELS), upProducts:()=>PROD, cpmProducts:()=>PROD};
+const S={q:'',qRaw:'',showArchived:false,stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
+// board search (name or email) narrows like a filter: cards keep only matching rows; empty cards hide
+const qMatch=(p,q)=>p.name.toLowerCase().includes(q)||(p.email||'').toLowerCase().includes(q);
+function filtersOn(){ return filtersActive()||!!S.q; }
+function filtersActive(){const F=S.filters;
+  return !!(countOn(F,'up')||countOn(F,'cpm')||F.journey.length||F.customer.length||F.finance.length||F.mode.length||F.product||F.events.length
     ||F.queues.length||F.queueStage||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
     ||F.ageMin!==''||F.ageMax!==''||F.bigLevel.length);}
 function matchFilter(p){
@@ -320,9 +339,14 @@ function matchFilter(p){
   if(F.ageMin!==''&&!(typeof f.age==='number'&&f.age>=+F.ageMin)) return false;
   if(F.ageMax!==''&&!(typeof f.age==='number'&&f.age<=+F.ageMax)) return false;
   if(F.bigLevel.length&&!F.bigLevel.includes(p.bigLevel)) return false;
+  if(countOn(F,'up')&&!countOk(F,'up',f)) return false;
+  if(countOn(F,'cpm')&&!countOk(F,'cpm',f)) return false;
   return true;
 }
-function refreshFilter(){S.fids=filtersOn()?new Set(P.filter(matchFilter).map(p=>p.pid)):null;}
+function refreshFilter(){
+  const fa=filtersActive(), q=S.q;
+  S.fids=fa||q?new Set(P.filter(p=>(!fa||matchFilter(p))&&(!q||qMatch(p,q))).map(p=>p.pid)):null;
+}
 const inFilter=pid=>!S.fids||S.fids.has(pid);
 const curSet=()=>SETS.find(s=>s.id===S.setId);
 const canEdit=()=>S.role==='admin';                       // master segments
@@ -455,8 +479,9 @@ function renderMain(){
     <span class="dev-note">participants = participant metadata docs · lists = segmentboardlist</span>
   </section>
   <div class="toolbar">
-    <div class="search"><input id="q" type="search" placeholder="Find a participant by name or ID" autocomplete="off" aria-label="Find a participant"><div id="qres" class="qres" hidden></div></div>
+    <div class="search"><input id="q" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
     <div class="spacer"></div>
+    <button class="btn" data-act="show-archived" aria-pressed="${S.showArchived}">${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</button>
     <button class="btn" data-act="collapse-all">${set.segments.length&&set.segments.every(s=>S.collapsed.has(s.id))?'Expand all':'Collapse all'}</button>
     <button class="btn" data-act="activity">Activity</button>
     ${set.type==='master'?'<button class="btn" data-act="history">Change history</button>':''}
@@ -475,9 +500,12 @@ function renderMain(){
   if(!set.segments.length){
     h+=`<div class="empty"><h3>No segments yet</h3><p class="subtle">Everyone is Unsegmented until you add segments.</p>${edit?'<button class="btn primary" data-act="new-seg">Create the first segment</button>':''}</div>`;
   } else {
-    const segs=set.displayOrder.map(id=>set._by.get(id)).filter(Boolean);
-    h+=`<div class="${S.arranging?'arranging':''}" id="groups"><div class="cards">${segs.map(x=>segCard(set,x,t)).join('')}</div></div>`;
+    let segs=set.displayOrder.map(id=>set._by.get(id)).filter(Boolean);
+    if(S.q) segs=segs.filter(x=>(t.fby[x.id]||0)>0);   // search: only segments holding a matching participant
+    h+=!segs.length?`<div class="empty"><h3>No segment has a participant matching “${esc(S.qRaw)}”</h3><p class="subtle">Search looks at names and emails in the saved segment lists.</p></div>`
+      :`<div class="${S.arranging?'arranging':''}" id="groups"><div class="cards">${segs.map(x=>segCard(set,x,t)).join('')}</div></div>`;
   }
+  if(S.showArchived) h=h.replace(/<div class="attn">[\s\S]*$/,'')+archivedHtml();
   $('#main').innerHTML=h+'</div>';
   $('#roleSel').value=S.role;
 }
@@ -486,6 +514,16 @@ function checkList(key,map){
   return `<div class="ms-tools"><button type="button" data-fall="${key}:1">Select all</button><button type="button" data-fall="${key}:0">Clear</button>
       <span class="subtle small">${picked.length} of ${Object.keys(map).length}</span></div>
     <div class="checks">${Object.entries(map).map(([v,l])=>`<label><input type="checkbox" data-fk="${key}" value="${v}" ${picked.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div>`;
+}
+function countDrop(k,title){   // uP! / CPM attended filter: pick products, then at least / at most / exactly / between
+  const F=S.filters, op=F[k+'Op'], on=countOn(F,k), W=Object.fromEntries(COUNT_OPS), id=k==='up'?'fUp':'fCpm';
+  const label=`${title}: ${on?(op==='between'?`${F[k+'N']}–${F[k+'N2']}`:`${W[op]} ${F[k+'N']}`):'Any'}`;
+  return fdrop(k+'Cnt',label,on,`<label class="f" for="${id}Op">Count</label>
+    <div class="cnt-row"><select id="${id}Op" data-fk="${k}Op">${COUNT_OPS.map(([v,l])=>`<option value="${v}" ${v===op?'selected':''}>${l}</option>`).join('')}</select>
+      <input id="${id}N" type="number" min="0" data-fk="${k}N" value="${esc(F[k+'N'])}" placeholder="0" aria-label="Count">
+      ${op==='between'?`<span>and</span><input id="${id}N2" type="number" min="0" data-fk="${k}N2" value="${esc(F[k+'N2'])}" placeholder="0" aria-label="Up to">`:''}</div>
+    <label class="f">Counting these products</label>${checkList(k+'Products',PROD)}
+    ${F[k+'Products'].length?'':'<p class="subtle small" style="margin:8px 0 0">Pick at least one product to count.</p>'}`);
 }
 function fdrop(key,label,on,panel){
   return `<details class="fdrop" data-on="${on?1:0}" data-drop="${key}"><summary>${esc(label)}</summary><div class="fpanel">${panel}</div></details>`;
@@ -502,23 +540,11 @@ function filterBar(t){
        <p class="subtle small" style="margin:8px 0 0">Combines a product with the participant's current mode, like the participants product screen.</p>`),
     fdrop('ongoing',`Ongoing product: ${sel(F.ongoing,'Any')}`,F.ongoing.length,
       checkList('ongoing',PROD)+`<p class="subtle small" style="margin:8px 0 0">Products that are ongoing or initiated right now.</p>`),
-    fdrop('events',`Events: ${F.events.length?`${F.eventsMode==='attended'?'attended':'not attended'} · ${F.events.length}`:'Any'}`,F.events.length,
-      `<label class="f" for="fEvMode">Attendance</label><select id="fEvMode" data-fk="eventsMode">${[['attended','Attended any of these'],['not','Did not attend any of these']].map(([v,l])=>`<option value="${v}" ${v===F.eventsMode?'selected':''}>${l}</option>`).join('')}</select>
-       <label class="f">Events</label>${checkList('events',EVENT_NAME)}
-       <p class="subtle small" style="margin:8px 0 0">Events come from the create events screen; only attendance counts.</p>`),
-    fdrop('queues',`Queue: ${F.queues.length?sel(F.queues,''):'Any'}${F.queueStage?' · '+F.queueStage:''}`,F.queues.length||F.queueStage,
-      `<label class="f">Queue</label>${checkList('queues',asMap(QUEUES))}
-       <label class="f" for="fQS">Stage</label><select id="fQS" data-fk="queueStage"><option value="">Any stage</option>${QUEUE_STAGES.map(x=>`<option value="${x}" ${x===F.queueStage?'selected':''}>${x}</option>`).join('')}</select>
-       <p class="subtle small" style="margin:8px 0 0">Queues come from the queue list screen; it reads live tokens.</p>`),
-    fdrop('workshops',`Workshop: ${F.workshops.length?sel(F.workshops,''):'Any'}${F.workshopState!=='any'?' · '+Object.fromEntries(WORKSHOP_STATES)[F.workshopState]:''}`,F.workshops.length||F.workshopState!=='any',
-      `<label class="f">Workshop</label>${checkList('workshops',asMap(WORKSHOPS))}
-       <label class="f" for="fW">Status</label><select id="fW" data-fk="workshopState">${WORKSHOP_STATES.map(([v,l])=>`<option value="${v}" ${v===F.workshopState?'selected':''}>${l}</option>`).join('')}</select>
-       <p class="subtle small" style="margin:8px 0 0">Workshops come from the EI Flix workshop screen.</p>`),
     fdrop('age',`Age: ${F.ageMin===''&&F.ageMax===''?'Any':`${F.ageMin===''?'0':F.ageMin}–${F.ageMax===''?'∞':F.ageMax}`}`,F.ageMin!==''||F.ageMax!=='',
       `<label class="f" for="fAgeMin">From</label><input id="fAgeMin" type="number" min="0" data-fk="ageMin" value="${F.ageMin}" placeholder="0">
        <label class="f" for="fAgeMax">To</label><input id="fAgeMax" type="number" min="0" data-fk="ageMax" value="${F.ageMax}" placeholder="99">`),
-    fdrop('bigLevel',`B!G Level: ${sel(F.bigLevel,'Any')}`,F.bigLevel.length,
-      checkList('bigLevel',asMap(BIG_LEVELS))+`<p class="subtle small" style="margin:8px 0 0">No participant carries a B!G level yet; this fills in once the levels are fed in.</p>`)
+    countDrop('up','uP! events'),
+    countDrop('cpm','CPM events')
   ].join('');
   return `<section class="filters" aria-label="Filters"><span class="flabel">Filter</span>${bar}
     <span class="fsum">${filtersOn()?`<b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants match <button class="btn ghost" data-act="clear-filters">Clear filters</button>`:`<span class="subtle">Filters narrow what you see and who an action applies to. They never change who is in which segment.</span>`}</span>
@@ -528,7 +554,7 @@ const ICON_COLORS=['#4c769d','#6a4c9d','#1a7a6d','#9d6a4c','#4c9d68','#9d4c78','
 const colorFor=g=>ICON_COLORS[[...g].reduce((a,c)=>a+c.charCodeAt(0),0)%ICON_COLORS.length];
 function prow(set,p,m,edit){
   return `<div class="prow" data-pid="${p.pid}" ${edit?'draggable="true"':''}><span class="pav">${esc(p.name[0])}</span>
-    <span class="nm"><div>${esc(p.name)}${m.pinned?LOCK:''}</div><div class="subtle small">${p.pid} · ${esc(p.journey)}</div></span>
+    <span class="nm"><div>${esc(p.name)}${m.pinned?LOCK:''}</div><div class="subtle small">${esc(p.journey)}</div></span>
     ${m.warning?'<span class="chip warn">Not eligible</span>':''}</div>`;
 }
 function segCard(set,s,t){
@@ -591,7 +617,7 @@ function drawerRows(set,d){
     else if(d.kind==='attention'){ if(m.warning) out.push([p,m]); }
   }
   let rows=out;
-  if(S.dq){const q=S.dq.toLowerCase(); rows=rows.filter(([p])=>p.name.toLowerCase().includes(q)||p.pid.toLowerCase().includes(q));}
+  if(S.dq){const q=S.dq.toLowerCase(); rows=rows.filter(([p])=>qMatch(p,q));}
   if(d.hl) rows.sort((a,b)=>(b[0].pid===d.hl)-(a[0].pid===d.hl));
   return rows;
 }
@@ -625,6 +651,38 @@ function downloadCsv(title,head,lines){
   const a=document.createElement('a'), url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   a.href=url; a.download=`${title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'segment'}-${localDate()}.csv`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+// ---------- archived segments: view, unarchive, delete ----------
+function archivedHtml(){
+  const rows=ARCHIVED.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  return `<div class="banner"><div><b>Archived segments.</b> They place no one. Restore one to put it back at the end of the board${'' }, or delete it for good.</div></div>
+    ${rows.length?`<div class="cards">${rows.map(x=>`<article class="card arch" data-arch="${x.id}">
+      <div class="card-h"><div class="card-icon" aria-hidden="true">${esc(x.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
+        <div class="card-info"><div class="card-title">${esc(x.name)}</div><div class="card-sub">${x.mode==='auto'?'Automated':'Manual'}${x.archivedAt?.toDate?` · archived ${esc(TIME.format(x.archivedAt.toDate()))}`:''}</div></div></div>
+      ${x.description?`<div class="card-desc">${esc(x.description)}</div>`:''}
+      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-act="unarchive" data-seg="${x.id}">Unarchive</button><button class="btn danger" data-act="delete-seg" data-seg="${x.id}">Delete</button>`:''}</div></article>`).join('')}</div>`
+      :'<div class="empty"><h3>No archived segments</h3></div>'}`;
+}
+async function unarchiveSeg(id){
+  const set=curSet(), x=ARCHIVED.find(a=>a.id===id); if(!x) return;
+  const seq=x.mode==='auto'?Math.max(0,...set.segments.filter(s=>s.mode==='auto').map(s=>s.sequence||0))+1:undefined;
+  const place={displayIndex:set.displayOrder.length,...(seq?{sequence:seq}:{})};
+  try{ await store.unarchiveSegment(id,place); }catch(e){ return toast(`Couldn’t unarchive: ${e?.message||e}`); }
+  const seg={...x,...place}; delete seg.archived; delete seg.archivedAt; delete seg.archivedBy;
+  ARCHIVED=ARCHIVED.filter(a=>a.id!==id); ARCHIVED_IDS.delete(id);
+  set.segments.push(seg); set.displayOrder.push(id); set.defaultDisplayOrder.push(id); computeSet(set);
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${seg.name}: restored from the archive`});
+  render(); toast(`Restored “${seg.name}”.`);
+  if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([id]); else if(seg.mode==='manual') { await syncAutoLists(); render(); }
+}
+async function deleteSeg(id){
+  const x=ARCHIVED.find(a=>a.id===id); if(!x) return;
+  if(!confirm(`Delete “${x.name}” for good?\n\nIts configuration and saved list are removed from Firestore. This can’t be undone.`)) return;
+  try{ await store.deleteSegment(id); }catch(e){ return toast(`Couldn’t delete: ${e?.message||e}`); }
+  ARCHIVED=ARCHIVED.filter(a=>a.id!==id); ARCHIVED_IDS.delete(id); LISTS.delete(id);
+  AUDIT.unshift({at:Date.now(),by:who(),type:'SEGMENT_ARCHIVE',text:`${x.name} deleted`});
+  render(); toast(`Deleted “${x.name}”.`);
 }
 
 // ---------- import & compare: an uploaded / pasted list vs the segment's View all list ----------
@@ -691,8 +749,8 @@ function renderCmp(){
     body=`<div class="cmp-tiles">${CMP_TABS.map(([k,l,sub])=>`<button class="cmp-tile ${k}" data-cmptab="${k}" aria-pressed="${CMP.tab===k}"><b>${fmt(n[k])}</b><span>${l}</span><small>${sub}</small></button>`).join('')}</div>
       <p class="subtle small" style="margin:8px 0">Matched by ${R.by} · ${plural(R.imported,'unique imported value')}${R.dupImports?` (${fmt(R.dupImports)} repeated ${R.dupImports===1?'value':'values'} ignored)`:''} · ${plural(R.current,'participant')} in View all.</p>
       ${rows.length?`<div class="tbl-wrap"><table class="pt"><thead><tr><th>${CMP.tab==='onlyImported'?'Imported value':'Participant'}</th><th>${CMP.tab==='onlyImported'?'Found in participant metadata':'Email'}</th><th>Journey</th></tr></thead><tbody>
-        ${shown.map(r=>CMP.tab==='onlyImported'?`<tr><td>${esc(r[1])}</td><td>${r[2]?`${esc(r[3])} <span class="mono subtle small">${esc(r[2])}</span><div class="subtle small">${esc(r[7])}</div>`:'<span class="chip bad">Not found</span>'}</td><td>${esc(r[5])}</td></tr>`
-          :`<tr><td><div class="pn">${esc(r[3])}</div><div class="pid mono">${esc(r[2])}</div></td><td>${esc(r[4])||'<span class="subtle">—</span>'}</td><td>${esc(r[5])}</td></tr>`).join('')}
+        ${shown.map(r=>CMP.tab==='onlyImported'?`<tr><td>${esc(r[1])}</td><td>${r[2]?`${esc(r[3])}<div class="subtle small">${esc(r[7])}</div>`:'<span class="chip bad">Not found</span>'}</td><td>${esc(r[5])}</td></tr>`
+          :`<tr><td><div class="pn">${esc(r[3])}</div></td><td>${esc(r[4])||'<span class="subtle">—</span>'}</td><td>${esc(r[5])}</td></tr>`).join('')}
       </tbody></table></div>${rows.length>shown.length?`<p class="subtle small">Showing 200 of ${fmt(rows.length)}. Export for the full list.</p>`:''}`:'<p class="subtle" style="padding:12px 0">Nobody in this group.</p>'}`;
     foot=`<button class="btn" data-act="cmp-back" style="margin-right:auto">← Compare another list</button><button class="btn" data-act="cmp-export" ${rows.length?'':'disabled'}>Export this group</button><button class="btn primary" data-act="cmp-export-all">Export all three</button>`;
   }
@@ -720,7 +778,7 @@ function tableHtml(set,d,rows,extra){
   return `<div class="tbl-wrap"><table class="pt"><thead><tr>${edit?'<th class="c"><input type="checkbox" id="selAll" aria-label="Select all shown"></th>':''}<th>Participant</th><th>Journey</th><th>Customer · Finance</th><th class="num">uP! / CPM</th><th class="num">Age</th>${extra?`<th>${extra.h}</th>`:''}</tr></thead><tbody>
   ${shown.map(([p,m])=>`<tr data-pid="${p.pid}" ${edit&&MEMBERSHIP_EDIT?'draggable="true"':''} class="${S.sel.has(p.pid)?'sel':''} ${d.hl===p.pid?'hl':''}">
     ${edit?`<td class="c"><input type="checkbox" data-selpid="${p.pid}" ${S.sel.has(p.pid)?'checked':''} aria-label="Select ${esc(p.name)}"></td>`:''}
-    <td><div class="pn">${esc(p.name)}${m.pinned?LOCK:''}</div><div class="pid mono">${p.pid}</div></td>
+    <td><div class="pn">${esc(p.name)}${m.pinned?LOCK:''}</div>${p.email?`<div class="pid">${esc(p.email)}</div>`:''}</td>
     <td>${esc(p.journey)}<div class="subtle small">${esc(p.mode)}${p.queue.inQueue?` · ${esc(p.queue.name)} #${p.queue.position}`:''}${p.workshop.name?` · ${esc(p.workshop.name)}`:''}${p.pending.length?` · ${plural(p.pending.length,'action')} pending`:''}</div>${p.f.onboardingStatus!=='ONBOARDED'?`<div class="subtle small">${VAL.onboardingStatus[p.f.onboardingStatus]}</div>`:''}</td>
     <td>${statusCell(p)}</td><td class="num" title="Counted from consumedproducts with the products picked in this segment's uP! / CPM conditions">${cnt(p,'upCount')} / ${cnt(p,'cpmCount')}</td><td class="num">${p.f.age??'<span class="chip bad">—</span>'}</td>
     ${extra?`<td>${extra.cell(p,m)}</td>`:''}</tr>`).join('')}
@@ -747,7 +805,7 @@ function historyHtml(set){
   return `<ul class="h-list">${AUDIT.map(a=>{
     let title,detail='';
     if(a.type==='MANUAL_MOVE'){const p=PI.get(a.pid);title='Participant moved';
-      detail=`${esc(p.name)} <span class="mono subtle">${a.pid}</span> from <b>${esc(segName(set,a.from))}</b> to <b>${esc(segName(set,a.to))}</b>${a.landed!==a.to?`. The rules then placed them in <b>${esc(segName(set,a.landed))}</b>`:''}.`;}
+      detail=`${esc(p.name)} from <b>${esc(segName(set,a.from))}</b> to <b>${esc(segName(set,a.to))}</b>${a.landed!==a.to?`. The rules then placed them in <b>${esc(segName(set,a.landed))}</b>`:''}.`;}
     else if(a.type==='SEGMENT_CREATE'){title='Segment created';detail=esc(a.text);}
     else if(a.type==='RULE_CHANGE'){title='Segment changed';detail=esc(a.text);}
     else if(a.type==='SEGMENT_ARCHIVE'){title='Segment archived';detail=esc(a.text);}
@@ -763,7 +821,9 @@ function renderDrawer(fresh){
     const s=set._by.get(d.id); eyebrow='Master segment'; title=s.name; desc=s.description||'';
     // automated: evaluate the conditions over every participant now, so View all never depends on the last refresh
     const auto=s.mode==='auto', L=LISTS.get(s.id);
-    d.live=auto?new Set(P.filter(p=>matches(segRule(s),p.f)).map(p=>p.pid)):null;
+    const hit=auto?P.filter(p=>matches(segRule(s),p.f)):[];
+    d.live=auto?new Set(hit.filter(p=>!set._pinned.has(p.pid)).map(p=>p.pid)):null;
+    const pinnedOut=auto?hit.length-d.live.size:0;   // match, but sit in a manual segment
     const n=auto?d.live.size:(t.by[s.id]||0);
     const saved=L?L.ids.size:0, inBoth=auto&&L?[...d.live].filter(id=>L.ids.has(id)).length:0;
     chips=`<span class="chip ${s.mode}">${auto?'Automated':'Manual'}</span><span class="chip">${plural(n,'participant')}${auto?' match now':''}</span>${s.sourceSegmentId?'<span class="chip">Copied from master</span>':''}`;
@@ -774,7 +834,7 @@ function renderDrawer(fresh){
     else if(auto){
       const sync=!L?'The list hasn’t been saved yet.':(saved===n&&inBoth===n)?`The saved list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
         :`The saved list has ${fmt(saved)} (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'—'}): ${fmt(n-inBoth)} new match${n-inBoth===1?'':'es'} not in it, ${fmt(saved-inBoth)} in it that no longer match.`;
-      tools=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="subtle small" style="margin:0;flex:1;min-width:220px">Everyone who matches the conditions right now. ${sync}</p>
+      tools=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="subtle small" style="margin:0;flex:1;min-width:220px">Everyone who matches the conditions right now. ${sync}${pinnedOut?` ${plural(pinnedOut,'more participant')} match${pinnedOut===1?'es':''} but ${pinnedOut===1?'is':'are'} in a manual segment, so ${pinnedOut===1?'is':'are'} left out.`:''}</p>
         ${canEdit(set)&&s.status!=='inactive'?`<button class="btn" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''}>${S.refreshing?.has(s.id)?'Saving…':'Save as list'}</button>`:''}</div>`;
       content=tableHtml(set,d,drawerRows(set,d),{h:'Saved list',cell:(p)=>L?.ids.has(p.pid)?'In list':'<span class="chip warn">Not saved yet</span>'});
     }
@@ -831,7 +891,9 @@ function renderDrawer(fresh){
   $('#drawer').innerHTML=`<div class="d-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${desc?`<p class="d-desc">${esc(desc)}</p>`:''}<div class="chips">${chips}</div></div><button class="icon-btn" data-act="close" aria-label="Close">×</button></div>
     ${tabs}<div class="d-tools">${tools}${showSearch?`<div class="dq-row"><input id="dq" type="search" placeholder="Search in this list" value="${esc(S.dq)}" aria-label="Search in this list">${d.kind==='seg'?'<button class="btn" data-act="compare" title="Compare an uploaded or pasted list with this list">Import &amp; compare</button>':''}${['seg','dups','unseg'].includes(d.kind)?'<button class="btn" data-act="export-list" title="Download the rows shown as a CSV file">Export CSV</button>':''}</div>`:''}${hint}</div>
     <div class="d-body">${content}</div>
-    ${edit&&showSearch&&d.kind==='seg'&&set._by.get(d.id)?.mode==='manual'?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button><button class="btn primary" data-act="remove-from-seg" data-seg="${d.id}">Remove from segment</button></div>`:''}
+    ${edit&&showSearch&&['seg','dups','unseg'].includes(d.kind)?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button>
+      ${d.kind==='seg'&&set._by.get(d.id)?.mode==='manual'?`<button class="btn" data-act="remove-from-seg" data-seg="${d.id}">Remove from segment</button>`:''}
+      <button class="btn primary" data-act="move-manual" ${set.segments.some(x=>x.mode==='manual'&&x.status!=='inactive'&&x.id!==d.id)?'':'disabled title="Create an active manual segment first"'}>Move to manual segment…</button></div>`:''}
     ${edit&&showSearch&&MEMBERSHIP_EDIT?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button><button class="btn primary" data-act="move">Move to…</button><span class="dev-note">seg_moveParticipants</span></div>`:''}`;
   $('#drawer .d-body').scrollTop=keep;
 }
@@ -1125,12 +1187,42 @@ function updatePreview(){
   const v=validRule(); el.hidden=v===true; el.innerHTML=v===true?'':`<span class="subtle">${esc(v)}</span>`;
 }
 // build each segment's list from its conditions over every participant, then store it in segmentboardlist
+// an automated segment's list: everyone matching its journeys + conditions, except people in a manual segment
+function autoList(s){
+  const rule=segRule(s), pin=master._pinned||new Set();
+  return {segmentid:s.id,segmentname:s.name,profilelist:P.filter(p=>!pin.has(p.pid)&&matches(rule,p.f)).map(p=>p.pid)};
+}
+// after a manual change: rebuild every active automated list and store only the ones that changed
+async function syncAutoLists(){
+  computeSet(master);
+  const changed=master._auto.map(autoList).filter(l=>{const L=LISTS.get(l.segmentid); return !L||L.ids.size!==l.profilelist.length||l.profilelist.some(id=>!L.ids.has(id));});
+  if(!changed.length) return 0;
+  try{ await store.saveLists(changed); }catch(e){ toast(`Couldn’t update the automated lists: ${e?.message||e}`); return 0; }
+  const now=new Date(); for(const l of changed) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
+  computeSet(master); return changed.length;
+}
+// place people in one manual segment: out of every other manual segment, then automated lists follow
+async function placeInManual(targetId,pids,btn,errEl){
+  const set=curSet(), add=new Set(pids), writes=[];
+  for(const s of set.segments) if(s.mode==='manual'){
+    const cur=[...(LISTS.get(s.id)?.ids||[])];
+    const next=s.id===targetId?[...cur,...pids.filter(id=>!cur.includes(id))]:cur.filter(id=>!add.has(id));
+    if(s.id===targetId||next.length!==cur.length) writes.push({segmentid:s.id,segmentname:s.name,profilelist:next});
+  }
+  const label=btn?.textContent; if(btn){btn.disabled=true; btn.textContent='Saving…';}
+  try{ await store.saveLists(writes); }
+  catch(e){ if(btn){btn.disabled=false; btn.textContent=label;} const m=`Couldn’t save to segmentboardlist: ${e?.message||e}`; if(errEl) errEl.textContent=m; else toast(m); return null; }
+  const now=new Date(); for(const l of writes) LISTS.set(l.segmentid,{ids:new Set(l.profilelist),lastupdated:now});
+  const moved=writes.filter(w=>w.segmentid!==targetId).length;
+  const autos=await syncAutoLists();
+  return {moved,autos};
+}
 async function refreshLists(ids){
   const segs=ids.map(id=>master._by.get(id)).filter(s=>s&&s.mode==='auto'&&s.status!=='inactive');
   if(!segs.length||S.refreshing) return;
   if(!P.length) return toast('No participants loaded.');
   S.refreshing=new Set(segs.map(s=>s.id)); render();
-  const lists=segs.map(s=>{const rule=segRule(s); return {segmentid:s.id,segmentname:s.name,profilelist:P.filter(p=>matches(rule,p.f)).map(p=>p.pid)};});
+  const lists=segs.map(autoList);
   try{ await store.saveLists(lists); }
   catch(e){ S.refreshing=null; render(); return toast(`Couldn’t save to segmentboardlist: ${e?.message||e}`); }
   const now=new Date();
@@ -1182,22 +1274,25 @@ async function saveSeg(){
     :{at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${name}: ${changes.join('; ')}`});
   $('#segDlg').close(); render();
   const n=tally(set).by[seg.id]||0;
-  toast(isNew?(seg.mode==='auto'?`Created “${name}”. ${plural(n,'participant')} placed here.`:`Created “${name}”. Move participants in by hand.`)
-    :`Saved. ${name} now has ${plural(n,'participant')}.`);
+  toast(isNew?(seg.mode==='auto'?`Created “${name}”.`:`Created “${name}”. Move participants in by hand.`):`Saved “${name}”.`);
+  // the list follows the conditions: rebuild and store it now instead of waiting for Refresh list
+  if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([seg.id]);
+  else if(seg.mode==='manual') await syncAutoLists();   // a manual segment turned on/off changes who the automated lists may hold
 }
 const describeRule=r=>{const ex=expand(r);return (ex.all||ex.any).map(describe).join(ex.any?' OR ':'; ');};
 async function archiveSeg(){
   const set=curSet(), s=set._by.get(B.id), n=tally(set).by[s.id]||0;
   if(!confirm(`Archive “${s.name}”?\n\n${n?`${fmt(n)} participants will be re-checked against the remaining segments.`:'No participants are in it.'}\nArchived segments are kept, never deleted, so anything that points at this segment still resolves.`)) return;
   try{ await store.archiveSegment(s.id); }catch(e){ $('#sErr').textContent=`Couldn’t archive: ${e?.message||e}`; return; }
-  ARCHIVED_IDS.add(s.id);
+  ARCHIVED_IDS.add(s.id); ARCHIVED.push({...s,archived:true});
   set.segments=set.segments.filter(x=>x.id!==s.id);
   set.displayOrder=set.displayOrder.filter(i=>i!==s.id); set.defaultDisplayOrder=set.defaultDisplayOrder.filter(i=>i!==s.id);
   for(const m of MEM[set.id].values()) if(m.segmentId===s.id&&m.pinned) m.pinned=false;
   computeSet(set);
   if(set.type==='master') AUDIT.unshift({at:Date.now(),by:who(),type:'SEGMENT_ARCHIVE',text:`${s.name} archived. ${plural(n,'participant')} re-checked.`});
   $('#segDlg').close(); if(S.drawer&&S.drawer.id===s.id) closeDrawer(); render();
-  toast(`Archived “${s.name}”. ${plural(n,'participant')} re-checked against the other segments.`);
+  if(s.mode==='manual') await syncAutoLists();   // its people can be in automated segments again
+  render(); toast(`Archived “${s.name}”. It’s under Archived, where it can be restored or deleted.`);
 }
 
 // ---------- features: communication, content, app actions ----------
@@ -1308,7 +1403,7 @@ function openAdd(segId){
   const set=curSet(), s=set._by.get(segId); if(!canEdit(set)||!s||s.mode!=='manual') return;
   ADD={segId,sel:new Set(),q:''};
   $('#addDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="addTitle">Add participants to ${esc(s.name)}</h2><p class="subtle">They stay in this segment until someone removes them.</p></div>
-    <div class="dlg-b"><label class="f" for="aq">Find participants</label><input id="aq" type="search" placeholder="Search by name or profile ID" autocomplete="off">
+    <div class="dlg-b"><label class="f" for="aq">Find participants</label><input id="aq" type="search" placeholder="Search by name or email" autocomplete="off">
       <div class="target-list" id="alist"></div>
       <span class="dev-note block">segmentboardlist/${esc(segId)}.profilelist += picked profile ids</span></div>
     <div class="dlg-f"><span class="err" id="aErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`;
@@ -1316,9 +1411,9 @@ function openAdd(segId){
 }
 function renderAddList(){
   const set=curSet(), q=ADD.q.trim().toLowerCase(), mm=MEM[set.id], here=LISTS.get(ADD.segId)?.ids;
-  const hits=P.filter(p=>!here?.has(p.pid)&&(!q||p.name.toLowerCase().includes(q)||p.pid.toLowerCase().includes(q))).slice(0,60);
+  const hits=P.filter(p=>!here?.has(p.pid)&&(!q||qMatch(p,q))).slice(0,60);
   $('#alist').innerHTML=hits.length?hits.map(p=>{const m=mm.get(p.pid);
-    return `<label><input type="checkbox" data-addpid="${p.pid}" ${ADD.sel.has(p.pid)?'checked':''}><span class="grow">${esc(p.name)} <span class="mono subtle small">${p.pid}</span><div class="subtle small">${esc(p.journey)} · ${m.segs.length?'In '+esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment'}</div></span></label>`;}).join('')
+    return `<label><input type="checkbox" data-addpid="${p.pid}" ${ADD.sel.has(p.pid)?'checked':''}><span class="grow">${esc(p.name)}<div class="subtle small">${p.email?esc(p.email)+' · ':''}${esc(p.journey)} · ${m.segs.length?'In '+esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment'}</div></span></label>`;}).join('')
     :`<div class="subtle" style="padding:12px">${q?'No participant found.':'Everyone is already in this segment.'}</div>`;
   const go=$('#aGo'); go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add'; go.disabled=!ADD.sel.size;
 }
@@ -1332,16 +1427,37 @@ async function saveManualList(segId,ids,btn,errEl){
 }
 async function doAdd(){
   const s=curSet()._by.get(ADD.segId), before=[...(LISTS.get(s.id)?.ids||[])], added=[...ADD.sel].filter(id=>!before.includes(id));
-  if(!(await saveManualList(s.id,[...before,...added],$('#aGo'),$('#aErr')))) return;
+  const r=await placeInManual(s.id,added,$('#aGo'),$('#aErr')); if(!r) return;
   AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(added.length,'participant')} added by hand`});
-  $('#addDlg').close(); render(); toast(`Added ${plural(added.length,'participant')} to ${s.name}.`);
+  $('#addDlg').close(); render(); toast(`Added ${plural(added.length,'participant')} to ${s.name}.${r.autos?` ${plural(r.autos,'automated list')} updated.`:''}`);
+}
+// "Move to manual segment…" from any list side panel
+let MM=null;
+function openManualMove(){
+  const set=curSet(), pids=[...S.sel], here=S.drawer?.kind==='seg'?S.drawer.id:null;
+  const targets=set.displayOrder.map(id=>set._by.get(id)).filter(x=>x&&x.mode==='manual'&&x.status!=='inactive'&&x.id!==here);
+  if(!pids.length||!targets.length) return;
+  MM={pids,target:null};
+  $('#moveDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="moveTitle">Move ${plural(pids.length,'participant')} to a manual segment</h2>
+      <p class="subtle">They’re taken out of any other manual segment and left out of every automated segment while they’re here.</p></div>
+    <div class="dlg-b"><div class="target-list">${targets.map(x=>`<label><input type="radio" name="mmTgt" value="${x.id}"><span class="grow">${esc(x.name)}<div class="subtle small">${plural(LISTS.get(x.id)?.ids.size||0,'participant')}</div></span></label>`).join('')}</div></div>
+    <div class="dlg-f"><span class="err" id="mmErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="mmGo" disabled>Move</button></div>`;
+  $('#moveDlg').showModal();
+}
+async function doManualMove(){
+  const s=curSet()._by.get(MM.target); if(!s) return;
+  const r=await placeInManual(s.id,MM.pids,$('#mmGo'),$('#mmErr')); if(!r) return;
+  AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(MM.pids.length,'participant')} moved in by hand`});
+  $('#moveDlg').close(); S.sel.clear(); render();
+  toast(`Moved ${plural(MM.pids.length,'participant')} to ${s.name}.${r.autos?` ${plural(r.autos,'automated list')} updated.`:''}`);
 }
 async function removeFromSeg(segId){
   const s=curSet()._by.get(segId), gone=new Set(S.sel), keep=[...(LISTS.get(segId)?.ids||[])].filter(id=>!gone.has(id));
   if(!gone.size||!confirm(`Remove ${plural(gone.size,'participant')} from “${s.name}”?`)) return;
   if(!(await saveManualList(segId,keep,null,null))) return;
+  const autos=await syncAutoLists();   // they can match automated segments again
   AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${s.name}: ${plural(gone.size,'participant')} removed by hand`});
-  S.sel.clear(); render(); toast(`Removed ${plural(gone.size,'participant')} from ${s.name}.`);
+  S.sel.clear(); render(); toast(`Removed ${plural(gone.size,'participant')} from ${s.name}.${autos?` ${plural(autos,'automated list')} updated.`:''}`);
 }
 function applyMove(set,pids,target,reason){
   const mm=MEM[set.id], tseg=target==='__UNSEG__'?null:set._by.get(target), landed={};
@@ -1442,6 +1558,7 @@ listen(root,'click',e=>{
     if(dlg.id==='groupDlg'&&t.closest('#gGo')) saveGroup();
     if(dlg.id==='groupDlg'&&t.closest('#gDelete')) deleteGroup();
     if(dlg.id==='teamDlg'&&t.closest('#tGo')) createTeam();
+    if(dlg.id==='moveDlg'&&MM&&t.closest('#mmGo')) doManualMove();
     if(dlg.id==='cmpDlg'&&CMP){
       if(t.closest('#cmpGo')){ runCompare(); renderCmp(); }
       else if(t.closest('[data-cmptab]')){ CMP.tab=t.closest('[data-cmptab]').dataset.cmptab; renderCmp(); }
@@ -1497,6 +1614,10 @@ listen(root,'click',e=>{
     if(act==='close') closeDrawer();
     else if(act==='reload') load();
     else if(act==='export-list') exportList();
+    else if(act==='show-archived'){ S.showArchived=!S.showArchived; render(); }
+    else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
+    else if(act==='delete-seg') deleteSeg(a.dataset.seg);
+    else if(act==='move-manual') openManualMove();
     else if(act==='compare') openCompare();
     else if(act==='refresh-list') refreshLists([a.dataset.seg]);
     else if(act==='refresh-all') refreshLists(set._auto.map(x=>x.id));
@@ -1554,6 +1675,7 @@ listen(document,'keydown',e=>{
 });
 listen(root,'change',e=>{
   const t=e.target;
+  if(t.name==='mmTgt'&&MM){ MM.target=t.value; const g=$('#mmGo'); if(g) g.disabled=false; return; }
   if(CMP&&t.closest&&t.closest('#cmpDlg')){
     if(t.name==='cmpBy'){ CMP.by=t.value; cmpDetect(); renderCmp(); }
     else if(t.id==='cmpCol'){ CMP.col=+t.value; renderCmp(); }
@@ -1611,10 +1733,10 @@ listen(root,'input',e=>{
   if(t.id==='cmpPaste'&&CMP){ CMP.paste=t.value; const v=cmpValues(), go=$('#cmpGo'), info=$('#cmpInfo');
     if(go) go.disabled=!v.length; if(info) info.textContent=v.length?`${plural(v.length,'value')} to compare against the ${plural(cmpCurrentRows().length,'participant')} in View all.`:'Upload a file or paste a list to compare.'; return; }
   if(t.id==='q'){
-    const q=t.value.trim().toLowerCase(), r=$('#qres'); if(q.length<2){r.hidden=true;return;}
-    const set=curSet(), hits=P.filter(p=>p.name.toLowerCase().includes(q)||p.pid.toLowerCase().includes(q)).slice(0,8);
-    r.innerHTML=hits.length?hits.map(p=>{const m=MEM[set.id].get(p.pid);return `<button data-qpid="${p.pid}"><div>${esc(p.name)} <span class="mono subtle small">${p.pid}</span></div><div class="where">${m.segs.length?esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment · '+esc(REASONS[m.reason])}${m.pinned?' · placed by hand':''}</div></button>`;}).join(''):'<div class="subtle" style="padding:10px 12px">No participant found.</div>';
-    r.hidden=false; return;
+    clearTimeout(S.qT); const v=t.value;
+    S.qT=setTimeout(()=>{ S.qRaw=v; S.q=v.trim().toLowerCase(); refreshFilter(); render();
+      const n=$('#q'); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } },150);
+    return;
   }
   if(t.id==='dq'){S.dq=t.value;S.limit=150;const pos=t.selectionStart;renderDrawer(true);const n=$('#dq');n.focus();n.setSelectionRange(pos,pos);return;}
   if(t.id==='tq'){const q=t.value.trim().toLowerCase();$$('#tlist label[data-name]').forEach(l=>l.hidden=!!q&&!l.dataset.name.includes(q));return;}
