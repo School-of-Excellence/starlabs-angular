@@ -17,7 +17,16 @@ export interface SegmentBoardStore {
   saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
   // journeys from `journey`, products from `products` (ids + names); countDefaults = products counted as uP! / CPM events
   readTable(file: File): Promise<string[][]>;               // rows x cells of an uploaded CSV / Excel file
-  loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
+  // the B!G Cohorts dialogs (app notification, email, WhatsApp, recommended playlist) for these profile ids;
+  // resolves with a short line for the activity log, or null when the dialog was closed without sending
+  communicate(channel: 'app' | 'email' | 'whatsapp', profileIds: string[]): Promise<string | null>;
+  recommendPlaylist(profileIds: string[]): Promise<string | null>;
+  // active + approved `queue_token` docs: who is in which queue, at which stage
+  loadQueueTokens(): Promise<{ profileId: string; queueId: string; stage: string }[]>;
+  // approved `event participation request` docs for these events: eventId -> profile ids (confirmed, not yet attended)
+  loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>>;
+  loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[];
+    events?: { id: string; name: string; date: Date | null }[]; queues?: { id: string; name: string; stages: string[] }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
 }
 export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
 const cleanups: Array<() => void> = [];
@@ -54,7 +63,13 @@ const EVENTS=[
 const QUEUES=['uP!/LYL D&I','Walk in Clinic','CTD D&I','B!G Studio','SMP D&I'];
 const WORKSHOPS=['CTD Workshop','SMP Workshop','Scope Enhancement Workshop','W!SH Workshop'];
 const BIG_LEVELS=['SE Solo','SE Shadow','Diagnostics Shadow','Diagnostics Collaborator','Diagnostics Solo'];
-const EVENT_NAME=Object.fromEntries(EVENTS.map(e=>[e.id,e.name]));
+// Live events: `event collection` (id -> "name · Mon YYYY", names repeat). Queues: `queue generation` (id -> queuename, stages).
+// QTOK: profile id -> [{q, stage}] from active + approved queue_token. CONFIRMED: event id -> Set(profile id) with an approved
+// participation request, loaded only for the events picked in the filter (same split as Participant Intelligence).
+let EVENT_NAME={}, QUEUE_NAME={}, QSTAGES={};
+const QTOK=new Map(), CONFIRMED=new Map();
+let confirmedLoading=false;
+const EVENT_MONTH=new Intl.DateTimeFormat('en-IN',{month:'short',year:'numeric'});
 const asMap=a=>Object.fromEntries(a.map(x=>[x,x]));
 const FIELDS = [
   {key:'journeyGroup',label:'Journey',type:'enum'},
@@ -210,7 +225,7 @@ function refresh(set){
   set._by=new Map(set.segments.map(s=>[s.id,s]));
 }
 function assign(set,p,m){
-  // every active automated segment whose refreshed list holds this participant, in sequence order
+  // every active segment whose refreshed list holds this participant (overlaps allowed: sequence orders, it never excludes)
   m.segs=set._members.filter(s=>LISTS.get(s.id)?.ids.has(p.pid)).map(s=>s.id);
   // someone placed in a manual segment is only in that segment, whatever the automated conditions say
   if(set._pinned?.has(p.pid)) m.segs=m.segs.filter(id=>set._by.get(id)?.mode==='manual');
@@ -246,6 +261,33 @@ function setCatalog(cat){
   JOURNEYS=cat.journeys.slice().sort(byName); VAL.journeyId=Object.fromEntries(JOURNEYS.map(j=>[j.id,j.name]));
   COUNT_DEFAULT={upCount:cat.countDefaults.upCount.filter(id=>PROD[id]),cpmCount:cat.countDefaults.cpmCount.filter(id=>PROD[id])};
   VAL.participantMode=Object.fromEntries([...(cat.modes||[]).map(m=>[m.name,m.name]),['NO_MODE','No mode']]);   // `modes` sequence order
+  // every event, newest first; the month tells repeated names apart
+  const ev=(cat.events||[]).slice().sort((a,b)=>(b.date?.getTime?.()||0)-(a.date?.getTime?.()||0)||a.name.localeCompare(b.name));
+  EVENT_NAME=Object.fromEntries(ev.map(e=>[e.id,e.date?`${e.name} · ${EVENT_MONTH.format(e.date)}`:e.name]));
+  const qs=(cat.queues||[]).slice().sort(byName);
+  QUEUE_NAME=Object.fromEntries(qs.map(q=>[q.id,q.name])); QSTAGES=Object.fromEntries(qs.map(q=>[q.id,q.stages||[]]));
+}
+// stages of the picked queues (catalogue order, then any stage only seen on a token); nothing picked → no stage list
+function stageOptions(){
+  const F=S.filters, out=[];
+  for(const q of F.queues) for(const st of QSTAGES[q]||[]) if(!out.includes(st)) out.push(st);
+  for(const toks of QTOK.values()) for(const t of toks) if(F.queues.includes(t.q)&&t.stage&&!out.includes(t.stage)) out.push(t.stage);
+  return Object.fromEntries(out.map(x=>[x,x]));
+}
+// confirmed = approved requests, read only for the picked events that aren't loaded yet
+function ensureConfirmed(){
+  const F=S.filters; if(F.eventsMode==='attended'||confirmedLoading) return;
+  const missing=F.events.filter(id=>!CONFIRMED.has(id)); if(!missing.length) return;
+  confirmedLoading=true; reRender();
+  store.loadConfirmed(missing).then(m=>{ for(const id of missing) CONFIRMED.set(id,new Set(m[id]||[])); })
+    .catch(e=>toast(`Couldn’t load confirmed registrations: ${e?.message||e}`))
+    .finally(()=>{ confirmedLoading=false; refreshFilter(); reRender(); ensureConfirmed(); });
+}
+// re-render and keep the open filter panel (and its search text) open
+function reRender(){
+  const d=$('.filters .fdrop[open]'), key=d?.dataset.drop, fq=d?.querySelector('.ms-q')?.value||'';
+  render();
+  const n=key&&$(`.filters .fdrop[data-drop="${key}"]`); if(n){ n.open=true; const q=n.querySelector('.ms-q'); if(q&&fq){ q.value=fq; q.dispatchEvent(new Event('input',{bubbles:true})); } }
 }
 // participant metadata.participantmode → the `modes` name it means (ignoring case, spaces and a missing " Mode");
 // empty → NO_MODE; a value not in the catalogue is kept and added as its own option so it can still be picked
@@ -262,8 +304,11 @@ function canonModes(){
 async function load(){
   S.loading=true; S.loadError=null; render();
   try{
-    const [docs,parts,lists,cat]=await Promise.all([store.load(),store.loadParticipants(),store.loadLists(),store.loadCatalog()]);
+    const [docs,parts,lists,cat,toks]=await Promise.all([store.load(),store.loadParticipants(),store.loadLists(),store.loadCatalog(),
+      store.loadQueueTokens().catch(()=>[])]);
     setCatalog(cat);
+    QTOK.clear(); CONFIRMED.clear();
+    for(const t of toks){ if(!t.profileId||!t.queueId) continue; if(!QTOK.has(t.profileId)) QTOK.set(t.profileId,[]); QTOK.get(t.profileId).push({q:t.queueId,stage:t.stage||''}); }
     // A–Z by name (then profile id): every list on the board walks P, so they all come out in this order
     P=parts.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base',numeric:true})||x.pid.localeCompare(y.pid)); PI=new Map(P.map(p=>[p.pid,p]));
     canonModes();
@@ -289,13 +334,34 @@ const plural=(n,w)=>`${fmt(n)} ${w}${n===1?'':'s'}`;
 const TIME=new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const Sortable=window.Sortable; const sortableOk=typeof Sortable!=='undefined';
 const LOCK='<svg class="lock" width="12" height="12" viewBox="0 0 16 16" aria-label="Placed by hand" role="img"><title>Placed by hand</title><path fill="currentColor" d="M4 7V5a4 4 0 1 1 8 0v2h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h1Zm2 0h4V5a2 2 0 1 0-4 0v2Z"/></svg>';
+// line icons (16px, currentColor) for the toolbar, filters and cards
+const ico=d=>`<svg class="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const IC={
+  search:ico('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  filter:ico('<path d="M3 5h18l-7 8v6l-4-2v-4z"/>'),
+  edit:ico('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  chev:ico('<path d="m6 9 6 6 6-6"/>'),
+  refresh:ico('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+  plus:ico('<path d="M12 5v14M5 12h14"/>'),
+  archive:ico('<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>'),
+  activity:ico('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+  history:ico('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>'),
+  arrange:ico('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  collapse:ico('<path d="m7 15 5-5 5 5"/><path d="m7 20 5-5 5 5" opacity=".5"/>'),
+  rules:ico('<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/>'),
+  list:ico('<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20a6 6 0 0 0-4-5.6"/>'),
+  more:ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
+  close:ico('<path d="M18 6 6 18M6 6l12 12"/>'),
+  arrowR:ico('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  grip:ico('<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>'),
+};
 const LOGO='<svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="5"><circle cx="16" cy="16" r="11" stroke="var(--primary)" stroke-dasharray="20 3.04"/><circle cx="16" cy="16" r="11" stroke="var(--bar)" stroke-dasharray="11 58.1" stroke-dashoffset="-23"/></g></svg>';
 
 // participant metadata.participantmode — the 15-value lifecycle catalog (`modes`), lowest sequence first
 const MODES=['Big','Installation Event','Event','Integration','Priority','Preparation','Performance','Journey Priority Planning','Extended Performance','Early Preparation','Journey Planning','Exploration','After Extended Performance','Snooze','Investment'];
 const WORKSHOP_STATES=[['any','Any'],['enrollednotstarted','Enrolled, not started'],['inprogress','In progress'],['completed','Completed'],['attended','Attended a live session'],['missed','Missed the last live session'],['none','Never enrolled']];
 const emptyFilters=()=>({journey:[],customer:[],finance:[],mode:[],product:'',
-  events:[],eventsMode:'attended', queues:[],queueStage:'', workshops:[],workshopState:'any',
+  events:[],eventsMode:'any', queues:[],queueStages:[], workshops:[],workshopState:'any',
   ongoing:[], ageMin:'', ageMax:'', bigLevel:[],
   // uP! / CPM attended: count of the picked products in consumedproducts, compared like the conditions
   upProducts:[], upOp:'gte', upN:'', upN2:'', cpmProducts:[], cpmOp:'gte', cpmN:'', cpmN2:''});
@@ -306,7 +372,7 @@ function countOk(F,k,f){
   return F[k+'Op']==='gte'?c>=n:F[k+'Op']==='lte'?c<=n:F[k+'Op']==='eq'?c===n:c>=Math.min(n,n2)&&c<=Math.max(n,n2);
 }
 const OPTS={journey:()=>VAL.journeyId, customer:()=>VAL.customerStatus, finance:()=>VAL.financeStatus,
-  mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>asMap(QUEUES), workshops:()=>asMap(WORKSHOPS),
+  mode:()=>VAL.participantMode, events:()=>EVENT_NAME, queues:()=>QUEUE_NAME, queueStages:()=>stageOptions(), workshops:()=>asMap(WORKSHOPS),
   ongoing:()=>PROD, bigLevel:()=>asMap(BIG_LEVELS), upProducts:()=>PROD, cpmProducts:()=>PROD};
 const S={q:'',qRaw:'',showArchived:false,stale:new Set(),refreshing:null,role:'admin',setId:'master',teamId:null,arranging:false,drawer:null,sel:new Set(),dq:'',limit:150,dev:false,dragPids:null,cardView:{},filters:emptyFilters(),fids:null,collapsed:new Set(),prevCollapsed:null,cardSel:new Set()};
 // board search (name or email) narrows like a filter: cards keep only matching rows; empty cards hide
@@ -314,7 +380,7 @@ const qMatch=(p,q)=>p.name.toLowerCase().includes(q)||(p.email||'').toLowerCase(
 function filtersOn(){ return filtersActive()||!!S.q; }
 function filtersActive(){const F=S.filters;
   return !!(countOn(F,'up')||countOn(F,'cpm')||F.journey.length||F.customer.length||F.finance.length||F.mode.length||F.product||F.events.length
-    ||F.queues.length||F.queueStage||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
+    ||F.queues.length||F.queueStages.length||F.workshops.length||F.workshopState!=='any'||F.ongoing.length
     ||F.ageMin!==''||F.ageMax!==''||F.bigLevel.length);}
 function matchFilter(p){
   const F=S.filters, f=p.f;
@@ -324,12 +390,17 @@ function matchFilter(p){
   if(F.mode.length&&!F.mode.includes(p.f.participantMode)) return false;
   if(F.product&&!(p.ongoingProducts.includes(F.product)||(f.consumedProducts[F.product]||0)>0||(f.unconsumedProducts[F.product]||0)>0)) return false;
   if(F.ongoing.length&&!p.ongoingProducts.some(id=>F.ongoing.includes(id))) return false;
+  // Live events: attended = participant metadata.productevent; confirmed = an approved participation request
   if(F.events.length){
-    const any=F.events.some(id=>p.attendedEvents.includes(id));
-    if(F.eventsMode==='attended'?!any:any) return false;
+    const hit=F.events.some(id=>{const att=p.attendedEvents.includes(id), conf=!!CONFIRMED.get(id)?.has(p.pid);
+      return F.eventsMode==='attended'?att:F.eventsMode==='confirmed'?conf:att||conf;});
+    if(!hit) return false;
   }
-  if(F.queues.length&&!F.queues.includes(p.queue.name)) return false;
-  if(F.queueStage&&p.queue.stage!==F.queueStage) return false;
+  // Queue: an active + approved token in a picked queue (and, if stages are picked, at one of those stages)
+  if(F.queues.length||F.queueStages.length){
+    const toks=QTOK.get(p.pid)||[];
+    if(!toks.some(t=>(!F.queues.length||F.queues.includes(t.q))&&(!F.queueStages.length||F.queueStages.includes(t.stage)))) return false;
+  }
   if(F.workshops.length&&!F.workshops.includes(p.workshop.name)) return false;
   if(F.workshopState!=='any'){const w=p.workshop;
     if(F.workshopState==='attended'&&!w.attendedSession) return false;
@@ -454,49 +525,50 @@ function renderTeamMain(){
 }
 function renderMain(){
   if(S.loading||S.loadError){
-    $('#main').innerHTML=`<div class="empty">${S.loading?'<h3>Loading segments…</h3><p class="subtle">Reading segmentboardconfig, participant metadata, segmentboardlist, journey and products.</p>'
+    $('#main').innerHTML=`<div class="empty ${S.loading?'is-loading':''}">${S.loading?'<div class="sb-spinner" role="status" aria-label="Loading segments"></div><h3>Loading segments…</h3>'
       :`<h3>Couldn’t load the segments</h3><p class="subtle">${esc(S.loadError)}</p><button class="btn primary" data-act="reload">Try again</button>`}</div>`;
     return;
   }
   if(S.teamId) return renderTeamMain();
   const set=curSet(), t=tally(set), edit=canEdit(set), inSeg=t.total-t.unseg;
-  const sub=set.type==='master'
-    ?'Each segment’s list is built from its conditions when you refresh it, so a participant can be in more than one segment. These drive Breakthroughs app content, mode content and queue delivery.'
-    :'This team’s own segments, separate from the master set. Every participant sits in exactly one of them.';
-  const topReasons=Object.entries(t.reasons).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([r,n])=>`${fmt(n)} · ${REASONS[r].toLowerCase()}`).join('  ·  ');
-  let h=`<div class="freeze">${teamTabs()}<header class="top">
-    <div><div class="eyebrow">Master set · ${plural(set.segments.length,'segment')}</div><h1>${esc(set.name)}</h1><p class="sub">${sub}</p></div>
-    <div class="controls">
-      <label class="ctl" for="roleSel">Preview as <select id="roleSel"><option value="admin">Admin (can edit)</option><option value="team">Team member</option><option value="viewer">Other roles (view only)</option></select></label>
-      <label class="ctl" for="devToggle"><input type="checkbox" id="devToggle" ${S.dev?'checked':''}> Developer notes</label>
+  // header is the screen name plus its actions (no eyebrow or description, operator 2026-10-12); the summary sits under it,
+  // and only the search + filter toolbar stays pinned while the board scrolls
+  const inPct=t.total?inSeg/t.total*100:0, allCollapsed=set.segments.length&&set.segments.every(s=>S.collapsed.has(s.id));
+  let h=`${teamTabs()}<header class="top">
+    <h1>${esc(set.name)}</h1>
+    <div class="top-actions">
+      <div class="tgroup" role="group" aria-label="Records">
+        <button class="btn quiet" data-act="activity" title="Recent activity">${IC.activity}<span>Activity</span></button>
+        ${set.type==='master'?`<button class="btn quiet" data-act="history" title="Change history">${IC.history}<span>Change history</span></button>`:''}
+        <button class="btn quiet" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}" title="Archived segments">${IC.archive}<span>${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</span></button>
+      </div>
+      <button class="btn ${S.refreshing&&S.refreshing.size>1?'is-busy':''}" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''} title="Rebuild every active automated list from its conditions">${IC.refresh}<span>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</span></button>
+      <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>${IC.plus}<span>New segment</span></button>
     </div></header>
   <section class="stats" aria-label="Summary">
-    <div class="stat" data-testid="sgb-stat-total" title="Documents in participant metadata"><b>${fmt(t.total)}</b><span>Participants</span></div>
-    <div class="stat" data-testid="sgb-stat-inseg"><b>${fmt(inSeg)}</b><span>In a segment · ${pct(inSeg,t.total)}</span></div>
-    <button class="stat ${t.unseg?'bad':''}" data-testid="sgb-stat-unseg" data-open="unseg"><b>${fmt(t.unseg)}</b><span>Not in a segment</span></button>
-    <button class="stat ${t.dups?'warn':''}" data-testid="sgb-stat-dups" data-open="dups"><b>${fmt(t.dups)}</b><span>In more than one segment</span></button>
-    ${filtersOn()?`<div class="stat"><b>${fmt(t.ftotal)}</b><span>Match the filters</span></div>`:''}
+    <div class="stat" data-testid="sgb-stat-total" title="Documents in participant metadata"><span class="stat-l">Participants</span><b class="stat-v">${fmt(t.total)}</b><span class="stat-s">across ${plural(set.segments.length,'segment')}</span></div>
+    <div class="stat" data-testid="sgb-stat-inseg"><span class="stat-l">In a segment</span><b class="stat-v">${fmt(inSeg)}</b><span class="stat-s"><span class="meter" style="--p:${inPct.toFixed(1)}%" aria-hidden="true"></span>${pct(inSeg,t.total)} coverage</span></div>
+    <button class="stat ${t.unseg?'bad':''}" data-testid="sgb-stat-unseg" data-open="unseg"><span class="stat-l"><i class="dot" aria-hidden="true"></i>Not in a segment</span><b class="stat-v">${fmt(t.unseg)}</b><span class="stat-s">${pct(t.unseg,t.total)} of participants<span class="go">View${IC.arrowR}</span></span></button>
+    <button class="stat ${t.dups?'warn':''}" data-testid="sgb-stat-dups" data-open="dups"><span class="stat-l"><i class="dot" aria-hidden="true"></i>In more than one segment</span><b class="stat-v">${fmt(t.dups)}</b><span class="stat-s">${t.dups?'':'No overlaps'}<span class="go">View${IC.arrowR}</span></span></button>
     <span class="dev-note">participants = participant metadata docs · lists = segmentboardlist</span>
   </section>
+  <div class="freeze">
   <div class="toolbar">
-    <div class="search"><input id="q" data-testid="sgb-search" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
+    <div class="search">${IC.search}<input id="q" data-testid="sgb-search" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
+    ${filterBar(t)}
     <div class="spacer"></div>
-    <button class="btn" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}">${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</button>
-    <button class="btn" data-act="collapse-all">${set.segments.length&&set.segments.every(s=>S.collapsed.has(s.id))?'Expand all':'Collapse all'}</button>
-    <button class="btn" data-act="activity">Activity</button>
-    ${set.type==='master'?'<button class="btn" data-act="history">Change history</button>':''}
-    <button class="btn" data-act="arrange" ${!edit||!sortableOk||S.arranging?'disabled':''} title="${sortableOk?'':'Drag-and-drop library did not load'}">Arrange</button>
-    <button class="btn" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''}>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</button>
-    <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>New segment</button>
-  </div>`;
-  h+=filterBar(t)+'</div><div class="board-scroll">';
+    <div class="tgroup" role="group" aria-label="Layout">
+      <button class="btn quiet" data-act="collapse-all" title="${allCollapsed?'Open every card to show its list':'Fold every card down to its title'}">${IC.collapse}<span>${allCollapsed?'Expand all':'Collapse all'}</span></button>
+      <button class="btn quiet" data-act="arrange" ${!edit||!sortableOk||S.arranging?'disabled':''} title="${sortableOk?'Drag cards into the order everyone sees':'Drag-and-drop library did not load'}">${IC.arrange}<span>${S.arranging?'Arranging…':'Arrange cards'}</span></button>
+    </div>
+  </div>
+  ${appliedBar(t)}
+  </div><div class="board-scroll">`;
   if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
-  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange segments</b><p>Drag a segment by its <b>card header</b> into the order you want. This changes the layout for everyone and never changes who is in which segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
+  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange cards</b><p>Cards are folded so they are easy to move. Grab a card anywhere on its title row and drop it where you want it, then <b>Save arrangement</b>. Everyone sees the new order; nobody changes segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
     <div class="acts"><button class="btn" data-act="arr-reset">Reset to default</button><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
-  h+=`<div class="attn">
-    <button class="attn-tile ${t.unseg?'':'ok'}" data-open="unseg" data-drop="__UNSEG__"><b>${fmt(t.unseg)}</b><div><div class="t">Not in a segment</div><div class="d">${t.unseg?esc(topReasons):'Everyone is in a segment'}</div></div></button>
-    <button class="attn-tile warn ${t.dups?'':'ok'}" data-open="dups"><b>${fmt(t.dups)}</b><div><div class="t">In more than one segment</div><div class="d">${t.dups?'Their data matches the conditions of two or more segments':'Nobody is in two segments'}</div></div></button>
-  </div>`;
+  // the "Not in a segment" / "In more than one segment" row is gone; the same two numbers open from the stats tiles above
+  const boardAt=h.length;   // the Archived view replaces everything from here on
   if(!set.segments.length){
     h+=`<div class="empty"><h3>No segments yet</h3><p class="subtle">Everyone is Unsegmented until you add segments.</p>${edit?'<button class="btn primary" data-act="new-seg">Create the first segment</button>':''}</div>`;
   } else {
@@ -505,15 +577,16 @@ function renderMain(){
     h+=!segs.length?`<div class="empty"><h3>No segment has a participant matching “${esc(S.qRaw)}”</h3><p class="subtle">Search looks at names and emails in the saved segment lists.</p></div>`
       :`<div class="${S.arranging?'arranging':''}" id="groups"><div class="cards">${segs.map(x=>segCard(set,x,t)).join('')}</div></div>`;
   }
-  if(S.showArchived) h=h.replace(/<div class="attn">[\s\S]*$/,'')+archivedHtml();
+  if(S.showArchived) h=h.slice(0,boardAt)+archivedHtml();
   $('#main').innerHTML=h+'</div>';
-  $('#roleSel').value=S.role;
 }
 function checkList(key,map){
-  const picked=S.filters[key];
-  return `<div class="ms-tools"><button type="button" data-fall="${key}:1">Select all</button><button type="button" data-fall="${key}:0">Clear</button>
-      <span class="subtle small">${picked.length} of ${Object.keys(map).length}</span></div>
-    <div class="checks">${Object.entries(map).map(([v,l])=>`<label><input type="checkbox" data-fk="${key}" value="${v}" ${picked.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div>`;
+  const picked=S.filters[key], n=Object.keys(map).length;
+  // long lists (journeys, products, modes) get a search box; the existing .ms-q handler hides labels that don't match
+  return `${n>8?`<input type="search" class="ms-q" placeholder="Search" aria-label="Search options" autocomplete="off">`:''}
+    <div class="ms-tools"><button type="button" data-fall="${key}:1">Select all</button><button type="button" data-fall="${key}:0">Clear</button>
+      <span class="subtle small">${picked.length} of ${n}</span></div>
+    <div class="checks">${Object.entries(map).map(([v,l])=>`<label data-name="${esc(String(l).toLowerCase())}"><input type="checkbox" data-fk="${key}" value="${v}" ${picked.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div>`;
 }
 function countDrop(k,title){   // uP! / CPM attended filter: pick products, then at least / at most / exactly / between
   const F=S.filters, op=F[k+'Op'], on=countOn(F,k), W=Object.fromEntries(COUNT_OPS), id=k==='up'?'fUp':'fCpm';
@@ -526,34 +599,59 @@ function countDrop(k,title){   // uP! / CPM attended filter: pick products, then
     ${F[k+'Products'].length?'':'<p class="subtle small" style="margin:8px 0 0">Pick at least one product to count.</p>'}`);
 }
 function fdrop(key,label,on,panel){
-  return `<details class="fdrop" data-on="${on?1:0}" data-drop="${key}"><summary>${esc(label)}</summary><div class="fpanel">${panel}</div></details>`;
+  // "Journey: uP!" renders as a muted name and a value; a filter with nothing picked reads "Any"
+  const i=label.indexOf(': '), name=i<0?label:label.slice(0,i), val=i<0?'Any':label.slice(i+2);
+  return `<details class="fdrop" data-on="${on?1:0}" data-drop="${key}"><summary><span class="fl-n">${esc(name)}</span><span class="fl-v">${esc(val)}</span></summary><div class="fpanel">${panel}</div></details>`;
+}
+// which filter fields each control owns, so one applied filter can be removed on its own
+const FILTER_KEYS={journey:['journey'],customer:['customer'],finance:['finance'],product:['product','mode'],ongoing:['ongoing'],age:['ageMin','ageMax'],
+  upCnt:['upProducts','upOp','upN','upN2'],cpmCnt:['cpmProducts','cpmOp','cpmN','cpmN2'],events:['events','eventsMode'],queues:['queues','queueStages']};
+const PARSE=html=>{const d=document.createElement('div'); d.innerHTML=html; return d;};
+// the applied filters, each removable, under the toolbar; only shown while something narrows the board
+function appliedBar(t){
+  if(!filtersOn()) return '';
+  const chips=$$('.fdrop[data-on="1"]',PARSE(filterBar(t))).map(d=>{const n=d.querySelector('.fl-n').textContent, v=d.querySelector('.fl-v').textContent;
+    return `<span class="achip"><span class="fl-n">${esc(n)}</span><span class="fl-v">${esc(v)}</span><button class="achip-x" data-fclear="${d.dataset.drop}" aria-label="Remove the ${esc(n)} filter" title="Remove">${IC.close}</button></span>`;});
+  return `<div class="applied" aria-live="polite"><span class="applied-n">Showing <b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants</span>${chips.join('')}
+    ${filtersActive()?'<button class="btn link" data-testid="sgb-clear-filters" data-act="clear-filters">Clear all</button>':''}</div>`;
 }
 function filterBar(t){
-  const F=S.filters, sel=(a,all)=>a.length?`${a.length} selected`:all;
+  // a chip names what is picked: "Journey: uP!" or "Journey: uP! +2"
+  const F=S.filters, sel=(a,all,map)=>!a.length?all:`${map&&map[a[0]]||a[0]}${a.length>1?` +${a.length-1}`:''}`;
   const bar=[
-    fdrop('journey',`Journey: ${sel(F.journey,'All')}`,F.journey.length,checkList('journey',VAL.journeyId)),
-    fdrop('customer',`Customer status: ${sel(F.customer,'All')}`,F.customer.length,checkList('customer',VAL.customerStatus)),
-    fdrop('finance',`Finance status: ${sel(F.finance,'All')}`,F.finance.length,checkList('finance',VAL.financeStatus)),
-    fdrop('product',`Product + Mode${F.product?': '+PROD[F.product]:''}${F.mode.length?' · '+sel(F.mode,''):''}`,F.product||F.mode.length,
+    fdrop('journey',`Journey: ${sel(F.journey,'All',VAL.journeyId)}`,F.journey.length,checkList('journey',VAL.journeyId)),
+    fdrop('customer',`Customer status: ${sel(F.customer,'All',VAL.customerStatus)}`,F.customer.length,checkList('customer',VAL.customerStatus)),
+    fdrop('finance',`Finance status: ${sel(F.finance,'All',VAL.financeStatus)}`,F.finance.length,checkList('finance',VAL.financeStatus)),
+    fdrop('product',`Product + Mode${F.product?': '+PROD[F.product]:''}${F.mode.length?' · '+sel(F.mode,'',VAL.participantMode):''}`,F.product||F.mode.length,
       `<label class="f" for="fProd">Product</label><select id="fProd" data-fk="product"><option value="">Any product</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===F.product?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
        <label class="f">Participant mode</label>${checkList('mode',VAL.participantMode)}
        <p class="subtle small" style="margin:8px 0 0">Combines a product with the participant's current mode, like the participants product screen.</p>`),
-    fdrop('ongoing',`Ongoing product: ${sel(F.ongoing,'Any')}`,F.ongoing.length,
+    fdrop('ongoing',`Ongoing product: ${sel(F.ongoing,'Any',PROD)}`,F.ongoing.length,
       checkList('ongoing',PROD)+`<p class="subtle small" style="margin:8px 0 0">Products that are ongoing or initiated right now.</p>`),
     fdrop('age',`Age: ${F.ageMin===''&&F.ageMax===''?'Any':`${F.ageMin===''?'0':F.ageMin}–${F.ageMax===''?'∞':F.ageMax}`}`,F.ageMin!==''||F.ageMax!=='',
       `<label class="f" for="fAgeMin">From</label><input id="fAgeMin" type="number" min="0" data-fk="ageMin" value="${F.ageMin}" placeholder="0">
        <label class="f" for="fAgeMax">To</label><input id="fAgeMax" type="number" min="0" data-fk="ageMax" value="${F.ageMax}" placeholder="99">`),
+    fdrop('events',`Live events: ${sel(F.events,'Any',EVENT_NAME)}${F.events.length&&F.eventsMode!=='any'?` · ${F.eventsMode==='attended'?'attended':'confirmed'}`:''}`,F.events.length,
+      `<label class="f">Status</label>
+       <div class="seg-toggle ev-mode" role="radiogroup" aria-label="Participation status">${[['any','Confirmed or attended'],['confirmed','Confirmed'],['attended','Attended']].map(([v,l])=>
+         `<label><input type="radio" name="fEvMode" data-fk="eventsMode" value="${v}" ${F.eventsMode===v?'checked':''}>${l}</label>`).join('')}</div>
+       ${confirmedLoading?'<p class="subtle small" style="margin:8px 6px 0">Loading confirmed registrations…</p>':''}
+       <label class="f">Events</label>${checkList('events',EVENT_NAME)}
+       <p class="subtle small" style="margin:8px 6px 0">Attended comes from the participant’s attended events; confirmed is an approved participation request.</p>`),
+    fdrop('queues',`Queue: ${sel(F.queues,'Any',QUEUE_NAME)}${F.queueStages.length?` · ${sel(F.queueStages,'')}`:''}`,F.queues.length||F.queueStages.length,
+      `<label class="f">Queues</label>${checkList('queues',QUEUE_NAME)}
+       ${F.queues.length?`<label class="f">Stage <span class="opt">optional</span></label>${checkList('queueStages',stageOptions())}`:'<p class="subtle small" style="margin:8px 6px 0">Pick a queue to narrow by its stage.</p>'}
+       <p class="subtle small" style="margin:8px 6px 0">Active, approved queue tokens.</p>`),
     countDrop('up','uP! events'),
     countDrop('cpm','CPM events')
   ].join('');
-  return `<section class="filters" aria-label="Filters"><span class="flabel">Filter</span>${bar}
-    <span class="fsum">${filtersOn()?`<b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants match <button class="btn ghost" data-testid="sgb-clear-filters" data-act="clear-filters">Clear filters</button>`:`<span class="subtle">Filters narrow what you see and who an action applies to. They never change who is in which segment.</span>`}</span>
-    <span class="dev-note">events / queues / workshops are read from their own screens by id</span></section>`;
+  return `<section class="filters" aria-label="Filters"><span class="flabel">${IC.filter}<span>Filter</span></span>${bar}</section>`;
 }
 const ICON_COLORS=['#4c769d','#6a4c9d','#1a7a6d','#9d6a4c','#4c9d68','#9d4c78','#3f5ea8','#7a6a1a'];
 const colorFor=g=>ICON_COLORS[[...g].reduce((a,c)=>a+c.charCodeAt(0),0)%ICON_COLORS.length];
+const initials=n=>String(n).split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
 function prow(set,p,m,edit){
-  return `<div class="prow" data-pid="${p.pid}" ${edit?'draggable="true"':''}><span class="pav">${esc(p.name[0])}</span>
+  return `<div class="prow" data-pid="${p.pid}" ${edit?'draggable="true"':''}><span class="pav" style="--av:${colorFor(p.name)}">${esc(initials(p.name))}</span>
     <span class="nm"><div>${esc(p.name)}${m.pinned?LOCK:''}</div><div class="subtle small">${esc(p.journey)}</div></span>
     ${m.warning?'<span class="chip warn">Not eligible</span>':''}</div>`;
 }
@@ -567,40 +665,35 @@ function segCard(set,s,t){
       :L?`<span class="chip" title="Last refreshed">Updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):''}</span>`:'<span class="chip warn">List not refreshed</span>');}
   else{const L=LISTS.get(s.id); if(L?.lastupdated) chips.push(`<span class="chip" title="Last changed">Updated ${esc(TIME.format(L.lastupdated))}</span>`);}
   if(w) chips.push(`<span class="chip warn">${fmt(w)} not eligible</span>`);
-  if(lost&&s.mode==='auto') chips.push(`<span class="chip" title="Match this segment’s conditions but are placed in a higher-ranked or manual segment">+${fmt(lost)} placed elsewhere</span>`);
+  if(lost&&s.mode==='auto') chips.push(`<span class="chip" title="Match this segment’s conditions but are placed in a manual segment">+${fmt(lost)} placed elsewhere</span>`);
   if(s.sourceSegmentId) chips.push('<span class="chip">From master</span>');
   if(s.contentRules&&s.contentRules.length) chips.push(`<span class="chip" title="${esc(s.contentRules.join(' · '))}">${plural(s.contentRules.length,'content rule')}</span>`);
   chips.push(`<span class="dev-note">${s.id}${s.mode==='auto'?' · sequence '+s.sequence:''}</span>`);
   let body;
-  if(view==='rules') body=`<div style="padding:4px 6px">${conditionsHtml(set,s,true)}</div>`;
+  // conditions open as a panel inside the card with its own close button; the header toggle closes it too
+  if(view==='rules') body=`<div class="cond-view"><div class="cond-head"><b>Conditions</b><button class="icon-btn" data-cardtab="${s.id}" aria-label="Close conditions" title="Close conditions">${IC.close}</button></div>${conditionsHtml(set,s,true)}</div>`;
   else{
     const mm=MEM[set.id], rows=[];
     for(const p of P){const m=mm.get(p.pid); if(m.segs.includes(s.id)&&inFilter(p.pid)){rows.push(prow(set,p,m,edit&&MEMBERSHIP_EDIT)); if(rows.length>=25) break;}}
     body=rows.length?rows.join('')+(fn>rows.length?`<div class="card-empty">${plural(fn-rows.length,'more participant')}</div>`:'')
       :`<div class="card-empty">${s.mode==='auto'&&!LISTS.has(s.id)?'List not built yet. Use <b>Refresh list</b> to build it from the conditions.':filtersOn()?'No one here matches the filters.':s.mode==='manual'?'No one added yet. Use <b>Add</b> to pick participants.':'No participant matches these conditions right now.'}</div>`;
   }
-  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(s.id)?'picked':''} ${s.status==='inactive'?'inactive':''}" style="--icon:${colorFor(s.id)}" data-testid="sgb-card" data-seg="${s.id}" data-drop="${s.id}">
+  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(s.id)?'picked':''} ${s.status==='inactive'?'inactive':''}" style="--icon:${s.mode==='manual'?'var(--manual)':'var(--accent)'}" data-testid="sgb-card" data-seg="${s.id}" data-drop="${s.id}">
     <div class="card-h" ${S.arranging?'':`tabindex="0" role="button" aria-label="Open ${esc(s.name)}"`}>
-      ${S.arranging?'<span class="handle c-handle" title="Drag segment"></span>':`<input type="checkbox" class="cardsel" data-cardsel="${s.id}" ${S.cardSel.has(s.id)?'checked':''} aria-label="Select ${esc(s.name)} for an action">`}
+      ${S.arranging?`<span class="handle c-handle" title="Drag to move" aria-hidden="true">${IC.grip}</span>`:`<input type="checkbox" class="cardsel" data-cardsel="${s.id}" ${S.cardSel.has(s.id)?'checked':''} aria-label="Select ${esc(s.name)} for an action">`}
       <div class="card-icon" aria-hidden="true">${esc(s.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
-      <div class="card-info"><div class="card-title" data-testid="sgb-card-title">${esc(s.name)}</div>
-        <button class="card-count" data-cardtab="${s.id}">${filtersOn()?`${fmt(fn)} of ${fmt(n)} match`:plural(n,'participant')} · ${view==='people'?'conditions':'list'}</button></div>
-      <div class="card-acts">${edit?`<button class="icon-btn" data-testid="sgb-card-edit" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">✎</button>`:''}
-        <button class="icon-btn collapse-btn" data-collapse="${s.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(s.name)}" title="${collapsed?'Expand':'Collapse'}">⌄</button></div>
+      <div class="card-info"><div class="card-title" data-testid="sgb-card-title" title="${esc(s.name)}">${esc(s.name)}</div>
+        <div class="card-meta"><span class="card-n">${filtersOn()?`<b>${fmt(fn)}</b> of ${fmt(n)} match`:`<b>${fmt(n)}</b> participant${n===1?'':'s'}`}</span></div></div>
+      <div class="card-acts"><button class="icon-btn card-count" data-cardtab="${s.id}" aria-pressed="${view!=='people'}" aria-label="${view==='people'?'Show':'Hide'} the conditions of ${esc(s.name)}" title="${view==='people'?'Show conditions':'Hide conditions'}">${IC.rules}</button>${edit?`<button class="icon-btn" data-testid="sgb-card-edit" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">${IC.edit}</button>`:''}
+        <button class="icon-btn collapse-btn" data-collapse="${s.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(s.name)}" title="${collapsed?'Expand':'Collapse'}">${IC.chev}</button></div>
     </div>
     ${s.description?`<div class="card-desc" title="${esc(s.description)}">${esc(s.description)}</div>`:''}
     <div class="card-chips">${chips.join('')}</div>
     <div class="card-body">${body}</div>
     <div class="card-f">
-      <button class="btn" data-testid="sgb-card-viewall" data-openseg="${s.id}">View all</button>
-      ${s.mode==='auto'?`<button class="btn" data-testid="sgb-card-refresh" data-act="refresh-list" data-seg="${s.id}" ${!canEdit(set)||S.arranging||S.refreshing||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Build this list from the conditions and store it'}">${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</button>`:''}
-      ${s.mode==='manual'?`<button class="btn" data-testid="sgb-card-add" data-act="add-people" data-seg="${s.id}" ${!edit||S.arranging||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Pick participants to add to this segment'}">Add</button>`:''}
-      <details class="fdrop menu"><summary class="btn">Actions</summary><div class="fpanel menu-panel">
-        <div class="subtle small" style="padding:2px 6px 6px">Applies to ${filtersOn()?`the ${fmt(fn)} filtered participants`:plural(n,'participant')} in this segment</div>
-        <button class="menu-item" data-act="comm" data-seg="${s.id}">Send communication</button>
-        <button class="menu-item" data-act="content" data-seg="${s.id}">Recommend content</button>
-        <button class="menu-item" data-act="appaction" data-seg="${s.id}">Assign app action</button>
-      </div></details>
+      <button class="btn secondary" data-testid="sgb-card-viewall" data-openseg="${s.id}"><span>View all</span>${IC.arrowR}</button>
+      ${s.mode==='auto'?`<button class="btn tertiary ${S.refreshing?.has(s.id)?'is-busy':''}" data-testid="sgb-card-refresh" data-act="refresh-list" data-seg="${s.id}" ${!canEdit(set)||S.arranging||S.refreshing||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Build this list from the conditions and store it'}">${IC.refresh}<span>${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</span></button>`:''}
+      ${s.mode==='manual'?`<button class="btn tertiary" data-testid="sgb-card-add" data-act="add-people" data-seg="${s.id}" ${!edit||S.arranging||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Pick participants to add to this segment'}">${IC.plus}<span>Add</span></button>`:''}
     </div></article>`;
 }
 
@@ -636,7 +729,7 @@ function exportList(){
   const cp=countProducts(set,d), cnt=(p,k)=>cp[k]?sumConsumed(p.f,cp[k]):'';
   const seg=d.kind==='seg'?set._by.get(d.id):null, L=seg?LISTS.get(seg.id):null;
   const title=seg?seg.name:d.kind==='dups'?'In more than one segment':'Not in a segment';
-  const extra=seg&&seg.mode==='auto'?['Saved list',(p)=>L?.ids.has(p.pid)?'In list':'Not saved yet']
+  const extra=seg&&seg.mode==='auto'?['In list',(p)=>L?.ids.has(p.pid)?'Yes':'Not in list yet']
     :d.kind==='dups'?['In segments',(p,m)=>m.segs.map(id=>segName(set,id)).join('; ')]
     :d.kind==='unseg'?['Why',(p,m)=>REASONS[m.reason]||'']:null;
   const head=['Profile ID','Name','Journey','Participant mode','Customer status','Finance status','Onboarding','uP! events','CPM events','Age',...(extra?[extra[0]]:[])];
@@ -797,7 +890,7 @@ function conditionsHtml(set,s,compact){
   const ex=expand(s.rule), any=!!ex.any, items=ex.any||ex.all;
   return `${jline}${items.length?`<h4>Placed here when ${any?'<em>any</em>':'<em>all</em>'} of these are true</h4>
     <ul class="rules">${items.map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>`:'<p class="subtle small">No other conditions: everyone in this journey is placed here.</p>'}
-    <p class="subtle small">Segments are checked in sequence order${s.sequence?` (this one is ${s.sequence})`:''}. If someone also matches a segment earlier in the sequence, they go there instead.</p>
+    <p class="subtle small">${s.sequence?`Sequence ${s.sequence}. `:''}Everyone who matches these conditions is in this list, even if they also match another segment. People placed in a manual segment are left out.</p>
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
@@ -832,11 +925,11 @@ function renderDrawer(fresh){
     if(d.tab==='rules') content=conditionsHtml(set,s);
     else if(d.tab==='elsewhere'){ tools=`<p class="subtle small" style="margin:0">These participants match this segment’s conditions, but sit in a segment that ranks higher or were placed by hand.</p>`; content=tableHtml(set,d,drawerRows(set,d),{h:'Placed in',cell:(p,m)=>esc(segName(set,m.segmentId))}); }
     else if(auto){
-      const sync=!L?'The list hasn’t been saved yet.':(saved===n&&inBoth===n)?`The saved list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
-        :`The saved list has ${fmt(saved)} (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'—'}): ${fmt(n-inBoth)} new match${n-inBoth===1?'':'es'} not in it, ${fmt(saved-inBoth)} in it that no longer match.`;
+      const sync=!L?'The list hasn’t been refreshed yet.':(saved===n&&inBoth===n)?`The stored list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
+        :`The stored list has ${fmt(saved)} (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'—'}): ${fmt(n-inBoth)} new match${n-inBoth===1?'':'es'} not in it, ${fmt(saved-inBoth)} in it that no longer match.`;
       tools=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="subtle small" style="margin:0;flex:1;min-width:220px">Everyone who matches the conditions right now. ${sync}${pinnedOut?` ${plural(pinnedOut,'more participant')} match${pinnedOut===1?'es':''} but ${pinnedOut===1?'is':'are'} in a manual segment, so ${pinnedOut===1?'is':'are'} left out.`:''}</p>
-        ${canEdit(set)&&s.status!=='inactive'?`<button class="btn" data-testid="sgb-drawer-save-list" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''}>${S.refreshing?.has(s.id)?'Saving…':'Save as list'}</button>`:''}</div>`;
-      content=tableHtml(set,d,drawerRows(set,d),{h:'Saved list',cell:(p)=>L?.ids.has(p.pid)?'In list':'<span class="chip warn">Not saved yet</span>'});
+        ${canEdit(set)&&s.status!=='inactive'?`<button class="btn ${S.refreshing?.has(s.id)?'is-busy':''}" data-testid="sgb-drawer-save-list" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''} title="Build this list from the conditions and store it">${IC.refresh}<span>${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</span></button>`:''}</div>`;
+      content=tableHtml(set,d,drawerRows(set,d),{h:'In list',cell:(p)=>L?.ids.has(p.pid)?'In list':'<span class="chip warn">Not in list yet</span>'});
     }
     else content=tableHtml(set,d,drawerRows(set,d));
   } else if(d.kind==='group'){
@@ -919,12 +1012,7 @@ function actionsWidget(scopeAttr){
       <button class="commbtn" data-act="comm" data-ch="Email" ${scopeAttr} title="Email">${ICON.email}<span>Email</span></button>
       <button class="commbtn" data-act="comm" data-ch="App notification" ${scopeAttr} title="App notification">${ICON.app}<span>App</span></button>
     </div>
-    <button class="btn primary" data-act="content" ${scopeAttr}>${ICON.content} Recommend content</button>
-    <details class="fdrop"><summary class="btn icon-only" title="More actions" aria-label="More actions">${ICON.more}</summary>
-      <div class="fpanel menu-panel up">
-        <button class="menu-item" data-act="appaction" ${scopeAttr}>App action pending</button>
-        <div class="subtle small" style="padding:6px 8px 2px">More actions can be added here later.</div>
-      </div></details>
+    <button class="btn primary" data-act="content" ${scopeAttr}>${ICON.content} Recommend playlist</button>
   </div>`;
 }
 function renderSelBar(){
@@ -1102,9 +1190,8 @@ function renderSegDlg(){
     h.push(`<label class="f">Conditions</label>
       <div id="conds">${B.rows.map(rowHtml).join('')}</div><button type="button" class="btn ghost" data-testid="sgb-dlg-add-cond" data-b="add">+ Add condition</button>
       <div class="preview" id="sPrev" aria-live="polite"></div>`);
-    if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Segments are checked from top to bottom, and a participant goes into the first one they match. Drag the new segment, or use the arrows, to set where it is checked.</p><div id="seqBox"></div>`);
+    if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Sets this segment’s place in the order of automated segments. Each segment’s list holds everyone who matches its conditions, so a participant can be in more than one segment; the order doesn’t move anyone. Drag the new segment, or use the arrows, to set its place.</p><div id="seqBox"></div>`);
   } else h.push(`<div class="info">A manual segment starts empty. Move participants in from any segment, by drag and drop or with “Move to…”.${B.eligibility?' It keeps the copied eligibility conditions, so you’ll see a warning when someone no longer qualifies.':''}</div>`);
-  h.push(`<details class="store" open><summary>Stored as <span>· segmentboardconfig/{id}</span></summary><pre id="sJson" data-testid="sgb-dlg-stored"></pre></details>`);
   h.push(`</div><div class="dlg-f"><span class="err" id="sErr"></span>${B.mode==='edit'?'<button class="btn" id="sArchive" data-testid="sgb-dlg-archive">Archive segment</button>':''}<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="sGo" data-testid="sgb-dlg-save">${B.mode==='edit'?'Save changes':'Create segment'}</button></div>`);
   $('#segDlg .dlg').innerHTML=h.join('');
   renderSeq(); updatePreview();
@@ -1121,7 +1208,7 @@ function renderSeq(){
     if(id!==NEW_ID){const x=set._by.get(id); return `<li class="seq-item ${x.status==='inactive'?'off':''}" data-sid="${id}"><span class="seq-n">${i+1}</span><span class="grow">${esc(x.name)}${x.status==='inactive'?' · inactive':''}</span></li>`;}
     return `<li class="seq-item new" data-sid="${NEW_ID}"><span class="seq-n">${i+1}</span><span class="seq-handle" aria-hidden="true" title="Drag">⠿</span><span class="grow" id="seqNewName">${esc(B.name.trim()||'New segment')}</span>
       <button type="button" class="icon-btn" data-seqmv="-1" aria-label="Move up" ${i===0?'disabled':''}>↑</button><button type="button" class="icon-btn" data-seqmv="1" aria-label="Move down" ${i===last?'disabled':''}>↓</button></li>`;}).join('')}</ol>`;
-  if(sortableOk) seqSort=new Sortable($('#seqList'),{handle:'.seq-handle',animation:150,onEnd:()=>{B.order=$$('#seqList .seq-item').map(li=>li.dataset.sid);renderSeq();renderStore();}});
+  if(sortableOk) seqSort=new Sortable($('#seqList'),{handle:'.seq-handle',animation:150,onEnd:()=>{B.order=$$('#seqList .seq-item').map(li=>li.dataset.sid);renderSeq();}});
   const n=$('#seqList .seq-item.new'); if(n) n.scrollIntoView({block:'nearest'});
 }
 const jHint=()=>{const t=SCOPE[B.scope.type];
@@ -1161,7 +1248,7 @@ function seqShifts(set){   // existing segments whose sequence changes when the 
 function segIdFor(set,name){   // id from the name, made unique within the set
   let id=name.toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,24)||'SEG'; while(set._by.has(id)||ARCHIVED_IDS.has(id)) id+='_2'; return id;
 }
-function buildDoc(){   // the Firestore document this dialog saves, exactly as shown in "Stored as"
+function buildDoc(){   // the Firestore document this dialog saves
   const set=curSet(), name=B.name.trim(), desc=B.description.trim(), edit=B.mode==='edit';
   const doc={id:edit?B.id:(name?segIdFor(set,name):'<from name>'), name};
   if(desc) doc.description=desc;
@@ -1175,14 +1262,7 @@ function buildDoc(){   // the Firestore document this dialog saves, exactly as s
   Object.assign(doc,edit?{updatedAt:'<serverTimestamp>',updatedBy:'<your email>'}:{createdAt:'<serverTimestamp>',createdBy:'<your email>'});
   return doc;
 }
-function renderStore(){
-  const el=$('#sJson'); if(!el) return;
-  let txt=JSON.stringify(buildDoc(),null,2);
-  if(B.mode==='create'&&B.type==='auto'){const k=seqShifts(curSet()); if(k) txt+=`\n\n// also updates ${k} segment${k===1?'':'s'} below it: sequence + 1`;}
-  el.textContent=txt;
-}
 function updatePreview(){
-  renderStore();
   const el=$('#sPrev'); if(!el) return;
   const v=validRule(); el.hidden=v===true; el.innerHTML=v===true?'':`<span class="subtle">${esc(v)}</span>`;
 }
@@ -1318,9 +1398,9 @@ let ACT=null;
 function actionTargets(scope){
   const mm=MEM.master, uniq=new Set();
   if(scope.groups){for(const id of scope.groups){const g=curTeam().groups.find(x=>x.id===id); if(g) groupPids(g).forEach(p=>uniq.add(p.pid));} return [...uniq];}
-  if(scope.segs){for(const p of P){const m=mm.get(p.pid); if(m.segmentId&&scope.segs.includes(m.segmentId)&&inFilter(p.pid)) uniq.add(p.pid);} return [...uniq];}
+  if(scope.segs){for(const p of P){const m=mm.get(p.pid); if(m.segs.some(id=>scope.segs.includes(id))&&inFilter(p.pid)) uniq.add(p.pid);} return [...uniq];}
   if(scope.group){const g=curTeam().groups.find(x=>x.id===scope.group); return groupPids(g).map(p=>p.pid);}
-  if(scope.seg) return P.filter(p=>mm.get(p.pid).segmentId===scope.seg&&inFilter(p.pid)).map(p=>p.pid);
+  if(scope.seg) return P.filter(p=>mm.get(p.pid).segs.includes(scope.seg)&&inFilter(p.pid)).map(p=>p.pid);
   return [...S.sel];
 }
 function scopeLabel(scope){
@@ -1373,6 +1453,17 @@ standing rule: stored on the segment; the membership trigger writes/removes the 
     <div class="dlg-b">${body}</div>
     <div class="dlg-f"><span class="err" id="actErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="actGo">${kind==='comm'?'Send':kind==='content'?'Recommend':'Assign'}</button></div>`;
   $('#actDlg').showModal();
+}
+// Send communication / Recommend playlist: the same dialogs as the B!G Cohorts dashboard, opened by the component
+const CHANNEL={'WhatsApp':'whatsapp','Email':'email','App notification':'app'};
+function sendReal(kind,scope,channel){
+  if(!canEdit(curSet())) return;
+  const pids=actionTargets(scope); if(!pids.length) return toast('No participants to act on.');
+  const run=kind==='comm'?store.communicate(CHANNEL[channel]||'app',pids):store.recommendPlaylist(pids);
+  run.then(text=>{ if(!text) return;
+    ACTIVITY.unshift({at:Date.now(),by:who(),setId:curSet().id,kind,segId:scope.seg||null,count:pids.length,text:`${text} · ${scopeLabel(scope)}`});
+    if(S.drawer?.kind==='activity') renderDrawer(); })
+   .catch(e=>toast(`Couldn’t send: ${e?.message||e}`));
 }
 function doAction(){
   const set=curSet(), k=ACT.kind, n=ACT.pids.length; let text='';
@@ -1571,7 +1662,7 @@ listen(root,'click',e=>{
     if(dlg.id==='segDlg'){
       const mv=t.closest('[data-seqmv]');
       if(mv){const i=B.order.indexOf(NEW_ID), j=i+(+mv.dataset.seqmv);
-        if(j>=0&&j<B.order.length){[B.order[i],B.order[j]]=[B.order[j],B.order[i]]; renderSeq(); renderStore(); $('#seqList .seq-item.new [data-seqmv="'+mv.dataset.seqmv+'"]')?.focus();}
+        if(j>=0&&j<B.order.length){[B.order[i],B.order[j]]=[B.order[j],B.order[i]]; renderSeq(); $('#seqList .seq-item.new [data-seqmv="'+mv.dataset.seqmv+'"]')?.focus();}
         return;}
       const ps=t.closest('[data-psall]');
       if(ps){const row=ps.closest('.cond'), r=B.rows[+row.dataset.i], on=ps.dataset.psall==='1', picked=new Set(r.products||[]);
@@ -1632,7 +1723,8 @@ listen(root,'click',e=>{
     else if(act==='remove-from-seg') removeFromSeg(a.dataset.seg);
     else if(['comm','content','appaction'].includes(act)){$$('.fdrop[open]').forEach(d=>d.open=false);
       const scope=a.dataset.multi?(S.teamId?{groups:[...S.cardSel]}:{segs:[...S.cardSel]}):{seg:a.dataset.seg||null,group:a.dataset.group||null};
-      openAction(act,scope,a.dataset.ch||null);}
+      if(act==='appaction') openAction(act,scope,a.dataset.ch||null);
+      else sendReal(act,scope,a.dataset.ch||null);}
     else if(act==='activity') openDrawer({kind:'activity'});
     else if(act==='new-group') openGroupDlg('create');
     else if(act==='edit-group') openGroupDlg('edit',a.dataset.group);
@@ -1641,16 +1733,19 @@ listen(root,'click',e=>{
     else if(act==='collapse-all'){const items=S.teamId?curTeam().groups:set.segments; const all=items.every(x=>S.collapsed.has(x.id));
       items.forEach(x=>all?S.collapsed.delete(x.id):S.collapsed.add(x.id)); render();}
     else if(act==='arrange'){closeDrawer();S.arranging=true;S.prevCollapsed=new Set(S.collapsed);(S.teamId?curTeam().groups:set.segments).forEach(x=>S.collapsed.add(x.id));render();
-      toast('Cards are collapsed so they are easy to drag. Drag a card by its header, a group by its title.');}
+      toast('Drag cards by their title row, then Save arrangement.');}
     else if(act==='arr-cancel'){S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
     else if(act==='arr-reset'){set.displayOrder=clone(set.defaultDisplayOrder);render();toast('Back to the default layout. Save to keep it.');}
     else if(act==='arr-save'){if(S.teamId){const ids=$('#groups .card').map(c=>c.dataset.groupId);const team=curTeam();team.groups.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));}else{const ids=readOrder(); store.saveDisplayOrder(ids).then(()=>{set.displayOrder=ids;S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();toast(`Arrangement saved for everyone in ${set.name}.`);}).catch(e=>toast(`Couldn’t save the arrangement: ${e?.message||e}`)); return;}S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
     return;
   }
+  const fc=t.closest('[data-fclear]');
+  if(fc){const def=emptyFilters(); for(const k of FILTER_KEYS[fc.dataset.fclear]||[]) S.filters[k]=def[k]; refreshFilter(); render(); return;}
   const fa=t.closest('[data-fall]');
   if(fa){const [key,on]=fa.dataset.fall.split(':');
     S.filters[key]= on==='1' ? Object.keys(OPTS[key]()) : [];
-    refreshFilter(); render(); const d=$(`.fdrop[data-drop="${key}"]`); if(d) d.open=true; return;}
+    if(key==='queues'){const ok=stageOptions(); S.filters.queueStages=S.filters.queueStages.filter(x=>ok[x]);}
+    refreshFilter(); render(); if(key==='events') setTimeout(ensureConfirmed); const d=$(`.fdrop[data-drop="${key}"]`); if(d) d.open=true; return;}
   const ct=t.closest('[data-cardtab]'); if(ct){const id=ct.dataset.cardtab;S.cardView[id]=(S.cardView[id]||'people')==='people'?'rules':'people';renderMain();updateBulk();return;}
   const cs=t.closest('[data-cardsel]'); if(cs){toggleCardSel(cs.dataset.cardsel);return;}
   const cb=t.closest('[data-collapse]'); if(cb){const id=cb.dataset.collapse;S.collapsed.has(id)?S.collapsed.delete(id):S.collapsed.add(id);render();updateBulk();return;}
@@ -1686,11 +1781,15 @@ listen(root,'change',e=>{
     return;
   }
   if(t.dataset.fk){
-    const k=t.dataset.fk, F=S.filters, open=t.closest('.fdrop')?.dataset.drop;
+    const k=t.dataset.fk, F=S.filters, open=t.closest('.fdrop')?.dataset.drop, fq=t.closest('.fpanel')?.querySelector('.ms-q')?.value||'';
     if(Array.isArray(F[k])){const set=new Set(F[k]);t.checked?set.add(t.value):set.delete(t.value);F[k]=[...set];}
     else F[k]=t.value;
+    if(k==='queues'){const ok=stageOptions(); F.queueStages=F.queueStages.filter(x=>ok[x]);}
     refreshFilter(); render();
-    const d=$(`.fdrop[data-drop="${open}"]`); if(d) d.open=true;
+    if(k==='events'||k==='eventsMode') setTimeout(ensureConfirmed);
+    const d=$(`.fdrop[data-drop="${open}"]`); if(d){ d.open=true;
+      // keep the panel's search text across the re-render
+      const q=d.querySelector('.ms-q'); if(q&&fq){ q.value=fq; q.dispatchEvent(new Event('input',{bubbles:true})); } }
     return;
   }
   if(t.id==='kType'){$('#kItem').innerHTML=(CONTENT[t.value]?.items||[]).map(x=>`<option>${esc(x)}</option>`).join('');return;}
@@ -1706,7 +1805,7 @@ listen(root,'change',e=>{
   if(t.dataset.addpid){t.checked?ADD.sel.add(t.dataset.addpid):ADD.sel.delete(t.dataset.addpid);const go=$('#aGo');go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add';go.disabled=!ADD.sel.size;$('#aErr').textContent='';return;}
   if(t.closest('#segDlg')){
     if(t.name==='sType'){B.type=t.value;renderSegDlg();return;}
-    if(t.name==='sStatus'){B.status=t.value;$('#sStatusHint').textContent=statusHint();renderStore();return;}
+    if(t.name==='sStatus'){B.status=t.value;$('#sStatusHint').textContent=statusHint();return;}
     if(t.id==='sComb'){B.comb=t.value;updatePreview();return;}
     if(t.dataset.jg){const js=new Set(B.scope.ids);t.checked?js.add(t.dataset.jg):js.delete(t.dataset.jg);
       B.scope.ids=SCOPE[B.scope.type].opts().map(o=>o[0]).filter(v=>js.has(v));syncJourney();return;}
@@ -1750,8 +1849,8 @@ listen(root,'input',e=>{
   if(t.classList.contains('ms-q')){const q=t.value.trim().toLowerCase();
     t.closest('.fpanel').querySelectorAll('label[data-name]').forEach(l=>l.hidden=!!q&&!l.dataset.name.includes(q));return;}
   if(t.closest('#segDlg')){
-    if(t.id==='sName'){B.name=t.value;const nn=$('#seqNewName'); if(nn) nn.textContent=B.name.trim()||'New segment';renderStore();return;}
-    if(t.id==='sDesc'){B.description=t.value;$('#sDescN').textContent=`${t.value.length} / ${DESC_MAX}`;renderStore();return;}
+    if(t.id==='sName'){B.name=t.value;const nn=$('#seqNewName'); if(nn) nn.textContent=B.name.trim()||'New segment';return;}
+    if(t.id==='sDesc'){B.description=t.value;$('#sDescN').textContent=`${t.value.length} / ${DESC_MAX}`;return;}
     const row=t.closest('.cond'); if(!row) return; const r=B.rows[+row.dataset.i], k=t.dataset.k, v=t.value===''?NaN:+t.value;
     if(k==='n'){r.value=v;updatePreview();} else if(k==='n0'){r.value=[v,r.value[1]];updatePreview();} else if(k==='n1'){r.value=[r.value[0],v];updatePreview();}
     else if(k==='ccn'){const ci=+t.closest('[data-ci]').dataset.ci;r.value.items[ci]={...r.value.items[ci],n:v};updatePreview();}

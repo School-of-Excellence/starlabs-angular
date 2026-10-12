@@ -319,3 +319,305 @@ id containing `${…}`. Spec + seed live in starlabs-e2e-tests `profiles/segment
 (hub journal `specs/journals/2026-10-12-segment-board-e2e.md`). hook-diff: aligned. Land order: these app hooks first, then the spec.
 Revert: strip `data-testid="sgb-…"` attributes from the engine and `segment-board.component.html` (behaviour unaffected), and
 drop the spec + seed module in the hub.
+
+---
+
+## 2026-10-12 · "Stored as" panel removed from the segment dialog
+
+Operator: remove the "Stored as" JSON preview from the create/edit dialog. It was a design-time aid for agreeing the
+`segmentboardconfig` shape; the shape is settled. `buildDoc()` stays (save still uses it); only the panel, `renderStore()`
+and its calls (name, description, status, sequence drag/move, `updatePreview`) and the `.store` CSS went. Hook `sgb-dlg-stored`
+dropped (56 hooks now); hub PR #9 spec's SGB-ADDR1 no longer lists it. hook-diff aligned, ng build ok.
+Revert: restore the `<details class="store">…#sJson` line in the dialog markup, `renderStore()` + its calls, the 4 `.sb-root .store`
+CSS rules, and the hook in SGB-ADDR1.
+
+## 2026-10-12 · Header, filter note and summary row removed
+
+Operator: the header shows the screen name only; drop the filter hint line and the "Not in a segment / In more than one segment"
+tile row (the stats tiles already show and open both). Master view (`renderMain`) only: eyebrow, description, **Preview as** and
+**Developer notes** gone (role stays `admin`, notes stay off; the `#roleSel` assignment after render went with them). The Archived
+view used to cut the page at `<div class="attn">`; it now cuts at `boardAt` (markup length before the board). `.attn*` CSS removed.
+No hooks affected. Revert: restore the header block, the `attn` row + `topReasons`, the `Filters narrow…` span in `filterBar`,
+the `.attn` CSS, `$('#roleSel').value=S.role`, and the regex cut in the Archived branch.
+
+## 2026-10-12 · Compact top area
+
+Operator: make the space above the cards compact. One CSS block at the end of `segment-board.component.css`, scoped to `.freeze`:
+smaller title, stats on one line (number + label side by side), 30px toolbar buttons, 28px filter chips, tighter padding.
+The sticky top area is ~180px tall at 1400px wide. Revert: delete the "compact top area" block.
+
+## 2026-10-12 · Loading state: spinner, no collection list
+
+Operator: the loading box shows only "Loading segments…" with a loader; the "Reading segmentboardconfig, …" line is gone.
+Spinner is `.sb-spinner` (CSS-only, `role="status"`). Revert: restore the `<p class="subtle">Reading …</p>` in `renderMain`'s loading
+branch, drop the spinner div and the "loading state" CSS block.
+
+## 2026-10-12 · Visual redesign (modern enterprise dark)
+
+Operator brief: a modern, compact enterprise dashboard with every feature, data path and behaviour unchanged.
+Plan: `specs/plans/2026-10-12-segment-board-redesign.md`.
+
+**Why it is mostly CSS.** The board is a vanilla engine rendering HTML strings. There is no component library to reuse, and the
+`sgb-*` hooks, the store and the event delegation all key off the existing markup. So the redesign is:
+- refined palette tokens, in place in the three token blocks, plus new `--primary-fill`, `--primary-fill-ink` and `--icon-mix`;
+- one "Redesign" block at the end of the CSS, which replaces the earlier "compact top area" block;
+- small markup edits in the engine.
+
+**Engine markup:**
+- `IC` line-icon set (inline SVG, `currentColor`).
+- Search icon.
+- Toolbar actions in two `.tgroup` groups (Layout: Collapse all, Arrange; Records: Activity, Change history, Archived), each with a `title` tooltip.
+- Icons on Refresh all lists and New segment.
+- `.pct` badge on In a segment.
+- Filter chips name the picked values (`sel()` with a label map), and the label reads "Filters" with an icon.
+- `checkList` gives lists of more than 8 options a search box (reusing the existing `.ms-q` handler) and `data-name` labels. The change handler restores the search text after its re-render.
+- Card header: a count span plus a separate Conditions/List toggle (same `data-cardtab`, now with `aria-pressed`), and SVG edit and chevron icons.
+- Footer buttons get icons, and the Actions summary gets an aria-label.
+
+**Layout decisions:**
+- Cards sit in a CSS grid, `auto-fill, minmax(300px,1fr)`, with `align-items:start` so collapsed cards don't stretch their row.
+- Header, description, tags and footer are `flex:none`. Without it, the description shrank into the tags once a card had a max-height.
+- At 1280px and below, the grouped actions become icon-only. Their label stays visually hidden, so screen readers still read it.
+- At 860px and below, search takes a full row.
+- At 700px and below:
+  - stats sit two by two;
+  - filter chips wrap, and their panels open full width under the bar (a fixed-position panel inside a sideways-scrolling bar landed off-screen);
+  - cards size to their content.
+
+**Verified** on the harness with 5 segments (the harness now has a viewport meta and an 11-product catalogue):
+- Customer status: Active filters to 110/200 with the chip reading "Active".
+- The product search "live" leaves 2 options, and the text survives picking.
+- Clear filters, the Conditions toggle, collapse (90px; the neighbour stays 460px), card select with the bulk bar, the Actions menu inside the card, the header opening the side panel, Archived, and Arrange/cancel all work.
+- Search "person 8" leaves 2 cards and keeps focus.
+- Checked at 1440, 1100, 820 (light) and 375 with no horizontal overflow; the dialog and side panel were checked as well.
+- ng build ok; hook-diff aligned.
+
+**Revert:**
+- Restore `segment-board.component.css` and `segment-board.engine.ts` from the commit before this one (`git show <prev>:<path>`).
+- Or, piecemeal: delete the "Redesign" block and put back the old token values (light `--bg:#f4f5fa…`, dark `--bg:#10121b…`).
+- In the engine, undo:
+  - `IC`;
+  - `.tgroup`;
+  - the `sel()` label map;
+  - the `checkList` search;
+  - the change-handler `fq` restore;
+  - the card-meta split.
+
+## 2026-10-12 · Card Actions removed; real B!G Cohorts dialogs; conditions panel closes
+
+**Operator asks:**
+- Remove the **Actions** button from the cards.
+- Send communication and Recommend playlist must use the B!G Cohorts dashboard's real dialogs.
+- The card's conditions view couldn't be closed: the toggle's label flipped to "List", which didn't read as "close".
+
+**Changes:**
+- **Card:** the Actions `<details>` menu is gone, and the footer is now View all + Refresh list / Add.
+- **Where sending happens now:** select cards (checkbox) or participants. The selection bar's WhatsApp / Email / App / **Recommend playlist** call `sendReal()` → `store.communicate(channel, ids)` / `store.recommendPlaylist(ids)`.
+- **The component opens the same dialogs, with the same options and send paths, as `cohort-management.component.ts`:**
+  - `AhNotificationComponent`: image upload, then `authguard.saveNotificationRecord` to profile ids that have a `firebaseuserref`;
+  - `EmailInputComponent`: `email archive` setDoc for queued/send, or a POST to `sendBatchEmail` once validated;
+  - `WatiInputComponent`: the dialog sends and reports success/failed;
+  - `MapRecommendedplaylistToparticipantComponentComponent` with `{participantlist}`: the dialog saves.
+- **What the dialogs receive:** the full `participant metadata` docs, which the component keeps in `meta` while loading participants (the same shape as cohorts' `mapParticipantMetaData`).
+- **App action pending:** "Assign app action" in the bar's ⋯ menu is still the prototype's own dialog. It records to the in-memory activity only.
+- **Fix — `actionTargets`:** it still read the old single `m.segmentId`. It now uses `m.segs`, so a person in several selected segments is counted once.
+- **Conditions panel:** a sticky header "Conditions" with a × close, and the header toggle reads "Hide conditions" while it is open.
+
+**Verified on the harness:**
+- No Actions menu.
+- The × and the toggle both close the conditions panel.
+- 2 selected cards → all 4 sends reach the store with 121 unique ids (85 + 36).
+- ng build ok; hook-diff aligned.
+- The dialogs themselves need the real app (auth, Firestore). Not exercised here.
+
+**Revert:**
+- Restore the card's Actions menu.
+- Point the `comm`/`content` dispatch back to `openAction`.
+- Drop `sendReal` / `CHANNEL`, plus the component's `communicate`, `recommendPlaylist`, `sendNotification`, `sendEmail`, `sendWhatsapp` and `meta`.
+- Remove the `cond-view` header, and put the `List` label back.
+
+## 2026-10-12 · Premium design system (second visual pass)
+
+**Operator brief:** the first redesign was "compact, not better". The ask is a deliberate, premium design language (Linear / Stripe /
+Vercel discipline), favouring quality over compactness, with no fake controls. The same session removed the card Actions, so that
+stays out despite the brief listing it.
+
+**Tokens** (top of `segment-board.component.css`, one block each for light and dark, plus aliases):
+- **Surfaces:** canvas `--bg` → card `--surface-1` → control `--surface-2` → hover `--surface-3`, plus `--sunken` for the card list well.
+- **Lines and text:** cool hairlines `--line-1/2/3`; text in three steps, `--text`, `--text-2`, `--text-3`.
+- **Colour:** one violet accent (`--accent` for text, `--accent-strong` for fills, plus soft and ring variants) and muted ok / warn / danger / manual.
+- **Effects:** `--shadow-card` and `--shadow-pop`.
+- **Type scale:** title 22, metric 26, segment 14, body 13, meta 12, micro 11.
+- **Space and size:** spacing 4–32, radii 6–14, control heights 32 and 28.
+- **Font:** Geist (already imported globally in `styles.css`), with tabular numerals.
+- **Aliases:** the older names (`--surface`, `--border`, `--muted`, `--primary`…) map onto the system, so the dialogs and side panel follow it without being rewritten.
+
+**Markup:**
+- **Header:** the title on the left. On the right, a segmented Records group (Activity · Change history · Archived), then Refresh all lists (secondary) and New segment (primary).
+- **Summary:** one instrument with four readings: label, 26px tabular value, and a sub-line. Coverage gets a meter. The red and amber dots carry meaning. "View →" appears on hover for the two clickable stats.
+- **Pinned toolbar:** only this stays pinned, with a translucent blurred background. Row 1 has the search and the Layout icon group; row 2 has the filters, each shown as a muted name plus a value. An active filter gets an accent dot and accent value.
+- **Applied filters:** a "Showing X of Y" line with removable chips (`data-fclear` resets only that control's fields, via `FILTER_KEYS`) and "Clear all". This keeps the `sgb-clear-filters` hook.
+- **Card:**
+  - Header: identity tile, title (2-line clamp), count, and icon controls (Conditions · Edit · Collapse).
+  - Status line: a dot plus "Automated · Updated …", with warnings as soft badges.
+  - Content: a sunken list well with 28px two-letter avatars tinted per name.
+  - Footer: View all (secondary, full width) and Refresh list / Add (tertiary). Refresh spins its icon while busy.
+- **Conditions moved to an icon control.** As text it wrapped onto its own line whenever the "Updated" time was long.
+- **Inputs:** custom checkboxes, and selects without browser chrome; popovers animate in over 140ms.
+- **Stat separators are 1px grid gaps over a line-coloured background.** Box-shadow separators misaligned once a label wrapped on phones.
+
+**Verified on the harness:**
+- Widths 1440 (dark and light) and 375 (dark), with no overflow at 375.
+- Filter open, apply and remove-one; Clear all.
+- Conditions panel open and close.
+- Card select plus the bulk bar.
+- Refresh all (toast); Collapse all; a stat opening its list.
+- Search (2 cards, "Showing 11 of 200"); the create dialog.
+- ng build ok; hook-diff aligned (no hook renamed).
+
+**Revert:** restore both files from the commit before this one, or from the scratch copies `engine.before-premium.ts` / `css.before-premium.css` taken at the start of the pass (session scratchpad).
+
+## 2026-10-12 · Design review pass, compact summary, labelled layout controls, five columns
+
+The review found five reasons the board still read as a generic admin page. Each fix is its own block at the end of the CSS.
+
+| # | Problem | Fix |
+|---|---|---|
+| 1 | Random hues on the tiles and avatars carried no meaning | Tiles are tinted by mode: `--accent` for automated, `--manual` for manual. Avatars are monochrome, with two-letter initials. |
+| 2 | Box inside box: every filter and footer button had its own border | Filters sit in one bar with a "Filter" label and hairline dividers, and the active one is tinted. The footer is text actions: "View all →" and "Refresh list". |
+| 3 | Crowded card headers | The checkbox sits on the tile and shows on hover, focus or when picked. Conditions and Edit appear on hover over a fade, and stay visible on touch (`hover:none`). Status line and description use the full card width. |
+| 4 | The summary was four tall boxes | Operator ask: one compact strip with number + label + sub-line. Dups drops its long sub-line. Two-by-two below 1100px. |
+| 5 | Unclear layout controls | Operator ask: the icon-only Collapse/Arrange become "Collapse all" / "Arrange cards" with words. Arrange mode shows a grip icon, dashed cards and a lifted chosen card, with clearer banner and toast copy. |
+
+- **Grid:** five columns (operator ask), `repeat(5,…)`. It steps down to 4 / 3 / 2 / 1 at 1180 / 940 / 720 / 520px. Cards are 440px tall.
+- **Status line:** `.chip` is 11px with 6px separators. At five columns, "Automated · Updated …" overflowed a 225px row by 6px.
+- **Empty state:** `.card-empty` is now `display:block`. Grid layout split the copy around its `<b>`.
+
+**Verified on the harness (1366px, 8 segments):**
+- 5 columns.
+- Every status line on one row, except the inactive card that also carries a warning.
+- Hover reveals the tools.
+- Arrange: fold, banner, grips, cancel restores.
+- Refresh all; filters.
+- ng build ok; hook-diff aligned.
+
+**Revert:** delete the "Design review pass" blocks at the end of the CSS, and undo the engine edits: tgroup labels, `flabel`, grip, `View all` arrow, `--icon` by mode, dups sub-line, arrange copy.
+
+## 2026-10-12 · Sequence: overlaps stay, wording fixed
+
+**Operator question:** "are you applying any logic for the sequence?"
+
+**Finding:** no. Each automated list is everyone matching its conditions, minus anyone in an active manual segment (`autoList`). Sequence only
+orders the create dialog's list and a participant's `m.segs`. Two texts claimed first-match-wins: the create dialog's Sequence hint and the
+card conditions panel.
+
+**Operator decision:** keep the overlaps and fix the text. The copy now says that overlaps are allowed, that the order moves no one, and that
+manual placements are left out. The unused "+N placed elsewhere" tooltip now names only manual segments; `t.lost` is never filled, so the tag
+does not show.
+
+**Revert:** restore the two sentences and the tooltip.
+
+## 2026-10-12 · Card columns follow the board width (side panel bug)
+
+**Operator report:** with the side list (View all) open, segment names weren't shown.
+
+**Cause:** the five columns were set by window-width media queries. Opening the side panel adds `padding-right:628px` to `main`, so the
+board kept five ~146px cards and each title was squeezed to 54px. My first attempt, an `auto-fill` grid with `minmax(max(240px, calc(%)), 1fr)`,
+was rejected by Chrome: the whole rule was dropped, which showed up as an unchanged computed `grid-template-columns`.
+
+**Fix:** `.board-scroll` is a size container (`container-name: board`), and `@container` rules set the column count: 2 from 492px, 3 from 744px, 4 from 996px and
+5 from 1248px. The board therefore reflows when the side panel or the app's side nav takes space. The summary strip wraps
+(`flex: 1 1 240px`).
+
+**Verified at 1440px:** 5 columns and 174px titles with the panel closed; 3 columns and 159px titles with it open.
+
+**Revert:** drop the container block at the end of the CSS.
+
+## 2026-10-12 · Side panel header under the app bar; "Save as list" → "Refresh list"
+
+**Operator reports:**
+- The segment name wasn't visible in the side panel.
+- Rename "Save as list" to "Refresh list".
+
+**Cause:** the app's `.toolbar` (STARLABS bar) is `position:sticky; z-index:10`, outside `.mat-drawer-container`, which is `z-index:1` and so forms a
+stacking context. The board's `.drawer` is `position:fixed; top:0; z-index:20`, but its z-index only counts inside that context. The bar
+therefore painted over the panel's first ~64px: the eyebrow and the segment name.
+
+**Fix:**
+- `.drawer` starts at `top: var(--host-bar)`, with `height: calc(100vh - var(--host-bar))`.
+- `--host-bar` is `clamp(40px,7.4vh,64px)`, the expression `app.component.css` keeps in sync for `.toolbar` and `.mainscreen`. If that changes, change it here too.
+- `.sb-root` gets `min-height: calc(100vh - var(--host-bar))`, so the dark board fills the shell. While loading, it stopped short over a white band.
+
+**Rename:**
+- The side panel button now reads "Refresh list" (refresh icon, spins while busy), the same action as the card's Refresh list. The hook `sgb-drawer-save-list` is kept, so the spec is unaffected.
+- The copy now says "stored list".
+- The table column and the CSV column are now "In list", with "Not in list yet".
+
+**Revert:** remove the host-bar block at the end of the CSS, and restore the button label and the copy.
+
+## 2026-10-12 · Live events and Queue filters (real data); centred loader
+
+**Operator ask:** a Live events filter and a Queue event filter. The prototype's Events and Queue filters were removed in feedback round 1 because nothing real fed them.
+
+**Sources (operator choices, 2026-10-12):**
+
+*Live events*
+- **List:** all of `event collection`, newest first, labelled "name · Mon YYYY" because names repeat. Lists over 8 get the search box.
+- **Status:** Confirmed or attended (default) / Confirmed / Attended.
+  - **Attended** = `participant metadata.productevent` (`{productId: [eventId…]}`, mapped in `segment-board.facts.ts` → `attendedEvents`). The operator chose this source.
+  - **Confirmed** = `event participation request` with `status == 'approved'`.
+  - That is the same split Participant Intelligence uses. The operator's two answers, "productevent" and "confirmed or attended", only fit together this way.
+- **Loading:** confirmed requests load lazily, only for the picked events, in batches of 30 (`in` limit), and are cached in `CONFIRMED`. The panel says "Loading confirmed registrations…" meanwhile.
+
+*Queue*
+- **Membership:** `queue_token` where `stagestatus == 'Approved'` and `tokenstatus == 'Active'`, read once at load into `QTOK` (profile → [{queue, stage}]). This matches Participants Analytics.
+- **Options:** queues from `queue generation` (`queuename`); stages from `stages[].stagename` plus any stage seen on a token.
+- **Behaviour:**
+  - The optional stage list appears once a queue is picked.
+  - Unpicking a queue drops stages that no longer belong.
+  - The chip reads e.g. "B!G Studio · Completed".
+
+**Gotcha (again):** the prototype already has a `const QUEUE_STAGES`. `tsc` passed (`@ts-nocheck`) but esbuild refused the bundle, so the live map is named `QSTAGES`.
+
+**Loader:** the loading state is centred in the area under the app bar (`.empty.is-loading`, flex centring, no box).
+
+**Verified on the harness (3 events, 2 queues, tokens and approved requests with hand-computed counts):**
+
+| Check | Result |
+|---|---|
+| ev1, any / attended / confirmed | 59 / 34 / 25 |
+| Confirmed requests fetched | once, then cached |
+| q1 | 50 |
+| q1 + Completed | 17 |
+| Unpick q1 | clears the stage |
+| Panels | stay open while picking |
+
+ng build ok; hook-diff aligned.
+
+**Revert:**
+- Remove the `events` / `queues` fdrops, `stageOptions`, `ensureConfirmed`, `reRender`, the `QTOK` / `CONFIRMED` / `EVENT_NAME` / `QUEUE_NAME` / `QSTAGES` setup and the `matchFilter` branches.
+- Remove the store's `loadQueueTokens` / `loadConfirmed` and catalogue `events` / `queues`, and `attendedEventIds` in facts.
+- Restore the old prototype `EVENT_NAME` and `queueStage` lines.
+
+## 2026-10-12 · Selection bar on one row
+
+**Operator report:** "Clear" dropped to a second line in the selection bar. The `.selbar` rule had `flex-wrap:wrap`, and the counts, the SEND group, Recommend playlist, ⋯ and Clear together overflowed.
+
+**Fix:**
+- `.selbar` is now `flex-wrap:nowrap; width:max-content`, with tighter gaps.
+- Below 1100px the channel labels and the "SEND" label collapse, leaving icons with titles.
+- The bar only wraps below 700px.
+
+**Verified:** 1366px, one row (56px tall), Clear inline.
+
+**Revert:** delete the "selection bar stays one row" block.
+
+## 2026-10-12 · "App action pending" removed
+
+**Operator ask:** remove it.
+
+**Change:** the ⋯ menu in the selection bar (`actionsWidget`) held only "App action pending", which opened the prototype's own dialog and
+wrote nothing to Firestore. The menu is gone, so the bar is WhatsApp / Email / App / Recommend playlist / Clear. `openAction('appaction')` stays
+reachable only from the disabled team-groups view.
+
+**Revert:** put the `<details class="fdrop">…App action pending…</details>` block back in `actionsWidget`.

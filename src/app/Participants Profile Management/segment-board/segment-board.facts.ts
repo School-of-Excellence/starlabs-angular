@@ -58,6 +58,9 @@ function journeyIdOf(d: Doc): string | null {
   return null;
 }
 
+const attendedEventIds = (pe: unknown): string[] =>
+  pe && typeof pe === 'object' ? [...new Set(Object.values(pe as Record<string, unknown>).flat().filter((x): x is string => typeof x === 'string'))] : [];
+
 /**
  * One `participant metadata` doc → the participant object the board evaluates.
  * `f` holds the values the segment conditions compare against.
@@ -79,7 +82,10 @@ export function toParticipant(id: string, d: Doc, journeyNames: Map<string, stri
     testuser: d['testuser'] === true,
     ongoingProducts: ongoing,
     // fields the design's filters and table read; not in participant metadata, left empty
-    eventsAttended: 0, eventsByProduct: {}, attendedEvents: [], bigLevel: null,
+    eventsAttended: 0, eventsByProduct: {}, bigLevel: null,
+    // ✅ CONFIRMED (operator, 2026-10-12) — Live events filter, attended: participant metadata.productevent
+    // ({ productId: [eventId, …] }), the same field Participant Intelligence reads as "attended"
+    attendedEvents: attendedEventIds(d['productevent']),
     queue: { inQueue: false, name: null, position: null, stage: null },
     workshop: { status: null, name: null, attendedSession: false, missedLast: false },
     pending: [],
