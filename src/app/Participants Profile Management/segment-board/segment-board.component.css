@@ -798,3 +798,27 @@
 .sb-root .selbar .btn.ghost{flex:none}
 @media (max-width:1100px){.sb-root .selbar .commbtn span{display:none}.sb-root .selbar .aw-label{display:none}}
 @media (max-width:700px){.sb-root .selbar{flex-wrap:wrap;width:auto}}
+
+/* change history (side panel History tab and board Change history) */
+.sb-root .h-item{padding:12px 0;border-bottom:1px solid var(--line-1)}
+.sb-root .h-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:var(--fs-body)}
+.sb-root .h-top time{flex:none;font-size:var(--fs-meta);color:var(--text-3)}
+.sb-root .h-act{display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-right:6px;border-radius:999px;font-size:var(--fs-micro);font-weight:600;background:var(--surface-3);color:var(--text-2)}
+.sb-root .h-act.h-create{background:var(--ok-soft);color:var(--ok)}
+.sb-root .h-act.h-edit{background:var(--accent-soft);color:var(--accent)}
+.sb-root .h-act.h-archive{background:var(--warn-soft);color:var(--warn)}
+.sb-root .h-act.h-unarchive{background:var(--manual-soft);color:var(--manual)}
+.sb-root .h-sum{margin:6px 0 4px;color:var(--text);font-size:var(--fs-body);line-height:1.45}
+.sb-root .h-diff{margin:4px 0 6px}
+.sb-root .h-diff>summary{cursor:pointer;font-size:var(--fs-meta);color:var(--accent);list-style:none}
+.sb-root .h-diff>summary::-webkit-details-marker{display:none}
+.sb-root .h-diff>summary::before{content:"";display:inline-block;width:5px;height:5px;margin-right:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(-45deg);transition:transform var(--t) var(--ease)}
+.sb-root .h-diff[open]>summary::before{transform:translateY(-3px) rotate(45deg)}
+.sb-root .h-diff table{width:100%;margin-top:8px;border-collapse:collapse;font-size:var(--fs-meta)}
+.sb-root .h-diff th{width:110px;padding:6px 8px 6px 0;text-align:left;font-weight:500;color:var(--text-2);vertical-align:top}
+.sb-root .h-diff td{padding:6px 8px;vertical-align:top;background:var(--sunken);border-top:1px solid var(--line-1)}
+.sb-root .h-diff td.h-arrow{width:20px;padding:6px 0;text-align:center;color:var(--text-3);background:none}
+.sb-root .h-rules{margin:0;padding-left:14px}
+.sb-root .h-rules li{margin:2px 0}
+.sb-root .h-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:40px 16px;text-align:center;color:var(--text-3);font-size:var(--fs-meta)}
+.sb-root .h-empty .sb-spinner{width:24px;height:24px;margin:0}

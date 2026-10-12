@@ -7,11 +7,14 @@
 // (collection segmentboardconfig, one doc per segment). Participants are still sample data.
 export interface SegmentBoardStore {
   load(): Promise<any[]>;                                   // every doc in segmentboardconfig, archived included
-  saveSegment(doc: any, opts: { isNew: boolean; sequenceUpdates: { id: string; sequence: number }[] }): Promise<void>;
-  saveDisplayOrder(ids: string[]): Promise<void>;          // displayIndex = position on the board
-  archiveSegment(id: string): Promise<void>;
-  unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }): Promise<void>;
-  deleteSegment(id: string): Promise<void>;                // removes the segmentboardconfig and segmentboardlist docs
+  // Every write carries its history: one entry per changed segment, written in the same batch to
+  // segmentboardconfig/{segmentid}/segmenthistory/{auto id} (the store adds `at` and `by`). See HistoryEntry.
+  saveSegment(doc: any, opts: { isNew: boolean; orderUpdates: OrderUpdate[]; history: HistoryEntry[] }): Promise<void>;
+  saveDisplayOrder(updates: OrderUpdate[], history: HistoryEntry[]): Promise<void>;   // card order = sequence
+  archiveSegment(id: string, history: HistoryEntry[]): Promise<void>;
+  unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }, history: HistoryEntry[]): Promise<void>;
+  loadHistory(segmentId: string): Promise<any[]>;           // one segment's history, newest first
+  loadAllHistory(limit: number): Promise<any[]>;            // every segment's history (collection group), newest first
   loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
   loadLists(): Promise<{ segmentid: string; profilelist: string[]; lastupdated: Date | null }[]>;   // segmentboardlist
   saveLists(lists: { segmentid: string; segmentname: string; profilelist: string[] }[]): Promise<void>;
@@ -27,6 +30,14 @@ export interface SegmentBoardStore {
   loadConfirmed(eventIds: string[]): Promise<Record<string, string[]>>;
   loadCatalog(): Promise<{ journeys: { id: string; name: string }[]; products: { id: string; name: string }[]; modes?: { id: string; name: string }[];
     events?: { id: string; name: string; date: Date | null }[]; queues?: { id: string; name: string; stages: string[] }[]; countDefaults: { upCount: string[]; cpmCount: string[] } }>;
+}
+// one board position: displayIndex for every card, sequence (rank among automated cards) for automated ones
+export interface OrderUpdate { id: string; displayIndex: number; sequence?: number }
+// a change to one segment; only the fields that changed, as { from, to } in the config doc's own shapes
+export interface HistoryEntry {
+  segmentid: string; segmentname: string;
+  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder';
+  changedfields: string[]; changes: Record<string, { from: unknown; to: unknown }>; summary: string;
 }
 export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
 const cleanups: Array<() => void> = [];
@@ -247,11 +258,63 @@ const SETS=[master];
 const ARCHIVED_IDS=new Set();   // archived docs keep their id reserved
 let ARCHIVED=[];                // archived segments, for the Archived view
 computeSet(master);
-const AUDIT=[];                 // change history for this session only (not stored yet)
+const AUDIT=[];                 // in-session notes only; the stored history is segmentboardconfig/{id}/segmenthistory
+
+// ---------- one order: card order on the board is the sequence ----------
+// an automated segment's sequence is its rank among the automated cards in board order; manual cards have none
+function applyOrder(set){
+  const by=new Map(set.segments.map(x=>[x.id,x])); let n=0;
+  for(const id of set.displayOrder){ const x=by.get(id); if(!x) continue; if(x.mode==='auto') x.sequence=++n; else delete x.sequence; }
+}
+// a new board order -> the writes it needs (only values Firestore doesn't already hold) and one history entry per
+// segment whose position moved. `skip` is a segment that carries its own place (the one being created).
+function orderPlan(set,ids,skip,skipAuto){
+  const by=new Map(set.segments.map(x=>[x.id,x])), before=new Map(set.displayOrder.map((id,i)=>[id,i+1]));
+  const updates=[], history=[]; let n=0;
+  ids.forEach((id,i)=>{
+    const x=by.get(id); if(!x){ if(id===skip&&skipAuto) n++; return; }
+    const seq=x.mode==='auto'?++n:undefined;
+    if(x._stored?.displayIndex!==i||(seq!==undefined&&x._stored?.sequence!==seq)) updates.push({id,displayIndex:i,...(seq!==undefined?{sequence:seq}:{})});
+    const from=before.get(id), to=i+1;
+    if(from!==to){
+      const changes={position:{from,to}}; if(seq!==undefined&&x.sequence!==seq) changes.sequence={from:x.sequence??null,to:seq};
+      history.push(hEntry(x,'reorder',changes,`Moved from position ${from} to ${to}${changes.sequence?` (sequence ${changes.sequence.from??'—'} → ${seq})`:''}`));
+    }
+  });
+  return {updates,history};
+}
+// after a successful write: the board and the stored copy follow the new order
+function commitOrder(set,ids,updates){
+  set.displayOrder=ids.slice();
+  const by=new Map(set.segments.map(x=>[x.id,x]));
+  for(const u of updates){ const x=by.get(u.id); if(x){ x._stored={displayIndex:u.displayIndex,sequence:u.sequence??x._stored?.sequence??null}; } }
+  applyOrder(set);
+}
+
+// ---------- history entries ----------
+// the config fields history tracks, in the stored doc's shapes (rule = plain condition list; {any:[…]} kept)
+const HIST_FIELDS=['name','description','status','journeys','rule','eligibility'];
+function storedFields(x){
+  const out={name:x.name, description:x.description||'', status:x.status||'active', journeys:[...(x.journeys||[])]};
+  if(x.mode==='auto'){ const r=x.rule; out.rule=Array.isArray(r)?r:(r?.all||r||[]); } else out.eligibility=x.eligibility||null;
+  return out;
+}
+function diffFields(a,b){
+  const changes={};
+  for(const f of HIST_FIELDS){ if(!(f in a)&&!(f in b)) continue; if(JSON.stringify(a[f]??null)!==JSON.stringify(b[f]??null)) changes[f]={from:a[f]??null,to:b[f]??null}; }
+  return changes;
+}
+function hEntry(x,action,changes,summary){
+  return {segmentid:x.id, segmentname:x.name, action, changedfields:Object.keys(changes), changes, summary};
+}
+// history views: per segment (side panel tab) and board-wide (Change history), read on demand and cached
+const HIST=new Map(); let ALLHIST=null;
+function forgetHistory(ids){ for(const id of ids) HIST.delete(id); ALLHIST=null; }
 
 // a stored doc -> the board's in-memory segment
 function fromDoc(d){
   const seg={...d, journeys:d.journeys||[], status:d.status||'active'};
+  seg._stored={displayIndex:d.displayIndex??null, sequence:d.sequence??null};   // what Firestore holds, to write only real changes
   if(seg.mode==='auto') seg.rule=Array.isArray(d.rule)?{all:d.rule}:(d.rule||{all:[]});   // stored rule = plain condition list
   return seg;
 }
@@ -320,6 +383,7 @@ async function load(){
     master.segments=live;
     master.defaultDisplayOrder=defaultOrder(live);
     master.displayOrder=live.slice().sort((a,b)=>(a.displayIndex??1e9)-(b.displayIndex??1e9)||master.defaultDisplayOrder.indexOf(a.id)-master.defaultDisplayOrder.indexOf(b.id)).map(x=>x.id);
+    applyOrder(master);   // card order IS the sequence: automated cards are numbered in board order
     computeSet(master);
   }catch(e){ S.loadError=e?.message||String(e); }
   S.loading=false; render();
@@ -565,8 +629,8 @@ function renderMain(){
   ${appliedBar(t)}
   </div><div class="board-scroll">`;
   if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
-  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange cards</b><p>Cards are folded so they are easy to move. Grab a card anywhere on its title row and drop it where you want it, then <b>Save arrangement</b>. Everyone sees the new order; nobody changes segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
-    <div class="acts"><button class="btn" data-act="arr-reset">Reset to default</button><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
+  if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange cards</b><p>Cards are folded so they are easy to move. Grab a card anywhere on its title row and drop it where you want it, then <b>Save arrangement</b>. Everyone sees the new order, and it is also the sequence of the automated segments. Nobody changes segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
+    <div class="acts"><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
   // the "Not in a segment" / "In more than one segment" row is gone; the same two numbers open from the stats tiles above
   const boardAt=h.length;   // the Archived view replaces everything from here on
   if(!set.segments.length){
@@ -746,38 +810,33 @@ function downloadCsv(title,head,lines){
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-// ---------- archived segments: view, unarchive, delete ----------
+// ---------- archived segments: view, unarchive (no hard delete: archiving is the only delete) ----------
 function archivedHtml(){
   const rows=ARCHIVED.slice().sort((a,b)=>a.name.localeCompare(b.name));
-  return `<div class="banner"><div><b>Archived segments.</b> They place no one. Restore one to put it back at the end of the board${'' }, or delete it for good.</div></div>
+  return `<div class="banner"><div><b>Archived segments.</b> They place no one. Restore one to put it back at the end of the board. Segments are never deleted, so their history stays.</div></div>
     ${rows.length?`<div class="cards">${rows.map(x=>`<article class="card arch" data-testid="sgb-arch-card" data-arch="${x.id}">
       <div class="card-h"><div class="card-icon" aria-hidden="true">${esc(x.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
         <div class="card-info"><div class="card-title">${esc(x.name)}</div><div class="card-sub">${x.mode==='auto'?'Automated':'Manual'}${x.archivedAt?.toDate?` · archived ${esc(TIME.format(x.archivedAt.toDate()))}`:''}</div></div></div>
       ${x.description?`<div class="card-desc">${esc(x.description)}</div>`:''}
-      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-testid="sgb-arch-unarchive" data-act="unarchive" data-seg="${x.id}">Unarchive</button><button class="btn danger" data-testid="sgb-arch-delete" data-act="delete-seg" data-seg="${x.id}">Delete</button>`:''}</div></article>`).join('')}</div>`
+      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-testid="sgb-arch-unarchive" data-act="unarchive" data-seg="${x.id}">Unarchive</button>`:''}</div></article>`).join('')}</div>`
       :'<div class="empty"><h3>No archived segments</h3></div>'}`;
 }
 async function unarchiveSeg(id){
   const set=curSet(), x=ARCHIVED.find(a=>a.id===id); if(!x) return;
-  const seq=x.mode==='auto'?Math.max(0,...set.segments.filter(s=>s.mode==='auto').map(s=>s.sequence||0))+1:undefined;
-  const place={displayIndex:set.displayOrder.length,...(seq?{sequence:seq}:{})};
-  try{ await store.unarchiveSegment(id,place); }catch(e){ return toast(`Couldn’t unarchive: ${e?.message||e}`); }
-  const seg={...x,...place}; delete seg.archived; delete seg.archivedAt; delete seg.archivedBy;
+  // back at the end of the board (after the highest stored index, so it never collides with a gap left by an archive)
+  const top=Math.max(-1,...set.segments.map(s=>s._stored?.displayIndex??-1));
+  const seq=x.mode==='auto'?set.segments.filter(s=>s.mode==='auto').length+1:undefined;
+  const place={displayIndex:top+1,...(seq?{sequence:seq}:{})};
+  const ch={archived:{from:true,to:false},position:{from:null,to:set.displayOrder.length+1},...(seq&&x.sequence!==seq?{sequence:{from:x.sequence??null,to:seq}}:{})};
+  try{ await store.unarchiveSegment(id,place,[hEntry(x,'unarchive',ch,`Restored from the archive at position ${set.displayOrder.length+1}`)]); }catch(e){ return toast(`Couldn’t unarchive: ${e?.message||e}`); }
+  forgetHistory([id]);
+  const seg={...x,...place,_stored:{displayIndex:place.displayIndex,sequence:place.sequence??null}}; delete seg.archived; delete seg.archivedAt; delete seg.archivedBy;
   ARCHIVED=ARCHIVED.filter(a=>a.id!==id); ARCHIVED_IDS.delete(id);
-  set.segments.push(seg); set.displayOrder.push(id); set.defaultDisplayOrder.push(id); computeSet(set);
+  set.segments.push(seg); set.displayOrder.push(id); set.defaultDisplayOrder.push(id); applyOrder(set); computeSet(set);
   AUDIT.unshift({at:Date.now(),by:who(),type:'RULE_CHANGE',text:`${seg.name}: restored from the archive`});
   render(); toast(`Restored “${seg.name}”.`);
   if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([id]); else if(seg.mode==='manual') { await syncAutoLists(); render(); }
 }
-async function deleteSeg(id){
-  const x=ARCHIVED.find(a=>a.id===id); if(!x) return;
-  if(!confirm(`Delete “${x.name}” for good?\n\nIts configuration and saved list are removed from Firestore. This can’t be undone.`)) return;
-  try{ await store.deleteSegment(id); }catch(e){ return toast(`Couldn’t delete: ${e?.message||e}`); }
-  ARCHIVED=ARCHIVED.filter(a=>a.id!==id); ARCHIVED_IDS.delete(id); LISTS.delete(id);
-  AUDIT.unshift({at:Date.now(),by:who(),type:'SEGMENT_ARCHIVE',text:`${x.name} deleted`});
-  render(); toast(`Deleted “${x.name}”.`);
-}
-
 // ---------- import & compare: an uploaded / pasted list vs the segment's View all list ----------
 let CMP=null;
 const normEmail=v=>String(v??'').trim().toLowerCase();
@@ -894,6 +953,37 @@ function conditionsHtml(set,s,compact){
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved'};
+const H_FIELD={name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
+function hVal(f,v){
+  if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
+  if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
+  if(f==='journeys') return esc(v.map(id=>VAL.journeyId[id]||id).join(', '));
+  if(f==='status') return v==='inactive'?'Inactive':'Active';
+  if(f==='archived') return v?'Yes':'No';
+  return esc(String(v));
+}
+function historyListHtml(state,showSeg){
+  if(!state||state.loading) return '<div class="h-empty"><div class="sb-spinner" role="status" aria-label="Loading history"></div>Loading history…</div>';
+  if(state.error) return `<div class="h-empty">Couldn’t load the history: ${esc(state.error)}</div>`;
+  if(!state.rows.length) return '<div class="h-empty">No changes recorded yet. Every create, edit, archive, restore and move is recorded from now on.</div>';
+  return `<ul class="h-list">${state.rows.map(a=>`<li class="h-item" data-testid="sgb-history-item">
+    <div class="h-top"><span><span class="h-act h-${esc(a.action)}">${esc(H_ACTION[a.action]||a.action)}</span>${showSeg?` <b>${esc(a.segmentname||a.segmentid)}</b>`:''}</span><time>${a.at?esc(TIME.format(a.at)):'just now'}</time></div>
+    <div class="h-sum">${esc(a.summary||'')}</div>
+    ${Object.keys(a.changes||{}).length?`<details class="h-diff"><summary>${plural((a.changedfields||Object.keys(a.changes)).length,'field')} changed</summary>
+      <table>${Object.entries(a.changes).map(([f,c])=>`<tr><th>${esc(H_FIELD[f]||f)}</th><td>${hVal(f,c?.from)}</td><td class="h-arrow">→</td><td>${hVal(f,c?.to)}</td></tr>`).join('')}</table></details>`:''}
+    <div class="subtle small">by ${esc(a.by?.name||a.by?.email||'—')}${a.by?.email&&a.by?.name&&a.by.name!==a.by.email?` · ${esc(a.by.email)}`:''}</div></li>`).join('')}</ul>`;
+}
+function loadSegHistory(id){
+  if(HIST.has(id)) return; HIST.set(id,{loading:true});
+  store.loadHistory(id).then(rows=>HIST.set(id,{rows})).catch(e=>HIST.set(id,{rows:[],error:e?.message||String(e)}))
+    .finally(()=>{ if(S.drawer?.kind==='seg'&&S.drawer.id===id&&S.drawer.tab==='history') renderDrawer(); });
+}
+function loadAllHistory(){
+  if(ALLHIST) return; ALLHIST={loading:true};
+  store.loadAllHistory(200).then(rows=>ALLHIST={rows}).catch(e=>ALLHIST={rows:[],error:e?.message||String(e)})
+    .finally(()=>{ if(S.drawer?.kind==='history') renderDrawer(); });
+}
 function historyHtml(set){
   return `<ul class="h-list">${AUDIT.map(a=>{
     let title,detail='';
@@ -920,9 +1010,10 @@ function renderDrawer(fresh){
     const n=auto?d.live.size:(t.by[s.id]||0);
     const saved=L?L.ids.size:0, inBoth=auto&&L?[...d.live].filter(id=>L.ids.has(id)).length:0;
     chips=`<span class="chip ${s.mode}">${auto?'Automated':'Manual'}</span><span class="chip">${plural(n,'participant')}${auto?' match now':''}</span>${s.sourceSegmentId?'<span class="chip">Copied from master</span>':''}`;
-    const tb=[['people',`Participants · ${fmt(n)}`],['rules','Conditions']];
-    tabs=`<div class="tabs" role="tablist">${tb.map(([k,l])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
+    const tb=[['people',`Participants · ${fmt(n)}`],['rules','Conditions'],['history','History']];
+    tabs=`<div class="tabs" role="tablist">${tb.map(([k,l])=>`<button class="tab" role="tab" ${k==='history'?'data-testid="sgb-drawer-tab-history"':''} data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
     if(d.tab==='rules') content=conditionsHtml(set,s);
+    else if(d.tab==='history'){ loadSegHistory(s.id); content=historyListHtml(HIST.get(s.id),false); }
     else if(d.tab==='elsewhere'){ tools=`<p class="subtle small" style="margin:0">These participants match this segment’s conditions, but sit in a segment that ranks higher or were placed by hand.</p>`; content=tableHtml(set,d,drawerRows(set,d),{h:'Placed in',cell:(p,m)=>esc(segName(set,m.segmentId))}); }
     else if(auto){
       const sync=!L?'The list hasn’t been refreshed yet.':(saved===n&&inBoth===n)?`The stored list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
@@ -976,10 +1067,10 @@ function renderDrawer(fresh){
       :'<p class="subtle" style="padding:16px 0">Nothing sent or assigned yet. Use <b>Actions</b> on a segment card, or select participants and use the actions bar.</p>';
     content+='<span class="dev-note block">reads the activity log for this set (one doc per send / recommendation / assignment)</span>';
   } else if(d.kind==='history'){
-    eyebrow='Master set'; title='Change history'; chips='<span class="chip">Manual moves, new segments and condition changes</span>';
-    content=historyHtml(set)+'<span class="dev-note block">reads segment_audit where setId == "master" orderBy at desc</span>';
+    eyebrow='Master segments'; title='Change history'; chips='<span class="chip">Every segment · newest first</span>';
+    loadAllHistory(); content=historyListHtml(ALLHIST,true);
   }
-  const showSearch=!['history','activity'].includes(d.kind)&&!(d.kind==='seg'&&d.tab==='rules');
+  const showSearch=!['history','activity'].includes(d.kind)&&!(d.kind==='seg'&&['rules','history'].includes(d.tab));
   const hint=edit&&showSearch&&MEMBERSHIP_EDIT?`<p class="subtle small" style="margin:0">Select participants and use <b>Move to…</b>, or drag rows onto a segment on the board.</p>`:'';
   $('#drawer').innerHTML=`<div class="d-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${desc?`<p class="d-desc">${esc(desc)}</p>`:''}<div class="chips">${chips}</div></div><button class="icon-btn" data-testid="sgb-drawer-close" data-act="close" aria-label="Close">×</button></div>
     ${tabs}<div class="d-tools">${tools}${showSearch?`<div class="dq-row"><input id="dq" data-testid="sgb-drawer-search" type="search" placeholder="Search in this list" value="${esc(S.dq)}" aria-label="Search in this list">${d.kind==='seg'?'<button class="btn" data-testid="sgb-drawer-compare" data-act="compare" title="Compare an uploaded or pasted list with this list">Import &amp; compare</button>':''}${['seg','dups','unseg'].includes(d.kind)?'<button class="btn" data-testid="sgb-drawer-export" data-act="export-list" title="Download the rows shown as a CSV file">Export CSV</button>':''}</div>`:''}${hint}</div>
@@ -1190,7 +1281,7 @@ function renderSegDlg(){
     h.push(`<label class="f">Conditions</label>
       <div id="conds">${B.rows.map(rowHtml).join('')}</div><button type="button" class="btn ghost" data-testid="sgb-dlg-add-cond" data-b="add">+ Add condition</button>
       <div class="preview" id="sPrev" aria-live="polite"></div>`);
-    if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Sets this segment’s place in the order of automated segments. Each segment’s list holds everyone who matches its conditions, so a participant can be in more than one segment; the order doesn’t move anyone. Drag the new segment, or use the arrows, to set its place.</p><div id="seqBox"></div>`);
+    if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Sets this segment’s place in the order of automated segments. Each segment’s list holds everyone who matches its conditions, so a participant can be in more than one segment; the order doesn’t move anyone. The sequence is the board order: the new card goes on the board right after the segment above it here. Drag the new segment, or use the arrows, to set its place.</p><div id="seqBox"></div>`);
   } else h.push(`<div class="info">A manual segment starts empty. Move participants in from any segment, by drag and drop or with “Move to…”.${B.eligibility?' It keeps the copied eligibility conditions, so you’ll see a warning when someone no longer qualifies.':''}</div>`);
   h.push(`</div><div class="dlg-f"><span class="err" id="sErr"></span>${B.mode==='edit'?'<button class="btn" id="sArchive" data-testid="sgb-dlg-archive">Archive segment</button>':''}<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="sGo" data-testid="sgb-dlg-save">${B.mode==='edit'?'Save changes':'Create segment'}</button></div>`);
   $('#segDlg .dlg').innerHTML=h.join('');
@@ -1256,7 +1347,7 @@ function buildDoc(){   // the Firestore document this dialog saves
   doc.journeys=[...B.scope.ids];
   // rule is stored as a plain list of conditions, all of which must be true (no "all" wrapper);
   // only an older ANY rule (the Do Not Use segments) keeps its { any: [...] } form
-  if(B.type==='auto'){doc.sequence=newSequence(set); const r=buildRule(); doc.rule=r.all||r;}
+  if(B.type==='auto'){ if(!edit) doc.sequence=newSequence(set); const r=buildRule(); doc.rule=r.all||r;}
   else doc.eligibility=B.eligibility||null;
   if(!edit) doc.displayIndex=set.displayOrder.length;   // new segments go at the end of the board
   Object.assign(doc,edit?{updatedAt:'<serverTimestamp>',updatedBy:'<your email>'}:{createdAt:'<serverTimestamp>',createdBy:'<your email>'});
@@ -1319,7 +1410,7 @@ async function saveSeg(){
   if(name.length<3) return err('Give the segment a name of at least 3 characters.');
   if(set.segments.some(x=>x.id!==(B.mode==='edit'?B.id:null)&&x.name.toLowerCase()===name.toLowerCase())) return err('This set already has a segment with that name.');
   const doc=buildDoc(), isNew=B.mode!=='edit';
-  let changes=[], sequenceUpdates=[];
+  let changes=[], plan={updates:[],history:[]}, newOrder=null;
   if(!isNew){
     const s=set._by.get(B.id);
     if((s.status||'active')!==B.status) changes.push(`status changed to ${B.status}`);
@@ -1328,24 +1419,44 @@ async function saveSeg(){
     const desc=B.description.trim(); if(desc!==(s.description||'')) changes.push(desc?'description updated':'description removed');
     if(B.type==='auto'){const before=describeRule(s.rule), after=describeRule(buildRule()); if(before!==after) changes.push(`conditions changed: ${before} → ${after}`);}
     if(!changes.length){$('#segDlg').close(); toast('No changes to save.'); return;}
-  } else if(B.type==='auto'){
-    // the automated segments are renumbered to match the order chosen in the dialog
-    B.order.forEach((sid,i)=>{ if(sid!==NEW_ID&&set._by.get(sid).sequence!==i+1) sequenceUpdates.push({id:sid,sequence:i+1}); });
   }
+  const history=[];
+  if(isNew){
+    // one order: a new automated card goes on the board right after the automated card it follows in the
+    // sequence list (or before the first one); a manual card goes last. Everything after it moves down one.
+    newOrder=set.displayOrder.slice();
+    let at=newOrder.length;
+    if(B.type==='auto'){
+      const k=B.order.indexOf(NEW_ID), prev=B.order[k-1], next=B.order[k+1];
+      if(prev&&newOrder.includes(prev)) at=newOrder.indexOf(prev)+1; else if(next&&newOrder.includes(next)) at=newOrder.indexOf(next);
+    }
+    newOrder.splice(at,0,doc.id);
+    plan=orderPlan(set,newOrder,doc.id,B.type==='auto');
+    doc.displayIndex=at;
+    if(B.type==='auto') doc.sequence=newOrder.slice(0,at+1).filter(id=>id===doc.id||set._by.get(id)?.mode==='auto').length;
+    const start=storedFields(fromDoc(doc)), ch={};
+    for(const [f,v] of Object.entries(start)) if(!(f==='description'&&!v)) ch[f]={from:null,to:v};
+    ch.position={from:null,to:at+1}; if(doc.sequence) ch.sequence={from:null,to:doc.sequence};
+    history.push(hEntry({id:doc.id,name},'create',ch,`Created (${B.type==='auto'?`automated, sequence ${doc.sequence}`:'manual'}, position ${at+1}${B.status==='inactive'?', inactive':''})`));
+  } else {
+    const ch=diffFields(storedFields(set._by.get(B.id)),storedFields(fromDoc(doc)));
+    if(Object.keys(ch).length) history.push(hEntry({id:B.id,name},'edit',ch,changes.map(c=>c[0].toUpperCase()+c.slice(1)).join(' · ')));
+  }
+  history.push(...plan.history);
   saving=true; err(''); if(go){go.disabled=true; go.textContent='Saving…';}
-  try{ await store.saveSegment(doc,{isNew,sequenceUpdates}); }
+  try{ await store.saveSegment(doc,{isNew,orderUpdates:plan.updates,history}); }
   catch(e){ saving=false; if(go){go.disabled=false; go.textContent=isNew?'Create segment':'Save changes';} return err(`Couldn’t save to segmentboardconfig: ${e?.message||e}`); }
   saving=false;
   if(!isNew&&changes.some(c=>/^(conditions|journey|status)/.test(c))) S.stale.add(B.id);
   // written: apply the same doc to the board
   const seg=fromDoc(doc);
+  forgetHistory([seg.id,...plan.updates.map(u=>u.id)]);
   if(isNew){
-    set.segments.push(seg);
-    for(const u of sequenceUpdates) set._by.get(u.id).sequence=u.sequence;
-    set.displayOrder.push(seg.id); set.defaultDisplayOrder.push(seg.id);
+    set.segments.push(seg); set.defaultDisplayOrder.push(seg.id);
+    commitOrder(set,newOrder,plan.updates);
   } else {
     const i=set.segments.findIndex(x=>x.id===seg.id), old=set.segments[i];
-    set.segments[i]={...old,...seg};
+    set.segments[i]={...old,...seg,_stored:old._stored,sequence:old.sequence};
     if(!doc.description) delete set.segments[i].description;
   }
   computeSet(set);
@@ -1363,7 +1474,8 @@ const describeRule=r=>{const ex=expand(r);return (ex.all||ex.any).map(describe).
 async function archiveSeg(){
   const set=curSet(), s=set._by.get(B.id), n=tally(set).by[s.id]||0;
   if(!confirm(`Archive “${s.name}”?\n\n${n?`${fmt(n)} participants will be re-checked against the remaining segments.`:'No participants are in it.'}\nArchived segments are kept, never deleted, so anything that points at this segment still resolves.`)) return;
-  try{ await store.archiveSegment(s.id); }catch(e){ $('#sErr').textContent=`Couldn’t archive: ${e?.message||e}`; return; }
+  try{ await store.archiveSegment(s.id,[hEntry(s,'archive',{archived:{from:false,to:true}},'Archived')]); }catch(e){ $('#sErr').textContent=`Couldn’t archive: ${e?.message||e}`; return; }
+  forgetHistory([s.id]);
   ARCHIVED_IDS.add(s.id); ARCHIVED.push({...s,archived:true});
   set.segments=set.segments.filter(x=>x.id!==s.id);
   set.displayOrder=set.displayOrder.filter(i=>i!==s.id); set.defaultDisplayOrder=set.defaultDisplayOrder.filter(i=>i!==s.id);
@@ -1372,7 +1484,7 @@ async function archiveSeg(){
   if(set.type==='master') AUDIT.unshift({at:Date.now(),by:who(),type:'SEGMENT_ARCHIVE',text:`${s.name} archived. ${plural(n,'participant')} re-checked.`});
   $('#segDlg').close(); if(S.drawer&&S.drawer.id===s.id) closeDrawer(); render();
   if(s.mode==='manual') await syncAutoLists();   // its people can be in automated segments again
-  render(); toast(`Archived “${s.name}”. It’s under Archived, where it can be restored or deleted.`);
+  render(); toast(`Archived “${s.name}”. It’s under Archived, where it can be restored.`);
 }
 
 // ---------- features: communication, content, app actions ----------
@@ -1707,7 +1819,6 @@ listen(root,'click',e=>{
     else if(act==='export-list') exportList();
     else if(act==='show-archived'){ S.showArchived=!S.showArchived; render(); }
     else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
-    else if(act==='delete-seg') deleteSeg(a.dataset.seg);
     else if(act==='move-manual') openManualMove();
     else if(act==='compare') openCompare();
     else if(act==='refresh-list') refreshLists([a.dataset.seg]);
@@ -1716,7 +1827,7 @@ listen(root,'click',e=>{
     else if(act==='clear-sel'){S.sel.clear();$$('input[data-selpid]').forEach(i=>i.checked=false);updateBulk();}
     else if(act==='clear-cardsel'){S.cardSel.clear();render();renderSelBar();}
     else if(act==='move') openMove([...S.sel]);
-    else if(act==='history') openDrawer({kind:'history'});
+    else if(act==='history'){ ALLHIST=null; openDrawer({kind:'history'}); }
     else if(act==='new-seg') openSegDlg('create');
     else if(act==='edit-seg') openSegDlg('edit',a.dataset.seg);
     else if(act==='add-people') openAdd(a.dataset.seg);
@@ -1736,7 +1847,7 @@ listen(root,'click',e=>{
       toast('Drag cards by their title row, then Save arrangement.');}
     else if(act==='arr-cancel'){S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
     else if(act==='arr-reset'){set.displayOrder=clone(set.defaultDisplayOrder);render();toast('Back to the default layout. Save to keep it.');}
-    else if(act==='arr-save'){if(S.teamId){const ids=$('#groups .card').map(c=>c.dataset.groupId);const team=curTeam();team.groups.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));}else{const ids=readOrder(); store.saveDisplayOrder(ids).then(()=>{set.displayOrder=ids;S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();toast(`Arrangement saved for everyone in ${set.name}.`);}).catch(e=>toast(`Couldn’t save the arrangement: ${e?.message||e}`)); return;}S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
+    else if(act==='arr-save'){if(S.teamId){const ids=$('#groups .card').map(c=>c.dataset.groupId);const team=curTeam();team.groups.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));}else{const ids=readOrder(), plan=orderPlan(set,ids); store.saveDisplayOrder(plan.updates,plan.history).then(()=>{forgetHistory(plan.updates.map(u=>u.id));commitOrder(set,ids,plan.updates);computeSet(set);S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();toast(plan.history.length?`Order saved: ${plural(plan.history.length,'segment')} moved. The sequence follows the board.`:'Order saved.');}).catch(e=>toast(`Couldn’t save the arrangement: ${e?.message||e}`)); return;}S.arranging=false;if(S.prevCollapsed){S.collapsed=S.prevCollapsed;S.prevCollapsed=null;}render();}
     return;
   }
   const fc=t.closest('[data-fclear]');

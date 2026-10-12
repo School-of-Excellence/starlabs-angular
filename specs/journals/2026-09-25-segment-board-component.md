@@ -621,3 +621,57 @@ wrote nothing to Firestore. The menu is gone, so the bar is WhatsApp / Email / A
 reachable only from the disabled team-groups view.
 
 **Revert:** put the `<details class="fdrop">…App action pending…</details>` block back in `actionsWidget`.
+
+## 2026-10-12 · Change history (subcollection), one order, no hard delete
+
+Plan (approved): `specs/plans/2026-10-12-segment-history.md`.
+
+**Storage:**
+- **Where:** `segmentboardconfig/{id}/segmenthistory/{autoId}`, a subcollection of the segment's own config doc. There is no new collection; that was the operator's rule.
+- **What each entry holds:** `action`, `segmentid`, `segmentname`, `changedfields`, `changes` (`{field: {from, to}}`, changed fields only; whole before/after `rule` / `eligibility`) and `summary`.
+- **Who and when:** the store adds `at` (serverTimestamp) and `by` (`{email, uid, name}`).
+- **Atomic with the change:** entries are written in the same `writeBatch` as the change (`writeHistory` / `writeOrder` in the component).
+
+**Actions:**
+- `create`: every starting value as `from: null`, plus position and sequence.
+- `edit`: `diffFields` over name / description / status / journeys / rule / eligibility, with the dialog's change list as the summary.
+- `archive`: `archived` false → true.
+- `unarchive`: archived true → false, plus position.
+- `reorder`: position, and sequence for automated segments.
+
+**One order (operator: "make them one"):**
+- An automated segment's `sequence` is its rank among the automated cards in board order (`applyOrder` on load and after every change).
+- `orderPlan` turns a new board order into the minimal writes plus one `reorder` entry per segment whose position actually moved. Values that merely fix older stored numbers are written without an entry.
+- **Create:** a new automated card goes right after the automated card it follows in the dialog's sequence list.
+- **Arrange:** writes `displayIndex` and `sequence`.
+- **Edit:** no longer writes the order.
+- "Reset to default" is gone, because the stored order is the order.
+
+**No hard delete:**
+- The Archived view's Delete button, `deleteSeg` and `store.deleteSegment` are removed.
+- Archived segments keep their config, list and history.
+
+**Views:**
+- A side panel **History** tab, per segment.
+- **Change history** for all segments, via a collection-group query (`orderBy at desc`, limit 200). This replaces the in-session AUDIT list.
+- Both are read on demand and cached, and forgotten after a write.
+
+**Console steps (operator):**
+- rules for `segmentboardconfig/{id}/segmenthistory` (read, create; no update or delete);
+- a `/{path=**}/segmenthistory` read rule for the collection group;
+- a collection-group index on `at` (descending). The first Change history query's error links to it.
+
+**Verified on the harness:**
+- An edit (name + status) writes one `edit` entry with only those two fields.
+- A create placed mid-order lands at position 7 with sequence 6, and the two later cards get `reorder` entries.
+- Arrange (one card to the front) writes `reorder` for each card that moved.
+- Archive and unarchive write entries, and the card comes back last.
+- There is no Delete button.
+- The History tab and Change history render, with from → to tables.
+- ng build ok; hook-diff aligned (57).
+
+**e2e:** SGB-06 now asserts the history docs instead of deleting (hub `test/segment-board`).
+
+**Revert:**
+- Restore the engine and component from the commit before this one. A scratch copy is in `engine.before-history.ts`.
+- History docs already written are inert; leave them, or delete the subcollections.

@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, Inject, OnDestroy, PLATFORM_ID, ViewChild, ViewEncapsulation, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Firestore, collection, deleteField, doc, getDocs, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from '@angular/fire/firestore';
+import { Firestore, WriteBatch, collection, collectionGroup, deleteField, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
 import { Storage, getDownloadURL, ref as ref_, uploadBytes } from '@angular/fire/storage';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -12,7 +12,7 @@ import { AhNotificationComponent } from '../participants-analytics/ah-notificati
 import { EmailInputComponent } from '../participants-analytics/email-input/email-input.component';
 import { WatiInputComponent } from '../participants-analytics/wati-input/wati-input.component';
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
-import { SegmentBoardStore, mountSegmentBoard } from './segment-board.engine';
+import { HistoryEntry, OrderUpdate, SegmentBoardStore, mountSegmentBoard } from './segment-board.engine';
 import { toParticipant } from './segment-board.facts';
 
 // Same drag-and-drop library and version the standalone prototype uses (Arrange + sequence list).
@@ -22,6 +22,8 @@ const CONFIG_COLLECTION = 'segmentboardconfig';
 // Each segment's refreshed list: doc id = segment id, { segmentname, segmentid, profilelist, lastupdated }.
 const LIST_COLLECTION = 'segmentboardlist';
 const PARTICIPANTS_COLLECTION = 'participant metadata';
+// Change history: a subcollection of each segment's config doc only (no top-level collection), append-only.
+const HISTORY_SUBCOLLECTION = 'segmenthistory';
 
 /**
  * Segment Board: the "Segment Board (standalone).html" design, hosted as a component.
@@ -65,47 +67,52 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       const snap = await getDocs(collection(this.firestore, CONFIG_COLLECTION));
       return snap.docs.map(d => ({ ...d.data(), id: d.id }));
     },
-    saveSegment: async (segment, { isNew, sequenceUpdates }) => {
+    saveSegment: async (segment, { isNew, orderUpdates, history }) => {
       const batch = writeBatch(this.firestore);
       const data: Record<string, unknown> = { ...segment };
-      delete data['createdAt']; delete data['createdBy']; delete data['updatedAt']; delete data['updatedBy'];
+      delete data['createdAt']; delete data['createdBy']; delete data['updatedAt']; delete data['updatedBy']; delete data['_stored'];
       if (isNew) {
         batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, createdAt: serverTimestamp(), createdBy: this.userId() });
       } else {
         if (!segment.description) data['description'] = deleteField();
         batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, updatedAt: serverTimestamp(), updatedBy: this.userId() }, { merge: true });
       }
-      // a new automated segment shifts the ones after it down: same batch, so the sequence never has gaps or duplicates
-      for (const u of sequenceUpdates) {
-        batch.update(doc(this.firestore, CONFIG_COLLECTION, u.id), { sequence: u.sequence, updatedAt: serverTimestamp(), updatedBy: this.userId() });
-      }
+      // one order: a new card moves the ones after it; same batch, so order and history never disagree
+      this.writeOrder(batch, orderUpdates);
+      this.writeHistory(batch, history);
       await batch.commit();
     },
-    saveDisplayOrder: async ids => {
+    saveDisplayOrder: async (updates, history) => {
       const batch = writeBatch(this.firestore);
-      ids.forEach((id, i) => batch.update(doc(this.firestore, CONFIG_COLLECTION, id), { displayIndex: i }));
+      this.writeOrder(batch, updates);
+      this.writeHistory(batch, history);
       await batch.commit();
     },
-    archiveSegment: async id => {
+    archiveSegment: async (id, history) => {
       const batch = writeBatch(this.firestore);
       batch.update(doc(this.firestore, CONFIG_COLLECTION, id), { archived: true, archivedAt: serverTimestamp(), archivedBy: this.userId() });
+      this.writeHistory(batch, history);
       await batch.commit();
     },
-    unarchiveSegment: async (id, place) => {
+    unarchiveSegment: async (id, place, history) => {
       // back on the board: at the end of the board, and at the end of the sequence if automated
       const batch = writeBatch(this.firestore);
       batch.update(doc(this.firestore, CONFIG_COLLECTION, id), {
         ...place, archived: deleteField(), archivedAt: deleteField(), archivedBy: deleteField(),
         updatedAt: serverTimestamp(), updatedBy: this.userId(),
       });
+      this.writeHistory(batch, history);
       await batch.commit();
     },
-    deleteSegment: async id => {
-      // only reachable from the Archived view; removes the config and its saved list together
-      const batch = writeBatch(this.firestore);
-      batch.delete(doc(this.firestore, CONFIG_COLLECTION, id));
-      batch.delete(doc(this.firestore, LIST_COLLECTION, id));
-      await batch.commit();
+    // no deleteSegment: archiving is the only delete, so every segment keeps its history
+    loadHistory: async segmentId => {
+      const snap = await getDocs(query(collection(this.firestore, CONFIG_COLLECTION, segmentId, HISTORY_SUBCOLLECTION), orderBy('at', 'desc'), limit(200)));
+      return snap.docs.map(d => this.historyRow(d.id, d.data()));
+    },
+    loadAllHistory: async max => {
+      // every segment's subcollection in one query; needs a collection-group index on segmenthistory.at (desc)
+      const snap = await getDocs(query(collectionGroup(this.firestore, HISTORY_SUBCOLLECTION), orderBy('at', 'desc'), limit(max)));
+      return snap.docs.map(d => this.historyRow(d.id, d.data()));
     },
     loadParticipants: async () => {
       // journey names label each participant's journey id in the tables (see segment-board.facts.ts).
@@ -266,6 +273,34 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
   private journeys() {
     return this.journeysP ??= getDocs(collection(this.firestore, 'journey'))
       .then(s => s.docs.map(j => ({ id: j.id, name: String(j.data()['journey'] ?? j.id) })));
+  }
+
+  /** displayIndex for every moved card, sequence for automated ones. */
+  private writeOrder(batch: WriteBatch, updates: OrderUpdate[]) {
+    for (const u of updates) {
+      batch.update(doc(this.firestore, CONFIG_COLLECTION, u.id), {
+        displayIndex: u.displayIndex, ...(u.sequence !== undefined ? { sequence: u.sequence } : {}),
+        updatedAt: serverTimestamp(), updatedBy: this.userId(),
+      });
+    }
+  }
+
+  /** One doc per changed segment in segmentboardconfig/{id}/segmenthistory: what changed, when (server time) and who. */
+  private writeHistory(batch: WriteBatch, history: HistoryEntry[]) {
+    const by = this.actor();
+    for (const h of history) {
+      batch.set(doc(collection(this.firestore, CONFIG_COLLECTION, h.segmentid, HISTORY_SUBCOLLECTION)), { ...h, at: serverTimestamp(), by });
+    }
+  }
+
+  private historyRow(id: string, d: any) {
+    return { ...d, id, at: d['at']?.toDate?.() ?? null };
+  }
+
+  /** Who made the change, stored as written so it still reads correctly later. */
+  private actor() {
+    const u = this.auth.currentUser;
+    return { email: u?.email ?? null, uid: u?.uid ?? null, name: u?.displayName || u?.email || 'unknown' };
   }
 
   private userId(): string {
