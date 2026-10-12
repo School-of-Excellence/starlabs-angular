@@ -9,6 +9,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ZoomMigrationService, ZoomRecording, VerificationResult, CostRates } from './zoom-migration.service';
@@ -17,7 +18,7 @@ import { ZoomMigrationService, ZoomRecording, VerificationResult, CostRates } fr
   selector: 'app-zoom-recording-dashboard',
   imports: [MatTableModule, CommonModule, MatFormFieldModule,
     MatInput, FormsModule, MatDatepickerModule,
-    MatSelectModule, MatPaginatorModule, MatButtonModule, ReactiveFormsModule,
+    MatSelectModule, MatPaginatorModule, MatSortModule, MatButtonModule, ReactiveFormsModule,
     MatProgressSpinnerModule],
   templateUrl: './zoom-recording-dashboard.component.html',
   styleUrl: './zoom-recording-dashboard.component.css',
@@ -25,6 +26,7 @@ import { ZoomMigrationService, ZoomRecording, VerificationResult, CostRates } fr
 })
 export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(MatPaginator) paginator: MatPaginator;
+  @ViewChild(MatSort) sort: MatSort;
   private firestore: Firestore = inject(Firestore)
   private migrationApi = inject(ZoomMigrationService)
 
@@ -84,6 +86,12 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
 
   ngAfterViewInit(): void {
     this.recordsBackup.paginator = this.paginator;
+    // Only the "In Zoom" header is sortable: ascending = In Zoom first, then
+    // Not in Zoom, then unknown (—); clicking again reverses; a third click
+    // returns to the default date order.
+    this.recordsBackup.sortingDataAccessor = (row: any, column: string) =>
+      column === 'zoom' ? ({ yes: 0, no: 1, unknown: 2 } as any)[this.existsInZoom(row)] : row[column]
+    this.recordsBackup.sort = this.sort;
   }
 
   ngOnDestroy(): void {
@@ -147,6 +155,7 @@ export class ZoomRecordingDashboardComponent implements OnInit, AfterViewInit, O
       const recs = await this.migrationApi.listRecordings(this.ymd(start), this.ymd(end))
       this.zoomPresentUuids = new Set(recs.map(r => r.uuid).filter(Boolean))
       this.zoomPresenceLoaded = true
+      this.recordsBackup.data = this.recordsBackup.data // re-apply an active "In Zoom" sort now that presence is known
     } catch {
       this.zoomPresenceLoaded = false
     }
