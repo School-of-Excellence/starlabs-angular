@@ -49,15 +49,17 @@ jobs:
             WATSON_CONFIG=$WATSON_TEST_CONFIG
             SALESCRM_CONFIG=$SALESCRM_TEST_CONFIG
             CDN_URL='https://breakthroughs-test.web.app/assets/df3'
-            ZOOM_API_URL='https://zoom-to-dropbox-server-rhdwzw46ya-uc.a.run.app'
+            # The starlabs-test zoom-to-dropbox service is retired, and test must
+            # never call the production one — the Migrate panel is off in test.
+            ZOOM_API_URL=''
           else
             FIREBASE_CONFIG=$FIREBASE_PROD_CONFIG
             WATSON_CONFIG=$WATSON_PROD_CONFIG
             SALESCRM_CONFIG=$SALESCRM_PROD_CONFIG
             CDN_URL='https://breakthroughs.app/assets/df3'
-            # TODO: set to the production zoom-to-dropbox server URL when one exists.
-            # Left empty so prod never silently hits the starlabs-test Cloud Run service.
-            ZOOM_API_URL=''
+            # Production zoom-to-dropbox service (project fir-sample-aae4a) — the
+            # same service Zoom's recording.completed webhook calls.
+            ZOOM_API_URL='https://zoom-to-dropbox-server-kakybqnyrq-uc.a.run.app'
           fi
 
           cat > src/environments/environment.development.ts << EOF

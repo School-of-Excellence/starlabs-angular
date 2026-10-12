@@ -59,12 +59,12 @@
 
 <!-- numeric half of a By-content row, shared by the item and each of its playlist slices -->
 <ng-template #tVidMetrics let-o="o" let-tag="tag">
-  <td class="num" style="font-weight:700"><span class="dnum" (click)="dEvents($event, tag + ' · all views', o.evs)">{{ o.views }}</span></td>
-  <td class="num"><span class="dnum" (click)="dPeople($event, tag + ' · unique viewers', o.evs)">{{ o.viewers }}</span></td>
-  <td class="num">@if (o.rewatch) {<span class="dnum" (click)="dRepeat($event, tag + ' · repeat plays', o.evs)">{{ o.rewatch }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
+  <td class="num" style="font-weight:700"><span data-testid="cav-dnum-tag-views" class="dnum" (click)="dEvents($event, tag + ' · all views', o.evs)">{{ o.views }}</span></td>
+  <td class="num"><span data-testid="cav-dnum-tag-viewers" class="dnum" (click)="dPeople($event, tag + ' · unique viewers', o.evs)">{{ o.viewers }}</span></td>
+  <td class="num">@if (o.rewatch) {<span data-testid="cav-dnum-tag-repeat" class="dnum" (click)="dRepeat($event, tag + ' · repeat plays', o.evs)">{{ o.rewatch }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>
   <td class="num"><span style="font-weight:700" [style.color]="reachColor(o.avgReach)">{{ pct(o.avgReach) }}</span></td>
-  <td class="num">@if (o.doneN) {<span class="dnum" (click)="dPeopleIn($event, tag + ' · finished it', o.evs, o.done)">{{ o.doneN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
-  <td class="num">@if (o.midN) {<span class="dnum" (click)="dPeopleIn($event, tag + ' · did not finish it', o.evs, o.mid)">{{ o.midN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+  <td class="num">@if (o.doneN) {<span data-testid="cav-dnum-tag-done" class="dnum" (click)="dPeopleIn($event, tag + ' · finished it', o.evs, o.done)">{{ o.doneN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+  <td class="num">@if (o.midN) {<span data-testid="cav-dnum-tag-mid" class="dnum" (click)="dPeopleIn($event, tag + ' · did not finish it', o.evs, o.mid)">{{ o.midN }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
   <td class="num" style="font-weight:600">@if (o.watch) { {{ durLong(o.watch) }} } @else {<span style="color:var(--t3)">—</span>}</td>
 </ng-template>
 
@@ -299,12 +299,12 @@
                 @if (hasJourney()) {<td><span class="plat">{{ o.journeyName || '—' }}</span></td>}
                 @for (k of personSrcKeys(); track k) {
                   <td class="num">
-                    @if (o.bySrc[k]; as b) {<span class="dnum" (click)="dPContent($event, o.name + ' · ' + sources[k].label, b.evs)">{{ b.vids.size }}</span>}
+                    @if (o.bySrc[k]; as b) {<span data-testid="cav-dnum-person-source" class="dnum" (click)="dPContent($event, o.name + ' · ' + sources[k].label, b.evs)">{{ b.vids.size }}</span>}
                     @else {<span style="color:var(--t3)">—</span>}
                   </td>
                 }
-                <td class="num"><span class="dnum" (click)="dPContent($event, o.name + ' · everything watched', o.evs)">{{ o.unique }}</span></td>
-                <td class="num" style="font-weight:700"><span class="dnum" (click)="dEvents($event, o.name + ' · all views', o.evs)">{{ o.views }}</span></td>
+                <td class="num"><span data-testid="cav-dnum-person-content" class="dnum" (click)="dPContent($event, o.name + ' · everything watched', o.evs)">{{ o.unique }}</span></td>
+                <td class="num" style="font-weight:700"><span data-testid="cav-dnum-person-views" class="dnum" (click)="dEvents($event, o.name + ' · all views', o.evs)">{{ o.views }}</span></td>
                 <td class="num" style="font-weight:600">{{ durLong(o.watch) }}</td>
                 <td class="num" style="color:var(--t2);white-space:nowrap">{{ fmtDate(o.last) }}</td>
               </tr>
@@ -335,14 +335,14 @@
               @for (o of mv.shifts; track o.from + o.to) {
                 <div class="shift">
                   <span class="fromto"><span class="jy" [style.color]="modeColor(o.from)"><i [style.background]="modeColor(o.from)"></i>{{ o.from }}</span><span class="ar">▶</span><span class="jy" [style.color]="modeColor(o.to)"><i [style.background]="modeColor(o.to)"></i>{{ o.to }}</span></span>
-                  <span class="n"><span class="dnum" (click)="dMovers($event, o.from + ' ▶ ' + o.to + ' · next ' + shiftWin() + ' days', o.list)">{{ o.n }}</span></span>
+                  <span class="n"><span data-testid="cav-dnum-mode-movers" class="dnum" (click)="dMovers($event, o.from + ' ▶ ' + o.to + ' · next ' + shiftWin() + ' days', o.list)">{{ o.n }}</span></span>
                   <span class="wh">from {{ shortDay(o.first) }}</span></div>
               } @empty {
                 <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">Nobody on this product is due to move in this window.</div>
               }
               <div class="shift" style="border-top:.5px solid var(--line);margin-top:4px;padding-top:10px">
                 <span class="fromto" style="color:var(--t2);font-weight:700">Total moving</span>
-                <span class="n"><span class="dnum" (click)="dMovers($event, 'Everyone moving mode in the next ' + shiftWin() + ' days', mv.soon)">{{ mv.moving }}</span></span>
+                <span class="n"><span data-testid="cav-dnum-mode-movers-all" class="dnum" (click)="dMovers($event, 'Everyone moving mode in the next ' + shiftWin() + ' days', mv.soon)">{{ mv.moving }}</span></span>
                 <span class="wh">of {{ num(mv.rows.length) }} on this product</span></div>
             } @else if (!hasScopeSel()) {
               <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">Pick a scope to see who moves.</div>
@@ -411,7 +411,7 @@
               <div class="k" [style.color]="modeColor(o.key)">{{ o.key }}</div>
               <div class="v mono">{{ durLong(o.watch) }}</div>
               <div class="s"><b>{{ num(o.people) }}</b> here now ·
-                <b>@if (o.views) {<span class="dnum" (click)="dEvents($event, o.key + ' · plays in the period', o.rows)">{{ o.views }}</span>} @else {0}</b> plays</div>
+                <b>@if (o.views) {<span data-testid="cav-dnum-scope-plays" class="dnum" (click)="dEvents($event, o.key + ' · plays in the period', o.rows)">{{ o.views }}</span>} @else {0}</b> plays</div>
               <div class="split">
                 <div class="bar"><i [style.width.%]="o.onShare * 100" [style.background]="modeColor(o.key)"></i><i [style.width.%]="(1 - o.onShare) * 100" style="background:#DCDBD5"></i></div>
                 <div class="lg"><span [style.color]="modeColor(o.key)">{{ pct(o.onShare) }} on-mode</span><span>{{ o.shelf }} configured</span></div>
@@ -466,8 +466,8 @@
                       <td><div class="vname">{{ o.label }}@if (o.mandatory) {<span class="xover" title="Marked mandatory in the mode configuration">mandatory</span>}</div></td>
                       <td><span class="jy" [style.color]="modeColor(o.mode)"><i [style.background]="modeColor(o.mode)"></i>{{ o.mode }}</span></td>
                       <td><span class="plat">{{ o.widget || '—' }}</span></td>
-                      <td class="num" style="font-weight:700">@if (o.views) {<span class="dnum" (click)="dEvents($event, o.label + ' · plays in ' + o.mode, o.evs)">{{ o.views }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
-                      <td class="num">@if (o.viewers) {<span class="dnum" (click)="dPeople($event, o.label + ' · viewers', o.evs)">{{ o.viewers }}</span>} @else {0}</td>
+                      <td class="num" style="font-weight:700">@if (o.views) {<span data-testid="cav-dnum-mode-plays" class="dnum" (click)="dEvents($event, o.label + ' · plays in ' + o.mode, o.evs)">{{ o.views }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
+                      <td class="num">@if (o.viewers) {<span data-testid="cav-dnum-mode-viewers" class="dnum" (click)="dPeople($event, o.label + ' · viewers', o.evs)">{{ o.viewers }}</span>} @else {0}</td>
                       <td class="num">{{ o.finN }}</td>
                       <td>@if (o.views) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.avgReach }" />} @else {<span style="color:var(--t3)">—</span>}</td>
                       <td class="num" style="font-weight:600">{{ o.watch ? durLong(o.watch) : '—' }}</td>
@@ -517,27 +517,27 @@
             @for (o of rv.cl; track o.label) {
               <div class="shift">
                 <span class="fromto">{{ o.label }}@for (t of o.types; track t) {<span class="ar">·</span><ng-container *ngTemplateOutlet="tRecType; context: { $implicit: t }" />}</span>
-                <span class="n"><span class="dnum" (click)="dPushes($event, o.label + ' · closing with work left', o.list)">{{ o.n }}</span></span>
+                <span class="n"><span data-testid="cav-dnum-rec-closing" class="dnum" (click)="dPushes($event, o.label + ' · closing with work left', o.list)">{{ o.n }}</span></span>
                 <span class="wh">by {{ shortDay(o.first) }}</span></div>
             } @empty {
               <div style="padding:14px 0;font-size:12.5px;color:var(--t2)">No playlists close in this window with work outstanding.</div>
             }
             <div class="shift" style="border-top:.5px solid var(--line);margin-top:4px;padding-top:10px">
               <span class="fromto" style="color:var(--t2);font-weight:700">Unfinished and closing</span>
-              <span class="n"><span class="dnum" (click)="dPushes($event, 'Everything closing in the next ' + shiftWin() + ' days', rv.clAll)">{{ rv.clTotal }}</span></span>
-              <span class="wh">of <span class="dnum" (click)="dPushes($event, 'Pushes that carry a close date', rv.open)">{{ rv.open.length }}</span> still open</span></div>
+              <span class="n"><span data-testid="cav-dnum-rec-closing-all" class="dnum" (click)="dPushes($event, 'Everything closing in the next ' + shiftWin() + ' days', rv.clAll)">{{ rv.clTotal }}</span></span>
+              <span class="wh">of <span data-testid="cav-dnum-rec-open" class="dnum" (click)="dPushes($event, 'Pushes that carry a close date', rv.open)">{{ rv.open.length }}</span> still open</span></div>
           </div>
         </div>
 
         <div class="note">
           <ng-container *ngTemplateOutlet="tInfo" />
           <div><b>{{ rv.donePct }} of pushed items were finished</b> ({{ num(rv.totDone) }} of {{ num(rv.totItems) }}) —
-            <b><span class="dnum" (click)="dPushPeople($event, 'Participants with a playlist pushed', rv.pushes)">{{ rv.people.length }}</span></b> {{ rv.people.length === 1 ? 'participant' : 'participants' }},
-            <b><span class="dnum" (click)="dPushes($event, 'Playlists pushed in this period', rv.pushes)">{{ num(rv.pushes.length) }}</span></b> {{ rv.pushes.length === 1 ? 'push' : 'pushes' }}.
+            <b><span data-testid="cav-dnum-rec-pushed-people" class="dnum" (click)="dPushPeople($event, 'Participants with a playlist pushed', rv.pushes)">{{ rv.people.length }}</span></b> {{ rv.people.length === 1 ? 'participant' : 'participants' }},
+            <b><span data-testid="cav-dnum-rec-pushed" class="dnum" (click)="dPushes($event, 'Playlists pushed in this period', rv.pushes)">{{ num(rv.pushes.length) }}</span></b> {{ rv.pushes.length === 1 ? 'push' : 'pushes' }}.
             A pushed series or playlist is expanded into the episodes and audios inside it, and an item counts as finished
             from the <b>play log</b> — the documents' own <b>completedcontent</b> is filled on too few of them to report from.
             @if (rv.undated) {
-              <b><span class="dnum" (click)="dPushes($event, 'Pushes with no close date', rv.pushes)">{{ num(rv.undated) }}</span></b> of these have
+              <b><span data-testid="cav-dnum-rec-noclose" class="dnum" (click)="dPushes($event, 'Pushes with no close date', rv.pushes)">{{ num(rv.undated) }}</span></b> of these have
               no <b>expiredate</b> — with no close date, a push never counts as missed.
             }
             @if (live.recCapped(); as c) { Only the most recent <b>{{ num(c.shown) }}</b> of <b>{{ num(c.total) }}</b> pushes were loaded. }
@@ -550,8 +550,8 @@
             <div class="card step" [style.border-top]="'3px solid ' + col">
               <div class="k" [style.color]="col" style="text-transform:none;letter-spacing:.02em;font-size:11px">{{ o.label }}</div>
               <div class="v mono">{{ pct(o.itemRate) }}</div>
-              <div class="s"><b><span class="dnum" (click)="dPushPeople($event, o.label + ' · pushed to', o.all)">{{ o.peopleN }}</span></b> {{ o.peopleN === 1 ? 'person' : 'people' }} ·
-                <b><span class="dnum" (click)="dPushes($event, o.label + ' · every push', o.all)">{{ o.pushed }}</span></b> {{ o.pushed === 1 ? 'push' : 'pushes' }}</div>
+              <div class="s"><b><span data-testid="cav-dnum-rec-item-people" class="dnum" (click)="dPushPeople($event, o.label + ' · pushed to', o.all)">{{ o.peopleN }}</span></b> {{ o.peopleN === 1 ? 'person' : 'people' }} ·
+                <b><span data-testid="cav-dnum-rec-item-pushes" class="dnum" (click)="dPushes($event, o.label + ' · every push', o.all)">{{ o.pushed }}</span></b> {{ o.pushed === 1 ? 'push' : 'pushes' }}</div>
               <div class="split">
                 <div class="bar"><i [style.width.%]="o.itemRate * 100" [style.background]="col"></i><i [style.width.%]="(1 - o.itemRate) * 100" style="background:#DCDBD5"></i></div>
                 <div class="lg"><span [style.color]="col">{{ pct(o.itemRate) }} items done</span><span>{{ pct(o.finRate) }} fully</span></div>
@@ -577,15 +577,15 @@
                   @for (r of rv.people; track r.pid) {
                     @let op = openRec() === r.pid;
                     <tr class="rrow" data-testid="cav-rec-row" (click)="toggleRec(r.pid)">
-                      <td class="selcol" (click)="$event.stopPropagation()"><input type="checkbox" class="rowsel" data-testid="cav-rec-sel" [checked]="isSel(r.pid)" (change)="toggleSel(r.pid, $any($event.target).checked, r.n)"></td>
+                      <td data-testid="cav-rec-selcol" class="selcol" (click)="$event.stopPropagation()"><input type="checkbox" class="rowsel" data-testid="cav-rec-sel" [checked]="isSel(r.pid)" (change)="toggleSel(r.pid, $any($event.target).checked, r.n)"></td>
                       <td><span class="chev" [class.open]="op">▶</span>&ngsp;<span class="pname" style="display:inline-block">{{ r.n }}</span></td>
                       @if (hasJourney()) {<td style="font-size:11.5px;font-weight:600;color:var(--t2)">{{ r.j || '—' }}</td>}
-                      <td class="num" style="font-weight:700"><span class="dnum" (click)="dPushes($event, r.n + ' · playlists pushed', r.all)">{{ r.pushed }}</span></td>
+                      <td class="num" style="font-weight:700"><span data-testid="cav-dnum-rec-row-pushed" class="dnum" (click)="dPushes($event, r.n + ' · playlists pushed', r.all)">{{ r.pushed }}</span></td>
                       <td class="num">{{ r.done }}<span style="color:var(--t3)"> / {{ r.items }}</span></td>
                       <td><ng-container *ngTemplateOutlet="tProg; context: { r: r.prog }" /></td>
-                      <td class="num">@if (r.complete) {<span class="dnum" (click)="dPushes($event, r.n + ' · completed playlists', completedOf(r.all))">{{ r.complete }}</span>} @else {0}</td>
-                      <td class="num">@if (r.missed) {<span class="dnum" (click)="dPushes($event, r.n + ' · closed unfinished', missedOf(r.all))">{{ r.missed }}</span>} @else {0}</td>
-                      <td class="num">@if (r.soon) {<span class="dnum" (click)="dPushes($event, r.n + ' · closing soon', closingOf(r.all))">{{ r.soon }}</span>} @else {0}</td>
+                      <td class="num">@if (r.complete) {<span data-testid="cav-dnum-rec-row-completed" class="dnum" (click)="dPushes($event, r.n + ' · completed playlists', completedOf(r.all))">{{ r.complete }}</span>} @else {0}</td>
+                      <td class="num">@if (r.missed) {<span data-testid="cav-dnum-rec-row-missed" class="dnum" (click)="dPushes($event, r.n + ' · closed unfinished', missedOf(r.all))">{{ r.missed }}</span>} @else {0}</td>
+                      <td class="num">@if (r.soon) {<span data-testid="cav-dnum-rec-row-closing" class="dnum" (click)="dPushes($event, r.n + ' · closing soon', closingOf(r.all))">{{ r.soon }}</span>} @else {0}</td>
                       <td class="num"><span class="pill" [ngClass]="pushFlagDef[r.flag][1]">{{ pushFlagDef[r.flag][0] }}</span></td>
                     </tr>
                     @if (op && openRecHist(); as hist) {
@@ -601,7 +601,7 @@
                             <span class="pg"><ng-container *ngTemplateOutlet="tProg; context: { r: x.prog, t: x.done + '/' + x.total }" /></span>
                             <span class="mt">{{ x.watch ? durLong(x.watch) : '—' }}</span>
                             <span style="flex:1"></span>
-                            <span class="dnum" (click)="dItems($event, r.n + ' · ' + x.title, x.items)">Items</span>
+                            <span data-testid="cav-dnum-rec-exp-items" class="dnum" (click)="dItems($event, r.n + ' · ' + x.title, x.items)">Items</span>
                           </div>
                         }
                       </div></td></tr>
@@ -620,7 +620,7 @@
                       <td style="font-size:11.5px;font-weight:600;color:var(--t2)">{{ o.container || '—' }}</td>
                       <td><ng-container *ngTemplateOutlet="tRecType; context: { $implicit: o.type }" /></td>
                       <td class="num" style="font-weight:700">{{ o.pushed }}</td>
-                      <td class="num">@if (o.opened) {<span class="dnum" (click)="dEvents($event, o.label + ' · plays by people it was pushed to', o.plays)">{{ o.opened }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
+                      <td class="num">@if (o.opened) {<span data-testid="cav-dnum-rec-content-plays" class="dnum" (click)="dEvents($event, o.label + ' · plays by people it was pushed to', o.plays)">{{ o.opened }}</span>} @else {<span style="color:var(--bad)">0</span>}</td>
                       <td class="num">{{ o.done }}</td>
                       <td><ng-container *ngTemplateOutlet="tProg; context: { r: o.openRate }" /></td>
                       <td>@if (o.opened) {<ng-container *ngTemplateOutlet="tProg; context: { r: o.avgReach }" />} @else {<span style="color:var(--t3)">—</span>}</td>
@@ -664,7 +664,7 @@
             @for (ov of tv.overview; track ov.id) {
               <tr data-testid="cav-tier-overview-row" [style.opacity]="ov.r.length ? null : .4">
                 <td><span class="tierpill">{{ ov.name }}</span></td>
-                <td class="num" style="font-weight:700">@if (ov.r.length) {<span class="dnum" (click)="dTierPeople($event, ov.name + ' · participants', ov.r)">{{ num(ov.r.length) }}</span>} @else {0}</td>
+                <td class="num" style="font-weight:700">@if (ov.r.length) {<span data-testid="cav-dnum-tier-overview-people" class="dnum" (click)="dTierPeople($event, ov.name + ' · participants', ov.r)">{{ num(ov.r.length) }}</span>} @else {0}</td>
                 <td class="num" style="color:var(--t2)">{{ ov.open }}@if (ov.epsOpen) {<div class="sub">{{ num(ov.epsOpen) }} videos</div>}</td>
                 <td class="num">{{ ov.r.length && ov.open ? ov.avg.toFixed(1) + ' of ' + ov.open : '—' }}</td>
                 <td class="num">@if (ov.r.length && ov.epsOpen) {<ng-container *ngTemplateOutlet="tProg; context: { r: ov.rate }" />} @else {—}</td>
@@ -716,8 +716,8 @@
                       <td><div class="vname">{{ sr.name }}</div></td>
                       <td>@for (t of sr.tierNames; track t) {<span class="tierpill">{{ t }}</span>&ngsp;} @empty {<span style="color:var(--t3)">No tier</span>}</td>
                       <td class="num" style="color:var(--t2)">{{ sr.eps.length }}</td>
-                      <td class="num">@if (sr.access.length) {<span class="dnum" (click)="dTierPeople($event, sr.name + ' · have access', sr.access)">{{ num(sr.access.length) }}</span>} @else {0}</td>
-                      <td class="num" style="font-weight:700">@if (sr.fin.length) {<span class="dnum" (click)="dTierPeople($event, sr.name + ' · completed it', sr.fin)">{{ sr.fin.length }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
+                      <td class="num">@if (sr.access.length) {<span data-testid="cav-dnum-tier-series-access" class="dnum" (click)="dTierPeople($event, sr.name + ' · have access', sr.access)">{{ num(sr.access.length) }}</span>} @else {0}</td>
+                      <td class="num" style="font-weight:700">@if (sr.fin.length) {<span data-testid="cav-dnum-tier-series-fin" class="dnum" (click)="dTierPeople($event, sr.name + ' · completed it', sr.fin)">{{ sr.fin.length }}</span>} @else {<span style="color:var(--t3)">0</span>}</td>
                       <td class="num">@if (sr.epsTot) {<span style="font-weight:700">{{ num(sr.epsDone) }}</span><span style="color:var(--t3)"> / {{ num(sr.epsTot) }}</span>
                         <div class="sub" [style.color]="reachColor(sr.epsDone / sr.epsTot)">{{ pct(sr.epsDone / sr.epsTot) }}</div>} @else {<span style="color:var(--t3)">—</span>}</td>
                       <td class="num">@if (sr.access.length) {<span style="font-weight:700" [style.color]="reachColor(sr.consumed)">{{ pct(sr.consumed) }}</span>} @else {<span style="color:var(--t3)">—</span>}</td>

@@ -20,6 +20,8 @@ interface LogRow {
   id: string; profileid: string; name: string;
   date: Date | null; dateLabel: string;
   device_os: string; current_version: string;
+  /** Resolved once at load, beside `name`, so filtering never re-walks the directories. */
+  isNewUser: boolean;
 }
 
 type Accent = 'indigo' | 'emerald' | 'amber' | 'violet' | 'rose' | 'orange' | 'red';
@@ -397,6 +399,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   logSearch = '';
   logNameFilter = 'all';
   logOsFilter = 'all';
+  logUserTypeFilter: 'all' | 'new' | 'existing' = 'all';
   /** Distinct people in the loaded rows, labelled by name — the name filter's options. */
   logNameOptions: { profileid: string; name: string }[] = [];
   /** Typed into the name filter's search row; narrows the options, not the table. */
@@ -455,6 +458,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           date, dateLabel: date ? formatDate(date, 'dd MMM yyyy, h:mm a', 'en-IN') : '—',
           device_os: String(data['device_os'] ?? '').trim(),
           current_version: String(data['current_version'] ?? '').trim(),
+          isNewUser: this.isNewUserProfile(profileid),
         });
       });
       this.logAll = rows;
@@ -475,6 +479,22 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Whether this person is still a NEW user.
+   *
+   * Deliberately the same rule the Total New Users card above uses (splitUsers:
+   * `movedtoexist !== true`), so the card's number and this filter can never disagree. Anyone
+   * who has been moved across — the New Users to Paid card — counts as existing from here on,
+   * which is the whole point of that card.
+   *
+   * Everyone else who can sign in to the app is existing: the split is total, so no log row
+   * disappears from both halves of the filter.
+   */
+  private isNewUserProfile(profileid: string): boolean {
+    const nud = profileid ? this.nudMap.get(profileid) : null;
+    return !!nud && nud['movedtoexist'] !== true;
+  }
+
   /** Name from the participant directory, then new_user_data; the id itself when neither knows them. */
   private logNameFor(profileid: string): string {
     if (!profileid) return '—';
@@ -490,6 +510,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.logShown = this.logAll
       .filter(r => this.logNameFilter === 'all' || r.profileid === this.logNameFilter)
       .filter(r => this.logOsFilter === 'all' || r.device_os === this.logOsFilter)
+      .filter(r => this.logUserTypeFilter === 'all'
+        || (this.logUserTypeFilter === 'new' ? r.isNewUser : !r.isNewUser))
       .filter(r => !q || `${r.name} ${r.profileid} ${r.device_os} ${r.current_version} ${r.dateLabel}`.toLowerCase().includes(q))
       .sort((a, b) => {
         if (key === 'date') return ((a.date?.getTime() || 0) - (b.date?.getTime() || 0)) * dir;
@@ -510,8 +532,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.applyLogFilters();
   }
   onLogFilterChange(): void { this.logPageIndex = 0; this.applyLogFilters(); }
-  clearLogFilters(): void { this.logSearch = ''; this.logNameSearch = ''; this.logNameFilter = 'all'; this.logOsFilter = 'all'; this.onLogFilterChange(); }
-  get logFilterCount(): number { return (this.logSearch.trim() ? 1 : 0) + (this.logNameFilter !== 'all' ? 1 : 0) + (this.logOsFilter !== 'all' ? 1 : 0); }
+  clearLogFilters(): void { this.logSearch = ''; this.logNameSearch = ''; this.logNameFilter = 'all'; this.logOsFilter = 'all'; this.logUserTypeFilter = 'all'; this.onLogFilterChange(); }
+  get logFilterCount(): number { return (this.logSearch.trim() ? 1 : 0) + (this.logNameFilter !== 'all' ? 1 : 0) + (this.logOsFilter !== 'all' ? 1 : 0) + (this.logUserTypeFilter !== 'all' ? 1 : 0); }
   setLogPageSize(size: number): void { this.logPageSize = Number(size) || 25; this.logPageIndex = 0; this.slicePage(); }
   logPrev(): void { if (this.logPageIndex > 0) { this.logPageIndex--; this.slicePage(); } }
   logNext(): void { if (this.logPageIndex < this.logPageCount - 1) { this.logPageIndex++; this.slicePage(); } }

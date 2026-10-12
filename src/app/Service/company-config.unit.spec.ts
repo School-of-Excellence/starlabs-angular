@@ -120,21 +120,29 @@ describe('company-config — which legal entity a Watson payment is booked under
   });
 
   describe('isDefaultCompany', () => {
-    it('is true for the unprefixed series and for a missing company', () => {
-      expect(isDefaultCompany(companyWith({ seriesPrefix: 'none' }))).toBeTrue();
+    // Decided by `key`, exactly as the cloud function's resolveInvoiceSeries()
+    // does. `seriesPrefix` is descriptive only: when the two disagreed, the
+    // client and the server stamped different series onto the same payment.
+    it('is true for company A and for a missing company', () => {
+      expect(isDefaultCompany(companyWith({ key: 'A' }))).toBeTrue();
+      expect(isDefaultCompany(companyWith({ key: '' }))).toBeTrue();
       expect(isDefaultCompany(null)).toBeTrue();
     });
 
-    it('is false only for a state-prefixed series', () => {
-      expect(isDefaultCompany(companyWith({ seriesPrefix: 'statecode' }))).toBeFalse();
-      // anything else is treated as the original series — the safe direction
-      expect(isDefaultCompany(companyWith({ seriesPrefix: 'something-else' }))).toBeTrue();
+    it('is false for every other key, whatever seriesPrefix says', () => {
+      expect(isDefaultCompany(companyWith({ key: 'B' }))).toBeFalse();
+      expect(isDefaultCompany(companyWith({ key: 'B', seriesPrefix: 'none' }))).toBeFalse();
+      expect(isDefaultCompany(companyWith({ key: 'C', seriesPrefix: 'something-else' }))).toBeFalse();
+    });
+
+    it('ignores seriesPrefix on company A too', () => {
+      expect(isDefaultCompany(companyWith({ key: 'A', seriesPrefix: 'statecode' }))).toBeTrue();
     });
   });
 
   describe('companyPrefixFor — the letters stamped on the invoice number', () => {
     it('stamps nothing for the default company, whatever its registration says', () => {
-      expect(companyPrefixFor(companyWith({ seriesPrefix: 'none' }), { statecode: '33' })).toBe('');
+      expect(companyPrefixFor(companyWith({ key: 'A' }), { statecode: '33' })).toBe('');
     });
 
     it('uses the registration state code of a prefixed company', () => {
@@ -164,7 +172,7 @@ describe('company-config — which legal entity a Watson payment is booked under
 
   describe('ratioCounterDocId — whose non-GST tally a payment lands in', () => {
     it('keeps the original MM-YY id for the default company so its counts carry over', () => {
-      expect(ratioCounterDocId(companyWith({ seriesPrefix: 'none' }), '09', '26')).toBe('09-26');
+      expect(ratioCounterDocId(companyWith({ key: 'A' }), '09', '26')).toBe('09-26');
       expect(ratioCounterDocId(null, '09', '26')).toBe('09-26');
     });
 

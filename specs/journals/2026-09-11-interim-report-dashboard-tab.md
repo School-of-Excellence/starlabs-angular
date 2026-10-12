@@ -335,3 +335,76 @@ IRD-ADDR2 — a dropped connection is not reproducible deterministically in the 
 
 **Revert:** `fromServer` → `getDocs`, `ensureFilters` → the old `filtersReady` promise, drop the two Retry
 buttons + `data-retry` handler.
+
+## 2026-09-27 — cancelled reports excluded; capped lists can be opened in full
+
+**Cancelled (operator):** a report with `status: 'cancelled'` is not part of any dashboard number. It is
+dropped in `loadPool` one step AFTER the read, not in the query, and that is deliberate: Firestore's `!=`
+/ `not-in` match only documents whose field EXISTS and is NOT NULL, while an interim report carries
+`status` only once it is completed or cancelled. Measured on production `interimreport log`: 2461 docs —
+1850 completed, 139 cancelled, 441 null, 31 with no status field. A query-side filter would therefore have
+dropped 472 live logs (every Ongoing / Not started one) and would also have put a second inequality field
+beside the `createdon` range, needing a new composite index. `status !== 'cancelled'` keeps null / missing
+/ '' exactly as before. The calendar dots followed the same rule the same day — see
+*calendar dots drop cancelled too* below.
+
+**Capped lists:** a drill-down dialog rendered the first 60 rows and said so with no way to see the rest
+(operator: "in the dialog it is showing only 60"); By participant capped at 40. Both notes now carry a
+button — `ird-modal-show-all` / `ird-people-show-all` — that lifts the cap for that list (`mo.all`,
+`PEOPLE_ALL`). The cap stays as the opening state so a 2000-row list still opens instantly. Export was
+already the whole list, not the visible page.
+
+**Verified (dev server, starlabs-test):** with the caps temporarily set to 2, the dialog showed "Showing
+the first 2 of 7 · Show all 7" and expanded to 7 with the note gone; By participant went "Showing 2 of 3 ·
+Show all" → "Showing 3 of 3". Caps restored to 60 / 40 and rebuilt.
+
+**e2e:** IRD-18 — the seed gains p1's third log `IRL_CANCELLED` (in range, steps saved, so it would read
+as Ongoing): the oracle reads it from Firestore, then the strip must still count 2 and the list behind the
+count must hold 2 rows. IRD-01's exact "p1 has two" is now a second guard. The two Show-all hooks are
+registered in IRD-ADDR2 (driving them would need 60+ seeded logs).
+
+**Revert:** drop the `status !== 'cancelled'` filter in loadPool; `cap`/`show` back to constants and remove
+the two buttons + their handlers; remove IRL_CANCELLED and IRD-18.
+
+## 2026-09-27 — numbered rows and a wider list dialog
+
+Operator: "add the serial number of the list and increase the width of the dialog, the internal content is
+scrolling." The dialog was 900px wide, so the grouped tables (Name · Journey · Status · Report done ×4)
+overflowed `.mt-wrap` and scrolled sideways INSIDE the list.
+
+- `.mo` max-width 900px → `min(1320px, 94vw)`; `.mo-body` 64vh → 72vh. At 1680px the status table now
+  measures 1279px against 1279px of space — no sideways scroll. The body still scrolls vertically, which
+  is what a 559-row list needs.
+- Every dialog row carries its position: a `#` column in the tables (`ird-row-no`, modal lists only — the
+  inline Areas-changed preview is unchanged) and a number on each letter / ask card. It numbers WHAT IS ON
+  SCREEN, so it runs 1..n over the filtered, searched list, and continues past 60 once "Show all" is used.
+
+**Verified against production data through the dev server (read-only):** September 2026 holds 611 logs of
+which 52 are cancelled; the strip read 559, matching 611 − 52, which is the cancelled-exclusion rule proved
+at scale. The dialog listed 60 numbered rows, and "Show all 559" rendered all 559 in ~1.1 s.
+
+**Note for future sessions:** `environment.development.ts` flipped between starlabs-test and production
+across reloads during this session — check `performance.getEntriesByType('resource')` for `projects/<id>`
+before trusting any number, and never drive a write on the production build.
+
+e2e: IRD-18 also asserts the first two rows read 1 and 2. **Revert:** restore the two CSS values, drop the
+`sn` column / card badge and the `ird-row-no` assertions.
+
+## 2026-09-27 — calendar dots drop cancelled too
+
+Operator: "the dots showing in the calendar is not filtering cancelled I guess." They were not: the dots
+come from `getCountFromServer` per day, and an aggregation cannot exclude a status without a filter —
+`status == 'cancelled'` beside the `createdon` range needs a composite index that is not deployed (and
+`!=` would drop the null-status logs, as above).
+
+**Fix:** read the cancelled logs ONCE per mount with an equality-only query (`status == 'cancelled'`, no
+index needed, 139 docs on production), fold them into a dayKey → count map, and subtract per day. A day
+keeps its dot only when `count(day) - cancelled(day) > 0`, and the month-level short-circuit now compares
+the same way, so a month that is entirely cancelled costs one aggregation and no per-day reads. The map is
+cached for the mount; a failed read clears the cache so the next month view retries.
+
+**Verified against production (read-only):** September holds reports on 8 days; 1 Sep and 17 Sep carry two
+reports each, ALL cancelled. The calendar now marks 2, 3, 11, 15, 16, 18 — every day with at least one live
+report — and leaves 1 and 17 unmarked. Mixed days keep their dot (e.g. 2 Sep: 10 live + 14 cancelled).
+
+**Revert:** drop `cancelledPerDay()` and restore the plain `countLogs` chain in `loadMonth`.

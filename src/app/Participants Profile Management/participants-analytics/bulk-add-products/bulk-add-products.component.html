@@ -12,12 +12,12 @@
 
     <!-- Tabs -->
     <nav class="bap-tabs" role="tablist">
-        <button class="bap-tab" [class.is-active]="tab === 0" [class.is-disabled]="addDisabled"
+        <button data-testid="bap-tab-add" class="bap-tab" [class.is-active]="tab === 0" [class.is-disabled]="addDisabled"
             [disabled]="addDisabled" (click)="setTab(0)" role="tab"
             [title]="addDisabled ? 'Select at least one participant to add products' : ''">
             <mat-icon>add_shopping_cart</mat-icon> Add products
         </button>
-        <button class="bap-tab" [class.is-active]="tab === 1" (click)="setTab(1)" role="tab">
+        <button data-testid="bap-tab-history" class="bap-tab" [class.is-active]="tab === 1" (click)="setTab(1)" role="tab">
             <mat-icon>history</mat-icon> History
         </button>
     </nav>
@@ -60,10 +60,10 @@
                         <span class="bap-reason-count">{{ g.items.length }}</span>
                     </div>
                     <div class="bap-people bap-people-warn">
-                        <span class="bap-unres-chip" *ngFor="let p of g.items; trackBy: trackByProfile"
+                        <span data-testid="bap-unres-chip" class="bap-unres-chip" *ngFor="let p of g.items; trackBy: trackByProfile"
                             (click)="reviewPurchase(p.profileid)" title="Review purchase">
                             <span class="bap-unres-name">{{ p.name || p.profileid }}</span>
-                            <button class="bap-unres-remove" (click)="$event.stopPropagation(); removeUnresolved(p)"
+                            <button data-testid="bap-unres-remove" class="bap-unres-remove" (click)="$event.stopPropagation(); removeUnresolved(p)"
                                 title="Remove from list">
                                 <mat-icon>close</mat-icon>
                             </button>
@@ -201,7 +201,7 @@
                             </span>
                         </div>
                         <div class="bap-job-actions">
-                            <button class="bap-expand-link" (click)="openParticipants(job)">View participants</button>
+                            <button data-testid="bap-history-participants" class="bap-expand-link" (click)="openParticipants(job)">View participants</button>
                             <button *ngIf="job.failures?.length" class="bap-expand-link" (click)="exportFailures(job)"
                                 data-testid="bap-history-export">Export failed</button>
                             <button *ngIf="canRetry(job)" class="bap-btn bap-btn-warn bap-btn-sm" (click)="retry(job)"
@@ -235,10 +235,10 @@
                 <h2 class="bap-title">Participants</h2>
             </div>
             <div class="bap-modal-head-actions">
-                <button *ngIf="job.failures?.length" class="bap-btn bap-btn-ghost bap-btn-sm" (click)="exportFailures(job)">
+                <button data-testid="bap-history-export-failures" *ngIf="job.failures?.length" class="bap-btn bap-btn-ghost bap-btn-sm" (click)="exportFailures(job)">
                     <mat-icon>download</mat-icon> Export failed
                 </button>
-                <button class="bap-close" matDialogClose aria-label="Close"><mat-icon>close</mat-icon></button>
+                <button data-testid="bap-footer-close" class="bap-close" matDialogClose aria-label="Close"><mat-icon>close</mat-icon></button>
             </div>
         </header>
         <div class="bap-panel">

@@ -11,6 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { updateDoc, arrayUnion, Timestamp } from '@angular/fire/firestore';
 import { SnackbarService } from '../../../shared/snackbar.service';
+import { daysRemaining, daysRemainingLabel } from '../workshop-dashboard.engine';
 
 interface ExtendEntry {
   created: number | null;
@@ -79,6 +80,22 @@ export class ExtendedTimelineComponent {
   isActive(u: ExtendedUser): boolean {
     const last = this.latestEntry(u);
     return !!last?.extenduntill && last.extenduntill >= Date.now();
+  }
+
+  /** Whole calendar days left on this person's current extension; null when they have none. */
+  daysLeft(u: ExtendedUser): number | null {
+    return daysRemaining(this.latestEntry(u)?.extenduntill ?? null);
+  }
+
+  /** "12 days left" / "Last day" / "Expired" — '' when there is nothing to count to. */
+  daysLeftLabel(u: ExtendedUser): string {
+    return daysRemainingLabel(this.daysLeft(u));
+  }
+
+  /** Nearly out of time: used to colour the pill, not to decide access. */
+  isEndingSoon(u: ExtendedUser): boolean {
+    const d = this.daysLeft(u);
+    return d !== null && d >= 0 && d <= 3;
   }
 
   // A new extension must extend, not silently shorten: for a still-active
