@@ -14,10 +14,39 @@
 
   <!-- ============ New Users section ============ -->
   <section class="eod-section">
-    <div class="eod-section-head">
+    <div class="eod-section-head eod-section-head-controls">
       <h2 class="eod-section-title">Users</h2>
       <span class="eod-section-rule"></span>
+
+      <!-- One range drives both date-driven cards: Total New Users by signup
+           date, New Users to Paid by move date. B!G Participants has no
+           comparable date and is not filtered — its caption says so while a
+           range is active. -->
+      <div class="eod-eng-controls">
+        <div class="eod-seg" role="group" aria-label="Users date range">
+          <button data-testid="eif-users-range-all" type="button" [class.eod-seg-active]="usersRange === 'all'" [attr.aria-pressed]="usersRange === 'all'" (click)="setUsersRange('all')">All</button>
+          <button data-testid="eif-users-range-today" type="button" [class.eod-seg-active]="usersRange === 'today'" [attr.aria-pressed]="usersRange === 'today'" (click)="setUsersRange('today')">Today</button>
+          <button data-testid="eif-users-range-7d" type="button" [class.eod-seg-active]="usersRange === '7d'" [attr.aria-pressed]="usersRange === '7d'" (click)="setUsersRange('7d')">7D</button>
+          <button data-testid="eif-users-range-30d" type="button" [class.eod-seg-active]="usersRange === '30d'" [attr.aria-pressed]="usersRange === '30d'" (click)="setUsersRange('30d')">30D</button>
+        </div>
+        <label class="eod-datefield">
+          <span>From</span>
+          <input data-testid="eif-users-range-from" type="date" [(ngModel)]="usersCustomStart" (change)="applyUsersCustom()" [max]="usersCustomEnd || todayStr">
+        </label>
+        <label class="eod-datefield">
+          <span>To</span>
+          <input data-testid="eif-users-range-to" type="date" [(ngModel)]="usersCustomEnd" (change)="applyUsersCustom()" [min]="usersCustomStart" [max]="todayStr">
+        </label>
+        @if (usersRange !== 'all') {
+          <button data-testid="eif-users-range-clear" type="button" class="eod-clear" (click)="setUsersRange('all')">
+            <mat-icon>close</mat-icon>&nbsp;Clear
+          </button>
+        }
+      </div>
     </div>
+    @if (usersCustomHint) {
+      <span class="eod-date-hint eod-date-hint-head" role="status">Pick both dates to apply the range</span>
+    }
 
     @if (loadError) {
       <div class="eod-error">
@@ -451,10 +480,10 @@
     </article>
   </section>
 
-  <!-- ============ EiFlix Mobile App Logs ============ -->
+  <!-- ============ EiFlix App Logs ============ -->
   <section class="eod-section eod-section-gap" data-testid="eif-logs-section">
     <div class="eod-section-head">
-      <h2 class="eod-section-title">EiFlix Mobile App Logs</h2>
+      <h2 class="eod-section-title">EiFlix App Logs</h2>
       <span class="eod-section-rule"></span>
       <div class="eod-seg" role="group" aria-label="Login log period">
         <button data-testid="eif-logs-range-today" type="button" [class.eod-seg-active]="logRange === 1" [attr.aria-pressed]="logRange === 1" (click)="setLogRange(1)">Today</button>
@@ -530,7 +559,7 @@
         </div>
       } @else {
         <div class="eod-log-tablewrap">
-          <table class="eod-log-table" aria-label="EiFlix mobile app logins">
+          <table class="eod-log-table" aria-label="EiFlix app logins">
             <thead>
               <tr>
                 <th [attr.aria-sort]="logSortKey === 'name' ? (logSortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
@@ -581,6 +610,131 @@
         </div>
       }
     </article>
+  </section>
+
+  <!-- ============ EiFlix Report ============ -->
+  <section class="eir" data-testid="eif-report-section">
+
+    <header class="eir-top">
+      <div class="eir-id">
+        <span class="eir-eyebrow">Report</span>
+        <h2 class="eir-title">EiFlix</h2>
+        <span class="eir-period">{{ repRangeLabel }}</span>
+      </div>
+      <div class="eir-tools">
+        <div class="eod-seg eir-seg" role="group" aria-label="Report period">
+          <button data-testid="eif-rep-range-today" type="button" [class.eod-seg-active]="repRange === 1" [attr.aria-pressed]="repRange === 1" (click)="setRepRange(1)">Today</button>
+          <button data-testid="eif-rep-range-7d" type="button" [class.eod-seg-active]="repRange === 7" [attr.aria-pressed]="repRange === 7" (click)="setRepRange(7)">7D</button>
+          <button data-testid="eif-rep-range-30d" type="button" [class.eod-seg-active]="repRange === 30" [attr.aria-pressed]="repRange === 30" (click)="setRepRange(30)">30D</button>
+        </div>
+        <button data-testid="eif-rep-export" type="button" class="eir-export" (click)="exportReport()"
+                [disabled]="repExporting" aria-label="Export this report as an Excel file">
+          <mat-icon aria-hidden="true">{{ repExporting ? 'hourglass_top' : 'file_download' }}</mat-icon>
+          <span>{{ repExporting ? 'Preparing' : 'Export' }}</span>
+        </button>
+        <span class="eir-export-err" *ngIf="repExportError" role="alert">Export failed</span>
+      </div>
+    </header>
+
+    <div class="eod-empty eod-empty-slim" *ngIf="repError">
+      <mat-icon>error_outline</mat-icon>
+      <p>Couldn&rsquo;t build the report.</p>
+    </div>
+
+    <div class="eir-body" *ngIf="!repError">
+
+      <!-- ─── surfaces ─── -->
+      <div class="eir-pair">
+
+        <article class="eir-card">
+          <div class="eir-card-top">
+            <h3 class="eir-card-title">EiFlix Mobile App Users</h3>
+          </div>
+
+          <div class="eir-figs" [class.eir-dim]="repLoading">
+            <div class="eir-fig" data-testid="eif-rep-android">
+              <span class="eir-fig-k">Android</span>
+              <span class="eir-fig-n" data-testid="eif-rep-android-total">{{ repCounts.android.total }}</span>
+              <span class="eir-fig-s"><b data-testid="eif-rep-android-existing">{{ repCounts.android.existing }}</b> existing<i>·</i><b data-testid="eif-rep-android-new">{{ repCounts.android.new }}</b> new</span>
+            </div>
+            <div class="eir-fig" data-testid="eif-rep-ios">
+              <span class="eir-fig-k">iOS</span>
+              <span class="eir-fig-n" data-testid="eif-rep-ios-total">{{ repCounts.ios.total }}</span>
+              <span class="eir-fig-s"><b data-testid="eif-rep-ios-existing">{{ repCounts.ios.existing }}</b> existing<i>·</i><b data-testid="eif-rep-ios-new">{{ repCounts.ios.new }}</b> new</span>
+            </div>
+            <div class="eir-fig eir-fig--lead" data-testid="eif-rep-mobile-total">
+              <span class="eir-fig-k">Total</span>
+              <span class="eir-fig-n" data-testid="eif-rep-mobile-total-count">{{ repCounts.mobileTotal.total }}</span>
+              <span class="eir-fig-s"><b data-testid="eif-rep-mobile-total-existing">{{ repCounts.mobileTotal.existing }}</b> existing<i>·</i><b data-testid="eif-rep-mobile-total-new">{{ repCounts.mobileTotal.new }}</b> new</span>
+            </div>
+          </div>
+
+          <div class="eir-cons" data-testid="eif-rep-cons-app" [class.eir-dim]="repConsLoading">
+            <div class="eir-cons-h">
+              <span>Total Content Consumption</span>
+              <span class="eir-cons-err" *ngIf="repConsError">unavailable</span>
+            </div>
+            <dl class="eir-cons-l" *ngIf="!repConsError">
+              <div><dt>Existing Users</dt><dd data-testid="eif-rep-cons-app-existing">{{ formatConsumption(repConsumption.app.existingSeconds) }}</dd></div>
+              <div><dt>New Users</dt><dd data-testid="eif-rep-cons-app-new">{{ formatConsumption(repConsumption.app.newSeconds) }}</dd></div>
+              <div class="is-total"><dt>Total</dt><dd data-testid="eif-rep-cons-app-total">{{ formatConsumption(repConsumption.app.totalSeconds) }}</dd></div>
+              <div class="is-sub"><dt>Workshop Videos</dt><dd data-testid="eif-rep-cons-app-workshop">{{ formatConsumption(repConsumption.app.workshopSeconds) }}</dd></div>
+              <div class="is-sub"><dt>Library Videos</dt><dd data-testid="eif-rep-cons-app-library">{{ formatConsumption(repConsumption.app.librarySeconds) }}</dd></div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="eir-card">
+          <div class="eir-card-top">
+            <h3 class="eir-card-title">EiFlix Web App Users</h3>
+          </div>
+
+          <div class="eir-figs eir-figs--one" [class.eir-dim]="repConsLoading">
+            <div class="eir-fig eir-fig--lead" data-testid="eif-rep-web">
+              <span class="eir-fig-k">Web</span>
+              <span class="eir-fig-n" data-testid="eif-rep-web-total">{{ repWebUsers.total }}</span>
+              <span class="eir-fig-s"><b data-testid="eif-rep-web-existing">{{ repWebUsers.existing }}</b> existing<i>·</i><b data-testid="eif-rep-web-new">{{ repWebUsers.new }}</b> new</span>
+            </div>
+          </div>
+
+          <div class="eir-cons" data-testid="eif-rep-cons-web" [class.eir-dim]="repConsLoading">
+            <div class="eir-cons-h">
+              <span>Total Content Consumption</span>
+              <span class="eir-cons-err" *ngIf="repConsError">unavailable</span>
+            </div>
+            <dl class="eir-cons-l" *ngIf="!repConsError">
+              <div><dt>Existing Users</dt><dd data-testid="eif-rep-cons-web-existing">{{ formatConsumption(repConsumption.web.existingSeconds) }}</dd></div>
+              <div><dt>New Users</dt><dd data-testid="eif-rep-cons-web-new">{{ formatConsumption(repConsumption.web.newSeconds) }}</dd></div>
+              <div class="is-total"><dt>Total</dt><dd data-testid="eif-rep-cons-web-total">{{ formatConsumption(repConsumption.web.totalSeconds) }}</dd></div>
+              <div class="is-sub"><dt>Workshop Videos</dt><dd data-testid="eif-rep-cons-web-workshop">{{ formatConsumption(repConsumption.web.workshopSeconds) }}</dd></div>
+              <div class="is-sub"><dt>Library Videos</dt><dd data-testid="eif-rep-cons-web-library">{{ formatConsumption(repConsumption.web.librarySeconds) }}</dd></div>
+            </dl>
+          </div>
+        </article>
+      </div>
+
+      <!-- ─── purchases ─── -->
+      <article class="eir-card eir-card--row" data-testid="eif-rep-purchases">
+        <div class="eir-card-top">
+          <h3 class="eir-card-title">Purchases &amp; Signups</h3>
+        </div>
+        <div class="eir-figs">
+          <div class="eir-fig" data-testid="eif-rep-journey">
+            <span class="eir-fig-k">Journey Purchased</span>
+            <span class="eir-fig-n" data-testid="eif-rep-journey-count">{{ repJourneyPurchased }}</span>
+          </div>
+          <div class="eir-fig" data-testid="eif-rep-joined">
+            <span class="eir-fig-k">New Users Joined in EiFlix</span>
+            <span class="eir-fig-n" data-testid="eif-rep-joined-count">{{ repNewUsersJoined }}</span>
+          </div>
+          <div class="eir-fig" data-testid="eif-rep-masterclass" [class.eir-dim]="repMasterclassLoading">
+            <span class="eir-fig-k">Masterclass Purchase</span>
+            <span class="eir-fig-n" data-testid="eif-rep-masterclass-count">{{ repMasterclass }}</span>
+            <span class="eir-fig-s" *ngIf="repMasterclassError">unavailable</span>
+          </div>
+        </div>
+      </article>
+    </div>
   </section>
 
   <!-- ============ Detail side panel ============ -->
