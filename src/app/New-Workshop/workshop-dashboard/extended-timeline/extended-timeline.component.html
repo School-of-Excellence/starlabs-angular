@@ -33,6 +33,12 @@
             {{ u.entries.length }} {{ u.entries.length === 1 ? 'extension' : 'extensions' }}
           </span>
         </div>
+        <!-- Days remaining, beside the date it runs to — the date alone makes every reader do the
+             subtraction themselves. -->
+        <span class="ext-days" data-testid="et-days-left-5" *ngIf="daysLeftLabel(u)"
+              [class.on]="isActive(u)" [class.soon]="isEndingSoon(u)">
+          {{ daysLeftLabel(u) }}
+        </span>
         <span class="ext-status" [class.on]="isActive(u)">
           {{ isActive(u) ? 'Active until' : 'Expired' }}
           {{ latestEntry(u)?.extenduntill | date: 'MMM d, y' }}

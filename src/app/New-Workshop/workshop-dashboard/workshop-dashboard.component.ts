@@ -52,7 +52,8 @@ import {
   evergreenWorkshopDays, filterTableParticipants, filteredProgressListForChallenge, formatDate, formatDateTime,
   groupProgressStat, hasAccessToChallenge, headlineMetrics, isChallengeVisibleForCategory,
   moveButtonText, moveButtonTooltip, neverStartedIds, normalizeSubChallengeStatus, oldResultTooltip,
-  overallProgressLabel, participantTypeClass, participantTypeLabel
+  overallProgressLabel, participantTypeClass, participantTypeLabel,
+  filterParticipantsByName,
 } from './workshop-dashboard.engine';
 
 @Component({
@@ -210,6 +211,8 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['completedParticipants', []],
   ]);
   filterOption: 'all' | 'new' | 'old' = 'all';
+  /** Side-panel name search. Narrows the list in the panel only — never the progress table. */
+  sideSearch = '';
   cohortTypeFilter: 'all' | 'facilitator' | 'cohort' = 'all';
   filteredParticipants: any[] = [];
   loggedinProfile: string = null;
@@ -1692,6 +1695,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -1856,6 +1860,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedCustomerStatusFilters = [];
       this.selectedEnrollmentStatusFilters = [];
@@ -1875,6 +1880,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedCustomerStatusFilters = [];
       this.selectedEnrollmentStatusFilters = [];
@@ -1903,6 +1909,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedSubscriberCode = [];
       this.showReferredOnly = false;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'totalNewUsersNotEnrolled') {
@@ -1926,6 +1933,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedSubscriberCode = [];
       this.showReferredOnly = false;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'shareClicked' || metricType === 'shareClaimed') {
@@ -1965,6 +1973,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
 
     } else if (metricType === 'purchase') {
@@ -1981,6 +1990,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.applyFilterSide();
     } else {
       const participantIds = this.metrics.get(metricType);
@@ -1992,6 +2002,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       };
       this.showParticipantPanel = true;
       this.filterOption = 'all';
+      this.sideSearch = '';
       this.selectedJourneyFilters = [];
       this.selectedEnrollmentStatusFilters = [];
       this.selectedTierFilters = [];
@@ -2020,6 +2031,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.extendDate = null;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedJourneyFilters = [];
     this.selectedEnrollmentStatusFilters = [];
     this.selectedTierFilters = [];
@@ -2138,6 +2150,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = statusInfo;
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -2690,7 +2703,16 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           metadata: p
         }));
     }
-    this.filteredParticipants = base;
+    // Applied last, over whatever the other side filters left.
+    this.filteredParticipants = filterParticipantsByName(base, this.sideSearch, p => this.sideNameFor(p));
+  }
+
+  /** The name a side-panel row shows: its own, else whichever directory knows the profile. */
+  private sideNameFor(p: any): string {
+    return p?.name
+      || this.mapProfile[p?.profileid]?.['name']
+      || this.mapProfileNew[p?.profileid]?.['name']
+      || '';
   }
 
   toggleJourneyFilter(journey: string) {
@@ -2785,6 +2807,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.cohortTypeFilter = 'all';
     this.applyFilterSide();
   }
@@ -2799,6 +2822,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -2916,6 +2940,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = { status: type, challengeName: label, subChallengeName: label, count: profileIds.length };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedCategoryFilters = [];
     this.selectedNotStartedTypeFilters = [];
     this.applyFilterSide();
@@ -2950,6 +2975,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.applyFilterSide();
   }
 
@@ -3177,6 +3203,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     this.selectedStatusInfo = { status: 'platform', challengeName: 'Enrolled via', subChallengeName: label, count: list.length };
     this.showParticipantPanel = true;
     this.filterOption = 'all';
+    this.sideSearch = '';
     this.selectedJourneyFilters = [];
     this.selectedCustomerStatusFilters = [];
     this.selectedEnrollmentStatusFilters = [];

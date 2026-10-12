@@ -13,7 +13,38 @@
   post-commit reconcile, Firestore auto-ids). 369/369 unit tests pass, `dart analyze lib` clean.
   Changes are still **uncommitted** in that repo.
 
-## Last session changes (2026-10-06)
+## Last session changes (2026-10-08)
+
+**Workshop dashboard side panel — search by name.** A search box with a clear button at the top of
+the panel's participant list. Narrows the panel only; the progress table behind it is untouched.
+
+- The rule is `filterParticipantsByName()` in `workshop-dashboard.engine.ts` — pure, so it runs in
+  the local unit spec. The component needs Firestore and cannot be spec-built, which is why that
+  engine exists.
+- `nameOf` is passed in: the panel's entries come from several builders, some carrying `name`
+  directly and others only a profileid resolved against the profile maps.
+- Cleared alongside `filterOption` at all 15 panel-open sites, or a stale term would make the next
+  card open on an empty panel.
+
+**Evergreen "days remaining".** Each profile in the Extended Participants dialog now shows
+"12 days left" / "Last day" / "Expired". Calendar days, not elapsed hours — `extenduntill` is stored
+at 23:59, so an hours-based count would read "0 days left" for most of someone's final day.
+`Math.round` over midnight-to-midnight, because DST makes a day 23 or 25 hours and flooring the raw
+gap would be off by one past the switch. Today is "Last day", not zero; no extension shows nothing
+at all rather than "Expired".
+
+**Verified:** engine unit spec **134/134 locally** (17 new across both changes) · `ng build` clean ·
+hub parses at 137. **Hub: WS-48 and WS-49**, pushed.
+
+Two mistakes caught locally, neither worth a CI round trip: an import insert that assumed a trailing
+comma and broke the build, and a wrong test expectation (`ita` does not match "Chitra" — it contains
+`itr`); the code was right.
+
+### Previous: the 2026-10-06 parked cases were ARMED and the app was pushed
+WS-45, WS-46, WS-47, CN-47, CN-48, CN-49 are live again (`test.fixme` → `test`, ids inlined), and
+the Angular side landed as `b5bec223`.
+
+### Previous session (2026-10-06) — popup banner array
 
 **Popup banner → an array of banners.** `classify/eiflixpopupbanner` held ONE banner as flat fields;
 it now also holds `popupbanner`, an array of maps. The dialog became a master-detail: a list picks a

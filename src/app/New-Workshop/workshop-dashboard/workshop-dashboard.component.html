@@ -1697,6 +1697,18 @@
       </button>
     </div>
       <div class="participants-list">
+        <!-- Name search. Narrows the panel list only; the progress table behind it is untouched. -->
+        <label class="wd-side-search">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input data-testid="wd-side-search-85" type="search" [(ngModel)]="sideSearch"
+                 (ngModelChange)="applyFilterSide()" [ngModelOptions]="{standalone: true}"
+                 placeholder="Search names" autocomplete="off" spellcheck="false"
+                 aria-label="Search participants by name">
+          <button data-testid="wd-side-search-clear-86" type="button" class="wd-side-search-x"
+                  *ngIf="sideSearch" (click)="sideSearch = ''; applyFilterSide()" aria-label="Clear the search">
+            <mat-icon>close</mat-icon>
+          </button>
+        </label>
         <div class="filter-header">
           <h4>Filter {{ filterOption | titlecase }} ({{ filteredParticipants.length }})</h4>
           <div>  
