@@ -471,23 +471,23 @@ function renderMain(){
       <label class="ctl" for="devToggle"><input type="checkbox" id="devToggle" ${S.dev?'checked':''}> Developer notes</label>
     </div></header>
   <section class="stats" aria-label="Summary">
-    <div class="stat" title="Documents in participant metadata"><b>${fmt(t.total)}</b><span>Participants</span></div>
-    <div class="stat"><b>${fmt(inSeg)}</b><span>In a segment · ${pct(inSeg,t.total)}</span></div>
-    <button class="stat ${t.unseg?'bad':''}" data-open="unseg"><b>${fmt(t.unseg)}</b><span>Not in a segment</span></button>
-    <button class="stat ${t.dups?'warn':''}" data-open="dups"><b>${fmt(t.dups)}</b><span>In more than one segment</span></button>
+    <div class="stat" data-testid="sgb-stat-total" title="Documents in participant metadata"><b>${fmt(t.total)}</b><span>Participants</span></div>
+    <div class="stat" data-testid="sgb-stat-inseg"><b>${fmt(inSeg)}</b><span>In a segment · ${pct(inSeg,t.total)}</span></div>
+    <button class="stat ${t.unseg?'bad':''}" data-testid="sgb-stat-unseg" data-open="unseg"><b>${fmt(t.unseg)}</b><span>Not in a segment</span></button>
+    <button class="stat ${t.dups?'warn':''}" data-testid="sgb-stat-dups" data-open="dups"><b>${fmt(t.dups)}</b><span>In more than one segment</span></button>
     ${filtersOn()?`<div class="stat"><b>${fmt(t.ftotal)}</b><span>Match the filters</span></div>`:''}
     <span class="dev-note">participants = participant metadata docs · lists = segmentboardlist</span>
   </section>
   <div class="toolbar">
-    <div class="search"><input id="q" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
+    <div class="search"><input id="q" data-testid="sgb-search" type="search" placeholder="Search participants by name or email" autocomplete="off" aria-label="Search participants" value="${esc(S.qRaw)}"></div>
     <div class="spacer"></div>
-    <button class="btn" data-act="show-archived" aria-pressed="${S.showArchived}">${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</button>
+    <button class="btn" data-testid="sgb-show-archived" data-act="show-archived" aria-pressed="${S.showArchived}">${S.showArchived?'Back to segments':`Archived (${fmt(ARCHIVED.length)})`}</button>
     <button class="btn" data-act="collapse-all">${set.segments.length&&set.segments.every(s=>S.collapsed.has(s.id))?'Expand all':'Collapse all'}</button>
     <button class="btn" data-act="activity">Activity</button>
     ${set.type==='master'?'<button class="btn" data-act="history">Change history</button>':''}
     <button class="btn" data-act="arrange" ${!edit||!sortableOk||S.arranging?'disabled':''} title="${sortableOk?'':'Drag-and-drop library did not load'}">Arrange</button>
-    <button class="btn" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''}>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</button>
-    <button class="btn primary" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>New segment</button>
+    <button class="btn" data-testid="sgb-refresh-all" data-act="refresh-all" ${!edit||S.arranging||S.refreshing||!set._auto.length?'disabled':''}>${S.refreshing&&S.refreshing.size>1?'Refreshing…':'Refresh all lists'}</button>
+    <button class="btn primary" data-testid="sgb-new-seg" data-act="new-seg" ${!edit||S.arranging?'disabled':''}>New segment</button>
   </div>`;
   h+=filterBar(t)+'</div><div class="board-scroll">';
   if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
@@ -519,8 +519,8 @@ function countDrop(k,title){   // uP! / CPM attended filter: pick products, then
   const F=S.filters, op=F[k+'Op'], on=countOn(F,k), W=Object.fromEntries(COUNT_OPS), id=k==='up'?'fUp':'fCpm';
   const label=`${title}: ${on?(op==='between'?`${F[k+'N']}–${F[k+'N2']}`:`${W[op]} ${F[k+'N']}`):'Any'}`;
   return fdrop(k+'Cnt',label,on,`<label class="f" for="${id}Op">Count</label>
-    <div class="cnt-row"><select id="${id}Op" data-fk="${k}Op">${COUNT_OPS.map(([v,l])=>`<option value="${v}" ${v===op?'selected':''}>${l}</option>`).join('')}</select>
-      <input id="${id}N" type="number" min="0" data-fk="${k}N" value="${esc(F[k+'N'])}" placeholder="0" aria-label="Count">
+    <div class="cnt-row"><select id="${id}Op" ${k==='up'?'data-testid="sgb-filter-up-op"':'data-testid="sgb-filter-cpm-op"'} data-fk="${k}Op">${COUNT_OPS.map(([v,l])=>`<option value="${v}" ${v===op?'selected':''}>${l}</option>`).join('')}</select>
+      <input id="${id}N" ${k==='up'?'data-testid="sgb-filter-up-n"':'data-testid="sgb-filter-cpm-n"'} type="number" min="0" data-fk="${k}N" value="${esc(F[k+'N'])}" placeholder="0" aria-label="Count">
       ${op==='between'?`<span>and</span><input id="${id}N2" type="number" min="0" data-fk="${k}N2" value="${esc(F[k+'N2'])}" placeholder="0" aria-label="Up to">`:''}</div>
     <label class="f">Counting these products</label>${checkList(k+'Products',PROD)}
     ${F[k+'Products'].length?'':'<p class="subtle small" style="margin:8px 0 0">Pick at least one product to count.</p>'}`);
@@ -547,7 +547,7 @@ function filterBar(t){
     countDrop('cpm','CPM events')
   ].join('');
   return `<section class="filters" aria-label="Filters"><span class="flabel">Filter</span>${bar}
-    <span class="fsum">${filtersOn()?`<b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants match <button class="btn ghost" data-act="clear-filters">Clear filters</button>`:`<span class="subtle">Filters narrow what you see and who an action applies to. They never change who is in which segment.</span>`}</span>
+    <span class="fsum">${filtersOn()?`<b>${fmt(t.ftotal)}</b> of ${fmt(t.total)} participants match <button class="btn ghost" data-testid="sgb-clear-filters" data-act="clear-filters">Clear filters</button>`:`<span class="subtle">Filters narrow what you see and who an action applies to. They never change who is in which segment.</span>`}</span>
     <span class="dev-note">events / queues / workshops are read from their own screens by id</span></section>`;
 }
 const ICON_COLORS=['#4c769d','#6a4c9d','#1a7a6d','#9d6a4c','#4c9d68','#9d4c78','#3f5ea8','#7a6a1a'];
@@ -579,22 +579,22 @@ function segCard(set,s,t){
     body=rows.length?rows.join('')+(fn>rows.length?`<div class="card-empty">${plural(fn-rows.length,'more participant')}</div>`:'')
       :`<div class="card-empty">${s.mode==='auto'&&!LISTS.has(s.id)?'List not built yet. Use <b>Refresh list</b> to build it from the conditions.':filtersOn()?'No one here matches the filters.':s.mode==='manual'?'No one added yet. Use <b>Add</b> to pick participants.':'No participant matches these conditions right now.'}</div>`;
   }
-  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(s.id)?'picked':''} ${s.status==='inactive'?'inactive':''}" style="--icon:${colorFor(s.id)}" data-seg="${s.id}" data-drop="${s.id}">
+  return `<article class="card ${n?'':'zero'} ${collapsed?'collapsed':''} ${S.cardSel.has(s.id)?'picked':''} ${s.status==='inactive'?'inactive':''}" style="--icon:${colorFor(s.id)}" data-testid="sgb-card" data-seg="${s.id}" data-drop="${s.id}">
     <div class="card-h" ${S.arranging?'':`tabindex="0" role="button" aria-label="Open ${esc(s.name)}"`}>
       ${S.arranging?'<span class="handle c-handle" title="Drag segment"></span>':`<input type="checkbox" class="cardsel" data-cardsel="${s.id}" ${S.cardSel.has(s.id)?'checked':''} aria-label="Select ${esc(s.name)} for an action">`}
       <div class="card-icon" aria-hidden="true">${esc(s.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
-      <div class="card-info"><div class="card-title">${esc(s.name)}</div>
+      <div class="card-info"><div class="card-title" data-testid="sgb-card-title">${esc(s.name)}</div>
         <button class="card-count" data-cardtab="${s.id}">${filtersOn()?`${fmt(fn)} of ${fmt(n)} match`:plural(n,'participant')} · ${view==='people'?'conditions':'list'}</button></div>
-      <div class="card-acts">${edit?`<button class="icon-btn" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">✎</button>`:''}
+      <div class="card-acts">${edit?`<button class="icon-btn" data-testid="sgb-card-edit" data-act="edit-seg" data-seg="${s.id}" title="Edit segment" aria-label="Edit ${esc(s.name)}">✎</button>`:''}
         <button class="icon-btn collapse-btn" data-collapse="${s.id}" aria-expanded="${!collapsed}" aria-label="${collapsed?'Expand':'Collapse'} ${esc(s.name)}" title="${collapsed?'Expand':'Collapse'}">⌄</button></div>
     </div>
     ${s.description?`<div class="card-desc" title="${esc(s.description)}">${esc(s.description)}</div>`:''}
     <div class="card-chips">${chips.join('')}</div>
     <div class="card-body">${body}</div>
     <div class="card-f">
-      <button class="btn" data-openseg="${s.id}">View all</button>
-      ${s.mode==='auto'?`<button class="btn" data-act="refresh-list" data-seg="${s.id}" ${!canEdit(set)||S.arranging||S.refreshing||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Build this list from the conditions and store it'}">${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</button>`:''}
-      ${s.mode==='manual'?`<button class="btn" data-act="add-people" data-seg="${s.id}" ${!edit||S.arranging||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Pick participants to add to this segment'}">Add</button>`:''}
+      <button class="btn" data-testid="sgb-card-viewall" data-openseg="${s.id}">View all</button>
+      ${s.mode==='auto'?`<button class="btn" data-testid="sgb-card-refresh" data-act="refresh-list" data-seg="${s.id}" ${!canEdit(set)||S.arranging||S.refreshing||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Build this list from the conditions and store it'}">${S.refreshing?.has(s.id)?'Refreshing…':'Refresh list'}</button>`:''}
+      ${s.mode==='manual'?`<button class="btn" data-testid="sgb-card-add" data-act="add-people" data-seg="${s.id}" ${!edit||S.arranging||s.status==='inactive'?'disabled':''} title="${s.status==='inactive'?'Inactive segments place no one':'Pick participants to add to this segment'}">Add</button>`:''}
       <details class="fdrop menu"><summary class="btn">Actions</summary><div class="fpanel menu-panel">
         <div class="subtle small" style="padding:2px 6px 6px">Applies to ${filtersOn()?`the ${fmt(fn)} filtered participants`:plural(n,'participant')} in this segment</div>
         <button class="menu-item" data-act="comm" data-seg="${s.id}">Send communication</button>
@@ -657,11 +657,11 @@ function downloadCsv(title,head,lines){
 function archivedHtml(){
   const rows=ARCHIVED.slice().sort((a,b)=>a.name.localeCompare(b.name));
   return `<div class="banner"><div><b>Archived segments.</b> They place no one. Restore one to put it back at the end of the board${'' }, or delete it for good.</div></div>
-    ${rows.length?`<div class="cards">${rows.map(x=>`<article class="card arch" data-arch="${x.id}">
+    ${rows.length?`<div class="cards">${rows.map(x=>`<article class="card arch" data-testid="sgb-arch-card" data-arch="${x.id}">
       <div class="card-h"><div class="card-icon" aria-hidden="true">${esc(x.name.replace(/[^A-Za-z0-9]/g,'')[0]||'S')}</div>
         <div class="card-info"><div class="card-title">${esc(x.name)}</div><div class="card-sub">${x.mode==='auto'?'Automated':'Manual'}${x.archivedAt?.toDate?` · archived ${esc(TIME.format(x.archivedAt.toDate()))}`:''}</div></div></div>
       ${x.description?`<div class="card-desc">${esc(x.description)}</div>`:''}
-      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-act="unarchive" data-seg="${x.id}">Unarchive</button><button class="btn danger" data-act="delete-seg" data-seg="${x.id}">Delete</button>`:''}</div></article>`).join('')}</div>`
+      <div class="card-f">${canEdit(curSet())?`<button class="btn" data-testid="sgb-arch-unarchive" data-act="unarchive" data-seg="${x.id}">Unarchive</button><button class="btn danger" data-testid="sgb-arch-delete" data-act="delete-seg" data-seg="${x.id}">Delete</button>`:''}</div></article>`).join('')}</div>`
       :'<div class="empty"><h3>No archived segments</h3></div>'}`;
 }
 async function unarchiveSeg(id){
@@ -737,22 +737,22 @@ function renderCmp(){
     const vals=cmpValues(), T=CMP.table, w=T?Math.max(0,...T.map(r=>r.length)):0;
     body=`<label class="f">Match by</label><div class="seg-toggle" role="radiogroup" aria-label="Match by">${[['email','Email'],['name','Name']].map(([v,l])=>`<label><input type="radio" name="cmpBy" value="${v}" ${CMP.by===v?'checked':''}>${l}</label>`).join('')}</div>
       <p class="subtle small" style="margin:6px 0 0">${CMP.by==='email'?'Emails are compared ignoring case and spaces.':'Names are compared ignoring case and extra spaces. People who share a name all count as a match.'}</p>
-      <label class="f" for="cmpFile">Upload a list <span class="opt">CSV or Excel</span></label><input id="cmpFile" type="file" accept=".csv,.txt,.xlsx,.xls">
+      <label class="f" for="cmpFile">Upload a list <span class="opt">CSV or Excel</span></label><input id="cmpFile" data-testid="sgb-cmp-file" type="file" accept=".csv,.txt,.xlsx,.xls">
       ${T?`<div class="cmp-col"><label class="f" for="cmpCol">Column in ${esc(CMP.fileName)}</label><select id="cmpCol">${Array.from({length:w},(_,i)=>`<option value="${i}" ${i===CMP.col?'selected':''}>${esc(CMP.header&&T[0][i]?T[0][i]:'Column '+String.fromCharCode(65+i%26))}</option>`).join('')}</select>
         <label class="f" style="font-weight:400"><input type="checkbox" id="cmpHead" ${CMP.header?'checked':''}> First row is a header</label></div>`:''}
       <label class="f" for="cmpPaste">…or paste ${CMP.by==='email'?'emails':'names'}, one per line <span class="opt">used instead of the file</span></label>
-      <textarea id="cmpPaste" rows="4" placeholder="${CMP.by==='email'?'someone@example.com':'Full name'}">${esc(CMP.paste)}</textarea>
+      <textarea id="cmpPaste" data-testid="sgb-cmp-paste" rows="4" placeholder="${CMP.by==='email'?'someone@example.com':'Full name'}">${esc(CMP.paste)}</textarea>
       <div class="info" id="cmpInfo">${vals.length?`${plural(vals.length,'value')} to compare against the ${plural(cmpCurrentRows().length,'participant')} in View all.`:'Upload a file or paste a list to compare.'}</div>`;
-    foot=`<span class="err" id="cmpErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="cmpGo" ${vals.length&&!CMP.busy?'':'disabled'}>Compare</button>`;
+    foot=`<span class="err" id="cmpErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="cmpGo" data-testid="sgb-cmp-go" ${vals.length&&!CMP.busy?'':'disabled'}>Compare</button>`;
   } else {
     const n={matched:R.matched.length,onlyCurrent:R.onlyCurrent.length,onlyImported:R.onlyImported.length}, rows=cmpRowsFor(CMP.tab), shown=rows.slice(0,200);
-    body=`<div class="cmp-tiles">${CMP_TABS.map(([k,l,sub])=>`<button class="cmp-tile ${k}" data-cmptab="${k}" aria-pressed="${CMP.tab===k}"><b>${fmt(n[k])}</b><span>${l}</span><small>${sub}</small></button>`).join('')}</div>
+    body=`<div class="cmp-tiles">${CMP_TABS.map(([k,l,sub])=>`<button class="cmp-tile ${k}" data-testid="sgb-cmp-tile" data-cmptab="${k}" aria-pressed="${CMP.tab===k}"><b>${fmt(n[k])}</b><span>${l}</span><small>${sub}</small></button>`).join('')}</div>
       <p class="subtle small" style="margin:8px 0">Matched by ${R.by} · ${plural(R.imported,'unique imported value')}${R.dupImports?` (${fmt(R.dupImports)} repeated ${R.dupImports===1?'value':'values'} ignored)`:''} · ${plural(R.current,'participant')} in View all.</p>
       ${rows.length?`<div class="tbl-wrap"><table class="pt"><thead><tr><th>${CMP.tab==='onlyImported'?'Imported value':'Participant'}</th><th>${CMP.tab==='onlyImported'?'Found in participant metadata':'Email'}</th><th>Journey</th></tr></thead><tbody>
         ${shown.map(r=>CMP.tab==='onlyImported'?`<tr><td>${esc(r[1])}</td><td>${r[2]?`${esc(r[3])}<div class="subtle small">${esc(r[7])}</div>`:'<span class="chip bad">Not found</span>'}</td><td>${esc(r[5])}</td></tr>`
           :`<tr><td><div class="pn">${esc(r[3])}</div></td><td>${esc(r[4])||'<span class="subtle">—</span>'}</td><td>${esc(r[5])}</td></tr>`).join('')}
       </tbody></table></div>${rows.length>shown.length?`<p class="subtle small">Showing 200 of ${fmt(rows.length)}. Export for the full list.</p>`:''}`:'<p class="subtle" style="padding:12px 0">Nobody in this group.</p>'}`;
-    foot=`<button class="btn" data-act="cmp-back" style="margin-right:auto">← Compare another list</button><button class="btn" data-act="cmp-export" ${rows.length?'':'disabled'}>Export this group</button><button class="btn primary" data-act="cmp-export-all">Export all three</button>`;
+    foot=`<button class="btn" data-act="cmp-back" style="margin-right:auto">← Compare another list</button><button class="btn" data-testid="sgb-cmp-export" data-act="cmp-export" ${rows.length?'':'disabled'}>Export this group</button><button class="btn primary" data-testid="sgb-cmp-export-all" data-act="cmp-export-all">Export all three</button>`;
   }
   $('#cmpDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="cmpTitle">Import &amp; compare</h2><p class="subtle">${esc(s.name)} · compare an outside list with who is in View all</p></div>
     <div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
@@ -776,8 +776,8 @@ function tableHtml(set,d,rows,extra){
   const edit=canEdit(set)&&!['group','ungrouped'].includes(d.kind), shown=rows.slice(0,S.limit);
   if(!rows.length) return `<p class="subtle" style="padding:16px 0">${S.dq?'No participants match your search.':'No participants here.'}</p>`;
   return `<div class="tbl-wrap"><table class="pt"><thead><tr>${edit?'<th class="c"><input type="checkbox" id="selAll" aria-label="Select all shown"></th>':''}<th>Participant</th><th>Journey</th><th>Customer · Finance</th><th class="num">uP! / CPM</th><th class="num">Age</th>${extra?`<th>${extra.h}</th>`:''}</tr></thead><tbody>
-  ${shown.map(([p,m])=>`<tr data-pid="${p.pid}" ${edit&&MEMBERSHIP_EDIT?'draggable="true"':''} class="${S.sel.has(p.pid)?'sel':''} ${d.hl===p.pid?'hl':''}">
-    ${edit?`<td class="c"><input type="checkbox" data-selpid="${p.pid}" ${S.sel.has(p.pid)?'checked':''} aria-label="Select ${esc(p.name)}"></td>`:''}
+  ${shown.map(([p,m])=>`<tr data-testid="sgb-drawer-row" data-pid="${p.pid}" ${edit&&MEMBERSHIP_EDIT?'draggable="true"':''} class="${S.sel.has(p.pid)?'sel':''} ${d.hl===p.pid?'hl':''}">
+    ${edit?`<td class="c"><input type="checkbox" data-testid="sgb-drawer-row-select" data-selpid="${p.pid}" ${S.sel.has(p.pid)?'checked':''} aria-label="Select ${esc(p.name)}"></td>`:''}
     <td><div class="pn">${esc(p.name)}${m.pinned?LOCK:''}</div>${p.email?`<div class="pid">${esc(p.email)}</div>`:''}</td>
     <td>${esc(p.journey)}<div class="subtle small">${esc(p.mode)}${p.queue.inQueue?` · ${esc(p.queue.name)} #${p.queue.position}`:''}${p.workshop.name?` · ${esc(p.workshop.name)}`:''}${p.pending.length?` · ${plural(p.pending.length,'action')} pending`:''}</div>${p.f.onboardingStatus!=='ONBOARDED'?`<div class="subtle small">${VAL.onboardingStatus[p.f.onboardingStatus]}</div>`:''}</td>
     <td>${statusCell(p)}</td><td class="num" title="Counted from consumedproducts with the products picked in this segment's uP! / CPM conditions">${cnt(p,'upCount')} / ${cnt(p,'cpmCount')}</td><td class="num">${p.f.age??'<span class="chip bad">—</span>'}</td>
@@ -835,7 +835,7 @@ function renderDrawer(fresh){
       const sync=!L?'The list hasn’t been saved yet.':(saved===n&&inBoth===n)?`The saved list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
         :`The saved list has ${fmt(saved)} (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'—'}): ${fmt(n-inBoth)} new match${n-inBoth===1?'':'es'} not in it, ${fmt(saved-inBoth)} in it that no longer match.`;
       tools=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><p class="subtle small" style="margin:0;flex:1;min-width:220px">Everyone who matches the conditions right now. ${sync}${pinnedOut?` ${plural(pinnedOut,'more participant')} match${pinnedOut===1?'es':''} but ${pinnedOut===1?'is':'are'} in a manual segment, so ${pinnedOut===1?'is':'are'} left out.`:''}</p>
-        ${canEdit(set)&&s.status!=='inactive'?`<button class="btn" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''}>${S.refreshing?.has(s.id)?'Saving…':'Save as list'}</button>`:''}</div>`;
+        ${canEdit(set)&&s.status!=='inactive'?`<button class="btn" data-testid="sgb-drawer-save-list" data-act="refresh-list" data-seg="${s.id}" ${S.refreshing?'disabled':''}>${S.refreshing?.has(s.id)?'Saving…':'Save as list'}</button>`:''}</div>`;
       content=tableHtml(set,d,drawerRows(set,d),{h:'Saved list',cell:(p)=>L?.ids.has(p.pid)?'In list':'<span class="chip warn">Not saved yet</span>'});
     }
     else content=tableHtml(set,d,drawerRows(set,d));
@@ -888,12 +888,12 @@ function renderDrawer(fresh){
   }
   const showSearch=!['history','activity'].includes(d.kind)&&!(d.kind==='seg'&&d.tab==='rules');
   const hint=edit&&showSearch&&MEMBERSHIP_EDIT?`<p class="subtle small" style="margin:0">Select participants and use <b>Move to…</b>, or drag rows onto a segment on the board.</p>`:'';
-  $('#drawer').innerHTML=`<div class="d-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${desc?`<p class="d-desc">${esc(desc)}</p>`:''}<div class="chips">${chips}</div></div><button class="icon-btn" data-act="close" aria-label="Close">×</button></div>
-    ${tabs}<div class="d-tools">${tools}${showSearch?`<div class="dq-row"><input id="dq" type="search" placeholder="Search in this list" value="${esc(S.dq)}" aria-label="Search in this list">${d.kind==='seg'?'<button class="btn" data-act="compare" title="Compare an uploaded or pasted list with this list">Import &amp; compare</button>':''}${['seg','dups','unseg'].includes(d.kind)?'<button class="btn" data-act="export-list" title="Download the rows shown as a CSV file">Export CSV</button>':''}</div>`:''}${hint}</div>
+  $('#drawer').innerHTML=`<div class="d-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${desc?`<p class="d-desc">${esc(desc)}</p>`:''}<div class="chips">${chips}</div></div><button class="icon-btn" data-testid="sgb-drawer-close" data-act="close" aria-label="Close">×</button></div>
+    ${tabs}<div class="d-tools">${tools}${showSearch?`<div class="dq-row"><input id="dq" data-testid="sgb-drawer-search" type="search" placeholder="Search in this list" value="${esc(S.dq)}" aria-label="Search in this list">${d.kind==='seg'?'<button class="btn" data-testid="sgb-drawer-compare" data-act="compare" title="Compare an uploaded or pasted list with this list">Import &amp; compare</button>':''}${['seg','dups','unseg'].includes(d.kind)?'<button class="btn" data-testid="sgb-drawer-export" data-act="export-list" title="Download the rows shown as a CSV file">Export CSV</button>':''}</div>`:''}${hint}</div>
     <div class="d-body">${content}</div>
     ${edit&&showSearch&&['seg','dups','unseg'].includes(d.kind)?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button>
-      ${d.kind==='seg'&&set._by.get(d.id)?.mode==='manual'?`<button class="btn" data-act="remove-from-seg" data-seg="${d.id}">Remove from segment</button>`:''}
-      <button class="btn primary" data-act="move-manual" ${set.segments.some(x=>x.mode==='manual'&&x.status!=='inactive'&&x.id!==d.id)?'':'disabled title="Create an active manual segment first"'}>Move to manual segment…</button></div>`:''}
+      ${d.kind==='seg'&&set._by.get(d.id)?.mode==='manual'?`<button class="btn" data-testid="sgb-bulk-remove" data-act="remove-from-seg" data-seg="${d.id}">Remove from segment</button>`:''}
+      <button class="btn primary" data-testid="sgb-bulk-move-manual" data-act="move-manual" ${set.segments.some(x=>x.mode==='manual'&&x.status!=='inactive'&&x.id!==d.id)?'':'disabled title="Create an active manual segment first"'}>Move to manual segment…</button></div>`:''}
     ${edit&&showSearch&&MEMBERSHIP_EDIT?`<div class="bulk" id="bulk" ${S.sel.size?'':'hidden'}><b>${plural(S.sel.size,'participant')} selected</b><button class="btn" data-act="clear-sel">Clear</button><button class="btn primary" data-act="move">Move to…</button><span class="dev-note">seg_moveParticipants</span></div>`:''}`;
   $('#drawer .d-body').scrollTop=keep;
 }
@@ -1009,11 +1009,11 @@ const optsFor=field=>{const f=FIELD[field];
 function multiSel(r){
   const opts=optsFor(r.field), map=Object.fromEntries(opts), sel=Array.isArray(r.value)?r.value:[];
   const label=sel.length?sel.map(v=>map[v]||v).join(', '):'Choose…';
-  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}">${esc(label)}</summary><div class="fpanel">
+  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}" data-testid="sgb-dlg-cond-values">${esc(label)}</summary><div class="fpanel">
     ${opts.length>8?'<input type="search" class="ms-q" placeholder="Search" aria-label="Search options">':''}
     <div class="ms-tools"><button type="button" data-msall="1">Select all</button><button type="button" data-msall="0">Clear</button>
       <span class="subtle small ms-count">${sel.length} of ${opts.length}</span></div>
-    <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(String(l).toLowerCase())}"><input type="checkbox" data-k="v" value="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>`;
+    <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(String(l).toLowerCase())}"><input type="checkbox" data-testid="sgb-dlg-cond-option" data-k="v" value="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>`;
 }
 function syncMsSummary(scope,r){
   const map=Object.fromEntries(optsFor(r.field)), sum=scope.querySelector('.ms-sum');
@@ -1044,7 +1044,7 @@ function openSegDlg(mode,segId){
 function rowHtml(r,i){
   const f=FIELD[r.field], used=new Set(B.rows.map(x=>x.field));
   const avail=FIELDS.filter(x=>!SCOPE_FIELDS.includes(x.key)&&(x.key===r.field||!used.has(x.key)));
-  const field=`<select data-k="field" aria-label="Field">${avail.map(x=>`<option value="${x.key}" ${x.key===r.field?'selected':''}>${x.label}</option>`).join('')}</select>`;
+  const field=`<select data-testid="sgb-dlg-cond-field" data-k="field" aria-label="Field">${avail.map(x=>`<option value="${x.key}" ${x.key===r.field?'selected':''}>${x.label}</option>`).join('')}</select>`;
   const rm=`<button type="button" class="icon-btn" data-b="rm" aria-label="Remove condition">×</button>`;
   // onboarding: one choice, Onboarded or Yet to onboard (they can't both be true)
   if(r.field==='onboardingStatus'){const k=obKind(r.value);
@@ -1089,23 +1089,23 @@ function valHtmlBase(r,f){
 function renderSegDlg(){
   const set=curSet(), h=[];
   h.push(`<div class="dlg-h"><h2>${B.mode==='edit'?'Edit segment':'New segment'}</h2><p class="subtle">${esc(set.name)}${B.mode==='edit'?' · '+(B.type==='auto'?'automated':'manual')+' segment':''}</p></div><div class="dlg-b">`);
-  h.push(`<label class="f" for="sName">Segment name</label><input id="sName" type="text" value="${esc(B.name)}" placeholder="e.g. CPM – ready for Arena" autocomplete="off">`);
+  h.push(`<label class="f" for="sName">Segment name</label><input id="sName" data-testid="sgb-dlg-name" type="text" value="${esc(B.name)}" placeholder="e.g. CPM – ready for Arena" autocomplete="off">`);
   h.push(`<label class="f" for="sDesc">Description <span class="opt">optional</span></label><textarea id="sDesc" rows="2" maxlength="${DESC_MAX}" placeholder="Who this segment is for and what it is used for">${esc(B.description)}</textarea><div class="char-count" id="sDescN">${B.description.length} / ${DESC_MAX}</div>`);
   if(B.mode==='create')
-    h.push(`<label class="f">How participants get in</label><div class="radio-cards"><label><input type="radio" name="sType" value="auto" ${B.type==='auto'?'checked':''}> <b>Automated</b><span>Rules place people here and keep it up to date.</span></label><label><input type="radio" name="sType" value="manual" ${B.type==='manual'?'checked':''}> <b>Manual</b><span>People are placed here by hand and stay until moved.</span></label></div><p class="subtle small">You can’t change this after the segment is created.</p>`);
-  h.push(`<label class="f">Status</label><div class="seg-toggle" role="radiogroup" aria-label="Status">${[['active','Active'],['inactive','Inactive']].map(([v,l])=>`<label><input type="radio" name="sStatus" value="${v}" ${B.status===v?'checked':''}>${l}</label>`).join('')}</div>
+    h.push(`<label class="f">How participants get in</label><div class="radio-cards"><label><input type="radio" data-testid="sgb-dlg-type-auto" name="sType" value="auto" ${B.type==='auto'?'checked':''}> <b>Automated</b><span>Rules place people here and keep it up to date.</span></label><label><input type="radio" data-testid="sgb-dlg-type-manual" name="sType" value="manual" ${B.type==='manual'?'checked':''}> <b>Manual</b><span>People are placed here by hand and stay until moved.</span></label></div><p class="subtle small">You can’t change this after the segment is created.</p>`);
+  h.push(`<label class="f">Status</label><div class="seg-toggle" role="radiogroup" aria-label="Status">${[['active','Active'],['inactive','Inactive']].map(([v,l])=>`<label><input type="radio" ${v==='active'?'data-testid="sgb-dlg-status-active"':'data-testid="sgb-dlg-status-inactive"'} name="sStatus" value="${v}" ${B.status===v?'checked':''}>${l}</label>`).join('')}</div>
     <p class="subtle small" id="sStatusHint" style="margin:6px 0 0">${statusHint()}</p>`);
   h.push(`<label class="f">Journey</label>
     <div id="sScopeBox">${scopeHtml()}</div>`);
   if(B.type==='auto'){
     // no all/any choice: new segments always match ALL conditions; an existing ANY rule keeps its B.comb
     h.push(`<label class="f">Conditions</label>
-      <div id="conds">${B.rows.map(rowHtml).join('')}</div><button type="button" class="btn ghost" data-b="add">+ Add condition</button>
+      <div id="conds">${B.rows.map(rowHtml).join('')}</div><button type="button" class="btn ghost" data-testid="sgb-dlg-add-cond" data-b="add">+ Add condition</button>
       <div class="preview" id="sPrev" aria-live="polite"></div>`);
     if(B.mode==='create') h.push(`<label class="f">Sequence</label><p class="subtle small" style="margin:0">Segments are checked from top to bottom, and a participant goes into the first one they match. Drag the new segment, or use the arrows, to set where it is checked.</p><div id="seqBox"></div>`);
   } else h.push(`<div class="info">A manual segment starts empty. Move participants in from any segment, by drag and drop or with “Move to…”.${B.eligibility?' It keeps the copied eligibility conditions, so you’ll see a warning when someone no longer qualifies.':''}</div>`);
-  h.push(`<details class="store" open><summary>Stored as <span>· segmentboardconfig/{id}</span></summary><pre id="sJson"></pre></details>`);
-  h.push(`</div><div class="dlg-f"><span class="err" id="sErr"></span>${B.mode==='edit'?'<button class="btn" id="sArchive">Archive segment</button>':''}<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="sGo">${B.mode==='edit'?'Save changes':'Create segment'}</button></div>`);
+  h.push(`<details class="store" open><summary>Stored as <span>· segmentboardconfig/{id}</span></summary><pre id="sJson" data-testid="sgb-dlg-stored"></pre></details>`);
+  h.push(`</div><div class="dlg-f"><span class="err" id="sErr"></span>${B.mode==='edit'?'<button class="btn" id="sArchive" data-testid="sgb-dlg-archive">Archive segment</button>':''}<button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="sGo" data-testid="sgb-dlg-save">${B.mode==='edit'?'Save changes':'Create segment'}</button></div>`);
   $('#segDlg .dlg').innerHTML=h.join('');
   renderSeq(); updatePreview();
 }
@@ -1128,10 +1128,10 @@ const jHint=()=>{const t=SCOPE[B.scope.type];
   return B.scope.ids.length?`Only participants in ${scopeText(B.scope)} can be in this segment.`:`No ${t.label.toLowerCase()} picked: the segment applies to all ${t.plural}.`;};
 function scopeHtml(){   // the journey dropdown
   const t=SCOPE[B.scope.type], opts=t.opts(), sel=B.scope.ids;
-  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}" id="sJSum" aria-label="${t.label}">${esc(scopeText(B.scope))}</summary><div class="fpanel">
+  return `<details class="fdrop ms"><summary class="ms-sum ${sel.length?'has':''}" id="sJSum" data-testid="sgb-dlg-journey" aria-label="${t.label}">${esc(scopeText(B.scope))}</summary><div class="fpanel">
       ${opts.length>8?`<input type="search" class="ms-q" placeholder="Search ${t.plural}" aria-label="Search ${t.plural}">`:''}
       <div class="ms-tools"><button type="button" data-jall="1">Select all</button><button type="button" data-jall="0">Clear</button><span class="subtle small" id="sJCount">${sel.length} of ${opts.length}</span></div>
-      <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(l.toLowerCase())}"><input type="checkbox" data-jg="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>
+      <div class="checks">${opts.map(([v,l])=>`<label data-name="${esc(l.toLowerCase())}"><input type="checkbox" data-testid="sgb-dlg-journey-option" data-jg="${esc(v)}" ${sel.includes(v)?'checked':''}>${esc(l)}</label>`).join('')}</div></div></details>
     <p class="subtle small" id="sJText" style="margin:6px 0 0">${jHint()}</p>`;
 }
 function syncJourney(){   // keep the scope dropdown summary, count and hint in step with B.scope
@@ -1403,17 +1403,17 @@ function openAdd(segId){
   const set=curSet(), s=set._by.get(segId); if(!canEdit(set)||!s||s.mode!=='manual') return;
   ADD={segId,sel:new Set(),q:''};
   $('#addDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="addTitle">Add participants to ${esc(s.name)}</h2><p class="subtle">They stay in this segment until someone removes them.</p></div>
-    <div class="dlg-b"><label class="f" for="aq">Find participants</label><input id="aq" type="search" placeholder="Search by name or email" autocomplete="off">
+    <div class="dlg-b"><label class="f" for="aq">Find participants</label><input id="aq" data-testid="sgb-add-search" type="search" placeholder="Search by name or email" autocomplete="off">
       <div class="target-list" id="alist"></div>
       <span class="dev-note block">segmentboardlist/${esc(segId)}.profilelist += picked profile ids</span></div>
-    <div class="dlg-f"><span class="err" id="aErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="aGo">Add</button></div>`;
+    <div class="dlg-f"><span class="err" id="aErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="aGo" data-testid="sgb-add-go">Add</button></div>`;
   renderAddList(); $('#addDlg').showModal(); $('#aq').focus();
 }
 function renderAddList(){
   const set=curSet(), q=ADD.q.trim().toLowerCase(), mm=MEM[set.id], here=LISTS.get(ADD.segId)?.ids;
   const hits=P.filter(p=>!here?.has(p.pid)&&(!q||qMatch(p,q))).slice(0,60);
   $('#alist').innerHTML=hits.length?hits.map(p=>{const m=mm.get(p.pid);
-    return `<label><input type="checkbox" data-addpid="${p.pid}" ${ADD.sel.has(p.pid)?'checked':''}><span class="grow">${esc(p.name)}<div class="subtle small">${p.email?esc(p.email)+' · ':''}${esc(p.journey)} · ${m.segs.length?'In '+esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment'}</div></span></label>`;}).join('')
+    return `<label><input type="checkbox" data-testid="sgb-add-option" data-addpid="${p.pid}" ${ADD.sel.has(p.pid)?'checked':''}><span class="grow">${esc(p.name)}<div class="subtle small">${p.email?esc(p.email)+' · ':''}${esc(p.journey)} · ${m.segs.length?'In '+esc(m.segs.map(id=>segName(set,id)).join(', ')):'Not in a segment'}</div></span></label>`;}).join('')
     :`<div class="subtle" style="padding:12px">${q?'No participant found.':'Everyone is already in this segment.'}</div>`;
   const go=$('#aGo'); go.textContent=ADD.sel.size?`Add ${plural(ADD.sel.size,'participant')}`:'Add'; go.disabled=!ADD.sel.size;
 }
@@ -1440,8 +1440,8 @@ function openManualMove(){
   MM={pids,target:null};
   $('#moveDlg .dlg').innerHTML=`<div class="dlg-h"><h2 id="moveTitle">Move ${plural(pids.length,'participant')} to a manual segment</h2>
       <p class="subtle">They’re taken out of any other manual segment and left out of every automated segment while they’re here.</p></div>
-    <div class="dlg-b"><div class="target-list">${targets.map(x=>`<label><input type="radio" name="mmTgt" value="${x.id}"><span class="grow">${esc(x.name)}<div class="subtle small">${plural(LISTS.get(x.id)?.ids.size||0,'participant')}</div></span></label>`).join('')}</div></div>
-    <div class="dlg-f"><span class="err" id="mmErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="mmGo" disabled>Move</button></div>`;
+    <div class="dlg-b"><div class="target-list">${targets.map(x=>`<label><input type="radio" data-testid="sgb-move-target" name="mmTgt" value="${x.id}"><span class="grow">${esc(x.name)}<div class="subtle small">${plural(LISTS.get(x.id)?.ids.size||0,'participant')}</div></span></label>`).join('')}</div></div>
+    <div class="dlg-f"><span class="err" id="mmErr"></span><button class="btn" data-dlg="cancel">Cancel</button><button class="btn primary" id="mmGo" data-testid="sgb-move-go" disabled>Move</button></div>`;
   $('#moveDlg').showModal();
 }
 async function doManualMove(){

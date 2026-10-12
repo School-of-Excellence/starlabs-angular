@@ -307,3 +307,15 @@ uP! at least 2 → 100, between 1–2 → 100. tsc 0, esbuild ok, ng build ok.
 `saveManualList`. 5 — the `#q` input handler back to the dropdown, drop `qMatch`/`S.q` from `filtersOn`/`refreshFilter`.
 6/7 — remove `archivedHtml`/`unarchiveSeg`/`deleteSeg`, the toolbar button, `unarchiveSegment`/`deleteSegment` in the component.
 8 — put the four `fdrop`s back in `filterBar`. 9 — remove `countDrop` and the `up*`/`cpm*` filter fields.
+
+---
+
+## 2026-10-12 · e2e hooks (prefix `sgb`, 57 literal `data-testid`s)
+
+Toolbar, stats, cards, segment dialog, side panel, bulk bar, move/add dialogs, archived view, compare dialog and the uP!/CPM
+count filters carry literal hooks. Generated markup uses a literal lookup where needed (status radios, count-filter inputs:
+`${k==='up'?'data-testid="sgb-filter-up-op"':'data-testid="sgb-filter-cpm-op"'}`) because the readiness gate ignores any
+id containing `${…}`. Spec + seed live in starlabs-e2e-tests `profiles/segment-board.spec.ts` / `seed-segment-board.js`
+(hub journal `specs/journals/2026-10-12-segment-board-e2e.md`). hook-diff: aligned. Land order: these app hooks first, then the spec.
+Revert: strip `data-testid="sgb-…"` attributes from the engine and `segment-board.component.html` (behaviour unaffected), and
+drop the spec + seed module in the hub.
