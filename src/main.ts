@@ -23,6 +23,10 @@ if (emuEnv.useEmulators && emuEnv.emulators) {
   const e = emuEnv.emulators;
   const firestore = getFirestore(app);
   if (e.firestore) connectFirestoreEmulator(firestore, e.firestore.host, e.firestore.port);
+  // Named DB `firestore-atc` MUST be emulator-connected too: ATC screens call getFirestore("firestore-atc")
+  // directly, and an unconnected handle points at the REAL cloud database. ATC is tested against the
+  // emulator ONLY — never the development or production database.
+  if (e.firestore) connectFirestoreEmulator(getFirestore(app, 'firestore-atc'), e.firestore.host, e.firestore.port);
   if (e.auth) connectAuthEmulator(getAuth(app), e.auth.url, { disableWarnings: true });
   if (e.storage) connectStorageEmulator(getStorage(app), e.storage.host, e.storage.port);
   console.info('[emulator] Firestore/Auth/Storage connected to local emulator', e);

@@ -1386,8 +1386,9 @@ export class EditAtcComponent {
       const atcDocRef = doc(this.firestoreATC, this.reportATC.atcpath);
       this.firebaseATCBatch.update(atcDocRef, notesMeta);
 
-      let audiodata: string[] = [];
-      let imagedata: string[] = [];
+      // start from the NEW uploads so an ATC with no existing notes keeps them (copies, so notesMeta's array is never shared)
+      let audiodata: string[] = [...audiobrief];
+      let imagedata: string[] = [...imagenotes];
 
       if (this.existingNotes != null) {
         audiodata = [...(this.existingNotes['changeworkbrief'] ?? []), ...audiobrief];
