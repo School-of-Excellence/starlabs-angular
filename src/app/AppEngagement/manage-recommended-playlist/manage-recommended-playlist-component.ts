@@ -1036,6 +1036,7 @@ async sendNotificationinBreakthrough(){
           .map(participant => {
             const metadata = participant['metadata'];
             return {
+              profileid: participant['profileid'],
               email: metadata['email'],
               name: metadata['name']
             };
@@ -1123,6 +1124,7 @@ async sendNotificationinBreakthrough(){
             }));
 
             return {
+              profileid: participant['profileid'],
               phonenumber: fullPhoneNumber,
               name,
               customParams: processedParams
