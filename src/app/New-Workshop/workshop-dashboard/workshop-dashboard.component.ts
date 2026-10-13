@@ -911,7 +911,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           name: param.name,
           value: param.value.replace(/\{\{name\}\}/g, name)
         }));
-        return { phonenumber, name, customParams: processedParams };
+        return { profileid: participant['profileid'], phonenumber, name, customParams: processedParams };
       });
 
     if (participants.length === 0) {
@@ -1059,7 +1059,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
           })
           .map(participant => {
             const metadata = participant['metadata'];
-            return { email: metadata['email'], name: metadata['name'] };
+            return { profileid: participant['profileid'], email: metadata['email'], name: metadata['name'] };
           });
 
         if (recipients.length === 0) {
@@ -1111,7 +1111,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
               name: param.name,
               value: param.value.replace(/\{\{name\}\}/g, name)
             }));
-            return { phonenumber: fullPhoneNumber, name, customParams: processedParams };
+            return { profileid: participant['profileid'], phonenumber: fullPhoneNumber, name, customParams: processedParams };
           });
 
         if (participants.length === 0) {
