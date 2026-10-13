@@ -2736,6 +2736,7 @@ export class ParticipantsAnalyticsComponent {
         }));
 
         return {
+          profileid: metadata['profileid'],
           phonenumber,
           name,
           customParams: processedParams
@@ -2911,6 +2912,7 @@ export class ParticipantsAnalyticsComponent {
               phonenumber, "conslingggg fullnum"
             );
             return {
+              profileid: metadata['profileid'],
               phonenumber,
               name,
               customParams: processedParams

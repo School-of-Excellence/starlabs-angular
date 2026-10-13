@@ -13,15 +13,13 @@
   </header>
 
   <!-- ============ New Users section ============ -->
-  <section class="eod-section">
+  <section class="eod-section" data-testid="eif-users-section">
     <div class="eod-section-head eod-section-head-controls">
       <h2 class="eod-section-title">Users</h2>
       <span class="eod-section-rule"></span>
 
-      <!-- One range drives both date-driven cards: Total New Users by signup
-           date, New Users to Paid by move date. B!G Participants has no
-           comparable date and is not filtered — its caption says so while a
-           range is active. -->
+      <!-- One range drives both cards: Total New Users by signup date,
+           New Users to Paid by move date. -->
       <div class="eod-eng-controls">
         <div class="eod-seg" role="group" aria-label="Users date range">
           <button data-testid="eif-users-range-all" type="button" [class.eod-seg-active]="usersRange === 'all'" [attr.aria-pressed]="usersRange === 'all'" (click)="setUsersRange('all')">All</button>
@@ -56,40 +54,67 @@
     }
 
     <div class="eod-grid">
-      @for (card of cards; track card.key; let i = $index) {
-        <button data-testid="eif-open-panel-1"
-          type="button"
-          class="eod-card"
-          [class.eod-accent-indigo]="card.accent === 'indigo'"
-          [class.eod-accent-emerald]="card.accent === 'emerald'"
-          [class.eod-accent-violet]="card.accent === 'violet'"
-          [style.animation-delay.ms]="80 + i * 90"
-          (click)="openPanel(card)"
-          [attr.aria-label]="card.title + ', ' + card.users.length + ' users. Open details panel'">
-          <div class="eod-card-top">
-            <span class="eod-chip"><mat-icon>{{ card.icon }}</mat-icon></span>
-            <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
-          </div>
-          <span class="eod-card-label">{{ card.title }}</span>
-          @if (cardLoading(card)) {
-            <span class="eod-skeleton eod-gh-num" aria-hidden="true"></span>
-          } @else {
-            <div class="eod-count-row">
-              <span class="eod-count">{{ card.displayCount | number }}</span>
-              @if (card.breakdown?.length) {
-                <div class="eod-card-chips">
-                  @for (b of card.breakdown; track b.label) {
-                    <span class="eod-card-chip"><strong>{{ b.count | number }}</strong>{{ b.label }}</span>
-                  }
-                </div>
-              }
-            </div>
-          }
-          <span class="eod-card-caption">{{ card.caption }}</span>
-        </button>
+      @for (card of userCards; track card.key; let i = $index) {
+        <ng-container *ngTemplateOutlet="opsCardTpl; context: { $implicit: card, i: i }"></ng-container>
       }
     </div>
   </section>
+
+  <!-- ============ B!G section ============ -->
+  <!-- Same card, same panel — only where it renders changed. Not under the
+       Users date range: it has no comparable date. -->
+  <section class="eod-section eod-section-gap" data-testid="eif-big-section">
+    <div class="eod-section-head">
+      <h2 class="eod-section-title">B!G</h2>
+      <span class="eod-section-rule"></span>
+    </div>
+    <div class="eod-grid">
+      @for (card of bigCards; track card.key; let i = $index) {
+        <ng-container *ngTemplateOutlet="opsCardTpl; context: { $implicit: card, i: i }"></ng-container>
+      }
+    </div>
+  </section>
+
+  <!-- One stat card, rendered by both the Users and the B!G grids. -->
+  <ng-template #opsCardTpl let-card let-i="i">
+    <button data-testid="eif-open-panel-1"
+      type="button"
+      class="eod-card"
+      [class.eod-accent-indigo]="card.accent === 'indigo'"
+      [class.eod-accent-emerald]="card.accent === 'emerald'"
+      [class.eod-accent-violet]="card.accent === 'violet'"
+      [class.eod-accent-amber]="card.accent === 'amber'"
+      [style.animation-delay.ms]="80 + i * 90"
+      (click)="openPanel(card)"
+      [attr.aria-label]="card.title + ', ' + card.users.length + ' users. Open details panel'">
+      <div class="eod-card-top">
+        <span class="eod-chip"><mat-icon>{{ card.icon }}</mat-icon></span>
+        <mat-icon class="eod-card-arrow" aria-hidden="true">north_east</mat-icon>
+      </div>
+      <span class="eod-card-label">{{ card.title }}</span>
+      @if (cardLoading(card)) {
+        <span class="eod-skeleton eod-gh-num" aria-hidden="true"></span>
+      } @else {
+        <div class="eod-count-row">
+          <span class="eod-count">{{ card.displayCount | number }}</span>
+          @if (card.breakdown?.length) {
+            <div class="eod-card-chips">
+              @for (b of card.breakdown; track b.label) {
+                <span class="eod-card-chip"><strong>{{ b.count | number }}</strong>{{ b.label }}</span>
+              }
+            </div>
+          }
+        </div>
+      }
+      @if (card.highlight && !cardLoading(card)) {
+        <span class="eod-card-amount" data-testid="eif-mc-card-amount">{{ card.highlight }}@if (card.highlightLabel) {<small class="eod-card-amount-label">{{ card.highlightLabel }}</small>}</span>
+      }
+      @if (card.highlightWords && !cardLoading(card)) {
+        <span class="eod-card-amount-words">{{ card.highlightWords }}</span>
+      }
+      <span class="eod-card-caption">{{ card.caption }}</span>
+    </button>
+  </ng-template>
 
   <!-- ============ Engagement section ============ -->
   <section class="eod-section eod-section-gap" #engSection tabindex="-1">
@@ -402,15 +427,35 @@
 
   <!-- ============ Device Breakdown ============ -->
   <section class="eod-section eod-section-gap">
-    <div class="eod-section-head">
+    <div class="eod-section-head eod-section-head-controls">
       <h2 class="eod-section-title">Device Breakdown</h2>
       <span class="eod-section-rule"></span>
-      <div class="eod-seg" role="group" aria-label="Device breakdown period">
-        <button data-testid="eif-set-db-range-20" type="button" [class.eod-seg-active]="dbRange === 1" [attr.aria-pressed]="dbRange === 1" (click)="setDbRange(1)">1M</button>
-        <button data-testid="eif-set-db-range-21" type="button" [class.eod-seg-active]="dbRange === 2" [attr.aria-pressed]="dbRange === 2" (click)="setDbRange(2)">2M</button>
-        <button data-testid="eif-set-db-range-22" type="button" [class.eod-seg-active]="dbRange === 3" [attr.aria-pressed]="dbRange === 3" (click)="setDbRange(3)">3M</button>
+      <!-- From is floored at the register's first day: this section is summed
+           from register pages only, so earlier dates would show nothing. -->
+      <div class="eod-eng-controls">
+        <div class="eod-seg" role="group" aria-label="Device breakdown period">
+          <button data-testid="eif-set-db-range-20" type="button" [class.eod-seg-active]="dbRange === 1" [attr.aria-pressed]="dbRange === 1" (click)="setDbRange(1)">1M</button>
+          <button data-testid="eif-set-db-range-21" type="button" [class.eod-seg-active]="dbRange === 2" [attr.aria-pressed]="dbRange === 2" (click)="setDbRange(2)">2M</button>
+          <button data-testid="eif-set-db-range-22" type="button" [class.eod-seg-active]="dbRange === 3" [attr.aria-pressed]="dbRange === 3" (click)="setDbRange(3)">3M</button>
+        </div>
+        <label class="eod-datefield">
+          <span>From</span>
+          <input data-testid="eif-db-range-from" type="date" [(ngModel)]="dbFrom" (change)="applyDbCustom()" [min]="dbMinDate" [max]="dbTo || todayStr">
+        </label>
+        <label class="eod-datefield">
+          <span>To</span>
+          <input data-testid="eif-db-range-to" type="date" [(ngModel)]="dbTo" (change)="applyDbCustom()" [min]="dbFrom || dbMinDate" [max]="todayStr">
+        </label>
+        @if (dbRange === 'custom') {
+          <button data-testid="eif-db-range-clear" type="button" class="eod-clear" (click)="setDbRange(1)">
+            <mat-icon>close</mat-icon>&nbsp;Clear
+          </button>
+        }
       </div>
     </div>
+    @if (dbCustomHint) {
+      <span class="eod-date-hint eod-date-hint-head" role="status">Pick both dates to apply the range</span>
+    }
 
     <article class="eod-bigcard eod-dbcard" [style.animation-delay.ms]="120">
       @if (naLoading) {
@@ -893,11 +938,19 @@
                       <span class="eod-tag eod-tag-journey">{{ row.journeyTag }}</span>
                     }
                   </span>
+                  <!-- Own line under the name: workshop titles are long and must wrap
+                       inside this column, not run under the phone/date column. -->
+                  @if (row.workshopTag) {
+                    <span class="eod-tag eod-tag-workshop" data-testid="eif-mc-workshop">{{ row.workshopTag }}</span>
+                  }
                   <span class="eod-row-email">@if (row.hl) {{{ row.hl.email[0] }}@if (row.hl.email[1]) {<mark>{{ row.hl.email[1] }}</mark>}{{ row.hl.email[2] }}} @else {{{ row.email || '—' }}}</span>
                 </div>
                 <div class="eod-row-side">
                   @if (row.hoursLabel) {
                     <span class="eod-row-hours">{{ row.hoursLabel }}</span>
+                  }
+                  @if (row.amountLabel) {
+                    <span class="eod-row-hours eod-row-amount" data-testid="eif-mc-amount">{{ row.amountLabel }}</span>
                   }
                   <span class="eod-row-phone">@if (row.hl) {{{ row.hl.phone[0] }}@if (row.hl.phone[1]) {<mark>{{ row.hl.phone[1] }}</mark>}{{ row.hl.phone[2] }}} @else {{{ row.phonenumber || '—' }}}</span>
                   @if (row.lastSeenLabel) {

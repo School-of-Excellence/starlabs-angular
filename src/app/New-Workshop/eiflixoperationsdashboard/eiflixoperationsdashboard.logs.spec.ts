@@ -1,4 +1,4 @@
-import { EiflixoperationsdashboardComponent } from './eiflixoperationsdashboard.component';
+import { EiflixoperationsdashboardComponent, journeySupportTotal, journeySupportParticipantId, indianNumberWords } from './eiflixoperationsdashboard.component';
 
 /**
  * EiFlix Mobile App Logs — filtering, sorting and paging over rows already loaded from `loginlog`.
@@ -677,9 +677,11 @@ describe('EiflixoperationsdashboardComponent — Users section date range', () =
     c.usersCustomStart = '';
     c.usersCustomEnd = '';
     c.usersRangeLabel = '';
+    c.planStatus = 'idle'; c.planTotals = new Map(); c.planPending = new Set();
+    c.loading = true; c.pmLoading = true;   // keep the Watson lookup out of unit tests
     c.cards = [
-      { key: 'total-new-users', title: 'Total New Users', caption: 'Signed up · not yet moved to paid', users: [], displayCount: 0 },
-      { key: 'new-users-to-paid', title: 'New Users to Paid', caption: 'Moved to existing / paid profiles', users: [], displayCount: 0 },
+      { key: 'total-new-users', title: 'Total New Users', caption: 'Signed up · not yet purchased journey', users: [], displayCount: 0 },
+      { key: 'new-users-to-paid', title: 'New Users to Paid', caption: 'Purchased Journey', users: [], displayCount: 0 },
       { key: 'big-participants', title: 'Total B!G Participants', caption: 'Active in a B!G journey', users: [], displayCount: 0 },
     ];
     c.splitUsers([
@@ -781,8 +783,8 @@ describe('EiflixoperationsdashboardComponent — Users section date range', () =
     c.setUsersRange('7d');
     expect(card(c, 'total-new-users').caption).withContext('caption names the window').toContain('7 days');
     expect(card(c, 'new-users-to-paid').caption).toContain('7 days');
-    // B!G has no comparable date, so the card has to say it is not filtered.
-    expect(card(c, 'big-participants').caption).toContain('not date-filtered');
+    // B!G has its own section and no comparable date — the range must not touch it.
+    expect(card(c, 'big-participants').caption).toBe(baseBig);
 
     c.setUsersRange('all');
     expect(card(c, 'total-new-users').caption).toBe(baseNew);
@@ -804,3 +806,285 @@ describe('EiflixoperationsdashboardComponent — Users section date range', () =
     expect(ids(c, 'total-new-users')).toEqual(['justSignedUp', 'todayNew']);
   });
 });
+
+/** Master Class Purchase (operator 2026-10-13) — captured payments, bucketed in memory by the Users range. */
+describe('EiflixoperationsdashboardComponent — Master Class Purchase', () => {
+  const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(10, 0, 0, 0); return d; };
+  const ref = (id: string) => ({ id, path: `workshopconfiguration/${id}` });   // DocumentReference-shaped
+
+  function make(): any {
+    const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
+    c.reducedMotion = true; c.activePanel = null; c.mcError = false;
+    c.usersRange = 'all'; c.usersCustomStart = ''; c.usersCustomEnd = ''; c.usersRangeLabel = '';
+    c.cards = [{ key: 'masterclass-purchase', title: 'Master Class Purchase', caption: '', users: [], displayCount: 0 }];
+    c.pmMap = new Map([['pmPerson', { name: 'Priya Participant', email: 'p@x.com', activejourney: 'j1' }]]);
+    c.nudMap = new Map([['nuPerson', { name: 'Nila Newcomer' }]]);
+    c.journeyNames = new Map([['j1', 'B!G Journey One']]);
+    c.workshopTitles = new Map([['ws1', 'Money Masterclass']]);
+    c.mcPayments = [
+      { id: 'a', profileid: 'nuPerson', amountRupees: 499, datetime: daysAgo(0), workshopref: ref('ws1') },
+      { id: 'b', profileid: 'pmPerson', amountRupees: 1500, datetime: daysAgo(3), workshopref: 'workshopconfiguration/ws1' },
+      { id: 'c', profileid: 'ghost', amountRupees: 999, datetime: daysAgo(20), workshopref: ref('gone') },
+    ];
+    c.rebuildMasterclassCard();
+    return c;
+  }
+  const card = (c: any) => c.cards[0];
+  const row = (c: any, id: string) => card(c).users.find((r: any) => r.id === id);
+
+  it('tags a payer found in new_user_data as New User, and nobody else', () => {
+    const c = make();
+    expect(row(c, 'a').sourceTag).toBe('New User');
+    expect(row(c, 'b').sourceTag).withContext('participant only').toBeUndefined();
+    expect(row(c, 'c').sourceTag).withContext('in neither directory').toBeUndefined();
+    expect(card(c).breakdown).toEqual([{ label: 'new users', count: 1 }]);
+  });
+
+  it('resolves names from participant metadata, then new_user_data, else the raw id', () => {
+    const c = make();
+    expect(row(c, 'a').name).toBe('Nila Newcomer');
+    expect(row(c, 'b').name).toBe('Priya Participant');
+    expect(row(c, 'c').name).toBe('ghost');
+  });
+
+  it('shows detailpage.title for the workshopref — reference or path string — and flags a missing one', () => {
+    const c = make();
+    expect(row(c, 'a').workshopTag).toBe('Money Masterclass');
+    expect(row(c, 'b').workshopTag).withContext('path-string ref').toBe('Money Masterclass');
+    expect(row(c, 'c').workshopTag).toBe('Unknown workshop');
+  });
+
+  it('narrows by the datetime field with the Users range, and totals the rupees shown', () => {
+    const c = make();
+    expect(card(c).displayCount).toBe(3);
+    expect(card(c).highlight).toBe('₹' + (2998).toLocaleString('en-IN'));
+    expect(card(c).caption).withContext('no "collected" wording').toBe('Captured payments');
+    c.usersRange = 'today'; c.usersRangeLabel = 'today'; c.rebuildMasterclassCard();
+    expect(card(c).users.map((r: any) => r.id)).toEqual(['a']);
+    expect(card(c).highlight).toBe('₹499');
+    expect(card(c).caption).toBe('Captured payments · today');
+    c.usersRange = '7d'; c.usersRangeLabel = 'in the last 7 days'; c.rebuildMasterclassCard();
+    expect(card(c).users.map((r: any) => r.id)).withContext('newest first').toEqual(['a', 'b']);
+  });
+
+  it('formats each amount in rupees and treats a non-numeric amount as zero', () => {
+    const c = make();
+    expect(row(c, 'b').amountLabel).toBe('₹' + (1500).toLocaleString('en-IN'));
+    c.mcPayments = [{ id: 'x', profileid: 'nuPerson', amountRupees: 'abc', datetime: daysAgo(0) }];
+    c.rebuildMasterclassCard();
+    expect(row(c, 'x').amountLabel).toBe('₹0');
+    expect(row(c, 'x').workshopTag).withContext('no ref -> no tag').toBeUndefined();
+  });
+
+  it('shows the journey for participant-metadata payers only', () => {
+    const c = make();
+    expect(row(c, 'b').journeyTag).withContext('participant with a named journey').toBe('B!G Journey One');
+    expect(row(c, 'a').journeyTag).withContext('new-user-only payer has no journey').toBeUndefined();
+    expect(row(c, 'c').journeyTag).withContext('payer in neither directory').toBeUndefined();
+  });
+});
+
+/** Device Breakdown — 1M/2M/3M plus a manual From–To over the register pages (operator 2026-10-13). */
+describe('EiflixoperationsdashboardComponent — Device Breakdown range', () => {
+  const key = (daysBack: number) => {
+    const d = new Date(); d.setDate(d.getDate() - daysBack);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  // One hour of app watching on each of four days: today, -10d, -45d, -80d.
+  function make(): any {
+    const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
+    c.activePanel = null; c.dbRange = 1; c.dbFrom = ''; c.dbTo = '';
+    c.platformColors = {}; c.platformExtraColors = ['#888'];   // class fields Object.create skips
+    c.naPages = new Map([0, 10, 45, 80].map(n => [key(n), { platforms: { EiflixApp: { [`p${n}`]: 3600 } } }]));
+    c.computeDeviceBreakdown();
+    return c;
+  }
+  const hours = (c: any) => c.dbTotalSeconds / 3600;
+
+  it('1M / 2M / 3M sum the register pages inside each window', () => {
+    const c = make();
+    expect(hours(c)).withContext('1M: today and -10d').toBe(2);
+    c.setDbRange(2); expect(hours(c)).withContext('2M adds -45d').toBe(3);
+    c.setDbRange(3); expect(hours(c)).withContext('3M adds -80d').toBe(4);
+  });
+
+  it('a manual From–To sums only the pages between the two dates, inclusive', () => {
+    const c = make();
+    c.dbFrom = key(50); c.dbTo = key(40); c.applyDbCustom();
+    expect(c.dbRange).toBe('custom');
+    expect(hours(c)).withContext('only the -45d page').toBe(1);
+    c.dbFrom = key(45); c.dbTo = key(10); c.applyDbCustom();
+    expect(hours(c)).withContext('both endpoints are included').toBe(2);
+  });
+
+  it('tolerates a reversed pick, and ignores a half-filled range', () => {
+    const c = make();
+    c.dbFrom = key(40); c.dbTo = key(50); c.applyDbCustom();
+    expect(hours(c)).withContext('reversed still means -50d..-40d').toBe(1);
+
+    const d = make();
+    d.dbFrom = key(45); d.applyDbCustom();
+    expect(d.dbRange).withContext('one date is not a range').toBe(1);
+    expect(d.dbCustomHint).toBe(true);
+  });
+
+  it('the platform panel uses the same window as the chart', () => {
+    const c = make();
+    c.dbFrom = key(50); c.dbTo = key(40); c.applyDbCustom();
+    expect([...c.platformPerProfile('EiflixApp').keys()]).toEqual(['p45']);
+  });
+
+  it('a 1M/2M/3M click clears the manual dates', () => {
+    const c = make();
+    c.dbFrom = key(50); c.dbTo = key(40); c.applyDbCustom();
+    c.setDbRange(3);
+    expect([c.dbRange, c.dbFrom, c.dbTo]).toEqual([3, '', '']);
+    expect(hours(c)).toBe(4);
+  });
+});
+
+/**
+ * New Users to Paid — Watson TOTAL AMOUNT, copied exactly from Journey Support (operator 2026-10-13).
+ * The two copied functions are tested without Watson; the card wiring is tested with a filled cache.
+ */
+describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
+  const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(10, 0, 0, 0); return d; };
+
+  it('matches Journey Support\'s cumulative column for the first four rows of the screenshot', () => {
+    const total = journeySupportTotal([{ amount: 16520 }, { amount: 10000 }, { amount: 65000 }, { amount: 36800 }])!;
+    const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
+    expect(c.formatPlan(total)).withContext('₹108,746 after row 4 on Journey Support').toBe('₹108,746');
+    expect(c.formatPlan(2724000)).withContext('same format as Journey Support').toBe('₹2,724,000');
+  });
+
+  it('drops rescheduled rows like Journey Support, and has no total for an empty schedule', () => {
+    expect(journeySupportTotal([{ amount: 1180 }, { amount: 1180, schedulemodified: true }])).toBeCloseTo(1000, 6);
+    expect(journeySupportTotal([{ amount: 1180, schedulemodified: true }])).toBeNull();
+    expect(journeySupportTotal([])).toBeNull();
+  });
+
+  it('picks the participant exactly as Journey Support does', () => {
+    const profile = { name: 'Arvind R', email: 'arvind@x.com' };
+    expect(journeySupportParticipantId([{ id: 'P-1', name: 'Someone', email: 'other@x.com' }, { id: 'P-2', name: 'ARVIND  R' }], profile)).toBe('P-2');
+    expect(journeySupportParticipantId([{ id: 'P-3', name: 'X', email: 'Arvind@X.com ' }], profile)).toBe('P-3');
+    expect(journeySupportParticipantId([{ id: 'P-4', name: 'X', email: 'y@x.com' }], profile))
+      .withContext('"unable to find Client in Watson"').toBeNull();
+    expect(journeySupportParticipantId([], profile)).toBeNull();
+  });
+
+  function make(status: string, totals: [string, number | null][]): any {
+    const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
+    c.reducedMotion = true; c.activePanel = null; c.loading = true; c.pmLoading = true;  // no auto-fetch in tests
+    c.usersRange = 'all'; c.usersCustomStart = ''; c.usersCustomEnd = ''; c.usersRangeLabel = '';
+    c.planStatus = status; c.planTotals = new Map(totals); c.planPending = new Set();
+    c.pmMap = new Map(); c.journeyNames = new Map();
+    c.nudMap = new Map([
+      ['moved1', { name: 'Moved One', movedtoexist: true, movedon: daysAgo(0) }],
+      ['moved2', { name: 'Moved Two', movedtoexist: true, movedon: daysAgo(20) }],
+      ['notInWatson', { name: 'Not Found', movedtoexist: true, movedon: daysAgo(0) }],
+      ['stillNew', { name: 'Still New' }],
+    ]);
+    c.cards = [{ key: 'new-users-to-paid', title: 'New Users to Paid', caption: '', users: [], displayCount: 0 }];
+    c.rebuildPaidCard();
+    return c;
+  }
+  const card = (c: any) => c.cards[0];
+  const label = (c: any, id: string) => card(c).users.find((r: any) => r.id === id)?.amountLabel;
+
+  it('shows each person\'s total in the panel and sums only the people Watson found', () => {
+    const c = make('ready', [['moved1', 2724000], ['moved2', 1000], ['notInWatson', null]]);
+    expect(label(c, 'moved1')).toBe('₹2,724,000');
+    expect(label(c, 'notInWatson')).withContext('not found in Watson').toBe('—');
+    expect(card(c).highlight).toBe('₹2,725,000');
+    expect(card(c).highlightLabel).withContext('no label text in the pill').toBeUndefined();
+  });
+
+  it('never shows ₹0 when nobody in the card is in Watson', () => {
+    const c = make('ready', [['moved1', null], ['moved2', null], ['notInWatson', null]]);
+    expect(card(c).highlight).toBe('—');
+    expect(card(c).highlightLabel).toBeUndefined();
+  });
+
+  it('the card total follows the Users range', () => {
+    const c = make('ready', [['moved1', 2724000], ['moved2', 1000], ['notInWatson', null]]);
+    c.usersRange = 'today'; c.usersRangeLabel = 'today'; c.rebuildPaidCard();
+    expect(card(c).highlight).withContext('moved2 moved 20 days ago').toBe('₹2,724,000');
+  });
+
+  it('shows a placeholder while someone is still being looked up', () => {
+    const c = make('loading', [['moved1', 2724000]]);
+    expect(label(c, 'moved2')).toBe('…');
+    expect(card(c).highlight).toBe('…');
+  });
+
+  it('shows nothing at all when this build has no Watson (the emulator build)', () => {
+    const c = make('unavailable', []);
+    expect(label(c, 'moved1')).toBeUndefined();
+    expect(card(c).highlight).toBeUndefined();
+  });
+
+  it('writes the card total in words, Indian system', () => {
+    expect(indianNumberWords(10486474)).toBe('One crore four lakh eighty-six thousand four hundred seventy-four');
+    expect(indianNumberWords(2724000)).toBe('Twenty-seven lakh twenty-four thousand');
+    expect(indianNumberWords(123456789)).toBe('Twelve crore thirty-four lakh fifty-six thousand seven hundred eighty-nine');
+    expect(indianNumberWords(1000000000)).withContext('crore above 99').toBe('One hundred crore');
+    expect(indianNumberWords(101)).toBe('One hundred one');
+    expect(indianNumberWords(108745.76)).withContext('rounded to the rupee').toBe('One lakh eight thousand seven hundred forty-six');
+    expect(indianNumberWords(0)).toBe('Zero');
+
+    const c = make('ready', [['moved1', 2724000], ['moved2', 1000], ['notInWatson', null]]);
+    expect(card(c).highlightWords).toBe('Twenty-seven lakh twenty-five thousand');
+    const none = make('ready', [['moved1', null], ['moved2', null], ['notInWatson', null]]);
+    expect(none.cards[0].highlightWords).withContext('no words when nobody was found').toBeUndefined();
+  });
+
+  it('captions the card "Purchased Journey"', () => {
+    const c = make('ready', []);
+    expect(card(c).caption).toBe('Purchased Journey');
+    c.usersRange = 'today'; c.usersRangeLabel = 'today'; c.rebuildPaidCard();
+    expect(card(c).caption).toBe('Purchased Journey · today');
+  });
+
+  it('offers an Amount sort in this panel: highest first, not-found last', () => {
+    const c = make('ready', [['moved1', 1000], ['moved2', 2724000], ['notInWatson', null]]);
+    c.openPanel(card(c));
+    const p = c.activePanel;
+    expect(p.sortOptions).toContain('amount');
+    expect(c.sortLabel('amount')).toBe('Amount high–low');
+    c.setPanelSort(p, 'amount');
+    expect(p.viewRows.map((r: any) => r.id)).toEqual(['moved2', 'moved1', 'notInWatson']);
+    c.unlockScroll?.();
+  });
+});
+
+/** Panel export carries the amount as a number — New Users to Paid and Master Class Purchase (operator 2026-10-13). */
+describe('EiflixoperationsdashboardComponent — export with amount', () => {
+  const panelOf = (viewRows: any[]) => ({ title: 'X', viewRows } as any);
+  const proto = () => Object.create(EiflixoperationsdashboardComponent.prototype) as any;
+
+  it('New Users to Paid exports "Total Amount", rounded to the rupee, blank when not found', () => {
+    const sheet = proto().panelExportRows(panelOf([
+      { name: 'A', planValue: 2724000.4, createdLabel: 'x' },
+      { name: 'B', createdLabel: 'y' },                       // not found in Watson
+    ]));
+    const col = sheet[0].indexOf('Total Amount');
+    expect(col).toBeGreaterThan(-1);
+    expect(sheet[0]).not.toContain('Amount');
+    expect(sheet[1][col]).toBe(2724000);
+    expect(sheet[2][col]).toBe('');
+  });
+
+  it('Master Class Purchase exports "Amount" as the payment value', () => {
+    const sheet = proto().panelExportRows(panelOf([{ name: 'A', amountValue: 499 }, { name: 'B', amountValue: 1500 }]));
+    const col = sheet[0].indexOf('Amount');
+    expect(col).toBeGreaterThan(-1);
+    expect(sheet.slice(1).map((r: any[]) => r[col])).toEqual([499, 1500]);
+  });
+
+  it('other panels gain no amount column', () => {
+    const sheet = proto().panelExportRows(panelOf([{ name: 'A', hoursSeconds: 3600 }]));
+    expect(sheet[0]).not.toContain('Amount');
+    expect(sheet[0]).not.toContain('Total Amount');
+  });
+});
+

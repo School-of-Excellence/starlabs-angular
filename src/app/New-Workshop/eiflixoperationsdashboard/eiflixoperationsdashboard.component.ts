@@ -1,9 +1,12 @@
 import { Component, OnDestroy, OnInit, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule, formatDate } from '@angular/common';
+import { CommonModule, formatDate, formatCurrency } from '@angular/common';
+import { getApp, getApps, initializeApp } from '@angular/fire/app';
+import { getFirestore } from '@angular/fire/firestore';
+import { environment } from '../../../environments/environment';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import {
-  Firestore, collection, collectionData, getDocs, query, where, orderBy, documentId, Timestamp,
+  Firestore, collection, collectionData, getDoc, getDocs, query, where, orderBy, documentId, Timestamp,
   doc, setDoc, serverTimestamp
 } from '@angular/fire/firestore';
 import { MatIconModule } from '@angular/material/icon';
@@ -54,6 +57,64 @@ interface LogRow {
 type Accent = 'indigo' | 'emerald' | 'amber' | 'violet' | 'rose' | 'orange' | 'red';
 type RangeKey = 'today' | '7d' | '30d' | 'custom';
 
+/**
+ * Journey Support's TOTAL AMOUNT, copied EXACTLY from
+ * journeyplan.component.ts watsonParticipantSchedule() — same filter, same
+ * arithmetic, same order. TOTAL AMOUNT there is the last running total.
+ * Returns null when no rows remain (Journey Support then shows no total).
+ */
+/**
+ * Rupees in words, Indian system (crore / lakh / thousand / hundred), rounded to
+ * the rupee: 10486474 -> "One crore four lakh eighty-six thousand four hundred seventy-four".
+ */
+export function indianNumberWords(value: number): string {
+  const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const two = (n: number) => n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+  const three = (n: number) => [n >= 100 ? ONES[Math.floor(n / 100)] + ' hundred' : '', n % 100 ? two(n % 100) : '']
+    .filter(Boolean).join(' ');
+  const words = (n: number): string => {
+    const crore = Math.floor(n / 1e7); n %= 1e7;
+    const lakh = Math.floor(n / 1e5); n %= 1e5;
+    const thousand = Math.floor(n / 1e3); n %= 1e3;
+    return [crore ? words(crore) + ' crore' : '', lakh ? two(lakh) + ' lakh' : '',
+      thousand ? two(thousand) + ' thousand' : '', n ? three(n) : ''].filter(Boolean).join(' ');
+  };
+  const n = Math.round(Math.abs(Number(value) || 0));
+  const out = n ? words(n) : 'zero';
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+
+export function journeySupportTotal(scheduleDocs: any[]): number | null {
+  const watsonScheduleList = scheduleDocs.filter((e) => e['schedulemodified'] != true);
+  let runningTotal = 0;
+  const cumulativeTotals: number[] = [];
+  watsonScheduleList.forEach(schedule => {
+    runningTotal += (schedule.amount / 1.18); // Calculate the amount before GST
+    cumulativeTotals.push(runningTotal);
+  });
+  return cumulativeTotals.length ? cumulativeTotals[cumulativeTotals.length - 1] : null;
+}
+
+/**
+ * Journey Support's participant match, copied EXACTLY: walk the Participants
+ * returned for the profile's email and take the first whose name OR email
+ * matches (lower-cased, whitespace removed). Returns its `id` field, or null
+ * ("unable to find Client in Watson").
+ */
+export function journeySupportParticipantId(participantDocs: any[], profileData: any): any {
+  let participantid = null;
+  for (let i = 0; i < participantDocs.length; i++) {
+    const participantdata = participantDocs[i];
+    if (participantdata["name"]?.toLowerCase().replace(/\s/g, "") == profileData["name"]?.toLowerCase().replace(/\s/g, "") || participantdata["email"]?.toLowerCase().replace(/\s/g, "") == profileData["email"]?.toLowerCase().replace(/\s/g, "")) {
+      participantid = participantdata["id"];
+      break;
+    }
+  }
+  return participantid;
+}
+
 /** The Users section adds 'all' — see `usersRange` for why it is the default. */
 type UsersRangeKey = 'all' | RangeKey;
 
@@ -77,6 +138,12 @@ interface OpsCard {
   rafId?: number;
   /** Optional per-bucket counts rendered as the chip stack. */
   breakdown?: { label: string; count: number }[];
+  /** Optional emphasised figure under the count (Master Class Purchase: the ₹ total). */
+  highlight?: string;
+  /** Small caption inside the highlight, e.g. "total amount". */
+  highlightLabel?: string;
+  /** The highlighted figure in words (New Users to Paid). */
+  highlightWords?: string;
 }
 
 /** The shared right-hand side panel. Every card type renders through this. */
@@ -95,8 +162,8 @@ interface PanelState {
   /** ---- v2 toolbar state (search / cohort filter / sort) ---- */
   q: string;
   cohort: 'all' | 'nud' | 'pm';
-  sortKey: 'default' | 'name' | 'hours';
-  sortOptions: ('default' | 'name' | 'hours')[];
+  sortKey: 'default' | 'name' | 'hours' | 'amount';
+  sortOptions: ('default' | 'name' | 'hours' | 'amount')[];
   sortOpen: boolean;
   showCohort: boolean;
   journeyFilter: string;
@@ -175,7 +242,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     {
       key: 'total-new-users',
       title: 'Total New Users',
-      caption: 'Signed up · not yet moved to paid',
+      caption: 'Signed up · not yet purchased journey',
       icon: 'person_add',
       accent: 'indigo',
       emptyText: 'No users here yet.',
@@ -185,10 +252,20 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     {
       key: 'new-users-to-paid',
       title: 'New Users to Paid',
-      caption: 'Moved to existing / paid profiles',
+      caption: 'Purchased Journey',
       icon: 'workspace_premium',
       accent: 'emerald',
       emptyText: 'No users here yet.',
+      users: [],
+      displayCount: 0
+    },
+    {
+      key: 'masterclass-purchase',
+      title: 'Master Class Purchase',
+      caption: 'Captured payments',
+      icon: 'school',
+      accent: 'amber',
+      emptyText: 'No captured purchases in this range.',
       users: [],
       displayCount: 0
     },
@@ -219,6 +296,21 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   usersRangeLabel = '';
   /** Raw docs from the live listener, kept so a range change re-buckets in memory. */
   private nudDocs: any[] = [];
+
+  // ---- Watson TOTAL AMOUNT for New Users to Paid (operator 2026-10-13) ----
+  /** profileid -> total plan value excl. GST; null = not found in Watson / no schedule. */
+  private planTotals = new Map<string, number | null>();
+  private planPending = new Set<string>();
+  /** 'unavailable' = this build has no Watson config (the emulator build, deliberately). */
+  planStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
+
+  // ---- Master Class Purchase (operator 2026-10-13) ----
+  /** Captured `workshoppaymentlog` rows, read once. */
+  private mcPayments: any[] = [];
+  /** workshopconfiguration doc id -> detailpage.title, read once. */
+  private workshopTitles = new Map<string, string>();
+  mcLoading = true;
+  mcError = false;
 
   // ---- Directories, each loaded ONCE for the whole dashboard ----
   /** Entire 'participant metadata' collection keyed by doc id (PRIMARY). */
@@ -311,7 +403,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   ];
 
   // ---- Device Breakdown ----
-  dbRange: 1 | 2 | 3 = 1;
+  dbRange: 1 | 2 | 3 | 'custom' = 1;
+  /** Manual From–To for Device Breakdown, as 'yyyy-MM-dd' — the register's own key format. */
+  dbFrom = '';
+  dbTo = '';
   dbTotalSeconds = 0;
   dbRows: {
     key: string; label: string; seconds: number; hours: number;
@@ -371,6 +466,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   get dbRangeLabel(): string {
+    if (this.dbRange === 'custom') {
+      const { from, to } = this.dbKeyBounds();
+      return this.formatRange(this.parseDateInput(from), this.parseDateInput(to));
+    }
     return this.dbRange === 1 ? 'last 1 month' : 'last ' + this.dbRange + ' months';
   }
 
@@ -417,6 +516,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
           this.pmLoading = false;
           this.updateBigParticipantsCard();
           this.rebuildPaidCard();
+          this.rebuildMasterclassCard();
           if (!this.naLoading) this.computeNonActive();
           this.pmReadyResolve();
         },
@@ -430,6 +530,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
     this.epReady = this.loadDirectory('episodes', this.epMap);
     this.loadJourneyNames();
+    this.loadMasterclass();
     this.loadNaRegister();
     this.fetchEngagement();
     this.refreshConsumption();
@@ -1151,6 +1252,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     if (!this.pmLoading) {
       this.updateBigParticipantsCard();
       this.rebuildPaidCard();
+      this.rebuildMasterclassCard();
     }
   }
 
@@ -1235,13 +1337,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       : this.usersRange === '7d' ? 'in the last 7 days'
       : this.usersRange === '30d' ? 'in the last 30 days'
       : this.formatRange(new Date(win.start), new Date(win.end));
-    // B!G Participants comes from participant metadata and has no comparable
-    // date, so it is NOT filtered. Say so on the card while a range is active,
-    // or the three numbers look like they answer the same question.
-    const big = this.cards.find(c => c.key === 'big-participants');
-    if (big) big.caption = win ? 'Active in a B!G journey · not date-filtered' : 'Active in a B!G journey';
     this.rebuildNewUsersCard();
     this.rebuildPaidCard();
+    this.rebuildMasterclassCard();
   }
 
   /**
@@ -1257,6 +1355,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     this.nudDocs = data;
     this.rebuildNewUsersCard();
     this.rebuildPaidCard();
+    this.rebuildMasterclassCard();
     // Keep an open users panel in sync with realtime updates.
     if (this.activePanel?.kind === 'users') {
       const card = this.cards.find(c => c.key === this.activePanel!.cardKey);
@@ -1285,7 +1384,102 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       }))
       .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
     card.users = rows;
-    card.caption = win ? 'Signed up ' + this.usersRangeLabel : 'Signed up · not yet moved to paid';
+    card.caption = win ? 'Signed up ' + this.usersRangeLabel : 'Signed up · not yet purchased journey';
+    this.animateCount(card, rows.length);
+    if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
+      this.setPanelRows(this.activePanel, rows);
+      this.activePanel.loading = false;
+    }
+  }
+
+  /**
+   * Master Class Purchase: ONE equality query (status == 'captured', so no
+   * composite index), plus one read of workshopconfiguration for the titles.
+   * The Users range then narrows on `datetime` in memory — a range change
+   * costs no read.
+   */
+  private async loadMasterclass(): Promise<void> {
+    this.mcLoading = true;
+    this.mcError = false;
+    try {
+      const [paySnap, wsSnap] = await Promise.all([
+        getDocs(query(collection(this.firestore, 'workshoppaymentlog'), where('status', '==', 'captured'))),
+        getDocs(collection(this.firestore, 'workshopconfiguration'))
+      ]);
+      this.workshopTitles.clear();
+      wsSnap.forEach(d => {
+        const title = String((d.data() as any)?.['detailpage']?.['title'] ?? '').trim();
+        if (title) this.workshopTitles.set(d.id, title);
+      });
+      this.mcPayments = paySnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+    } catch (err) {
+      console.error('Master Class Purchase load failed', err);
+      this.mcError = true;
+      this.mcPayments = [];
+    } finally {
+      this.mcLoading = false;
+      this.rebuildMasterclassCard();
+    }
+  }
+
+  /** workshopref is a DocumentReference; tolerate a plain path string too. */
+  private refId(ref: any): string {
+    if (!ref) return '';
+    if (typeof ref === 'string') return ref.split('/').filter(Boolean).pop() || '';
+    if (typeof ref.id === 'string') return ref.id;
+    if (typeof ref.path === 'string') return ref.path.split('/').filter(Boolean).pop() || '';
+    return '';
+  }
+
+  /**
+   * One row per captured payment in the Users range. Name comes from the
+   * directories (participant metadata first, then new_user_data); a payer who
+   * is in new_user_data is tagged New User (operator rule). Re-run whenever the
+   * range or either directory changes, so names and tags stay current.
+   */
+  private rebuildMasterclassCard(): void {
+    const card = this.cards.find(c => c.key === 'masterclass-purchase');
+    if (!card) return;
+    const win = this.usersWindow();
+    let rupees = 0;
+    let newUsers = 0;
+    const rows = this.mcPayments
+      .filter(p => this.inUsersWindow(p['datetime'], win))
+      .map(p => {
+        const pid = String(p['profileid'] ?? '').trim();
+        const pm = pid ? this.pmMap.get(pid) : undefined;
+        const nud = pid ? this.nudMap.get(pid) : undefined;
+        const src: any = pm || nud || {};
+        const amount = Number(p['amountRupees']);
+        const rs = Number.isFinite(amount) ? amount : 0;
+        rupees += rs;
+        if (nud) newUsers++;
+        const wsId = this.refId(p['workshopref']);
+        return {
+          id: p.id,
+          profileid: pid,
+          name: src.name || pid || 'Unknown',
+          email: src.email,
+          phonenumber: src.phonenumber,
+          initialsLabel: this.initials(src.name),
+          unknown: !pm && !nud,
+          ...(nud ? { sourceTag: 'New User' } : {}),
+          // Journey exists only on participant metadata — new-user-only payers get none.
+          ...(pm ? { journeyTag: this.journeyTagFor(pm) } : {}),
+          workshopTag: this.workshopTitles.get(wsId) || (wsId ? 'Unknown workshop' : undefined),
+          amountLabel: '₹' + rs.toLocaleString('en-IN'),
+          amountValue: rs,
+          created: p['datetime'],
+          createdLabel: this.formatCreated(p['datetime'])
+        };
+      })
+      .sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
+    card.users = rows;
+    card.breakdown = rows.length ? [{ label: 'new users', count: newUsers }] : undefined;
+    card.highlight = this.mcError ? undefined : '₹' + rupees.toLocaleString('en-IN');
+    card.caption = this.mcError
+      ? 'Couldn’t load purchases — refresh to retry'
+      : 'Captured payments' + (win ? ' · ' + this.usersRangeLabel : '');
     this.animateCount(card, rows.length);
     if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
       this.setPanelRows(this.activePanel, rows);
@@ -1340,12 +1534,36 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         created: src.created ?? nud.created,
         createdLabel: this.formatCreated(src.created ?? nud.created),
         initialsLabel: this.initials(src.name),
-        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' })
+        ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' }),
+        amountLabel: this.planLabel(id),
+        // Numeric copy for the panel's Amount sort; not found / loading sort last.
+        planValue: this.planTotals?.get(id) ?? undefined
       });
     });
     rows.sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
     card.users = rows;
-    card.caption = win ? 'Moved to paid ' + this.usersRangeLabel : 'Moved to existing / paid profiles';
+    card.caption = win ? 'Purchased Journey · ' + this.usersRangeLabel : 'Purchased Journey';
+    // Card total = the people currently in the card (so it follows the range).
+    if (this.planStatus === 'unavailable' || this.planStatus === 'idle') {
+      card.highlight = undefined;
+    } else if (rows.some(r => !this.planTotals.has(r.id))) {
+      card.highlight = '…';
+    } else {
+      const found = rows.filter(r => typeof this.planTotals.get(r.id) === 'number');
+      if (!found.length && rows.length) {
+        // Nobody in the card was found in Watson — say so; never show ₹0.
+        card.highlight = '—';
+      } else {
+        const sum = found.reduce((acc, r) => acc + (this.planTotals.get(r.id) as number), 0);
+        card.highlight = this.formatPlan(sum);
+        card.highlightWords = indianNumberWords(sum);
+      }
+    }
+    if (!card.highlight || card.highlight === '…' || card.highlight === '—' || card.highlight === this.formatPlan(0)) card.highlightWords = undefined;
+    // No label inside the pill — the amount (and its words) only (operator 2026-10-13).
+    card.highlightLabel = undefined;
+    // Once both directories have loaded, look up anyone not yet fetched.
+    if (!this.loading && !this.pmLoading) void this.loadPlanTotals();
     this.animateCount(card, rows.length);
     if (this.activePanel?.kind === 'users' && this.activePanel.cardKey === card.key) {
       this.setPanelRows(this.activePanel, rows);
@@ -1353,9 +1571,88 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Journey Support renders the total with the currency pipe ('INR', symbol, '1.0-0'); match it exactly. */
+  private formatPlan(v: number): string {
+    return formatCurrency(v, 'en-US', '₹', 'INR', '1.0-0');
+  }
+
+  private planLabel(profileid: string): string | undefined {
+    if (this.planStatus === 'unavailable' || this.planStatus === 'idle') return undefined;
+    if (!this.planTotals.has(profileid)) return '…';
+    const v = this.planTotals.get(profileid);
+    return v === null || v === undefined ? '—' : this.formatPlan(v);
+  }
+
+  /** Same initialisation as AuthguardService.initializeWatson; null when this build has no Watson config. */
+  private watsonDb(): any | null {
+    const cfg = (environment as any)['watson'];
+    if (!cfg) return null;
+    if (!getApps().some(a => a.name === 'watson')) initializeApp(cfg, 'watson');
+    return getFirestore(getApp('watson'));
+  }
+
+  /**
+   * Watson TOTAL AMOUNT for everyone on the paid side — the EXACT chain Journey
+   * Support runs for one person, run here for each person:
+   *   profile_data/{profileid}            -> name + email
+   *   Watson Participants where email ==  -> first name-or-email match -> id
+   *   Watson Payment Schedule where participantid == , orderBy date asc
+   *   -> journeySupportTotal()
+   * Each person is fetched once per visit and cached; a few run at a time.
+   */
+  private async loadPlanTotals(): Promise<void> {
+    const wanted: string[] = [];
+    this.nudMap.forEach((nud, id) => {
+      if (nud.movedtoexist !== true || this.planTotals.has(id) || this.planPending.has(id)) return;
+      wanted.push(id);
+    });
+    if (!wanted.length) return;
+    const watsonDatabase = this.watsonDb();
+    if (!watsonDatabase) {
+      if (this.planStatus !== 'unavailable') { this.planStatus = 'unavailable'; this.rebuildPaidCard(); }
+      return;
+    }
+    wanted.forEach(id => this.planPending.add(id));
+    this.planStatus = 'loading';
+    const one = async (profileid: string): Promise<number | null> => {
+      try {
+        const profile = await getDoc(doc(this.firestore, 'profile_data', profileid));
+        const profileData: any = profile.data();
+        if (!profileData) return null;
+        const participant = await getDocs(query(collection(watsonDatabase, 'Participants'), where('email', '==', profileData['email'])));
+        const participantid = journeySupportParticipantId(participant.docs.map(d => d.data()), profileData);
+        if (participantid == null) return null;   // Journey Support: "unable to find Client in Watson"
+        const schedule = await getDocs(query(collection(watsonDatabase, 'Payment Schedule'),
+          where('participantid', '==', participantid), orderBy('date', 'asc')));
+        return journeySupportTotal(schedule.docs.map(d => d.data()));
+      } catch (err) {
+        console.error('eiflixoperationsdashboard: Watson total amount lookup failed for ' + profileid, err);
+        return null;
+      }
+    };
+    // Six people in flight at once — the chain per person is unchanged.
+    const queue = [...wanted];
+    const worker = async () => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        this.planTotals.set(id, await one(id));
+        this.planPending.delete(id);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, queue.length) }, worker));
+    this.planStatus = 'ready';
+    this.rebuildPaidCard();
+  }
+
+  // B!G Participants lives in its own section (operator 2026-10-13). The
+  // `cards` array stays whole so loading, panels and live updates are shared.
+  get userCards(): OpsCard[] { return this.cards.filter(c => c.key !== 'big-participants'); }
+  get bigCards(): OpsCard[] { return this.cards.filter(c => c.key === 'big-participants'); }
+
   /** The Users cards load from two different listeners. */
   cardLoading(card: OpsCard): boolean {
-    return card.key === 'big-participants' ? this.pmLoading : this.loading;
+    if (card.key === 'big-participants') return this.pmLoading;
+    if (card.key === 'masterclass-purchase') return this.mcLoading;
+    return this.loading;
   }
 
   /**
@@ -2288,6 +2585,49 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
 
   setDbRange(months: 1 | 2 | 3): void {
     this.dbRange = months;
+    this.dbFrom = '';
+    this.dbTo = '';
+    this.applyDbChange();
+  }
+
+  /** Both pickers set -> switch to the manual range (mirrors Engagement / Users). */
+  applyDbCustom(): void {
+    if (!this.dbFrom || !this.dbTo) return;
+    this.dbRange = 'custom';
+    this.applyDbChange();
+  }
+
+  /** True while exactly one manual date is picked — shows the header hint. */
+  get dbCustomHint(): boolean {
+    return !!this.dbFrom !== !!this.dbTo;
+  }
+
+  /**
+   * Earliest day the register holds — the From picker's floor. Device Breakdown
+   * is summed from register pages only, so a date before this has no data.
+   */
+  get dbMinDate(): string {
+    return this.naRegisterSince || '';
+  }
+
+  /**
+   * The window as inclusive register keys. Keys and <input type="date"> values
+   * are both 'yyyy-MM-dd', so plain string comparison is a date comparison.
+   */
+  private dbKeyBounds(): { from: string; to: string } {
+    if (this.dbRange === 'custom' && this.dbFrom && this.dbTo) {
+      // Tolerate a reversed pick — the earlier date is the start.
+      return this.dbFrom <= this.dbTo
+        ? { from: this.dbFrom, to: this.dbTo }
+        : { from: this.dbTo, to: this.dbFrom };
+    }
+    const months = this.dbRange === 'custom' ? 1 : this.dbRange;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - months * 30);
+    return { from: this.dayKey(cutoff), to: this.dayKey(new Date()) };
+  }
+
+  private applyDbChange(): void {
     this.computeDeviceBreakdown();
     // A range change while a platform panel is open refreshes it in place.
     if (this.activePanel?.kind === 'platform' && this.activePanel.cardKey) {
@@ -2296,12 +2636,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   private platformPerProfile(platform: string): Map<string, number> {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - this.dbRange * 30);
-    const cutoffKey = this.dayKey(cutoff);
+    const { from, to } = this.dbKeyBounds();
     const perProfile = new Map<string, number>();
     this.naPages.forEach((page, key) => {
-      if (key < cutoffKey) return;
+      if (key < from || key > to) return;
       const byProfile = page?.platforms?.[platform];
       if (!byProfile) return;
       for (const [pid, sec] of Object.entries(byProfile as Record<string, number>)) {
@@ -2336,14 +2674,12 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Share of watch time per platform over the last 1/2/3 months of pages. */
+  /** Share of watch time per platform over the chosen window of register pages. */
   private computeDeviceBreakdown(): void {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - this.dbRange * 30);
-    const cutoffKey = this.dayKey(cutoff);
+    const { from, to } = this.dbKeyBounds();
     const totals = new Map<string, number>();
     this.naPages.forEach((page, key) => {
-      if (key < cutoffKey) return;
+      if (key < from || key > to) return;
       const plats = page?.platforms;
       if (!plats) return;
       for (const [name, byProfile] of Object.entries(plats)) {
@@ -2422,7 +2758,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   private setPanelRows(panel: PanelState, rows: any[]): void {
     panel.rows = rows;
     const hasHours = rows.some(r => r.hoursSeconds !== undefined);
-    panel.sortOptions = hasHours ? ['default', 'name', 'hours'] : ['default', 'name'];
+    // Amount appears once rows carry a Watson total (New Users to Paid).
+    const hasAmount = rows.some(r => typeof r.planValue === 'number');
+    panel.sortOptions = ['default', 'name', ...(hasHours ? ['hours' as const] : []), ...(hasAmount ? ['amount' as const] : [])];
     if (!panel.sortOptions.includes(panel.sortKey)) panel.sortKey = 'default';
     const hasNud = rows.some(r => !!r.sourceTag);
     const hasPm = rows.some(r => !r.sourceTag && !r.unknown);
@@ -2451,6 +2789,10 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
       rows = [...rows].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     } else if (panel.sortKey === 'hours') {
       rows = [...rows].sort((a, b) => (b.hoursSeconds || 0) - (a.hoursSeconds || 0));
+    } else if (panel.sortKey === 'amount') {
+      // Highest total first; people not found in Watson (or still loading) last.
+      const v = (r: any) => (typeof r.planValue === 'number' ? r.planValue : -1);
+      rows = [...rows].sort((a, b) => v(b) - v(a));
     }
     // Precompute highlight segments once per view change — never per CD cycle.
     panel.viewRows = q
@@ -2482,32 +2824,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    * actually displays them.
    */
   exportPanel(panel: PanelState): void {
-    const rows = panel.viewRows;
-    if (!rows.length) return;
-    const hasHours = rows.some(r => r.hoursSeconds !== undefined || r.hoursLabel);
-    const hasLastSeen = rows.some(r => r.lastSeenLabel);
-    const hasCreated = rows.some(r => r.createdLabel);
-    const hasVideos = rows.some(r => Array.isArray(r.videos));
-    const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
-    if (hasHours) header.push('Watch Hours');
-    if (hasVideos) header.push('Videos Watched');
-    if (hasLastSeen) header.push('Last Seen');
-    if (hasCreated) header.push('Created');
-    const data = rows.map(r => {
-      const line: (string | number)[] = [
-        String(r.name ?? ''),
-        String(r.phonenumber ?? ''),
-        String(r.email ?? ''),
-        r.journeyTag || '',
-        r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
-      ];
-      if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
-      if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
-      if (hasLastSeen) line.push(r.lastSeenLabel || '');
-      if (hasCreated) line.push(r.createdLabel || '');
-      return line;
-    });
-    const worksheetData = [header, ...data];
+    const worksheetData = this.panelExportRows(panel);
+    if (worksheetData.length < 2) return;
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const maxWidths: number[] = [];
@@ -2522,19 +2840,58 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     XLSX.writeFile(wb, slug + '-' + this.todayStr + '.xlsx');
   }
 
+  /** Header + one line per visible panel row — the sheet exportPanel writes. */
+  panelExportRows(panel: PanelState): (string | number)[][] {
+    const rows = panel.viewRows;
+    if (!rows.length) return [];
+    // Amounts go out as NUMBERS so the sheet can be summed: the Watson total
+    // (rounded to the rupee, as Journey Support displays it) for New Users to
+    // Paid, the payment amount for Master Class Purchase. Blank when unknown.
+    const hasPlan = rows.some(r => typeof r.planValue === 'number');
+    const hasAmount = !hasPlan && rows.some(r => typeof r.amountValue === 'number');
+    const hasHours = rows.some(r => r.hoursSeconds !== undefined || r.hoursLabel);
+    const hasLastSeen = rows.some(r => r.lastSeenLabel);
+    const hasCreated = rows.some(r => r.createdLabel);
+    const hasVideos = rows.some(r => Array.isArray(r.videos));
+    const header = ['Name', 'Phone Number', 'Email', 'Journey', 'User Type'];
+    if (hasHours) header.push('Watch Hours');
+    if (hasVideos) header.push('Videos Watched');
+    if (hasLastSeen) header.push('Last Seen');
+    if (hasCreated) header.push('Created');
+    if (hasPlan) header.push('Total Amount');
+    if (hasAmount) header.push('Amount');
+    const data = rows.map(r => {
+      const line: (string | number)[] = [
+        String(r.name ?? ''),
+        String(r.phonenumber ?? ''),
+        String(r.email ?? ''),
+        r.journeyTag || '',
+        r.unknown ? 'Unknown' : (r.sourceTag ? 'New User' : 'Existing')
+      ];
+      if (hasHours) line.push(r.hoursSeconds !== undefined ? +(r.hoursSeconds / 3600).toFixed(2) : '');
+      if (hasVideos) line.push(Array.isArray(r.videos) ? r.videos.length : '');
+      if (hasLastSeen) line.push(r.lastSeenLabel || '');
+      if (hasCreated) line.push(r.createdLabel || '');
+      if (hasPlan) line.push(typeof r.planValue === 'number' ? Math.round(r.planValue) : '');
+      if (hasAmount) line.push(typeof r.amountValue === 'number' ? r.amountValue : '');
+      return line;
+    });
+    return [header, ...data];
+  }
+
   setPanelJourney(panel: PanelState, value: string): void {
     panel.journeyFilter = value || 'all';
     this.updatePanelView(panel);
   }
 
-  setPanelSort(panel: PanelState, key: 'default' | 'name' | 'hours'): void {
+  setPanelSort(panel: PanelState, key: 'default' | 'name' | 'hours' | 'amount'): void {
     panel.sortKey = key;
     panel.sortOpen = false;
     this.updatePanelView(panel);
   }
 
-  sortLabel(key: 'default' | 'name' | 'hours'): string {
-    return key === 'name' ? 'Name A–Z' : key === 'hours' ? 'Watch hours' : 'Default';
+  sortLabel(key: 'default' | 'name' | 'hours' | 'amount'): string {
+    return key === 'name' ? 'Name A–Z' : key === 'hours' ? 'Watch hours' : key === 'amount' ? 'Amount high–low' : 'Default';
   }
 
   /** 'Abdul Hakkim' + 'ha' -> ['Abdul ', 'Ha', 'kkim']; no match -> [text, '', ''].

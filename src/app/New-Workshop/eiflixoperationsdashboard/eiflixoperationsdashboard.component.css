@@ -516,6 +516,50 @@ section.eod-section:focus { outline: none; }
 }
 .eod-retry:hover { background: rgba(161, 60, 49, 0.08); }
 
+/* The highlighted total in words, under the amount (Indian system). */
+.eod-card-amount-words {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--eod-amber, #a35d04);
+  opacity: 0.85;
+  margin: -2px 0 2px;
+}
+.eod-card-amount-label {
+  margin-left: 8px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+/* Emphasised figure on a stat card (Master Class Purchase total). */
+.eod-card-amount {
+  align-self: flex-start;
+  font-family: 'Geist Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--eod-amber, #a35d04);
+  background: var(--eod-amber-tint, rgba(163, 93, 4, 0.09));
+  border: 1px solid rgba(163, 93, 4, 0.22);
+  border-radius: 8px;
+  padding: 3px 10px;
+  margin: 2px 0 2px;
+}
+.eod-tag.eod-tag-workshop {
+  /* Its own line in the row's column: hug the text, but wrap long titles
+     within the column instead of overflowing into the side column. */
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  border-radius: 7px;   /* a 999px pill turns into a stadium once it wraps */
+  color: var(--eod-amber, #a35d04);
+  background: var(--eod-amber-tint, rgba(163, 93, 4, 0.09));
+  border-color: rgba(163, 93, 4, 0.24);
+}
 .eod-tag.eod-tag-journey {
   color: var(--eod-violet, #6d28d9);
   background: var(--eod-violet-tint, rgba(109, 40, 217, 0.09));
@@ -1206,6 +1250,8 @@ section.eod-section:focus { outline: none; }
   font-weight: 600;
   color: var(--eod-rose, #c2233c);
 }
+/* Purchase amount: same mono figure as hours, but neutral — red reads as a refund or loss. */
+.eod-row-hours.eod-row-amount { color: var(--eod-ink, #1f2328); }
 .eod-row-chevron {
   flex: none;
   font-size: 20px;
