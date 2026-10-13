@@ -675,3 +675,55 @@ Plan (approved): `specs/plans/2026-10-12-segment-history.md`.
 **Revert:**
 - Restore the engine and component from the commit before this one. A scratch copy is in `engine.before-history.ts`.
 - History docs already written are inert; leave them, or delete the subcollections.
+
+## 2026-10-13 · Random segment ids, profile ids for "who", one-time migration
+
+Plan (approved): `specs/plans/2026-10-13-segment-ids-and-profileid.md`.
+
+**New writes**
+- A new segment gets `doc(collection('segmentboardconfig')).id`, a 20-character Firestore auto id. It's generated when the dialog opens (`B.newId`), so the create history entry and the list use the same id. `segIdFor` (the name slug) is gone. Name uniqueness is still checked by the dialog.
+- `segmentboardlist` doc id and `segmentid` = the config id (no code change was needed).
+- **Who:** `createdBy`, `updatedBy` and `archivedBy`, plus order updates, hold the editor's **profile id**. The source is `profile_data` where `user_ref == user_data/{uid}`, the same lookup as `authService.username()`, read once per board.
+- **No email fallback:** a write without a profile id is refused with a message, so nothing is attributed to an email again.
+- History `by: { profileid }` only (operator choice). The view resolves names from `profile_data/{id}`, once per person; older entries show their stored name or email.
+
+**Migration** (admin banner "N segments still use the old id format" → "Migrate segment ids…")
+- **Preview (reads only):**
+  - Each segment whose id isn't an auto id, or whose who-fields hold an `@`.
+  - Old id → new id, list size, history count.
+  - Email → profile id, from `profile_data` by `email`, exact then lower-case. Unresolved emails are flagged and left as they are.
+- **Run, per segment:**
+  1. History is copied to the new parent under the **same doc ids**, with `segmentid` = new and `copiedfrom`. A re-run overwrites instead of duplicating.
+  2. One batch then makes:
+     - the new config (data, who fixed, `id` = new, `legacyid` = old);
+     - the new list (`segmentid` = new);
+     - the deletion of the old list (derived data);
+     - a `migrate` history entry (doc id `migrate`);
+     - the retired old config: `archived:true`, `migratedto`, `migratedAt`, `migratedBy`. Nothing is hard-deleted.
+- Segments that keep their id only get their who-fields updated.
+- **Saved Participant Intelligence filters** (`searchquery.pifilter.journeysegments` and `.exclude.journeysegments`) are remapped from old to new ids.
+- **Re-running** skips any doc that already has `migratedto`. The board's load hides migrated docs and stops showing the banner once nothing needs migrating.
+- Migration entries are labelled "New id" in the history views.
+
+**Rules the run needs:**
+- `segmentboardconfig` create and update;
+- `segmentboardlist` create and delete;
+- `segmenthistory` create, already granted;
+- `searchquery` update.
+
+**Verified on the harness (9 text-id segments, 2 with email who-fields):**
+- The preview lists 9 rows with correct list and history counts.
+- The run moves all 9 to auto ids with `legacyid`, retires 9 old docs, and leaves 0 old list docs. List sizes are identical, every list's doc id equals its `segmentid`, 15 history entries are copied plus 9 `migrate` entries, and emails become the profile id.
+- The banner disappears and the board reloads on the new ids.
+- A new segment gets an auto id with `id` = doc id, `createdBy` = profile id and the list under the same id.
+- History shows "by Harness User" from the profile lookup.
+- ng build ok; hook-diff aligned.
+
+**e2e (hub):**
+- SGB-02 finds the app-created segment by name. It asserts an auto id, `id` = doc id, `createdBy` without `@`, and list `segmentid` = id.
+- SGB-06 checks `by.profileid`.
+- SGB-ADDR3 registers the migration hooks and never drives them, because the run is a project-wide one-time write.
+
+**Revert:**
+- Code: restore from the previous commit (scratch copies in `engine.before-ids.ts` / `component.before-ids.ts`).
+- Data: the old docs still exist (archived, with `migratedto`). Un-archive them, archive the new ones and recreate the old list docs, which a list refresh does on the old ids.

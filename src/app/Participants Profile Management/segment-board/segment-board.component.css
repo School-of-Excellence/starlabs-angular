@@ -822,3 +822,14 @@
 .sb-root .h-rules li{margin:2px 0}
 .sb-root .h-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:40px 16px;text-align:center;color:var(--text-3);font-size:var(--fs-meta)}
 .sb-root .h-empty .sb-spinner{width:24px;height:24px;margin:0}
+
+/* id migration: banner on the board while segments still need it, preview dialog */
+.sb-root .banner.mig{border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:var(--warn-soft)}
+.sb-root .banner.mig p{color:var(--text-2)}
+.sb-root #migDlg{width:min(980px,calc(100% - 32px))}
+.sb-root .mig-sum{margin:0 0 10px;font-size:var(--fs-meta);color:var(--text-2)}
+.sb-root .mig-sum b{color:var(--text)}
+.sb-root .mig-tbl{max-height:min(52vh,460px);overflow:auto;border:1px solid var(--line-1);border-radius:var(--r-md)}
+.sb-root .mig-tbl td{font-size:var(--fs-meta)}
+.sb-root .mig-tbl .mono{font-family:var(--mono);font-size:11px;word-break:break-all}
+.sb-root .h-act.h-migrate{background:var(--surface-3);color:var(--text-2)}

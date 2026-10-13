@@ -14,6 +14,11 @@ export interface SegmentBoardStore {
   archiveSegment(id: string, history: HistoryEntry[]): Promise<void>;
   unarchiveSegment(id: string, place: { sequence?: number; displayIndex: number }, history: HistoryEntry[]): Promise<void>;
   loadHistory(segmentId: string): Promise<any[]>;           // one segment's history, newest first
+  newSegmentId(): string;                                   // a Firestore auto id for a new segmentboardconfig doc
+  profileNames(profileIds: string[]): Promise<Record<string, string>>;   // profile_data name per profile id (history "by")
+  // one-time move of text-id segments to auto ids (+ who fields email -> profile id); see MigrationRow
+  migrationPreview(): Promise<MigrationRow[]>;
+  runMigration(rows: MigrationRow[], progress: (done: number, total: number) => void): Promise<MigrationResult>;
   loadAllHistory(limit: number): Promise<any[]>;            // every segment's history (collection group), newest first
   loadParticipants(): Promise<any[]>;                      // participant metadata docs, already mapped (segment-board.facts.ts)
   loadLists(): Promise<{ segmentid: string; profilelist: string[]; lastupdated: Date | null }[]>;   // segmentboardlist
@@ -36,9 +41,15 @@ export interface OrderUpdate { id: string; displayIndex: number; sequence?: numb
 // a change to one segment; only the fields that changed, as { from, to } in the config doc's own shapes
 export interface HistoryEntry {
   segmentid: string; segmentname: string;
-  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder';
+  action: 'create' | 'edit' | 'archive' | 'unarchive' | 'reorder' | 'migrate';
   changedfields: string[]; changes: Record<string, { from: unknown; to: unknown }>; summary: string;
 }
+export interface MigrationRow {
+  oldId: string; newId: string | null;          // newId null = keeps its id (only the who fields change)
+  name: string; archived: boolean; listSize: number | null; historyCount: number;
+  who: Record<string, { from: string; to: string | null }>;   // createdBy / updatedBy / archivedBy email -> profile id
+}
+export interface MigrationResult { moved: number; whoFixed: number; filtersRemapped: number; failed: { id: string; error: string }[] }
 export function mountSegmentBoard(root: HTMLElement, store: SegmentBoardStore): () => void {
 const cleanups: Array<() => void> = [];
 const listen = (target, type, fn, opts?) => { target.addEventListener(type, fn, opts); cleanups.push(() => target.removeEventListener(type, fn, opts)); };
@@ -257,6 +268,9 @@ const master={id:'master',type:'master',name:'Master Segments',segments:[],displ
 const SETS=[master];
 const ARCHIVED_IDS=new Set();   // archived docs keep their id reserved
 let ARCHIVED=[];                // archived segments, for the Archived view
+// Firestore auto ids: 20 letters/digits. Older segments used a slug of the name; MIG_NEEDED counts docs still to migrate.
+const AUTO_ID_RE=/^[A-Za-z0-9]{20}$/;
+let MIG_NEEDED=0;
 computeSet(master);
 const AUDIT=[];                 // in-session notes only; the stored history is segmentboardconfig/{id}/segmenthistory
 
@@ -379,7 +393,12 @@ async function load(){
     ARCHIVED_IDS.clear();
     const live=[];
     ARCHIVED=[];
-    for(const d of docs){ if(d.archived){ ARCHIVED_IDS.add(d.id); ARCHIVED.push(fromDoc(d)); } else live.push(fromDoc(d)); }
+    MIG_NEEDED=0;
+    for(const d of docs){
+      if(d.migratedto) continue;   // retired by the id migration: its copy lives at migratedto
+      if(!AUTO_ID_RE.test(d.id)||['createdBy','updatedBy','archivedBy'].some(k=>String(d[k]??'').includes('@'))) MIG_NEEDED++;
+      if(d.archived){ ARCHIVED_IDS.add(d.id); ARCHIVED.push(fromDoc(d)); } else live.push(fromDoc(d));
+    }
     master.segments=live;
     master.defaultDisplayOrder=defaultOrder(live);
     master.displayOrder=live.slice().sort((a,b)=>(a.displayIndex??1e9)-(b.displayIndex??1e9)||master.defaultDisplayOrder.indexOf(a.id)-master.defaultDisplayOrder.indexOf(b.id)).map(x=>x.id);
@@ -628,6 +647,9 @@ function renderMain(){
   </div>
   ${appliedBar(t)}
   </div><div class="board-scroll">`;
+  if(edit&&MIG_NEEDED&&!S.showArchived) h+=`<div class="banner mig"><div><b>${plural(MIG_NEEDED,'segment')} still use${MIG_NEEDED===1?'s':''} the old id format.</b>
+    <p>New segments get random ids and record who changed them by profile id. Migrate the existing ones once: you’ll see a preview before anything is written.</p></div>
+    <div class="acts"><button class="btn primary" data-testid="sgb-mig-open" data-act="migrate">Migrate segment ids…</button></div></div>`;
   if(!edit) h+=`<div class="banner"><div><b>View only.</b> Master segments can be changed by Admins. Everyone else can look, filter and export.</div></div>`;
   if(S.arranging) h+=`<div class="banner arrange"><div><b>Arrange cards</b><p>Cards are folded so they are easy to move. Grab a card anywhere on its title row and drop it where you want it, then <b>Save arrangement</b>. Everyone sees the new order, and it is also the sequence of the automated segments. Nobody changes segment.</p><span class="dev-note">seg_saveDisplayOrder → segment_sets/${set.id}.displayOrder</span></div>
     <div class="acts"><button class="btn" data-act="arr-cancel">Cancel</button><button class="btn primary" data-act="arr-save">Save arrangement</button></div></div>`;
@@ -837,6 +859,49 @@ async function unarchiveSeg(id){
   render(); toast(`Restored “${seg.name}”.`);
   if(seg.mode==='auto'&&seg.status!=='inactive') await refreshLists([id]); else if(seg.mode==='manual') { await syncAutoLists(); render(); }
 }
+// ---------- one-time id migration (text ids -> auto ids; who fields email -> profile id) ----------
+let MIG=null;
+function openMigrate(){
+  if(!canEdit(curSet())) return;
+  MIG={state:'loading'}; renderMig(); $('#migDlg').showModal();
+  store.migrationPreview().then(rows=>{ MIG={state:'preview',rows}; renderMig(); })
+    .catch(e=>{ MIG={state:'error',error:e?.message||String(e)}; renderMig(); });
+}
+function renderMig(){
+  const box=$('#migDlg .dlg'); if(!box||!MIG) return;
+  let body='', foot='<button class="btn" data-dlg="cancel">Close</button>';
+  if(MIG.state==='loading') body='<div class="h-empty"><div class="sb-spinner" role="status" aria-label="Reading"></div>Reading segments, lists and history…</div>';
+  else if(MIG.state==='error') body=`<div class="info warn">Couldn’t prepare the migration: ${esc(MIG.error)}</div>`;
+  else if(MIG.state==='preview'||MIG.state==='running'){
+    const rows=MIG.rows, moves=rows.filter(r=>r.newId), unresolved=rows.flatMap(r=>Object.values(r.who).filter(w=>!w.to).map(w=>w.from));
+    body=!rows.length?'<div class="info">Nothing to migrate: every segment already uses a random id and profile ids.</div>'
+      :`<p class="subtle small" style="margin:0 0 10px">Each segment moves in one batch: a new config doc with a random id (the old id kept as <code>legacyid</code>), its list under the new id, its history copied, and the old doc archived with a pointer to the new one. Nothing is hard-deleted. Saved Participant Intelligence filters that pick these segments are updated too.</p>
+      <div class="mig-sum"><b>${plural(moves.length,'segment')}</b> get a new id · <b>${plural(rows.filter(r=>Object.keys(r.who).length).length,'segment')}</b> get profile ids for who changed them${unresolved.length?` · <span class="chip warn">${plural(new Set(unresolved).size,'email')} not found in profile_data (left as is)</span>`:''}</div>
+      <div class="tbl-wrap mig-tbl"><table class="pt"><thead><tr><th>Segment</th><th>Id</th><th class="num">List</th><th class="num">History</th><th>Who fields</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr data-testid="sgb-mig-row"><td><b>${esc(r.name)}</b>${r.archived?' <span class="chip">archived</span>':''}</td>
+        <td class="mono small">${r.newId?`${esc(r.oldId)}<br>→ ${esc(r.newId)}`:`<span class="subtle">keeps ${esc(r.oldId)}</span>`}</td>
+        <td class="num">${r.listSize==null?'—':fmt(r.listSize)}</td><td class="num">${fmt(r.historyCount)}</td>
+        <td class="small">${Object.entries(r.who).map(([k,w])=>`${k}: ${esc(w.from)} → ${w.to?esc(w.to):'<span class="chip warn">not found</span>'}`).join('<br>')||'<span class="subtle">—</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${MIG.state==='running'?`<div class="info" id="migProg">Migrating… ${MIG.done||0} of ${rows.length}</div>`:'<div class="info warn">Back up segmentboardconfig and segmentboardlist first, and make sure nobody edits segments while this runs.</div>'}`;
+    if(rows.length) foot=`<button class="btn" data-dlg="cancel" ${MIG.state==='running'?'disabled':''}>Cancel</button><button class="btn primary" data-testid="sgb-mig-run" data-act="mig-run" ${MIG.state==='running'?'disabled':''}>${MIG.state==='running'?'Migrating…':`Migrate ${plural(rows.length,'segment')}`}</button>`;
+  } else if(MIG.state==='done'){
+    const r=MIG.result;
+    body=`<div class="info ${r.failed.length?'warn':''}"><b>Done.</b> ${plural(r.moved,'segment')} moved to new ids · ${plural(r.whoFixed,'segment')} updated to profile ids · ${plural(r.filtersRemapped,'saved filter')} updated.${r.failed.length?`<br>${plural(r.failed.length,'segment')} failed and can be retried: ${r.failed.map(f=>`${esc(f.id)} (${esc(f.error)})`).join(', ')}`:''}</div>`;
+    foot='<button class="btn primary" data-testid="sgb-mig-done" data-act="mig-done">Reload the board</button>';
+  }
+  box.innerHTML=`<div class="dlg-h"><h2 id="migTitle">Migrate segment ids</h2><p class="subtle">One time${MIG.rows?' · '+plural(MIG.rows.length,'segment'):''}</p></div><div class="dlg-b">${body}</div><div class="dlg-f">${foot}</div>`;
+}
+async function runMigrate(){
+  if(!MIG||MIG.state!=='preview') return;
+  MIG.state='running'; MIG.done=0; renderMig();
+  try{
+    const result=await store.runMigration(MIG.rows,(done)=>{ MIG.done=done; const p=$('#migProg'); if(p) p.textContent=`Migrating… ${done} of ${MIG.rows.length}`; });
+    MIG={state:'done',result,rows:MIG.rows}; HIST.clear(); ALLHIST=null;
+  }catch(e){ MIG={state:'error',error:e?.message||String(e)}; }
+  renderMig();
+}
+
 // ---------- import & compare: an uploaded / pasted list vs the segment's View all list ----------
 let CMP=null;
 const normEmail=v=>String(v??'').trim().toLowerCase();
@@ -953,8 +1018,8 @@ function conditionsHtml(set,s,compact){
     ${!compact&&edit?`<button class="btn" data-act="edit-seg" data-seg="${s.id}">Edit segment</button>`:''}
     ${compact?'':`<pre class="dev-note block">${esc(JSON.stringify({journeys:js.ids,rule:s.rule},null,2))}</pre>`}`;
 }
-const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved'};
-const H_FIELD={name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
+const H_ACTION={create:'Created',edit:'Edited',archive:'Archived',unarchive:'Unarchived',reorder:'Moved',migrate:'New id'};
+const H_FIELD={id:'Segment id',name:'Name',description:'Description',status:'Status',journeys:'Journey',rule:'Conditions',eligibility:'Eligibility',position:'Board position',sequence:'Sequence',archived:'Archived'};
 function hVal(f,v){
   if(v===null||v===undefined||v===''||(Array.isArray(v)&&!v.length)) return '<span class="subtle">—</span>';
   if(f==='rule'||f==='eligibility'){ const r=Array.isArray(v)?{all:v}:v; try{ const ex=expand(r); return `<ul class="h-rules">${(ex.all||ex.any).map(n=>`<li>${esc(describe(n))}</li>`).join('')}</ul>${ex.any?'<span class="subtle small">any of these</span>':''}`; }catch(e){ return `<code>${esc(JSON.stringify(v))}</code>`; } }
@@ -972,7 +1037,21 @@ function historyListHtml(state,showSeg){
     <div class="h-sum">${esc(a.summary||'')}</div>
     ${Object.keys(a.changes||{}).length?`<details class="h-diff"><summary>${plural((a.changedfields||Object.keys(a.changes)).length,'field')} changed</summary>
       <table>${Object.entries(a.changes).map(([f,c])=>`<tr><th>${esc(H_FIELD[f]||f)}</th><td>${hVal(f,c?.from)}</td><td class="h-arrow">→</td><td>${hVal(f,c?.to)}</td></tr>`).join('')}</table></details>`:''}
-    <div class="subtle small">by ${esc(a.by?.name||a.by?.email||'—')}${a.by?.email&&a.by?.name&&a.by.name!==a.by.email?` · ${esc(a.by.email)}`:''}</div></li>`).join('')}</ul>`;
+    <div class="subtle small">by ${esc(byName(a.by))}</div></li>`).join('')}</ul>`;
+}
+// history "by" holds { profileid }; names come from profile_data once per person (older entries carry name / email)
+const PNAMES=new Map(); let pnLoading=false;
+function byName(by){
+  if(!by) return '—';
+  if(by.profileid) return PNAMES.get(by.profileid)||(PNAMES.has(by.profileid)?by.profileid:'…');
+  return by.name||by.email||'—';
+}
+function loadNames(rows){
+  const ids=[...new Set((rows||[]).map(a=>a.by?.profileid).filter(id=>id&&!PNAMES.has(id)))];
+  if(!ids.length||pnLoading) return; pnLoading=true;
+  store.profileNames(ids).then(m=>{ for(const id of ids) PNAMES.set(id,m[id]||''); })
+    .catch(()=>{ for(const id of ids) PNAMES.set(id,''); })
+    .finally(()=>{ pnLoading=false; if(S.drawer&&(S.drawer.kind==='history'||S.drawer.tab==='history')) renderDrawer(); });
 }
 function loadSegHistory(id){
   if(HIST.has(id)) return; HIST.set(id,{loading:true});
@@ -1013,7 +1092,7 @@ function renderDrawer(fresh){
     const tb=[['people',`Participants · ${fmt(n)}`],['rules','Conditions'],['history','History']];
     tabs=`<div class="tabs" role="tablist">${tb.map(([k,l])=>`<button class="tab" role="tab" ${k==='history'?'data-testid="sgb-drawer-tab-history"':''} data-tab="${k}" aria-selected="${d.tab===k}">${l}</button>`).join('')}</div>`;
     if(d.tab==='rules') content=conditionsHtml(set,s);
-    else if(d.tab==='history'){ loadSegHistory(s.id); content=historyListHtml(HIST.get(s.id),false); }
+    else if(d.tab==='history'){ loadSegHistory(s.id); loadNames(HIST.get(s.id)?.rows); content=historyListHtml(HIST.get(s.id),false); }
     else if(d.tab==='elsewhere'){ tools=`<p class="subtle small" style="margin:0">These participants match this segment’s conditions, but sit in a segment that ranks higher or were placed by hand.</p>`; content=tableHtml(set,d,drawerRows(set,d),{h:'Placed in',cell:(p,m)=>esc(segName(set,m.segmentId))}); }
     else if(auto){
       const sync=!L?'The list hasn’t been refreshed yet.':(saved===n&&inBoth===n)?`The stored list matches (updated ${L.lastupdated?esc(TIME.format(L.lastupdated)):'just now'}).`
@@ -1068,7 +1147,7 @@ function renderDrawer(fresh){
     content+='<span class="dev-note block">reads the activity log for this set (one doc per send / recommendation / assignment)</span>';
   } else if(d.kind==='history'){
     eyebrow='Master segments'; title='Change history'; chips='<span class="chip">Every segment · newest first</span>';
-    loadAllHistory(); content=historyListHtml(ALLHIST,true);
+    loadAllHistory(); loadNames(ALLHIST?.rows); content=historyListHtml(ALLHIST,true);
   }
   const showSearch=!['history','activity'].includes(d.kind)&&!(d.kind==='seg'&&['rules','history'].includes(d.tab));
   const hint=edit&&showSearch&&MEMBERSHIP_EDIT?`<p class="subtle small" style="margin:0">Select participants and use <b>Move to…</b>, or drag rows onto a segment on the board.</p>`:'';
@@ -1216,7 +1295,7 @@ function openSegDlg(mode,segId){
   if(mode==='edit'){
     const s=set._by.get(segId||S.drawer.id), auto=s.mode==='auto', ex=auto?expand(s.rule):null, comb=ex&&ex.any?'any':'all';
     B={mode,id:s.id,name:s.name,description:s.description||'',scope:jScope([...(s.journeys||[])]),type:s.mode,comb,rows:auto?toRows(ex[comb]):[],sequence:s.sequence,status:s.status||'active',eligibility:s.eligibility||null};}
-  else B={mode:'create',name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
+  else B={mode:'create',newId:store.newSegmentId(),name:'',description:'',scope:{type:'journey',ids:[]},type:'auto',status:'active',comb:'all',rows:[],eligibility:null,
     order:[...seqSegs(set).map(x=>x.id),NEW_ID]};   // where the new segment is checked; it starts last
   renderSegDlg(); $('#segDlg').showModal();
 }
@@ -1336,12 +1415,9 @@ function seqShifts(set){   // existing segments whose sequence changes when the 
   return B.order.filter((id,i)=>id!==NEW_ID&&set._by.get(id).sequence!==i+1).length;
 }
 // no match preview: the box only shows what is still missing, and hides once the conditions are complete
-function segIdFor(set,name){   // id from the name, made unique within the set
-  let id=name.toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,24)||'SEG'; while(set._by.has(id)||ARCHIVED_IDS.has(id)) id+='_2'; return id;
-}
 function buildDoc(){   // the Firestore document this dialog saves
   const set=curSet(), name=B.name.trim(), desc=B.description.trim(), edit=B.mode==='edit';
-  const doc={id:edit?B.id:(name?segIdFor(set,name):'<from name>'), name};
+  const doc={id:edit?B.id:B.newId, name};
   if(desc) doc.description=desc;
   doc.mode=B.type; doc.status=B.status;
   doc.journeys=[...B.scope.ids];
@@ -1770,6 +1846,11 @@ listen(root,'click',e=>{
       else if(t.closest('[data-act="cmp-export-all"]')) cmpExport(true);
       return;
     }
+    if(dlg.id==='migDlg'){
+      if(t.closest('[data-act="mig-run"]')) runMigrate();
+      else if(t.closest('[data-act="mig-done"]')){ dlg.close(); MIG=null; load(); }
+      return;
+    }
     if(dlg.id==='segDlg'&&t.closest('#sArchive')) archiveSeg();
     if(dlg.id==='segDlg'){
       const mv=t.closest('[data-seqmv]');
@@ -1817,6 +1898,7 @@ listen(root,'click',e=>{
     if(act==='close') closeDrawer();
     else if(act==='reload') load();
     else if(act==='export-list') exportList();
+    else if(act==='migrate') openMigrate();
     else if(act==='show-archived'){ S.showArchived=!S.showArchived; render(); }
     else if(act==='unarchive') unarchiveSeg(a.dataset.seg);
     else if(act==='move-manual') openManualMove();

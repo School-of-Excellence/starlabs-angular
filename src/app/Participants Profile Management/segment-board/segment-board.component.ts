@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, Inject, OnDestroy, PLATFORM_ID, ViewChild, ViewEncapsulation, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Firestore, WriteBatch, collection, collectionGroup, deleteField, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where, writeBatch } from '@angular/fire/firestore';
+import { Firestore, WriteBatch, collection, collectionGroup, deleteField, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from '@angular/fire/firestore';
 import { Auth } from '@angular/fire/auth';
 import { Storage, getDownloadURL, ref as ref_, uploadBytes } from '@angular/fire/storage';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -12,12 +12,12 @@ import { AhNotificationComponent } from '../participants-analytics/ah-notificati
 import { EmailInputComponent } from '../participants-analytics/email-input/email-input.component';
 import { WatiInputComponent } from '../participants-analytics/wati-input/wati-input.component';
 import { MapRecommendedplaylistToparticipantComponentComponent } from '../participants-analytics/map-recommendedplaylist-toparticipant.component/map-recommendedplaylist-toparticipant.component.component';
-import { HistoryEntry, OrderUpdate, SegmentBoardStore, mountSegmentBoard } from './segment-board.engine';
+import { HistoryEntry, MigrationResult, MigrationRow, OrderUpdate, SegmentBoardStore, mountSegmentBoard } from './segment-board.engine';
 import { toParticipant } from './segment-board.facts';
 
 // Same drag-and-drop library and version the standalone prototype uses (Arrange + sequence list).
 const SORTABLE_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js';
-// Master segment configuration: one doc per segment, doc id = segment id.
+// Master segment configuration: one doc per segment, doc id = a Firestore auto id (older docs: a name slug, see the migration).
 const CONFIG_COLLECTION = 'segmentboardconfig';
 // Each segment's refreshed list: doc id = segment id, { segmentname, segmentid, profilelist, lastupdated }.
 const LIST_COLLECTION = 'segmentboardlist';
@@ -68,42 +68,57 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
       return snap.docs.map(d => ({ ...d.data(), id: d.id }));
     },
     saveSegment: async (segment, { isNew, orderUpdates, history }) => {
+      const pid = await this.profileId();
       const batch = writeBatch(this.firestore);
       const data: Record<string, unknown> = { ...segment };
       delete data['createdAt']; delete data['createdBy']; delete data['updatedAt']; delete data['updatedBy']; delete data['_stored'];
       if (isNew) {
-        batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, createdAt: serverTimestamp(), createdBy: this.userId() });
+        batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, createdAt: serverTimestamp(), createdBy: pid });
       } else {
         if (!segment.description) data['description'] = deleteField();
-        batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, updatedAt: serverTimestamp(), updatedBy: this.userId() }, { merge: true });
+        batch.set(doc(this.firestore, CONFIG_COLLECTION, segment.id), { ...data, updatedAt: serverTimestamp(), updatedBy: pid }, { merge: true });
       }
       // one order: a new card moves the ones after it; same batch, so order and history never disagree
-      this.writeOrder(batch, orderUpdates);
-      this.writeHistory(batch, history);
+      this.writeOrder(batch, orderUpdates, pid);
+      this.writeHistory(batch, history, pid);
       await batch.commit();
     },
     saveDisplayOrder: async (updates, history) => {
+      const pid = await this.profileId();
       const batch = writeBatch(this.firestore);
-      this.writeOrder(batch, updates);
-      this.writeHistory(batch, history);
+      this.writeOrder(batch, updates, pid);
+      this.writeHistory(batch, history, pid);
       await batch.commit();
     },
     archiveSegment: async (id, history) => {
+      const pid = await this.profileId();
       const batch = writeBatch(this.firestore);
-      batch.update(doc(this.firestore, CONFIG_COLLECTION, id), { archived: true, archivedAt: serverTimestamp(), archivedBy: this.userId() });
-      this.writeHistory(batch, history);
+      batch.update(doc(this.firestore, CONFIG_COLLECTION, id), { archived: true, archivedAt: serverTimestamp(), archivedBy: pid });
+      this.writeHistory(batch, history, pid);
       await batch.commit();
     },
     unarchiveSegment: async (id, place, history) => {
       // back on the board: at the end of the board, and at the end of the sequence if automated
+      const pid = await this.profileId();
       const batch = writeBatch(this.firestore);
       batch.update(doc(this.firestore, CONFIG_COLLECTION, id), {
         ...place, archived: deleteField(), archivedAt: deleteField(), archivedBy: deleteField(),
-        updatedAt: serverTimestamp(), updatedBy: this.userId(),
+        updatedAt: serverTimestamp(), updatedBy: pid,
       });
-      this.writeHistory(batch, history);
+      this.writeHistory(batch, history, pid);
       await batch.commit();
     },
+    newSegmentId: () => doc(collection(this.firestore, CONFIG_COLLECTION)).id,
+    profileNames: async ids => {
+      const out: Record<string, string> = {};
+      await Promise.all(ids.map(async id => {
+        const d = await getDoc(doc(this.firestore, 'profile_data', id)).catch(() => null);
+        out[id] = d?.exists() ? String(d.data()?.['name'] ?? '') : '';
+      }));
+      return out;
+    },
+    migrationPreview: () => this.migrationPreview(),
+    runMigration: (rows, progress) => this.runMigration(rows, progress),
     // no deleteSegment: archiving is the only delete, so every segment keeps its history
     loadHistory: async segmentId => {
       const snap = await getDocs(query(collection(this.firestore, CONFIG_COLLECTION, segmentId, HISTORY_SUBCOLLECTION), orderBy('at', 'desc'), limit(200)));
@@ -276,36 +291,156 @@ export class SegmentBoardComponent implements AfterViewInit, OnDestroy {
   }
 
   /** displayIndex for every moved card, sequence for automated ones. */
-  private writeOrder(batch: WriteBatch, updates: OrderUpdate[]) {
+  private writeOrder(batch: WriteBatch, updates: OrderUpdate[], pid: string) {
     for (const u of updates) {
       batch.update(doc(this.firestore, CONFIG_COLLECTION, u.id), {
         displayIndex: u.displayIndex, ...(u.sequence !== undefined ? { sequence: u.sequence } : {}),
-        updatedAt: serverTimestamp(), updatedBy: this.userId(),
+        updatedAt: serverTimestamp(), updatedBy: pid,
       });
     }
   }
 
-  /** One doc per changed segment in segmentboardconfig/{id}/segmenthistory: what changed, when (server time) and who. */
-  private writeHistory(batch: WriteBatch, history: HistoryEntry[]) {
-    const by = this.actor();
+  /** One doc per changed segment in segmentboardconfig/{id}/segmenthistory: what changed, when (server time) and who (profile id). */
+  private writeHistory(batch: WriteBatch, history: HistoryEntry[], pid: string) {
     for (const h of history) {
-      batch.set(doc(collection(this.firestore, CONFIG_COLLECTION, h.segmentid, HISTORY_SUBCOLLECTION)), { ...h, at: serverTimestamp(), by });
+      batch.set(doc(collection(this.firestore, CONFIG_COLLECTION, h.segmentid, HISTORY_SUBCOLLECTION)), { ...h, at: serverTimestamp(), by: { profileid: pid } });
     }
+  }
+
+  /**
+   * The signed-in user's profile id: the profile_data doc linked to user_data/{uid} (as authService.username()).
+   * Read once. No fallback to the email: a write without a profile id is refused.
+   */
+  private profileIdP: Promise<string> | null = null;
+  private profileId(): Promise<string> {
+    return this.profileIdP ??= (async () => {
+      const uid = this.auth.currentUser?.uid;
+      if (!uid) throw new Error('Not signed in.');
+      const snap = await getDocs(query(collection(this.firestore, 'profile_data'), where('user_ref', '==', doc(this.firestore, 'user_data', uid)), limit(1)));
+      const d = snap.docs[0];
+      const pid = d ? String(d.data()['profileid'] ?? d.id) : '';
+      if (!pid) throw new Error('No profile found for your sign-in, so the change can’t be recorded against you.');
+      return pid;
+    })().catch(e => { this.profileIdP = null; throw e; });
+  }
+
+  // ---- One-time migration: name-slug ids -> auto ids; createdBy / updatedBy / archivedBy email -> profile id ----
+
+  /** Every segment that still needs it, with what would change. Reads only. */
+  private async migrationPreview(): Promise<MigrationRow[]> {
+    const [configs, lists] = await Promise.all([getDocs(collection(this.firestore, CONFIG_COLLECTION)), getDocs(collection(this.firestore, LIST_COLLECTION))]);
+    const listSize = new Map(lists.docs.map(l => [l.id, (l.data()['profilelist'] ?? []).length as number]));
+    const emailToPid = new Map<string, string | null>();
+    const rows: MigrationRow[] = [];
+    for (const c of configs.docs) {
+      const d = c.data();
+      if (d['migratedto']) continue;
+      const move = !/^[A-Za-z0-9]{20}$/.test(c.id);
+      const who: MigrationRow['who'] = {};
+      for (const k of ['createdBy', 'updatedBy', 'archivedBy']) {
+        const v = String(d[k] ?? '');
+        if (!v.includes('@')) continue;
+        if (!emailToPid.has(v)) emailToPid.set(v, await this.profileIdForEmail(v));
+        who[k] = { from: v, to: emailToPid.get(v) ?? null };
+      }
+      if (!move && !Object.keys(who).length) continue;
+      const hist = await getDocs(collection(this.firestore, CONFIG_COLLECTION, c.id, HISTORY_SUBCOLLECTION));
+      rows.push({
+        oldId: c.id, newId: move ? doc(collection(this.firestore, CONFIG_COLLECTION)).id : null,
+        name: String(d['name'] ?? c.id), archived: !!d['archived'], listSize: listSize.has(c.id) ? listSize.get(c.id)! : null,
+        historyCount: hist.size, who,
+      });
+    }
+    return rows;
+  }
+
+  private async profileIdForEmail(email: string): Promise<string | null> {
+    for (const e of [...new Set([email, email.toLowerCase()])]) {
+      const snap = await getDocs(query(collection(this.firestore, 'profile_data'), where('email', '==', e), limit(1)));
+      if (snap.docs[0]) return String(snap.docs[0].data()['profileid'] ?? snap.docs[0].id);
+    }
+    return null;
+  }
+
+  /**
+   * Per segment: history copies first (same doc ids, so a re-run overwrites instead of duplicating), then one batch with
+   * the new config doc, its list under the new id, the old list removed, a `migrate` entry and the old config retired
+   * (archived + migratedto). Then saved Participant Intelligence filters are remapped old id -> new id.
+   */
+  private async runMigration(rows: MigrationRow[], progress: (done: number, total: number) => void): Promise<MigrationResult> {
+    const pid = await this.profileId();
+    const result: MigrationResult = { moved: 0, whoFixed: 0, filtersRemapped: 0, failed: [] };
+    const idMap = new Map<string, string>();
+    let done = 0;
+    for (const r of rows) {
+      try {
+        const oldRef = doc(this.firestore, CONFIG_COLLECTION, r.oldId);
+        const snap = await getDoc(oldRef);
+        if (!snap.exists() || snap.data()['migratedto']) { done++; progress(done, rows.length); continue; }   // already done
+        const data = snap.data();
+        const whoFix: Record<string, string> = {};
+        for (const [k, w] of Object.entries(r.who)) if (w.to) whoFix[k] = w.to;
+        if (!r.newId) {
+          if (Object.keys(whoFix).length) { await updateDoc(oldRef, whoFix); result.whoFixed++; }
+          done++; progress(done, rows.length); continue;
+        }
+        const newId = r.newId;
+        const hist = await getDocs(collection(this.firestore, CONFIG_COLLECTION, r.oldId, HISTORY_SUBCOLLECTION));
+        for (let i = 0; i < hist.docs.length; i += 400) {
+          const b = writeBatch(this.firestore);
+          for (const h of hist.docs.slice(i, i + 400)) {
+            b.set(doc(this.firestore, CONFIG_COLLECTION, newId, HISTORY_SUBCOLLECTION, h.id), { ...h.data(), segmentid: newId, copiedfrom: r.oldId });
+          }
+          await b.commit();
+        }
+        const list = await getDoc(doc(this.firestore, LIST_COLLECTION, r.oldId));
+        const b = writeBatch(this.firestore);
+        b.set(doc(this.firestore, CONFIG_COLLECTION, newId), { ...data, ...whoFix, id: newId, legacyid: r.oldId });
+        if (list.exists()) {
+          b.set(doc(this.firestore, LIST_COLLECTION, newId), { ...list.data(), segmentid: newId });
+          b.delete(list.ref);
+        }
+        b.set(doc(this.firestore, CONFIG_COLLECTION, newId, HISTORY_SUBCOLLECTION, 'migrate'), {
+          segmentid: newId, segmentname: r.name, action: 'migrate', changedfields: ['id'],
+          changes: { id: { from: r.oldId, to: newId } }, summary: `Moved to a random id (was ${r.oldId})`,
+          at: serverTimestamp(), by: { profileid: pid },
+        });
+        b.update(oldRef, { archived: true, migratedto: newId, migratedAt: serverTimestamp(), migratedBy: pid });
+        await b.commit();
+        idMap.set(r.oldId, newId);
+        result.moved++;
+        if (Object.keys(whoFix).length) result.whoFixed++;
+      } catch (e: any) {
+        result.failed.push({ id: r.oldId, error: e?.message || String(e) });
+      }
+      done++; progress(done, rows.length);
+    }
+    if (idMap.size) result.filtersRemapped = await this.remapSavedFilters(idMap);
+    return result;
+  }
+
+  /** Participant Intelligence saved filters (searchquery) pick segments by id in pifilter.journeysegments / exclude.journeysegments. */
+  private async remapSavedFilters(idMap: Map<string, string>): Promise<number> {
+    const snap = await getDocs(collection(this.firestore, 'searchquery'));
+    let n = 0;
+    for (const d of snap.docs) {
+      const f = d.data()['pifilter'];
+      if (!f) continue;
+      const map = (a: unknown) => Array.isArray(a) ? a.map(x => idMap.get(x) ?? x) : a;
+      const inc = map(f['journeysegments']), exc = map(f['exclude']?.['journeysegments']);
+      const changed = JSON.stringify(inc) !== JSON.stringify(f['journeysegments']) || JSON.stringify(exc) !== JSON.stringify(f['exclude']?.['journeysegments']);
+      if (!changed) continue;
+      const upd: Record<string, unknown> = {};
+      if (Array.isArray(inc)) upd['pifilter.journeysegments'] = inc;
+      if (Array.isArray(exc)) upd['pifilter.exclude.journeysegments'] = exc;
+      await updateDoc(d.ref, upd);
+      n++;
+    }
+    return n;
   }
 
   private historyRow(id: string, d: any) {
     return { ...d, id, at: d['at']?.toDate?.() ?? null };
-  }
-
-  /** Who made the change, stored as written so it still reads correctly later. */
-  private actor() {
-    const u = this.auth.currentUser;
-    return { email: u?.email ?? null, uid: u?.uid ?? null, name: u?.displayName || u?.email || 'unknown' };
-  }
-
-  private userId(): string {
-    const u = this.auth.currentUser;
-    return u?.email || u?.uid || 'unknown';
   }
 
   ngOnDestroy(): void {
