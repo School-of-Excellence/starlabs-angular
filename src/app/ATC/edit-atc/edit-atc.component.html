@@ -322,6 +322,29 @@
       <!-- New Transcription Section -->
       <section class="content-section">
         <h2 class="section-heading">NEW ADJUSTMENTS</h2>
+        <!-- one section per assigned_to activity: pick agents once and apply them to every new-adjustment procedure (page-only, not saved to draft) -->
+        <!-- shown only while there is at least one new adjustment -->
+        <ng-container *ngIf="(newTranscription ?? []).length != 0">
+          <div *ngFor="let assigned of assignedtoActivity" class="bulk-assign-section">
+            <div class="bulk-assign-title">{{assigned.activity}} — set for all procedures</div>
+            <div class="bulk-assign-row">
+              <mat-form-field appearance="outline" class="procedure-field">
+                <mat-label>{{assigned.activity}}</mat-label>
+                <mat-select [(ngModel)]="bulkAssignedSelection[assigned.docid]" multiple>
+                  <mat-option>
+                    <ngx-mat-select-search [(ngModel)]="bulkAssignedFilter[assigned.docid]" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                  </mat-option>
+                  <mat-option *ngFor="let name of availableBulkSpecialistList(assigned.docid)" [value]="name.authorpath">
+                    <span class="person-chip">{{name.authorname}}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <button mat-button class="primary-button bulk-assign-apply" [disabled]="!(bulkAssignedSelection[assigned.docid]?.length)" (click)="applyAssignedToAllProcedures(assigned)">
+                Apply to all procedures
+              </button>
+            </div>
+          </div>
+        </ng-container>
         <div class="new-adjustments">
           <div *ngFor="let transcript of newTranscription; let i=index" class="new-adjustment-item">
             <div class="new-adjustment-header">

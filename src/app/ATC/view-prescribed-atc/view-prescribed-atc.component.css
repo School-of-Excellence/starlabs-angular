@@ -224,6 +224,46 @@ mat-list-item:hover {
   color: #666 !important;
 }
 
+/* Bulk Change Agent box (one row per assigned_to activity) */
+.bulk-agent-box {
+  background-color: #e3f2fd !important;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+}
+
+.bulk-agent-title {
+  font-weight: 600;
+  color: #1565c0;
+  margin-bottom: 5px;
+}
+
+.bulk-agent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.bulk-agent-field {
+  min-width: 280px;
+}
+
+.submitbtn.bulk-agent-submit {
+  margin-top: 0;
+}
+
+.submitbtn.bulk-agent-submit:disabled {
+  opacity: 0.5;
+}
+
+.bulk-agent-note {
+  display: block;
+  font-style: italic;
+  color: #666 !important;
+}
+
 .deleteStyle{
   color: grey !important;
   font-weight: 400;

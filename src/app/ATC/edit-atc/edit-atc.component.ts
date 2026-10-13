@@ -162,6 +162,8 @@ export class EditAtcComponent {
   // Big Activity
   mapBigActivity = {}
   assignedtoActivity = []
+  bulkAssignedSelection = {} // NEW ADJUSTMENTS section-level agents per assigned_to activity docid (page-only, not saved to draft)
+  bulkAssignedFilter = {} // separate search text per section dropdown
   authorActivity = []
   observerActivity = []
   mentorActivity = []
@@ -385,6 +387,31 @@ export class EditAtcComponent {
   availableMentorList(): Array<any> {
     var person = this.mentorList.filter(e => e.authorname.toLowerCase().includes(this.filteredSpecialist.toLowerCase()))
     return person;
+  }
+
+  // same list as the per-procedure dropdown, filtered by that section's own search text
+  availableBulkSpecialistList(activityId): Array<any> {
+    var search = (this.bulkAssignedFilter[activityId] ?? "").toLowerCase()
+    var person = this.authorList.filter(e => e.authorname.toLowerCase().includes(search))
+    return person;
+  }
+
+  // overwrite this activity's agents on every procedure of every NEW adjustment, then save the draft
+  applyAssignedToAllProcedures(assigned){
+    var selected = this.bulkAssignedSelection[assigned.docid] ?? []
+    if(selected.length == 0) return
+    var procedureCount = (this.newTranscription ?? []).reduce((count, adjustment)=>count + (adjustment.procedure ?? []).length, 0)
+    var names = selected.map(path=>this.authorList.find(e=>e.authorpath == path)?.authorname ?? path).join(", ")
+    if(confirm(`Apply ${names} as ${assigned.activity} to all ${procedureCount} procedures? This will replace the current ${assigned.activity} on every procedure.`)){
+      (this.newTranscription ?? []).forEach(adjustment=>{
+        (adjustment.procedure ?? []).forEach(procedure=>{
+          procedure.bigactivity = procedure.bigactivity ?? {}
+          // each procedure gets its own copy so a later per-procedure edit doesn't change the others
+          procedure.bigactivity[assigned.docid] = [...selected]
+        })
+      })
+      this.autoSave()
+    }
   }
 
   async getATC() {

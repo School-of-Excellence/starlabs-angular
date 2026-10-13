@@ -294,6 +294,24 @@
               Loading Full ATC...
             </div>
 
+            <!-- Bulk Change Agent: one row per assigned_to activity, each with its own Submit; acts on this ATC's loaded procedures that are not deleted or completed -->
+            <div *ngIf="mapATCtranscription[atc.id]['transcription'].length != 0" class="bulk-agent-box nonprintable">
+              <div class="bulk-agent-title">Assign Change Agent — all open procedures</div>
+              <div *ngFor="let activity of assignedToActivity" class="bulk-agent-row">
+                <mat-form-field class="bg-light bulk-agent-field" appearance="outline">
+                  <mat-label>{{activity.activity}}</mat-label>
+                  <mat-select [(ngModel)]="bulkAgentSelection[atc.id + '_' + activity.docid]" multiple>
+                    <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="bulkAgentFilter[atc.id + '_' + activity.docid]" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let name of availableBulkAssignerList(atc.id + '_' + activity.docid); trackBy: trackByAuthorOption" [value]="name.authorpath">{{name.authorname}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button class="submitbtn bulk-agent-submit" mat-stroked-button [disabled]="!isBulkReady(atc.id) || !(bulkAgentSelection[atc.id + '_' + activity.docid]?.length)" (click)="bulkUpdateChangeAgent(atc, activity)">Submit</button>
+              </div>
+              <label class="bulk-agent-note">{{isBulkReady(atc.id) ? 'Applies to ' + bulkEligibleProcedures(atc.id).length + ' procedures (skips deleted and completed)' : 'Loading procedures…'}}</label>
+            </div>
+
             <div *ngFor="let transcription of mapATCtranscription[atc.id]['transcription']; let j = index; trackBy: trackByAdjustmentID" class="transcription-item">
               <div *ngIf="transcription.adjustment.data() as adjustmentData">
                 <div [ngClass]="{'deleteStyle' : adjustmentData['isdelete'], 'nonprintable': adjustmentData['isdelete']}" class="adjustment-container">
