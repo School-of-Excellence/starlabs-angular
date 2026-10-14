@@ -9,7 +9,7 @@
       <span class="material-symbols-rounded">search</span>
       <input type="text" [(ngModel)]="search" placeholder="Search name, email or phone…" />
       @if (search) {
-        <button class="clear" (click)="search = ''" aria-label="Clear search">
+        <button data-testid="pi-search-clear" class="clear" (click)="search = ''" aria-label="Clear search">
           <span class="material-symbols-rounded">close</span>
         </button>
       }
@@ -20,7 +20,7 @@
 
       <app-column-config />
 
-      <button class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
+      <button data-testid="pi-checklists" class="tbtn" [matMenuTriggerFor]="checklistsMenu" matTooltip="Reconciliation checklists">
         <span class="material-symbols-rounded">checklist</span>
         <span class="lbl">Checklists</span>
       </button>
@@ -35,7 +35,7 @@
       <button data-testid="pi-comms" class="iconbtn" matTooltip="Notification records (new tab)" (click)="openNotificationRecord()">
         <span class="material-symbols-rounded">campaign</span>
       </button>
-      <button class="iconbtn" matTooltip="Refresh" (click)="refresh()">
+      <button data-testid="pi-refresh" class="iconbtn" matTooltip="Refresh" (click)="refresh()">
         <span class="material-symbols-rounded">refresh</span>
       </button>
     </div>
@@ -107,16 +107,16 @@
 </mat-menu>
 
 <mat-menu #checklistsMenu="matMenu" xPosition="before">
-  <div class="menu-group" (click)="$event.stopPropagation()">Watson status</div>
+  <div data-testid="pi-checklists-watson-heading" class="menu-group" (click)="$event.stopPropagation()">Watson status</div>
   @for (c of watsonChecklists; track c.id) {
     <button data-testid="pi-watson-checklist-item" mat-menu-item (click)="openChecklist(c)">
       <span class="material-symbols-rounded mi">rule</span>
       {{ c.label }}
     </button>
   }
-  <div class="menu-group" (click)="$event.stopPropagation()">Reconciliation</div>
+  <div data-testid="pi-checklists-recon-heading" class="menu-group" (click)="$event.stopPropagation()">Reconciliation</div>
   @for (c of checklists; track c.id) {
-    <button mat-menu-item (click)="openChecklist(c)">
+    <button data-testid="pi-checklist-item" mat-menu-item (click)="openChecklist(c)">
       <span class="material-symbols-rounded mi">{{ c.wired ? 'fact_check' : 'lock' }}</span>
       {{ c.label }}
     </button>
