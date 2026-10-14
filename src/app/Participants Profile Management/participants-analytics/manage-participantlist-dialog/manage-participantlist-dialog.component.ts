@@ -1,6 +1,6 @@
 import { Component, Inject, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule, FormControl } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,6 +25,8 @@ import { AuthguardService } from '../../../authguard.service';
 import { ActivatedRoute } from '@angular/router';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
+import { filterOptions } from '../participants-analytics.engine';
 
 interface Profile {
   id: string;
@@ -45,6 +47,21 @@ interface FilterCriteria {
   searchTerm: string;
   filterType: 'all' | 'profileid' | 'name' | 'email' | 'phone';
 }
+
+interface FilterTypeOption {
+  value: FilterCriteria['filterType'];
+  label: string;
+  icon: string;
+}
+
+// Kept A–Z by label so every dropdown in the list / segment dialogs reads the same way.
+const FILTER_TYPE_OPTIONS: FilterTypeOption[] = [
+  { value: 'all', label: 'All Fields', icon: 'filter_list' },
+  { value: 'email', label: 'Email', icon: 'email' },
+  { value: 'name', label: 'Name', icon: 'person' },
+  { value: 'phone', label: 'Phone', icon: 'phone' },
+  { value: 'profileid', label: 'Profile ID', icon: 'fingerprint' },
+];
 
 interface SegmentConflict {
   profileId: string;
@@ -86,7 +103,8 @@ interface ListConflictSummary {
     ProfilePictureComponent,
     MatSlideToggleModule,
     MatDatepickerModule,
-    MatNativeDateModule
+    MatNativeDateModule,
+    NgxMatSelectSearchModule
   ],
   templateUrl: './manage-participantlist-dialog.component.html',
   styleUrls: ['./manage-participantlist-dialog.component.css']
@@ -132,6 +150,8 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   addProfileForm!: FormGroup;
   mergeProfilesForm!: FormGroup;
   filterForm!: FormGroup;
+  // Standalone (not in filterForm) so typing in the dropdown search never re-runs applyFilter.
+  filterTypeSearchCtrl = new FormControl('');
 
   // Loading states
   loading = false;
@@ -236,6 +256,10 @@ export class ManageParticipantlistDialogComponent implements OnInit {
   ngOnInit(): void {
   this.loadData();
 }
+
+  get filteredFilterTypeOptions(): FilterTypeOption[] {
+    return filterOptions(FILTER_TYPE_OPTIONS, this.filterTypeSearchCtrl.value, (o) => o.label);
+  }
 
   // get list log
 
