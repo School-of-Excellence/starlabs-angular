@@ -287,6 +287,8 @@ export class ParticipantsAnalyticsComponent {
 
   isCheckListActive = false;
 
+  controller = new AbortController();
+  
   //import 
   isExcelFile: boolean;
   @ViewChild('inputFile') inputFile: ElementRef;
@@ -701,6 +703,7 @@ export class ParticipantsAnalyticsComponent {
       this.destroy$.complete();
     }
     this.clearTimers();
+    this.controller.abort();
   }
 
 
@@ -793,7 +796,7 @@ export class ParticipantsAnalyticsComponent {
     events.forEach(event => {
       document.addEventListener(event, () => {
         this.resetTimer();
-      }, true);
+      }, {signal : this.controller.signal});
     });
   }
 

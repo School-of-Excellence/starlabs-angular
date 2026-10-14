@@ -12,8 +12,13 @@
                 <mat-form-field>
                     <mat-label>Select Event</mat-label>
                     <mat-select [(ngModel)]="selectedEvent" (selectionChange)="filterCommunications()">
+                        <mat-option>
+                            <ngx-mat-select-search [(ngModel)]="eventSearch" name="event Search"
+                                [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
                         <mat-option [value]="null">None</mat-option>
-                        <mat-option *ngFor="let event of eventList" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
+                        <mat-option *ngFor="let event of getFilteredEvents(this.eventSearch)" [value]="event.docid">{{event?.name ?? 'no title'}}</mat-option>
                     </mat-select>
                 </mat-form-field>
             </div>
@@ -21,6 +26,20 @@
                 <mat-form-field>
                     <mat-label>Search Communication</mat-label>
                     <input matInput [(ngModel)]="communicationSearch" (input)="filterCommunications()">
+                </mat-form-field>
+            </div>
+            <div>
+                <mat-form-field>
+                    <mat-label>Select Participant</mat-label>
+                    <mat-select [(ngModel)]="selectedParticipant" (selectionChange)="filterCommunications()" multiple>
+                        <mat-option>
+                            <ngx-mat-select-search [(ngModel)]="participantSearch" name="participant Search"
+                                [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'"
+                                ngDefaultControl></ngx-mat-select-search>
+                        </mat-option>
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option *ngFor="let p of getFilteredParticipants()" [value]="p?.profileid">{{p?.name}}</mat-option>
+                    </mat-select>
                 </mat-form-field>
             </div>
             <button (click)="refresPage()" mat-stroked-button> <mat-icon>refresh</mat-icon> Refresh </button>
@@ -61,7 +80,7 @@
                         <div class="dow">Fri</div>
                         <div class="dow">Sat</div>
                         <div class="dow">Sun</div>
-                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth">
+                        <div class="day" *ngFor="let days of calendarDays" [class.out]="!days.isCurrentMonth" (click)="days.isCurrentMonth && openCommunicationDaySidePanel(days?.date)">
                             <div *ngIf="days.isCurrentMonth">
                                 <div class="dhead">
                                     <span class="dn">{{days?.date?.getDate()}}</span>
@@ -85,9 +104,16 @@
                                 </div>
                                 <div class="cell-com-wrap">
                                     <div class="cell-com">
-                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)" [attr.data-testid]="'cgp-cal-comm-' + comm?.docid" (click)="onCummunicationClick(comm)">
+                                        <button class="cchip" [title]="comm?.title ?? ''" style="display:inline-flex; align-items:center; gap:6px; max-width:200px; overflow:hidden;" *ngFor="let comm of getCommunicationForDay(days?.date)?.slice(0,3)" [attr.data-testid]="'cgp-cal-comm-' + comm?.docid" (click)="onCummunicationClick(comm);$event.stopPropagation()">
+                                            <div>
                                             <span class="sd" style="background:var(--s-draft); flex-shrink:0; width:8px; height:8px; border-radius:50%;"></span>
                                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size: 13px;">{{comm?.title ?? ''}}</span>
+                                            </div>
+                                            <button class="comm-dup-btn" (click)="onCommunicationDuplicate(comm); $event.stopPropagation()"><mat-icon>file_copy</mat-icon></button>
+                                        </button>
+                                        <button *ngIf="getCommunicationForDay(days?.date)?.length > 3" type="button" class="show-more-btn">
+                                            <span>Show {{ getCommunicationForDay(days?.date).length - 3 }} more</span>
+                                            <span class="show-more-icon">+</span>
                                         </button>
                                     </div>
                                 </div>
@@ -150,7 +176,7 @@
                                                         <span class="email-broadcast-name">{{ archive.broadcastname }} </span>
                                                         <span class="email-archive-status" [attr.data-status]="archive?.status"> {{ archive?.status }} </span>
                                                     </div>
-                                                    <div class="email-content" *ngIf="archive?.status === 'send'">
+                                                    <div class="email-content">
                                                         <button mat-button class="recipient-chip clickable-chip"
                                                             [attr.data-testid]="'cgp-email-recipients-' + archive?.broadcastname"
                                                             (click)="openParticipantsPopup(archive, 'all'); $event.stopPropagation()"
@@ -204,11 +230,10 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <div class="cell">
+                                        <!-- <div class="cell">
                                             <div class="cellh"><span>App notification</span></div>
                                             <div class="pv-note">
                                                 <div class="notebody">
-                                                    <!-- <div class="noteapp">SLD CI</div> -->
                                                     <ng-container *ngIf="comm.apptemplate?.docid as tplId; else noAppTpl">
                                                         <div class="subj">
                                                             <span class="ptxt">{{ appNotificationTemplateMap[tplId]?.title || 'no title' }}</span>
@@ -219,11 +244,11 @@
                                                         <div class="ntitle"><span class="mt">no title</span></div>
                                                         <div class="ptxt"><span class="mt">not written yet</span></div>
                                                     </ng-template>
-                                                    <!-- <div class="ntitle"><span class="mt">no title</span></div>
-                                                    <div class="ptxt"><span class="mt">not written yet</span></div> -->
+                                                    <div class="ntitle"><span class="mt">no title</span></div>
+                                                    <div class="ptxt"><span class="mt">not written yet</span></div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </div> -->
                                     </div>
                                 </div>
                             </details>
@@ -280,7 +305,11 @@
                         <mat-form-field appearance="outline" class="cf-field cf-field-event">
                             <mat-label>Select Event</mat-label>
                             <mat-select formControlName="eventref">
-                                <mat-option *ngFor="let event of eventList" [value]="event.docid">
+                                <mat-option>
+                                    <ngx-mat-select-search formControlName="eventsearch" name="event Search" [placeholderLabel]="'Search'"
+                                        [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                </mat-option>
+                                <mat-option *ngFor="let event of getFilteredEvents(group?.get('eventsearch')?.value)" [value]="event.docid">
                                     {{ event?.name ?? 'no title' }}
                                 </mat-option>
                             </mat-select>
@@ -299,7 +328,11 @@
                                     <mat-form-field appearance="outline" class="cf-field cf-field-tmpl">
                                         <mat-label>Select Email Template</mat-label>
                                         <mat-select formControlName="emailtemplate">
-                                            <mat-option *ngFor="let template of emailTemplates" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
+                                            <mat-option>
+                                                <ngx-mat-select-search formControlName="emailsearch" name="event Search" [placeholderLabel]="'Search'"
+                                                    [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                                            </mat-option>
+                                            <mat-option *ngFor="let template of getFilteredEmailTemplates(group?.get('emailsearch')?.value)" [value]="template.docid"> {{ template?.templatename ?? 'no title' }} </mat-option>
                                         </mat-select>
                                     </mat-form-field>
                                     <button mat-stroked-button class="cf-btn cf-btn-primary cf-btn-sm" (click)="navigateToCreateEmail()"> + </button>
@@ -338,7 +371,7 @@
                             </div>
 
                             <!-- APP NOTIFICATION -->
-                            <div>
+                            <!-- <div>
                                 <mat-form-field appearance="outline" class="full-width">
                                     <mat-label>Select App Template</mat-label>
                                     <mat-select formControlName="apptemplate">
@@ -346,7 +379,7 @@
                                             'no title' }} </mat-option>
                                     </mat-select>
                                 </mat-form-field>
-                            </div>
+                            </div> -->
 
                         </div>
 
@@ -381,7 +414,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="cell">
+                            <!-- <div class="cell">
                                 <div class="cellh"><span>App notification</span></div>
                                 <div class="pv-note">
                                     <div class="notebody">
@@ -397,7 +430,7 @@
                                         </ng-template>
                                     </div>
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
                     </div>
                 </div>
@@ -674,5 +707,53 @@
                 </ng-container>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="csp-wrap" *ngIf="expandedCommunication">
+    <div class="csp">
+        <aside class="drawer" aria-label="Communications for the day">
+            <div class="dh">
+                <div class="r1">
+                    <button class="nav" title="Previous day" (click)="onPreSidePanelClick()" [disabled]="!showPreSidePanel()"><span>‹</span></button>
+                    <h3>{{expandedCommunication?.date | date}}</h3>
+                    <button class="nav" title="Next day" (click)="onNextSidePanelClick()" [disabled]="!showNextSidePanel()"><span>›</span></button>
+                    <button class="x" title="Close" (click)="closeCommunicationDaySidePanel()">×</button>
+                </div>
+                <div class="sub">{{expandedCommunication?.communications?.length}} communications</div>
+                <div class="tot">
+                    <span class="email " title="Show / hide Email">
+                        <svg viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path d="M3 5h18v14H3z" opacity=".25"></path>
+                            <path d="M3 5h18v2l-9 6-9-6z"></path>
+                        </svg>Email {{expandedCommunication?.email}}
+                    </span>
+                    <span class="whatsapp " title="Show / hide WhatsApp">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M4 4h16v12H8l-4 4z"></path>
+                        </svg>WhatsApp {{expandedCommunication?.wati}}
+                    </span>
+                    <!-- <span class="app " title="Show / hide App">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0z"></path>
+                        </svg>App 165
+                    </span> -->
+                </div>
+                <input class="inp" placeholder="Search this day" [(ngModel)]="expandedCommunication.communicationSearch">
+            </div>
+            <div class="db">
+                <div class="grp" *ngFor="let event of getCommunicationsForSidePanel() | keyvalue">
+                    <div class="gh"><i style="background:#1f5bd8"></i>{{eventMap[event?.key]?.name ?? event?.key}} <small>{{event?.value?.length}}</small></div>
+                    <div class="row" style="border-left-color:#1f5bd8;background:rgba(31,91,216,0.04);" *ngFor="let comm of event?.value">
+                        <div><b>{{comm?.title ?? 'Unknown'}}</b></div>
+                        <div class="acts">
+                            <button title="Duplicate" (click)="onCommunicationDuplicate(comm)">⧉</button>
+                            <button title="Open" (click)="onCummunicationClick(comm);$event.stopPropagation()" >Open</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 </div>

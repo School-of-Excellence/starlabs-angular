@@ -119,6 +119,8 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   selectedCommunication = null;
   openedCommunications = [];
   communicationSearch = '';
+  selectedParticipant = [];
+  participantSearch = '';
 
   // profile data
   mapProfile = {};
@@ -163,6 +165,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   eventMap = {};
   selectedEvent = null;
   upcomingEvents = [];
+  eventSearch = '';
 
   loadingStatus = {
     communicationPlanner: true,
@@ -210,6 +213,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     total: 0
   };
 
+  // side panel
+  expandedCommunication = null;
+
   constructor(
     private firestore: Firestore,
     private from: FormBuilder,
@@ -237,7 +243,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     this.fetchEvents();
     this.fetchEmailTemplates();
     this.fetchWatiTemplates();
-    this.fetchAppNotificationTemplates();
+    // this.fetchAppNotificationTemplates();
     this.loadTemplatesFromAllServers();
   }
 
@@ -424,6 +430,9 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         emailtemplate: [null],
         watitemplate: [null],
         apptemplate: [null],
+
+        emailsearch : '',
+        eventsearch : ''
       })
     );
   }
@@ -469,7 +478,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
           const emailTemplate = this.getSelectedEmail(values.emailtemplate);
           const emailTemplateObject = values.emailtemplate ? { docid: values.emailtemplate, templatealias: emailTemplate?.templatealias, postmarktemplateid: emailTemplate.postmarktemplateid } : null
           
-          const appNotificationObject = { docid : values.apptemplate }
+          // const appNotificationObject = { docid : values.apptemplate }
           const communicationDoc = {
             docid: docref.id,
             title: values?.title ?? '',
@@ -477,7 +486,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
             eventref: eventRef,
             emailtemplate: emailTemplateObject ?? null,
             watitemplate: values.watitemplate ?? null,
-            apptemplate: appNotificationObject ?? null,
+            apptemplate: null,
             lastupated: lastupated,
             type: values?.type ?? null
           }
@@ -512,7 +521,11 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         type: [communication?.type ?? null],
         emailtemplate: [communication?.emailtemplate?.docid ?? null],
         watitemplate: [communication?.watitemplate ?? null],
-        apptemplate: [communication?.apptemplate?.docid ?? null],
+        apptemplate: [communication?.apptemplate ?? null],
+
+        // search 
+        emailsearch : '',
+        eventsearch : '',
       })
     );
     this.communicationFormMode = 'edit';
@@ -535,6 +548,35 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
         emailtemplate: [null],
         watitemplate: [null],
         apptemplate: [null],
+
+        // search
+        emailsearch : '',
+        eventsearch : ''
+      })
+    );
+    this.communicationFormMode = 'add';
+    this.openCommunicationPopUp();
+  }
+
+  onCommunicationDuplicate(communication : any) {
+    if ([null , undefined ,''].includes(communication)) {
+      alert('please select the communication to duplicate');
+      return
+    }
+    this.communicationForm.push(
+      this.from.group({
+        docid: [doc(collection(this.firestore, 'communication planner')).id],
+        title: [communication?.title ?? '', { validators: [Validators.required], update: "change" }],
+        date: [this.toDate(communication?.date) , { validators: [Validators.required], update: "change" }],
+        eventref: [communication?.eventref?.id ?? null, { validators: [Validators.required], update: "change" }],
+        type: [communication?.type ?? null],
+        emailtemplate: [communication?.emailtemplate?.docid ?? null],
+        watitemplate: [communication?.watitemplate ?? null],
+        apptemplate: [communication?.apptemplate ?? null],
+
+        // search 
+        emailsearch : '',
+        eventsearch : '',
       })
     );
     this.communicationFormMode = 'add';
@@ -559,6 +601,19 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     this.communicationForm.clear();
     this.communicationFormMode = null;
   }
+
+  getFilteredEmailTemplates(emailSearch = ''){
+    const search = emailSearch?.trim().toLocaleLowerCase() ?? '';
+    if (search.length > 0) {
+      return this.emailTemplates.filter((template) => {
+        const name = template?.templatename?.trim()?.toLocaleLowerCase() ?? '';
+
+        return name.includes(search);
+      });
+    }
+    return [...this.emailTemplates]; 
+  }
+
 
   // ==================== DATA LOAD AND FILTERS ====================
 
@@ -606,7 +661,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
 
   // function to apply filter
   applyFilter(communication) {
-    const search = this.communicationSearch.trim()?.toLowerCase();
+    const search = this.communicationSearch?.trim()?.toLowerCase();
     if (this.selectedEvent !== null) {
       const eventId = communication?.eventref?.id ?? null;
       if (this.selectedEvent !== eventId) {
@@ -620,10 +675,43 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
       const watiTemplate = this.watiTemplateMap[communication?.watitemplate?.templateid ?? '']?.templatename?.toLowerCase() ?? '';
       const appNotification = this.appNotificationTemplateMap[communication?.apptemplate?.docid ?? '']?.title?.toLowerCase() ?? '';
 
-      console.log(this.watiTemplateMap[communication?.watitemplate?.templateid ?? '']?.templatename)
       if (!(communicationTitle.includes(search) || emailTemplate.includes(search) || watiTemplate.includes(search) || appNotification.includes(search))) {
         return false
       }
+    }
+
+    if (this.selectedParticipant?.length > 0) {
+      const participants : Set<string> = new Set();
+      let hasParticipant = false;
+      const email = this.communicationEmailLog[communication?.docid ?? ''] ?? [];
+      const wati = this.communicationwatilLog[communication?.docid ?? ''] ?? [];
+
+      for (const archieve of email) {
+        const pidList = archieve?.profileid ?? [];
+        for (const pid of pidList) {
+          participants.add(pid);
+        }
+      }
+
+      for (const archieve of wati) {
+        const pidList = archieve?.profileid ?? [];
+        for (const pid of pidList) {
+          participants.add(pid);
+        }
+      }
+
+      // console.log(participants)
+      for (const pid of this.selectedParticipant) {
+        if (participants.has(pid)) {
+          hasParticipant = true;
+          break
+        }
+      }
+
+      if (!hasParticipant) {
+        return false
+      }
+
     }
 
     return true
@@ -1221,6 +1309,7 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
   }
 
   onCummunicationClick(comm) {
+    this.expandedCommunication = null;
     this.onActiveTabChange('library');
     this.toggleCommunications(comm?.docid);
     setTimeout(() => this.scrollToCommunication(comm?.docid))
@@ -1547,9 +1636,125 @@ export class CommunicationGridPlannerComponent implements OnInit, OnDestroy {
     return labels[status] || status;
   }
 
+  getFilteredEvents(eventSearch = ''){
+    const search = eventSearch?.trim().toLocaleLowerCase();
+    if (search.length > 0) {
+      return this.eventList.filter((event) => {
+        const eventName = event?.name?.trim()?.toLocaleLowerCase() ?? '';
+
+        return eventName.includes(search);
+      });
+    } 
+    return [...this.eventList]; 
+  }
+
   refresPage() {
     this.fetchEmailArchieve();
     this.fetchWatiArchieve();
     this.fetchAppNotification();
+  }
+
+  getFilteredParticipants(){
+    const participants = Object.values(this.mapProfile);
+    const search = this.participantSearch?.trim()?.toLocaleLowerCase();
+    if (search?.length > 0) {
+      return participants.filter((p : any)=>{
+        const name = p?.name?.trim()?.toLocaleLowerCase() ?? '';
+        return name?.includes(search);
+      });
+    }
+    return participants
+  }
+
+  // SIDE PANEL
+
+  openCommunicationDaySidePanel(date : Date){
+    const communications = this.getCommunicationForDay(date);
+    let email = 0;
+    let wati = 0;
+    let notification = 0;
+    
+    for (const comm of communications) {
+      const emailCount = ( this.communicationEmailLog[comm?.docid ?? ''] ?? [] ).length;
+      const watiCount = ( this.communicationwatilLog[comm?.docid ?? ''] ?? [] ).length;
+      email += emailCount;
+      wati += watiCount;
+    }
+    
+    
+    const expandedCommunication = {
+      date : new Date(date),
+      communications : [...communications],
+      communicationSearch : '',
+      email , wati , notification
+    };
+
+    this.expandedCommunication = expandedCommunication;
+  }
+
+  closeCommunicationDaySidePanel(){
+    this.expandedCommunication = null;
+  }
+
+  getCommunicationsForSidePanel(){
+    // console.log('comes in')
+    if (this.expandedCommunication) {
+      const communications = this.expandedCommunication?.communications;
+      const search = this.expandedCommunication?.communicationSearch?.trim().toLocaleLowerCase() ?? '';
+      const eventBasedMap = {};
+
+      for (const communication of communications) {
+        const eventId = communication?.eventref?.id ?? 'Unknown';
+        const eventName = this.eventMap[eventId]?.name?.trim().toLocaleLowerCase() ?? '' ;
+        const communicationName = communication?.title?.trim().toLocaleLowerCase() ?? '';
+
+        if (eventId && (search?.length === 0 || eventName.includes(search) || communicationName.includes(search)) ) {
+          if (Object.hasOwn(eventBasedMap, eventId)) {
+            eventBasedMap[eventId].push(communication);
+          } else {
+            eventBasedMap[eventId] = [communication];
+          }
+        };
+
+      };
+      return eventBasedMap
+    }
+    return {}
+  }
+
+  onPreSidePanelClick(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      currentDate.setDate(currentDate.getDate() - 1);
+      this.openCommunicationDaySidePanel(currentDate);
+    }
+  }
+
+  onNextSidePanelClick(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      currentDate.setDate(currentDate.getDate() + 1);
+      this.openCommunicationDaySidePanel(currentDate);
+    }
+  }
+
+  showPreSidePanel(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      return currentDate.getDate() !== 1;
+    }
+    return true
+  }
+
+  showNextSidePanel(){
+    if (this.expandedCommunication) {
+      const currentDate = new Date(this.expandedCommunication?.date);
+      const lastDate = new Date(currentDate);
+      lastDate.setDate(1);
+      lastDate.setMonth(lastDate.getMonth() + 1);
+      lastDate.setDate(0);
+      return currentDate.getDate() !== lastDate.getDate();
+    }
+    return true
   }
 }
