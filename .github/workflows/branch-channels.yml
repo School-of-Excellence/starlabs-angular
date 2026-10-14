@@ -231,8 +231,11 @@ jobs:
           echo "$SA" > "$HOME/firebase-key.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$HOME/firebase-key.json"
           jq --arg site "$SITE" '.hosting.site = $site' firebase.json > firebase.json.tmp && mv firebase.json.tmp firebase.json
-          OUT=$(firebase hosting:channel:deploy "$CHANNEL" --expires 7d --project "${{ matrix.project }}" --json)
+          # `set -e` would kill the step inside $(…) before the echo below, swallowing Firebase's error — capture the
+          # exit code instead and print the --json error body before failing.
+          RC=0; OUT=$(firebase hosting:channel:deploy "$CHANNEL" --expires 7d --project "${{ matrix.project }}" --json) || RC=$?
           echo "$OUT"
+          if [ "$RC" -ne 0 ]; then echo "::error::firebase hosting:channel:deploy failed (exit $RC) — Firebase's response is printed above."; exit "$RC"; fi
           URL=$(echo "$OUT" | jq -r --arg site "$SITE" '.result[$site].url // empty')
           EXPIRES=$(echo "$OUT" | jq -r --arg site "$SITE" '.result[$site].expireTime // empty')
           if [ -z "$URL" ]; then

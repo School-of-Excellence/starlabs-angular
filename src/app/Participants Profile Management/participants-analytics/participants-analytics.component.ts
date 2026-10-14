@@ -1020,7 +1020,8 @@ export class ParticipantsAnalyticsComponent {
     this.filtereddashboarddata = this.cloneddashboarddata.filter(e => {
       let booleanarray = []
       for (const key in data) {
-        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend' , 'subscriptionstart'].includes(key)) {
+        // pifilter holds what only Participant Intelligence filters on; it isn't a criterion here
+        if (!['docid', 'profileid', 'label', 'createdby', 'productcount', 'operator', 'products', 'subscriptionend' , 'subscriptionstart', 'pifilter'].includes(key)) {
           if (this.arraystring.includes(key)) { [null, undefined].includes(e[key]) ? e[key] = 'none' : null }
 
           if (['atccount'].includes(key) || (e[key] != undefined && e[key] != null)) {

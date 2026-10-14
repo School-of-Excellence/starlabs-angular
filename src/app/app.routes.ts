@@ -21,6 +21,7 @@ export const routes: Routes = [
   {path: 'productdelivery', loadComponent: () => import('./Product Designer/product-delivery/product-delivery.component').then(m => m.ProductDeliveryComponent), canActivate:[authGuard]},
   {path: 'deliverysequence', loadComponent: () => import('./Product Designer/delivery-sequence/delivery-sequence.component').then(m => m.DeliverySequenceComponent), canActivate:[authGuard]},
   {path: 'profilelist', loadComponent: () => import('./Participants Profile Management/profilelist/profilelist.component').then(m => m.ProfilelistComponent), canActivate:[authGuard]},
+  {path: 'segmentboard', loadComponent: () => import('./Participants Profile Management/segment-board/segment-board.component').then(m => m.SegmentBoardComponent), canActivate:[authGuard]},
   {path: 'app-flow-breaks', loadComponent: () => import('./Participants Profile Management/app-flow-breaks/app-flow-breaks.component').then(m => m.AppFlowBreaksComponent), canActivate:[authGuard]},
   {path: 'participantproduct', loadComponent: () => import('./Participants Profile Management/participant-product/participant-product.component').then(m => m.ParticipantProductComponent), canActivate:[authGuard]},
   {path: 'ProfileScreen', loadComponent: () => import('./Participants Profile Management/new-profile/new-profile.component').then(m => m.NewProfileComponent), canActivate:[authGuard]},
@@ -164,6 +165,7 @@ export const routes: Routes = [
   {path: 'approveofftime', loadComponent: () => import('./Offtime/approve-offtime/approve-offtime.component').then(m => m.ApproveOfftimeComponent), canActivate:[authGuard]},
   {path: 'capacityutilization', loadComponent: () => import('./Scheduling/capacity-utilization/capacity-utilization.component').then(m => m.CapacityUtilizationComponent), canActivate:[authGuard]},
   {path: 'appointmentstudio', loadComponent: () => import('./Scheduling/appointment-studio/appointment-studio.component').then(m => m.AppointmentStudioComponent), canActivate:[authGuard]},
+  {path: 'specialistappointmentstudio', loadComponent: () => import('./Scheduling/specialist-appointment-studio/specialist-appointment-studio.component').then(m => m.SpecialistAppointmentStudioComponent), canActivate:[authGuard]},
   {path: 'openappointmentzoom/:id', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-zoom-view.component').then(m => m.AppointmentZoomViewComponent), canActivate:[authGuard]},
   {path: 'appointment-status-update', loadComponent: () => import('./Scheduling/appointment-zoom-view/appointment-status-update/appointment-status-update.component').then(m => m.AppointmentStatusUpdateComponent), canActivate:[authGuard]},
 
