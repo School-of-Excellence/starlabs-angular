@@ -146,9 +146,12 @@ export class AppointmentStudioComponent {
         var hostNames = []
         var hostID = []
         
-        appointmentData["appointmentrole"].forEach(role=>{
+        var appointmentRoles = appointmentData["appointmentrole"] ?? []
+        appointmentRoles.forEach(role=>{
+          var roleHosts = appointmentData["hostRole"]?.[role.path]
+          if(!roleHosts?.length) return
           var hostName = []
-          appointmentData["hostRole"][role.path].forEach(host=>{
+          roleHosts.forEach(host=>{
             hostName.push(this.mapProfile[host.id])
             hostNames.push(this.mapProfile[host.id])
             hostID.push(host.path)
@@ -249,9 +252,12 @@ export class AppointmentStudioComponent {
           var hostNames = []
           var hostID = []
           
-          appointmentData["appointmentrole"].forEach(role=>{
+          var appointmentRoles = appointmentData["appointmentrole"] ?? []
+          appointmentRoles.forEach(role=>{
+            var roleHosts = appointmentData["hostRole"]?.[role.path]
+            if(!roleHosts?.length) return
             var hostName = []
-            appointmentData["hostRole"][role.path].forEach(host=>{
+            roleHosts.forEach(host=>{
               hostName.push(this.mapProfile[host.id])
               hostNames.push(this.mapProfile[host.id])
               hostID.push(host.path)
@@ -403,9 +409,12 @@ export class AppointmentStudioComponent {
         var hostNames = []
         var hostID = []
         
-        apptData["appointmentrole"].forEach(role=>{
+        var appointmentRoles = apptData["appointmentrole"] ?? []
+        appointmentRoles.forEach(role=>{
+          var roleHosts = apptData["hostRole"]?.[role.path]
+          if(!roleHosts?.length) return
           var hostName = []
-          apptData["hostRole"][role.path].forEach(host=>{
+          roleHosts.forEach(host=>{
             hostName.push(this.mapProfile[host.id])
             hostNames.push(this.mapProfile[host.id])
             hostID.push(host.path)

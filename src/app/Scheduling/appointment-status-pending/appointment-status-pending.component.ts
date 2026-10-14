@@ -107,9 +107,12 @@ export class AppointmentStatusPendingComponent implements OnDestroy {
         var appointmentData = appointment.data()
         var hostData = []
         var hostID = []
-        appointmentData["appointmentrole"].forEach(role=>{
+        var appointmentRoles = appointmentData["appointmentrole"] ?? []
+        appointmentRoles.forEach(role=>{
+          var roleHosts = appointmentData["hostRole"]?.[role.path]
+          if(!roleHosts?.length) return
           var hostName = []
-          appointmentData["hostRole"][role.path].forEach(host=>{
+          roleHosts.forEach(host=>{
             hostName.push(this.mapProfile[host.id])
             hostID.push(host.path)
           })
