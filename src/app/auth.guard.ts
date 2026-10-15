@@ -29,8 +29,8 @@ export const authGuard: CanActivateFn = (route, state) => {
         return true;
       }
       try {
-        const currentRoles = await authService.getRoles();
-        const loggedProfileId = (await authService.username())['profileid'] ?? '';
+        const currentRoles = await authService.getRoles(user.uid);
+        const loggedProfileId = (await authService.username(user.uid))['profileid'] ?? '';
         // const cleanUrl = '/' + state.url.split('/')[1];
         const cleanUrl = '/' + state.url.split('?')[0].split('/')[1];
         const { roles: routeConfigRoles, label: routeLabel , profileid :  routeConfigProfiles   } = await authService.routeConfig(cleanUrl);
