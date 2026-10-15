@@ -23,6 +23,11 @@ import { ActivatedRoute } from '@angular/router';
 import { AuthguardService } from '../../../authguard.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { filterOptions } from '../participants-analytics.engine';
+
+// Case- and accent-insensitive A–Z with numbers in numeric order ("Batch 2" before "Batch 10"), as on
+// the Participant Intelligence screen, so every dropdown in the list / segment dialogs reads the same way.
+const byLabel = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true }).compare;
 
 @Component({
   selector: 'app-create-segments-dialog',
@@ -96,7 +101,11 @@ export class CreateSegmentsDialogComponent implements OnInit {
   editSegmentForm!: FormGroup;
   addListForm!: FormGroup;
   addTagForm!: FormGroup;
+  // Dropdown search boxes; standalone controls so they never touch the forms' values or validity.
+  listSearchCtrl: FormControl = new FormControl('');
   tagSearchCtrl: FormControl = new FormControl('');
+  addListSearchCtrl: FormControl = new FormControl('');
+  addTagSearchCtrl: FormControl = new FormControl('');
   
   // Loading states
   loading = false;
@@ -133,6 +142,22 @@ mapUsers: Record<string, string> = {};
   ngOnInit(): void {
     this.initializeForms();
     this.loadData();
+  }
+
+  get filteredListOptions(): any[] {
+    return filterOptions(this.participantLists, this.listSearchCtrl.value, (l) => l.listname ?? '');
+  }
+
+  get filteredTagOptions(): any[] {
+    return filterOptions(this.participantTags, this.tagSearchCtrl.value, (t) => t.name ?? '');
+  }
+
+  get filteredAvailableLists(): any[] {
+    return filterOptions(this.availableListsForSelected, this.addListSearchCtrl.value, (l) => l.listname ?? '');
+  }
+
+  get filteredAvailableTags(): any[] {
+    return filterOptions(this.availableTagsForSelected, this.addTagSearchCtrl.value, (t) => t.name ?? '');
   }
 
   toggleLogExpand(docId: string): void {
@@ -393,7 +418,7 @@ scrollLogTop(): void {
   }
 
   filterAvailableTags(selectedTagIds: string[]): any[] {
-    return this.participantTags.filter(tag => !selectedTagIds.includes(tag.docid));
+    return this.participantTags.filter(tag => !selectedTagIds.includes(tag.id));
   }
 
   checkSegmentNameDuplicate(form: FormGroup, excludeSegmentId?: string): void {
@@ -433,6 +458,8 @@ scrollLogTop(): void {
         this.participantLists.push(participantlistData);
         this.mapParticipantList[participantlistData['docid']] = participantlistData;
 }
+      // Sorted once here; the available-lists dropdown filters this array, so it inherits the order.
+      this.participantLists.sort((a, b) => byLabel(a.listname ?? '', b.listname ?? ''));
     });
 
     // Load participant tags
@@ -444,6 +471,7 @@ scrollLogTop(): void {
         this.participantTags.push(tagData);
         this.mapParticipantTag[tagData['id']] = tagData;
       }
+      this.participantTags.sort((a, b) => byLabel(a.name ?? '', b.name ?? ''));
     });
 
     await this.loadSegments();
@@ -644,7 +672,7 @@ scrollLogTop(): void {
     }
 
     const currentTagIds = this.selectedSegment.tagids || [];
-    this.availableTagsForSelected = this.participantTags.filter(tag => !currentTagIds.includes(tag.docid));
+    this.availableTagsForSelected = this.participantTags.filter(tag => !currentTagIds.includes(tag.id));
   }
 
   closeSidePanel(): void {

@@ -167,9 +167,14 @@ export class AppointmentCalendarComponent implements OnDestroy {
         var hostData = []
         var hostNames = []
         var hostID = []
-        appointmentData["appointmentrole"].forEach(role=>{
+        // Specialist-slot bookings list every required/additional role in appointmentrole
+        // but only fill hostRole for the slot's own role — skip roles with no hosts.
+        var appointmentRoles = appointmentData["appointmentrole"] ?? []
+        appointmentRoles.forEach(role=>{
+          var roleHosts = appointmentData["hostRole"]?.[role.path]
+          if(!roleHosts?.length) return
           var hostName = []
-          appointmentData["hostRole"][role.path].forEach(host=>{
+          roleHosts.forEach(host=>{
             hostName.push(this.mapProfile[host.id])
             hostNames.push(this.mapProfile[host.id])
             hostID.push(host.path)

@@ -163,6 +163,13 @@
             <span class="dd-tile__hint">No updates for 14+ days — follow up now</span>
             <span class="dd-tile__arr">&rarr;</span>
           </button>
+          <button data-testid="ddc-btn-014" class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
+            (click)="navToAttention('idle')">
+            <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
+            <span class="dd-tile__label">Initiated – Not Consuming</span>
+            <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
+            <span class="dd-tile__arr">&rarr;</span>
+          </button>
           <button data-testid="ddc-btn-012" class="dd-tile" [class.dd-tile--empty]="kpiAwaitingTotal === 0" (click)="navToAttention('awaiting')">
             <span class="dd-tile__num">{{ kpiAwaitingTotal | number }}</span>
             <span class="dd-tile__label">Awaiting Initiation</span>
@@ -174,13 +181,6 @@
             <span class="dd-tile__num">{{ kpiReadyToInitiate | number }}</span>
             <span class="dd-tile__label">Ready to Start</span>
             <span class="dd-tile__hint">Payment confirmed — initiate their delivery now</span>
-            <span class="dd-tile__arr">&rarr;</span>
-          </button>
-          <button data-testid="ddc-btn-014" class="dd-tile" [class.dd-tile--empty]="kpiInitiatedNotConsuming === 0"
-            (click)="navToAttention('idle')">
-            <span class="dd-tile__num">{{ kpiInitiatedNotConsuming | number }}</span>
-            <span class="dd-tile__label">Initiated – Not Consuming</span>
-            <span class="dd-tile__hint">Delivery started but participant hasn't been active</span>
             <span class="dd-tile__arr">&rarr;</span>
           </button>
         </div>
@@ -1581,6 +1581,7 @@
           <div class="pm-section">
             <div class="pm-header">
               <h2 class="pm-title">Participant Management & Actions</h2>
+              <span class="pm-row-info">Total Participants: {{ getCurrentTabDataLength() }}</span>
               <div class="pm-actions">
                 <form [formGroup]="filterForm" class="pm-search-and-filters">
                   <div class="pm-search-wrap">
@@ -1590,6 +1591,35 @@
                     <button data-testid="ddc-btn-105" *ngIf="filterForm.value.search" (click)="clearSearch()" class="pm-clear-search"
                       title="Clear search">✕</button>
                   </div>
+                  <mat-form-field appearance="outline" class="pm-filter-field">
+                    <mat-label>Customer Status</mat-label>
+                    <mat-select data-testid="ddc-msel-125" [formControl]="customerStatusFilterControl"
+                      (selectionChange)="filterTableData()" multiple>
+                      <mat-option value="active">Active</mat-option>
+                      <mat-option value="non active">Non-active</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="pm-filter-field">
+                    <mat-label>Financial Status</mat-label>
+                    <mat-select data-testid="ddc-msel-126" [formControl]="financialStatusFilterControl"
+                      (selectionChange)="filterTableData()" multiple>
+                      <mat-option value="regular">Regular</mat-option>
+                      <mat-option value="fully paid">Fully paid</mat-option>
+                      <mat-option value="locked">Locked</mat-option>
+                      <mat-option value="defaulted">Defaulted</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="pm-filter-field">
+                    <mat-label>Parallel Product</mat-label>
+                    <mat-select data-testid="ddc-msel-127" [formControl]="parallelFilterControl"
+                      (selectionChange)="filterTableData()">
+                      <mat-option value="all">All</mat-option>
+                      <mat-option value="has">Parallel Product Available</mat-option>
+                      <mat-option value="none">No Parallel Product</mat-option>
+                    </mat-select>
+                  </mat-form-field>
                   <mat-form-field appearance="outline" class="pm-filter-field">
                     <mat-label>Journey</mat-label>
                     <mat-select data-testid="ddc-msel-106" placeholder="Select Journey" formControlName="journey"
@@ -1607,19 +1637,39 @@
                   </mat-select>
                 </mat-form-field>
                 </form>
-                <button data-testid="ddc-btn-108" class="pm-btn-primary" (click)="exportTableData()">
-                  Export &middot; <span class="pm-btn-filter">{{ participantsActiveTabName }}</span>
+                <button data-testid="ddc-btn-129" class="pm-btn-primary" (click)="refreshFilter()">
+                  Clear Filter
                 </button>
-                <button data-testid="ddc-btn-109" class="pm-btn-primary pm-btn-bulk" (click)="bulkInitiateReady()"
+                <button data-testid="ddc-btn-108" class="pm-btn-primary" (click)="exportTableData()">
+                  Export
+                </button>
+                <!-- <button data-testid="ddc-btn-109" class="pm-btn-primary pm-btn-bulk" (click)="bulkInitiateReady()"
                   [disabled]="kpiReadyToInitiate === 0">
                   Bulk Initiate Ready <span class="pm-btn-count" *ngIf="kpiReadyToInitiate > 0">({{ kpiReadyToInitiate
                     }})</span>
-                </button>
+                </button> -->
               </div>
             </div>
 
             <mat-tab-group class="pm-tab-group" (selectedTabChange)="onTabChange($event)" #tabGroup
               [(selectedIndex)]="currentTabIndex">
+              <mat-tab>
+                <ng-template mat-tab-label><span class="pm-tab-text">All</span><span class="pm-tab-count">{{
+                    originalData['allParticipants'].count }}</span></ng-template>
+                <div *ngIf="isFilterActive()" class="pm-filter-indicator">
+                  <span class="pm-filter-text">{{ getFilterDisplayText() }}</span>
+                  <button data-testid="ddc-btn-128" class="pm-clear-filter-btn" (click)="clearActiveFilter()">✕ Clear Filter</button>
+                </div>
+                <div class="pm-table-container">
+                  <table class="pm-data-table">
+                    <thead>
+                      <tr>
+                        <th *ngFor="let header of getCurrentTabHeaders()" [style.width]="header.width"><span>{{ header.label }}</span></th>
+                      </tr>
+                    </thead><ng-container *ngTemplateOutlet="pmTableBody"></ng-container>
+                  </table>
+                </div>
+              </mat-tab>
               <mat-tab>
                 <ng-template mat-tab-label><span class="pm-tab-text">Awaiting Initiation</span><span
                     class="pm-tab-count">{{
@@ -1753,8 +1803,9 @@
 
           <!-- Pagination Footer -->
           <div class="pm-table-footer">
-            <div class="pm-row-info">Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage *
-              itemsPerPage, getCurrentTabData().length) }} of {{ getCurrentTabData().length }} entries</div>
+            <div class="pm-row-info">Showing {{ getCurrentTabDataLength() === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1 }}
+              to {{ Math.min(currentPage * itemsPerPage, getCurrentTabDataLength()) }}
+              of {{ getCurrentTabDataLength() }} entries</div>
             <div class="pm-pagination">
               <button data-testid="ddc-btn-119" class="pm-page-btn" (click)="firstPage()" [disabled]="currentPage === 1" title="First Page"><svg
                   width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

@@ -822,6 +822,8 @@ export class SpecialistAppointmentSlotsComponent implements OnInit {
         const slotRole: string = selectedSlotData.appointmentrole || appointmentRoles[0];
         const hostRole: { [key: string]: any[] } = {};
         hostRole[slotRole] = [doc(this.firestore, eisprofile)];
+        // Every role in appointmentrole needs a hostRole entry — readers look each one up.
+        appointmentRoles.forEach(r => hostRole[r] = hostRole[r] ?? []);
 
         const availabilityDocRef = doc(this.firestore, 'availability/' + docdata[0].id);
         const availabilitySnap = await getDoc(availabilityDocRef);

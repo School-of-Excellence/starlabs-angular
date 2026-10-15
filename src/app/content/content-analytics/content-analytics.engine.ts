@@ -149,3 +149,110 @@ export function visibleProfileCount(
 ): number {
   return (profiles || []).filter((p) => journeyProfileVisible(p, filter, search)).length;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+// New users — who still counts as one, and CSV safety for the export.
+// ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `new_user_data` KEEPS a person's record after they are migrated to a full profile, and marks it
+ * `movedtoexist: true`. From that moment their live details are in `participant metadata`, and the
+ * stale new_user_data row must not stand in for them — so only a record that has NOT been moved
+ * counts as a new user.
+ *
+ * Deliberately the same rule as the workshop dashboard (`isNewUserProfile`) and the EiFlix ops
+ * dashboard's user-type filter, so "new user" means one thing across every screen.
+ */
+export function isStillNewUser(doc: any): boolean {
+  return !!doc && doc['movedtoexist'] !== true;
+}
+
+/**
+ * Narrow an id→value map built from new_user_data down to the people who are still new.
+ *
+ * An id whose document is missing is KEPT, not dropped. The two come from the same read so it
+ * should not happen; if it ever does, keeping means the filter quietly does nothing, while
+ * dropping would blank out every name on the screen. Only people we can positively see have moved
+ * are removed.
+ */
+export function stillNewUserMap<T>(
+  map: { [id: string]: T } | null | undefined,
+  docdata: { [id: string]: any } | null | undefined,
+): { [id: string]: T } {
+  const out: { [id: string]: T } = {};
+  const docs = docdata || {};
+  for (const id of Object.keys(map || {})) {
+    const doc = docs[id];
+    if (doc !== undefined && doc !== null && !isStillNewUser(doc)) continue;
+    out[id] = (map as any)[id];
+  }
+  return out;
+}
+
+/**
+ * One CSV cell.
+ *
+ * ConvertToCSV joins values with bare commas and quotes nothing, so a value containing a comma or a
+ * newline shifts every column after it on that row — which is why the export already strips commas
+ * out of `videoname` by hand. Any field added to the export needs the same treatment.
+ */
+export function csvCell(value: any): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[\r\n]+/g, ' ').replace(/,/g, ' ').trim();
+}
+
+/**
+ * The options the Video Name dropdown should render for a given search term.
+ *
+ * Same matching rule as the dropdowns on /participants-analytics (`filterOptions` in
+ * participants-analytics.engine.ts): trimmed, lower-cased, CONTAINS. Reimplemented rather than
+ * imported so this screen's bundle does not pull in that 500-line engine for five lines.
+ *
+ * ALREADY-SELECTED OPTIONS ARE ALWAYS KEPT, and that is not a nicety — it is required for a
+ * `multiple` select. On every options change MatSelect runs _initializeSelection() →
+ * _setSelectionByValue(), which clears the selection model and re-selects only the options
+ * CURRENTLY RENDERED; _propagateChanges() then writes back `selected.map(o => o.value)`. So a
+ * selected video hidden behind a search term leaves the selection model, and the user's next click
+ * on any option silently emits a value array without it. Rendering selected options regardless of
+ * the term is what stops that.
+ *
+ * Order is the source list's order — selected items are not hoisted, so MatSelect's _sortValues()
+ * (which sorts by options.indexOf) keeps a stable ordering.
+ */
+export function filterVideoNameOptions(
+  options: string[] | null | undefined,
+  query: string | null | undefined,
+  selected: string[] | null | undefined,
+): string[] {
+  const all = options || [];
+  const term = (query != null && query !== '') ? query.trim().toLowerCase() : '';
+  const keep = new Set(selected || []);
+  if (!term) return all.slice();
+  return all.filter(o => keep.has(o) || String(o ?? '').trim().toLowerCase().includes(term));
+}
+
+/**
+ * A person's phone for the export, as every other screen in this app presents one: the country code
+ * then the number, e.g. "+91 9999900000".
+ *
+ * FIELD NAMES, which are not obvious and are easy to get silently wrong:
+ *   • the number is `phonenumber` on BOTH `participant metadata` and `new_user_data` — this is what
+ *     /newusersprofile renders from each of them (newusersprofile.component.html:224).
+ *   • the country code is `countryCode` on new_user_data and `countrycode` on participant metadata
+ *     (the CF profiledata_to_participantmetadata writes the lower-cased one), so both are accepted.
+ *
+ * Note that AuthguardService's `phonenumber` map is NOT the source here: it reads `doc.data()
+ * ['number']`, which is the `profile_data` shape, and would come back empty for these documents.
+ *
+ * Returns '' when there is no number, so a caller can fall through to its other source — a document
+ * that exists but carries no phone should not win over one that does.
+ */
+export function profilePhone(doc: any): string {
+  if (!doc) return '';
+  const raw = doc['phonenumber'];
+  if (raw === null || raw === undefined) return '';
+  const num = String(raw).trim();
+  if (num === '') return '';
+  const code = String(doc['countryCode'] ?? doc['countrycode'] ?? '').trim();
+  return code ? `${code} ${num}` : num;
+}

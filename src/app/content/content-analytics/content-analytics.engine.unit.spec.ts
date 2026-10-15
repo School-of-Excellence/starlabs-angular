@@ -16,7 +16,12 @@ import {
   formatDaysHoursMins,
   formatHoursMins,
   formatMinutesSeconds,
+  csvCell,
+  filterVideoNameOptions,
+  isStillNewUser,
+  profilePhone,
   journeyProfileVisible,
+  stillNewUserMap,
   visibleProfileCount,
   watchHours,
 } from './content-analytics.engine';
@@ -230,6 +235,209 @@ describe('content-analytics.engine', () => {
       expect(visibleProfileCount(all, 'watching', '')).toBe(2);
       expect(visibleProfileCount(all, 'all', 'bala')).toBe(1);
       expect(visibleProfileCount(null, 'all', '')).toBe(0);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // New users — new_user_data keeps the record after migration and flags it `movedtoexist: true`.
+  // Those people are existing users from then on; their live details are in participant metadata.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('isStillNewUser', () => {
+    it('counts a record with no movedtoexist flag', () => {
+      expect(isStillNewUser({ name: 'Anita' })).toBe(true);
+    });
+
+    it('counts a record explicitly NOT moved', () => {
+      expect(isStillNewUser({ name: 'Anita', movedtoexist: false })).toBe(true);
+    });
+
+    it('does not count a record that has been moved to a full profile', () => {
+      expect(isStillNewUser({ name: 'Bala', movedtoexist: true })).toBe(false);
+    });
+
+    it('only the boolean true means moved — a truthy string does not', () => {
+      // The flag is written as a boolean. Treating 'true' as moved would silently drop people
+      // whose record was ever written by something that stringified it.
+      expect(isStillNewUser({ movedtoexist: 'true' })).toBe(true);
+    });
+
+    it('has nothing to say about a missing record', () => {
+      expect(isStillNewUser(null)).toBe(false);
+      expect(isStillNewUser(undefined)).toBe(false);
+    });
+  });
+
+  describe('stillNewUserMap', () => {
+    const docs = {
+      p1: { name: 'Anita' },
+      p2: { name: 'Bala', movedtoexist: true },
+      p3: { name: 'Chitra', movedtoexist: false },
+    };
+    const names = { p1: 'Anita', p2: 'Bala', p3: 'Chitra' };
+
+    it('drops the people who have moved to a full profile, keeps the rest', () => {
+      expect(stillNewUserMap(names, docs)).toEqual({ p1: 'Anita', p3: 'Chitra' });
+    });
+
+    it('works over the documents themselves, not just the name map', () => {
+      expect(Object.keys(stillNewUserMap(docs, docs))).toEqual(['p1', 'p3']);
+    });
+
+    it('KEEPS an id whose document is missing rather than blanking it out', () => {
+      // The map and the documents come from one read, so this should not arise. If it ever does,
+      // keeping makes the filter do nothing; dropping would erase every name on the screen.
+      expect(stillNewUserMap({ p9: 'Ghost' }, docs)).toEqual({ p9: 'Ghost' });
+      expect(stillNewUserMap(names, {})).toEqual(names);
+      expect(stillNewUserMap(names, null)).toEqual(names);
+    });
+
+    it('survives an empty or absent map', () => {
+      expect(stillNewUserMap({}, docs)).toEqual({});
+      expect(stillNewUserMap(null, docs)).toEqual({});
+      expect(stillNewUserMap(undefined, undefined)).toEqual({});
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // CSV cells — ConvertToCSV joins on bare commas and quotes nothing, so one stray comma shifts
+  // every column after it on that row.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('csvCell', () => {
+    it('passes an ordinary value through', () => {
+      expect(csvCell('anita@example.com')).toBe('anita@example.com');
+      expect(csvCell('complete')).toBe('complete');
+    });
+
+    it('empties null and undefined rather than writing the words', () => {
+      expect(csvCell(null)).toBe('');
+      expect(csvCell(undefined)).toBe('');
+    });
+
+    it('strips commas, which would otherwise shift every later column', () => {
+      expect(csvCell('Anita, Kumar')).toBe('Anita  Kumar');
+    });
+
+    it('flattens newlines onto the one row', () => {
+      expect(csvCell('line one\nline two')).toBe('line one line two');
+      expect(csvCell('a\r\nb')).toBe('a b');
+    });
+
+    it('keeps a zero rather than treating it as empty', () => {
+      expect(csvCell(0)).toBe('0');
+      expect(csvCell(false)).toBe('false');
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // Video Name typeahead. The dropdown is `multiple`, which is what makes the selected-option rule
+  // load-bearing rather than cosmetic — see the engine comment.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('filterVideoNameOptions', () => {
+    const all = ['Morning Routine', 'Evening Wind Down', 'Deep Work', 'morning stretch'];
+
+    it('shows everything when nothing has been typed', () => {
+      expect(filterVideoNameOptions(all, '', [])).toEqual(all);
+      expect(filterVideoNameOptions(all, null, [])).toEqual(all);
+      expect(filterVideoNameOptions(all, undefined, null)).toEqual(all);
+    });
+
+    it('matches anywhere in the name, not just the start', () => {
+      expect(filterVideoNameOptions(all, 'work', [])).toEqual(['Deep Work']);
+      expect(filterVideoNameOptions(all, 'wind', [])).toEqual(['Evening Wind Down']);
+    });
+
+    it('ignores case and surrounding spaces in the query', () => {
+      expect(filterVideoNameOptions(all, '  MORNING  ', [])).toEqual(['Morning Routine', 'morning stretch']);
+    });
+
+    it('returns nothing when the term matches nothing', () => {
+      expect(filterVideoNameOptions(all, 'zzz', [])).toEqual([]);
+    });
+
+    it('KEEPS an already-selected name even when the term excludes it', () => {
+      // The load-bearing case. MatSelect re-selects only the options it can still see, then writes
+      // back selected.map(o => o.value) — so a selected option hidden by the search would be
+      // dropped from the model on the user's next click, losing a choice they already made.
+      expect(filterVideoNameOptions(all, 'work', ['Morning Routine']))
+        .toEqual(['Morning Routine', 'Deep Work']);
+    });
+
+    it('keeps several selected names, in the source list order', () => {
+      // Order matters: MatSelect._sortValues() sorts by options.indexOf, so hoisting the selected
+      // ones to the front would reorder the chosen values behind the user's back.
+      expect(filterVideoNameOptions(all, 'zzz', ['Deep Work', 'Morning Routine']))
+        .toEqual(['Morning Routine', 'Deep Work']);
+    });
+
+    it('does not duplicate a name that both matches and is selected', () => {
+      expect(filterVideoNameOptions(all, 'deep', ['Deep Work'])).toEqual(['Deep Work']);
+    });
+
+    it('survives an empty or absent option list', () => {
+      expect(filterVideoNameOptions([], 'x', [])).toEqual([]);
+      expect(filterVideoNameOptions(null, 'x', ['a'])).toEqual([]);
+      expect(filterVideoNameOptions(undefined, null, null)).toEqual([]);
+    });
+
+    it('does not throw on a null entry in the list', () => {
+      // videoNameList is built from log documents, and a log with no videoname pushes undefined.
+      const ragged = ['Deep Work', null as any, undefined as any];
+      expect(() => filterVideoNameOptions(ragged, 'deep', [])).not.toThrow();
+      expect(filterVideoNameOptions(ragged, 'deep', [])).toEqual(['Deep Work']);
+    });
+
+    it('returns a copy, so the caller cannot mutate the source list', () => {
+      const out = filterVideoNameOptions(all, '', []);
+      out.push('Injected');
+      expect(all.length).toBe(4);
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  // Phone for the export. The field names differ between the two collections, which is the whole
+  // reason this is a function and not an inline lookup.
+  // ────────────────────────────────────────────────────────────────────────────────────────────
+  describe('profilePhone', () => {
+    it('reads new_user_data: phonenumber + countryCode', () => {
+      expect(profilePhone({ phonenumber: '9999900001', countryCode: '+91' })).toBe('+91 9999900001');
+    });
+
+    it('reads participant metadata: phonenumber + the LOWER-cased countrycode', () => {
+      // The CF profiledata_to_participantmetadata writes `countrycode`; new_user_data carries
+      // `countryCode`. Accepting only one of them would blank the column for half the people.
+      expect(profilePhone({ phonenumber: '9999900000', countrycode: '+91' })).toBe('+91 9999900000');
+    });
+
+    it('returns the bare number when there is no country code', () => {
+      expect(profilePhone({ phonenumber: '9999900000' })).toBe('9999900000');
+      expect(profilePhone({ phonenumber: '9999900000', countryCode: '' })).toBe('9999900000');
+      expect(profilePhone({ phonenumber: '9999900000', countryCode: '   ' })).toBe('9999900000');
+    });
+
+    it('returns empty when there is no number, so the caller can fall through to its other source', () => {
+      // A document that exists but carries no phone must not beat one that does.
+      expect(profilePhone({ countryCode: '+91' })).toBe('');
+      expect(profilePhone({ phonenumber: '' })).toBe('');
+      expect(profilePhone({ phonenumber: '   ' })).toBe('');
+      expect(profilePhone({ phonenumber: null })).toBe('');
+      expect(profilePhone({})).toBe('');
+    });
+
+    it('has nothing to say about a missing document', () => {
+      expect(profilePhone(null)).toBe('');
+      expect(profilePhone(undefined)).toBe('');
+    });
+
+    it('copes with a number stored as a number rather than a string', () => {
+      expect(profilePhone({ phonenumber: 9999900000, countryCode: '+91' })).toBe('+91 9999900000');
+    });
+
+    it('trims both parts so the pair never double-spaces', () => {
+      expect(profilePhone({ phonenumber: ' 9999900000 ', countryCode: ' +91 ' })).toBe('+91 9999900000');
+    });
+
+    it('prefers countryCode when a document somehow carries both spellings', () => {
+      expect(profilePhone({ phonenumber: '1', countryCode: '+1', countrycode: '+91' })).toBe('+1 1');
     });
   });
 });

@@ -19,11 +19,13 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { UserAnalyticsDialogComponent } from './user-analytics-dialog/user-analytics-dialog.component';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {
-  avgHoursPerActiveDay, completionPercent, daysSinceLastSeen, formatDaysHoursMins, formatHoursMins,
-  formatMinutesSeconds, journeyProfileVisible as journeyProfileVisibleRule, visibleProfileCount,
-  watchHours,
+  avgHoursPerActiveDay, completionPercent, csvCell, daysSinceLastSeen, filterVideoNameOptions,
+  formatDaysHoursMins, formatHoursMins, formatMinutesSeconds,
+  journeyProfileVisible as journeyProfileVisibleRule, profilePhone, stillNewUserMap,
+  visibleProfileCount, watchHours,
 } from './content-analytics.engine';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-content-analytics',
@@ -43,7 +45,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     MatTabsModule,
     MatDialogModule,
     MatSlideToggleModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    NgxMatSelectSearchModule
   ],  templateUrl: './content-analytics.component.html',
   styleUrl: './content-analytics.component.css'
 })
@@ -54,6 +57,8 @@ export class ContentAnalyticsComponent {
   mapProfileData = {}
   //newuser
   mapProfileNew = {}
+  /** new_user_data documents for the people still counted as new — the export reads email off these. */
+  mapProfileNewData = {}
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild(MatSort) sort: MatSort;
   // displayedColumns: string[] = ['profileid','from','lastwatchedtime','logdate','totalruntime','totaltimespend','type','videoname'];
@@ -75,6 +80,12 @@ export class ContentAnalyticsComponent {
   }
 
   videoNameList = []
+  /** Typeahead behind the Video Name dropdown. Narrows the OPTIONS only — never the table. */
+  videoNameSearch = ''
+  /** Options the Video Name dropdown renders; already-chosen names always stay (see the engine). */
+  videoNameOptionsShown(): string[] {
+    return filterVideoNameOptions(this.videoNameList, this.videoNameSearch, this.filterValue.videoname)
+  }
   fromScreenList = []
   platformNameList = []
   private subscription = new Subject<void>();
@@ -123,7 +134,11 @@ export class ContentAnalyticsComponent {
     })
     //newuser
     this.guard.getProfileMapNewUser().then(newuser => {
-      this.mapProfileNew = newuser.map
+      // Only people who have NOT been moved to a full profile still count as new users: once
+      // `movedtoexist` is true their live details are in 'participant metadata' and the stale
+      // new_user_data row must not stand in for them. stillNewUserMap() is the shared rule.
+      this.mapProfileNew = stillNewUserMap(newuser.map, newuser.docdata)
+      this.mapProfileNewData = stillNewUserMap(newuser.docdata, newuser.docdata)
     })
     this.filterData();
     this.seriesData();
@@ -737,6 +752,7 @@ export class ContentAnalyticsComponent {
     }
     this.showDuplicatesOnly = false;
     this.showNewUsersOnly = false;
+    this.videoNameSearch = '';
     this.onFilter(this.filterValue)
   }
 
@@ -1155,6 +1171,14 @@ export class ContentAnalyticsComponent {
         "logdate":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(0,10),
         "logtime":new Date(new Date(element['logdate'].toDate()).getTime() + (5 * 60 * 60 * 1000) + (30 * 60 * 1000)).toISOString().substring(11,19),
         "name":this.mapProfile[element['profileid']] ?? this.mapProfileNew[element['profileid']],
+        // Participant metadata is primary; new_user_data only answers for people still counted as
+        // new, so somebody who has moved across resolves from their full profile, not the stale row.
+        "email":csvCell(this.mapProfileData[element['profileid']]?.['email']
+          ?? this.mapProfileNewData[element['profileid']]?.['email']),
+        // `||` rather than `??`: profilePhone() returns '' for a document that carries no number, and
+        // an empty one must fall through to the other source rather than win it.
+        "phonenumber":csvCell(profilePhone(this.mapProfileData[element['profileid']])
+          || profilePhone(this.mapProfileNewData[element['profileid']])),
         "from":element['from'],
         "videoname" :![null,undefined].includes(element['videoname']) ? element['videoname'].replace(/,/g," ") : null,
         "totalruntime(sec)":element['totalruntime'],
@@ -1162,7 +1186,9 @@ export class ContentAnalyticsComponent {
         // "lastwatchedtime(only mins)":element['lastwatchedtime'].slice(2,4),
         "totaltimespend(sec)":element['totaltimespend'],
         // "platform" : element['platform_name'] ?? null
-        "platform": element['platform_name'] ?? "A&H App" 
+        "platform": element['platform_name'] ?? "A&H App",
+        // The Status column the table already shows (row.status), which the export was missing.
+        "status": csvCell(element['status'])
         // type:element['type']
       })
         // element['name'] = this.mapProfile[element['profileid']]
