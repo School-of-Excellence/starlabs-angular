@@ -26,12 +26,16 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { ProfilePictureComponent } from '../../ProfilePicture/profile-picture/profile-picture.component';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
+import { NgxMatSelectSearchModule } from 'ngx-mat-select-search';
 
 @Component({
   selector: 'app-profilelist',
   imports: [
     MatSlideToggleModule,
     MatTooltipModule,
+    MatSelectModule,
+    NgxMatSelectSearchModule,
     MatFormFieldModule,
     MatInputModule,
     ReactiveFormsModule,
@@ -66,12 +70,18 @@ export class ProfilelistComponent {
   tableData:MatTableDataSource<any> = new MatTableDataSource();
 
   // ── Filters ───────────────────────────────────────────────────────────
-  // Name search plus two toggles, combined into one predicate. The filter value
-  // is JSON so all three travel together through MatTableDataSource.
+  // Name search, two toggles and a role picker, combined into one predicate.
+  // The filter value is JSON so they all travel together through MatTableDataSource.
   nameFilter = '';
   holdOnly = false;
   ahcrmOnly = false;
+  roleFilter: string[] = [];
+  roleSearch = '';
   profilerole = {}
+  // Saved roles per profile, for the role filter. Kept apart from profilerole
+  // because the expanded panel's checkboxes edit profilerole before "Update Role"
+  // is pressed — filtering on it would move rows while they are being edited.
+  savedRoles: { [profileid: string]: any } = {}
   roleList = []
   atcmodelList = []
   loading:boolean = false
@@ -147,7 +157,11 @@ export class ProfilelistComponent {
            for (let i = 0; i < roles.length; i++) {
             const doc = roles[i];
             this.profilerole[doc["profile_ref"].id] = doc
+            this.savedRoles[doc["profile_ref"].id] = { ...doc }
           }
+          // Roles arrive after the profiles; re-run the predicate so a picked role
+          // filter reflects them, without jumping back to page one.
+          if (this.roleFilter.length) this.tableData.filter = this.filterValue()
         })
         const atcmodelcollction = collection(this.firestoreDefault, 'atc model')
         collectionData(atcmodelcollction , {idField: 'id'}).pipe(takeUntil(this.subscription)).subscribe(atcmodel => {
@@ -176,6 +190,12 @@ export class ProfilelistComponent {
       if (f.hold && row['deliveryonhold'] !== true) return false;
       if (f.ahcrm && row['enableahcrm'] !== true) return false;
 
+      if (f.roles?.length) {
+        // Match if the profile holds ANY of the picked roles.
+        const r = this.savedRoles[row['profileid']];
+        if (!r || !f.roles.some((role: string) => r[role] === true)) return false;
+      }
+
       if (f.name) {
         // Same haystack MatTableDataSource builds by default, so the name box
         // keeps matching every column exactly as it did before.
@@ -190,12 +210,68 @@ export class ProfilelistComponent {
   }
 
   applyFilters(): void {
-    this.tableData.filter = JSON.stringify({
+    this.tableData.filter = this.filterValue();
+    if (this.tableData.paginator) this.tableData.paginator.firstPage();
+  }
+
+  private filterValue(): string {
+    return JSON.stringify({
       name: this.nameFilter.trim().toLowerCase(),
       hold: this.holdOnly,
       ahcrm: this.ahcrmOnly,
+      roles: this.roleFilter,
     });
-    if (this.tableData.paginator) this.tableData.paginator.firstPage();
+  }
+
+  // Plain role names from roleList (the trailing { productowner } entry is skipped).
+  get roleOptions(): string[] {
+    const q = this.roleSearch.trim().toLowerCase();
+    return this.roleList.filter((r: any) => typeof r === 'string' && (!q || r.toLowerCase().includes(q)));
+  }
+
+  roleCount(role: string): number {
+    return Object.values(this.savedRoles).filter((r: any) => r?.[role] === true).length;
+  }
+
+  // ── Role dropdown sizing ─────────────────────────────────────────────
+  // The field grows with what it shows (label, or "ROLE +N more"); the panel
+  // grows to fit the longest role name. Both clamped so neither runs away.
+  get roleFieldWidth(): number {
+    const text = this.roleFilter.length
+      ? this.roleFilter[0].toUpperCase() + (this.roleFilter.length > 1 ? ` +${this.roleFilter.length - 1} more` : '')
+      : 'Filter by role';
+    // 32 side padding + 24 arrow, + 40 for the clear button when it shows
+    const chrome = 56 + (this.roleFilter.length ? 40 : 0);
+    return Math.min(Math.max(this.textWidth(text) + chrome, 200), 420);
+  }
+
+  get rolePanelWidth(): number {
+    const longest = Math.max(0, ...this.roleList
+      .filter((r: any) => typeof r === 'string')
+      .map((r: string) => this.textWidth(r.toUpperCase())));
+    // 32 padding + 32 checkbox + ~48 count badge
+    return Math.min(Math.max(longest + 112, this.roleFieldWidth), 480);
+  }
+
+  private textWidthCache = new Map<string, number>();
+  private measureCtx: CanvasRenderingContext2D | null | undefined;
+
+  private textWidth(text: string): number {
+    const hit = this.textWidthCache.get(text);
+    if (hit !== undefined) return hit;
+    if (this.measureCtx === undefined) {
+      // No canvas during SSR — fall back to an average glyph width.
+      this.measureCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+      if (this.measureCtx) this.measureCtx.font = '400 16px Roboto, "Helvetica Neue", sans-serif';
+    }
+    const w = this.measureCtx ? Math.ceil(this.measureCtx.measureText(text).width) : text.length * 10;
+    this.textWidthCache.set(text, w);
+    return w;
+  }
+
+  clearRoleFilter(): void {
+    this.roleFilter = [];
+    this.applyFilters();
   }
 
   get holdCount(): number {

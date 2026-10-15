@@ -11,6 +11,7 @@
     </button>
     <div class="table-container">
       <table mat-table [dataSource]="dataSource" 
+             [trackBy]="trackRow"
              cdkDropList 
              [cdkDropListData]="getTableData()"
              (cdkDropListDropped)="onChildRouteDrop($event)"

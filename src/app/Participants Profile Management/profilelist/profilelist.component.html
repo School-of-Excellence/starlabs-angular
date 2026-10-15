@@ -8,6 +8,27 @@
       </mat-form-field>
     </div>
     <div class="filter-toggles">
+      <mat-form-field class="rolefilter" appearance="outline" subscriptSizing="dynamic" [style.width.px]="roleFieldWidth">
+        <mat-label>Filter by role</mat-label>
+        <mat-select data-testid="pl-role-filter" multiple [(ngModel)]="roleFilter" (selectionChange)="applyFilters()" [panelWidth]="rolePanelWidth">
+          <mat-select-trigger>
+            {{ roleFilter[0] | uppercase }}
+            <span *ngIf="roleFilter.length > 1" class="role-more">+{{ roleFilter.length - 1 }} more</span>
+          </mat-select-trigger>
+          <mat-option>
+            <ngx-mat-select-search data-testid="pl-role-search" [(ngModel)]="roleSearch" [ngModelOptions]="{standalone: true}"
+              placeholderLabel="Search role" noEntriesFoundLabel="No matching role" ngDefaultControl></ngx-mat-select-search>
+          </mat-option>
+          <mat-option data-testid="pl-role-option" *ngFor="let role of roleOptions" [value]="role">
+            {{ role | uppercase }}
+            <span data-testid="pl-role-count" class="toggle-count role">{{ roleCount(role) }}</span>
+          </mat-option>
+        </mat-select>
+        <button data-testid="pl-role-clear" *ngIf="roleFilter.length" matSuffix mat-icon-button aria-label="Clear role filter"
+          (click)="clearRoleFilter(); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </mat-form-field>
       <mat-slide-toggle color="warn" [(ngModel)]="holdOnly" (change)="applyFilters()"
         matTooltip="Show only profiles with deliveryonhold set — these are excluded from all sends">
         Delivery on hold
