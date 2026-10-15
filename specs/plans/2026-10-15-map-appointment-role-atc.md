@@ -21,10 +21,10 @@ New fields, alongside the unchanged `id`, `assigned_appttype_ref`, `required_rol
 `assigned_role`:
 ```
 atcrequired: boolean
-atcrolemap:  { [eisroles id]: [bigactivity docid] }   // 1-item array per role; {} when unticked
+atcrolemap:  { [eisroles id]: bigactivity docid }   // one activity id per role; {} when unticked
 ```
-- Array value (not a bare string) matches the operator's example and leaves room for several
-  activities per role later without a data migration.
+- Map of role id → activity id (operator decision, 2026-10-15, replacing an earlier 1-item-array
+  draft): one activity per role, so the value is the bigactivity id itself.
 - `appointmentforms` is **not** written by this dialog (no owner yet; writing `[]` would erase it).
 - Save switches from `setDoc(..., {merge: true})` to `{mergeFields: [...]}` listing the dialog's own
   fields, so `atcrolemap` is replaced whole (merge:true deep-merges maps and would keep removed role keys)

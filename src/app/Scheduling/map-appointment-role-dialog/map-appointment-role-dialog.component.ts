@@ -83,12 +83,12 @@ export class MapAppointmentRoleDialogComponent {
         additional_role: additional,
         atcrequired: existingData.atcrequired === true
       })
-      // The rows exist now (built by the valueChanges above); one activity per role, stored as a 1-item array
+      // The rows exist now (built by the valueChanges above); atcrolemap is {roleId: activityId}
       var savedMap = existingData.atcrolemap ?? {}
       var atcGroup = this.atcRoleGroup
       for (const roleId of Object.keys(atcGroup.controls)) {
         var saved = savedMap[roleId]
-        atcGroup.get(roleId).setValue(Array.isArray(saved) ? (saved[0] ?? null) : null)
+        atcGroup.get(roleId).setValue(typeof saved === 'string' ? saved : null)
       }
     }
   }
@@ -155,7 +155,7 @@ export class MapAppointmentRoleDialogComponent {
       var atcrolemap = {}
       if (atcrequired) {
         for (const roleId of value.required_role) {
-          atcrolemap[roleId] = [value.atcrolemap[roleId]]
+          atcrolemap[roleId] = value.atcrolemap[roleId]
         }
       }
       var newData = {
