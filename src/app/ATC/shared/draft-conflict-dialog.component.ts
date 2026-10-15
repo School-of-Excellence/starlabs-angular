@@ -73,7 +73,7 @@ export interface DraftConflictData {
           </div>
 
           <button mat-flat-button [color]="side.key === 'mine' ? 'primary' : undefined"
-                  class="keep" (click)="choose(side.key)">
+                  class="keep" [attr.data-testid]="'dcfl-keep-' + side.key" (click)="choose(side.key)">
             Keep {{ side.label }}'s version
           </button>
         </div>
