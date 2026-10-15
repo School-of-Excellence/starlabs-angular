@@ -1,4 +1,4 @@
-import { EiflixoperationsdashboardComponent, journeySupportTotal, journeySupportParticipantId, indianNumberWords } from './eiflixoperationsdashboard.component';
+import { EiflixoperationsdashboardComponent, journeySupportTotal, journeySupportParticipantId, indianNumberWords, watsonPurchaseRows, groupLikeEquality, journeySupportScheduleOrder } from './eiflixoperationsdashboard.component';
 
 /**
  * EiFlix Mobile App Logs — filtering, sorting and paging over rows already loaded from `loginlog`.
@@ -953,8 +953,9 @@ describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
   it('matches Journey Support\'s cumulative column for the first four rows of the screenshot', () => {
     const total = journeySupportTotal([{ amount: 16520 }, { amount: 10000 }, { amount: 65000 }, { amount: 36800 }])!;
     const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
-    expect(c.formatPlan(total)).withContext('₹108,746 after row 4 on Journey Support').toBe('₹108,746');
-    expect(c.formatPlan(2724000)).withContext('same format as Journey Support').toBe('₹2,724,000');
+    expect(c.formatPlan(total)).withContext('₹1,08,746 after row 4 (Journey Support shows 108,746)').toBe('₹1,08,746');
+    expect(c.formatPlan(2724000)).withContext('Indian grouping (lakh/crore)').toBe('₹27,24,000');
+    expect(c.formatPlan(20694876)).withContext("the operator's example").toBe('₹2,06,94,876');
   });
 
   it('drops rescheduled rows like Journey Support, and has no total for an empty schedule', () => {
@@ -970,6 +971,33 @@ describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
     expect(journeySupportParticipantId([{ id: 'P-4', name: 'X', email: 'y@x.com' }], profile))
       .withContext('"unable to find Client in Watson"').toBeNull();
     expect(journeySupportParticipantId([], profile)).toBeNull();
+  });
+
+  it('rebuilds each person\'s equality result from one batched read (exact value, document-id order)', () => {
+    const g = groupLikeEquality([
+      { id: 'b', data: { email: 'a@x.com', id: 'P-B' } },
+      { id: 'a', data: { email: 'a@x.com', id: 'P-A' } },
+      { id: 'c', data: { email: 'A@x.com', id: 'P-C' } },
+      { id: 'd', data: { participantid: 5 } },
+      { id: 'e', data: { participantid: '5' } },
+    ], 'email');
+    expect(g.get('a@x.com')!.map(d => d.id)).withContext('document-id order, like where ==').toEqual(['a', 'b']);
+    expect(g.get('A@x.com')!.map(d => d.id)).withContext('case-sensitive, like where ==').toEqual(['c']);
+    const p = groupLikeEquality([{ id: 'd', data: { participantid: 5 } }, { id: 'e', data: { participantid: '5' } }], 'participantid');
+    expect(p.get(5)!.length).withContext('a number and its text form stay apart').toBe(1);
+    expect(p.get('5')!.length).toBe(1);
+  });
+
+  it('orders the schedule like orderBy(date asc): no date drops out, ties break on document id', () => {
+    const ts = (ms: number) => ({ toMillis: () => ms });
+    const rows = journeySupportScheduleOrder([
+      { id: 'z', data: { amount: 3, date: ts(200) } },
+      { id: 'y', data: { amount: 2, date: ts(100) } },
+      { id: 'x', data: { amount: 1, date: ts(100) } },
+      { id: 'w', data: { amount: 9 } },
+    ]);
+    expect(rows.map(r => r.amount)).toEqual([1, 2, 3]);
+    expect(journeySupportTotal(rows)).toBeCloseTo(6 / 1.18, 6);
   });
 
   function make(status: string, totals: [string, number | null][]): any {
@@ -993,9 +1021,9 @@ describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
 
   it('shows each person\'s total in the panel and sums only the people Watson found', () => {
     const c = make('ready', [['moved1', 2724000], ['moved2', 1000], ['notInWatson', null]]);
-    expect(label(c, 'moved1')).toBe('₹2,724,000');
+    expect(label(c, 'moved1')).toBe('₹27,24,000');
     expect(label(c, 'notInWatson')).withContext('not found in Watson').toBe('—');
-    expect(card(c).highlight).toBe('₹2,725,000');
+    expect(card(c).highlight).toBe('₹27,25,000');
     expect(card(c).highlightLabel).withContext('no label text in the pill').toBeUndefined();
   });
 
@@ -1008,7 +1036,7 @@ describe('EiflixoperationsdashboardComponent — Watson total amount', () => {
   it('the card total follows the Users range', () => {
     const c = make('ready', [['moved1', 2724000], ['moved2', 1000], ['notInWatson', null]]);
     c.usersRange = 'today'; c.usersRangeLabel = 'today'; c.rebuildPaidCard();
-    expect(card(c).highlight).withContext('moved2 moved 20 days ago').toBe('₹2,724,000');
+    expect(card(c).highlight).withContext('moved2 moved 20 days ago').toBe('₹27,24,000');
   });
 
   it('shows a placeholder while someone is still being looked up', () => {
@@ -1088,3 +1116,69 @@ describe('EiflixoperationsdashboardComponent — export with amount', () => {
   });
 });
 
+/** Purchases hover card on the New Users to Paid panel (operator 2026-10-14). */
+describe('EiflixoperationsdashboardComponent — purchases hover card', () => {
+  const ts = (iso: string) => ({ toDate: () => new Date(iso) });   // Firestore Timestamp-shaped
+
+  it('lists one line per product bought, oldest first, with its price before GST', () => {
+    // The operator's example: 3 products totalling 2,50,000.
+    const rows = watsonPurchaseRows([
+      { product: 'Product C', fee: 100000, gross: 118000, purchasedate: '2026-09-10' },
+      { product: 'Product A', fee: 50000, gross: 59000, purchasedate_ts: ts('2026-04-01T10:00:00'), purchasedate: '2026-04-01' },
+      { product: 'Product B', fee: 100000, gross: 118000, purchasedate: '2026-06-10' },
+    ]);
+    expect(rows.map((r) => r.product)).toEqual(['Product A', 'Product B', 'Product C']);
+    expect(rows.map((r) => r.amount)).withContext('fee = price before GST').toEqual([50000, 100000, 100000]);
+    expect(rows[1].date!.getMonth()).withContext('yyyy-mm-dd read as a local date').toBe(5);
+    expect(rows[1].date!.getDate()).toBe(10);
+    expect(rows.reduce((a, r) => a + (r.amount ?? 0), 0)).toBe(250000);
+  });
+
+  it('leaves out cancelled purchases and copes with missing fields', () => {
+    const rows = watsonPurchaseRows([
+      { product: 'Kept', fee: 1000, purchasedate: '2026-01-01' },
+      { product: 'Cancelled flag', fee: 5000, cancelled: true },
+      { product: 'Cancelled status', fee: 5000, purchasestatus: 'cancelled' },
+      { fee: 'x' },
+    ]);
+    expect(rows.map((r) => r.product)).withContext('a missing name stays empty, never the word "Product"').toEqual(['Kept', '']);
+    expect(rows[1].amount).withContext('non-numeric fee -> no amount').toBeNull();
+    expect(rows[1].date).toBeNull();
+  });
+
+  function make(): any {
+    const c: any = Object.create(EiflixoperationsdashboardComponent.prototype);
+    c.planTipRow = null; c.planTipStyle = {}; c.planTipTimer = null;
+    return c;
+  }
+  const el = () => {
+    const panel = document.createElement('aside'); panel.className = 'eod-panel';
+    const row = document.createElement('article'); panel.appendChild(row); document.body.appendChild(panel);
+    return { panel, row };
+  };
+
+  it('opens only for rows that carry purchases', () => {
+    const c = make(); const { panel, row } = el();
+    c.showPlanTip({ name: 'No Watson' }, row);
+    expect(c.planTipRow).withContext('no purchases -> no card').toBeNull();
+    const withPurchases = { name: 'Arvind R', planPurchases: [{ dateLabel: '1 Apr 2026', product: 'A', amountLabel: '₹50,000' }] };
+    c.showPlanTip(withPurchases, row);
+    expect(c.planTipRow).toBe(withPurchases);
+    expect(c.planTipStyle['top']).toMatch(/px$/);
+    panel.remove();
+  });
+
+  it('closes after a short grace, and stays open while the pointer is on the card', () => {
+    jasmine.clock().install();
+    try {
+      const c = make(); const { panel, row } = el();
+      c.showPlanTip({ planPurchases: [{}] }, row);
+      c.hidePlanTip(); c.keepPlanTip();
+      jasmine.clock().tick(500);
+      expect(c.planTipRow).withContext('kept open while on the card').not.toBeNull();
+      c.hidePlanTip(); jasmine.clock().tick(200);
+      expect(c.planTipRow).withContext('closes after leaving').toBeNull();
+      panel.remove();
+    } finally { jasmine.clock().uninstall(); }
+  });
+});

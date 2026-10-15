@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule, formatDate, formatCurrency } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { getApp, getApps, initializeApp } from '@angular/fire/app';
 import { getFirestore } from '@angular/fire/firestore';
 import { environment } from '../../../environments/environment';
@@ -86,6 +86,10 @@ export function indianNumberWords(value: number): string {
   return out.charAt(0).toUpperCase() + out.slice(1);
 }
 
+// Purchases rows now live in the shared, read-only Watson helpers (also used by the workshop dashboard).
+export { watsonPurchaseRows } from '../watson-purchases';
+import { watsonPurchaseRows, formatRupees } from '../watson-purchases';
+
 export function journeySupportTotal(scheduleDocs: any[]): number | null {
   const watsonScheduleList = scheduleDocs.filter((e) => e['schedulemodified'] != true);
   let runningTotal = 0;
@@ -113,6 +117,47 @@ export function journeySupportParticipantId(participantDocs: any[], profileData:
     }
   }
   return participantid;
+}
+
+/** Firestore's cross-type order (null < boolean < number < timestamp < string < other), enough for `date`. */
+function firestoreRank(v: any): number {
+  if (v === null) return 0;
+  if (typeof v === 'boolean') return 1;
+  if (typeof v === 'number') return 2;
+  if (v && typeof v.toMillis === 'function') return 3;
+  if (typeof v === 'string') return 4;
+  return 5;
+}
+function firestoreCompare(a: any, b: any): number {
+  const ra = firestoreRank(a), rb = firestoreRank(b);
+  if (ra !== rb) return ra - rb;
+  if (ra === 3) return a.toMillis() - b.toMillis();
+  if (ra === 1 || ra === 2) return Number(a) - Number(b);
+  if (ra === 4) return a < b ? -1 : a > b ? 1 : 0;
+  return 0;
+}
+const byDocId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/**
+ * What `where(field, '==', v)` returns for each v, rebuilt from one batched `in` read: docs grouped
+ * by the field's exact value, in document-id order (the default order of an equality query).
+ */
+export function groupLikeEquality(docs: { id: string; data: any }[], field: string): Map<any, { id: string; data: any }[]> {
+  const out = new Map<any, { id: string; data: any }[]>();
+  [...docs].sort(byDocId).forEach(d => {
+    const k = d.data?.[field];
+    if (!out.has(k)) out.set(k, []);
+    out.get(k)!.push(d);
+  });
+  return out;
+}
+
+/** Journey Support's `orderBy('date', 'asc')`: docs without `date` drop out, ties break on document id. */
+export function journeySupportScheduleOrder(docs: { id: string; data: any }[]): any[] {
+  return docs
+    .filter(d => d.data && Object.prototype.hasOwnProperty.call(d.data, 'date'))
+    .sort((a, b) => firestoreCompare(a.data.date, b.data.date) || byDocId(a, b))
+    .map(d => d.data);
 }
 
 /** The Users section adds 'all' — see `usersRange` for why it is the default. */
@@ -301,6 +346,14 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   /** profileid -> total plan value excl. GST; null = not found in Watson / no schedule. */
   private planTotals = new Map<string, number | null>();
   private planPending = new Set<string>();
+  /** profileid -> the products that person bought (Watson ParticipantPurchases), for the hover card. */
+  private planPurchases = new Map<string, { date: Date | null; product: string; amount: number | null; dateLabel: string; amountLabel: string }[]>();
+  /** profileid -> sum of those purchases' amounts (the card footer). */
+  private planPurchaseTotals = new Map<string, number>();
+  /** The paid-panel row whose purchases are showing in the hover card. */
+  planTipRow: any = null;
+  planTipStyle: Record<string, string> = {};
+  private planTipTimer: any = null;
   /** 'unavailable' = this build has no Watson config (the emulator build, deliberately). */
   planStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
 
@@ -1214,6 +1267,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   trackLog(_: number, r: LogRow): string { return r.id; }
 
   ngOnDestroy(): void {
+    if (this.planTipTimer) clearTimeout(this.planTipTimer);
     this.destroy$.next();
     this.destroy$.complete();
     if (typeof cancelAnimationFrame !== 'undefined') {
@@ -1537,7 +1591,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
         ...(pm ? { journeyTag: this.journeyTagFor(pm) } : { sourceTag: 'New User' }),
         amountLabel: this.planLabel(id),
         // Numeric copy for the panel's Amount sort; not found / loading sort last.
-        planValue: this.planTotals?.get(id) ?? undefined
+        planValue: this.planTotals?.get(id) ?? undefined,
+        planPurchases: this.planPurchases?.get(id),
+        planPurchaseTotalLabel: this.planPurchaseTotals?.has(id) ? this.formatPlan(this.planPurchaseTotals.get(id) as number) : undefined
       });
     });
     rows.sort((a, b) => (this.toDate(b.created)?.getTime() || 0) - (this.toDate(a.created)?.getTime() || 0));
@@ -1571,9 +1627,9 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Journey Support renders the total with the currency pipe ('INR', symbol, '1.0-0'); match it exactly. */
+  /** Rupees with Indian digit grouping (₹2,06,94,876) — the shared formatter, same as the workshop dashboard. */
   private formatPlan(v: number): string {
-    return formatCurrency(v, 'en-US', '₹', 'INR', '1.0-0');
+    return formatRupees(v);
   }
 
   private planLabel(profileid: string): string | undefined {
@@ -1598,7 +1654,8 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
    *   Watson Participants where email ==  -> first name-or-email match -> id
    *   Watson Payment Schedule where participantid == , orderBy date asc
    *   -> journeySupportTotal()
-   * Each person is fetched once per visit and cached; a few run at a time.
+   * Each person is fetched once per visit and cached. Every step reads 30 people per query, all
+   * queries at once, and rebuilds each person's equality result from the batch.
    */
   private async loadPlanTotals(): Promise<void> {
     const wanted: string[] = [];
@@ -1614,33 +1671,113 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
     }
     wanted.forEach(id => this.planPending.add(id));
     this.planStatus = 'loading';
-    const one = async (profileid: string): Promise<number | null> => {
+    const purchaseRowsFor = (docs: any[]) => watsonPurchaseRows(docs).map(r => ({
+      ...r,
+      dateLabel: r.date ? formatDate(r.date, 'd MMM y', 'en-US') : '—',
+      amountLabel: r.amount === null ? '—' : this.formatPlan(r.amount)
+    }));
+    const setPurchases = (profileid: string, docs: any[]) => {
+      const rows = purchaseRowsFor(docs);
+      this.planPurchases.set(profileid, rows);
+      this.planPurchaseTotals.set(profileid, rows.reduce((acc, r) => acc + (r.amount ?? 0), 0));
+    };
+    // The single-person chain, kept for a profile whose email is not text (the batched read needs text).
+    const one = async (profileid: string, profileData: any): Promise<number | null> => {
       try {
-        const profile = await getDoc(doc(this.firestore, 'profile_data', profileid));
-        const profileData: any = profile.data();
-        if (!profileData) return null;
         const participant = await getDocs(query(collection(watsonDatabase, 'Participants'), where('email', '==', profileData['email'])));
         const participantid = journeySupportParticipantId(participant.docs.map(d => d.data()), profileData);
         if (participantid == null) return null;   // Journey Support: "unable to find Client in Watson"
-        const schedule = await getDocs(query(collection(watsonDatabase, 'Payment Schedule'),
-          where('participantid', '==', participantid), orderBy('date', 'asc')));
+        const [schedule, purchases] = await Promise.all([
+          getDocs(query(collection(watsonDatabase, 'Payment Schedule'), where('participantid', '==', participantid), orderBy('date', 'asc'))),
+          getDocs(query(collection(watsonDatabase, 'ParticipantPurchases'), where('participantid', '==', participantid))),
+        ]);
+        setPurchases(profileid, purchases.docs.map(d => d.data()));
         return journeySupportTotal(schedule.docs.map(d => d.data()));
       } catch (err) {
         console.error('eiflixoperationsdashboard: Watson total amount lookup failed for ' + profileid, err);
         return null;
       }
     };
-    // Six people in flight at once — the chain per person is unchanged.
-    const queue = [...wanted];
-    const worker = async () => {
-      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-        this.planTotals.set(id, await one(id));
-        this.planPending.delete(id);
-      }
+    // Same chain as Journey Support, read 30 people per query with every query in flight at once
+    // (the workshop dashboard's Sale Achieved fix, 2026-10-15). READ ONLY — Watson is never written.
+    const readIn = async (db: any, coll: string, field: any, values: any[]): Promise<{ id: string; data: any }[]> => {
+      const chunks: any[][] = [];
+      for (let k = 0; k < values.length; k += 30) chunks.push(values.slice(k, k + 30));
+      const snaps = await Promise.all(chunks.map(c =>
+        getDocs(query(collection(db, coll), where(field, 'in', c))).catch(err => {
+          console.error('eiflixoperationsdashboard: Watson total amount read failed (' + coll + ')', err);
+          return null;
+        })));
+      return snaps.flatMap(sn => sn ? sn.docs.map(d => ({ id: d.id, data: d.data() })) : []);
     };
-    await Promise.all(Array.from({ length: Math.min(6, queue.length) }, worker));
+    const totals = new Map<string, number | null>();
+    try {
+      const profiles = new Map((await readIn(this.firestore, 'profile_data', documentId(), wanted)).map(d => [d.id, d.data]));
+      const textEmail = wanted.filter(id => typeof profiles.get(id)?.['email'] === 'string');
+      const emails = [...new Set(textEmail.map(id => profiles.get(id)!['email']))];
+      const participantsByEmail = groupLikeEquality(await readIn(watsonDatabase, 'Participants', 'email', emails), 'email');
+      const participantOf = new Map<string, any>();
+      textEmail.forEach(id => {
+        const profileData = profiles.get(id);
+        const pid = journeySupportParticipantId((participantsByEmail.get(profileData['email']) ?? []).map(d => d.data), profileData);
+        if (pid != null) participantOf.set(id, pid);   // null: "unable to find Client in Watson"
+      });
+      const pids = [...new Set(participantOf.values())];
+      const [scheduleDocs, purchaseDocs] = await Promise.all([
+        readIn(watsonDatabase, 'Payment Schedule', 'participantid', pids),
+        readIn(watsonDatabase, 'ParticipantPurchases', 'participantid', pids),
+      ]);
+      const scheduleBy = groupLikeEquality(scheduleDocs, 'participantid');
+      const purchasesBy = groupLikeEquality(purchaseDocs, 'participantid');
+      participantOf.forEach((pid, id) => {
+        setPurchases(id, (purchasesBy.get(pid) ?? []).map(d => d.data));
+        totals.set(id, journeySupportTotal(journeySupportScheduleOrder(scheduleBy.get(pid) ?? [])));
+      });
+      // A profile with a non-text email still gets the exact single-person chain.
+      await Promise.all(wanted
+        .filter(id => profiles.has(id) && !textEmail.includes(id))
+        .map(async id => totals.set(id, await one(id, profiles.get(id)))));
+    } catch (err) {
+      console.error('eiflixoperationsdashboard: Watson total amount lookup failed', err);
+    }
+    wanted.forEach(id => {
+      this.planTotals.set(id, totals.has(id) ? totals.get(id)! : null);
+      this.planPending.delete(id);
+    });
     this.planStatus = 'ready';
     this.rebuildPaidCard();
+  }
+
+  /**
+   * Purchases hover card (operator 2026-10-14): one line per product bought,
+   * from Watson ParticipantPurchases. Only rows that carry purchases open it. The side panel sits at z-index 1001 — above the
+   * CDK overlay layer (1000) — so this is a fixed card at 1002 placed beside the
+   * panel, level with the row; with no room beside it (phones) it drops below.
+   */
+  showPlanTip(row: any, el: HTMLElement): void {
+    this.keepPlanTip();
+    if (!row?.planPurchases?.length || !el) { this.planTipRow = null; return; }
+    const r = el.getBoundingClientRect();
+    const panel = (el.closest('.eod-panel') as HTMLElement | null)?.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tipMax = 360;   // matches .eod-plan-tip max-height + head/foot
+    const roomLeft = panel ? panel.left : r.left;
+    this.planTipStyle = roomLeft >= 320
+      ? { top: Math.max(8, Math.min(r.top, vh - tipMax - 8)) + 'px', right: (vw - roomLeft + 10) + 'px' }
+      : { top: Math.max(8, Math.min(r.bottom + 6, vh - tipMax - 8)) + 'px', left: '12px', right: '12px' };
+    this.planTipRow = row;
+  }
+
+  /** Pointer moved onto the card (to scroll it) — cancel the pending close. */
+  keepPlanTip(): void {
+    if (this.planTipTimer) { clearTimeout(this.planTipTimer); this.planTipTimer = null; }
+  }
+
+  /** Close after a short grace, so the pointer can travel from the row onto the card. */
+  hidePlanTip(): void {
+    this.keepPlanTip();
+    this.planTipTimer = setTimeout(() => { this.planTipRow = null; this.planTipTimer = null; }, 140);
   }
 
   // B!G Participants lives in its own section (operator 2026-10-13). The
@@ -2918,6 +3055,7 @@ export class EiflixoperationsdashboardComponent implements OnInit, OnDestroy {
   }
 
   closePanel(): void {
+    this.planTipRow = null;
     this.activePanel = null;
     this.unlockScroll();
   }
