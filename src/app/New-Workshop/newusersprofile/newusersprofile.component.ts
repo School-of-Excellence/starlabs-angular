@@ -829,7 +829,7 @@ export class NewusersprofileComponent implements OnInit, OnDestroy {
 
     this.workshopFilterLoading = true;
     this.workshopProfileIds = null; // predicate hides rows while loading
-    // Clear now (not just on completion) so a mid-load export can't read the
+    // Clear now (not just on completion) so a mid-load export can't read the.
     // previous selection's titles.
     this.workshopsByProfile.clear();
     this.refreshFilter();
