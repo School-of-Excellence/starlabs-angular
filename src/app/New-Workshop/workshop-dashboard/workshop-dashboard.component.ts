@@ -23,6 +23,7 @@ import {
   arrayUnion,
 } from '@angular/fire/firestore';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { watsonFirestore, saleWindow, purchaseLabels, formatRupees, buildSaleBuyers, sortSaleBuyers, saleExportRows } from '../watson-purchases';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { AuthguardService } from '../../authguard.service';
 import { MatDialog } from '@angular/material/dialog';
@@ -273,6 +274,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     ['existUsersEnrolled', 'Exist Users Enrolled'],
     ['platform', 'Enrolled via'],
     ['notInChatGroup', 'Not in Chat Group'],
+    ['saleAchieved', 'Sale Achieved'],
     ['completed', 'Completed'], ['inreview', 'In Review'], ['rework', 'Rework Required'],
     ['readyformobile', 'Ready for Mobile'], ['inprogress', 'In Progress'], ['notstarted', 'Not Started'],
     ['enrolled', 'All Enrolled'], ['activeParticipants', 'Active Participants'],
@@ -557,6 +559,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.saleTipTimer) clearTimeout(this.saleTipTimer);
     if (this.supportChatUnsub) { this.supportChatUnsub(); this.supportChatUnsub = null; }
     this.destroyed = true;
     this.clearSelectedParticipant();
@@ -1351,6 +1354,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       // `participant metadata` (which carries activejourney / customerstatus).
       this.mapProfile = { ...participantData.docdata, ...this.newUserOverlay() };
       this.recomputeNotInChat();
+      void this.loadSaleAchieved();
       // Participant progress lives in its own snapshot (setupParticipantWorkshopSnapshot);
       // here we just re-derive from the current (live) participantWorkshopMap.
       this.recomputeDerivedState();
@@ -1869,6 +1873,22 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
       this.selectedNotStartedTypeFilters = [];
       this.applyFilterSide();
 
+    } else if (metricType === 'saleAchieved') {
+      const list = this.saleAchievedParticipants;
+      this.selectedParticipants = list;
+      this.selectedStatusInfo = {
+        status: 'saleAchieved',
+        challengeName: 'Sale Achieved',
+        subChallengeName: this.saleWindowLabel,
+        count: list.length
+      };
+      this.showParticipantPanel = true;
+      this.filterOption = 'all';
+      this.sideSearch = '';
+      this.selectedJourneyFilters = [];
+      this.selectedCustomerStatusFilters = [];
+      this.applyFilterSide();
+
     } else if (metricType === 'notInChatGroup') {
       const list = this.notInChatParticipants;
       this.selectedParticipants = list;
@@ -2155,6 +2175,7 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   }
 
   closeParticipantPanel() {
+    this.saleTipRow = null;
     this.showParticipantPanel = false;
     this.selectedParticipants = [];
     this.selectedStatusInfo = null;
@@ -2705,6 +2726,10 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
     // Applied last, over whatever the other side filters left.
     this.filteredParticipants = filterParticipantsByName(base, this.sideSearch, p => this.sideNameFor(p));
+    // Sale Achieved sorts instead of filtering (operator 2026-10-14).
+    if (this.selectedStatusInfo?.status === 'saleAchieved') {
+      this.filteredParticipants = sortSaleBuyers(this.filteredParticipants, this.saleSort);
+    }
   }
 
   /** The name a side-panel row shows: its own, else whichever directory knows the profile. */
@@ -3039,6 +3064,134 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
   supportChatMembers: Set<string> | null = null;
   private supportChatUnsub: Unsubscribe | null = null;
   notInChatParticipants: any[] = [];
+
+  // ==================== Sale Achieved (liveworkshop only, operator 2026-10-14) ====================
+  // Enrolled people who bought anything in Watson `ParticipantPurchases` between the registration start
+  // and ONE MONTH after the workshop end. Watson is READ-ONLY here — reads only, never a write.
+  saleAchievedParticipants: any[] = [];
+  /** 'unavailable' = this build has no Watson config (the emulator build, deliberately). */
+  saleStatus: 'idle' | 'loading' | 'ready' | 'unavailable' = 'idle';
+  saleTotalLabel = '';
+  saleWindowLabel = '';
+  private saleToken = 0;
+  /** Inputs of the last started lookup — a re-fire of the live enrolled listener with the same people and
+   *  dates must NOT restart it (it used to, and the card sat on '…' while each run was thrown away). */
+  private saleKey = '';
+  /** The panel row whose purchases are showing in the hover card. */
+  saleTipRow: any = null;
+  saleTipStyle: Record<string, string> = {};
+  private saleTipTimer: any = null;
+  /** The Sale Achieved panel sorts (no All/New/Old filter): biggest total, or latest purchase first. */
+  saleSort: 'amount' | 'recent' = 'amount';
+
+  setSaleSort(by: 'amount' | 'recent'): void {
+    this.saleSort = by;
+    this.applyFilterSide();
+  }
+
+  get isLiveWorkshop(): boolean { return this.workshopData?.workshoptype === 'liveworkshop'; }
+  /** The card's highlighted figure: the rupee total. '…' while loading, '—' without Watson. */
+  get saleAmountValue(): string {
+    if (this.saleStatus === 'loading' || this.saleStatus === 'idle') return '…';
+    if (this.saleStatus === 'unavailable') return '—';
+    return this.saleTotalLabel || formatRupees(0);
+  }
+  /** The smaller line under it: how many enrolled people bought (only once the lookup has answered). */
+  get saleCountLabel(): string {
+    if (this.saleStatus !== 'ready') return '';
+    const n = this.saleAchievedParticipants.length;
+    return `${n} ${n === 1 ? 'user' : 'users'}`;
+  }
+
+  async loadSaleAchieved(): Promise<void> {
+    if (!this.isLiveWorkshop) { ++this.saleToken; this.saleKey = ''; this.saleStatus = 'idle'; this.saleAchievedParticipants = []; return; }
+    const dp = this.workshopData?.detailpage || {};
+    const win = saleWindow(dp['registrationStartDate'], dp['workshopEndDate']);
+    this.saleWindowLabel = win
+      ? `Bought ${formatDate(win.start)} – ${formatDate(win.end)}`
+      : 'Registration start or workshop end date is not set';
+    const db = watsonFirestore();
+    if (!db) { ++this.saleToken; this.saleStatus = 'unavailable'; this.saleAchievedParticipants = []; this.saleTotalLabel = ''; return; }
+    if (!win) { ++this.saleToken; this.saleStatus = 'ready'; this.saleAchievedParticipants = []; this.saleTotalLabel = ''; return; }
+
+    // Enrolled people with an email. Watson stores emails lower-cased; ask for the stored spelling too.
+    const ids = [...new Set(this.enrolledParticipants.map(p => p.profileid).filter(Boolean))];
+    const emailOf = new Map<string, string>();
+    ids.forEach(id => { const e = String(this.mapProfile[id]?.email ?? '').trim(); if (e) emailOf.set(id, e); });
+    const asked = [...new Set([...emailOf.values()].flatMap(e => [e, e.toLowerCase()]))];
+    // Same people + same window as the run already started (or finished)? Keep it — don't restart.
+    const key = [...asked].sort().join('|') + '#' + win.start.getTime() + '-' + win.end.getTime();
+    if (key === this.saleKey && (this.saleStatus === 'loading' || this.saleStatus === 'ready')) return;
+    this.saleKey = key;
+    const token = ++this.saleToken;
+    this.saleStatus = 'loading';
+    const chunks = <T>(a: T[]) => Array.from({ length: Math.ceil(a.length / 30) }, (_, i) => a.slice(i * 30, i * 30 + 30));
+    try {
+      // 1) Participants by email (READ) — every batch of 30 at once, not one after another.
+      const participantDocs: { id: string; data: any }[] = [];
+      const pSnaps = await Promise.all(chunks(asked).map(part =>
+        getDocs(query(collection(db, 'Participants'), where('email', 'in', part)))));
+      pSnaps.forEach(snap => snap.forEach((d: any) => participantDocs.push({ id: d.id, data: d.data() || {} })));
+      if (token !== this.saleToken || this.destroyed) return;
+      // 2) ParticipantPurchases for those participant ids (READ) — also all batches at once.
+      const allPids = [...new Set(participantDocs.map(d => String(d.data['id'] ?? d.id)))];
+      const purchaseDocs: any[] = [];
+      const bSnaps = await Promise.all(chunks(allPids).map(part =>
+        getDocs(query(collection(db, 'ParticipantPurchases'), where('participantid', 'in', part)))));
+      bSnaps.forEach(snap => snap.forEach((d: any) => purchaseDocs.push(d.data() || {})));
+      if (token !== this.saleToken || this.destroyed) return;
+      // 3) Match and window (pure — see buildSaleBuyers).
+      const matched = buildSaleBuyers(emailOf, participantDocs, purchaseDocs, win);
+      const grand = matched.reduce((a, m) => a + m.total, 0);
+      const buyers = matched.map(m => ({
+        ...this.buildParticipantEntry(m.profileid),
+        salePurchases: m.rows.map(purchaseLabels),
+        saleTotal: m.total,
+        saleTotalLabel: formatRupees(m.total),
+        // Latest purchase in the window — the "Recent purchase" sort key.
+        saleLastDate: Math.max(...m.rows.map(r => r.date ? r.date.getTime() : 0))
+      }));
+      this.saleAchievedParticipants = buyers;
+      this.saleTotalLabel = buyers.length ? formatRupees(grand) : '';
+      this.saleStatus = 'ready';
+    } catch (err) {
+      console.error('Sale Achieved: Watson lookup failed', err);
+      if (token !== this.saleToken || this.destroyed) return;
+      this.saleKey = '';   // let the next trigger retry
+      this.saleAchievedParticipants = [];
+      this.saleTotalLabel = '';
+      this.saleStatus = 'ready';
+    }
+    // Keep an open Sale Achieved panel in step.
+    if (this.selectedStatusInfo?.status === 'saleAchieved') this.onMetricClick('saleAchieved');
+  }
+
+  /**
+   * Purchases hover card on a Sale Achieved panel row — same card as the EiFlix dashboard's. The side
+   * panel is fixed at z-index 1000, so the card is fixed at 1002, placed beside the panel level with the
+   * row; with no room beside it (phones) it drops below the row.
+   */
+  showSaleTip(row: any, el: HTMLElement): void {
+    this.keepSaleTip();
+    if (this.selectedStatusInfo?.status !== 'saleAchieved' || !row?.salePurchases?.length || !el) { this.saleTipRow = null; return; }
+    const r = el.getBoundingClientRect();
+    const panel = (el.closest('.participant-panel') as HTMLElement | null)?.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tipMax = 360;
+    const roomLeft = panel ? panel.left : r.left;
+    this.saleTipStyle = roomLeft >= 320
+      ? { top: Math.max(8, Math.min(r.top, vh - tipMax - 8)) + 'px', right: (vw - roomLeft + 10) + 'px' }
+      : { top: Math.max(8, Math.min(r.bottom + 6, vh - tipMax - 8)) + 'px', left: '12px', right: '12px' };
+    this.saleTipRow = row;
+  }
+  keepSaleTip(): void {
+    if (this.saleTipTimer) { clearTimeout(this.saleTipTimer); this.saleTipTimer = null; }
+  }
+  hideSaleTip(): void {
+    this.keepSaleTip();
+    this.saleTipTimer = setTimeout(() => { this.saleTipRow = null; this.saleTipTimer = null; }, 140);
+  }
   chatAddBusy = new Set<string>();
   chatAddAllBusy = false;
 
@@ -3418,6 +3571,13 @@ export class WorkshopDashboardComponent implements OnInit, OnDestroy {
     }
     const confirmDownload = window.confirm("Are you sure you want to export participants as CSV?");
     if (!confirmDownload) return;
+    // Sale Achieved: one row per purchase — date, product, amount — in the panel's current order.
+    if (this.selectedStatusInfo?.status === 'saleAchieved') {
+      const rows = saleExportRows(this.filteredParticipants);
+      const name = `workshop-sale-achieved-${this.workshopData?.detailpage?.title || 'workshop'}-${new Date().toISOString().split('T')[0]}.csv`;
+      this.downloadCSV(this.createCSVContent(rows), name);
+      return;
+    }
     const csvData = this.filteredParticipants.map((p: any) => ({
       'Participant Name': p.name || 'N/A',
       'Email': p['metadata']['email'] || '',
