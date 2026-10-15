@@ -3,7 +3,7 @@
   <div>
     <mat-form-field appearance="outline" style="width:300px">
       <mat-label>Select Validator</mat-label>
-      <mat-select [(ngModel)]="selectedValidator" multiple>
+      <mat-select data-testid="selv-select" [(ngModel)]="selectedValidator" multiple>
         <mat-option *ngFor="let option of validatorList" [value]="option">{{option['name']}}</mat-option>
       </mat-select>
     </mat-form-field>
@@ -12,9 +12,9 @@
   <br>
 
   <div class="d-flex flex-row">
-    <button mat-stroked-button type="button" class="submitbutton" [disabled]="selectedValidator.length == 0" (click)="submitValidator()">Submit</button>
+    <button data-testid="selv-submit" mat-stroked-button type="button" class="submitbutton" [disabled]="selectedValidator.length == 0" (click)="submitValidator()">Submit</button>
     &nbsp;
-    <button mat-stroked-button type="button" class="closebutton" (click)="closeDialog()">Close</button>
+    <button data-testid="selv-close" mat-stroked-button type="button" class="closebutton" (click)="closeDialog()">Close</button>
   </div>
 
 </main>
