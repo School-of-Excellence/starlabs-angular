@@ -95,7 +95,7 @@
                                             {{getAppNotificationForDay(days?.date)?.length ?? 0}}
                                         </span>
                                     </div>
-                                    <button data-testid="cgp-cal-add" class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
+                                    <button class="add-btn" *ngIf="showAddButtonInDateCell(days?.date)" (click)="onCommunicationAddClick(days?.date);$event.stopPropagation()" title="Add communication" aria-label="Add communication">
                                         <mat-icon>add</mat-icon>
                                     </button>
                                 </div>
