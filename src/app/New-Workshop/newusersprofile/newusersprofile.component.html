@@ -140,37 +140,48 @@
         </div>
       </mat-menu>
 
-      <div class="date-filter-wrap">
-        <button data-testid="new-created-picker-16" mat-stroked-button type="button" class="tag-select-btn date-filter-btn"
-          [class.active]="hasDateFilter" (click)="createdPicker.open()">
-          <mat-icon>event</mat-icon>
-          <span class="df-label" *ngIf="!hasDateFilter">Created date</span>
-          <span class="df-label" *ngIf="hasDateFilter">
-            {{ startDate ? (startDate | date: 'MMM d, y') : '…' }} – {{ endDate ? (endDate | date: 'MMM d, y') : '…' }}
-          </span>
-          <mat-icon data-testid="new-event-17" *ngIf="hasDateFilter" class="df-clear" matTooltip="Clear dates"
-            (click)="$event.stopPropagation(); clearDates()">close</mat-icon>
-        </button>
+      <!-- Created-date range. Both bounds are on screen and typable, and the
+           calendar button opens the range picker; either bound alone is valid. -->
+      <mat-form-field class="created-range-field" [class.active]="hasDateFilter" appearance="outline"
+        subscriptSizing="dynamic">
+        <mat-date-range-input [rangePicker]="createdPicker">
+          <input matStartDate data-testid="new-created-start-date" placeholder="Created from"
+            [(ngModel)]="startDate" [ngModelOptions]="{ standalone: true }" (dateChange)="onDateChange()" />
+          <input matEndDate data-testid="new-created-end-date" placeholder="to"
+            [(ngModel)]="endDate" [ngModelOptions]="{ standalone: true }" (dateChange)="onDateChange()" />
+        </mat-date-range-input>
+        <mat-icon data-testid="new-event-17" matIconSuffix *ngIf="hasDateFilter" class="df-clear"
+          matTooltip="Clear dates" (click)="clearDates()">close</mat-icon>
+        <mat-datepicker-toggle data-testid="new-created-picker-16" matIconSuffix
+          [for]="createdPicker"></mat-datepicker-toggle>
+        <mat-date-range-picker #createdPicker></mat-date-range-picker>
+      </mat-form-field>
 
-        <mat-form-field class="date-hidden" appearance="outline" subscriptSizing="dynamic">
-          <mat-date-range-input [rangePicker]="createdPicker">
-            <input matStartDate [(ngModel)]="startDate" [ngModelOptions]="{ standalone: true }"
-              (dateChange)="onDateChange()" />
-            <input matEndDate [(ngModel)]="endDate" [ngModelOptions]="{ standalone: true }"
-              (dateChange)="onDateChange()" />
-          </mat-date-range-input>
-          <mat-date-range-picker #createdPicker></mat-date-range-picker>
-        </mat-form-field>
-      </div>
-
-      <button data-testid="new-toggle-converted-filter-18" mat-stroked-button type="button" class="tag-select-btn converted-filter-btn"
-        [class.active]="convertedOnly" (click)="toggleConvertedFilter()"
-        matTooltip="Show only profiles converted to existing users">
+      <!-- Conversion status: two options, and re-picking the active one clears
+           it, so the menu needs no third "any" row. -->
+      <button data-testid="new-toggle-converted-filter-18" mat-stroked-button type="button"
+        class="tag-select-btn converted-filter-btn" [class.active]="!!convertedFilter"
+        [matMenuTriggerFor]="convertedMenu" matTooltip="Filter by whether a profile moved to existing users">
         <mat-icon>swap_horiz</mat-icon>
-        Converted
-        <mat-icon data-testid="new-event-19" *ngIf="convertedOnly" class="df-clear" matTooltip="Clear converted filter"
-          (click)="$event.stopPropagation(); toggleConvertedFilter()">close</mat-icon>
+        {{ convertedLabel }}
+        <mat-icon data-testid="new-event-19" *ngIf="convertedFilter" class="df-clear"
+          matTooltip="Clear converted filter"
+          (click)="$event.stopPropagation(); clearConvertedFilter()">close</mat-icon>
+        <mat-icon class="trail" *ngIf="!convertedFilter">arrow_drop_down</mat-icon>
       </button>
+
+      <mat-menu #convertedMenu="matMenu" class="converted-filter-menu" xPosition="after">
+        <button data-testid="new-set-converted-filter-converted" mat-menu-item type="button"
+          [class.on]="convertedFilter === 'converted'" (click)="setConvertedFilter('converted')">
+          <mat-icon>{{ convertedFilter === 'converted' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+          <span>Converted</span>
+        </button>
+        <button data-testid="new-set-converted-filter-not-converted" mat-menu-item type="button"
+          [class.on]="convertedFilter === 'notconverted'" (click)="setConvertedFilter('notconverted')">
+          <mat-icon>{{ convertedFilter === 'notconverted' ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+          <span>Not converted</span>
+        </button>
+      </mat-menu>
 
       <button data-testid="new-open-tags-manager-20" mat-stroked-button class="tags-manage-btn" (click)="openTagsManager()">
         <mat-icon>sell</mat-icon>

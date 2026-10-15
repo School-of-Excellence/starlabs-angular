@@ -1,5 +1,5 @@
 <div *ngIf="loading | async">
-  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  <mat-progress-bar data-testid="vatc-loading" mode="indeterminate"></mat-progress-bar>
 </div>
 
 <div class="mainscreen">
@@ -9,7 +9,7 @@
     <div class="filterrow">
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Author</mat-label>
-        <mat-select [(ngModel)]="selectedPrescribers" (selectionChange)="onPrescriberSelect()" [disabled]="!superRoles" multiple>
+        <mat-select data-testid="vatc-filter-author" [(ngModel)]="selectedPrescribers" (selectionChange)="onPrescriberSelect()" [disabled]="!superRoles" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -19,7 +19,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>ATC Model</mat-label>
-        <mat-select [(ngModel)]="selectedProducts" (selectionChange)="onPrescriberSelect()" multiple>
+        <mat-select data-testid="vatc-filter-model" [(ngModel)]="selectedProducts" (selectionChange)="onPrescriberSelect()" multiple>
           <mat-option *ngFor="let atcmodel of atcModelList" [value]="atcmodel.atcmodel">
             {{atcmodel.atcmodel}}
           </mat-option>
@@ -28,7 +28,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Participant</mat-label>
-        <mat-select [(ngModel)]="selectedParticipants" (selectionChange)="onParticipantSelect()" multiple>
+        <mat-select data-testid="vatc-filter-participant" [(ngModel)]="selectedParticipants" (selectionChange)="onParticipantSelect()" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -38,7 +38,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Queue</mat-label>
-        <mat-select [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" multiple>
+        <mat-select data-testid="vatc-filter-queue" [(ngModel)]="selectedQueue" (selectionChange)="onQueueSelect()" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -48,7 +48,7 @@
 
       <mat-form-field class="filteritem" appearance="outline">
         <mat-label>Filter by Mentor</mat-label>
-        <mat-select [(ngModel)]="selectedMentors" (selectionChange)="onMentorSelect()" multiple>
+        <mat-select data-testid="vatc-filter-mentor" [(ngModel)]="selectedMentors" (selectionChange)="onMentorSelect()" multiple>
           <mat-option>
             <ngx-mat-select-search [(ngModel)]="filterText" [ngModelOptions]="{standalone: true}" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
           </mat-option>
@@ -60,9 +60,9 @@
         <mat-label>Prescribed Date</mat-label>
 
         <mat-date-range-input [rangePicker]="picker">
-          <input matStartDate placeholder="Start date" [(ngModel)]="startDate">
+          <input data-testid="vatc-filter-start" matStartDate placeholder="Start date" [(ngModel)]="startDate">
 
-          <input matEndDate placeholder="End date" [(ngModel)]="endDate" (ngModelChange)="onDateRangeChange()">
+          <input data-testid="vatc-filter-end" matEndDate placeholder="End date" [(ngModel)]="endDate" (ngModelChange)="onDateRangeChange()">
         </mat-date-range-input>
 
         <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
@@ -84,12 +84,12 @@
         <input matInput type="number" min="0" [(ngModel)]="atcCountValue" (ngModelChange)="onCountFilterChange()" [disabled]="atcCountOperator == null" placeholder="Count value">
       </mat-form-field>
     </div>
-    <button class="clearbtn" *ngIf="(selectedPrescribers.length > 0 && superRoles) || selectedParticipants.length > 0 || selectedProducts.length > 0 || selectedQueue.length > 0 || selectedMentors.length > 0 || (this.startDate != null && this.endDate != null) || atcCountOperator != null || atcCountValue != null" mat-stroked-button (click)="resetFilter()">Clear Filter</button>
+    <button data-testid="vatc-clear-filter" class="clearbtn" *ngIf="(selectedPrescribers.length > 0 && superRoles) || selectedParticipants.length > 0 || selectedProducts.length > 0 || selectedQueue.length > 0 || selectedMentors.length > 0 || (this.startDate != null && this.endDate != null) || atcCountOperator != null || atcCountValue != null" mat-stroked-button (click)="resetFilter()">Clear Filter</button>
   </div>
 
   <div class="filtered-info">
     <div class="filtered-text">
-      <span class="filtered-count">Showing {{ reportATC.length }} ATC{{ reportATC.length === 1 ? '' : 's' }}</span>
+      <span data-testid="vatc-count" class="filtered-count">Showing {{ reportATC.length }} ATC{{ reportATC.length === 1 ? '' : 's' }}</span>
       <span class="filtered-by" *ngIf="getActiveFilters().length > 0">
         &nbsp;|&nbsp; Filtered by: {{ getActiveFilters().join('  •  ') }}
       </span>
@@ -103,16 +103,16 @@
   <div class="summary-bar">
     <div class="summary-group">
       <div class="summary-item" (click)="filterByValidation(null)" [class.active]="validationFilter === null">
-        <span class="summary-value neutral">{{ reportSummary.total }}</span>
+        <span data-testid="vatc-sum-total" class="summary-value neutral">{{ reportSummary.total }}</span>
         <span class="summary-label">Total</span>
       </div>
       <div class="summary-item" (click)="filterByValidation('validated')" [class.active]="validationFilter === 'validated'">
-        <span class="summary-value green">{{ reportSummary.validated }}</span>
+        <span data-testid="vatc-sum-validated" class="summary-value green">{{ reportSummary.validated }}</span>
         <span class="summary-label">Validated</span>
       </div>
       <div class="summary-item" (click)="filterByValidation('unvalidated')"
         [class.active]="validationFilter === 'unvalidated'">
-        <span class="summary-value amber">{{ reportSummary.unvalidated }}</span>
+        <span data-testid="vatc-sum-unvalidated" class="summary-value amber">{{ reportSummary.unvalidated }}</span>
         <span class="summary-label">Unvalidated</span>
       </div>
     </div>
@@ -121,7 +121,7 @@
 
     <div class="summary-group">
       <div class="summary-item">
-        <span class="summary-value blue">{{ reportSummary.totalAdjustment }}</span>
+        <span data-testid="vatc-sum-adjustments" class="summary-value blue">{{ reportSummary.totalAdjustment }}</span>
         <span class="summary-label">Adjustments</span>
       </div>
       <div class="summary-item">
@@ -138,7 +138,7 @@
 
     <div class="summary-group">
       <div class="summary-item">
-        <span class="summary-value purple">{{ reportSummary.totalProcedure }}</span>
+        <span data-testid="vatc-sum-procedures" class="summary-value purple">{{ reportSummary.totalProcedure }}</span>
         <span class="summary-label">Change Work</span>
       </div>
       <div class="summary-item">
@@ -155,7 +155,7 @@
   <div class="mat-elevation-z3">
     <mat-list>
       <mat-list-item *ngFor="let atc of reportATC.slice(pageIndex * pageSize, (pageIndex * pageSize) + pageSize); let i = index; trackBy: trackByAtcId">
-        <div class="w-100" *ngIf="atc.data() as atcData" [attr.id]="atcData['atcid']" #printSection>
+        <div class="w-100" *ngIf="atc.data() as atcData" [attr.id]="atcData['atcid']" [attr.data-testid]="'vatc-row-' + atc.id" #printSection>
           <div class="atc-header-container">
             <!-- ATC Meta Data -->
             <div class="atc-meta">
@@ -262,8 +262,8 @@
 
           <!-- ATC Status -->
           <div class="atc-status nonprintable">
-            <label *ngIf="atcData['status'] == 'atc given'">This ATC is yet to validate.</label>
-            <label *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor.
+            <label data-testid="vatc-status-pending" *ngIf="atcData['status'] == 'atc given'">This ATC is yet to validate.</label>
+            <label data-testid="vatc-status-validated" *ngIf="atcData['status'] == 'validated'">This ATC has been validated by Arena Mentor.
               <span *ngIf="(atcData['validator'] || []).length != 0">
                 <!-- OPTIMIZED: Show names in a more efficient way -->
                 <span class="validator-names">
@@ -271,18 +271,18 @@
                 </span>
               </span>
             </label>
-            <label *ngIf="!atcData['status'] && atc.ref.parent.id == 'atc_alpha'">This ATC is directly visible to the Participant.</label>
+            <label data-testid="vatc-status-visible" *ngIf="!atcData['status'] && atc.ref.parent.id == 'atc_alpha'">This ATC is directly visible to the Participant.</label>
           </div>
 
           <!-- Action Button -->
           <div class="actionbuttonbox nonprintable">
-            <button class="actionbtn" mat-button (click)="(mapATCtranscription[atc.id] || {})['view'] ? closeATC(atc) : openATC(atc)">
+            <button data-testid="vatc-toggle-full" class="actionbtn" mat-button (click)="(mapATCtranscription[atc.id] || {})['view'] ? closeATC(atc) : openATC(atc)">
               {{(mapATCtranscription[atc.id] || {})['view'] ? "Close Full ATC" : "View Full ATC"}}
             </button>
-            <button class="actionbtn" mat-button (click)="onEditATC(atc)">
+            <button data-testid="vatc-edit" class="actionbtn" mat-button (click)="onEditATC(atc)">
               Edit ATC
             </button>
-            <button *ngIf="atcData['status'] == 'atc given'" class="actionbtn" mat-button (click)="markATCvalidate(atc.id)">
+            <button data-testid="vatc-mark-validated" *ngIf="atcData['status'] == 'atc given'" class="actionbtn" mat-button (click)="markATCvalidate(atc.id)">
               Mark ATC as Validated
             </button>
           </div>
@@ -294,7 +294,25 @@
               Loading Full ATC...
             </div>
 
-            <div *ngFor="let transcription of mapATCtranscription[atc.id]['transcription']; let j = index; trackBy: trackByAdjustmentID" class="transcription-item">
+            <!-- Bulk Change Agent: one row per assigned_to activity, each with its own Submit; acts on this ATC's loaded procedures that are not deleted or completed -->
+            <div data-testid="vatc-bulk-box" *ngIf="mapATCtranscription[atc.id]['transcription'].length != 0" class="bulk-agent-box nonprintable">
+              <div class="bulk-agent-title">Assign Change Agent — all open procedures</div>
+              <div *ngFor="let activity of assignedToActivity" class="bulk-agent-row">
+                <mat-form-field class="bg-light bulk-agent-field" appearance="outline">
+                  <mat-label>{{activity.activity}}</mat-label>
+                  <mat-select [attr.data-testid]="'vatc-bulk-select-' + activity.docid" [(ngModel)]="bulkAgentSelection[atc.id + '_' + activity.docid]" multiple>
+                    <mat-option>
+                      <ngx-mat-select-search [(ngModel)]="bulkAgentFilter[atc.id + '_' + activity.docid]" [placeholderLabel]="'Search'" [noEntriesFoundLabel]="'No matching records found'" ngDefaultControl></ngx-mat-select-search>
+                    </mat-option>
+                    <mat-option *ngFor="let name of availableBulkAssignerList(atc.id + '_' + activity.docid); trackBy: trackByAuthorOption" [value]="name.authorpath">{{name.authorname}}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button [attr.data-testid]="'vatc-bulk-submit-' + activity.docid" class="submitbtn bulk-agent-submit" mat-stroked-button [disabled]="!isBulkReady(atc.id) || !(bulkAgentSelection[atc.id + '_' + activity.docid]?.length)" (click)="bulkUpdateChangeAgent(atc, activity)">Submit</button>
+              </div>
+              <label data-testid="vatc-bulk-note" class="bulk-agent-note">{{isBulkReady(atc.id) ? 'Applies to ' + bulkEligibleProcedures(atc.id).length + ' procedures (skips deleted and completed)' : 'Loading procedures…'}}</label>
+            </div>
+
+            <div *ngFor="let transcription of mapATCtranscription[atc.id]['transcription']; let j = index; trackBy: trackByAdjustmentID" class="transcription-item" [attr.data-testid]="'vatc-adj-' + j">
               <div *ngIf="transcription.adjustment.data() as adjustmentData">
                 <div [ngClass]="{'deleteStyle' : adjustmentData['isdelete'], 'nonprintable': adjustmentData['isdelete']}" class="adjustment-container">
                   <!-- Adjustment Data -->
@@ -354,18 +372,18 @@
                   </div>
 
                   <div class="procedures-section">
-                    <div *ngFor="let procedure of transcription['procedure']; let k = index; trackBy: trackByProcedureId" class="procedure-item">
+                    <div *ngFor="let procedure of transcription['procedure']; let k = index; trackBy: trackByProcedureId" class="procedure-item" [attr.data-testid]="'vatc-proc-' + k">
                       <div *ngIf="procedure.data() as procedureData">
                         <!-- View Procedure - Inline View-->
                         <div *ngIf="updateProcedurePath != procedure.ref.path" [ngClass]="{'deleteStyle' : adjustmentData['isdelete'] || procedureData['isdelete'], 'nonprintable': adjustmentData['isdelete'] || procedureData['isdelete']}" class="procedure-view">
                           <div class="procedure-row">
                             <!-- Procedure Name -->
-                            <label class="procedure-name">
+                            <label data-testid="vatc-proc-name" class="procedure-name">
                               {{k+1}}. {{procedureMap[procedureData["name"].path]}}
                               <span class="text-success" *ngIf="procedureData['newlyadded']">(New)</span>
                             </label>
                             <!-- Assigned Author - OPTIMIZED -->
-                            <label class="assigned-authors nonprintable" *ngIf="(procedureData['assigned_to'] || []).length != 0">
+                            <label data-testid="vatc-proc-assigned" class="assigned-authors nonprintable" *ngIf="(procedureData['assigned_to'] || []).length != 0">
                               {{procedureData['assigned_to'].length}} assigned
                               <!-- Show names only when needed -->
                               <span class="assigned-names">

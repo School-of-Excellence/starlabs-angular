@@ -95,6 +95,17 @@ interface OverviewParticipantRow {
   ongoingProducts: OverviewProduct[] | null; 
 }
 
+interface OngoingParticipant {
+  profileid: string;
+  name: string;
+  email: string;
+  participantproducts?: any[];
+  notstartedparticipant?: boolean;
+  needsattention?: boolean;
+  completed?: boolean;
+  awaitingsignoff?: boolean;
+}
+
 @Component({
   selector: 'app-team-evolution-dashboard',
   standalone: true,
@@ -246,22 +257,12 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     'Critical Support Diagnostics',
     'A&H Light Diagnostics'
   ];
+  ongoingparticipants: OngoingParticipant[] = [];
 
   // Object declarations
   dfuProductsMap: { [key: string]: any } = {};
   expandedOverviewProduct: { [key: string]: boolean } = {};
-  ongoingparticipants: {
-    [profileId: string]: {
-      name: string;
-      email: string;
-      participantproducts?: any[];   
-      notstartedparticipant?: boolean;
-      needsattention?: boolean;
-      completed?: boolean;
-      awaitingsignoff?: boolean;
-    };
-  } = {};
-  fetchedProduct: { [productId: string]: typeof this.ongoingparticipants } = {};
+  fetchedProduct: { [productId: string]: OngoingParticipant[] } = {};
 
   // set/map declarations
   private fetchedProductData = new Set<string>();
@@ -272,8 +273,6 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     private router : Router
   ) { }
 
-  // Resolves once the AH members' metadata is loaded. The product dropdown fills earlier (after
-  // getDfuProducts), so selectProduct must wait on this or it builds — and caches — an empty list.
   private metadataReady: Promise<void> = Promise.resolve();
 
   async ngOnInit() {
@@ -367,7 +366,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
 
   buildOngoingParticipants(productId: string): void {
-    const localMap: typeof this.ongoingparticipants = {};
+    const list: OngoingParticipant[] = [];
 
     this.participantMetadata.forEach(participant => {
       const activeProducts: any[] = participant.activeproduct || [];
@@ -379,14 +378,15 @@ export class TeamEvolutionDashboardComponent implements OnInit {
 
       const hasConsumedProduct = consumedProducts.some(value => this.matchesProductId(value, productId));
 
-      localMap[participant.profileid] = {
+      list.push({
+        profileid: participant.profileid,
         name: participant.name,
         email: participant.email,
         completed: hasConsumedProduct
-      };
+      });
     });
 
-    this.ongoingparticipants = localMap;
+    this.ongoingparticipants = list;
   }
 
   async getProductToDeliverySequence(productId: string, productRef: any): Promise<void> {
@@ -417,7 +417,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
   }
 
   async fetchParticipantData(productRef: any): Promise<void> {
-    const profileIds = Object.keys(this.ongoingparticipants);
+    const profileIds = this.ongoingparticipants.map(p => p.profileid);
     const chunkSize = 30;
 
     const participantProductChunks: Promise<any>[] = [];
@@ -455,27 +455,41 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     await this.processDeliverySequences(deliveryDocs);
   }
 
+  // Process participant products and sort them by initiated status date, then assign them with ongoing participants
   processParticipantProducts(snapshots: any[]): void {
+    const allParticipantsProduct: any[] = [];
     for (const snapshot of snapshots) {
       for (const docSnap of snapshot.docs) {
-        const data = docSnap.data();
-        const participantProduct = { participantproductid: docSnap.id, ...data };
-        const profileid = participantProduct['profileid'];
-        const participant = this.ongoingparticipants[profileid];
-        if (!participant) { continue; }
-
-        if (!participant.participantproducts) { participant.participantproducts = []; }
-        participant.participantproducts.push(participantProduct);
+        allParticipantsProduct.push({ participantproductid: docSnap.id, ...docSnap.data() });
       }
     }
+    allParticipantsProduct.sort((a, b) => (a.statusdate?.initiated?.toMillis() ?? Infinity) - (b.statusdate?.initiated?.toMillis() ?? Infinity));
+
+    const byProfile = new Map(this.ongoingparticipants.map(p => [p.profileid, p]));
+    const sortedParticipants: OngoingParticipant[] = [];
+    const seen = new Set<string>();
+
+    for (const product of allParticipantsProduct) {
+      const participant = byProfile.get(product.profileid);
+      if (!participant) { continue; }
+
+      (participant.participantproducts ??= []).push(product);
+
+      if (!seen.has(participant.profileid)) {  
+        seen.add(participant.profileid);
+        sortedParticipants.push(participant);
+      }
+    }
+
+    for (const p of this.ongoingparticipants) {
+      if (!seen.has(p.profileid)) { sortedParticipants.push(p); }
+    }
+    this.ongoingparticipants = sortedParticipants;
   }
 
   async processDeliverySequences(deliveryDocs: any[]): Promise<void> {
-    const profileIds = Object.keys(this.ongoingparticipants);
-
-    for (const profileid of profileIds) {
-      const participant = this.ongoingparticipants[profileid];
-      const myDocs = deliveryDocs.filter(d => d.data()['profileid'] === profileid);
+    for (const participant of this.ongoingparticipants) {
+      const myDocs = deliveryDocs.filter(d => d.data()['profileid'] === participant.profileid);
       for (const pp of participant.participantproducts || []) {
         const steps = this.findDeliverySteps({ docs: myDocs } as any, pp.participantproductid);
         pp.deliverysequence = await this.buildStepList(steps, participant);
@@ -590,7 +604,7 @@ export class TeamEvolutionDashboardComponent implements OnInit {
     this.statusView = view;
   }
 
-  get displayedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
+  get displayedEntries(): OngoingParticipant[] {
     if (this.statusView === 'notStarted') { return this.notStartedEntries; }
     if (this.statusView === 'needsAttention') { return this.needsAttentionEntries; }
     if (this.statusView === 'completed') { return this.completedEntries; }
@@ -609,36 +623,36 @@ export class TeamEvolutionDashboardComponent implements OnInit {
         : p.notStartedProducts;
   }
 
-  get ongoingEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return Object.keys(this.ongoingparticipants).map(key => ({ key, value: this.ongoingparticipants[key] }));
+  get ongoingEntries(): OngoingParticipant[] {
+    return this.ongoingparticipants;
   }
 
-  get notStartedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return this.ongoingEntries.filter(entry => entry.value.notstartedparticipant === true);
+  get notStartedEntries(): OngoingParticipant[] {
+    return this.ongoingparticipants.filter(p => p.notstartedparticipant === true);
   }
 
   get notStartedCount(): number {
     return this.notStartedEntries.length;
   }
 
-  get needsAttentionEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return this.ongoingEntries.filter(entry => entry.value.needsattention === true);
+  get needsAttentionEntries(): OngoingParticipant[] {
+    return this.ongoingparticipants.filter(p => p.needsattention === true);
   }
 
   get needsAttentionCount(): number {
     return this.needsAttentionEntries.length;
   }
 
-  get completedEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return this.ongoingEntries.filter(entry => entry.value.completed === true);
+  get completedEntries(): OngoingParticipant[] {
+    return this.ongoingparticipants.filter(p => p.completed === true);
   }
 
   get completedCount(): number {
     return this.completedEntries.length;
   }
 
-  get awaitingSignoffEntries(): { key: string; value: typeof this.ongoingparticipants[string] }[] {
-    return this.ongoingEntries.filter(entry => entry.value.awaitingsignoff === true);
+   get awaitingSignoffEntries(): OngoingParticipant[] {
+    return this.ongoingparticipants.filter(p => p.awaitingsignoff === true);
   }
 
   get awaitingSignoffCount(): number {
